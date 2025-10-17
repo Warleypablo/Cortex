@@ -8,10 +8,10 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import TopBar from "@/components/TopBar";
 import { Loader2 } from "lucide-react";
+import Clients from "@/pages/Clients";
+import Contracts from "@/pages/Contracts";
+import ClientDetail from "@/pages/ClientDetail";
 
-const Clients = lazy(() => import("@/pages/Clients"));
-const ClientDetail = lazy(() => import("@/pages/ClientDetail"));
-const Contracts = lazy(() => import("@/pages/Contracts"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -24,14 +24,18 @@ function PageLoader() {
 
 function Router() {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <Switch>
-        <Route path="/" component={Clients} />
-        <Route path="/cliente/:id" component={ClientDetail} />
-        <Route path="/contratos" component={Contracts} />
-        <Route component={NotFound} />
-      </Switch>
-    </Suspense>
+    <Switch>
+      <Route path="/" component={Clients} />
+      <Route path="/contratos" component={Contracts} />
+      <Route path="/cliente/:id" component={ClientDetail} />
+      <Route>
+        {() => (
+          <Suspense fallback={<PageLoader />}>
+            <NotFound />
+          </Suspense>
+        )}
+      </Route>
+    </Switch>
   );
 }
 
