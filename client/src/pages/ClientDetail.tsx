@@ -2,6 +2,7 @@ import { useRoute, Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import StatsCard from "@/components/StatsCard";
 import TeamMember from "@/components/TeamMember";
 import ContractCard from "@/components/ContractCard";
@@ -28,10 +29,18 @@ const mockClientData = {
     avgTicket: 6200,
     totalInvoices: 7,
     contracts: [
-      { module: "Design Services", service: "Criação de artes", type: "Recorrente" as const, value: 0 },
-      { module: "Engagement Solutions", service: "Landing Page - Portugal", type: "Recorrente" as const, value: 5281 },
-      { module: "Growth Marketing Advisory", service: "Gestão de Projetos Essencial", type: "Recorrente" as const, value: 6200 },
-      { module: "Media Management", service: "Google + Social Ads", type: "Recorrente" as const, value: 0 }
+      { module: "Design Services", service: "Criação de artes", type: "Recorrente" as const, value: 0, status: "Ativo" as const },
+      { module: "Engagement Solutions", service: "Landing Page - Portugal", type: "Recorrente" as const, value: 5281, status: "Ativo" as const },
+      { module: "Growth Marketing Advisory", service: "Gestão de Projetos Essencial", type: "Recorrente" as const, value: 6200, status: "Ativo" as const },
+      { module: "Media Management", service: "Google + Social Ads", type: "Recorrente" as const, value: 0, status: "Onboard" as const }
+    ],
+    invoices: [
+      { month: "12/2024", status: "Pago", value: 6200, dueDate: "2024-12-10", paidDate: "2024-12-08" },
+      { month: "11/2024", status: "Pago", value: 6200, dueDate: "2024-11-10", paidDate: "2024-11-07" },
+      { month: "10/2024", status: "Pendente", value: 6200, dueDate: "2024-10-10", paidDate: null },
+      { month: "09/2024", status: "Pago", value: 6200, dueDate: "2024-09-10", paidDate: "2024-09-09" },
+      { month: "08/2024", status: "Pago", value: 6200, dueDate: "2024-08-10", paidDate: "2024-08-08" },
+      { month: "07/2024", status: "Pago", value: 6200, dueDate: "2024-07-10", paidDate: "2024-07-05" }
     ],
     team: [
       { name: "Murilo Carvalho", role: "Account Manager", avatar: avatar1 },
@@ -70,7 +79,7 @@ export default function ClientDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="mb-6">
           <Link href="/">
@@ -149,7 +158,7 @@ export default function ClientDetail() {
           </div>
         </div>
 
-        <div>
+        <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-6">Contratos Ativos</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {client.contracts.map((contract, idx) => (
@@ -160,9 +169,54 @@ export default function ClientDetail() {
                 type={contract.type}
                 value={contract.value}
                 startDate={client.startDate}
+                status={contract.status}
               />
             ))}
           </div>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold mb-6">Status das Faturas</h2>
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead>Mês</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead>Pagamento</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {client.invoices.map((invoice, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell className="font-medium">{invoice.month}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant="outline"
+                        className={invoice.status === "Pago" 
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                          : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                        }
+                      >
+                        {invoice.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-semibold">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(invoice.value)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(invoice.dueDate).toLocaleDateString('pt-BR')}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {invoice.paidDate ? new Date(invoice.paidDate).toLocaleDateString('pt-BR') : '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         </div>
 
         <div className="mt-8">

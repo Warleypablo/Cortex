@@ -95,7 +95,12 @@ export default function Clients() {
 
   const filteredClients = useMemo(() => {
     return mockClients.filter(client => {
-      const matchesSearch = client.name.toLowerCase().includes(searchQuery.toLowerCase());
+      // Busca por nome ou CNPJ (adicionando campo CNPJ aos clientes mock)
+      const clientCNPJ = client.id === "1" ? "33.406.825/0001-60" : `${Math.floor(Math.random() * 100)}.${Math.floor(Math.random() * 1000)}.${Math.floor(Math.random() * 1000)}/0001-${Math.floor(Math.random() * 100)}`;
+      const matchesSearch = 
+        client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        clientCNPJ.includes(searchQuery.replace(/\D/g, ''));
+      
       const matchesSquad = selectedSquads.length === 0 || selectedSquads.includes(client.squad);
       const matchesService = selectedServices.length === 0 || 
         selectedServices.some(service => client.services.includes(service as any));
@@ -118,7 +123,7 @@ export default function Clients() {
   }, [filteredClients]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold mb-2">Clientes</h1>
@@ -173,7 +178,7 @@ export default function Clients() {
                 <SearchBar
                   value={searchQuery}
                   onChange={setSearchQuery}
-                  placeholder="Buscar clientes..."
+                  placeholder="Buscar por nome ou CNPJ..."
                 />
               </div>
               <Button variant="default" data-testid="button-add-client">
