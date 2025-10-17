@@ -12,6 +12,7 @@ const mockClients: Client[] = [
   {
     id: "1",
     name: "Ensinando Tecnologia e Intermediação Ltda",
+    cnpj: "33.406.825/0001-60",
     squad: "Performance",
     services: ["Performance", "Comunicação", "Tech"],
     ltv: 43400,
@@ -21,6 +22,7 @@ const mockClients: Client[] = [
   {
     id: "2",
     name: "Tech Solutions Brasil",
+    cnpj: "12.345.678/0001-90",
     squad: "Tech",
     services: ["Tech", "Performance"],
     ltv: 65000,
@@ -30,6 +32,7 @@ const mockClients: Client[] = [
   {
     id: "3",
     name: "Marketing Pro Agency",
+    cnpj: "98.765.432/0001-10",
     squad: "Comunicação",
     services: ["Comunicação"],
     ltv: 28500,
@@ -39,6 +42,7 @@ const mockClients: Client[] = [
   {
     id: "4",
     name: "Digital Innovations Corp",
+    cnpj: "45.678.901/0001-23",
     squad: "Performance",
     services: ["Performance", "Tech"],
     ltv: 52000,
@@ -48,6 +52,7 @@ const mockClients: Client[] = [
   {
     id: "5",
     name: "Creative Media Group",
+    cnpj: "78.901.234/0001-45",
     squad: "Comunicação",
     services: ["Comunicação", "Performance"],
     ltv: 38900,
@@ -57,6 +62,7 @@ const mockClients: Client[] = [
   {
     id: "6",
     name: "Smart Tech Systems",
+    cnpj: "23.456.789/0001-67",
     squad: "Tech",
     services: ["Tech"],
     ltv: 71200,
@@ -95,11 +101,9 @@ export default function Clients() {
 
   const filteredClients = useMemo(() => {
     return mockClients.filter(client => {
-      // Busca por nome ou CNPJ (adicionando campo CNPJ aos clientes mock)
-      const clientCNPJ = client.id === "1" ? "33.406.825/0001-60" : `${Math.floor(Math.random() * 100)}.${Math.floor(Math.random() * 1000)}.${Math.floor(Math.random() * 1000)}/0001-${Math.floor(Math.random() * 100)}`;
       const matchesSearch = 
         client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        clientCNPJ.includes(searchQuery.replace(/\D/g, ''));
+        (client.cnpj && client.cnpj.includes(searchQuery.replace(/\D/g, '')));
       
       const matchesSquad = selectedSquads.length === 0 || selectedSquads.includes(client.squad);
       const matchesService = selectedServices.length === 0 || 
