@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -6,19 +7,31 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import TopBar from "@/components/TopBar";
-import Clients from "@/pages/Clients";
-import ClientDetail from "@/pages/ClientDetail";
-import Contracts from "@/pages/Contracts";
-import NotFound from "@/pages/not-found";
+import { Loader2 } from "lucide-react";
+
+const Clients = lazy(() => import("@/pages/Clients"));
+const ClientDetail = lazy(() => import("@/pages/ClientDetail"));
+const Contracts = lazy(() => import("@/pages/Contracts"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-full" data-testid="loading-page">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Clients} />
-      <Route path="/cliente/:id" component={ClientDetail} />
-      <Route path="/contratos" component={Contracts} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/" component={Clients} />
+        <Route path="/cliente/:id" component={ClientDetail} />
+        <Route path="/contratos" component={Contracts} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 

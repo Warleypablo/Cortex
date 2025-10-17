@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 export interface Client {
   id: string;
   name: string;
+  cnpj?: string;
   squad: "Performance" | "Comunicação" | "Tech";
   services: Array<"Performance" | "Comunicação" | "Tech">;
   ltv: number;
