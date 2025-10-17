@@ -132,7 +132,6 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
                 <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
             </TableHead>
-            <TableHead>Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -163,11 +162,6 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {new Date(client.startDate).toLocaleDateString('pt-BR')}
-              </TableCell>
-              <TableCell>
-                <Badge variant={client.status === "active" ? "default" : "secondary"}>
-                  {client.status === "active" ? "Ativo" : "Inativo"}
-                </Badge>
               </TableCell>
             </TableRow>
           ))}
