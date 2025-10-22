@@ -3,8 +3,6 @@ import { useLocation } from "wouter";
 import ClientsTable, { type Client } from "@/components/ClientsTable";
 import FilterPanel from "@/components/FilterPanel";
 import SearchBar from "@/components/SearchBar";
-import StatsCard from "@/components/StatsCard";
-import { DollarSign, TrendingUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 //todo: remove mock functionality
@@ -113,56 +111,12 @@ export default function Clients() {
     });
   }, [searchQuery, selectedSquads, selectedServices]);
 
-  //todo: remove mock functionality
-  const stats = useMemo(() => {
-    const activeClients = filteredClients.filter(c => c.status === "active");
-    const totalLTV = activeClients.reduce((sum, c) => sum + c.ltv, 0);
-    const avgTicket = activeClients.length > 0 ? totalLTV / activeClients.length : 0;
-
-    return {
-      totalClients: activeClients.length,
-      totalLTV,
-      avgTicket
-    };
-  }, [filteredClients]);
-
   return (
     <div className="bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold mb-2">Clientes</h1>
           <p className="text-muted-foreground">Gerencie seus clientes e visualize informações contratuais</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <StatsCard
-            title="Total de Clientes"
-            value={stats.totalClients.toString()}
-            icon={Users}
-            trend={{ value: "8% vs mês anterior", isPositive: true }}
-          />
-          <StatsCard
-            title="LTV Total"
-            value={new Intl.NumberFormat('pt-BR', { 
-              style: 'currency', 
-              currency: 'BRL',
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0
-            }).format(stats.totalLTV)}
-            icon={DollarSign}
-            trend={{ value: "12% vs mês anterior", isPositive: true }}
-          />
-          <StatsCard
-            title="Ticket Médio"
-            value={new Intl.NumberFormat('pt-BR', { 
-              style: 'currency', 
-              currency: 'BRL',
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0
-            }).format(stats.avgTicket)}
-            icon={TrendingUp}
-            trend={{ value: "5% vs mês anterior", isPositive: true }}
-          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

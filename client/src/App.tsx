@@ -11,6 +11,8 @@ import { Loader2 } from "lucide-react";
 import Clients from "@/pages/Clients";
 import Contracts from "@/pages/Contracts";
 import ClientDetail from "@/pages/ClientDetail";
+import Colaboradores from "@/pages/Colaboradores";
+import Patrimonio from "@/pages/Patrimonio";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -27,6 +29,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Clients} />
       <Route path="/contratos" component={Contracts} />
+      <Route path="/colaboradores" component={Colaboradores} />
+      <Route path="/patrimonio" component={Patrimonio} />
       <Route path="/cliente/:id" component={ClientDetail} />
       <Route>
         {() => (
