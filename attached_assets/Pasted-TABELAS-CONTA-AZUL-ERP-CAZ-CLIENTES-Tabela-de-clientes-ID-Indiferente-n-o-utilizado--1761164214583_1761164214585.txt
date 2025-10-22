@@ -1,0 +1,59 @@
+TABELAS CONTA AZUL (ERP)
+
+-CAZ_CLIENTES -> Tabela de clientes
+ID -> Indiferente, não é utilizado
+NOME -> Nome do cliente no Conta Azul
+CNPJ -> CNPJ do cliente (Atualmente usado como chave de relacionamento com outros sistemas)
+ENDERECO -> Endereço do cliente cadastrado no Conta Azul
+ATIVO -> Indiferente, não é utilizado
+Created_at -> Data de cadastro do cliente no Conta Azul
+Empresa -> Empresa em que o cliente foi cadastrado
+Ids -> ID do cliente, amplamente utilizado para relacionamento entre tabelas do Conta Azul
+
+
+-CAZ_PAGAR -> Tabela de Contas a Pagar
+ID -> ID da Parcela que pagamos 
+STATUS -> Status do Pagamento 
+TOTAL -> Valor Total do Pagamento
+DESCRICAO -> Descrição do pagamento 
+DATA_VENCIMENTO -> Data de vencimento da Parcela
+nao_pago -> Valor não pago (Se houver)
+pago -> Valor pago (Se houver)
+data_criacao -> Data de criação da parcela 
+data_alteracao -> Indiferente, não é utilizado
+fornecedor -> ID de quem vai receber a parcela 
+nome ->Nome de quem vai receber a parcela 
+empresa -> empresa em que a parcela foi cadastrada 
+
+
+-CAZ_RECEBER -> Tabela de Contas a Receber
+ID -> ID da Parcela que recebemos 
+STATUS -> Status do Pagamento 
+TOTAL -> Valor Total do Pagamento
+DESCRICAO -> Descrição do pagamento 
+DATA_VENCIMENTO -> Data de vencimento da Parcela
+nao_pago -> Valor não pago (Se houver)
+pago -> Valor pago (Se houver)
+data_criacao -> Data de criação da parcela 
+data_alteracao -> Indiferente, não é utilizado
+cliente_id -> ID do cliente que vai pagar a parcela 
+cliente_nome ->Nome do cliente que vai pagar a parcela 
+empresa -> empresa em que a parcela foi cadastrada 
+
+-CAZ_RECEBER -> Tabela de detalhamento de contas a pagar e contas a receber
+ID -> ID da Parcela
+STATUS -> Status da parcela
+Valor_pago -> Valor pago na parcela
+Perda -> Valor perdido da parcela
+nao_pago -> Valor que deixou de ser pago na parcela
+data_vencimento -> Data de vencimento da parcela
+descrição -> Descrição da parcela
+metodo_pagamento -> Método de pagamento da parcela
+valor_bruto -> Valor bruto da parcela
+valor_líquido -> Valor líquido da parcela 
+id_evento -> id do evento financeiro
+tipo_evento -> Tipo do evento financeiro (RECEITA OU DESPESA)
+id_conta_financeira -> id da conta financeira em que saiu ou entrou o dinheiro
+nome_conta_financeira -> nome da conta financeira em que saiu ou entrou o dinheiro
+id_cliente -> ID do cliente/fornecedor que recebeu/pagou a parcela
+url_cobranca -> Link do boleto do cliente
