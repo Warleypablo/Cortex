@@ -60,3 +60,31 @@ export type User = typeof users.$inferSelect;
 export type Cliente = typeof cazClientes.$inferSelect;
 export type ContaReceber = typeof cazReceber.$inferSelect;
 export type ContaPagar = typeof cazPagar.$inferSelect;
+
+// Schemas for mock data (not yet in database)
+export const colaboradorSchema = z.object({
+  id: z.string(),
+  nome: z.string(),
+  cargo: z.string(),
+  squad: z.enum(["Performance", "Comunicação", "Tech"]),
+  email: z.string().email(),
+  telefone: z.string().optional(),
+  status: z.enum(["Ativo", "Inativo"]),
+  foto: z.string().optional(),
+  dataAdmissao: z.string(),
+});
+
+export const patrimonioSchema = z.object({
+  id: z.string(),
+  tipo: z.string(),
+  nome: z.string(),
+  categoria: z.enum(["Equipamentos", "Móveis", "Veículos", "Imóveis"]),
+  valor: z.number(),
+  responsavel: z.string(),
+  status: z.enum(["Ativo", "Manutenção", "Inativo"]),
+  dataAquisicao: z.string(),
+  descricao: z.string().optional(),
+});
+
+export type Colaborador = z.infer<typeof colaboradorSchema>;
+export type Patrimonio = z.infer<typeof patrimonioSchema>;
