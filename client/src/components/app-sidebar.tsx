@@ -1,4 +1,4 @@
-import { Users, FileText, BarChart3 } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -22,6 +22,16 @@ const menuItems = [
     title: "Contratos",
     url: "/contratos",
     icon: FileText,
+  },
+  {
+    title: "Colaboradores",
+    url: "/colaboradores",
+    icon: UserCog,
+  },
+  {
+    title: "Patrimônio",
+    url: "/patrimonio",
+    icon: Building2,
   },
 ];
 
