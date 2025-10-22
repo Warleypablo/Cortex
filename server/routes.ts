@@ -13,9 +13,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/clientes/:cnpj", async (req, res) => {
+  app.get("/api/cliente/:id", async (req, res) => {
     try {
-      const cliente = await storage.getClienteByCnpj(req.params.cnpj);
+      const cliente = await storage.getClienteById(req.params.id);
       if (!cliente) {
         return res.status(404).json({ error: "Client not found" });
       }
@@ -26,7 +26,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/clientes/:clienteId/receitas", async (req, res) => {
+  app.get("/api/cliente/:clienteId/receitas", async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
       const receitas = await storage.getContasReceberByCliente(req.params.clienteId, limit);
@@ -37,7 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/clientes/:clienteId/revenue", async (req, res) => {
+  app.get("/api/cliente/:clienteId/revenue", async (req, res) => {
     try {
       const revenue = await storage.getClienteRevenue(req.params.clienteId);
       res.json(revenue);

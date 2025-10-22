@@ -8,6 +8,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getClientes(): Promise<Cliente[]>;
+  getClienteById(id: string): Promise<Cliente | undefined>;
   getClienteByCnpj(cnpj: string): Promise<Cliente | undefined>;
   getContasReceberByCliente(clienteId: string, limit?: number): Promise<ContaReceber[]>;
   getContasPagarByFornecedor(fornecedorId: string, limit?: number): Promise<ContaPagar[]>;
@@ -39,6 +40,10 @@ export class MemStorage implements IStorage {
   }
 
   async getClientes(): Promise<Cliente[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getClienteById(id: string): Promise<Cliente | undefined> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -77,6 +82,16 @@ export class DbStorage implements IStorage {
 
   async getClientes(): Promise<Cliente[]> {
     return await db.select().from(schema.cazClientes).orderBy(schema.cazClientes.nome);
+  }
+
+  async getClienteById(id: string): Promise<Cliente | undefined> {
+    const clientes = await db.select()
+      .from(schema.cazClientes)
+      .where(
+        sql`${schema.cazClientes.ids} = ${id} OR ${schema.cazClientes.id}::text = ${id}`
+      )
+      .limit(1);
+    return clientes[0];
   }
 
   async getClienteByCnpj(cnpj: string): Promise<Cliente | undefined> {
