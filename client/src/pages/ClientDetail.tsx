@@ -42,23 +42,22 @@ export default function ClientDetail() {
   const [, params] = useRoute("/cliente/:id");
   const clientId = params?.id || "";
 
-  const { data: clientes, isLoading: isLoadingClientes } = useQuery<ClienteDb[]>({
-    queryKey: ["/api/clientes"],
+  const { data: cliente, isLoading: isLoadingCliente, error: clienteError } = useQuery<ClienteDb>({
+    queryKey: ["/api/cliente", clientId],
+    enabled: !!clientId,
   });
 
-  const cliente = clientes?.find((c) => c.ids === clientId || c.id.toString() === clientId);
-
   const { data: receitas, isLoading: isLoadingReceitas } = useQuery<ContaReceber[]>({
-    queryKey: ["/api/clientes", clientId, "receitas"],
-    enabled: !!clientId,
+    queryKey: ["/api/cliente", clientId, "receitas"],
+    enabled: !!clientId && !!cliente,
   });
 
   const { data: revenueHistory, isLoading: isLoadingRevenue } = useQuery<RevenueData[]>({
-    queryKey: ["/api/clientes", clientId, "revenue"],
-    enabled: !!clientId,
+    queryKey: ["/api/cliente", clientId, "revenue"],
+    enabled: !!clientId && !!cliente,
   });
 
-  const isLoading = isLoadingClientes || isLoadingReceitas || isLoadingRevenue;
+  const isLoading = isLoadingCliente;
 
   if (isLoading) {
     return (
@@ -72,13 +71,21 @@ export default function ClientDetail() {
     );
   }
 
-  if (!cliente) {
+  if (clienteError || !cliente) {
     return (
       <div className="bg-background">
         <div className="container mx-auto px-4 py-8 max-w-7xl">
           <Card className="p-8">
             <div className="text-center">
-              <p className="text-destructive font-semibold">Cliente não encontrado</p>
+              <p className="text-destructive font-semibold mb-2">Cliente não encontrado</p>
+              <p className="text-sm text-muted-foreground">
+                {clienteError instanceof Error ? clienteError.message : "O cliente solicitado não existe"}
+              </p>
+              <Link href="/">
+                <Button variant="default" className="mt-4">
+                  Voltar para lista de clientes
+                </Button>
+              </Link>
             </div>
           </Card>
         </div>
@@ -189,71 +196,81 @@ export default function ClientDetail() {
           />
         </div>
 
-        {chartData.length > 0 && (
+        {isLoadingRevenue ? (
+          <div className="mb-8 flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : chartData.length > 0 ? (
           <div className="mb-8">
             <RevenueChart data={chartData} />
           </div>
-        )}
+        ) : null}
 
         <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-6">Contas a Receber</h2>
           <Card>
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Vencimento</TableHead>
-                  <TableHead>Valor Total</TableHead>
-                  <TableHead>Pago</TableHead>
-                  <TableHead>Pendente</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {receitas && receitas.length > 0 ? (
-                  receitas.slice(0, 10).map((receita) => (
-                    <TableRow key={receita.id}>
-                      <TableCell className="font-medium">
-                        {receita.descricao || "Sem descrição"}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(receita.status)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {receita.dataVencimento 
-                          ? new Date(receita.dataVencimento).toLocaleDateString('pt-BR')
-                          : "N/A"
-                        }
-                      </TableCell>
-                      <TableCell className="font-semibold">
-                        {new Intl.NumberFormat('pt-BR', { 
-                          style: 'currency', 
-                          currency: 'BRL' 
-                        }).format(parseFloat(receita.total || "0"))}
-                      </TableCell>
-                      <TableCell className="text-green-600">
-                        {new Intl.NumberFormat('pt-BR', { 
-                          style: 'currency', 
-                          currency: 'BRL' 
-                        }).format(parseFloat(receita.pago || "0"))}
-                      </TableCell>
-                      <TableCell className="text-orange-600">
-                        {new Intl.NumberFormat('pt-BR', { 
-                          style: 'currency', 
-                          currency: 'BRL' 
-                        }).format(parseFloat(receita.naoPago || "0"))}
+            {isLoadingReceitas ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Vencimento</TableHead>
+                    <TableHead>Valor Total</TableHead>
+                    <TableHead>Pago</TableHead>
+                    <TableHead>Pendente</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {receitas && receitas.length > 0 ? (
+                    receitas.slice(0, 10).map((receita, idx) => (
+                      <TableRow key={`receita-${receita.id}-${idx}`}>
+                        <TableCell className="font-medium">
+                          {receita.descricao || "Sem descrição"}
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(receita.status)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {receita.dataVencimento 
+                            ? new Date(receita.dataVencimento).toLocaleDateString('pt-BR')
+                            : "N/A"
+                          }
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          {new Intl.NumberFormat('pt-BR', { 
+                            style: 'currency', 
+                            currency: 'BRL' 
+                          }).format(parseFloat(receita.total || "0"))}
+                        </TableCell>
+                        <TableCell className="text-green-600">
+                          {new Intl.NumberFormat('pt-BR', { 
+                            style: 'currency', 
+                            currency: 'BRL' 
+                          }).format(parseFloat(receita.pago || "0"))}
+                        </TableCell>
+                        <TableCell className="text-orange-600">
+                          {new Intl.NumberFormat('pt-BR', { 
+                            style: 'currency', 
+                            currency: 'BRL' 
+                          }).format(parseFloat(receita.naoPago || "0"))}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        Nenhuma conta a receber encontrada
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      Nenhuma conta a receber encontrada
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </Card>
         </div>
       </div>
