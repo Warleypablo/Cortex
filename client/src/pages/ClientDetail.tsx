@@ -1,69 +1,99 @@
 import { useRoute, Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import StatsCard from "@/components/StatsCard";
-import TeamMember from "@/components/TeamMember";
-import ContractCard from "@/components/ContractCard";
 import RevenueChart from "@/components/RevenueChart";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt } from "lucide-react";
-import avatar1 from '@assets/generated_images/Marketing_executive_avatar_male_fff2f919.png';
-import avatar2 from '@assets/generated_images/Marketing_manager_avatar_female_d414a5e8.png';
-import avatar3 from '@assets/generated_images/Tech_developer_avatar_male_029e9424.png';
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2 } from "lucide-react";
 
-//todo: remove mock functionality
-const mockClientData = {
-  "1": {
-    id: "1",
-    name: "Ensinando Tecnologia e Intermediação Ltda",
-    cnpj: "33.406.825/0001-60",
-    squad: "Performance",
-    status: "active",
-    stakeholder: "Murilo Carvalho",
-    stakeholderPhone: "+5527996020510",
-    city: "Vitória",
-    state: "ES",
-    startDate: "2024-06-04",
-    ltv: 43400,
-    avgTicket: 6200,
-    totalInvoices: 7,
-    contracts: [
-      { module: "Design Services", service: "Criação de artes", type: "Recorrente" as const, value: 0, status: "Ativo" as const },
-      { module: "Engagement Solutions", service: "Landing Page - Portugal", type: "Recorrente" as const, value: 5281, status: "Ativo" as const },
-      { module: "Growth Marketing Advisory", service: "Gestão de Projetos Essencial", type: "Recorrente" as const, value: 6200, status: "Ativo" as const },
-      { module: "Media Management", service: "Google + Social Ads", type: "Recorrente" as const, value: 0, status: "Onboard" as const }
-    ],
-    invoices: [
-      { month: "12/2024", status: "Pago", value: 6200, dueDate: "2024-12-10", paidDate: "2024-12-08" },
-      { month: "11/2024", status: "Pago", value: 6200, dueDate: "2024-11-10", paidDate: "2024-11-07" },
-      { month: "10/2024", status: "Pendente", value: 6200, dueDate: "2024-10-10", paidDate: null },
-      { month: "09/2024", status: "Pago", value: 6200, dueDate: "2024-09-10", paidDate: "2024-09-09" },
-      { month: "08/2024", status: "Pago", value: 6200, dueDate: "2024-08-10", paidDate: "2024-08-08" },
-      { month: "07/2024", status: "Pago", value: 6200, dueDate: "2024-07-10", paidDate: "2024-07-05" }
-    ],
-    team: [
-      { name: "Murilo Carvalho", role: "Account Manager", avatar: avatar1 },
-      { name: "Ana Silva", role: "Performance Specialist", avatar: avatar2 },
-      { name: "Carlos Santos", role: "Tech Lead", avatar: avatar3 }
-    ],
-    revenueHistory: [
-      { month: '07/2024', revenue: 6200 },
-      { month: '08/2024', revenue: 6200 },
-      { month: '09/2024', revenue: 6200 },
-      { month: '10/2024', revenue: 6200 },
-      { month: '11/2024', revenue: 6200 },
-      { month: '12/2024', revenue: 6200 }
-    ]
-  }
-};
+interface ClienteDb {
+  id: number;
+  nome: string | null;
+  cnpj: string | null;
+  endereco: string | null;
+  ativo: string | null;
+  createdAt: string | null;
+  empresa: string | null;
+  ids: string | null;
+}
+
+interface ContaReceber {
+  id: number;
+  status: string | null;
+  total: string | null;
+  descricao: string | null;
+  dataVencimento: string | null;
+  naoPago: string | null;
+  pago: string | null;
+  dataCriacao: string | null;
+  clienteId: string | null;
+  clienteNome: string | null;
+  empresa: string | null;
+}
+
+interface RevenueData {
+  mes: string;
+  valor: number;
+}
 
 export default function ClientDetail() {
   const [, params] = useRoute("/cliente/:id");
-  const clientId = params?.id || "1";
-  
-  //todo: remove mock functionality
-  const client = mockClientData[clientId as keyof typeof mockClientData] || mockClientData["1"];
+  const clientId = params?.id || "";
+
+  const { data: clientes, isLoading: isLoadingClientes } = useQuery<ClienteDb[]>({
+    queryKey: ["/api/clientes"],
+  });
+
+  const cliente = clientes?.find((c) => c.ids === clientId || c.id.toString() === clientId);
+
+  const { data: receitas, isLoading: isLoadingReceitas } = useQuery<ContaReceber[]>({
+    queryKey: ["/api/clientes", clientId, "receitas"],
+    enabled: !!clientId,
+  });
+
+  const { data: revenueHistory, isLoading: isLoadingRevenue } = useQuery<RevenueData[]>({
+    queryKey: ["/api/clientes", clientId, "revenue"],
+    enabled: !!clientId,
+  });
+
+  const isLoading = isLoadingClientes || isLoadingReceitas || isLoadingRevenue;
+
+  if (isLoading) {
+    return (
+      <div className="bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!cliente) {
+    return (
+      <div className="bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          <Card className="p-8">
+            <div className="text-center">
+              <p className="text-destructive font-semibold">Cliente não encontrado</p>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const totalReceitas = receitas?.reduce((sum, r) => sum + parseFloat(r.pago || "0"), 0) || 0;
+  const totalFaturas = receitas?.length || 0;
+  const ticketMedio = totalFaturas > 0 ? totalReceitas / totalFaturas : 0;
+
+  const chartData = (revenueHistory || []).map((item) => ({
+    month: item.mes,
+    revenue: item.valor,
+  }));
 
   const getSquadColor = (squad: string) => {
     switch (squad) {
@@ -75,6 +105,20 @@ export default function ClientDetail() {
         return "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300";
       default:
         return "";
+    }
+  };
+
+  const getStatusBadge = (status: string | null) => {
+    const normalizedStatus = status?.toUpperCase();
+    switch (normalizedStatus) {
+      case "PAGO":
+        return <Badge variant="default" className="bg-green-600">Pago</Badge>;
+      case "PENDENTE":
+        return <Badge variant="secondary">Pendente</Badge>;
+      case "VENCIDO":
+        return <Badge variant="destructive">Vencido</Badge>;
+      default:
+        return <Badge variant="outline">{status || "N/A"}</Badge>;
     }
   };
 
@@ -91,21 +135,29 @@ export default function ClientDetail() {
           
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-3xl font-semibold mb-2">{client.name}</h1>
+              <h1 className="text-3xl font-semibold mb-2">{cliente.nome}</h1>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span>CNPJ: {client.cnpj}</span>
-                <span>•</span>
-                <span>{client.city}, {client.state}</span>
-                <span>•</span>
-                <span>Início: {new Date(client.startDate).toLocaleDateString('pt-BR')}</span>
+                <span>CNPJ: {cliente.cnpj || "N/A"}</span>
+                {cliente.endereco && (
+                  <>
+                    <span>•</span>
+                    <span>{cliente.endereco}</span>
+                  </>
+                )}
+                {cliente.createdAt && (
+                  <>
+                    <span>•</span>
+                    <span>Cadastro: {new Date(cliente.createdAt).toLocaleDateString('pt-BR')}</span>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Badge className={getSquadColor(client.squad)} variant="outline">
-                {client.squad}
+              <Badge className={getSquadColor("Performance")} variant="outline">
+                Performance
               </Badge>
-              <Badge variant={client.status === "active" ? "default" : "secondary"}>
-                {client.status === "active" ? "Ativo" : "Inativo"}
+              <Badge variant={cliente.ativo === "SIM" ? "default" : "secondary"}>
+                {cliente.ativo === "SIM" ? "Ativo" : "Inativo"}
               </Badge>
             </div>
           </div>
@@ -113,12 +165,12 @@ export default function ClientDetail() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <StatsCard
-            title="LTV"
+            title="Receita Total"
             value={new Intl.NumberFormat('pt-BR', { 
               style: 'currency', 
               currency: 'BRL',
               minimumFractionDigits: 0
-            }).format(client.ltv)}
+            }).format(totalReceitas)}
             icon={DollarSign}
           />
           <StatsCard
@@ -127,119 +179,81 @@ export default function ClientDetail() {
               style: 'currency', 
               currency: 'BRL',
               minimumFractionDigits: 0
-            }).format(client.avgTicket)}
+            }).format(ticketMedio)}
             icon={TrendingUp}
           />
           <StatsCard
             title="Total de Faturas"
-            value={client.totalInvoices.toString()}
+            value={totalFaturas.toString()}
             icon={Receipt}
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-2">
-            <RevenueChart data={client.revenueHistory} />
+        {chartData.length > 0 && (
+          <div className="mb-8">
+            <RevenueChart data={chartData} />
           </div>
-          <div>
-            <Card className="p-6">
-              <h3 className="font-semibold text-lg mb-4">Equipe Responsável</h3>
-              <div className="space-y-4">
-                {client.team.map((member, idx) => (
-                  <TeamMember
-                    key={idx}
-                    name={member.name}
-                    role={member.role}
-                    avatarUrl={member.avatar}
-                  />
-                ))}
-              </div>
-            </Card>
-          </div>
-        </div>
+        )}
 
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-6">Contratos Ativos</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {client.contracts.map((contract, idx) => (
-              <ContractCard
-                key={idx}
-                module={contract.module}
-                service={contract.service}
-                type={contract.type}
-                value={contract.value}
-                startDate={client.startDate}
-                status={contract.status}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-6">Status das Faturas</h2>
-          <Card className="overflow-hidden">
+          <h2 className="text-2xl font-semibold mb-6">Contas a Receber</h2>
+          <Card>
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead>Mês</TableHead>
+                  <TableHead>Descrição</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Valor</TableHead>
                   <TableHead>Vencimento</TableHead>
-                  <TableHead>Pagamento</TableHead>
+                  <TableHead>Valor Total</TableHead>
+                  <TableHead>Pago</TableHead>
+                  <TableHead>Pendente</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {client.invoices.map((invoice, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="font-medium">{invoice.month}</TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant="outline"
-                        className={invoice.status === "Pago" 
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                          : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                {receitas && receitas.length > 0 ? (
+                  receitas.slice(0, 10).map((receita) => (
+                    <TableRow key={receita.id}>
+                      <TableCell className="font-medium">
+                        {receita.descricao || "Sem descrição"}
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(receita.status)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {receita.dataVencimento 
+                          ? new Date(receita.dataVencimento).toLocaleDateString('pt-BR')
+                          : "N/A"
                         }
-                      >
-                        {invoice.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-semibold">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(invoice.value)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(invoice.dueDate).toLocaleDateString('pt-BR')}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {invoice.paidDate ? new Date(invoice.paidDate).toLocaleDateString('pt-BR') : '-'}
+                      </TableCell>
+                      <TableCell className="font-semibold">
+                        {new Intl.NumberFormat('pt-BR', { 
+                          style: 'currency', 
+                          currency: 'BRL' 
+                        }).format(parseFloat(receita.total || "0"))}
+                      </TableCell>
+                      <TableCell className="text-green-600">
+                        {new Intl.NumberFormat('pt-BR', { 
+                          style: 'currency', 
+                          currency: 'BRL' 
+                        }).format(parseFloat(receita.pago || "0"))}
+                      </TableCell>
+                      <TableCell className="text-orange-600">
+                        {new Intl.NumberFormat('pt-BR', { 
+                          style: 'currency', 
+                          currency: 'BRL' 
+                        }).format(parseFloat(receita.naoPago || "0"))}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      Nenhuma conta a receber encontrada
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
-          </Card>
-        </div>
-
-        <div className="mt-8">
-          <Card className="p-6">
-            <h3 className="font-semibold text-lg mb-4">Informações Institucionais</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground mb-1">Stakeholder</p>
-                <p className="font-medium">{client.stakeholder}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground mb-1">Celular</p>
-                <p className="font-medium">{client.stakeholderPhone}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground mb-1">Endereço</p>
-                <p className="font-medium">{client.city}, {client.state}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground mb-1">CNPJ</p>
-                <p className="font-medium">{client.cnpj}</p>
-              </div>
-            </div>
           </Card>
         </div>
       </div>
