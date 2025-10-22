@@ -1,154 +1,100 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import ClientsTable, { type Client } from "@/components/ClientsTable";
-import FilterPanel from "@/components/FilterPanel";
-import SearchBar from "@/components/SearchBar";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { Card } from "@/components/ui/card";
 
-//todo: remove mock functionality
-const mockClients: Client[] = [
-  {
-    id: "1",
-    name: "Ensinando Tecnologia e Intermediação Ltda",
-    cnpj: "33.406.825/0001-60",
+interface ClienteDb {
+  id: number;
+  nome: string | null;
+  cnpj: string | null;
+  endereco: string | null;
+  ativo: string | null;
+  createdAt: string | null;
+  empresa: string | null;
+  ids: string | null;
+}
+
+function transformCliente(cliente: ClienteDb): Client {
+  return {
+    id: cliente.ids || cliente.id.toString(),
+    name: cliente.nome || "Cliente sem nome",
+    cnpj: cliente.cnpj || undefined,
     squad: "Performance",
-    services: ["Performance", "Comunicação", "Tech"],
-    ltv: 43400,
-    status: "active",
-    startDate: "2024-06-04"
-  },
-  {
-    id: "2",
-    name: "Tech Solutions Brasil",
-    cnpj: "12.345.678/0001-90",
-    squad: "Tech",
-    services: ["Tech", "Performance"],
-    ltv: 65000,
-    status: "active",
-    startDate: "2024-03-15"
-  },
-  {
-    id: "3",
-    name: "Marketing Pro Agency",
-    cnpj: "98.765.432/0001-10",
-    squad: "Comunicação",
-    services: ["Comunicação"],
-    ltv: 28500,
-    status: "active",
-    startDate: "2024-08-20"
-  },
-  {
-    id: "4",
-    name: "Digital Innovations Corp",
-    cnpj: "45.678.901/0001-23",
-    squad: "Performance",
-    services: ["Performance", "Tech"],
-    ltv: 52000,
-    status: "active",
-    startDate: "2024-01-10"
-  },
-  {
-    id: "5",
-    name: "Creative Media Group",
-    cnpj: "78.901.234/0001-45",
-    squad: "Comunicação",
-    services: ["Comunicação", "Performance"],
-    ltv: 38900,
-    status: "active",
-    startDate: "2024-05-22"
-  },
-  {
-    id: "6",
-    name: "Smart Tech Systems",
-    cnpj: "23.456.789/0001-67",
-    squad: "Tech",
-    services: ["Tech"],
-    ltv: 71200,
-    status: "inactive",
-    startDate: "2023-11-05"
-  }
-];
+    services: ["Performance"],
+    ltv: 0,
+    status: cliente.ativo === "SIM" ? "active" : "inactive",
+    startDate: cliente.createdAt || new Date().toISOString(),
+  };
+}
 
 export default function Clients() {
   const [, setLocation] = useLocation();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSquads, setSelectedSquads] = useState<string[]>([]);
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
-  const handleSquadChange = (squad: string, checked: boolean) => {
-    if (checked) {
-      setSelectedSquads([...selectedSquads, squad]);
-    } else {
-      setSelectedSquads(selectedSquads.filter(s => s !== squad));
-    }
-  };
+  const { data: clientes, isLoading, error } = useQuery<ClienteDb[]>({
+    queryKey: ["/api/clientes"],
+  });
 
-  const handleServiceChange = (service: string, checked: boolean) => {
-    if (checked) {
-      setSelectedServices([...selectedServices, service]);
-    } else {
-      setSelectedServices(selectedServices.filter(s => s !== service));
-    }
-  };
+  const transformedClients = useMemo(() => {
+    if (!clientes) return [];
+    return clientes.map(transformCliente);
+  }, [clientes]);
 
-  const handleClearFilters = () => {
-    setSelectedSquads([]);
-    setSelectedServices([]);
-    setSearchQuery("");
-  };
+  if (error) {
+    return (
+      <div className="bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          <Card className="p-8">
+            <div className="text-center">
+              <p className="text-destructive font-semibold mb-2">Erro ao carregar clientes</p>
+              <p className="text-muted-foreground text-sm">
+                {error instanceof Error ? error.message : "Erro desconhecido"}
+              </p>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
-  const filteredClients = useMemo(() => {
-    return mockClients.filter(client => {
-      const matchesSearch = 
-        client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (client.cnpj && client.cnpj.includes(searchQuery.replace(/\D/g, '')));
-      
-      const matchesSquad = selectedSquads.length === 0 || selectedSquads.includes(client.squad);
-      const matchesService = selectedServices.length === 0 || 
-        selectedServices.some(service => client.services.includes(service as any));
-      
-      return matchesSearch && matchesSquad && matchesService;
-    });
-  }, [searchQuery, selectedSquads, selectedServices]);
+  if (isLoading) {
+    return (
+      <div className="bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          <div className="flex items-center justify-center py-12" data-testid="loading-clients">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold mb-2">Clientes</h1>
-          <p className="text-muted-foreground">Gerencie seus clientes e visualize informações contratuais</p>
+          <p className="text-muted-foreground">
+            Gerencie seus clientes e visualize informações contratuais
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-1">
-            <FilterPanel
-              selectedSquads={selectedSquads}
-              selectedServices={selectedServices}
-              onSquadChange={handleSquadChange}
-              onServiceChange={handleServiceChange}
-              onClearFilters={handleClearFilters}
-            />
-          </div>
-
-          <div className="lg:col-span-3 space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <SearchBar
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  placeholder="Buscar por nome ou CNPJ..."
-                />
-              </div>
-              <Button variant="default" data-testid="button-add-client">
-                + Novo Cliente
-              </Button>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {transformedClients.length} {transformedClients.length === 1 ? 'cliente' : 'clientes'} encontrados
             </div>
-
-            <ClientsTable
-              clients={filteredClients}
-              onClientClick={(id) => setLocation(`/cliente/${id}`)}
-            />
+            <Button variant="default" data-testid="button-add-client">
+              + Novo Cliente
+            </Button>
           </div>
+
+          <ClientsTable
+            clients={transformedClients}
+            onClientClick={(id) => setLocation(`/cliente/${id}`)}
+          />
         </div>
       </div>
     </div>
