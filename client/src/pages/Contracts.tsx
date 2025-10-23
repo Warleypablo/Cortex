@@ -184,7 +184,11 @@ export default function Contracts() {
               placeholder="Buscar por serviço ou cliente..."
             />
           </div>
-          <Button variant="default" data-testid="button-add-contract">
+          <Button 
+            variant="default" 
+            data-testid="button-add-contract"
+            onClick={() => window.open('https://contratos.turbopartners.com.br/index.php?page=contratos&action=new', '_blank')}
+          >
             + Novo Contrato
           </Button>
         </div>

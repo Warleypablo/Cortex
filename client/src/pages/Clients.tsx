@@ -125,9 +125,6 @@ export default function Clients() {
                 data-testid="input-search-clients"
               />
             </div>
-            <Button variant="default" data-testid="button-add-client">
-              + Novo Cliente
-            </Button>
           </div>
 
           <div className="flex items-center justify-between text-sm text-muted-foreground">
