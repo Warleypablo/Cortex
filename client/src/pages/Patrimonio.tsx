@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import type { Patrimonio } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, DollarSign, Laptop, Armchair, Car, Building2 } from "lucide-react";
+import { Search, Plus, DollarSign, Laptop, Armchair, Car, Building2, LayoutGrid, List } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -12,6 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // Mock data
 const mockPatrimonio: Patrimonio[] = [
@@ -129,6 +137,7 @@ export default function Patrimonio() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const filteredPatrimonio = useMemo(() => {
     let filtered = mockPatrimonio;
@@ -219,9 +228,30 @@ export default function Patrimonio() {
             </Button>
           </div>
 
-          <div className="text-sm text-muted-foreground">
-            {filteredPatrimonio.length}{" "}
-            {filteredPatrimonio.length === 1 ? "item" : "itens"} encontrados
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div>
+              {filteredPatrimonio.length}{" "}
+              {filteredPatrimonio.length === 1 ? "item" : "itens"} encontrados
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground mr-2">Visualização:</span>
+              <Button
+                variant={viewMode === "grid" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("grid")}
+                data-testid="button-view-grid"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+                data-testid="button-view-list"
+              >
+                <List className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
 
           {filteredPatrimonio.length === 0 ? (
@@ -230,7 +260,7 @@ export default function Patrimonio() {
                 Nenhum item encontrado
               </CardContent>
             </Card>
-          ) : (
+          ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredPatrimonio.map((item) => (
                 <Card
@@ -310,6 +340,57 @@ export default function Patrimonio() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border bg-card">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Identificação</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Responsável</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Aquisição</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPatrimonio.map((item) => {
+                    const IconComponent = categoriaIcons[item.categoria];
+                    return (
+                      <TableRow
+                        key={item.id}
+                        className="hover-elevate cursor-pointer"
+                        data-testid={`row-patrimonio-${item.id}`}
+                      >
+                        <TableCell className="font-medium">{item.tipo}</TableCell>
+                        <TableCell>{item.nome}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <IconComponent className="w-4 h-4 text-primary" />
+                            <Badge variant="secondary" className="text-xs">
+                              {item.categoria}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-semibold text-primary">
+                          {formatCurrency(item.valor)}
+                        </TableCell>
+                        <TableCell>{item.responsavel}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className={statusColors[item.status]}>
+                            {item.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {new Date(item.dataAquisicao).toLocaleDateString("pt-BR")}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </div>

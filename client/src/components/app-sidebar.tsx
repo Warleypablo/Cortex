@@ -1,4 +1,4 @@
-import { Users, FileText, BarChart3, UserCog, Building2 } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -32,6 +32,11 @@ const menuItems = [
     title: "Patrimônio",
     url: "/patrimonio",
     icon: Building2,
+  },
+  {
+    title: "Ferramentas",
+    url: "/ferramentas",
+    icon: Wrench,
   },
 ];
 
