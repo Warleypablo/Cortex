@@ -1,10 +1,29 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { Colaborador } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import type { Colaborador, InsertColaborador } from "@shared/schema";
+import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard } from "lucide-react";
+import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Table,
   TableBody,
@@ -20,6 +39,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const squadColors: Record<string, string> = {
   "Performance": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
@@ -46,6 +69,351 @@ function formatDate(date: string | Date | null | undefined) {
   } catch {
     return "-";
   }
+}
+
+function AddColaboradorDialog() {
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+
+  const form = useForm<InsertColaborador>({
+    resolver: zodResolver(insertColaboradorSchema),
+    defaultValues: {
+      nome: "",
+      status: "Ativo",
+      cpf: "",
+      telefone: "",
+      emailTurbo: "",
+      emailPessoal: "",
+      cargo: "",
+      nivel: "",
+      squad: "",
+      setor: "",
+      endereco: "",
+      estado: "",
+      pix: "",
+      cnpj: "",
+      aniversario: undefined,
+      admissao: undefined,
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: InsertColaborador) => {
+      const response = await apiRequest("POST", "/api/colaboradores", data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores"] });
+      toast({
+        title: "Colaborador adicionado",
+        description: "O colaborador foi adicionado com sucesso.",
+      });
+      setOpen(false);
+      form.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao adicionar colaborador",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: InsertColaborador) => {
+    createMutation.mutate(data);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button data-testid="button-add-colaborador">
+          <Plus className="w-4 h-4 mr-2" />
+          Adicionar Colaborador
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Adicionar Novo Colaborador</DialogTitle>
+          <DialogDescription>
+            Preencha os dados do novo colaborador. Campos com * são obrigatórios.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="nome"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Nome *</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-nome" placeholder="Nome completo" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "Ativo"}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-status">
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Ativo">Ativo</SelectItem>
+                        <SelectItem value="Inativo">Inativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="cargo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cargo</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-cargo" placeholder="Ex: Desenvolvedor" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="nivel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nível</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-nivel" placeholder="Ex: Pleno" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="squad"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Squad</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-squad" placeholder="Ex: Tech" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="setor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Setor</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-setor" placeholder="Ex: Tecnologia" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="cpf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-cpf" placeholder="000.000.000-00" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="cnpj"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CNPJ</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-cnpj" placeholder="00.000.000/0000-00" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="telefone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-telefone" placeholder="(00) 00000-0000" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="emailTurbo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Turbo</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-email-turbo" type="email" placeholder="nome@turbo.com" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="emailPessoal"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Pessoal</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-email-pessoal" type="email" placeholder="nome@email.com" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="pix"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>PIX</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-pix" placeholder="Chave PIX" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="estado"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Estado</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-estado" placeholder="SP" maxLength={2} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="endereco"
+                render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel>Endereço</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-endereco" placeholder="Rua, número, bairro" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="aniversario"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Aniversário</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-aniversario"
+                        type="date"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="admissao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Admissão</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-admissao"
+                        type="date"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                data-testid="button-cancel"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={createMutation.isPending}
+                data-testid="button-submit"
+              >
+                {createMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Adicionando...
+                  </>
+                ) : (
+                  "Adicionar"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default function Colaboradores() {
@@ -146,6 +514,8 @@ export default function Colaboradores() {
                 <SelectItem value="Inativo">Inativo</SelectItem>
               </SelectContent>
             </Select>
+
+            <AddColaboradorDialog />
           </div>
 
           <div className="flex items-center justify-between text-sm text-muted-foreground">
