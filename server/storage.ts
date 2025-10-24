@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -14,6 +14,7 @@ export interface IStorage {
   getContasPagarByFornecedor(fornecedorId: string, limit?: number): Promise<ContaPagar[]>;
   getClienteRevenue(clienteId: string): Promise<{ mes: string; valor: number }[]>;
   getColaboradores(): Promise<Colaborador[]>;
+  createColaborador(colaborador: InsertColaborador): Promise<Colaborador>;
 }
 
 export class MemStorage implements IStorage {
@@ -65,6 +66,10 @@ export class MemStorage implements IStorage {
   }
 
   async getColaboradores(): Promise<Colaborador[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -143,6 +148,11 @@ export class DbStorage implements IStorage {
 
   async getColaboradores(): Promise<Colaborador[]> {
     return await db.select().from(schema.rhPessoal).orderBy(schema.rhPessoal.nome);
+  }
+
+  async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
+    const [newColaborador] = await db.insert(schema.rhPessoal).values(colaborador as any).returning();
+    return newColaborador;
   }
 }
 
