@@ -83,7 +83,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
 });
 
-export const insertColaboradorSchema = createInsertSchema(rhPessoal).omit({
+export const insertColaboradorSchema = createInsertSchema(rhPessoal).partial({
   id: true,
 });
 
