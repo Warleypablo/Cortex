@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { insertColaboradorSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/clientes", async (req, res) => {
@@ -65,6 +66,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching colaboradores:", error);
       res.status(500).json({ error: "Failed to fetch colaboradores" });
+    }
+  });
+
+  app.post("/api/colaboradores", async (req, res) => {
+    try {
+      const validation = insertColaboradorSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid data", details: validation.error });
+      }
+      const novoColaborador = await storage.createColaborador(validation.data);
+      res.status(201).json(novoColaborador);
+    } catch (error) {
+      console.error("[api] Error creating colaborador:", error);
+      res.status(500).json({ error: "Failed to create colaborador" });
     }
   });
 
