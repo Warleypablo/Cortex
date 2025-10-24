@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -13,6 +13,7 @@ export interface IStorage {
   getContasReceberByCliente(clienteId: string, limit?: number): Promise<ContaReceber[]>;
   getContasPagarByFornecedor(fornecedorId: string, limit?: number): Promise<ContaPagar[]>;
   getClienteRevenue(clienteId: string): Promise<{ mes: string; valor: number }[]>;
+  getColaboradores(): Promise<Colaborador[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -60,6 +61,10 @@ export class MemStorage implements IStorage {
   }
 
   async getClienteRevenue(clienteId: string): Promise<{ mes: string; valor: number }[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getColaboradores(): Promise<Colaborador[]> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -134,6 +139,10 @@ export class DbStorage implements IStorage {
     .orderBy(sql`TO_CHAR(${schema.cazReceber.dataCriacao}, 'YYYY-MM')`);
 
     return receitas;
+  }
+
+  async getColaboradores(): Promise<Colaborador[]> {
+    return await db.select().from(schema.rhPessoal).orderBy(schema.rhPessoal.nome);
   }
 }
 

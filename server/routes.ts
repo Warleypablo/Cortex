@@ -58,6 +58,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/colaboradores", async (req, res) => {
+    try {
+      const colaboradores = await storage.getColaboradores();
+      res.json(colaboradores);
+    } catch (error) {
+      console.error("[api] Error fetching colaboradores:", error);
+      res.status(500).json({ error: "Failed to fetch colaboradores" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
