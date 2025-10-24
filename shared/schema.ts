@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, decimal, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, decimal, integer, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -50,6 +50,34 @@ export const cazPagar = pgTable("caz_pagar", {
   empresa: text("empresa"),
 });
 
+export const rhPessoal = pgTable("rh_pessoal", {
+  id: integer("id").primaryKey(),
+  status: varchar("status", { length: 50 }),
+  nome: varchar("nome", { length: 150 }).notNull(),
+  cpf: varchar("cpf", { length: 14 }),
+  endereco: text("endereco"),
+  estado: varchar("estado", { length: 2 }),
+  telefone: varchar("telefone", { length: 20 }),
+  aniversario: date("aniversario"),
+  admissao: date("admissao"),
+  demissao: date("demissao"),
+  tipoDemissao: varchar("tipo_demissao", { length: 100 }),
+  motivoDemissao: text("motivo_demissao"),
+  proporcional: decimal("proporcional"),
+  proporcionalCaju: decimal("proporcional_caju"),
+  setor: varchar("setor", { length: 100 }),
+  squad: varchar("squad", { length: 100 }),
+  cargo: varchar("cargo", { length: 100 }),
+  nivel: varchar("nivel", { length: 50 }),
+  pix: varchar("pix", { length: 200 }),
+  cnpj: varchar("cnpj", { length: 18 }),
+  emailTurbo: varchar("email_turbo", { length: 150 }),
+  emailPessoal: varchar("email_pessoal", { length: 150 }),
+  mesesDeTurbo: integer("meses_de_turbo"),
+  ultimoAumento: date("ultimo_aumento"),
+  mesesUltAumento: integer("meses_ult_aumento"),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -60,19 +88,7 @@ export type User = typeof users.$inferSelect;
 export type Cliente = typeof cazClientes.$inferSelect;
 export type ContaReceber = typeof cazReceber.$inferSelect;
 export type ContaPagar = typeof cazPagar.$inferSelect;
-
-// Schemas for mock data (not yet in database)
-export const colaboradorSchema = z.object({
-  id: z.string(),
-  nome: z.string(),
-  cargo: z.string(),
-  squad: z.enum(["Performance", "Comunicação", "Tech"]),
-  email: z.string().email(),
-  telefone: z.string().optional(),
-  status: z.enum(["Ativo", "Inativo"]),
-  foto: z.string().optional(),
-  dataAdmissao: z.string(),
-});
+export type Colaborador = typeof rhPessoal.$inferSelect;
 
 export const patrimonioSchema = z.object({
   id: z.string(),
@@ -86,5 +102,4 @@ export const patrimonioSchema = z.object({
   descricao: z.string().optional(),
 });
 
-export type Colaborador = z.infer<typeof colaboradorSchema>;
 export type Patrimonio = z.infer<typeof patrimonioSchema>;
