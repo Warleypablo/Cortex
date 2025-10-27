@@ -526,10 +526,11 @@ export default function Colaboradores() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-card overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="max-h-[calc(100vh-400px)] overflow-y-auto overflow-x-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-card z-10">
+                  <TableRow className="bg-muted/50">
                   <TableHead className="min-w-[80px]">ID</TableHead>
                   <TableHead className="min-w-[220px]">Colaborador</TableHead>
                   <TableHead className="min-w-[180px]">Cargo / Nível</TableHead>
@@ -778,6 +779,7 @@ export default function Colaboradores() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </div>
         </div>
       </div>
