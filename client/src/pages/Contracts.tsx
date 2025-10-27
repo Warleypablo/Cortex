@@ -109,7 +109,7 @@ export default function Contracts() {
     if (totalPages > 0 && currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
-  }, [totalPages, currentPage]);
+  }, [totalPages]);
 
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();
@@ -202,7 +202,7 @@ export default function Contracts() {
             <Table>
               <TableHeader className="sticky top-0 z-20 shadow-sm">
                 <TableRow className="bg-background border-b">
-                <TableHead>
+                <TableHead className="bg-background">
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -214,7 +214,7 @@ export default function Contracts() {
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
-                <TableHead>
+                <TableHead className="bg-background">
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -226,7 +226,7 @@ export default function Contracts() {
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
-                <TableHead>
+                <TableHead className="bg-background">
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -238,7 +238,7 @@ export default function Contracts() {
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
-                <TableHead>
+                <TableHead className="bg-background">
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -250,7 +250,7 @@ export default function Contracts() {
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
-                <TableHead>
+                <TableHead className="bg-background">
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -262,8 +262,8 @@ export default function Contracts() {
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
-                <TableHead className="text-right">Valor R</TableHead>
-                <TableHead className="text-right">Valor P</TableHead>
+                <TableHead className="text-right bg-background">Valor R</TableHead>
+                <TableHead className="text-right bg-background">Valor P</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

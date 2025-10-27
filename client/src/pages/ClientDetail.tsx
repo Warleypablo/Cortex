@@ -68,6 +68,14 @@ export default function ClientDetail() {
     enabled: !!clientId && !!cliente,
   });
 
+  const receitasTotalPages = Math.ceil((receitas?.length || 0) / receitasItemsPerPage);
+  
+  useEffect(() => {
+    if (receitasTotalPages > 0 && receitasCurrentPage > receitasTotalPages) {
+      setReceitasCurrentPage(receitasTotalPages);
+    }
+  }, [receitasTotalPages]);
+
   const isLoading = isLoadingCliente;
 
   if (isLoading) {
@@ -108,16 +116,9 @@ export default function ClientDetail() {
   const totalFaturas = receitas?.length || 0;
   const ticketMedio = totalFaturas > 0 ? totalReceitas / totalFaturas : 0;
 
-  const receitasTotalPages = Math.ceil((receitas?.length || 0) / receitasItemsPerPage);
   const receitasStartIndex = (receitasCurrentPage - 1) * receitasItemsPerPage;
   const receitasEndIndex = receitasStartIndex + receitasItemsPerPage;
   const paginatedReceitas = receitas?.slice(receitasStartIndex, receitasEndIndex) || [];
-
-  useEffect(() => {
-    if (receitasTotalPages > 0 && receitasCurrentPage > receitasTotalPages) {
-      setReceitasCurrentPage(receitasTotalPages);
-    }
-  }, [receitasTotalPages, receitasCurrentPage]);
 
   const chartData = (revenueHistory || []).map((item) => ({
     month: item.mes,
@@ -285,12 +286,12 @@ export default function ClientDetail() {
                 <Table>
                   <TableHeader className="sticky top-0 z-20 shadow-sm">
                     <TableRow className="bg-background border-b">
-                    <TableHead data-testid="header-service">Serviço</TableHead>
-                    <TableHead data-testid="header-status">Status</TableHead>
-                    <TableHead data-testid="header-squad">Squad</TableHead>
-                    <TableHead data-testid="header-date">Data Início</TableHead>
-                    <TableHead className="text-right" data-testid="header-recurring">Valor Recorrente</TableHead>
-                    <TableHead className="text-right" data-testid="header-onetime">Valor Pontual</TableHead>
+                    <TableHead className="bg-background" data-testid="header-service">Serviço</TableHead>
+                    <TableHead className="bg-background" data-testid="header-status">Status</TableHead>
+                    <TableHead className="bg-background" data-testid="header-squad">Squad</TableHead>
+                    <TableHead className="bg-background" data-testid="header-date">Data Início</TableHead>
+                    <TableHead className="text-right bg-background" data-testid="header-recurring">Valor Recorrente</TableHead>
+                    <TableHead className="text-right bg-background" data-testid="header-onetime">Valor Pontual</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -362,13 +363,13 @@ export default function ClientDetail() {
                   <Table>
                   <TableHeader className="sticky top-0 z-20 shadow-sm">
                     <TableRow className="bg-background border-b">
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead>Valor Total</TableHead>
-                    <TableHead>Pago</TableHead>
-                    <TableHead>Pendente</TableHead>
-                    <TableHead>Link Cobrança</TableHead>
+                    <TableHead className="bg-background">Descrição</TableHead>
+                    <TableHead className="bg-background">Status</TableHead>
+                    <TableHead className="bg-background">Vencimento</TableHead>
+                    <TableHead className="bg-background">Valor Total</TableHead>
+                    <TableHead className="bg-background">Pago</TableHead>
+                    <TableHead className="bg-background">Pendente</TableHead>
+                    <TableHead className="bg-background">Link Cobrança</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
