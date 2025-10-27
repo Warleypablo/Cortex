@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ContratoCompleto } from "@shared/schema";
 
 interface Contract {
@@ -39,6 +40,8 @@ export default function Contracts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("createdDate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   const { data: contratos = [], isLoading, error } = useQuery<ContratoCompleto[]>({
     queryKey: ["/api/contratos"],
@@ -96,6 +99,11 @@ export default function Contracts() {
       return sortDirection === "asc" ? comparison : -comparison;
     });
   }, [filteredContracts, sortField, sortDirection]);
+
+  const totalPages = Math.ceil(sortedContracts.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedContracts = sortedContracts.slice(startIndex, endIndex);
 
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();
@@ -253,14 +261,14 @@ export default function Contracts() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedContracts.length === 0 ? (
+              {paginatedContracts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     {searchQuery ? "Nenhum contrato encontrado com esse critério de busca." : "Nenhum contrato cadastrado."}
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedContracts.map((contract) => (
+                paginatedContracts.map((contract) => (
                   <TableRow 
                     key={contract.id} 
                     className="cursor-pointer hover-elevate"
@@ -306,9 +314,72 @@ export default function Contracts() {
           </div>
         </div>
 
-        {sortedContracts.length > 0 && (
-          <div className="mt-4 text-sm text-muted-foreground">
-            Mostrando {sortedContracts.length} de {contracts.length} {contracts.length === 1 ? 'contrato' : 'contratos'}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Itens por página:</span>
+              <Select
+                value={itemsPerPage.toString()}
+                onValueChange={(value) => {
+                  setItemsPerPage(Number(value));
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[100px]" data-testid="select-items-per-page">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </span>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  data-testid="button-first-page"
+                >
+                  Primeira
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  data-testid="button-prev-page"
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  data-testid="button-next-page"
+                >
+                  Próxima
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  data-testid="button-last-page"
+                >
+                  Última
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>
