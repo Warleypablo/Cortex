@@ -78,6 +78,7 @@ export const cupClientes = pgTable("cup_clientes", {
   cluster: text("cluster"),
   taskId: text("task_id"),
   responsavelGeral: text("responsavel_geral"),
+  squad: text("squad"),
 });
 
 export const cupContratos = pgTable("cup_contratos", {
@@ -155,16 +156,22 @@ export type ContratoCompleto = {
   idCliente: string | null;
 };
 
-export const patrimonioSchema = z.object({
-  id: z.string(),
-  tipo: z.string(),
-  nome: z.string(),
-  categoria: z.enum(["Equipamentos", "Móveis", "Veículos", "Imóveis"]),
-  valor: z.number(),
-  responsavel: z.string(),
-  status: z.enum(["Ativo", "Manutenção", "Inativo"]),
-  dataAquisicao: z.string(),
-  descricao: z.string().optional(),
+export const rhPatrimonio = pgTable("rh_patrimonio", {
+  id: integer("id").primaryKey(),
+  numeroAtivo: varchar("numero_ativo", { length: 100 }),
+  ativo: varchar("ativo", { length: 200 }),
+  marca: varchar("marca", { length: 150 }),
+  estadoConservacao: varchar("estado_conservacao", { length: 100 }),
+  responsavelAtual: varchar("responsavel_atual", { length: 200 }),
+  valorPago: decimal("valor_pago"),
+  valorMercado: decimal("valor_mercado"),
+  valorVenda: decimal("valor_venda"),
+  descricao: text("descricao"),
 });
 
-export type Patrimonio = z.infer<typeof patrimonioSchema>;
+export const insertPatrimonioSchema = createInsertSchema(rhPatrimonio).partial({
+  id: true,
+});
+
+export type InsertPatrimonio = z.infer<typeof insertPatrimonioSchema>;
+export type Patrimonio = typeof rhPatrimonio.$inferSelect;

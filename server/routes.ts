@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertColaboradorSchema } from "@shared/schema";
+import { insertColaboradorSchema, insertPatrimonioSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/clientes", async (req, res) => {
@@ -100,6 +100,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching contratos:", error);
       res.status(500).json({ error: "Failed to fetch contratos" });
+    }
+  });
+
+  app.get("/api/patrimonio", async (req, res) => {
+    try {
+      const patrimonios = await storage.getPatrimonios();
+      res.json(patrimonios);
+    } catch (error) {
+      console.error("[api] Error fetching patrimonio:", error);
+      res.status(500).json({ error: "Failed to fetch patrimonio" });
+    }
+  });
+
+  app.post("/api/patrimonio", async (req, res) => {
+    try {
+      const validation = insertPatrimonioSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid data", details: validation.error });
+      }
+      const novoPatrimonio = await storage.createPatrimonio(validation.data);
+      res.status(201).json(novoPatrimonio);
+    } catch (error) {
+      console.error("[api] Error creating patrimonio:", error);
+      res.status(500).json({ error: "Failed to create patrimonio" });
     }
   });
 

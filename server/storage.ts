@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -10,6 +10,7 @@ export type ClienteCompleto = Cliente & {
   telefone: string | null;
   responsavel: string | null;
   cluster: string | null;
+  ltv: string | null;
 };
 
 export interface IStorage {
@@ -26,6 +27,8 @@ export interface IStorage {
   createColaborador(colaborador: InsertColaborador): Promise<Colaborador>;
   getContratos(): Promise<ContratoCompleto[]>;
   getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]>;
+  getPatrimonios(): Promise<Patrimonio[]>;
+  createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio>;
 }
 
 export class MemStorage implements IStorage {
@@ -91,6 +94,14 @@ export class MemStorage implements IStorage {
   async getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]> {
     throw new Error("Not implemented in MemStorage");
   }
+
+  async getPatrimonios(): Promise<Patrimonio[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio> {
+    throw new Error("Not implemented in MemStorage");
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -121,11 +132,16 @@ export class DbStorage implements IStorage {
         empresa: schema.cazClientes.empresa,
         ids: schema.cazClientes.ids,
         nomeClickup: schema.cupClientes.nome,
-        squad: sql<string>`NULL`,
+        squad: schema.cupClientes.squad,
         statusClickup: schema.cupClientes.status,
         telefone: schema.cupClientes.telefone,
         responsavel: schema.cupClientes.responsavel,
         cluster: schema.cupClientes.cluster,
+        ltv: sql<string>`(
+          SELECT COALESCE(SUM(pago), 0)::text
+          FROM ${schema.cazReceber}
+          WHERE ${schema.cazReceber.clienteId} = ${schema.cazClientes.ids}
+        )`,
       })
       .from(schema.cazClientes)
       .leftJoin(
@@ -149,11 +165,16 @@ export class DbStorage implements IStorage {
         empresa: schema.cazClientes.empresa,
         ids: schema.cazClientes.ids,
         nomeClickup: schema.cupClientes.nome,
-        squad: sql<string>`NULL`,
+        squad: schema.cupClientes.squad,
         statusClickup: schema.cupClientes.status,
         telefone: schema.cupClientes.telefone,
         responsavel: schema.cupClientes.responsavel,
         cluster: schema.cupClientes.cluster,
+        ltv: sql<string>`(
+          SELECT COALESCE(SUM(pago), 0)::text
+          FROM ${schema.cazReceber}
+          WHERE ${schema.cazReceber.clienteId} = ${schema.cazClientes.ids}
+        )`,
       })
       .from(schema.cazClientes)
       .leftJoin(
@@ -278,6 +299,15 @@ export class DbStorage implements IStorage {
       .orderBy(desc(schema.cupContratos.dataInicio));
 
     return result;
+  }
+
+  async getPatrimonios(): Promise<Patrimonio[]> {
+    return await db.select().from(schema.rhPatrimonio).orderBy(schema.rhPatrimonio.numeroAtivo);
+  }
+
+  async createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio> {
+    const [newPatrimonio] = await db.insert(schema.rhPatrimonio).values(patrimonio as any).returning();
+    return newPatrimonio;
   }
 }
 
