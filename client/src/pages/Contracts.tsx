@@ -49,7 +49,7 @@ export default function Contracts() {
       id: c.idSubtask || "",
       service: c.servico || "Sem serviço",
       clientName: c.nomeCliente || "Cliente não identificado",
-      clientId: c.cnpjCliente || "",
+      clientId: c.idCliente || "",
       status: c.status || "Desconhecido",
       squad: mapSquadCodeToName(c.squad),
       createdDate: c.dataInicio ? new Date(c.dataInicio).toISOString().split('T')[0] : "",
