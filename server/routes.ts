@@ -48,6 +48,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/cliente/:clienteId/contratos", async (req, res) => {
+    try {
+      const contratos = await storage.getContratosPorCliente(req.params.clienteId);
+      res.json(contratos);
+    } catch (error) {
+      console.error("[api] Error fetching contracts:", error);
+      res.status(500).json({ error: "Failed to fetch contracts" });
+    }
+  });
+
   app.get("/api/fornecedores/:fornecedorId/despesas", async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
