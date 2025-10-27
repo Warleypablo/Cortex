@@ -93,6 +93,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/colaboradores/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid ID" });
+      }
+      const validation = insertColaboradorSchema.partial().safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid data", details: validation.error });
+      }
+      const colaboradorAtualizado = await storage.updateColaborador(id, validation.data);
+      res.json(colaboradorAtualizado);
+    } catch (error) {
+      console.error("[api] Error updating colaborador:", error);
+      res.status(500).json({ error: "Failed to update colaborador" });
+    }
+  });
+
+  app.delete("/api/colaboradores/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid ID" });
+      }
+      await storage.deleteColaborador(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[api] Error deleting colaborador:", error);
+      res.status(500).json({ error: "Failed to delete colaborador" });
+    }
+  });
+
   app.get("/api/contratos", async (req, res) => {
     try {
       const contratos = await storage.getContratos();

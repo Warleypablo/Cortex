@@ -24,6 +24,8 @@ export interface IStorage {
   getClienteRevenue(clienteId: string): Promise<{ mes: string; valor: number }[]>;
   getColaboradores(): Promise<Colaborador[]>;
   createColaborador(colaborador: InsertColaborador): Promise<Colaborador>;
+  updateColaborador(id: number, colaborador: Partial<InsertColaborador>): Promise<Colaborador>;
+  deleteColaborador(id: number): Promise<void>;
   getContratos(): Promise<ContratoCompleto[]>;
   getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]>;
   getPatrimonios(): Promise<Patrimonio[]>;
@@ -83,6 +85,14 @@ export class MemStorage implements IStorage {
   }
 
   async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async updateColaborador(id: number, colaborador: Partial<InsertColaborador>): Promise<Colaborador> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async deleteColaborador(id: number): Promise<void> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -255,6 +265,18 @@ export class DbStorage implements IStorage {
   async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
     const [newColaborador] = await db.insert(schema.rhPessoal).values(colaborador as any).returning();
     return newColaborador;
+  }
+
+  async updateColaborador(id: number, colaborador: Partial<InsertColaborador>): Promise<Colaborador> {
+    const [updatedColaborador] = await db.update(schema.rhPessoal)
+      .set(colaborador as any)
+      .where(eq(schema.rhPessoal.id, id))
+      .returning();
+    return updatedColaborador;
+  }
+
+  async deleteColaborador(id: number): Promise<void> {
+    await db.delete(schema.rhPessoal).where(eq(schema.rhPessoal.id, id));
   }
 
   async getContratos(): Promise<ContratoCompleto[]> {
