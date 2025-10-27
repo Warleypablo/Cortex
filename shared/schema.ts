@@ -152,6 +152,7 @@ export type ContratoCompleto = {
   idTask: string | null;
   nomeCliente: string | null;
   cnpjCliente: string | null;
+  idCliente: string | null;
 };
 
 export const patrimonioSchema = z.object({
