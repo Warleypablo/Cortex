@@ -24,7 +24,6 @@ interface ClienteDb {
   empresa: string | null;
   ids: string | null;
   nomeClickup: string | null;
-  squad: string | null;
   statusClickup: string | null;
   telefone: string | null;
   responsavel: string | null;
@@ -33,21 +32,12 @@ interface ClienteDb {
 }
 
 function transformCliente(cliente: ClienteDb): Client {
-  const mapSquad = (squad: string | null): "Supreme" | "Forja" | "Squadra" | "Chama" => {
-    if (!squad) return "Forja";
-    if (squad === "0") return "Supreme";
-    if (squad === "1") return "Forja";
-    if (squad === "2") return "Squadra";
-    if (squad === "3") return "Chama";
-    return "Forja";
-  };
-
   return {
     id: cliente.ids || cliente.id.toString(),
     name: cliente.nomeClickup || cliente.nome || "Cliente sem nome",
     cnpj: cliente.cnpj || undefined,
-    squad: mapSquad(cliente.squad),
-    services: [mapSquad(cliente.squad)],
+    squad: "Forja",
+    services: ["Forja"],
     ltv: parseFloat(cliente.ltv || "0"),
     status: cliente.ativo === "SIM" ? "active" : "inactive",
     startDate: cliente.createdAt || new Date().toISOString(),
