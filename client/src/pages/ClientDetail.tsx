@@ -1,9 +1,11 @@
+import { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
 import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink } from "lucide-react";
@@ -43,6 +45,8 @@ interface RevenueData {
 export default function ClientDetail() {
   const [, params] = useRoute("/cliente/:id");
   const clientId = params?.id || "";
+  const [receitasCurrentPage, setReceitasCurrentPage] = useState(1);
+  const [receitasItemsPerPage, setReceitasItemsPerPage] = useState(10);
 
   const { data: cliente, isLoading: isLoadingCliente, error: clienteError } = useQuery<ClienteDb>({
     queryKey: ["/api/cliente", clientId],
@@ -103,6 +107,17 @@ export default function ClientDetail() {
   const totalReceitas = receitas?.reduce((sum, r) => sum + parseFloat(r.pago || "0"), 0) || 0;
   const totalFaturas = receitas?.length || 0;
   const ticketMedio = totalFaturas > 0 ? totalReceitas / totalFaturas : 0;
+
+  const receitasTotalPages = Math.ceil((receitas?.length || 0) / receitasItemsPerPage);
+  const receitasStartIndex = (receitasCurrentPage - 1) * receitasItemsPerPage;
+  const receitasEndIndex = receitasStartIndex + receitasItemsPerPage;
+  const paginatedReceitas = receitas?.slice(receitasStartIndex, receitasEndIndex) || [];
+
+  useEffect(() => {
+    if (receitasTotalPages > 0 && receitasCurrentPage > receitasTotalPages) {
+      setReceitasCurrentPage(receitasTotalPages);
+    }
+  }, [receitasTotalPages, receitasCurrentPage]);
 
   const chartData = (revenueHistory || []).map((item) => ({
     month: item.mes,
@@ -336,15 +351,17 @@ export default function ClientDetail() {
 
         <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-6">Contas a Receber</h2>
-          <Card>
+          <Card className="overflow-hidden">
             {isLoadingReceitas ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
+              <>
+                <div className="max-h-[400px] overflow-y-auto">
+                  <Table>
+                  <TableHeader className="sticky top-0 z-20 shadow-sm">
+                    <TableRow className="bg-background border-b">
                     <TableHead>Descrição</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Vencimento</TableHead>
@@ -355,8 +372,8 @@ export default function ClientDetail() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {receitas && receitas.length > 0 ? (
-                    receitas.slice(0, 10).map((receita, idx) => (
+                  {paginatedReceitas.length > 0 ? (
+                    paginatedReceitas.map((receita, idx) => (
                       <TableRow key={`receita-${receita.id}-${idx}`}>
                         <TableCell className="font-medium">
                           {receita.descricao || "Sem descrição"}
@@ -414,7 +431,78 @@ export default function ClientDetail() {
                     </TableRow>
                   )}
                 </TableBody>
-              </Table>
+                  </Table>
+                </div>
+
+                {receitasTotalPages > 1 && (
+                  <div className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Itens por página:</span>
+                      <Select
+                        value={receitasItemsPerPage.toString()}
+                        onValueChange={(value) => {
+                          setReceitasItemsPerPage(Number(value));
+                          setReceitasCurrentPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="w-[100px]" data-testid="select-receitas-items-per-page">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="25">25</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        Página {receitasCurrentPage} de {receitasTotalPages}
+                      </span>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setReceitasCurrentPage(1)}
+                          disabled={receitasCurrentPage === 1}
+                          data-testid="button-receitas-first-page"
+                        >
+                          Primeira
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setReceitasCurrentPage(receitasCurrentPage - 1)}
+                          disabled={receitasCurrentPage === 1}
+                          data-testid="button-receitas-prev-page"
+                        >
+                          Anterior
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setReceitasCurrentPage(receitasCurrentPage + 1)}
+                          disabled={receitasCurrentPage === receitasTotalPages}
+                          data-testid="button-receitas-next-page"
+                        >
+                          Próxima
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setReceitasCurrentPage(receitasTotalPages)}
+                          disabled={receitasCurrentPage === receitasTotalPages}
+                          data-testid="button-receitas-last-page"
+                        >
+                          Última
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </Card>
         </div>
