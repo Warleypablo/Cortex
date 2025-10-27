@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -24,6 +24,7 @@ export interface IStorage {
   getClienteRevenue(clienteId: string): Promise<{ mes: string; valor: number }[]>;
   getColaboradores(): Promise<Colaborador[]>;
   createColaborador(colaborador: InsertColaborador): Promise<Colaborador>;
+  getContratos(): Promise<ContratoCompleto[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -79,6 +80,10 @@ export class MemStorage implements IStorage {
   }
 
   async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getContratos(): Promise<ContratoCompleto[]> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -207,6 +212,35 @@ export class DbStorage implements IStorage {
   async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
     const [newColaborador] = await db.insert(schema.rhPessoal).values(colaborador as any).returning();
     return newColaborador;
+  }
+
+  async getContratos(): Promise<ContratoCompleto[]> {
+    const result = await db
+      .select({
+        idSubtask: schema.cupContratos.idSubtask,
+        servico: schema.cupContratos.servico,
+        status: schema.cupContratos.status,
+        valorr: schema.cupContratos.valorr,
+        valorp: schema.cupContratos.valorp,
+        dataInicio: schema.cupContratos.dataInicio,
+        dataEncerramento: schema.cupContratos.dataEncerramento,
+        squad: schema.cupContratos.squad,
+        idTask: schema.cupContratos.idTask,
+        nomeCliente: sql<string>`COALESCE(${schema.cupClientes.nome}, ${schema.cazClientes.nome})`,
+        cnpjCliente: schema.cupClientes.cnpj,
+      })
+      .from(schema.cupContratos)
+      .leftJoin(
+        schema.cupClientes,
+        eq(schema.cupContratos.idTask, schema.cupClientes.taskId)
+      )
+      .leftJoin(
+        schema.cazClientes,
+        eq(schema.cupClientes.cnpj, schema.cazClientes.cnpj)
+      )
+      .orderBy(desc(schema.cupContratos.dataInicio));
+
+    return result;
   }
 }
 
