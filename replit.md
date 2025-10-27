@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a Customer Relationship Management (CRM) dashboard designed for a digital marketing agency. The application helps manage client relationships, contracts, services, and revenue tracking across different marketing squads (Performance, Comunicação, and Tech). It provides a centralized interface for viewing client data, contract status, invoicing, team assignments, and financial metrics.
+This is a Customer Relationship Management (CRM) dashboard designed for a digital marketing agency. The application integrates data from two main systems: Conta Azul (financial ERP) and ClickUp (operational management), providing a unified view of client relationships, contracts, services, and revenue tracking across different marketing squads (Supreme, Forja, Squadra, and Chama). It centralizes client data, contract status, invoicing, team assignments, and financial metrics from both systems.
 
 ## User Preferences
 
@@ -35,11 +35,19 @@ Preferred communication style: Simple, everyday language.
 - Drizzle-Zod for generating validation schemas from database models
 
 **Key Features**
-- Client listing with filtering by squad and services
-- Client detail pages showing contracts, invoices, team members, and revenue history
-- Contract management with status tracking (Ativo, Onboard, Triagem, Cancelamento, Cancelado)
-- Revenue visualization using Recharts for bar charts
-- Responsive sidebar navigation with collapsible states
+- **Client Management**: Integrated client listing with data from both Conta Azul and ClickUp
+  - Displays ClickUp client names and squad assignments (Supreme, Forja, Squadra, Chama)
+  - Search and filter by name or CNPJ
+  - Pagination with configurable items per page
+  - Sortable columns (name, squad, LTV, start date)
+- **Employee Management**: Complete HR data display and CRUD operations
+  - View all 25 employee fields from rh_pessoal table
+  - Add new collaborators with form validation
+  - Database persistence to Google Cloud SQL
+- Client detail pages showing contracts, invoices, team members, and revenue history (in development)
+- Contract management with status tracking (in development)
+- Revenue visualization using Recharts for bar charts (in development)
+- No emojis in UI - uses Lucide React icons for all visual indicators
 - Dark mode support through CSS variables
 
 ### Backend Architecture
@@ -61,27 +69,38 @@ Preferred communication style: Simple, everyday language.
 - Storage abstraction layer for data operations
 
 **Current Implementation**
-- In-memory storage implementation (`MemStorage`) for development/prototyping
-- User CRUD operations with UUID-based identifiers
-- Storage interface allows easy swapping to database-backed implementations
+- `DbStorage` implementation connecting to Google Cloud SQL PostgreSQL
+- Client queries with JOIN between caz_clientes and cup_clientes using CNPJ
+- Employee CRUD operations with full field support
+- Storage abstraction layer (`IStorage`) for flexible implementation swapping
 
 ### Data Storage Solutions
 
 **Database ORM**
 - Drizzle ORM configured for PostgreSQL dialect
 - Schema-first approach with TypeScript type inference
-- Migration support through Drizzle Kit
-- Connection to Neon serverless PostgreSQL (via `@neondatabase/serverless`)
+- Connection to Google Cloud SQL PostgreSQL instance (database: dados_turbo)
+- Credentials stored in Replit Secrets (DB_HOST, DB_NAME, DB_USER, DB_PASSWORD)
 
 **Schema Design**
-- Users table with UUID primary keys, username (unique), and password fields
-- Zod schemas generated from Drizzle tables for validation
-- Type-safe insert and select operations
+- **Conta Azul Tables (caz_*)**: Financial and client data from Conta Azul ERP
+  - `caz_clientes`: Client master data with CNPJ as relationship key
+  - `caz_receber`: Accounts receivable/invoices
+  - `caz_pagar`: Accounts payable
+  - `caz_parcelas`: Detailed installment/payment information
+- **ClickUp Tables (cup_*)**: Operational client and contract data from ClickUp
+  - `cup_clientes`: Client operational data with CNPJ as primary key
+  - `cup_contratos`: Contract details with squad assignments
+- **Internal Tables**:
+  - `rh_pessoal`: Employee/collaborator data with full HR information (25 fields)
+  - `users`: Authentication data (not actively used)
 
-**Migration Strategy**
-- Migrations stored in `/migrations` directory
-- Database schema defined in `shared/schema.ts` for sharing between client and server
-- Push-based deployment with `db:push` script for rapid iteration
+**Data Integration Strategy**
+- CNPJ field used as relationship key between Conta Azul and ClickUp systems
+- LEFT JOIN queries combine `caz_clientes` with `cup_clientes` on CNPJ
+- Client names preferentially displayed from ClickUp (`cup_clientes.nome`) over Conta Azul
+- Squad information sourced from ClickUp with mapping: 0=Supreme, 1=Forja, 2=Squadra, 3=Chama
+- Storage layer returns `ClienteCompleto` type combining both systems' data
 
 ### External Dependencies
 
@@ -114,8 +133,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Notes
 
-- The application currently uses mock data in the frontend (see `//todo: remove mock functionality` comments in Clients.tsx, ClientDetail.tsx, and Contracts.tsx)
+- **Data Sources**: Application integrates two primary systems:
+  - Conta Azul: Financial ERP with client master data, invoices, payments
+  - ClickUp: Operational CRM with client names, squads, contracts
+- **Key Relationships**:
+  - Between systems: CNPJ field links caz_clientes ↔ cup_clientes
+  - Within Conta Azul: `caz_receber.cliente_id` ↔ `caz_clientes.ids`
+  - Within Conta Azul: `caz_parcelas.id_cliente` ↔ `caz_clientes.ids`
+  - Within ClickUp: `cup_contratos.id_task` ↔ `cup_clientes.task_id`
+- **Squad Mapping**: ClickUp squad codes map to names (0=Supreme, 1=Forja, 2=Squadra, 3=Chama)
 - Session management infrastructure is in place but not actively implemented
-- The storage layer uses in-memory implementation; migration to PostgreSQL-backed storage is expected
 - Authentication and authorization mechanisms are defined in schema but not yet implemented in routes
 - The design system emphasizes light mode as primary with dark mode support through CSS custom properties
+- All UI icons use Lucide React - no emojis per design guidelines
