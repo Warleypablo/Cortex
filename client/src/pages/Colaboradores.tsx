@@ -881,7 +881,7 @@ export default function Colaboradores() {
     if (totalPages > 0 && currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
-  }, [totalPages, currentPage]);
+  }, [totalPages]);
 
   const ativos = filteredColaboradores.filter((c) => c.status === "Ativo").length;
 
@@ -958,23 +958,23 @@ export default function Colaboradores() {
               <Table>
                 <TableHeader className="sticky top-0 z-20 shadow-sm">
                   <TableRow className="bg-background border-b">
-                  <TableHead className="min-w-[80px]">ID</TableHead>
-                  <TableHead className="min-w-[220px]">Colaborador</TableHead>
-                  <TableHead className="min-w-[180px]">Cargo / Nível</TableHead>
-                  <TableHead className="min-w-[140px]">Squad</TableHead>
-                  <TableHead className="min-w-[140px]">Setor</TableHead>
-                  <TableHead className="min-w-[280px]">Contatos</TableHead>
-                  <TableHead className="min-w-[120px]">CPF</TableHead>
-                  <TableHead className="min-w-[140px]">CNPJ</TableHead>
-                  <TableHead className="min-w-[180px]">PIX</TableHead>
-                  <TableHead className="min-w-[200px]">Localização</TableHead>
-                  <TableHead className="min-w-[100px]">Status</TableHead>
-                  <TableHead className="min-w-[120px]">Admissão</TableHead>
-                  <TableHead className="min-w-[120px]">Demissão</TableHead>
-                  <TableHead className="min-w-[200px]">Motivo Demissão</TableHead>
-                  <TableHead className="min-w-[140px]">Proporcional</TableHead>
-                  <TableHead className="min-w-[120px]">Tempo Turbo</TableHead>
-                  <TableHead className="min-w-[140px]">Último Aumento</TableHead>
+                  <TableHead className="min-w-[80px] bg-background">ID</TableHead>
+                  <TableHead className="min-w-[220px] bg-background">Colaborador</TableHead>
+                  <TableHead className="min-w-[180px] bg-background">Cargo / Nível</TableHead>
+                  <TableHead className="min-w-[140px] bg-background">Squad</TableHead>
+                  <TableHead className="min-w-[140px] bg-background">Setor</TableHead>
+                  <TableHead className="min-w-[280px] bg-background">Contatos</TableHead>
+                  <TableHead className="min-w-[120px] bg-background">CPF</TableHead>
+                  <TableHead className="min-w-[140px] bg-background">CNPJ</TableHead>
+                  <TableHead className="min-w-[180px] bg-background">PIX</TableHead>
+                  <TableHead className="min-w-[200px] bg-background">Localização</TableHead>
+                  <TableHead className="min-w-[100px] bg-background">Status</TableHead>
+                  <TableHead className="min-w-[120px] bg-background">Admissão</TableHead>
+                  <TableHead className="min-w-[120px] bg-background">Demissão</TableHead>
+                  <TableHead className="min-w-[200px] bg-background">Motivo Demissão</TableHead>
+                  <TableHead className="min-w-[140px] bg-background">Proporcional</TableHead>
+                  <TableHead className="min-w-[120px] bg-background">Tempo Turbo</TableHead>
+                  <TableHead className="min-w-[140px] bg-background">Último Aumento</TableHead>
                   <TableHead className="min-w-[120px] sticky right-0 bg-background">Ações</TableHead>
                 </TableRow>
               </TableHeader>
