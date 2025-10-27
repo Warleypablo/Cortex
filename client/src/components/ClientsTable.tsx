@@ -88,7 +88,7 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
         <Table>
           <TableHeader className="sticky top-0 z-20 shadow-sm">
             <TableRow className="bg-background border-b">
-            <TableHead className="w-[300px]">
+            <TableHead className="w-[300px] bg-background">
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -100,7 +100,7 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
                 <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
             </TableHead>
-            <TableHead>
+            <TableHead className="bg-background">
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -112,8 +112,8 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
                 <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
             </TableHead>
-            <TableHead>Serviços</TableHead>
-            <TableHead>
+            <TableHead className="bg-background">Serviços</TableHead>
+            <TableHead className="bg-background">
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -125,7 +125,7 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
                 <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
             </TableHead>
-            <TableHead>
+            <TableHead className="bg-background">
               <Button 
                 variant="ghost" 
                 size="sm" 
