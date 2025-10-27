@@ -25,6 +25,7 @@ export interface IStorage {
   getColaboradores(): Promise<Colaborador[]>;
   createColaborador(colaborador: InsertColaborador): Promise<Colaborador>;
   getContratos(): Promise<ContratoCompleto[]>;
+  getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -84,6 +85,10 @@ export class MemStorage implements IStorage {
   }
 
   async getContratos(): Promise<ContratoCompleto[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -228,6 +233,7 @@ export class DbStorage implements IStorage {
         idTask: schema.cupContratos.idTask,
         nomeCliente: sql<string>`COALESCE(${schema.cupClientes.nome}, ${schema.cazClientes.nome})`,
         cnpjCliente: schema.cupClientes.cnpj,
+        idCliente: schema.cazClientes.ids,
       })
       .from(schema.cupContratos)
       .leftJoin(
@@ -238,6 +244,37 @@ export class DbStorage implements IStorage {
         schema.cazClientes,
         eq(schema.cupClientes.cnpj, schema.cazClientes.cnpj)
       )
+      .orderBy(desc(schema.cupContratos.dataInicio));
+
+    return result;
+  }
+
+  async getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]> {
+    const result = await db
+      .select({
+        idSubtask: schema.cupContratos.idSubtask,
+        servico: schema.cupContratos.servico,
+        status: schema.cupContratos.status,
+        valorr: schema.cupContratos.valorr,
+        valorp: schema.cupContratos.valorp,
+        dataInicio: schema.cupContratos.dataInicio,
+        dataEncerramento: schema.cupContratos.dataEncerramento,
+        squad: schema.cupContratos.squad,
+        idTask: schema.cupContratos.idTask,
+        nomeCliente: sql<string>`COALESCE(${schema.cupClientes.nome}, ${schema.cazClientes.nome})`,
+        cnpjCliente: schema.cupClientes.cnpj,
+        idCliente: schema.cazClientes.ids,
+      })
+      .from(schema.cupContratos)
+      .leftJoin(
+        schema.cupClientes,
+        eq(schema.cupContratos.idTask, schema.cupClientes.taskId)
+      )
+      .leftJoin(
+        schema.cazClientes,
+        eq(schema.cupClientes.cnpj, schema.cazClientes.cnpj)
+      )
+      .where(eq(schema.cazClientes.ids, clienteId))
       .orderBy(desc(schema.cupContratos.dataInicio));
 
     return result;
