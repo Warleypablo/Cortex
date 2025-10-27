@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
 import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2 } from "lucide-react";
+import type { ContratoCompleto } from "@shared/schema";
 
 interface ClienteDb {
   id: number;
@@ -54,6 +55,11 @@ export default function ClientDetail() {
 
   const { data: revenueHistory, isLoading: isLoadingRevenue } = useQuery<RevenueData[]>({
     queryKey: ["/api/cliente", clientId, "revenue"],
+    enabled: !!clientId && !!cliente,
+  });
+
+  const { data: contratos, isLoading: isLoadingContratos } = useQuery<ContratoCompleto[]>({
+    queryKey: ["/api/cliente", clientId, "contratos"],
     enabled: !!clientId && !!cliente,
   });
 
@@ -126,6 +132,51 @@ export default function ClientDetail() {
         return <Badge variant="destructive">Vencido</Badge>;
       default:
         return <Badge variant="outline">{status || "N/A"}</Badge>;
+    }
+  };
+
+  const getContractStatusColor = (status: string) => {
+    const statusLower = status.toLowerCase();
+    if (statusLower.includes("ativo") || statusLower.includes("active")) {
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    } else if (statusLower.includes("onboard") || statusLower.includes("início")) {
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    } else if (statusLower.includes("triagem") || statusLower.includes("análise")) {
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+    } else if (statusLower.includes("cancelamento") || statusLower.includes("pausa")) {
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+    } else if (statusLower.includes("cancelado") || statusLower.includes("inativo")) {
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+    }
+    return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+  };
+
+  const getSquadColorForContract = (squad: string) => {
+    switch (squad) {
+      case "Supreme":
+      case "Performance":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      case "Forja":
+      case "Comunicação":
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+      case "Squadra":
+      case "Tech":
+        return "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300";
+      case "Chama":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+    }
+  };
+
+  const mapSquadCodeToName = (code: string | null): string => {
+    if (!code) return "Não definido";
+    switch (code) {
+      case "0": return "Supreme";
+      case "1": return "Forja";
+      case "2": return "Squadra";
+      case "3": return "Chama";
+      default: return code;
     }
   };
 
@@ -205,6 +256,80 @@ export default function ClientDetail() {
             <RevenueChart data={chartData} />
           </div>
         ) : null}
+
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold mb-6">Contratos</h2>
+          <Card>
+            {isLoadingContratos ? (
+              <div className="flex items-center justify-center py-8" data-testid="loading-contratos">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead data-testid="header-service">Serviço</TableHead>
+                    <TableHead data-testid="header-status">Status</TableHead>
+                    <TableHead data-testid="header-squad">Squad</TableHead>
+                    <TableHead data-testid="header-date">Data Início</TableHead>
+                    <TableHead className="text-right" data-testid="header-recurring">Valor Recorrente</TableHead>
+                    <TableHead className="text-right" data-testid="header-onetime">Valor Pontual</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contratos && contratos.length > 0 ? (
+                    contratos.map((contrato) => (
+                      <TableRow key={contrato.idSubtask} data-testid={`contract-row-${contrato.idSubtask}`}>
+                        <TableCell className="font-medium" data-testid={`text-service-${contrato.idSubtask}`}>
+                          {contrato.servico || "Sem serviço"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            className={getContractStatusColor(contrato.status || "")} 
+                            variant="outline"
+                            data-testid={`badge-status-${contrato.idSubtask}`}
+                          >
+                            {contrato.status || "Desconhecido"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            className={getSquadColorForContract(mapSquadCodeToName(contrato.squad))} 
+                            variant="outline"
+                            data-testid={`badge-squad-${contrato.idSubtask}`}
+                          >
+                            {mapSquadCodeToName(contrato.squad)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground" data-testid={`text-date-${contrato.idSubtask}`}>
+                          {contrato.dataInicio ? new Date(contrato.dataInicio).toLocaleDateString('pt-BR') : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold" data-testid={`text-recurring-${contrato.idSubtask}`}>
+                          {contrato.valorr && parseFloat(contrato.valorr) > 0
+                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(contrato.valorr))
+                            : '-'
+                          }
+                        </TableCell>
+                        <TableCell className="text-right font-semibold" data-testid={`text-onetime-${contrato.idSubtask}`}>
+                          {contrato.valorp && parseFloat(contrato.valorp) > 0
+                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(contrato.valorp))
+                            : '-'
+                          }
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8" data-testid="text-no-contracts">
+                        Nenhum contrato encontrado para este cliente
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </div>
 
         <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-6">Contas a Receber</h2>
