@@ -5,7 +5,6 @@ import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 
 export type ClienteCompleto = Cliente & {
   nomeClickup: string | null;
-  squad: string | null;
   statusClickup: string | null;
   telefone: string | null;
   responsavel: string | null;
@@ -132,7 +131,6 @@ export class DbStorage implements IStorage {
         empresa: schema.cazClientes.empresa,
         ids: schema.cazClientes.ids,
         nomeClickup: schema.cupClientes.nome,
-        squad: schema.cupClientes.squad,
         statusClickup: schema.cupClientes.status,
         telefone: schema.cupClientes.telefone,
         responsavel: schema.cupClientes.responsavel,
@@ -165,7 +163,6 @@ export class DbStorage implements IStorage {
         empresa: schema.cazClientes.empresa,
         ids: schema.cazClientes.ids,
         nomeClickup: schema.cupClientes.nome,
-        squad: schema.cupClientes.squad,
         statusClickup: schema.cupClientes.status,
         telefone: schema.cupClientes.telefone,
         responsavel: schema.cupClientes.responsavel,
