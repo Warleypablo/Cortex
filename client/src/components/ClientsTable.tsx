@@ -86,8 +86,8 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
     <div className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="max-h-[calc(100vh-400px)] overflow-y-auto">
         <Table>
-          <TableHeader className="sticky top-0 bg-card z-10">
-            <TableRow className="bg-muted/50">
+          <TableHeader className="sticky top-0 z-20 shadow-sm">
+            <TableRow className="bg-background border-b">
             <TableHead className="w-[300px]">
               <Button 
                 variant="ghost" 
