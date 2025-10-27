@@ -44,8 +44,15 @@ Preferred communication style: Simple, everyday language.
   - View all 25 employee fields from rh_pessoal table
   - Add new collaborators with form validation
   - Database persistence to Google Cloud SQL
+- **Contract Management**: Comprehensive contract tracking with real database data
+  - Displays contracts from cup_contratos with client information via JOIN
+  - Shows service type, status, squad assignment, and financial values
+  - Search and filter by service or client name
+  - Sortable columns (service, client, status, squad, start date)
+  - Distinguishes between recurring (valorr) and one-time (valorp) contract values
+  - Squad mapping from codes (0-3) to names (Supreme, Forja, Squadra, Chama)
+  - Status-based color coding for visual status tracking
 - Client detail pages showing contracts, invoices, team members, and revenue history (in development)
-- Contract management with status tracking (in development)
 - Revenue visualization using Recharts for bar charts (in development)
 - No emojis in UI - uses Lucide React icons for all visual indicators
 - Dark mode support through CSS variables
@@ -71,8 +78,10 @@ Preferred communication style: Simple, everyday language.
 **Current Implementation**
 - `DbStorage` implementation connecting to Google Cloud SQL PostgreSQL
 - Client queries with JOIN between caz_clientes and cup_clientes using CNPJ
+- Contract queries with JOIN: cup_contratos → cup_clientes (via id_task/task_id) → caz_clientes (via CNPJ)
 - Employee CRUD operations with full field support
 - Storage abstraction layer (`IStorage`) for flexible implementation swapping
+- API endpoints: /api/clientes, /api/contratos, /api/colaboradores
 
 ### Data Storage Solutions
 
