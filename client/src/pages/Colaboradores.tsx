@@ -529,8 +529,8 @@ export default function Colaboradores() {
           <div className="rounded-lg border border-border bg-card overflow-hidden">
             <div className="max-h-[calc(100vh-400px)] overflow-y-auto overflow-x-auto">
               <Table>
-                <TableHeader className="sticky top-0 bg-card z-10">
-                  <TableRow className="bg-muted/50">
+                <TableHeader className="sticky top-0 z-20 shadow-sm">
+                  <TableRow className="bg-background border-b">
                   <TableHead className="min-w-[80px]">ID</TableHead>
                   <TableHead className="min-w-[220px]">Colaborador</TableHead>
                   <TableHead className="min-w-[180px]">Cargo / Nível</TableHead>

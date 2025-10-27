@@ -267,8 +267,8 @@ export default function ClientDetail() {
             ) : (
               <div className="max-h-[400px] overflow-y-auto">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-card z-10">
-                    <TableRow className="bg-muted/50">
+                  <TableHeader className="sticky top-0 z-20 shadow-sm">
+                    <TableRow className="bg-background border-b">
                     <TableHead data-testid="header-service">Serviço</TableHead>
                     <TableHead data-testid="header-status">Status</TableHead>
                     <TableHead data-testid="header-squad">Squad</TableHead>
