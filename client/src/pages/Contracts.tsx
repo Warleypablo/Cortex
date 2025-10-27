@@ -1,103 +1,62 @@
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import avatar1 from '@assets/generated_images/Marketing_executive_avatar_male_fff2f919.png';
-import avatar2 from '@assets/generated_images/Marketing_manager_avatar_female_d414a5e8.png';
-import avatar3 from '@assets/generated_images/Tech_developer_avatar_male_029e9424.png';
+import type { ContratoCompleto } from "@shared/schema";
 
-//todo: remove mock functionality
 interface Contract {
   id: string;
   service: string;
   clientName: string;
   clientId: string;
-  status: "Ativo" | "Onboard" | "Triagem" | "Cancelamento" | "Cancelado";
-  responsible: {
-    name: string;
-    avatar?: string;
-  };
-  squad: "Performance" | "Comunicação" | "Tech";
+  status: string;
+  squad: string;
   createdDate: string;
   recurringValue: number;
   oneTimeValue: number;
 }
 
-const mockContracts: Contract[] = [
-  {
-    id: "1",
-    service: "Growth Marketing Advisory",
-    clientName: "Ensinando Tecnologia e Intermediação Ltda",
-    clientId: "1",
-    status: "Ativo",
-    responsible: { name: "Murilo Carvalho", avatar: avatar1 },
-    squad: "Performance",
-    createdDate: "2024-06-04",
-    recurringValue: 6200,
-    oneTimeValue: 0
-  },
-  {
-    id: "2",
-    service: "Landing Page - Portugal",
-    clientName: "Ensinando Tecnologia e Intermediação Ltda",
-    clientId: "1",
-    status: "Ativo",
-    responsible: { name: "Ana Silva", avatar: avatar2 },
-    squad: "Comunicação",
-    createdDate: "2024-06-04",
-    recurringValue: 5281,
-    oneTimeValue: 0
-  },
-  {
-    id: "3",
-    service: "Consultoria Tech",
-    clientName: "Tech Solutions Brasil",
-    clientId: "2",
-    status: "Onboard",
-    responsible: { name: "Carlos Santos", avatar: avatar3 },
-    squad: "Tech",
-    createdDate: "2024-03-15",
-    recurringValue: 8500,
-    oneTimeValue: 15000
-  },
-  {
-    id: "4",
-    service: "Gestão de Mídias Sociais",
-    clientName: "Marketing Pro Agency",
-    clientId: "3",
-    status: "Triagem",
-    responsible: { name: "Ana Silva", avatar: avatar2 },
-    squad: "Comunicação",
-    createdDate: "2024-08-20",
-    recurringValue: 4200,
-    oneTimeValue: 0
-  },
-  {
-    id: "5",
-    service: "SEO e Performance",
-    clientName: "Digital Innovations Corp",
-    clientId: "4",
-    status: "Ativo",
-    responsible: { name: "Murilo Carvalho", avatar: avatar1 },
-    squad: "Performance",
-    createdDate: "2024-01-10",
-    recurringValue: 7800,
-    oneTimeValue: 5000
-  }
-];
-
 type SortField = "service" | "clientName" | "status" | "squad" | "createdDate";
 type SortDirection = "asc" | "desc";
+
+const mapSquadCodeToName = (code: string | null): string => {
+  if (!code) return "Não definido";
+  switch (code) {
+    case "0": return "Supreme";
+    case "1": return "Forja";
+    case "2": return "Squadra";
+    case "3": return "Chama";
+    default: return code;
+  }
+};
 
 export default function Contracts() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("createdDate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  const { data: contratos = [], isLoading, error } = useQuery<ContratoCompleto[]>({
+    queryKey: ["/api/contratos"],
+  });
+
+  const contracts: Contract[] = useMemo(() => {
+    return contratos.map(c => ({
+      id: c.idSubtask || "",
+      service: c.servico || "Sem serviço",
+      clientName: c.nomeCliente || "Cliente não identificado",
+      clientId: c.cnpjCliente || "",
+      status: c.status || "Desconhecido",
+      squad: mapSquadCodeToName(c.squad),
+      createdDate: c.dataInicio ? new Date(c.dataInicio).toISOString().split('T')[0] : "",
+      recurringValue: parseFloat(c.valorr || "0"),
+      oneTimeValue: parseFloat(c.valorp || "0"),
+    }));
+  }, [contratos]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -109,14 +68,14 @@ export default function Contracts() {
   };
 
   const filteredContracts = useMemo(() => {
-    return mockContracts.filter(contract => {
+    return contracts.filter(contract => {
       const matchesSearch = 
         contract.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
         contract.clientName.toLowerCase().includes(searchQuery.toLowerCase());
       
       return matchesSearch;
     });
-  }, [searchQuery]);
+  }, [contracts, searchQuery]);
 
   const sortedContracts = useMemo(() => {
     return [...filteredContracts].sort((a, b) => {
@@ -139,34 +98,64 @@ export default function Contracts() {
   }, [filteredContracts, sortField, sortDirection]);
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Ativo":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
-      case "Onboard":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
-      case "Triagem":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
-      case "Cancelamento":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
-      case "Cancelado":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
-      default:
-        return "";
+    const statusLower = status.toLowerCase();
+    if (statusLower.includes("ativo") || statusLower.includes("active")) {
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    } else if (statusLower.includes("onboard") || statusLower.includes("início")) {
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    } else if (statusLower.includes("triagem") || statusLower.includes("análise")) {
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+    } else if (statusLower.includes("cancelamento") || statusLower.includes("pausa")) {
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+    } else if (statusLower.includes("cancelado") || statusLower.includes("inativo")) {
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
     }
+    return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
   };
 
   const getSquadColor = (squad: string) => {
     switch (squad) {
+      case "Supreme":
       case "Performance":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      case "Forja":
       case "Comunicação":
         return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+      case "Squadra":
       case "Tech":
         return "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300";
+      case "Chama":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
       default:
-        return "";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          <div className="mb-8">
+            <h1 className="text-3xl font-semibold mb-2">Contratos</h1>
+            <p className="text-muted-foreground">Carregando contratos...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          <div className="mb-8">
+            <h1 className="text-3xl font-semibold mb-2">Contratos</h1>
+            <p className="text-red-500">Erro ao carregar contratos. Tente novamente mais tarde.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background">
@@ -182,6 +171,7 @@ export default function Contracts() {
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="Buscar por serviço ou cliente..."
+              data-testid="input-search-contracts"
             />
           </div>
           <Button 
@@ -233,7 +223,6 @@ export default function Contracts() {
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
-                <TableHead>Responsável</TableHead>
                 <TableHead>
                   <Button 
                     variant="ghost" 
@@ -254,7 +243,7 @@ export default function Contracts() {
                     className="hover-elevate -ml-3"
                     data-testid="sort-date"
                   >
-                    Data Criação
+                    Data Início
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
@@ -263,56 +252,63 @@ export default function Contracts() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedContracts.map((contract) => (
-                <TableRow 
-                  key={contract.id} 
-                  className="cursor-pointer hover-elevate"
-                  onClick={() => setLocation(`/cliente/${contract.clientId}`)}
-                  data-testid={`contract-row-${contract.id}`}
-                >
-                  <TableCell className="font-medium">{contract.service}</TableCell>
-                  <TableCell>{contract.clientName}</TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(contract.status)} variant="outline">
-                      {contract.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="w-6 h-6">
-                        <AvatarImage src={contract.responsible.avatar} />
-                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                          {contract.responsible.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">{contract.responsible.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getSquadColor(contract.squad)} variant="outline">
-                      {contract.squad}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(contract.createdDate).toLocaleDateString('pt-BR')}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {contract.recurringValue > 0 
-                      ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.recurringValue)
-                      : '-'
-                    }
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {contract.oneTimeValue > 0 
-                      ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.oneTimeValue)
-                      : '-'
-                    }
+              {sortedContracts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    {searchQuery ? "Nenhum contrato encontrado com esse critério de busca." : "Nenhum contrato cadastrado."}
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                sortedContracts.map((contract) => (
+                  <TableRow 
+                    key={contract.id} 
+                    className="cursor-pointer hover-elevate"
+                    onClick={() => contract.clientId && setLocation(`/cliente/${contract.clientId}`)}
+                    data-testid={`contract-row-${contract.id}`}
+                  >
+                    <TableCell className="font-medium" data-testid={`text-service-${contract.id}`}>
+                      {contract.service}
+                    </TableCell>
+                    <TableCell data-testid={`text-client-${contract.id}`}>
+                      {contract.clientName}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(contract.status)} variant="outline" data-testid={`badge-status-${contract.id}`}>
+                        {contract.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getSquadColor(contract.squad)} variant="outline" data-testid={`badge-squad-${contract.id}`}>
+                        {contract.squad}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground" data-testid={`text-date-${contract.id}`}>
+                      {contract.createdDate ? new Date(contract.createdDate).toLocaleDateString('pt-BR') : '-'}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold" data-testid={`text-recurring-${contract.id}`}>
+                      {contract.recurringValue > 0 
+                        ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.recurringValue)
+                        : '-'
+                      }
+                    </TableCell>
+                    <TableCell className="text-right font-semibold" data-testid={`text-onetime-${contract.id}`}>
+                      {contract.oneTimeValue > 0 
+                        ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.oneTimeValue)
+                        : '-'
+                      }
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
+
+        {sortedContracts.length > 0 && (
+          <div className="mt-4 text-sm text-muted-foreground">
+            Mostrando {sortedContracts.length} de {contracts.length} {contracts.length === 1 ? 'contrato' : 'contratos'}
+          </div>
+        )}
       </div>
     </div>
   );
