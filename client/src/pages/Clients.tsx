@@ -29,6 +29,7 @@ interface ClienteDb {
   telefone: string | null;
   responsavel: string | null;
   cluster: string | null;
+  ltv: string | null;
 }
 
 function transformCliente(cliente: ClienteDb): Client {
@@ -47,7 +48,7 @@ function transformCliente(cliente: ClienteDb): Client {
     cnpj: cliente.cnpj || undefined,
     squad: mapSquad(cliente.squad),
     services: [mapSquad(cliente.squad)],
-    ltv: 0,
+    ltv: parseFloat(cliente.ltv || "0"),
     status: cliente.ativo === "SIM" ? "active" : "inactive",
     startDate: cliente.createdAt || new Date().toISOString(),
   };
