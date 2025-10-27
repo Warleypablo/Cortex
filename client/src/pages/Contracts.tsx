@@ -184,9 +184,10 @@ export default function Contracts() {
         </div>
 
         <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
+          <div className="max-h-[calc(100vh-400px)] overflow-y-auto">
+            <Table>
+              <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow className="bg-muted/50">
                 <TableHead>
                   <Button 
                     variant="ghost" 
@@ -302,6 +303,7 @@ export default function Contracts() {
               )}
             </TableBody>
           </Table>
+          </div>
         </div>
 
         {sortedContracts.length > 0 && (

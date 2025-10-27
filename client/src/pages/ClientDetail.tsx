@@ -259,15 +259,16 @@ export default function ClientDetail() {
 
         <div className="mb-8">
           <h2 className="text-2xl font-semibold mb-6">Contratos</h2>
-          <Card>
+          <Card className="overflow-hidden">
             {isLoadingContratos ? (
               <div className="flex items-center justify-center py-8" data-testid="loading-contratos">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
+              <div className="max-h-[400px] overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-card z-10">
+                    <TableRow className="bg-muted/50">
                     <TableHead data-testid="header-service">Serviço</TableHead>
                     <TableHead data-testid="header-status">Status</TableHead>
                     <TableHead data-testid="header-squad">Squad</TableHead>
@@ -327,6 +328,7 @@ export default function ClientDetail() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             )}
           </Card>
         </div>
