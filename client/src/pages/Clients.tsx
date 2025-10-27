@@ -23,15 +23,30 @@ interface ClienteDb {
   createdAt: string | null;
   empresa: string | null;
   ids: string | null;
+  nomeClickup: string | null;
+  squad: string | null;
+  statusClickup: string | null;
+  telefone: string | null;
+  responsavel: string | null;
+  cluster: string | null;
 }
 
 function transformCliente(cliente: ClienteDb): Client {
+  const mapSquad = (squad: string | null): "Performance" | "Comunicação" | "Tech" => {
+    if (!squad) return "Performance";
+    if (squad === "1") return "Performance";
+    if (squad === "2") return "Comunicação";
+    if (squad === "3") return "Tech";
+    if (squad === "0") return "Performance";
+    return "Performance";
+  };
+
   return {
     id: cliente.ids || cliente.id.toString(),
-    name: cliente.nome || "Cliente sem nome",
+    name: cliente.nomeClickup || cliente.nome || "Cliente sem nome",
     cnpj: cliente.cnpj || undefined,
-    squad: "Performance",
-    services: ["Performance"],
+    squad: mapSquad(cliente.squad),
+    services: [mapSquad(cliente.squad)],
     ltv: 0,
     status: cliente.ativo === "SIM" ? "active" : "inactive",
     startDate: cliente.createdAt || new Date().toISOString(),
