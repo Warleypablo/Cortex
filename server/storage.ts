@@ -192,26 +192,23 @@ export class DbStorage implements IStorage {
   }
 
   async getContasReceberByCliente(clienteId: string, limit: number = 100): Promise<ContaReceber[]> {
-    const result = await db.select({
-      id: schema.cazReceber.id,
-      status: schema.cazReceber.status,
-      total: schema.cazReceber.total,
-      descricao: schema.cazReceber.descricao,
-      dataVencimento: schema.cazReceber.dataVencimento,
-      naoPago: schema.cazReceber.naoPago,
-      pago: schema.cazReceber.pago,
-      dataCriacao: schema.cazReceber.dataCriacao,
-      dataAlteracao: schema.cazReceber.dataAlteracao,
-      clienteId: schema.cazReceber.clienteId,
-      clienteNome: schema.cazReceber.clienteNome,
-      empresa: schema.cazReceber.empresa,
-      urlCobranca: schema.cazParcelas.urlCobranca,
-    })
+    const receberData = await db.select()
       .from(schema.cazReceber)
-      .leftJoin(schema.cazParcelas, eq(schema.cazReceber.id, schema.cazParcelas.id))
       .where(eq(schema.cazReceber.clienteId, clienteId))
       .orderBy(desc(schema.cazReceber.dataCriacao))
       .limit(limit);
+    
+    const result: ContaReceber[] = await Promise.all(receberData.map(async (receber) => {
+      const [parcela] = await db.select()
+        .from(schema.cazParcelas)
+        .where(sql`CAST(${schema.cazParcelas.id} AS TEXT) = CAST(${receber.id} AS TEXT)`)
+        .limit(1);
+      
+      return {
+        ...receber,
+        urlCobranca: parcela?.urlCobranca || null,
+      };
+    }));
     
     return result;
   }
