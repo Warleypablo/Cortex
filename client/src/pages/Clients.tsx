@@ -32,13 +32,13 @@ interface ClienteDb {
 }
 
 function transformCliente(cliente: ClienteDb): Client {
-  const mapSquad = (squad: string | null): "Performance" | "Comunicação" | "Tech" => {
-    if (!squad) return "Performance";
-    if (squad === "1") return "Performance";
-    if (squad === "2") return "Comunicação";
-    if (squad === "3") return "Tech";
-    if (squad === "0") return "Performance";
-    return "Performance";
+  const mapSquad = (squad: string | null): "Supreme" | "Forja" | "Squadra" | "Chama" => {
+    if (!squad) return "Forja";
+    if (squad === "0") return "Supreme";
+    if (squad === "1") return "Forja";
+    if (squad === "2") return "Squadra";
+    if (squad === "3") return "Chama";
+    return "Forja";
   };
 
   return {

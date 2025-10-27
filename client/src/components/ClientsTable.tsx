@@ -8,8 +8,8 @@ export interface Client {
   id: string;
   name: string;
   cnpj?: string;
-  squad: "Performance" | "Comunicação" | "Tech";
-  services: Array<"Performance" | "Comunicação" | "Tech">;
+  squad: "Supreme" | "Forja" | "Squadra" | "Chama";
+  services: Array<"Supreme" | "Forja" | "Squadra" | "Chama">;
   ltv: number;
   status: "active" | "inactive";
   startDate: string;
@@ -54,11 +54,13 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
 
   const getServiceIcon = (service: string) => {
     switch (service) {
-      case "Performance":
+      case "Supreme":
         return <TrendingUp className="w-4 h-4" />;
-      case "Comunicação":
+      case "Forja":
+        return <TrendingUp className="w-4 h-4" />;
+      case "Squadra":
         return <MessageCircle className="w-4 h-4" />;
-      case "Tech":
+      case "Chama":
         return <Code className="w-4 h-4" />;
       default:
         return null;
@@ -67,11 +69,13 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
 
   const getSquadColor = (squad: string) => {
     switch (squad) {
-      case "Performance":
+      case "Supreme":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
-      case "Comunicação":
+      case "Forja":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      case "Squadra":
         return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
-      case "Tech":
+      case "Chama":
         return "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300";
       default:
         return "";
