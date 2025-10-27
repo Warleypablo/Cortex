@@ -3,10 +3,20 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus } from "lucide-react";
+import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -416,10 +426,414 @@ function AddColaboradorDialog() {
   );
 }
 
+function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborador: Colaborador; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+
+  const form = useForm<InsertColaborador>({
+    resolver: zodResolver(insertColaboradorSchema),
+    defaultValues: {
+      nome: colaborador.nome || "",
+      status: colaborador.status || "Ativo",
+      cpf: colaborador.cpf || "",
+      telefone: colaborador.telefone || "",
+      emailTurbo: colaborador.emailTurbo || "",
+      emailPessoal: colaborador.emailPessoal || "",
+      cargo: colaborador.cargo || "",
+      nivel: colaborador.nivel || "",
+      squad: colaborador.squad || "",
+      setor: colaborador.setor || "",
+      endereco: colaborador.endereco || "",
+      estado: colaborador.estado || "",
+      pix: colaborador.pix || "",
+      cnpj: colaborador.cnpj || "",
+      aniversario: colaborador.aniversario ? new Date(colaborador.aniversario).toISOString().split('T')[0] : undefined,
+      admissao: colaborador.admissao ? new Date(colaborador.admissao).toISOString().split('T')[0] : undefined,
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: InsertColaborador) => {
+      const response = await apiRequest("PATCH", `/api/colaboradores/${colaborador.id}`, data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores"] });
+      toast({
+        title: "Colaborador atualizado",
+        description: "As informações do colaborador foram atualizadas com sucesso.",
+      });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao atualizar colaborador",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: InsertColaborador) => {
+    updateMutation.mutate(data);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Editar Colaborador</DialogTitle>
+          <DialogDescription>
+            Atualize as informações do colaborador {colaborador.nome}
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="nome"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome *</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-nome" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-status">
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Ativo">Ativo</SelectItem>
+                        <SelectItem value="Inativo">Inativo</SelectItem>
+                        <SelectItem value="Dispensado">Dispensado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="cpf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-edit-cpf" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="telefone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-edit-telefone" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="emailTurbo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Turbo</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} type="email" data-testid="input-edit-email-turbo" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="emailPessoal"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Pessoal</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} type="email" data-testid="input-edit-email-pessoal" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="cargo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cargo</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-edit-cargo" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="nivel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nível</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-edit-nivel" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="setor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Setor</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-edit-setor" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="squad"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Squad</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ""} data-testid="input-edit-squad" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="endereco"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Endereço</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-edit-endereco" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="estado"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Estado</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} maxLength={2} data-testid="input-edit-estado" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="pix"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>PIX</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-edit-pix" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="cnpj"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CNPJ</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value || ""} data-testid="input-edit-cnpj" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="aniversario"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Aniversário</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-edit-aniversario"
+                        type="date"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="admissao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Admissão</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-edit-admissao"
+                        type="date"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                data-testid="button-edit-cancel"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={updateMutation.isPending}
+                data-testid="button-edit-submit"
+              >
+                {updateMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar Alterações"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteConfirmDialog({ colaborador, open, onOpenChange }: { colaborador: Colaborador; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", `/api/colaboradores/${colaborador.id}`, {});
+      if (response.status !== 204) {
+        throw new Error("Erro ao excluir colaborador");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores"] });
+      toast({
+        title: "Colaborador excluído",
+        description: `${colaborador.nome} foi removido com sucesso.`,
+      });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao excluir colaborador",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja excluir o colaborador <strong>{colaborador.nome}</strong>? 
+            Esta ação não pode ser desfeita.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="button-delete-cancel">Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => deleteMutation.mutate()}
+            disabled={deleteMutation.isPending}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            data-testid="button-delete-confirm"
+          >
+            {deleteMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Excluindo...
+              </>
+            ) : (
+              "Excluir"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 export default function Colaboradores() {
   const [searchQuery, setSearchQuery] = useState("");
   const [squadFilter, setSquadFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [editingColaborador, setEditingColaborador] = useState<Colaborador | null>(null);
+  const [deletingColaborador, setDeletingColaborador] = useState<Colaborador | null>(null);
 
   const { data: colaboradores = [], isLoading } = useQuery<Colaborador[]>({
     queryKey: ["/api/colaboradores"],
@@ -548,12 +962,13 @@ export default function Colaboradores() {
                   <TableHead className="min-w-[140px]">Proporcional</TableHead>
                   <TableHead className="min-w-[120px]">Tempo Turbo</TableHead>
                   <TableHead className="min-w-[140px]">Último Aumento</TableHead>
+                  <TableHead className="min-w-[120px] sticky right-0 bg-background">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredColaboradores.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={17} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={18} className="text-center py-8 text-muted-foreground">
                       Nenhum colaborador encontrado
                     </TableCell>
                   </TableRow>
@@ -774,6 +1189,35 @@ export default function Colaboradores() {
                           )}
                         </div>
                       </TableCell>
+                      <TableCell className="sticky right-0 bg-background">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingColaborador(colaborador);
+                            }}
+                            data-testid={`button-edit-${colaborador.id}`}
+                            title="Editar colaborador"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingColaborador(colaborador);
+                            }}
+                            data-testid={`button-delete-${colaborador.id}`}
+                            title="Excluir colaborador"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -783,6 +1227,22 @@ export default function Colaboradores() {
           </div>
         </div>
       </div>
+
+      {editingColaborador && (
+        <EditColaboradorDialog
+          colaborador={editingColaborador}
+          open={!!editingColaborador}
+          onOpenChange={(open) => !open && setEditingColaborador(null)}
+        />
+      )}
+
+      {deletingColaborador && (
+        <DeleteConfirmDialog
+          colaborador={deletingColaborador}
+          open={!!deletingColaborador}
+          onOpenChange={(open) => !open && setDeletingColaborador(null)}
+        />
+      )}
     </div>
   );
 }
