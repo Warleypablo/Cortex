@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, TrendingUp, MessageCircle, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export interface Client {
@@ -52,16 +52,16 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
     return sortDirection === "asc" ? comparison : -comparison;
   });
 
-  const getServiceEmoji = (service: string) => {
+  const getServiceIcon = (service: string) => {
     switch (service) {
       case "Performance":
-        return "📊";
+        return <TrendingUp className="w-4 h-4" />;
       case "Comunicação":
-        return "💬";
+        return <MessageCircle className="w-4 h-4" />;
       case "Tech":
-        return "💻";
+        return <Code className="w-4 h-4" />;
       default:
-        return "";
+        return null;
     }
   };
 
@@ -149,11 +149,11 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
                 </Badge>
               </TableCell>
               <TableCell>
-                <div className="flex gap-1">
+                <div className="flex gap-2">
                   {client.services.map((service, idx) => (
-                    <span key={idx} className="text-lg" title={service}>
-                      {getServiceEmoji(service)}
-                    </span>
+                    <div key={idx} className="text-muted-foreground" title={service} data-testid={`service-icon-${service.toLowerCase()}`}>
+                      {getServiceIcon(service)}
+                    </div>
                   ))}
                 </div>
               </TableCell>
