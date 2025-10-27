@@ -133,7 +133,9 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertColaborador = z.infer<typeof insertColaboradorSchema>;
 export type User = typeof users.$inferSelect;
 export type Cliente = typeof cazClientes.$inferSelect;
-export type ContaReceber = typeof cazReceber.$inferSelect;
+export type ContaReceber = typeof cazReceber.$inferSelect & {
+  urlCobranca?: string | null;
+};
 export type ContaPagar = typeof cazPagar.$inferSelect;
 export type Colaborador = typeof rhPessoal.$inferSelect;
 export type Parcela = typeof cazParcelas.$inferSelect;
