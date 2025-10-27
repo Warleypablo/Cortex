@@ -50,6 +50,49 @@ export const cazPagar = pgTable("caz_pagar", {
   empresa: text("empresa"),
 });
 
+export const cazParcelas = pgTable("caz_parcelas", {
+  id: integer("id").primaryKey(),
+  status: text("status"),
+  valorPago: decimal("valor_pago"),
+  perda: decimal("perda"),
+  naoPago: decimal("nao_pago"),
+  dataVencimento: timestamp("data_vencimento"),
+  descricao: text("descricao"),
+  metodoPagamento: text("metodo_pagamento"),
+  valorBruto: decimal("valor_bruto"),
+  valorLiquido: decimal("valor_liquido"),
+  idEvento: text("id_evento"),
+  tipoEvento: text("tipo_evento"),
+  idContaFinanceira: text("id_conta_financeira"),
+  nomeContaFinanceira: text("nome_conta_financeira"),
+  idCliente: text("id_cliente"),
+  urlCobranca: text("url_cobranca"),
+});
+
+export const cupClientes = pgTable("cup_clientes", {
+  nome: text("nome"),
+  cnpj: text("cnpj").primaryKey(),
+  status: text("status"),
+  telefone: text("telefone"),
+  responsavel: text("responsavel"),
+  cluster: text("cluster"),
+  taskId: text("task_id"),
+  responsavelGeral: text("responsavel_geral"),
+  squad: text("squad"),
+});
+
+export const cupContratos = pgTable("cup_contratos", {
+  servico: text("servico"),
+  status: text("status"),
+  valorr: decimal("valorr"),
+  valorp: decimal("valorp"),
+  idTask: text("id_task"),
+  idSubtask: text("id_subtask").primaryKey(),
+  dataInicio: timestamp("data_inicio"),
+  dataEncerramento: timestamp("data_encerramento"),
+  squad: text("squad"),
+});
+
 export const rhPessoal = pgTable("rh_pessoal", {
   id: integer("id").primaryKey(),
   status: varchar("status", { length: 50 }),
@@ -94,6 +137,9 @@ export type Cliente = typeof cazClientes.$inferSelect;
 export type ContaReceber = typeof cazReceber.$inferSelect;
 export type ContaPagar = typeof cazPagar.$inferSelect;
 export type Colaborador = typeof rhPessoal.$inferSelect;
+export type Parcela = typeof cazParcelas.$inferSelect;
+export type ClienteClickup = typeof cupClientes.$inferSelect;
+export type Contrato = typeof cupContratos.$inferSelect;
 
 export const patrimonioSchema = z.object({
   id: z.string(),
