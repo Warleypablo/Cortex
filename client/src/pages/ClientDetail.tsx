@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2 } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink } from "lucide-react";
 import type { ContratoCompleto } from "@shared/schema";
 
 interface ClienteDb {
@@ -32,6 +32,7 @@ interface ContaReceber {
   clienteId: string | null;
   clienteNome: string | null;
   empresa: string | null;
+  urlCobranca: string | null;
 }
 
 interface RevenueData {
@@ -350,6 +351,7 @@ export default function ClientDetail() {
                     <TableHead>Valor Total</TableHead>
                     <TableHead>Pago</TableHead>
                     <TableHead>Pendente</TableHead>
+                    <TableHead>Link Cobrança</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -386,11 +388,27 @@ export default function ClientDetail() {
                             currency: 'BRL' 
                           }).format(parseFloat(receita.naoPago || "0"))}
                         </TableCell>
+                        <TableCell>
+                          {receita.urlCobranca ? (
+                            <a 
+                              href={receita.urlCobranca} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-primary hover:underline"
+                              data-testid={`link-cobranca-${receita.id}`}
+                            >
+                              Acessar
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground text-sm" data-testid={`text-no-link-${receita.id}`}>-</span>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                         Nenhuma conta a receber encontrada
                       </TableCell>
                     </TableRow>
