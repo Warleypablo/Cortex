@@ -834,6 +834,8 @@ export default function Colaboradores() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [editingColaborador, setEditingColaborador] = useState<Colaborador | null>(null);
   const [deletingColaborador, setDeletingColaborador] = useState<Colaborador | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   const { data: colaboradores = [], isLoading } = useQuery<Colaborador[]>({
     queryKey: ["/api/colaboradores"],
@@ -869,6 +871,11 @@ export default function Colaboradores() {
 
     return filtered;
   }, [colaboradores, searchQuery, squadFilter, statusFilter]);
+
+  const totalPages = Math.ceil(filteredColaboradores.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedColaboradores = filteredColaboradores.slice(startIndex, endIndex);
 
   const ativos = filteredColaboradores.filter((c) => c.status === "Ativo").length;
 
@@ -966,14 +973,14 @@ export default function Colaboradores() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredColaboradores.length === 0 ? (
+                {paginatedColaboradores.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={18} className="text-center py-8 text-muted-foreground">
                       Nenhum colaborador encontrado
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredColaboradores.map((colaborador) => (
+                  paginatedColaboradores.map((colaborador) => (
                     <TableRow
                       key={colaborador.id}
                       className="hover-elevate cursor-pointer"
@@ -1225,6 +1232,75 @@ export default function Colaboradores() {
             </Table>
             </div>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Itens por página:</span>
+                <Select
+                  value={itemsPerPage.toString()}
+                  onValueChange={(value) => {
+                    setItemsPerPage(Number(value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-[100px]" data-testid="select-items-per-page">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    data-testid="button-first-page"
+                  >
+                    Primeira
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    data-testid="button-prev-page"
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    data-testid="button-next-page"
+                  >
+                    Próxima
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    data-testid="button-last-page"
+                  >
+                    Última
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
