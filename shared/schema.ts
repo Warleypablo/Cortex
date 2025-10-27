@@ -140,6 +140,20 @@ export type Parcela = typeof cazParcelas.$inferSelect;
 export type ClienteClickup = typeof cupClientes.$inferSelect;
 export type Contrato = typeof cupContratos.$inferSelect;
 
+export type ContratoCompleto = {
+  idSubtask: string | null;
+  servico: string | null;
+  status: string | null;
+  valorr: string | null;
+  valorp: string | null;
+  dataInicio: Date | null;
+  dataEncerramento: Date | null;
+  squad: string | null;
+  idTask: string | null;
+  nomeCliente: string | null;
+  cnpjCliente: string | null;
+};
+
 export const patrimonioSchema = z.object({
   id: z.string(),
   tipo: z.string(),
