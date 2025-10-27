@@ -3,12 +3,21 @@ import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 
+export type ClienteCompleto = Cliente & {
+  nomeClickup: string | null;
+  squad: string | null;
+  statusClickup: string | null;
+  telefone: string | null;
+  responsavel: string | null;
+  cluster: string | null;
+};
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  getClientes(): Promise<Cliente[]>;
-  getClienteById(id: string): Promise<Cliente | undefined>;
+  getClientes(): Promise<ClienteCompleto[]>;
+  getClienteById(id: string): Promise<ClienteCompleto | undefined>;
   getClienteByCnpj(cnpj: string): Promise<Cliente | undefined>;
   getContasReceberByCliente(clienteId: string, limit?: number): Promise<ContaReceber[]>;
   getContasPagarByFornecedor(fornecedorId: string, limit?: number): Promise<ContaPagar[]>;
@@ -41,11 +50,11 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async getClientes(): Promise<Cliente[]> {
+  async getClientes(): Promise<ClienteCompleto[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getClienteById(id: string): Promise<Cliente | undefined> {
+  async getClienteById(id: string): Promise<ClienteCompleto | undefined> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -90,18 +99,63 @@ export class DbStorage implements IStorage {
     return user;
   }
 
-  async getClientes(): Promise<Cliente[]> {
-    return await db.select().from(schema.cazClientes).orderBy(schema.cazClientes.nome);
+  async getClientes(): Promise<ClienteCompleto[]> {
+    const result = await db
+      .select({
+        id: schema.cazClientes.id,
+        nome: schema.cazClientes.nome,
+        cnpj: schema.cazClientes.cnpj,
+        endereco: schema.cazClientes.endereco,
+        ativo: schema.cazClientes.ativo,
+        createdAt: schema.cazClientes.createdAt,
+        empresa: schema.cazClientes.empresa,
+        ids: schema.cazClientes.ids,
+        nomeClickup: schema.cupClientes.nome,
+        squad: schema.cupClientes.squad,
+        statusClickup: schema.cupClientes.status,
+        telefone: schema.cupClientes.telefone,
+        responsavel: schema.cupClientes.responsavel,
+        cluster: schema.cupClientes.cluster,
+      })
+      .from(schema.cazClientes)
+      .leftJoin(
+        schema.cupClientes,
+        eq(schema.cazClientes.cnpj, schema.cupClientes.cnpj)
+      )
+      .orderBy(schema.cupClientes.nome);
+
+    return result;
   }
 
-  async getClienteById(id: string): Promise<Cliente | undefined> {
-    const clientes = await db.select()
+  async getClienteById(id: string): Promise<ClienteCompleto | undefined> {
+    const result = await db
+      .select({
+        id: schema.cazClientes.id,
+        nome: schema.cazClientes.nome,
+        cnpj: schema.cazClientes.cnpj,
+        endereco: schema.cazClientes.endereco,
+        ativo: schema.cazClientes.ativo,
+        createdAt: schema.cazClientes.createdAt,
+        empresa: schema.cazClientes.empresa,
+        ids: schema.cazClientes.ids,
+        nomeClickup: schema.cupClientes.nome,
+        squad: schema.cupClientes.squad,
+        statusClickup: schema.cupClientes.status,
+        telefone: schema.cupClientes.telefone,
+        responsavel: schema.cupClientes.responsavel,
+        cluster: schema.cupClientes.cluster,
+      })
       .from(schema.cazClientes)
+      .leftJoin(
+        schema.cupClientes,
+        eq(schema.cazClientes.cnpj, schema.cupClientes.cnpj)
+      )
       .where(
         sql`${schema.cazClientes.ids} = ${id} OR ${schema.cazClientes.id}::text = ${id}`
       )
       .limit(1);
-    return clientes[0];
+
+    return result[0];
   }
 
   async getClienteByCnpj(cnpj: string): Promise<Cliente | undefined> {
