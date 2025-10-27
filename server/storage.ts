@@ -197,7 +197,7 @@ export class DbStorage implements IStorage {
       status: schema.cazReceber.status,
       total: schema.cazReceber.total,
       descricao: schema.cazReceber.descricao,
-      dataVencimento: schema.cazReceber.dataVencimento,
+      dataVencimento: sql<Date>`COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazParcelas.dataVencimento})`.as('data_vencimento'),
       naoPago: schema.cazReceber.naoPago,
       pago: schema.cazReceber.pago,
       dataCriacao: schema.cazReceber.dataCriacao,
