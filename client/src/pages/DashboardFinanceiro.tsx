@@ -92,9 +92,9 @@ export default function DashboardFinanceiro() {
   };
 
   const handleBarClick = (data: any) => {
-    if (data && data.mes) {
-      const [mes, ano] = data.mes.split('/').map(Number);
-      setMesSelecionado({ ano, mes, mesAno: data.mes });
+    if (data && data.payload && data.payload.mes) {
+      const [mes, ano] = data.payload.mes.split('/').map(Number);
+      setMesSelecionado({ ano, mes, mesAno: data.payload.mes });
     }
   };
 
@@ -193,7 +193,7 @@ export default function DashboardFinanceiro() {
           <CardContent>
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={chartData} data-testid="chart-fluxo-caixa" onClick={handleBarClick}>
+                <BarChart data={chartData} data-testid="chart-fluxo-caixa">
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis 
                     dataKey="mes" 
@@ -220,6 +220,7 @@ export default function DashboardFinanceiro() {
                     fill="#16a34a" 
                     radius={[4, 4, 0, 0]}
                     cursor="pointer"
+                    onClick={handleBarClick}
                   >
                     {chartData.map((entry, index) => (
                       <Cell 
@@ -234,6 +235,7 @@ export default function DashboardFinanceiro() {
                     fill="#dc2626" 
                     radius={[4, 4, 0, 0]}
                     cursor="pointer"
+                    onClick={handleBarClick}
                   >
                     {chartData.map((entry, index) => (
                       <Cell 
