@@ -169,6 +169,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dashboard/saldo-atual", async (req, res) => {
+    try {
+      const saldo = await storage.getSaldoAtualBancos();
+      res.json(saldo);
+    } catch (error) {
+      console.error("[api] Error fetching saldo atual:", error);
+      res.status(500).json({ error: "Failed to fetch saldo atual" });
+    }
+  });
+
+  app.get("/api/dashboard/fluxo-caixa", async (req, res) => {
+    try {
+      const fluxoCaixa = await storage.getFluxoCaixa();
+      res.json(fluxoCaixa);
+    } catch (error) {
+      console.error("[api] Error fetching fluxo de caixa:", error);
+      res.status(500).json({ error: "Failed to fetch fluxo de caixa" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
