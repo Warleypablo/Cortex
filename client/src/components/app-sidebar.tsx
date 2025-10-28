@@ -1,4 +1,5 @@
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench } from "lucide-react";
+import { useState } from "react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound, ChevronRight } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -8,8 +9,12 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarHeader,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useLocation, Link } from "wouter";
 
 const menuItems = [
@@ -40,8 +45,24 @@ const menuItems = [
   },
 ];
 
+const dashboardItems = [
+  {
+    title: "Financeiro",
+    url: "/dashboard/financeiro",
+    icon: TrendingUp,
+  },
+  {
+    title: "G&G",
+    url: "/dashboard/geg",
+    icon: UsersRound,
+  },
+];
+
 export function AppSidebar() {
   const [location] = useLocation();
+  const [isDashboardOpen, setIsDashboardOpen] = useState(
+    location.startsWith("/dashboard")
+  );
 
   return (
     <Sidebar>
@@ -61,6 +82,40 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <Collapsible
+                open={isDashboardOpen}
+                onOpenChange={setIsDashboardOpen}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton data-testid="nav-dashboards">
+                      <BarChart3 />
+                      <span>Dashboards</span>
+                      <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {dashboardItems.map((item) => (
+                        <SidebarMenuSubItem key={item.title}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={location === item.url}
+                            data-testid={`nav-dashboard-${item.title.toLowerCase().replace('&', '')}`}
+                          >
+                            <Link href={item.url}>
+                              <item.icon className="w-4 h-4" />
+                              <span>{item.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 

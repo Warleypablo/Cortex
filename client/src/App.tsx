@@ -15,6 +15,8 @@ import Colaboradores from "@/pages/Colaboradores";
 import ColaboradoresAnalise from "@/pages/ColaboradoresAnalise";
 import Patrimonio from "@/pages/Patrimonio";
 import Ferramentas from "@/pages/Ferramentas";
+import DashboardFinanceiro from "@/pages/DashboardFinanceiro";
+import DashboardGeG from "@/pages/DashboardGeG";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -35,6 +37,8 @@ function Router() {
       <Route path="/colaboradores/analise" component={ColaboradoresAnalise} />
       <Route path="/patrimonio" component={Patrimonio} />
       <Route path="/ferramentas" component={Ferramentas} />
+      <Route path="/dashboard/financeiro" component={DashboardFinanceiro} />
+      <Route path="/dashboard/geg" component={DashboardGeG} />
       <Route path="/cliente/:id" component={ClientDetail} />
       <Route>
         {() => (
