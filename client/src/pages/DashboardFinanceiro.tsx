@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +12,10 @@ export default function DashboardFinanceiro() {
   const [periodoMeses, setPeriodoMeses] = useState(6);
   const [mesSelecionado, setMesSelecionado] = useState<{ ano: number; mes: number; mesAno: string } | null>(null);
   const [diaSelecionado, setDiaSelecionado] = useState<{ ano: number; mes: number; dia: number; diaFormatado: string } | null>(null);
+
+  useEffect(() => {
+    setDiaSelecionado(null);
+  }, [mesSelecionado]);
 
   const { data: saldoData, isLoading: isLoadingSaldo } = useQuery<SaldoBancos>({
     queryKey: ["/api/dashboard/saldo-atual"],
@@ -113,7 +117,6 @@ export default function DashboardFinanceiro() {
 
   const handleLimparSelecao = () => {
     setMesSelecionado(null);
-    setDiaSelecionado(null);
   };
 
   const handleDiaClick = (data: any) => {
