@@ -9,7 +9,9 @@ export type ClienteCompleto = Cliente & {
   telefone: string | null;
   responsavel: string | null;
   cluster: string | null;
-  ltv: string | null;
+  cnpjCliente: string | null;
+  servicos: string | null;
+  dataInicio: Date | null;
 };
 
 export interface IStorage {
@@ -145,10 +147,16 @@ export class DbStorage implements IStorage {
         telefone: schema.cupClientes.telefone,
         responsavel: schema.cupClientes.responsavel,
         cluster: schema.cupClientes.cluster,
-        ltv: sql<string>`(
-          SELECT COALESCE(SUM(pago), 0)::text
-          FROM ${schema.cazReceber}
-          WHERE ${schema.cazReceber.clienteId} = ${schema.cazClientes.ids}
+        cnpjCliente: schema.cupClientes.cnpj,
+        servicos: sql<string>`(
+          SELECT string_agg(DISTINCT servico, ', ')
+          FROM ${schema.cupContratos}
+          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+        )`,
+        dataInicio: sql<Date>`(
+          SELECT MIN(data_inicio)
+          FROM ${schema.cupContratos}
+          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
       })
       .from(schema.cazClientes)
@@ -177,10 +185,16 @@ export class DbStorage implements IStorage {
         telefone: schema.cupClientes.telefone,
         responsavel: schema.cupClientes.responsavel,
         cluster: schema.cupClientes.cluster,
-        ltv: sql<string>`(
-          SELECT COALESCE(SUM(pago), 0)::text
-          FROM ${schema.cazReceber}
-          WHERE ${schema.cazReceber.clienteId} = ${schema.cazClientes.ids}
+        cnpjCliente: schema.cupClientes.cnpj,
+        servicos: sql<string>`(
+          SELECT string_agg(DISTINCT servico, ', ')
+          FROM ${schema.cupContratos}
+          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+        )`,
+        dataInicio: sql<Date>`(
+          SELECT MIN(data_inicio)
+          FROM ${schema.cupContratos}
+          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
       })
       .from(schema.cazClientes)
