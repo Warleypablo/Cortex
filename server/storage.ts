@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -84,6 +84,7 @@ export interface IStorage {
   getSaldoAtualBancos(): Promise<SaldoBancos>;
   getFluxoCaixa(): Promise<FluxoCaixaItem[]>;
   getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]>;
+  getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -179,6 +180,10 @@ export class MemStorage implements IStorage {
   }
 
   async getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -623,9 +628,12 @@ export class DbStorage implements IStorage {
   }
 
   async getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]> {
+    const saldoAtual = await this.getSaldoAtualBancos();
+    
     const result = await db.execute(sql`
       SELECT 
         TO_CHAR(data_vencimento, 'DD/MM/YYYY') as dia,
+        data_vencimento,
         COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END), 0) as receitas,
         COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END), 0) as despesas
       FROM ${schema.cazParcelas}
@@ -637,10 +645,63 @@ export class DbStorage implements IStorage {
       ORDER BY data_vencimento ASC
     `);
     
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    const transacoesPassadas = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END), 0) as fluxo_passado
+      FROM ${schema.cazParcelas}
+      WHERE tipo_evento IN ('RECEITA', 'DESPESA')
+        AND data_vencimento IS NOT NULL
+        AND data_vencimento < ${hoje.toISOString()}
+    `);
+    
+    const fluxoPassado = parseFloat((transacoesPassadas.rows[0] as any)?.fluxo_passado || '0');
+    const saldoInicial = saldoAtual.saldoTotal - fluxoPassado;
+    
+    let saldoAcumulado = saldoInicial;
+    
+    return (result.rows as any[]).map((row: any) => {
+      const receitas = parseFloat(row.receitas || '0');
+      const despesas = parseFloat(row.despesas || '0');
+      saldoAcumulado += receitas - despesas;
+      
+      return {
+        dia: row.dia,
+        receitas,
+        despesas,
+        saldoAcumulado,
+      };
+    });
+  }
+
+  async getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        id,
+        descricao,
+        valor_bruto,
+        tipo_evento,
+        empresa,
+        data_vencimento
+      FROM ${schema.cazParcelas}
+      WHERE tipo_evento IN ('RECEITA', 'DESPESA')
+        AND data_vencimento IS NOT NULL
+        AND EXTRACT(YEAR FROM data_vencimento) = ${ano}
+        AND EXTRACT(MONTH FROM data_vencimento) = ${mes}
+        AND EXTRACT(DAY FROM data_vencimento) = ${dia}
+      ORDER BY tipo_evento DESC, valor_bruto DESC
+    `);
+    
     return (result.rows as any[]).map((row: any) => ({
-      dia: row.dia,
-      receitas: parseFloat(row.receitas || '0'),
-      despesas: parseFloat(row.despesas || '0'),
+      id: row.id,
+      descricao: row.descricao,
+      valorBruto: parseFloat(row.valor_bruto || '0'),
+      tipoEvento: row.tipo_evento,
+      empresa: row.empresa,
+      dataVencimento: new Date(row.data_vencimento),
     }));
   }
 }
