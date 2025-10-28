@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type SaldoBancos } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -81,6 +81,8 @@ export interface IStorage {
   getPatrimonios(): Promise<Patrimonio[]>;
   createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio>;
   getColaboradoresAnalise(): Promise<DashboardAnaliseData>;
+  getSaldoAtualBancos(): Promise<SaldoBancos>;
+  getFluxoCaixa(): Promise<FluxoCaixaItem[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -164,6 +166,14 @@ export class MemStorage implements IStorage {
   }
 
   async getColaboradoresAnalise(): Promise<DashboardAnaliseData> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getSaldoAtualBancos(): Promise<SaldoBancos> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getFluxoCaixa(): Promise<FluxoCaixaItem[]> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -573,6 +583,38 @@ export class DbStorage implements IStorage {
       tempoMedioPromocao,
       tempoPermanencia,
     };
+  }
+
+  async getSaldoAtualBancos(): Promise<SaldoBancos> {
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
+      FROM ${schema.cazBancos}
+    `);
+    
+    const row = result.rows[0] as any;
+    return {
+      saldoTotal: parseFloat(row?.saldo_total || '0'),
+    };
+  }
+
+  async getFluxoCaixa(): Promise<FluxoCaixaItem[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        data_vencimento,
+        tipo_evento,
+        COALESCE(SUM(valor_bruto::numeric), 0) as valor_bruto
+      FROM ${schema.cazParcelas}
+      WHERE tipo_evento IN ('RECEITA', 'DESPESA')
+        AND data_vencimento IS NOT NULL
+      GROUP BY data_vencimento, tipo_evento
+      ORDER BY data_vencimento DESC
+    `);
+    
+    return (result.rows as any[]).map((row: any) => ({
+      dataVencimento: new Date(row.data_vencimento),
+      tipoEvento: row.tipo_evento,
+      valorBruto: parseFloat(row.valor_bruto || '0'),
+    }));
   }
 }
 
