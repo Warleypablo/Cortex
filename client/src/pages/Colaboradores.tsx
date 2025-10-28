@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2 } from "lucide-react";
+import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3 } from "lucide-react";
+import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -941,6 +942,13 @@ export default function Colaboradores() {
                 <SelectItem value="Inativo">Inativo</SelectItem>
               </SelectContent>
             </Select>
+
+            <Link href="/colaboradores/analise">
+              <Button variant="outline" data-testid="button-analise-colaboradores">
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Análise de Colaboradores
+              </Button>
+            </Link>
 
             <AddColaboradorDialog />
           </div>
