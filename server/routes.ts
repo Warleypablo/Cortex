@@ -125,6 +125,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/colaboradores/analise", async (req, res) => {
+    try {
+      const analiseData = await storage.getColaboradoresAnalise();
+      res.json(analiseData);
+    } catch (error) {
+      console.error("[api] Error fetching colaboradores analise:", error);
+      res.status(500).json({ error: "Failed to fetch colaboradores analise" });
+    }
+  });
+
   app.get("/api/contratos", async (req, res) => {
     try {
       const contratos = await storage.getContratos();

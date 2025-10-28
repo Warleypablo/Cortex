@@ -14,6 +14,54 @@ export type ClienteCompleto = Cliente & {
   dataInicio: Date | null;
 };
 
+export interface AniversariantesMes {
+  id: number;
+  nome: string;
+  aniversario: string;
+  cargo: string | null;
+  squad: string | null;
+  diasAteAniversario: number;
+}
+
+export interface AniversarioEmpresaMes {
+  id: number;
+  nome: string;
+  admissao: string;
+  cargo: string | null;
+  squad: string | null;
+  anosDeEmpresa: number;
+  diasAteAniversarioEmpresa: number;
+}
+
+export interface UltimaPromocao {
+  id: number;
+  nome: string;
+  cargo: string | null;
+  squad: string | null;
+  ultimoAumento: string | null;
+  mesesDesdeAumento: number | null;
+}
+
+export interface TempoMedioPromocao {
+  tempoMedioMeses: number;
+  totalColaboradores: number;
+}
+
+export interface TempoPermanencia {
+  tempoPermanenciaAtivos: number;
+  totalAtivos: number;
+  tempoPermanenciaDesligados: number;
+  totalDesligados: number;
+}
+
+export interface DashboardAnaliseData {
+  aniversariantesMes: AniversariantesMes[];
+  aniversarioEmpresaMes: AniversarioEmpresaMes[];
+  ultimasPromocoes: UltimaPromocao[];
+  tempoMedioPromocao: TempoMedioPromocao;
+  tempoPermanencia: TempoPermanencia;
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -32,6 +80,7 @@ export interface IStorage {
   getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]>;
   getPatrimonios(): Promise<Patrimonio[]>;
   createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio>;
+  getColaboradoresAnalise(): Promise<DashboardAnaliseData>;
 }
 
 export class MemStorage implements IStorage {
@@ -111,6 +160,10 @@ export class MemStorage implements IStorage {
   }
 
   async createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getColaboradoresAnalise(): Promise<DashboardAnaliseData> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -361,6 +414,165 @@ export class DbStorage implements IStorage {
   async createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio> {
     const [newPatrimonio] = await db.insert(schema.rhPatrimonio).values(patrimonio as any).returning();
     return newPatrimonio;
+  }
+
+  async getColaboradoresAnalise(): Promise<DashboardAnaliseData> {
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+
+    const aniversariantesResult = await db.execute(sql`
+      SELECT 
+        id,
+        nome,
+        aniversario::text,
+        cargo,
+        squad,
+        (
+          CASE
+            WHEN EXTRACT(MONTH FROM aniversario) = 2 AND EXTRACT(DAY FROM aniversario) = 29 
+                 AND NOT (
+                   (EXTRACT(YEAR FROM CURRENT_DATE)::int % 4 = 0 AND EXTRACT(YEAR FROM CURRENT_DATE)::int % 100 != 0)
+                   OR EXTRACT(YEAR FROM CURRENT_DATE)::int % 400 = 0
+                 ) THEN
+              MAKE_DATE(
+                EXTRACT(YEAR FROM CURRENT_DATE)::int,
+                2,
+                28
+              )
+            ELSE
+              MAKE_DATE(
+                EXTRACT(YEAR FROM CURRENT_DATE)::int,
+                EXTRACT(MONTH FROM aniversario)::int,
+                EXTRACT(DAY FROM aniversario)::int
+              )
+          END - CURRENT_DATE
+        )::int as dias_ate_aniversario
+      FROM ${schema.rhPessoal}
+      WHERE EXTRACT(MONTH FROM aniversario) = ${currentMonth}
+        AND status = 'Ativo'
+      ORDER BY EXTRACT(DAY FROM aniversario)
+    `);
+
+    const aniversarioEmpresaResult = await db.execute(sql`
+      SELECT 
+        id,
+        nome,
+        admissao::text,
+        cargo,
+        squad,
+        EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao))::int as anos_de_empresa,
+        (
+          CASE
+            WHEN EXTRACT(MONTH FROM admissao) = 2 AND EXTRACT(DAY FROM admissao) = 29 
+                 AND NOT (
+                   (EXTRACT(YEAR FROM CURRENT_DATE)::int % 4 = 0 AND EXTRACT(YEAR FROM CURRENT_DATE)::int % 100 != 0)
+                   OR EXTRACT(YEAR FROM CURRENT_DATE)::int % 400 = 0
+                 ) THEN
+              MAKE_DATE(
+                EXTRACT(YEAR FROM CURRENT_DATE)::int,
+                2,
+                28
+              )
+            ELSE
+              MAKE_DATE(
+                EXTRACT(YEAR FROM CURRENT_DATE)::int,
+                EXTRACT(MONTH FROM admissao)::int,
+                EXTRACT(DAY FROM admissao)::int
+              )
+          END - CURRENT_DATE
+        )::int as dias_ate_aniversario_empresa
+      FROM ${schema.rhPessoal}
+      WHERE EXTRACT(MONTH FROM admissao) = ${currentMonth}
+        AND status = 'Ativo'
+        AND admissao IS NOT NULL
+      ORDER BY EXTRACT(DAY FROM admissao)
+    `);
+
+    const ultimasPromocoesResult = await db.execute(sql`
+      SELECT 
+        id,
+        nome,
+        cargo,
+        squad,
+        ultimo_aumento::text as ultimo_aumento,
+        meses_ult_aumento as meses_desde_aumento
+      FROM ${schema.rhPessoal}
+      WHERE status = 'Ativo'
+        AND ultimo_aumento IS NOT NULL
+      ORDER BY meses_ult_aumento DESC NULLS LAST
+      LIMIT 50
+    `);
+
+    const tempoMedioPromocaoResult = await db.execute(sql`
+      SELECT 
+        COALESCE(AVG(meses_ult_aumento), 0)::numeric(10,2) as tempo_medio_meses,
+        COUNT(*) as total_colaboradores
+      FROM ${schema.rhPessoal}
+      WHERE status = 'Ativo'
+        AND meses_ult_aumento IS NOT NULL
+    `);
+
+    const tempoPermanenciaResult = await db.execute(sql`
+      SELECT 
+        COALESCE(AVG(CASE WHEN status = 'Ativo' THEN meses_de_turbo END), 0)::numeric(10,2) as tempo_permanencia_ativos,
+        COUNT(CASE WHEN status = 'Ativo' THEN 1 END) as total_ativos,
+        COALESCE(AVG(CASE WHEN status != 'Ativo' AND demissao IS NOT NULL THEN 
+          EXTRACT(YEAR FROM AGE(demissao, admissao))::int * 12 + 
+          EXTRACT(MONTH FROM AGE(demissao, admissao))::int
+        END), 0)::numeric(10,2) as tempo_permanencia_desligados,
+        COUNT(CASE WHEN status != 'Ativo' AND demissao IS NOT NULL THEN 1 END) as total_desligados
+      FROM ${schema.rhPessoal}
+    `);
+
+    const aniversariantesMes: AniversariantesMes[] = (aniversariantesResult.rows as any[]).map((row: any) => ({
+      id: row.id,
+      nome: row.nome,
+      aniversario: row.aniversario,
+      cargo: row.cargo,
+      squad: row.squad,
+      diasAteAniversario: row.dias_ate_aniversario || 0,
+    }));
+
+    const aniversarioEmpresaMes: AniversarioEmpresaMes[] = (aniversarioEmpresaResult.rows as any[]).map((row: any) => ({
+      id: row.id,
+      nome: row.nome,
+      admissao: row.admissao,
+      cargo: row.cargo,
+      squad: row.squad,
+      anosDeEmpresa: row.anos_de_empresa || 0,
+      diasAteAniversarioEmpresa: row.dias_ate_aniversario_empresa || 0,
+    }));
+
+    const ultimasPromocoes: UltimaPromocao[] = (ultimasPromocoesResult.rows as any[]).map((row: any) => ({
+      id: row.id,
+      nome: row.nome,
+      cargo: row.cargo,
+      squad: row.squad,
+      ultimoAumento: row.ultimo_aumento,
+      mesesDesdeAumento: row.meses_desde_aumento,
+    }));
+
+    const tempoMedioRow = tempoMedioPromocaoResult.rows[0] as any;
+    const tempoMedioPromocao: TempoMedioPromocao = {
+      tempoMedioMeses: parseFloat(tempoMedioRow?.tempo_medio_meses || '0'),
+      totalColaboradores: tempoMedioRow?.total_colaboradores || 0,
+    };
+
+    const tempoPermanenciaRow = tempoPermanenciaResult.rows[0] as any;
+    const tempoPermanencia: TempoPermanencia = {
+      tempoPermanenciaAtivos: parseFloat(tempoPermanenciaRow?.tempo_permanencia_ativos || '0'),
+      totalAtivos: tempoPermanenciaRow?.total_ativos || 0,
+      tempoPermanenciaDesligados: parseFloat(tempoPermanenciaRow?.tempo_permanencia_desligados || '0'),
+      totalDesligados: tempoPermanenciaRow?.total_desligados || 0,
+    };
+
+    return {
+      aniversariantesMes,
+      aniversarioEmpresaMes,
+      ultimasPromocoes,
+      tempoMedioPromocao,
+      tempoPermanencia,
+    };
   }
 }
 

@@ -12,6 +12,7 @@ import Clients from "@/pages/Clients";
 import Contracts from "@/pages/Contracts";
 import ClientDetail from "@/pages/ClientDetail";
 import Colaboradores from "@/pages/Colaboradores";
+import ColaboradoresAnalise from "@/pages/ColaboradoresAnalise";
 import Patrimonio from "@/pages/Patrimonio";
 import Ferramentas from "@/pages/Ferramentas";
 
@@ -31,6 +32,7 @@ function Router() {
       <Route path="/" component={Clients} />
       <Route path="/contratos" component={Contracts} />
       <Route path="/colaboradores" component={Colaboradores} />
+      <Route path="/colaboradores/analise" component={ColaboradoresAnalise} />
       <Route path="/patrimonio" component={Patrimonio} />
       <Route path="/ferramentas" component={Ferramentas} />
       <Route path="/cliente/:id" component={ClientDetail} />
