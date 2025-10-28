@@ -2,12 +2,14 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import type { FluxoCaixaItem, SaldoBancos } from "@shared/schema";
+import { Button } from "@/components/ui/button";
+import { Loader2, TrendingUp, TrendingDown, DollarSign, X, ChevronRight } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import type { FluxoCaixaItem, FluxoCaixaDiarioItem, SaldoBancos } from "@shared/schema";
 
 export default function DashboardFinanceiro() {
   const [periodoMeses, setPeriodoMeses] = useState(6);
+  const [mesSelecionado, setMesSelecionado] = useState<{ ano: number; mes: number; mesAno: string } | null>(null);
 
   const { data: saldoData, isLoading: isLoadingSaldo } = useQuery<SaldoBancos>({
     queryKey: ["/api/dashboard/saldo-atual"],
@@ -15,6 +17,11 @@ export default function DashboardFinanceiro() {
 
   const { data: fluxoCaixaData, isLoading: isLoadingFluxo } = useQuery<FluxoCaixaItem[]>({
     queryKey: ["/api/dashboard/fluxo-caixa"],
+  });
+
+  const { data: fluxoCaixaDiarioData, isLoading: isLoadingDiario } = useQuery<FluxoCaixaDiarioItem[]>({
+    queryKey: ["/api/dashboard/fluxo-caixa-diario", mesSelecionado?.ano, mesSelecionado?.mes],
+    enabled: mesSelecionado !== null,
   });
 
   const fluxoCaixaFiltrado = useMemo(() => {
@@ -78,6 +85,26 @@ export default function DashboardFinanceiro() {
     }).format(value);
   };
 
+  const handleBarClick = (data: any) => {
+    if (data && data.mes) {
+      const [mes, ano] = data.mes.split('/').map(Number);
+      setMesSelecionado({ ano, mes, mesAno: data.mes });
+    }
+  };
+
+  const handleLimparSelecao = () => {
+    setMesSelecionado(null);
+  };
+
+  const getNomeMes = (mesAno: string) => {
+    const [mes, ano] = mesAno.split('/');
+    const meses = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    return `${meses[parseInt(mes) - 1]} ${ano}`;
+  };
+
   const isLoading = isLoadingSaldo || isLoadingFluxo;
 
   if (isLoading) {
@@ -137,12 +164,12 @@ export default function DashboardFinanceiro() {
           </Card>
         </div>
 
-        <Card>
+        <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle data-testid="text-chart-title">Fluxo de Caixa</CardTitle>
-                <CardDescription>Receitas e despesas ao longo do tempo</CardDescription>
+                <CardTitle data-testid="text-chart-title">Fluxo de Caixa - Visão Mensal</CardTitle>
+                <CardDescription>Clique em um mês para ver detalhamento diário</CardDescription>
               </div>
               <Select value={periodoMeses.toString()} onValueChange={(value) => setPeriodoMeses(Number(value))}>
                 <SelectTrigger className="w-[180px]" data-testid="select-periodo">
@@ -160,7 +187,7 @@ export default function DashboardFinanceiro() {
           <CardContent>
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={chartData} data-testid="chart-fluxo-caixa">
+                <BarChart data={chartData} data-testid="chart-fluxo-caixa" onClick={handleBarClick}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis 
                     dataKey="mes" 
@@ -186,13 +213,29 @@ export default function DashboardFinanceiro() {
                     name="Receitas" 
                     fill="#16a34a" 
                     radius={[4, 4, 0, 0]}
-                  />
+                    cursor="pointer"
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-receita-${index}`} 
+                        opacity={mesSelecionado?.mesAno === entry.mes ? 1 : 0.7}
+                      />
+                    ))}
+                  </Bar>
                   <Bar 
                     dataKey="despesas" 
                     name="Despesas" 
                     fill="#dc2626" 
                     radius={[4, 4, 0, 0]}
-                  />
+                    cursor="pointer"
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-despesa-${index}`} 
+                        opacity={mesSelecionado?.mesAno === entry.mes ? 1 : 0.7}
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -202,6 +245,83 @@ export default function DashboardFinanceiro() {
             )}
           </CardContent>
         </Card>
+
+        {mesSelecionado && (
+          <Card data-testid="card-detalhamento-diario">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                    <span>Visão Mensal</span>
+                    <ChevronRight className="w-4 h-4" />
+                    <span className="text-foreground font-medium">{getNomeMes(mesSelecionado.mesAno)}</span>
+                  </div>
+                  <CardTitle data-testid="text-detalhamento-title">Detalhamento Diário</CardTitle>
+                  <CardDescription>Receitas e despesas dia a dia</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleLimparSelecao}
+                  data-testid="button-limpar-selecao"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingDiario ? (
+                <div className="flex items-center justify-center h-[400px]">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" data-testid="loading-diario" />
+                </div>
+              ) : fluxoCaixaDiarioData && fluxoCaixaDiarioData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={fluxoCaixaDiarioData} data-testid="chart-fluxo-caixa-diario">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis 
+                      dataKey="dia" 
+                      className="text-sm"
+                      tick={{ fill: 'currentColor', fontSize: 11 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis 
+                      className="text-sm"
+                      tick={{ fill: 'currentColor' }}
+                      tickFormatter={(value) => formatCurrency(value)}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--background))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px',
+                      }}
+                    />
+                    <Legend />
+                    <Bar 
+                      dataKey="receitas" 
+                      name="Receitas" 
+                      fill="#16a34a" 
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Bar 
+                      dataKey="despesas" 
+                      name="Despesas" 
+                      fill="#dc2626" 
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[400px]" data-testid="text-no-data-diario">
+                  <p className="text-muted-foreground">Nenhum dado disponível para este mês</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
