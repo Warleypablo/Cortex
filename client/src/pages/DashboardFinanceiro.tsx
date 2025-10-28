@@ -3,13 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Loader2, TrendingUp, TrendingDown, DollarSign, X, ChevronRight } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
-import type { FluxoCaixaItem, FluxoCaixaDiarioItem, SaldoBancos } from "@shared/schema";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Loader2, TrendingUp, TrendingDown, DollarSign, X, ChevronRight, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, ComposedChart, Line } from "recharts";
+import type { FluxoCaixaItem, FluxoCaixaDiarioItem, SaldoBancos, TransacaoDiaItem } from "@shared/schema";
 
 export default function DashboardFinanceiro() {
   const [periodoMeses, setPeriodoMeses] = useState(6);
   const [mesSelecionado, setMesSelecionado] = useState<{ ano: number; mes: number; mesAno: string } | null>(null);
+  const [diaSelecionado, setDiaSelecionado] = useState<{ ano: number; mes: number; dia: number; diaFormatado: string } | null>(null);
 
   const { data: saldoData, isLoading: isLoadingSaldo } = useQuery<SaldoBancos>({
     queryKey: ["/api/dashboard/saldo-atual"],
@@ -28,6 +30,17 @@ export default function DashboardFinanceiro() {
       return response.json();
     },
     enabled: mesSelecionado !== null,
+  });
+
+  const { data: transacoesDiaData, isLoading: isLoadingTransacoes } = useQuery<TransacaoDiaItem[]>({
+    queryKey: ["/api/dashboard/transacoes-dia", diaSelecionado?.ano, diaSelecionado?.mes, diaSelecionado?.dia],
+    queryFn: async () => {
+      if (!diaSelecionado) return [];
+      const response = await fetch(`/api/dashboard/transacoes-dia?ano=${diaSelecionado.ano}&mes=${diaSelecionado.mes}&dia=${diaSelecionado.dia}`);
+      if (!response.ok) throw new Error('Failed to fetch transactions');
+      return response.json();
+    },
+    enabled: diaSelecionado !== null,
   });
 
   const fluxoCaixaFiltrado = useMemo(() => {
@@ -100,6 +113,18 @@ export default function DashboardFinanceiro() {
 
   const handleLimparSelecao = () => {
     setMesSelecionado(null);
+    setDiaSelecionado(null);
+  };
+
+  const handleDiaClick = (data: any) => {
+    if (data && data.payload && data.payload.dia && mesSelecionado) {
+      const [dia, mes, ano] = data.payload.dia.split('/').map(Number);
+      setDiaSelecionado({ ano, mes, dia, diaFormatado: data.payload.dia });
+    }
+  };
+
+  const handleLimparDia = () => {
+    setDiaSelecionado(null);
   };
 
   const getNomeMes = (mesAno: string) => {
@@ -283,48 +308,172 @@ export default function DashboardFinanceiro() {
                   <Loader2 className="w-8 h-8 animate-spin text-primary" data-testid="loading-diario" />
                 </div>
               ) : fluxoCaixaDiarioData && fluxoCaixaDiarioData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={fluxoCaixaDiarioData} data-testid="chart-fluxo-caixa-diario">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="dia" 
-                      className="text-sm"
-                      tick={{ fill: 'currentColor', fontSize: 11 }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={80}
-                    />
-                    <YAxis 
-                      className="text-sm"
-                      tick={{ fill: 'currentColor' }}
-                      tickFormatter={(value) => formatCurrency(value)}
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px',
-                      }}
-                    />
-                    <Legend />
-                    <Bar 
-                      dataKey="receitas" 
-                      name="Receitas" 
-                      fill="#16a34a" 
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar 
-                      dataKey="despesas" 
-                      name="Despesas" 
-                      fill="#dc2626" 
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="w-full overflow-x-auto">
+                  <ResponsiveContainer width={Math.max(fluxoCaixaDiarioData.length * 60, 800)} height={400}>
+                    <ComposedChart data={fluxoCaixaDiarioData} data-testid="chart-fluxo-caixa-diario">
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis 
+                        dataKey="dia" 
+                        className="text-sm"
+                        tick={{ fill: 'currentColor', fontSize: 11 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis 
+                        yAxisId="left"
+                        className="text-sm"
+                        tick={{ fill: 'currentColor' }}
+                        tickFormatter={(value) => formatCurrency(value)}
+                      />
+                      <YAxis 
+                        yAxisId="right"
+                        orientation="right"
+                        className="text-sm"
+                        tick={{ fill: 'currentColor' }}
+                        tickFormatter={(value) => formatCurrency(value)}
+                      />
+                      <Tooltip 
+                        formatter={(value: number, name: string) => [formatCurrency(value), name === 'saldoAcumulado' ? 'Saldo Acumulado' : name]}
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '6px',
+                        }}
+                      />
+                      <Legend />
+                      <Bar 
+                        yAxisId="left"
+                        dataKey="receitas" 
+                        name="Receitas" 
+                        fill="#16a34a" 
+                        radius={[4, 4, 0, 0]}
+                        cursor="pointer"
+                        onClick={handleDiaClick}
+                      >
+                        {fluxoCaixaDiarioData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-receita-${index}`} 
+                            opacity={diaSelecionado?.diaFormatado === entry.dia ? 1 : 0.7}
+                          />
+                        ))}
+                      </Bar>
+                      <Bar 
+                        yAxisId="left"
+                        dataKey="despesas" 
+                        name="Despesas" 
+                        fill="#dc2626" 
+                        radius={[4, 4, 0, 0]}
+                        cursor="pointer"
+                        onClick={handleDiaClick}
+                      >
+                        {fluxoCaixaDiarioData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-despesa-${index}`} 
+                            opacity={diaSelecionado?.diaFormatado === entry.dia ? 1 : 0.7}
+                          />
+                        ))}
+                      </Bar>
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="saldoAcumulado" 
+                        name="Saldo Acumulado"
+                        stroke="#1d4ed8" 
+                        strokeWidth={3}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-[400px]" data-testid="text-no-data-diario">
                   <p className="text-muted-foreground">Nenhum dado disponível para este mês</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {diaSelecionado && (
+          <Card data-testid="card-transacoes-dia">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                    <span>Visão Mensal</span>
+                    <ChevronRight className="w-4 h-4" />
+                    <span>{getNomeMes(mesSelecionado!.mesAno)}</span>
+                    <ChevronRight className="w-4 h-4" />
+                    <span className="text-foreground font-medium">{diaSelecionado.diaFormatado}</span>
+                  </div>
+                  <CardTitle data-testid="text-transacoes-title">Transações do Dia</CardTitle>
+                  <CardDescription>Detalhamento completo de receitas e despesas</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleLimparDia}
+                  data-testid="button-limpar-dia"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingTransacoes ? (
+                <div className="flex items-center justify-center h-[200px]">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" data-testid="loading-transacoes" />
+                </div>
+              ) : transacoesDiaData && transacoesDiaData.length > 0 ? (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[120px]" data-testid="header-tipo">Tipo</TableHead>
+                        <TableHead data-testid="header-descricao">Descrição</TableHead>
+                        <TableHead data-testid="header-empresa">Empresa</TableHead>
+                        <TableHead className="text-right" data-testid="header-valor">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {transacoesDiaData.map((transacao) => (
+                        <TableRow key={transacao.id} data-testid={`row-transacao-${transacao.id}`}>
+                          <TableCell data-testid={`cell-tipo-${transacao.id}`}>
+                            <div className="flex items-center gap-2">
+                              {transacao.tipoEvento === 'RECEITA' ? (
+                                <>
+                                  <ArrowUpCircle className="w-4 h-4 text-green-600" />
+                                  <span className="text-green-600 font-medium">Receita</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ArrowDownCircle className="w-4 h-4 text-red-600" />
+                                  <span className="text-red-600 font-medium">Despesa</span>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell data-testid={`cell-descricao-${transacao.id}`}>
+                            {transacao.descricao || 'Sem descrição'}
+                          </TableCell>
+                          <TableCell data-testid={`cell-empresa-${transacao.id}`}>
+                            {transacao.empresa || '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-medium" data-testid={`cell-valor-${transacao.id}`}>
+                            <span className={transacao.tipoEvento === 'RECEITA' ? 'text-green-600' : 'text-red-600'}>
+                              {transacao.tipoEvento === 'RECEITA' ? '+' : '-'} {formatCurrency(transacao.valorBruto)}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[200px]" data-testid="text-no-transacoes">
+                  <p className="text-muted-foreground">Nenhuma transação encontrada para este dia</p>
                 </div>
               )}
             </CardContent>
