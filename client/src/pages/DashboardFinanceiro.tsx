@@ -21,6 +21,12 @@ export default function DashboardFinanceiro() {
 
   const { data: fluxoCaixaDiarioData, isLoading: isLoadingDiario } = useQuery<FluxoCaixaDiarioItem[]>({
     queryKey: ["/api/dashboard/fluxo-caixa-diario", mesSelecionado?.ano, mesSelecionado?.mes],
+    queryFn: async () => {
+      if (!mesSelecionado) return [];
+      const response = await fetch(`/api/dashboard/fluxo-caixa-diario?ano=${mesSelecionado.ano}&mes=${mesSelecionado.mes}`);
+      if (!response.ok) throw new Error('Failed to fetch daily cash flow');
+      return response.json();
+    },
     enabled: mesSelecionado !== null,
   });
 
