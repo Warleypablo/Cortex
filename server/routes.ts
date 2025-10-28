@@ -206,6 +206,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dashboard/transacoes-dia", async (req, res) => {
+    try {
+      const ano = parseInt(req.query.ano as string);
+      const mes = parseInt(req.query.mes as string);
+      const dia = parseInt(req.query.dia as string);
+      
+      if (isNaN(ano) || isNaN(mes) || isNaN(dia) || mes < 1 || mes > 12 || dia < 1 || dia > 31) {
+        return res.status(400).json({ error: "Invalid ano, mes, or dia parameter" });
+      }
+
+      const transacoes = await storage.getTransacoesDia(ano, mes, dia);
+      res.json(transacoes);
+    } catch (error) {
+      console.error("[api] Error fetching transacoes dia:", error);
+      res.status(500).json({ error: "Failed to fetch transacoes dia" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
