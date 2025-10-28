@@ -191,6 +191,12 @@ export type FluxoCaixaItem = {
   valorBruto: number;
 };
 
+export type FluxoCaixaDiarioItem = {
+  dia: string;
+  receitas: number;
+  despesas: number;
+};
+
 export type SaldoBancos = {
   saldoTotal: number;
 };
