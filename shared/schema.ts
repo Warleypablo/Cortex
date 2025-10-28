@@ -67,6 +67,7 @@ export const cazParcelas = pgTable("caz_parcelas", {
   nomeContaFinanceira: text("nome_conta_financeira"),
   idCliente: text("id_cliente"),
   urlCobranca: text("url_cobranca"),
+  empresa: text("empresa"),
 });
 
 export const cazBancos = pgTable("caz_bancos", {
@@ -195,6 +196,16 @@ export type FluxoCaixaDiarioItem = {
   dia: string;
   receitas: number;
   despesas: number;
+  saldoAcumulado: number;
+};
+
+export type TransacaoDiaItem = {
+  id: number;
+  descricao: string | null;
+  valorBruto: number;
+  tipoEvento: string | null;
+  empresa: string | null;
+  dataVencimento: Date;
 };
 
 export type SaldoBancos = {
