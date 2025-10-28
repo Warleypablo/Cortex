@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type SaldoBancos } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -83,6 +83,7 @@ export interface IStorage {
   getColaboradoresAnalise(): Promise<DashboardAnaliseData>;
   getSaldoAtualBancos(): Promise<SaldoBancos>;
   getFluxoCaixa(): Promise<FluxoCaixaItem[]>;
+  getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -174,6 +175,10 @@ export class MemStorage implements IStorage {
   }
 
   async getFluxoCaixa(): Promise<FluxoCaixaItem[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -614,6 +619,28 @@ export class DbStorage implements IStorage {
       dataVencimento: new Date(row.data_vencimento),
       tipoEvento: row.tipo_evento,
       valorBruto: parseFloat(row.valor_bruto || '0'),
+    }));
+  }
+
+  async getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        TO_CHAR(data_vencimento, 'DD/MM/YYYY') as dia,
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END), 0) as receitas,
+        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END), 0) as despesas
+      FROM ${schema.cazParcelas}
+      WHERE tipo_evento IN ('RECEITA', 'DESPESA')
+        AND data_vencimento IS NOT NULL
+        AND EXTRACT(YEAR FROM data_vencimento) = ${ano}
+        AND EXTRACT(MONTH FROM data_vencimento) = ${mes}
+      GROUP BY data_vencimento
+      ORDER BY data_vencimento ASC
+    `);
+    
+    return (result.rows as any[]).map((row: any) => ({
+      dia: row.dia,
+      receitas: parseFloat(row.receitas || '0'),
+      despesas: parseFloat(row.despesas || '0'),
     }));
   }
 }
