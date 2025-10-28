@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -68,7 +68,17 @@ export default function ClientDetail() {
     enabled: !!clientId && !!cliente,
   });
 
-  const receitasTotalPages = Math.ceil((receitas?.length || 0) / receitasItemsPerPage);
+  const sortedReceitas = useMemo(() => {
+    if (!receitas) return [];
+    
+    return [...receitas].sort((a, b) => {
+      const dateA = a.dataVencimento ? new Date(a.dataVencimento).getTime() : 0;
+      const dateB = b.dataVencimento ? new Date(b.dataVencimento).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [receitas]);
+
+  const receitasTotalPages = Math.ceil((sortedReceitas?.length || 0) / receitasItemsPerPage);
   
   useEffect(() => {
     if (receitasTotalPages > 0 && receitasCurrentPage > receitasTotalPages) {
@@ -112,13 +122,13 @@ export default function ClientDetail() {
     );
   }
 
-  const totalReceitas = receitas?.reduce((sum, r) => sum + parseFloat(r.pago || "0"), 0) || 0;
-  const totalFaturas = receitas?.length || 0;
+  const totalReceitas = sortedReceitas?.reduce((sum, r) => sum + parseFloat(r.pago || "0"), 0) || 0;
+  const totalFaturas = sortedReceitas?.length || 0;
   const ticketMedio = totalFaturas > 0 ? totalReceitas / totalFaturas : 0;
 
   const receitasStartIndex = (receitasCurrentPage - 1) * receitasItemsPerPage;
   const receitasEndIndex = receitasStartIndex + receitasItemsPerPage;
-  const paginatedReceitas = receitas?.slice(receitasStartIndex, receitasEndIndex) || [];
+  const paginatedReceitas = sortedReceitas?.slice(receitasStartIndex, receitasEndIndex) || [];
 
   const chartData = (revenueHistory || []).map((item) => ({
     month: item.mes,
