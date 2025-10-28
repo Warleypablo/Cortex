@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import ClientsTable, { type Client } from "@/components/ClientsTable";
+import ClientsTable from "@/components/ClientsTable";
 import { Button } from "@/components/ui/button";
 import { Loader2, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -13,36 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-interface ClienteDb {
-  id: number;
-  nome: string | null;
-  cnpj: string | null;
-  endereco: string | null;
-  ativo: string | null;
-  createdAt: string | null;
-  empresa: string | null;
-  ids: string | null;
-  nomeClickup: string | null;
-  statusClickup: string | null;
-  telefone: string | null;
-  responsavel: string | null;
-  cluster: string | null;
-  ltv: string | null;
-}
-
-function transformCliente(cliente: ClienteDb): Client {
-  return {
-    id: cliente.ids || cliente.id.toString(),
-    name: cliente.nomeClickup || cliente.nome || "Cliente sem nome",
-    cnpj: cliente.cnpj || undefined,
-    squad: "Forja",
-    services: ["Forja"],
-    ltv: parseFloat(cliente.ltv || "0"),
-    status: cliente.ativo === "SIM" ? "active" : "inactive",
-    startDate: cliente.createdAt || new Date().toISOString(),
-  };
-}
+import type { ClienteCompleto } from "../../../server/storage";
 
 export default function Clients() {
   const [, setLocation] = useLocation();
@@ -50,31 +21,34 @@ export default function Clients() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
-  const { data: clientes, isLoading, error } = useQuery<ClienteDb[]>({
+  const { data: clientes, isLoading, error } = useQuery<ClienteCompleto[]>({
     queryKey: ["/api/clientes"],
   });
 
-  const transformedClients = useMemo(() => {
-    if (!clientes) return [];
-    return clientes.map(transformCliente);
-  }, [clientes]);
-
   const filteredClients = useMemo(() => {
-    if (!searchQuery) return transformedClients;
+    if (!clientes) return [];
+    if (!searchQuery) return clientes;
     
     const query = searchQuery.toLowerCase();
-    return transformedClients.filter(client => 
-      client.name.toLowerCase().includes(query) ||
-      client.cnpj?.toLowerCase().includes(query)
-    );
-  }, [transformedClients, searchQuery]);
+    return clientes.filter(client => {
+      const nome = (client.nomeClickup || client.nome || "").toLowerCase();
+      const cnpj = (client.cnpjCliente || client.cnpj || "").toLowerCase();
+      return nome.includes(query) || cnpj.includes(query);
+    });
+  }, [clientes, searchQuery]);
 
   const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages]);
+
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedClients = filteredClients.slice(startIndex, endIndex);
 
-  // Reset to page 1 when search query or items per page changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, itemsPerPage]);
