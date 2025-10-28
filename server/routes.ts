@@ -189,6 +189,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dashboard/fluxo-caixa-diario", async (req, res) => {
+    try {
+      const ano = parseInt(req.query.ano as string);
+      const mes = parseInt(req.query.mes as string);
+      
+      if (isNaN(ano) || isNaN(mes) || mes < 1 || mes > 12) {
+        return res.status(400).json({ error: "Invalid ano or mes parameter" });
+      }
+
+      const fluxoCaixaDiario = await storage.getFluxoCaixaDiario(ano, mes);
+      res.json(fluxoCaixaDiario);
+    } catch (error) {
+      console.error("[api] Error fetching fluxo de caixa diario:", error);
+      res.status(500).json({ error: "Failed to fetch fluxo de caixa diario" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
