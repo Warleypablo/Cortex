@@ -69,6 +69,14 @@ export const cazParcelas = pgTable("caz_parcelas", {
   urlCobranca: text("url_cobranca"),
 });
 
+export const cazBancos = pgTable("caz_bancos", {
+  id: integer("id").primaryKey(),
+  nome: text("nome"),
+  balance: decimal("balance"),
+  empresa: text("empresa"),
+  ativo: text("ativo"),
+});
+
 export const cupClientes = pgTable("cup_clientes", {
   nome: text("nome"),
   cnpj: text("cnpj").primaryKey(),
@@ -176,3 +184,13 @@ export const insertPatrimonioSchema = createInsertSchema(rhPatrimonio).partial({
 
 export type InsertPatrimonio = z.infer<typeof insertPatrimonioSchema>;
 export type Patrimonio = typeof rhPatrimonio.$inferSelect;
+
+export type FluxoCaixaItem = {
+  dataVencimento: Date;
+  tipoEvento: string;
+  valorBruto: number;
+};
+
+export type SaldoBancos = {
+  saldoTotal: number;
+};
