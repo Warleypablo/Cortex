@@ -47,6 +47,7 @@ export default function ClientDetail() {
   const clientId = params?.id || "";
   const [receitasCurrentPage, setReceitasCurrentPage] = useState(1);
   const [receitasItemsPerPage, setReceitasItemsPerPage] = useState(10);
+  const [monthsFilter, setMonthsFilter] = useState<string>("all");
 
   const { data: cliente, isLoading: isLoadingCliente, error: clienteError } = useQuery<ClienteDb>({
     queryKey: ["/api/cliente", clientId],
@@ -124,10 +125,21 @@ export default function ClientDetail() {
   const receitasEndIndex = receitasStartIndex + receitasItemsPerPage;
   const paginatedReceitas = sortedReceitas?.slice(receitasStartIndex, receitasEndIndex) || [];
 
-  const chartData = (revenueHistory || []).map((item) => ({
-    month: item.mes,
-    revenue: item.valor,
-  }));
+  const chartData = useMemo(() => {
+    if (!revenueHistory || revenueHistory.length === 0) return [];
+    
+    const allData = revenueHistory.map((item) => ({
+      month: item.mes,
+      revenue: item.valor,
+    })).sort((a, b) => a.month.localeCompare(b.month));
+    
+    if (monthsFilter === "all") {
+      return allData;
+    }
+    
+    const numMonths = parseInt(monthsFilter);
+    return allData.slice(-numMonths);
+  }, [revenueHistory, monthsFilter]);
 
   const receitasTotalPages = Math.ceil((sortedReceitas?.length || 0) / receitasItemsPerPage);
   
@@ -320,7 +332,31 @@ export default function ClientDetail() {
           </div>
         ) : chartData.length > 0 ? (
           <div className="mb-8">
-            <RevenueChart data={chartData} />
+            <Card>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold">Histórico de Faturamento</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Período:</span>
+                    <Select
+                      value={monthsFilter}
+                      onValueChange={setMonthsFilter}
+                    >
+                      <SelectTrigger className="w-[140px]" data-testid="select-months-filter">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="3">3 meses</SelectItem>
+                        <SelectItem value="6">6 meses</SelectItem>
+                        <SelectItem value="12">12 meses</SelectItem>
+                        <SelectItem value="all">Todos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <RevenueChart data={chartData} />
+              </div>
+            </Card>
           </div>
         ) : null}
 
