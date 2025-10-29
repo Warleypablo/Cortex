@@ -325,24 +325,37 @@ export class DbStorage implements IStorage {
   }
 
   async getClienteRevenue(clienteId: string): Promise<{ mes: string; valor: number }[]> {
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
     const receitas = await db.select({
-      mes: sql<string>`TO_CHAR(${schema.cazReceber.dataCriacao}, 'YYYY-MM')`,
-      valor: sql<number>`COALESCE(SUM(${schema.cazReceber.pago}), 0)`
+      mes: sql<string>`TO_CHAR(
+        COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}), 
+        'YYYY-MM'
+      )`,
+      valor: sql<string>`COALESCE(
+        SUM(CAST(${schema.cazReceber.pago} AS DECIMAL)), 
+        0
+      )`
     })
     .from(schema.cazReceber)
     .where(
       and(
         eq(schema.cazReceber.clienteId, clienteId),
-        gte(schema.cazReceber.dataCriacao, sixMonthsAgo)
+        sql`UPPER(${schema.cazReceber.status}) IN ('PAGO', 'ACQUITTED')`,
+        sql`COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}) IS NOT NULL`
       )
     )
-    .groupBy(sql`TO_CHAR(${schema.cazReceber.dataCriacao}, 'YYYY-MM')`)
-    .orderBy(sql`TO_CHAR(${schema.cazReceber.dataCriacao}, 'YYYY-MM')`);
+    .groupBy(sql`TO_CHAR(
+      COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}), 
+      'YYYY-MM'
+    )`)
+    .orderBy(sql`TO_CHAR(
+      COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}), 
+      'YYYY-MM'
+    )`);
 
-    return receitas;
+    return receitas.map(r => ({
+      mes: r.mes,
+      valor: Number(r.valor ?? 0) || 0
+    }));
   }
 
   async getColaboradores(): Promise<Colaborador[]> {
