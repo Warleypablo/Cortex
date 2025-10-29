@@ -48,6 +48,7 @@ export default function ClientDetail() {
   const [receitasCurrentPage, setReceitasCurrentPage] = useState(1);
   const [receitasItemsPerPage, setReceitasItemsPerPage] = useState(10);
   const [monthsFilter, setMonthsFilter] = useState<string>("all");
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const { data: cliente, isLoading: isLoadingCliente, error: clienteError } = useQuery<ClienteDb>({
     queryKey: ["/api/cliente", clientId],
@@ -78,6 +79,21 @@ export default function ClientDetail() {
       return dateB - dateA;
     });
   }, [receitas]);
+
+  const filteredReceitas = useMemo(() => {
+    if (!selectedMonth) return sortedReceitas;
+    
+    return sortedReceitas.filter(r => {
+      const dataParaUsar = r.dataVencimento || r.dataCriacao;
+      if (!dataParaUsar) return false;
+      
+      const data = new Date(dataParaUsar);
+      if (isNaN(data.getTime())) return false;
+      
+      const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+      return mesAno === selectedMonth;
+    });
+  }, [sortedReceitas, selectedMonth]);
 
   const lt = useMemo(() => {
     if (!sortedReceitas || sortedReceitas.length === 0) return 0;
@@ -121,9 +137,14 @@ export default function ClientDetail() {
     return vencimento < hoje && valorPendente > 0;
   }) || false;
 
+  const handleBarClick = (month: string) => {
+    setSelectedMonth(prevMonth => prevMonth === month ? null : month);
+    setReceitasCurrentPage(1);
+  };
+
   const receitasStartIndex = (receitasCurrentPage - 1) * receitasItemsPerPage;
   const receitasEndIndex = receitasStartIndex + receitasItemsPerPage;
-  const paginatedReceitas = sortedReceitas?.slice(receitasStartIndex, receitasEndIndex) || [];
+  const paginatedReceitas = filteredReceitas?.slice(receitasStartIndex, receitasEndIndex) || [];
 
   const chartData = useMemo(() => {
     if (!revenueHistory || revenueHistory.length === 0) return [];
@@ -141,7 +162,7 @@ export default function ClientDetail() {
     return allData.slice(-numMonths);
   }, [revenueHistory, monthsFilter]);
 
-  const receitasTotalPages = Math.ceil((sortedReceitas?.length || 0) / receitasItemsPerPage);
+  const receitasTotalPages = Math.ceil((filteredReceitas?.length || 0) / receitasItemsPerPage);
   
   useEffect(() => {
     if (receitasTotalPages > 0 && receitasCurrentPage > receitasTotalPages) {
@@ -202,10 +223,13 @@ export default function ClientDetail() {
     const normalizedStatus = status?.toUpperCase();
     switch (normalizedStatus) {
       case "PAGO":
-        return <Badge variant="default" className="bg-green-600" data-testid="badge-pago">Pago</Badge>;
+      case "ACQUITTED":
+        return <Badge variant="default" className="bg-green-600" data-testid="badge-pago">Quitado</Badge>;
       case "PENDENTE":
+      case "PENDING":
         return <Badge variant="secondary" data-testid="badge-pendente">Pendente</Badge>;
       case "VENCIDO":
+      case "OVERDUE":
         return <Badge variant="destructive" data-testid="badge-vencido">Vencido</Badge>;
       default:
         return <Badge variant="outline" data-testid="badge-status">{status || "N/A"}</Badge>;
@@ -354,7 +378,11 @@ export default function ClientDetail() {
                     </Select>
                   </div>
                 </div>
-                <RevenueChart data={chartData} />
+                <RevenueChart 
+                  data={chartData} 
+                  onBarClick={handleBarClick}
+                  selectedMonth={selectedMonth}
+                />
               </div>
             </Card>
           </div>
@@ -445,7 +473,24 @@ export default function ClientDetail() {
         </div>
 
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-6">Contas a Receber</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-semibold">Contas a Receber</h2>
+            {selectedMonth && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" data-testid="badge-month-filter">
+                  Filtrado por: {selectedMonth}
+                </Badge>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setSelectedMonth(null)}
+                  data-testid="button-clear-month-filter"
+                >
+                  Limpar filtro
+                </Button>
+              </div>
+            )}
+          </div>
           <Card className="overflow-hidden">
             {isLoadingReceitas ? (
               <div className="flex items-center justify-center py-8">
