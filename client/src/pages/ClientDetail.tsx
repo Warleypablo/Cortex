@@ -123,8 +123,25 @@ export default function ClientDetail() {
   }
 
   const totalReceitas = sortedReceitas?.reduce((sum, r) => sum + parseFloat(r.pago || "0"), 0) || 0;
-  const totalFaturas = sortedReceitas?.length || 0;
-  const ticketMedio = totalFaturas > 0 ? totalReceitas / totalFaturas : 0;
+  const faturasQuitadas = sortedReceitas?.filter(r => r.status?.toUpperCase() === "PAGO").length || 0;
+  const ticketMedio = faturasQuitadas > 0 ? totalReceitas / faturasQuitadas : 0;
+  
+  const temContratoAtivo = contratos?.some(c => {
+    const statusLower = c.status?.toLowerCase() || "";
+    if (statusLower.includes("inativo") || statusLower.includes("inactive") || 
+        statusLower.includes("cancelado") || statusLower.includes("canceled")) {
+      return false;
+    }
+    return statusLower.includes("ativo") || statusLower.includes("active");
+  }) || false;
+  
+  const temInadimplencia = sortedReceitas?.some(r => {
+    if (!r.dataVencimento || r.status?.toUpperCase() === "PAGO") return false;
+    const vencimento = new Date(r.dataVencimento);
+    const hoje = new Date();
+    const valorPendente = parseFloat(r.naoPago || "0");
+    return vencimento < hoje && valorPendente > 0;
+  }) || false;
 
   const receitasStartIndex = (receitasCurrentPage - 1) * receitasItemsPerPage;
   const receitasEndIndex = receitasStartIndex + receitasItemsPerPage;
@@ -152,13 +169,13 @@ export default function ClientDetail() {
     const normalizedStatus = status?.toUpperCase();
     switch (normalizedStatus) {
       case "PAGO":
-        return <Badge variant="default" className="bg-green-600">Pago</Badge>;
+        return <Badge variant="default" className="bg-green-600" data-testid="badge-pago">Pago</Badge>;
       case "PENDENTE":
-        return <Badge variant="secondary">Pendente</Badge>;
+        return <Badge variant="secondary" data-testid="badge-pendente">Pendente</Badge>;
       case "VENCIDO":
-        return <Badge variant="destructive">Vencido</Badge>;
+        return <Badge variant="destructive" data-testid="badge-vencido">Vencido</Badge>;
       default:
-        return <Badge variant="outline">{status || "N/A"}</Badge>;
+        return <Badge variant="outline" data-testid="badge-status">{status || "N/A"}</Badge>;
     }
   };
 
@@ -238,11 +255,13 @@ export default function ClientDetail() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Badge className={getSquadColor("Performance")} variant="outline">
-                Performance
-              </Badge>
-              <Badge variant={cliente.ativo === "SIM" ? "default" : "secondary"}>
-                {cliente.ativo === "SIM" ? "Ativo" : "Inativo"}
+              {temInadimplencia && (
+                <Badge variant="destructive" data-testid="badge-inadimplente">
+                  Inadimplente
+                </Badge>
+              )}
+              <Badge variant={temContratoAtivo ? "default" : "secondary"} data-testid="badge-status-cliente">
+                {temContratoAtivo ? "Ativo" : "Inativo"}
               </Badge>
             </div>
           </div>
@@ -268,8 +287,8 @@ export default function ClientDetail() {
             icon={TrendingUp}
           />
           <StatsCard
-            title="Total de Faturas"
-            value={totalFaturas.toString()}
+            title="LT"
+            value={faturasQuitadas.toString()}
             icon={Receipt}
           />
         </div>
@@ -299,6 +318,8 @@ export default function ClientDetail() {
                     <TableHead className="bg-background" data-testid="header-service">Serviço</TableHead>
                     <TableHead className="bg-background" data-testid="header-status">Status</TableHead>
                     <TableHead className="bg-background" data-testid="header-squad">Squad</TableHead>
+                    <TableHead className="bg-background" data-testid="header-responsavel">Responsável</TableHead>
+                    <TableHead className="bg-background" data-testid="header-cs">CS</TableHead>
                     <TableHead className="bg-background" data-testid="header-date">Data Início</TableHead>
                     <TableHead className="text-right bg-background" data-testid="header-recurring">Valor Recorrente</TableHead>
                     <TableHead className="text-right bg-background" data-testid="header-onetime">Valor Pontual</TableHead>
@@ -329,6 +350,12 @@ export default function ClientDetail() {
                             {mapSquadCodeToName(contrato.squad)}
                           </Badge>
                         </TableCell>
+                        <TableCell className="text-muted-foreground" data-testid={`text-responsavel-${contrato.idSubtask}`}>
+                          {contrato.responsavelGeral || '-'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground" data-testid={`text-cs-${contrato.idSubtask}`}>
+                          {contrato.responsavel || '-'}
+                        </TableCell>
                         <TableCell className="text-muted-foreground" data-testid={`text-date-${contrato.idSubtask}`}>
                           {contrato.dataInicio ? new Date(contrato.dataInicio).toLocaleDateString('pt-BR') : '-'}
                         </TableCell>
@@ -348,7 +375,7 @@ export default function ClientDetail() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8" data-testid="text-no-contracts">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-contracts">
                         Nenhum contrato encontrado para este cliente
                       </TableCell>
                     </TableRow>

@@ -381,6 +381,8 @@ export class DbStorage implements IStorage {
         nomeCliente: sql<string>`COALESCE(${schema.cupClientes.nome}, ${schema.cazClientes.nome})`,
         cnpjCliente: schema.cupClientes.cnpj,
         idCliente: schema.cazClientes.ids,
+        responsavel: schema.cupClientes.responsavel,
+        responsavelGeral: schema.cupClientes.responsavelGeral,
       })
       .from(schema.cupContratos)
       .leftJoin(
@@ -411,6 +413,8 @@ export class DbStorage implements IStorage {
         nomeCliente: sql<string>`COALESCE(${schema.cupClientes.nome}, ${schema.cazClientes.nome})`,
         cnpjCliente: schema.cupClientes.cnpj,
         idCliente: schema.cazClientes.ids,
+        responsavel: schema.cupClientes.responsavel,
+        responsavelGeral: schema.cupClientes.responsavelGeral,
       })
       .from(schema.cupContratos)
       .leftJoin(

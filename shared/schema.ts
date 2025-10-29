@@ -164,6 +164,8 @@ export type ContratoCompleto = {
   nomeCliente: string | null;
   cnpjCliente: string | null;
   idCliente: string | null;
+  responsavel: string | null;
+  responsavelGeral: string | null;
 };
 
 export const rhPatrimonio = pgTable("rh_patrimonio", {
