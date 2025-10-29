@@ -13,7 +13,6 @@ interface RevenueChartProps {
 export default function RevenueChart({ data }: RevenueChartProps) {
   return (
     <Card className="p-6">
-      <h3 className="font-semibold text-lg mb-6">Histórico de Faturamento</h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
