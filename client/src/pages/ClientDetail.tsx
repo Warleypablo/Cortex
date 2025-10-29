@@ -123,8 +123,30 @@ export default function ClientDetail() {
   }
 
   const totalReceitas = sortedReceitas?.reduce((sum, r) => sum + parseFloat(r.pago || "0"), 0) || 0;
-  const faturasQuitadas = sortedReceitas?.filter(r => r.status?.toUpperCase() === "PAGO").length || 0;
-  const ticketMedio = faturasQuitadas > 0 ? totalReceitas / faturasQuitadas : 0;
+  
+  const lt = useMemo(() => {
+    if (!sortedReceitas || sortedReceitas.length === 0) return 0;
+    
+    const mesesUnicos = new Set<string>();
+    
+    sortedReceitas.forEach(r => {
+      const statusUpper = r.status?.toUpperCase();
+      if (statusUpper === "PAGO" || statusUpper === "ACQUITTED") {
+        const dataParaUsar = r.dataVencimento || r.dataCriacao;
+        if (dataParaUsar) {
+          const data = new Date(dataParaUsar);
+          if (!isNaN(data.getTime())) {
+            const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+            mesesUnicos.add(mesAno);
+          }
+        }
+      }
+    });
+    
+    return mesesUnicos.size;
+  }, [sortedReceitas]);
+  
+  const ticketMedio = lt > 0 ? totalReceitas / lt : 0;
   
   const temContratoAtivo = contratos?.some(c => {
     const statusLower = c.status?.toLowerCase() || "";
@@ -288,7 +310,7 @@ export default function ClientDetail() {
           />
           <StatsCard
             title="LT"
-            value={faturasQuitadas.toString()}
+            value={lt.toString()}
             icon={Receipt}
           />
         </div>
