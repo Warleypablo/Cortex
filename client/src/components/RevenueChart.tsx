@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface RevenueData {
   month: string;
@@ -8,9 +8,18 @@ interface RevenueData {
 
 interface RevenueChartProps {
   data: RevenueData[];
+  onBarClick?: (month: string) => void;
+  selectedMonth?: string | null;
 }
 
-export default function RevenueChart({ data }: RevenueChartProps) {
+export default function RevenueChart({ data, onBarClick, selectedMonth }: RevenueChartProps) {
+  const handleBarClick = (entry: any) => {
+    const month = entry?.payload?.month || entry?.month;
+    if (month && onBarClick) {
+      onBarClick(month);
+    }
+  };
+
   return (
     <Card className="p-6">
       <ResponsiveContainer width="100%" height={300}>
@@ -34,7 +43,20 @@ export default function RevenueChart({ data }: RevenueChartProps) {
             }}
             formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Faturamento']}
           />
-          <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+          <Bar 
+            dataKey="revenue" 
+            radius={[8, 8, 0, 0]}
+            cursor="pointer"
+            onClick={handleBarClick}
+          >
+            {data.map((entry, index) => (
+              <Cell 
+                key={`cell-${index}`}
+                fill="hsl(var(--primary))"
+                fillOpacity={selectedMonth && entry.month !== selectedMonth ? 0.3 : 1}
+              />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </Card>
