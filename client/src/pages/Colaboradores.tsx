@@ -962,7 +962,7 @@ export default function Colaboradores() {
           </div>
 
           <div className="rounded-lg border border-border bg-card overflow-hidden">
-            <div className="max-h-[calc(100vh-400px)] overflow-y-auto overflow-x-auto">
+            <div className="max-h-[calc(100vh-400px)] overflow-y-scroll overflow-x-auto">
               <Table>
                 <TableHeader className="sticky top-0 z-20 shadow-sm">
                   <TableRow className="bg-background border-b">
