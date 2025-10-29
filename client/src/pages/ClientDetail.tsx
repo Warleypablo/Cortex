@@ -78,13 +78,64 @@ export default function ClientDetail() {
     });
   }, [receitas]);
 
+  const lt = useMemo(() => {
+    if (!sortedReceitas || sortedReceitas.length === 0) return 0;
+    
+    const mesesUnicos = new Set<string>();
+    
+    sortedReceitas.forEach(r => {
+      const statusUpper = r.status?.toUpperCase();
+      if (statusUpper === "PAGO" || statusUpper === "ACQUITTED") {
+        const dataParaUsar = r.dataVencimento || r.dataCriacao;
+        if (dataParaUsar) {
+          const data = new Date(dataParaUsar);
+          if (!isNaN(data.getTime())) {
+            const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+            mesesUnicos.add(mesAno);
+          }
+        }
+      }
+    });
+    
+    return mesesUnicos.size;
+  }, [sortedReceitas]);
+
+  const totalReceitas = sortedReceitas?.reduce((sum, r) => sum + parseFloat(r.pago || "0"), 0) || 0;
+  const ticketMedio = lt > 0 ? totalReceitas / lt : 0;
+  
+  const temContratoAtivo = contratos?.some(c => {
+    const statusLower = c.status?.toLowerCase() || "";
+    if (statusLower.includes("inativo") || statusLower.includes("inactive") || 
+        statusLower.includes("cancelado") || statusLower.includes("canceled")) {
+      return false;
+    }
+    return statusLower.includes("ativo") || statusLower.includes("active");
+  }) || false;
+  
+  const temInadimplencia = sortedReceitas?.some(r => {
+    if (!r.dataVencimento || r.status?.toUpperCase() === "PAGO") return false;
+    const vencimento = new Date(r.dataVencimento);
+    const hoje = new Date();
+    const valorPendente = parseFloat(r.naoPago || "0");
+    return vencimento < hoje && valorPendente > 0;
+  }) || false;
+
+  const receitasStartIndex = (receitasCurrentPage - 1) * receitasItemsPerPage;
+  const receitasEndIndex = receitasStartIndex + receitasItemsPerPage;
+  const paginatedReceitas = sortedReceitas?.slice(receitasStartIndex, receitasEndIndex) || [];
+
+  const chartData = (revenueHistory || []).map((item) => ({
+    month: item.mes,
+    revenue: item.valor,
+  }));
+
   const receitasTotalPages = Math.ceil((sortedReceitas?.length || 0) / receitasItemsPerPage);
   
   useEffect(() => {
     if (receitasTotalPages > 0 && receitasCurrentPage > receitasTotalPages) {
       setReceitasCurrentPage(receitasTotalPages);
     }
-  }, [receitasTotalPages]);
+  }, [receitasTotalPages, receitasCurrentPage]);
 
   const isLoading = isLoadingCliente;
 
@@ -121,58 +172,6 @@ export default function ClientDetail() {
       </div>
     );
   }
-
-  const totalReceitas = sortedReceitas?.reduce((sum, r) => sum + parseFloat(r.pago || "0"), 0) || 0;
-  
-  const lt = useMemo(() => {
-    if (!sortedReceitas || sortedReceitas.length === 0) return 0;
-    
-    const mesesUnicos = new Set<string>();
-    
-    sortedReceitas.forEach(r => {
-      const statusUpper = r.status?.toUpperCase();
-      if (statusUpper === "PAGO" || statusUpper === "ACQUITTED") {
-        const dataParaUsar = r.dataVencimento || r.dataCriacao;
-        if (dataParaUsar) {
-          const data = new Date(dataParaUsar);
-          if (!isNaN(data.getTime())) {
-            const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
-            mesesUnicos.add(mesAno);
-          }
-        }
-      }
-    });
-    
-    return mesesUnicos.size;
-  }, [sortedReceitas]);
-  
-  const ticketMedio = lt > 0 ? totalReceitas / lt : 0;
-  
-  const temContratoAtivo = contratos?.some(c => {
-    const statusLower = c.status?.toLowerCase() || "";
-    if (statusLower.includes("inativo") || statusLower.includes("inactive") || 
-        statusLower.includes("cancelado") || statusLower.includes("canceled")) {
-      return false;
-    }
-    return statusLower.includes("ativo") || statusLower.includes("active");
-  }) || false;
-  
-  const temInadimplencia = sortedReceitas?.some(r => {
-    if (!r.dataVencimento || r.status?.toUpperCase() === "PAGO") return false;
-    const vencimento = new Date(r.dataVencimento);
-    const hoje = new Date();
-    const valorPendente = parseFloat(r.naoPago || "0");
-    return vencimento < hoje && valorPendente > 0;
-  }) || false;
-
-  const receitasStartIndex = (receitasCurrentPage - 1) * receitasItemsPerPage;
-  const receitasEndIndex = receitasStartIndex + receitasItemsPerPage;
-  const paginatedReceitas = sortedReceitas?.slice(receitasStartIndex, receitasEndIndex) || [];
-
-  const chartData = (revenueHistory || []).map((item) => ({
-    month: item.mes,
-    revenue: item.valor,
-  }));
 
   const getSquadColor = (squad: string) => {
     switch (squad) {
