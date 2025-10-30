@@ -66,6 +66,27 @@ export interface DashboardAnaliseData {
   tempoPermanencia: TempoPermanencia;
 }
 
+export interface CohortRetentionRow {
+  cohortMonth: string;
+  cohortLabel: string;
+  totalClients: number;
+  retentionByMonth: {
+    [monthOffset: number]: {
+      activeClients: number;
+      retentionRate: number;
+    };
+  };
+}
+
+export interface CohortRetentionData {
+  cohorts: CohortRetentionRow[];
+  maxMonthOffset: number;
+  filters: {
+    squad?: string;
+    servico?: string;
+  };
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -90,6 +111,7 @@ export interface IStorage {
   getFluxoCaixa(): Promise<FluxoCaixaItem[]>;
   getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]>;
   getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]>;
+  getCohortRetention(filters?: { squad?: string; servico?: string }): Promise<CohortRetentionData>;
 }
 
 export class MemStorage implements IStorage {
@@ -193,6 +215,10 @@ export class MemStorage implements IStorage {
   }
 
   async getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getCohortRetention(filters?: { squad?: string; servico?: string }): Promise<CohortRetentionData> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -772,6 +798,117 @@ export class DbStorage implements IStorage {
       empresa: row.empresa,
       dataVencimento: new Date(row.data_vencimento),
     }));
+  }
+
+  async getCohortRetention(filters?: { squad?: string; servico?: string }): Promise<CohortRetentionData> {
+    let query = db
+      .select({
+        idTask: schema.cupContratos.idTask,
+        servico: schema.cupContratos.servico,
+        squad: schema.cupContratos.squad,
+        dataInicio: schema.cupContratos.dataInicio,
+        dataEncerramento: schema.cupContratos.dataEncerramento,
+      })
+      .from(schema.cupContratos)
+      .where(sql`${schema.cupContratos.dataInicio} IS NOT NULL`);
+
+    const contratos = await query;
+
+    let filteredContratos = contratos.filter(c => c.dataInicio);
+
+    if (filters?.squad) {
+      filteredContratos = filteredContratos.filter(c => c.squad === filters.squad);
+    }
+    if (filters?.servico) {
+      filteredContratos = filteredContratos.filter(c => c.servico === filters.servico);
+    }
+
+    const cohortMap = new Map<string, {
+      clients: Set<string>;
+      contracts: Array<{
+        idTask: string;
+        dataInicio: Date;
+        dataEncerramento: Date | null;
+      }>;
+    }>();
+
+    filteredContratos.forEach(contrato => {
+      if (!contrato.dataInicio) return;
+      
+      const dataInicio = new Date(contrato.dataInicio);
+      const cohortKey = `${dataInicio.getFullYear()}-${String(dataInicio.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!cohortMap.has(cohortKey)) {
+        cohortMap.set(cohortKey, { clients: new Set(), contracts: [] });
+      }
+      
+      const cohort = cohortMap.get(cohortKey)!;
+      if (contrato.idTask) {
+        cohort.clients.add(contrato.idTask);
+      }
+      cohort.contracts.push({
+        idTask: contrato.idTask || '',
+        dataInicio: dataInicio,
+        dataEncerramento: contrato.dataEncerramento ? new Date(contrato.dataEncerramento) : null,
+      });
+    });
+
+    const sortedCohorts = Array.from(cohortMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+    let maxMonthOffset = 0;
+    const cohortRows: CohortRetentionRow[] = sortedCohorts.map(([cohortMonth, cohortData]) => {
+      const [year, month] = cohortMonth.split('-').map(Number);
+      const cohortDate = new Date(year, month - 1, 1);
+      
+      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const cohortLabel = `${monthNames[month - 1]}/${year}`;
+      
+      const totalClients = cohortData.clients.size;
+      const retentionByMonth: { [key: number]: { activeClients: number; retentionRate: number } } = {};
+
+      const now = new Date();
+      const monthsSinceCohort = (now.getFullYear() - year) * 12 + (now.getMonth() - (month - 1));
+
+      for (let offset = 0; offset <= monthsSinceCohort; offset++) {
+        const checkDate = new Date(year, month - 1 + offset, 1);
+        const checkEndDate = new Date(year, month - 1 + offset + 1, 0, 23, 59, 59);
+        
+        const activeClientsSet = new Set<string>();
+        
+        cohortData.contracts.forEach(contract => {
+          if (!contract.dataEncerramento || new Date(contract.dataEncerramento) > checkEndDate) {
+            if (contract.idTask) {
+              activeClientsSet.add(contract.idTask);
+            }
+          }
+        });
+        
+        const activeClients = activeClientsSet.size;
+        const retentionRate = totalClients > 0 ? (activeClients / totalClients) * 100 : 0;
+        
+        retentionByMonth[offset] = {
+          activeClients,
+          retentionRate,
+        };
+        
+        if (offset > maxMonthOffset) {
+          maxMonthOffset = offset;
+        }
+      }
+
+      return {
+        cohortMonth,
+        cohortLabel,
+        totalClients,
+        retentionByMonth,
+      };
+    });
+
+    return {
+      cohorts: cohortRows,
+      maxMonthOffset,
+      filters: filters || {},
+    };
   }
 }
 

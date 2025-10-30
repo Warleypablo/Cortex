@@ -241,6 +241,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/analytics/cohort-retention", async (req, res) => {
+    try {
+      const filters: { squad?: string; servico?: string } = {};
+      
+      if (req.query.squad && req.query.squad !== 'todos') {
+        filters.squad = req.query.squad as string;
+      }
+      
+      if (req.query.servico && req.query.servico !== 'todos') {
+        filters.servico = req.query.servico as string;
+      }
+
+      const cohortData = await storage.getCohortRetention(filters);
+      res.json(cohortData);
+    } catch (error) {
+      console.error("[api] Error fetching cohort retention:", error);
+      res.status(500).json({ error: "Failed to fetch cohort retention data" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
