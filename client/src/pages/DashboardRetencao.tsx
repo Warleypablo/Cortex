@@ -24,6 +24,8 @@ interface CohortRetentionData {
     squad?: string;
     servico?: string;
   };
+  availableServicos: string[];
+  availableSquads: string[];
 }
 
 export default function DashboardRetencao() {
@@ -95,14 +97,7 @@ export default function DashboardRetencao() {
 
   const uniqueServicos = useMemo(() => {
     if (!cohortData) return [];
-    const servicos = new Set<string>();
-    cohortData.cohorts.forEach(cohort => {
-      Object.keys(cohort.retentionByMonth).forEach(() => {
-        // We'll need to fetch actual services from contracts
-        // For now, returning empty array
-      });
-    });
-    return Array.from(servicos).sort();
+    return cohortData.availableServicos || [];
   }, [cohortData]);
 
   return (
