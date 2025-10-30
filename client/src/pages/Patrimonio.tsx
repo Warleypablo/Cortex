@@ -96,10 +96,15 @@ export default function Patrimonio() {
       result.sort((a, b) => {
         const nameA = a.responsavelAtual || "";
         const nameB = b.responsavelAtual || "";
+        
+        if (!nameA && !nameB) return 0;
+        if (!nameA) return 1;
+        if (!nameB) return -1;
+        
         if (sortAlpha === "asc") {
-          return nameA.localeCompare(nameB);
+          return nameA.localeCompare(nameB, 'pt-BR', { sensitivity: 'base' });
         } else {
-          return nameB.localeCompare(nameA);
+          return nameB.localeCompare(nameA, 'pt-BR', { sensitivity: 'base' });
         }
       });
     } else {
