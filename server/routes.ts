@@ -155,6 +155,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/patrimonio/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid patrimonio ID" });
+      }
+      const patrimonio = await storage.getPatrimonioById(id);
+      if (!patrimonio) {
+        return res.status(404).json({ error: "Patrimonio not found" });
+      }
+      res.json(patrimonio);
+    } catch (error) {
+      console.error("[api] Error fetching patrimonio by id:", error);
+      res.status(500).json({ error: "Failed to fetch patrimonio" });
+    }
+  });
+
   app.post("/api/patrimonio", async (req, res) => {
     try {
       const validation = insertPatrimonioSchema.safeParse(req.body);

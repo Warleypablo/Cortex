@@ -14,6 +14,7 @@ import ClientDetail from "@/pages/ClientDetail";
 import Colaboradores from "@/pages/Colaboradores";
 import ColaboradoresAnalise from "@/pages/ColaboradoresAnalise";
 import Patrimonio from "@/pages/Patrimonio";
+import PatrimonioDetail from "@/pages/PatrimonioDetail";
 import Ferramentas from "@/pages/Ferramentas";
 import VisaoGeral from "@/pages/VisaoGeral";
 import DashboardFinanceiro from "@/pages/DashboardFinanceiro";
@@ -36,6 +37,7 @@ function Router() {
       <Route path="/contratos" component={Contracts} />
       <Route path="/colaboradores" component={Colaboradores} />
       <Route path="/colaboradores/analise" component={ColaboradoresAnalise} />
+      <Route path="/patrimonio/:id" component={PatrimonioDetail} />
       <Route path="/patrimonio" component={Patrimonio} />
       <Route path="/ferramentas" component={Ferramentas} />
       <Route path="/visao-geral" component={VisaoGeral} />

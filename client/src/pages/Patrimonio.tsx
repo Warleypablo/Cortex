@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Loader2, Search, Package, ArrowDownNarrowWide, ArrowUpNarrowWide, ArrowDownAZ, ArrowUpZA } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +39,7 @@ type SortNumericType = "asc" | "desc";
 type SortAlphaType = "none" | "asc" | "desc";
 
 export default function Patrimonio() {
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
@@ -46,7 +48,7 @@ export default function Patrimonio() {
   const [sortNumeric, setSortNumeric] = useState<SortNumericType>("asc");
   const [sortAlpha, setSortAlpha] = useState<SortAlphaType>("none");
 
-  const { data: patrimonios, isLoading, error } = useQuery<PatrimonioDb[]>({
+  const { data: patrimonios, isLoading, error} = useQuery<PatrimonioDb[]>({
     queryKey: ["/api/patrimonio"],
   });
 
@@ -330,7 +332,8 @@ export default function Patrimonio() {
                             paginatedPatrimonios.map((item) => (
                               <TableRow 
                                 key={item.id} 
-                                className="hover-elevate"
+                                className="hover-elevate cursor-pointer"
+                                onClick={() => setLocation(`/patrimonio/${item.id}`)}
                                 data-testid={`patrimonio-row-${item.id}`}
                               >
                                 <TableCell className="font-medium" data-testid={`numero-${item.id}`}>

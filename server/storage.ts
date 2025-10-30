@@ -54,6 +54,10 @@ export interface TempoPermanencia {
   totalDesligados: number;
 }
 
+export interface PatrimonioComResponsavel extends Patrimonio {
+  colaborador?: Colaborador;
+}
+
 export interface DashboardAnaliseData {
   aniversariantesMes: AniversariantesMes[];
   aniversarioEmpresaMes: AniversarioEmpresaMes[];
@@ -79,6 +83,7 @@ export interface IStorage {
   getContratos(): Promise<ContratoCompleto[]>;
   getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]>;
   getPatrimonios(): Promise<Patrimonio[]>;
+  getPatrimonioById(id: number): Promise<PatrimonioComResponsavel | undefined>;
   createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio>;
   getColaboradoresAnalise(): Promise<DashboardAnaliseData>;
   getSaldoAtualBancos(): Promise<SaldoBancos>;
@@ -160,6 +165,10 @@ export class MemStorage implements IStorage {
   }
 
   async getPatrimonios(): Promise<Patrimonio[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getPatrimonioById(id: number): Promise<PatrimonioComResponsavel | undefined> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -446,6 +455,49 @@ export class DbStorage implements IStorage {
 
   async getPatrimonios(): Promise<Patrimonio[]> {
     return await db.select().from(schema.rhPatrimonio).orderBy(schema.rhPatrimonio.numeroAtivo);
+  }
+
+  async getPatrimonioById(id: number): Promise<PatrimonioComResponsavel | undefined> {
+    const result = await db
+      .select({
+        id: schema.rhPatrimonio.id,
+        numeroAtivo: schema.rhPatrimonio.numeroAtivo,
+        ativo: schema.rhPatrimonio.ativo,
+        marca: schema.rhPatrimonio.marca,
+        estadoConservacao: schema.rhPatrimonio.estadoConservacao,
+        responsavelAtual: schema.rhPatrimonio.responsavelAtual,
+        valorPago: schema.rhPatrimonio.valorPago,
+        valorMercado: schema.rhPatrimonio.valorMercado,
+        valorVenda: schema.rhPatrimonio.valorVenda,
+        descricao: schema.rhPatrimonio.descricao,
+        colaborador: schema.rhPessoal,
+      })
+      .from(schema.rhPatrimonio)
+      .leftJoin(
+        schema.rhPessoal,
+        eq(schema.rhPatrimonio.responsavelAtual, schema.rhPessoal.nome)
+      )
+      .where(eq(schema.rhPatrimonio.id, id))
+      .limit(1);
+    
+    if (result.length === 0) {
+      return undefined;
+    }
+    
+    const row = result[0];
+    return {
+      id: row.id,
+      numeroAtivo: row.numeroAtivo,
+      ativo: row.ativo,
+      marca: row.marca,
+      estadoConservacao: row.estadoConservacao,
+      responsavelAtual: row.responsavelAtual,
+      valorPago: row.valorPago,
+      valorMercado: row.valorMercado,
+      valorVenda: row.valorVenda,
+      descricao: row.descricao,
+      colaborador: row.colaborador || undefined,
+    };
   }
 
   async createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio> {
