@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Package } from "lucide-react";
+import { Loader2, Search, Package, ArrowDownNarrowWide, ArrowUpNarrowWide, ArrowDownAZ, ArrowUpZA } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,34 +34,107 @@ interface PatrimonioDb {
   descricao: string | null;
 }
 
+type SortNumericType = "asc" | "desc";
+type SortAlphaType = "none" | "asc" | "desc";
+
 export default function Patrimonio() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [filterTipoBem, setFilterTipoBem] = useState<string>("todos");
+  const [filterEstado, setFilterEstado] = useState<string>("todos");
+  const [sortNumeric, setSortNumeric] = useState<SortNumericType>("asc");
+  const [sortAlpha, setSortAlpha] = useState<SortAlphaType>("none");
 
   const { data: patrimonios, isLoading, error } = useQuery<PatrimonioDb[]>({
     queryKey: ["/api/patrimonio"],
   });
 
-  const filteredPatrimonios = useMemo(() => {
+  const uniqueTiposBem = useMemo(() => {
+    if (!patrimonios) return [];
+    const tipos = new Set<string>();
+    patrimonios.forEach(p => {
+      if (p.ativo) tipos.add(p.ativo);
+    });
+    return Array.from(tipos).sort();
+  }, [patrimonios]);
+
+  const uniqueEstados = useMemo(() => {
+    if (!patrimonios) return [];
+    const estados = new Set<string>();
+    patrimonios.forEach(p => {
+      if (p.estadoConservacao) estados.add(p.estadoConservacao);
+    });
+    return Array.from(estados).sort();
+  }, [patrimonios]);
+
+  const filteredAndSortedPatrimonios = useMemo(() => {
     if (!patrimonios) return [];
     
-    if (!searchQuery) return patrimonios;
+    let result = [...patrimonios];
     
-    const query = searchQuery.toLowerCase();
-    return patrimonios.filter(p => 
-      p.numeroAtivo?.toLowerCase().includes(query) ||
-      p.ativo?.toLowerCase().includes(query) ||
-      p.marca?.toLowerCase().includes(query) ||
-      p.responsavelAtual?.toLowerCase().includes(query) ||
-      p.descricao?.toLowerCase().includes(query)
-    );
-  }, [patrimonios, searchQuery]);
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(p => 
+        p.numeroAtivo?.toLowerCase().includes(query) ||
+        p.ativo?.toLowerCase().includes(query) ||
+        p.marca?.toLowerCase().includes(query) ||
+        p.responsavelAtual?.toLowerCase().includes(query) ||
+        p.descricao?.toLowerCase().includes(query)
+      );
+    }
+    
+    if (filterTipoBem !== "todos") {
+      result = result.filter(p => p.ativo === filterTipoBem);
+    }
+    
+    if (filterEstado !== "todos") {
+      result = result.filter(p => p.estadoConservacao === filterEstado);
+    }
+    
+    if (sortAlpha !== "none") {
+      result.sort((a, b) => {
+        const nameA = a.responsavelAtual || "";
+        const nameB = b.responsavelAtual || "";
+        if (sortAlpha === "asc") {
+          return nameA.localeCompare(nameB);
+        } else {
+          return nameB.localeCompare(nameA);
+        }
+      });
+    } else {
+      result.sort((a, b) => {
+        const numA = a.numeroAtivo || "";
+        const numB = b.numeroAtivo || "";
+        if (sortNumeric === "asc") {
+          return numA.localeCompare(numB, undefined, { numeric: true });
+        } else {
+          return numB.localeCompare(numA, undefined, { numeric: true });
+        }
+      });
+    }
+    
+    return result;
+  }, [patrimonios, searchQuery, filterTipoBem, filterEstado, sortNumeric, sortAlpha]);
 
-  const totalPages = Math.ceil(filteredPatrimonios.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredAndSortedPatrimonios.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedPatrimonios = filteredPatrimonios.slice(startIndex, endIndex);
+  const paginatedPatrimonios = filteredAndSortedPatrimonios.slice(startIndex, endIndex);
+
+  const handleNumericSort = () => {
+    setSortNumeric(prev => prev === "asc" ? "desc" : "asc");
+  };
+
+  const handleAlphaSort = () => {
+    if (sortAlpha === "none") {
+      setSortAlpha("asc");
+    } else if (sortAlpha === "asc") {
+      setSortAlpha("desc");
+    } else {
+      setSortAlpha("none");
+    }
+  };
 
   const getEstadoColor = (estado: string | null) => {
     if (!estado) return "";
@@ -117,13 +190,13 @@ export default function Patrimonio() {
               <div className="space-y-1">
                 <CardTitle>Listagem de Patrimônio</CardTitle>
                 <CardDescription>
-                  Total de {filteredPatrimonios.length} {filteredPatrimonios.length === 1 ? "item" : "itens"}
+                  Total de {filteredAndSortedPatrimonios.length} {filteredAndSortedPatrimonios.length === 1 ? "item" : "itens"}
                 </CardDescription>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex gap-4">
-                <div className="flex-1 relative">
+              <div className="flex flex-wrap gap-4">
+                <div className="flex-1 min-w-[250px] relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
                     placeholder="Buscar por número, bem, marca, responsável ou modelo..."
@@ -135,6 +208,87 @@ export default function Patrimonio() {
                     className="pl-9"
                     data-testid="input-search-patrimonio"
                   />
+                </div>
+                
+                <Select
+                  value={filterTipoBem}
+                  onValueChange={(value) => {
+                    setFilterTipoBem(value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-[200px]" data-testid="select-filter-tipo-bem">
+                    <SelectValue placeholder="Tipo de Bem" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os Bens</SelectItem>
+                    {uniqueTiposBem.map(tipo => (
+                      <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={filterEstado}
+                  onValueChange={(value) => {
+                    setFilterEstado(value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-[200px]" data-testid="select-filter-estado">
+                    <SelectValue placeholder="Estado de Conservação" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os Estados</SelectItem>
+                    {uniqueEstados.map(estado => (
+                      <SelectItem key={estado} value={estado}>{estado}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleNumericSort}
+                    disabled={sortAlpha !== "none"}
+                    data-testid="button-sort-numeric"
+                    title={
+                      sortAlpha !== "none" 
+                        ? "Ordenação alfabética está ativa" 
+                        : sortNumeric === "asc" 
+                        ? "Ordenar por número decrescente" 
+                        : "Ordenar por número crescente"
+                    }
+                  >
+                    {sortNumeric === "asc" ? (
+                      <ArrowDownNarrowWide className="h-4 w-4" />
+                    ) : (
+                      <ArrowUpNarrowWide className="h-4 w-4" />
+                    )}
+                  </Button>
+
+                  <Button
+                    variant={sortAlpha === "none" ? "outline" : "default"}
+                    size="icon"
+                    onClick={handleAlphaSort}
+                    data-testid="button-sort-alpha"
+                    title={
+                      sortAlpha === "none" 
+                        ? "Ordenar alfabeticamente" 
+                        : sortAlpha === "asc" 
+                        ? "Ordenar alfabeticamente reverso" 
+                        : "Voltar para ordenação padrão"
+                    }
+                  >
+                    {sortAlpha === "asc" ? (
+                      <ArrowDownAZ className="h-4 w-4" />
+                    ) : sortAlpha === "desc" ? (
+                      <ArrowUpZA className="h-4 w-4" />
+                    ) : (
+                      <ArrowDownAZ className="h-4 w-4 opacity-50" />
+                    )}
+                  </Button>
                 </div>
               </div>
 
