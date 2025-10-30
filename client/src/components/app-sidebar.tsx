@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound, ChevronRight, Eye } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -60,6 +60,11 @@ const dashboardItems = [
     title: "G&G",
     url: "/dashboard/geg",
     icon: UsersRound,
+  },
+  {
+    title: "Análise de Retenção",
+    url: "/dashboard/retencao",
+    icon: UserCheck,
   },
 ];
 
