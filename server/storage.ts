@@ -85,6 +85,8 @@ export interface CohortRetentionData {
     squad?: string;
     servico?: string;
   };
+  availableServicos: string[];
+  availableSquads: string[];
 }
 
 export interface IStorage {
@@ -853,6 +855,9 @@ export class DbStorage implements IStorage {
       });
     });
 
+    const availableServicos = Array.from(new Set(filteredContratos.map(c => c.servico).filter(Boolean) as string[])).sort();
+    const availableSquads = Array.from(new Set(filteredContratos.map(c => c.squad).filter(Boolean) as string[])).sort();
+
     const sortedCohorts = Array.from(cohortMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 
     let maxMonthOffset = 0;
@@ -908,6 +913,8 @@ export class DbStorage implements IStorage {
       cohorts: cohortRows,
       maxMonthOffset,
       filters: filters || {},
+      availableServicos,
+      availableSquads,
     };
   }
 }
