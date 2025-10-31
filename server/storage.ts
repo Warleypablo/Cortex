@@ -836,40 +836,68 @@ export class DbStorage implements IStorage {
       filteredContratos = filteredContratos.filter(c => c.servico === filters.servico);
     }
 
-    const cohortMap = new Map<string, {
-      clients: Set<string>;
-      contracts: Array<{
-        idTask: string;
-        dataInicio: Date;
-        dataEncerramento: Date | null;
-        valorr: number;
-      }>;
-    }>();
+    const availableServicos = Array.from(new Set(filteredContratos.map(c => c.servico).filter(Boolean) as string[])).sort();
+    const availableSquads = Array.from(new Set(filteredContratos.map(c => c.squad).filter(Boolean) as string[])).sort();
+
+    const clientContractMap = new Map<string, Array<{
+      servico: string;
+      squad: string;
+      dataInicio: Date;
+      dataEncerramento: Date | null;
+      valorr: number;
+    }>>();
 
     filteredContratos.forEach(contrato => {
-      if (!contrato.dataInicio) return;
+      if (!contrato.idTask) return;
       
-      const dataInicio = contrato.dataInicio;
-      const cohortKey = `${dataInicio.getFullYear()}-${String(dataInicio.getMonth() + 1).padStart(2, '0')}`;
-      
-      if (!cohortMap.has(cohortKey)) {
-        cohortMap.set(cohortKey, { clients: new Set(), contracts: [] });
+      if (!clientContractMap.has(contrato.idTask)) {
+        clientContractMap.set(contrato.idTask, []);
       }
       
-      const cohort = cohortMap.get(cohortKey)!;
-      if (contrato.idTask && contrato.valorr > 0) {
-        cohort.clients.add(contrato.idTask);
-      }
-      cohort.contracts.push({
-        idTask: contrato.idTask || '',
-        dataInicio: contrato.dataInicio,
+      clientContractMap.get(contrato.idTask)!.push({
+        servico: contrato.servico || '',
+        squad: contrato.squad || '',
+        dataInicio: contrato.dataInicio!,
         dataEncerramento: contrato.dataEncerramento,
         valorr: contrato.valorr,
       });
     });
 
-    const availableServicos = Array.from(new Set(filteredContratos.map(c => c.servico).filter(Boolean) as string[])).sort();
-    const availableSquads = Array.from(new Set(filteredContratos.map(c => c.squad).filter(Boolean) as string[])).sort();
+    const clientCohortMap = new Map<string, { cohortMonth: string; firstDate: Date }>();
+
+    clientContractMap.forEach((contracts, clientId) => {
+      const contractsWithValue = contracts.filter(c => c.valorr > 0);
+      
+      if (contractsWithValue.length === 0) return;
+      
+      contractsWithValue.sort((a, b) => a.dataInicio.getTime() - b.dataInicio.getTime());
+      const firstDate = contractsWithValue[0].dataInicio;
+      const cohortKey = `${firstDate.getFullYear()}-${String(firstDate.getMonth() + 1).padStart(2, '0')}`;
+      
+      clientCohortMap.set(clientId, { cohortMonth: cohortKey, firstDate });
+    });
+
+    const cohortMap = new Map<string, {
+      clients: Set<string>;
+      allClientContracts: Map<string, Array<{
+        dataInicio: Date;
+        dataEncerramento: Date | null;
+        valorr: number;
+      }>>;
+    }>();
+
+    clientCohortMap.forEach(({ cohortMonth }, clientId) => {
+      if (!cohortMap.has(cohortMonth)) {
+        cohortMap.set(cohortMonth, { 
+          clients: new Set(), 
+          allClientContracts: new Map() 
+        });
+      }
+      
+      const cohort = cohortMap.get(cohortMonth)!;
+      cohort.clients.add(clientId);
+      cohort.allClientContracts.set(clientId, clientContractMap.get(clientId)!);
+    });
 
     let sortedCohorts = Array.from(cohortMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 
@@ -890,7 +918,15 @@ export class DbStorage implements IStorage {
       const cohortLabel = `${monthNames[month - 1]}/${year}`;
       
       const totalClients = cohortData.clients.size;
-      const totalValue = cohortData.contracts.reduce((sum, c) => sum + c.valorr, 0);
+      
+      let totalValue = 0;
+      cohortData.allClientContracts.forEach(contracts => {
+        contracts.forEach(contract => {
+          if (contract.valorr > 0) {
+            totalValue += contract.valorr;
+          }
+        });
+      });
       
       const retentionByMonth: { [key: number]: { activeClients: number; retentionRate: number; activeValue: number; valueRetentionRate: number } } = {};
 
@@ -904,12 +940,21 @@ export class DbStorage implements IStorage {
         const activeClientsSet = new Set<string>();
         let activeValue = 0;
         
-        cohortData.contracts.forEach(contract => {
-          if (!contract.dataEncerramento || new Date(contract.dataEncerramento) > checkEndDate) {
-            if (contract.idTask && contract.valorr > 0) {
-              activeClientsSet.add(contract.idTask);
-            }
-            activeValue += contract.valorr;
+        cohortData.allClientContracts.forEach((contracts, clientId) => {
+          const hasActiveValueContract = contracts.some(contract => {
+            const isActive = !contract.dataEncerramento || new Date(contract.dataEncerramento) > checkEndDate;
+            return isActive && contract.valorr > 0;
+          });
+          
+          if (hasActiveValueContract) {
+            activeClientsSet.add(clientId);
+            
+            contracts.forEach(contract => {
+              const isActive = !contract.dataEncerramento || new Date(contract.dataEncerramento) > checkEndDate;
+              if (isActive && contract.valorr > 0) {
+                activeValue += contract.valorr;
+              }
+            });
           }
         });
         
