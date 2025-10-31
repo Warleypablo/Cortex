@@ -60,6 +60,7 @@ export default function DashboardRetencao() {
     if (!cohortData || cohortData.cohorts.length === 0) {
       return {
         totalClients: 0,
+        totalValue: 0,
         avgRetentionMonth3: 0,
         avgRetentionMonth6: 0,
         avgChurnRate: 0,
@@ -67,16 +68,23 @@ export default function DashboardRetencao() {
     }
 
     const totalClients = cohortData.cohorts.reduce((sum, cohort) => sum + cohort.totalClients, 0);
+    const totalValue = cohortData.cohorts.reduce((sum, cohort) => sum + cohort.totalValue, 0);
     
     const retentionsMonth3: number[] = [];
     const retentionsMonth6: number[] = [];
     
     cohortData.cohorts.forEach(cohort => {
       if (cohort.retentionByMonth[3]) {
-        retentionsMonth3.push(cohort.retentionByMonth[3].retentionRate);
+        const rate = viewMode === "clientes" 
+          ? cohort.retentionByMonth[3].retentionRate 
+          : cohort.retentionByMonth[3].valueRetentionRate;
+        retentionsMonth3.push(rate);
       }
       if (cohort.retentionByMonth[6]) {
-        retentionsMonth6.push(cohort.retentionByMonth[6].retentionRate);
+        const rate = viewMode === "clientes"
+          ? cohort.retentionByMonth[6].retentionRate
+          : cohort.retentionByMonth[6].valueRetentionRate;
+        retentionsMonth6.push(rate);
       }
     });
 
@@ -92,11 +100,12 @@ export default function DashboardRetencao() {
 
     return {
       totalClients,
+      totalValue,
       avgRetentionMonth3,
       avgRetentionMonth6,
       avgChurnRate,
     };
-  }, [cohortData]);
+  }, [cohortData, viewMode]);
 
   const getRetentionColor = (rate: number): string => {
     if (rate >= 80) return "bg-green-100 dark:bg-green-950 text-green-900 dark:text-green-100 border-green-300 dark:border-green-700";
@@ -149,11 +158,22 @@ export default function DashboardRetencao() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card data-testid="card-total-clients">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-                <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">
+                  {viewMode === "clientes" ? "Total de Clientes" : "Valor Total MRR"}
+                </CardTitle>
+                {viewMode === "clientes" ? (
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                )}
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold" data-testid="text-total-clients">{kpis.totalClients}</div>
+                <div className="text-2xl font-bold" data-testid="text-total-clients">
+                  {viewMode === "clientes" 
+                    ? kpis.totalClients 
+                    : `R$ ${kpis.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  }
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Desde o início
                 </p>
