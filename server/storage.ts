@@ -803,20 +803,26 @@ export class DbStorage implements IStorage {
   }
 
   async getCohortRetention(filters?: { squad?: string; servico?: string }): Promise<CohortRetentionData> {
-    let query = db
-      .select({
-        idTask: schema.cupContratos.idTask,
-        servico: schema.cupContratos.servico,
-        squad: schema.cupContratos.squad,
-        dataInicio: schema.cupContratos.dataInicio,
-        dataEncerramento: schema.cupContratos.dataEncerramento,
-      })
-      .from(schema.cupContratos)
-      .where(sql`${schema.cupContratos.dataInicio} IS NOT NULL`);
+    const result = await db.execute(sql`
+      SELECT 
+        id_task,
+        servico,
+        squad,
+        data_inicio,
+        data_encerramento
+      FROM ${schema.cupContratos}
+      WHERE data_inicio IS NOT NULL
+    `);
 
-    const contratos = await query;
+    const contratos = (result.rows as any[]).map((row: any) => ({
+      idTask: row.id_task,
+      servico: row.servico,
+      squad: row.squad,
+      dataInicio: row.data_inicio ? new Date(row.data_inicio) : null,
+      dataEncerramento: row.data_encerramento ? new Date(row.data_encerramento) : null,
+    }));
 
-    let filteredContratos = contratos.filter(c => c.dataInicio);
+    let filteredContratos = contratos.filter(c => c.dataInicio && !isNaN(c.dataInicio.getTime()));
 
     if (filters?.squad) {
       filteredContratos = filteredContratos.filter(c => c.squad === filters.squad);
@@ -837,7 +843,7 @@ export class DbStorage implements IStorage {
     filteredContratos.forEach(contrato => {
       if (!contrato.dataInicio) return;
       
-      const dataInicio = new Date(contrato.dataInicio);
+      const dataInicio = contrato.dataInicio;
       const cohortKey = `${dataInicio.getFullYear()}-${String(dataInicio.getMonth() + 1).padStart(2, '0')}`;
       
       if (!cohortMap.has(cohortKey)) {
@@ -850,8 +856,8 @@ export class DbStorage implements IStorage {
       }
       cohort.contracts.push({
         idTask: contrato.idTask || '',
-        dataInicio: dataInicio,
-        dataEncerramento: contrato.dataEncerramento ? new Date(contrato.dataEncerramento) : null,
+        dataInicio: contrato.dataInicio,
+        dataEncerramento: contrato.dataEncerramento,
       });
     });
 
