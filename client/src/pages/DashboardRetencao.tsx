@@ -31,13 +31,17 @@ interface CohortRetentionData {
 export default function DashboardRetencao() {
   const [filterSquad, setFilterSquad] = useState<string>("todos");
   const [filterServico, setFilterServico] = useState<string>("todos");
+  const [filterMesInicio, setFilterMesInicio] = useState<string>("");
+  const [filterMesFim, setFilterMesFim] = useState<string>("");
 
   const { data: cohortData, isLoading } = useQuery<CohortRetentionData>({
-    queryKey: ["/api/analytics/cohort-retention", filterSquad, filterServico],
+    queryKey: ["/api/analytics/cohort-retention", filterSquad, filterServico, filterMesInicio, filterMesFim],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filterSquad !== "todos") params.append("squad", filterSquad);
       if (filterServico !== "todos") params.append("servico", filterServico);
+      if (filterMesInicio) params.append("mesInicio", filterMesInicio);
+      if (filterMesFim) params.append("mesFim", filterMesFim);
       
       const res = await fetch(`/api/analytics/cohort-retention?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch cohort data");
@@ -188,6 +192,28 @@ export default function DashboardRetencao() {
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-muted-foreground whitespace-nowrap">De:</label>
+                    <input
+                      type="month"
+                      value={filterMesInicio}
+                      onChange={(e) => setFilterMesInicio(e.target.value)}
+                      className="h-9 rounded-md border border-input bg-background px-3 text-sm hover-elevate"
+                      data-testid="input-mes-inicio"
+                    />
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-muted-foreground whitespace-nowrap">Até:</label>
+                    <input
+                      type="month"
+                      value={filterMesFim}
+                      onChange={(e) => setFilterMesFim(e.target.value)}
+                      className="h-9 rounded-md border border-input bg-background px-3 text-sm hover-elevate"
+                      data-testid="input-mes-fim"
+                    />
+                  </div>
+
                   <Select value={filterSquad} onValueChange={setFilterSquad}>
                     <SelectTrigger className="w-[160px]" data-testid="select-squad-filter">
                       <SelectValue placeholder="Filtrar Squad" />

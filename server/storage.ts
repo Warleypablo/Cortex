@@ -113,7 +113,7 @@ export interface IStorage {
   getFluxoCaixa(): Promise<FluxoCaixaItem[]>;
   getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]>;
   getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]>;
-  getCohortRetention(filters?: { squad?: string; servico?: string }): Promise<CohortRetentionData>;
+  getCohortRetention(filters?: { squad?: string; servico?: string; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
 }
 
 export class MemStorage implements IStorage {
@@ -220,7 +220,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getCohortRetention(filters?: { squad?: string; servico?: string }): Promise<CohortRetentionData> {
+  async getCohortRetention(filters?: { squad?: string; servico?: string; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -802,7 +802,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getCohortRetention(filters?: { squad?: string; servico?: string }): Promise<CohortRetentionData> {
+  async getCohortRetention(filters?: { squad?: string; servico?: string; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData> {
     const result = await db.execute(sql`
       SELECT 
         id_task,
@@ -864,7 +864,15 @@ export class DbStorage implements IStorage {
     const availableServicos = Array.from(new Set(filteredContratos.map(c => c.servico).filter(Boolean) as string[])).sort();
     const availableSquads = Array.from(new Set(filteredContratos.map(c => c.squad).filter(Boolean) as string[])).sort();
 
-    const sortedCohorts = Array.from(cohortMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    let sortedCohorts = Array.from(cohortMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+    if (filters?.mesInicio) {
+      sortedCohorts = sortedCohorts.filter(([cohortMonth]) => cohortMonth >= filters.mesInicio!);
+    }
+    
+    if (filters?.mesFim) {
+      sortedCohorts = sortedCohorts.filter(([cohortMonth]) => cohortMonth <= filters.mesFim!);
+    }
 
     let maxMonthOffset = 0;
     const cohortRows: CohortRetentionRow[] = sortedCohorts.map(([cohortMonth, cohortData]) => {
