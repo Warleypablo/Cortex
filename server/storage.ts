@@ -818,14 +818,17 @@ export class DbStorage implements IStorage {
       WHERE data_inicio IS NOT NULL
     `);
 
-    const contratos = (result.rows as any[]).map((row: any) => ({
-      idTask: row.id_task,
-      servico: row.servico,
-      squad: row.squad,
-      dataInicio: row.data_inicio ? new Date(row.data_inicio) : null,
-      dataEncerramento: row.data_encerramento ? new Date(row.data_encerramento) : null,
-      valorr: parseFloat(row.valorr || '0'),
-    }));
+    const contratos = (result.rows as any[]).map((row: any) => {
+      const valorr = parseFloat(row.valorr || '0');
+      return {
+        idTask: row.id_task,
+        servico: row.servico,
+        squad: row.squad,
+        dataInicio: row.data_inicio ? new Date(row.data_inicio) : null,
+        dataEncerramento: row.data_encerramento ? new Date(row.data_encerramento) : null,
+        valorr: isNaN(valorr) ? 0 : valorr,
+      };
+    });
 
     let filteredContratos = contratos.filter(c => c.dataInicio && !isNaN(c.dataInicio.getTime()));
 
@@ -866,7 +869,7 @@ export class DbStorage implements IStorage {
     const clientCohortMap = new Map<string, { cohortMonth: string; firstDate: Date }>();
 
     clientContractMap.forEach((contracts, clientId) => {
-      const contractsWithValue = contracts.filter(c => c.valorr > 0);
+      const contractsWithValue = contracts.filter(c => !isNaN(c.valorr) && c.valorr > 0);
       
       if (contractsWithValue.length === 0) return;
       
@@ -922,7 +925,7 @@ export class DbStorage implements IStorage {
       let totalValue = 0;
       cohortData.allClientContracts.forEach(contracts => {
         contracts.forEach(contract => {
-          if (contract.valorr > 0) {
+          if (!isNaN(contract.valorr) && contract.valorr > 0) {
             totalValue += contract.valorr;
           }
         });
@@ -943,7 +946,7 @@ export class DbStorage implements IStorage {
         cohortData.allClientContracts.forEach((contracts, clientId) => {
           const hasActiveValueContract = contracts.some(contract => {
             const isActive = !contract.dataEncerramento || new Date(contract.dataEncerramento) > checkEndDate;
-            return isActive && contract.valorr > 0;
+            return isActive && !isNaN(contract.valorr) && contract.valorr > 0;
           });
           
           if (hasActiveValueContract) {
@@ -951,7 +954,7 @@ export class DbStorage implements IStorage {
             
             contracts.forEach(contract => {
               const isActive = !contract.dataEncerramento || new Date(contract.dataEncerramento) > checkEndDate;
-              if (isActive && contract.valorr > 0) {
+              if (isActive && !isNaN(contract.valorr) && contract.valorr > 0) {
                 activeValue += contract.valorr;
               }
             });
