@@ -70,10 +70,13 @@ export interface CohortRetentionRow {
   cohortMonth: string;
   cohortLabel: string;
   totalClients: number;
+  totalValue: number;
   retentionByMonth: {
     [monthOffset: number]: {
       activeClients: number;
       retentionRate: number;
+      activeValue: number;
+      valueRetentionRate: number;
     };
   };
 }
