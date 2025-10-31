@@ -64,6 +64,7 @@ export default function DashboardRetencao() {
       return {
         totalClients: 0,
         totalValue: 0,
+        totalContracts: 0,
         avgRetentionMonth3: 0,
         avgRetentionMonth6: 0,
         avgChurnRate: 0,
@@ -72,6 +73,7 @@ export default function DashboardRetencao() {
 
     const totalClients = cohortData.cohorts.reduce((sum, cohort) => sum + cohort.totalClients, 0);
     const totalValue = cohortData.cohorts.reduce((sum, cohort) => sum + cohort.totalValue, 0);
+    const totalContracts = cohortData.cohorts.reduce((sum, cohort) => sum + cohort.totalContracts, 0);
     
     const retentionsMonth3: number[] = [];
     const retentionsMonth6: number[] = [];
@@ -80,13 +82,17 @@ export default function DashboardRetencao() {
       if (cohort.retentionByMonth[3]) {
         const rate = viewMode === "clientes" 
           ? cohort.retentionByMonth[3].retentionRate 
-          : cohort.retentionByMonth[3].valueRetentionRate;
+          : viewMode === "valor"
+          ? cohort.retentionByMonth[3].valueRetentionRate
+          : cohort.retentionByMonth[3].contractRetentionRate;
         retentionsMonth3.push(rate);
       }
       if (cohort.retentionByMonth[6]) {
         const rate = viewMode === "clientes"
           ? cohort.retentionByMonth[6].retentionRate
-          : cohort.retentionByMonth[6].valueRetentionRate;
+          : viewMode === "valor"
+          ? cohort.retentionByMonth[6].valueRetentionRate
+          : cohort.retentionByMonth[6].contractRetentionRate;
         retentionsMonth6.push(rate);
       }
     });
@@ -104,6 +110,7 @@ export default function DashboardRetencao() {
     return {
       totalClients,
       totalValue,
+      totalContracts,
       avgRetentionMonth3,
       avgRetentionMonth6,
       avgChurnRate,
@@ -152,6 +159,15 @@ export default function DashboardRetencao() {
               <DollarSign className="h-4 w-4 mr-2" />
               Valor MRR
             </Button>
+            <Button
+              variant={viewMode === "contratos" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("contratos")}
+              data-testid="button-view-contratos"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Contratos
+            </Button>
           </div>
         </div>
       </div>
@@ -162,19 +178,28 @@ export default function DashboardRetencao() {
             <Card data-testid="card-total-clients">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
                 <CardTitle className="text-sm font-medium">
-                  {viewMode === "clientes" ? "Total de Clientes" : "Valor Total MRR"}
+                  {viewMode === "clientes" 
+                    ? "Total de Clientes" 
+                    : viewMode === "valor"
+                    ? "Valor Total MRR"
+                    : "Total de Contratos"
+                  }
                 </CardTitle>
                 {viewMode === "clientes" ? (
                   <Users className="h-4 w-4 text-muted-foreground" />
-                ) : (
+                ) : viewMode === "valor" ? (
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
                 )}
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-total-clients">
                   {viewMode === "clientes" 
                     ? kpis.totalClients 
-                    : `R$ ${kpis.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : viewMode === "valor"
+                    ? `R$ ${kpis.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : kpis.totalContracts
                   }
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -332,7 +357,9 @@ export default function DashboardRetencao() {
                             <td className="p-3 text-center font-semibold" data-testid={`total-${cohort.cohortMonth}`}>
                               {viewMode === "clientes" 
                                 ? cohort.totalClients
-                                : `R$ ${cohort.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                : viewMode === "valor"
+                                ? `R$ ${cohort.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                : cohort.totalContracts
                               }
                             </td>
                             {Array.from({ length: cohortData.maxMonthOffset + 1 }, (_, offset) => {
@@ -345,9 +372,21 @@ export default function DashboardRetencao() {
                                 );
                               }
                               
-                              const rate = viewMode === "clientes" ? data.retentionRate : data.valueRetentionRate;
-                              const activeMetric = viewMode === "clientes" ? data.activeClients : data.activeValue;
-                              const totalMetric = viewMode === "clientes" ? cohort.totalClients : cohort.totalValue;
+                              const rate = viewMode === "clientes" 
+                                ? data.retentionRate 
+                                : viewMode === "valor"
+                                ? data.valueRetentionRate
+                                : data.contractRetentionRate;
+                              const activeMetric = viewMode === "clientes" 
+                                ? data.activeClients 
+                                : viewMode === "valor"
+                                ? data.activeValue
+                                : data.activeContracts;
+                              const totalMetric = viewMode === "clientes" 
+                                ? cohort.totalClients 
+                                : viewMode === "valor"
+                                ? cohort.totalValue
+                                : cohort.totalContracts;
                               
                               return (
                                 <td 
@@ -365,7 +404,9 @@ export default function DashboardRetencao() {
                                     <span className="text-xs text-muted-foreground">
                                       {viewMode === "clientes" 
                                         ? `${activeMetric}/${totalMetric}`
-                                        : `R$ ${activeMetric.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                        : viewMode === "valor"
+                                        ? `R$ ${activeMetric.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                        : `${activeMetric}/${totalMetric}`
                                       }
                                     </span>
                                   </div>
