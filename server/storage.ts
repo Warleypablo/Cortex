@@ -923,15 +923,17 @@ export class DbStorage implements IStorage {
       const totalClients = cohortData.clients.size;
       
       let totalValue = 0;
+      let totalContracts = 0;
       cohortData.allClientContracts.forEach(contracts => {
         contracts.forEach(contract => {
           if (!isNaN(contract.valorr) && contract.valorr > 0) {
             totalValue += contract.valorr;
+            totalContracts++;
           }
         });
       });
       
-      const retentionByMonth: { [key: number]: { activeClients: number; retentionRate: number; activeValue: number; valueRetentionRate: number } } = {};
+      const retentionByMonth: { [key: number]: { activeClients: number; retentionRate: number; activeValue: number; valueRetentionRate: number; activeContracts: number; contractRetentionRate: number } } = {};
 
       const now = new Date();
       const monthsSinceCohort = (now.getFullYear() - year) * 12 + (now.getMonth() - (month - 1));
@@ -942,6 +944,7 @@ export class DbStorage implements IStorage {
         
         const activeClientsSet = new Set<string>();
         let activeValue = 0;
+        let activeContracts = 0;
         
         cohortData.allClientContracts.forEach((contracts, clientId) => {
           const hasActiveValueContract = contracts.some(contract => {
@@ -956,6 +959,7 @@ export class DbStorage implements IStorage {
               const isActive = !contract.dataEncerramento || new Date(contract.dataEncerramento) > checkEndDate;
               if (isActive && !isNaN(contract.valorr) && contract.valorr > 0) {
                 activeValue += contract.valorr;
+                activeContracts++;
               }
             });
           }
@@ -964,12 +968,15 @@ export class DbStorage implements IStorage {
         const activeClients = activeClientsSet.size;
         const retentionRate = totalClients > 0 ? (activeClients / totalClients) * 100 : 0;
         const valueRetentionRate = totalValue > 0 ? (activeValue / totalValue) * 100 : 0;
+        const contractRetentionRate = totalContracts > 0 ? (activeContracts / totalContracts) * 100 : 0;
         
         retentionByMonth[offset] = {
           activeClients,
           retentionRate,
           activeValue,
           valueRetentionRate,
+          activeContracts,
+          contractRetentionRate,
         };
         
         if (offset > maxMonthOffset) {
@@ -982,6 +989,7 @@ export class DbStorage implements IStorage {
         cohortLabel,
         totalClients,
         totalValue,
+        totalContracts,
         retentionByMonth,
       };
     });
