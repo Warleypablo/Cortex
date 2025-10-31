@@ -2,17 +2,21 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Users, TrendingDown, TrendingUp, Calendar } from "lucide-react";
+import { Loader2, Users, TrendingDown, TrendingUp, Calendar, DollarSign } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface CohortRetentionRow {
   cohortMonth: string;
   cohortLabel: string;
   totalClients: number;
+  totalValue: number;
   retentionByMonth: {
     [monthOffset: number]: {
       activeClients: number;
       retentionRate: number;
+      activeValue: number;
+      valueRetentionRate: number;
     };
   };
 }
@@ -28,11 +32,14 @@ interface CohortRetentionData {
   availableSquads: string[];
 }
 
+type ViewMode = "clientes" | "valor";
+
 export default function DashboardRetencao() {
   const [filterSquad, setFilterSquad] = useState<string>("todos");
   const [filterServico, setFilterServico] = useState<string>("todos");
   const [filterMesInicio, setFilterMesInicio] = useState<string>("");
   const [filterMesFim, setFilterMesFim] = useState<string>("");
+  const [viewMode, setViewMode] = useState<ViewMode>("clientes");
 
   const { data: cohortData, isLoading } = useQuery<CohortRetentionData>({
     queryKey: ["/api/analytics/cohort-retention", filterSquad, filterServico, filterMesInicio, filterMesFim],
@@ -113,6 +120,26 @@ export default function DashboardRetencao() {
             <p className="text-sm text-muted-foreground mt-1">
               Análise de coorte de clientes por mês de início do contrato
             </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={viewMode === "clientes" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("clientes")}
+              data-testid="button-view-clientes"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Clientes
+            </Button>
+            <Button
+              variant={viewMode === "valor" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("valor")}
+              data-testid="button-view-valor"
+            >
+              <DollarSign className="h-4 w-4 mr-2" />
+              Valor MRR
+            </Button>
           </div>
         </div>
       </div>
