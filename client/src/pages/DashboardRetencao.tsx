@@ -11,12 +11,15 @@ interface CohortRetentionRow {
   cohortLabel: string;
   totalClients: number;
   totalValue: number;
+  totalContracts: number;
   retentionByMonth: {
     [monthOffset: number]: {
       activeClients: number;
       retentionRate: number;
       activeValue: number;
       valueRetentionRate: number;
+      activeContracts: number;
+      contractRetentionRate: number;
     };
   };
 }
@@ -32,7 +35,7 @@ interface CohortRetentionData {
   availableSquads: string[];
 }
 
-type ViewMode = "clientes" | "valor";
+type ViewMode = "clientes" | "valor" | "contratos";
 
 export default function DashboardRetencao() {
   const [filterSquad, setFilterSquad] = useState<string>("todos");
