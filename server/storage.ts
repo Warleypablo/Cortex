@@ -857,7 +857,7 @@ export class DbStorage implements IStorage {
       }
       
       const cohort = cohortMap.get(cohortKey)!;
-      if (contrato.idTask) {
+      if (contrato.idTask && contrato.valorr > 0) {
         cohort.clients.add(contrato.idTask);
       }
       cohort.contracts.push({
@@ -906,7 +906,7 @@ export class DbStorage implements IStorage {
         
         cohortData.contracts.forEach(contract => {
           if (!contract.dataEncerramento || new Date(contract.dataEncerramento) > checkEndDate) {
-            if (contract.idTask) {
+            if (contract.idTask && contract.valorr > 0) {
               activeClientsSet.add(contract.idTask);
             }
             activeValue += contract.valorr;
