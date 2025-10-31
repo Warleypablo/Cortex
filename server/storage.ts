@@ -812,7 +812,8 @@ export class DbStorage implements IStorage {
         servico,
         squad,
         data_inicio,
-        data_encerramento
+        data_encerramento,
+        valorr
       FROM ${schema.cupContratos}
       WHERE data_inicio IS NOT NULL
     `);
@@ -823,6 +824,7 @@ export class DbStorage implements IStorage {
       squad: row.squad,
       dataInicio: row.data_inicio ? new Date(row.data_inicio) : null,
       dataEncerramento: row.data_encerramento ? new Date(row.data_encerramento) : null,
+      valorr: parseFloat(row.valorr || '0'),
     }));
 
     let filteredContratos = contratos.filter(c => c.dataInicio && !isNaN(c.dataInicio.getTime()));
@@ -840,6 +842,7 @@ export class DbStorage implements IStorage {
         idTask: string;
         dataInicio: Date;
         dataEncerramento: Date | null;
+        valorr: number;
       }>;
     }>();
 
@@ -861,6 +864,7 @@ export class DbStorage implements IStorage {
         idTask: contrato.idTask || '',
         dataInicio: contrato.dataInicio,
         dataEncerramento: contrato.dataEncerramento,
+        valorr: contrato.valorr,
       });
     });
 
@@ -886,7 +890,9 @@ export class DbStorage implements IStorage {
       const cohortLabel = `${monthNames[month - 1]}/${year}`;
       
       const totalClients = cohortData.clients.size;
-      const retentionByMonth: { [key: number]: { activeClients: number; retentionRate: number } } = {};
+      const totalValue = cohortData.contracts.reduce((sum, c) => sum + c.valorr, 0);
+      
+      const retentionByMonth: { [key: number]: { activeClients: number; retentionRate: number; activeValue: number; valueRetentionRate: number } } = {};
 
       const now = new Date();
       const monthsSinceCohort = (now.getFullYear() - year) * 12 + (now.getMonth() - (month - 1));
@@ -896,21 +902,26 @@ export class DbStorage implements IStorage {
         const checkEndDate = new Date(year, month - 1 + offset + 1, 0, 23, 59, 59);
         
         const activeClientsSet = new Set<string>();
+        let activeValue = 0;
         
         cohortData.contracts.forEach(contract => {
           if (!contract.dataEncerramento || new Date(contract.dataEncerramento) > checkEndDate) {
             if (contract.idTask) {
               activeClientsSet.add(contract.idTask);
             }
+            activeValue += contract.valorr;
           }
         });
         
         const activeClients = activeClientsSet.size;
         const retentionRate = totalClients > 0 ? (activeClients / totalClients) * 100 : 0;
+        const valueRetentionRate = totalValue > 0 ? (activeValue / totalValue) * 100 : 0;
         
         retentionByMonth[offset] = {
           activeClients,
           retentionRate,
+          activeValue,
+          valueRetentionRate,
         };
         
         if (offset > maxMonthOffset) {
@@ -922,6 +933,7 @@ export class DbStorage implements IStorage {
         cohortMonth,
         cohortLabel,
         totalClients,
+        totalValue,
         retentionByMonth,
       };
     });
