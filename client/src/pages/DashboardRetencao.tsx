@@ -327,7 +327,10 @@ export default function DashboardRetencao() {
                               {cohort.cohortLabel}
                             </td>
                             <td className="p-3 text-center font-semibold" data-testid={`total-${cohort.cohortMonth}`}>
-                              {cohort.totalClients}
+                              {viewMode === "clientes" 
+                                ? cohort.totalClients
+                                : `R$ ${cohort.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                              }
                             </td>
                             {Array.from({ length: cohortData.maxMonthOffset + 1 }, (_, offset) => {
                               const data = cohort.retentionByMonth[offset];
@@ -339,6 +342,10 @@ export default function DashboardRetencao() {
                                 );
                               }
                               
+                              const rate = viewMode === "clientes" ? data.retentionRate : data.valueRetentionRate;
+                              const activeMetric = viewMode === "clientes" ? data.activeClients : data.activeValue;
+                              const totalMetric = viewMode === "clientes" ? cohort.totalClients : cohort.totalValue;
+                              
                               return (
                                 <td 
                                   key={offset} 
@@ -348,12 +355,15 @@ export default function DashboardRetencao() {
                                   <div className="flex flex-col items-center gap-1">
                                     <Badge 
                                       variant="outline"
-                                      className={`${getRetentionColor(data.retentionRate)} font-semibold min-w-[70px]`}
+                                      className={`${getRetentionColor(rate)} font-semibold min-w-[70px]`}
                                     >
-                                      {data.retentionRate.toFixed(0)}%
+                                      {rate.toFixed(0)}%
                                     </Badge>
                                     <span className="text-xs text-muted-foreground">
-                                      {data.activeClients}/{cohort.totalClients}
+                                      {viewMode === "clientes" 
+                                        ? `${activeMetric}/${totalMetric}`
+                                        : `R$ ${activeMetric.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                      }
                                     </span>
                                   </div>
                                 </td>
