@@ -24,21 +24,21 @@ export default function RevenueChart({ data, onBarClick, selectedMonth }: Revenu
     <Card className="p-6">
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
           <XAxis 
             dataKey="month" 
-            stroke="hsl(var(--muted-foreground))"
+            stroke="var(--muted-foreground)"
             fontSize={12}
           />
           <YAxis 
-            stroke="hsl(var(--muted-foreground))"
+            stroke="var(--muted-foreground)"
             fontSize={12}
             tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
           />
           <Tooltip 
             contentStyle={{
-              backgroundColor: 'hsl(var(--card))',
-              border: '1px solid hsl(var(--border))',
+              backgroundColor: 'var(--card)',
+              border: '1px solid var(--border)',
               borderRadius: '0.5rem',
             }}
             formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Faturamento']}
@@ -52,7 +52,7 @@ export default function RevenueChart({ data, onBarClick, selectedMonth }: Revenu
             {data.map((entry, index) => (
               <Cell 
                 key={`cell-${index}`}
-                fill="hsl(var(--primary))"
+                fill="var(--primary)"
                 fillOpacity={selectedMonth && entry.month !== selectedMonth ? 0.3 : 1}
               />
             ))}
