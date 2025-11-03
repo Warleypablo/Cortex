@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DollarSign, TrendingUp, TrendingDown, Users } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { useQuery } from "@tanstack/react-query";
 
 export default function VisaoGeral() {
   const [mesVisaoGeral, setMesVisaoGeral] = useState<string>(() => {
@@ -34,32 +35,17 @@ export default function VisaoGeral() {
     return meses;
   };
 
-  const getMockDataVisaoGeral = (mesRef: string) => {
-    const mesesDisponiveis = getUltimos6Meses().map(m => m.valor);
-    const indice = mesesDisponiveis.indexOf(mesRef);
-    
-    const multiplier = indice >= 0 ? 1.0 - ((mesesDisponiveis.length - 1 - indice) * 0.03) : 0.90;
-    
-    const mrrAtivo = 450000 * multiplier;
-    const aquisicaoMrr = 85000 * multiplier;
-    const aquisicaoPontual = 120000 * multiplier;
-    const churnReais = 25000 * multiplier;
-    
-    return {
-      receitaTotal: mrrAtivo + aquisicaoPontual,
-      mrrAtivo,
-      aquisicaoMrr,
-      aquisicaoPontual,
-      cac: 0,
-      churnReais,
-      churnPercentual: 5.5,
-    };
-  };
-
-  const mockDataVisaoGeral = useMemo(() => getMockDataVisaoGeral(mesVisaoGeral), [mesVisaoGeral]);
+  const { data: metricas, isLoading: isLoadingMetricas } = useQuery({
+    queryKey: ['/api/visao-geral/metricas', mesVisaoGeral],
+    queryFn: async () => {
+      const response = await fetch(`/api/visao-geral/metricas?mesAno=${mesVisaoGeral}`);
+      if (!response.ok) throw new Error('Failed to fetch metrics');
+      return response.json();
+    },
+  });
 
   const mockMrrEvolution = [
-    { mes: mesVisaoGeral, mrr: mockDataVisaoGeral.mrrAtivo }
+    { mes: mesVisaoGeral, mrr: metricas?.mrr || 0 }
   ];
 
   const mockTopResponsaveis = [
@@ -111,7 +97,7 @@ export default function VisaoGeral() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-receita-total">
-                  {formatCurrency(mockDataVisaoGeral.receitaTotal)}
+                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.receitaTotal || 0)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">MRR + Pontual</p>
               </CardContent>
@@ -124,7 +110,7 @@ export default function VisaoGeral() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-mrr">
-                  {formatCurrency(mockDataVisaoGeral.mrrAtivo)}
+                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.mrr || 0)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Receita recorrente</p>
               </CardContent>
@@ -137,7 +123,7 @@ export default function VisaoGeral() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600" data-testid="text-aquisicao-mrr">
-                  {formatCurrency(mockDataVisaoGeral.aquisicaoMrr)}
+                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.aquisicaoMrr || 0)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Novos MRR</p>
               </CardContent>
@@ -150,7 +136,7 @@ export default function VisaoGeral() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600" data-testid="text-aquisicao-pontual">
-                  {formatCurrency(mockDataVisaoGeral.aquisicaoPontual)}
+                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.aquisicaoPontual || 0)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Novos pontuais</p>
               </CardContent>
@@ -176,11 +162,9 @@ export default function VisaoGeral() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600" data-testid="text-churn">
-                  {formatCurrency(mockDataVisaoGeral.churnReais)}
+                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.churn || 0)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {mockDataVisaoGeral.churnPercentual}% de perda
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">Contratos encerrados</p>
               </CardContent>
             </Card>
           </div>

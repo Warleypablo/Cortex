@@ -269,6 +269,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/visao-geral/metricas", async (req, res) => {
+    try {
+      const mesAno = req.query.mesAno as string;
+      
+      if (!mesAno || !/^\d{4}-\d{2}$/.test(mesAno)) {
+        return res.status(400).json({ error: "Invalid mesAno parameter. Expected format: YYYY-MM" });
+      }
+
+      const metricas = await storage.getVisaoGeralMetricas(mesAno);
+      res.json(metricas);
+    } catch (error) {
+      console.error("[api] Error fetching visao geral metricas:", error);
+      res.status(500).json({ error: "Failed to fetch visao geral metricas" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
