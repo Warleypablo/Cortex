@@ -1035,10 +1035,11 @@ export class DbStorage implements IStorage {
         FROM ${schema.cupContratos}
       )
       SELECT 
-        -- MRR: contratos ativos (sem data_encerramento ou encerramento no período)
+        -- MRR: contratos ativos no mês (sem data_encerramento ou encerrados no/após o mês)
         COALESCE(SUM(
           CASE 
-            WHEN (data_encerramento IS NULL OR data_encerramento >= ${fimMes})
+            WHEN (data_encerramento IS NULL OR 
+                  (data_encerramento >= ${inicioMes} AND data_encerramento <= ${fimMes}))
             THEN valorr 
             ELSE 0 
           END
