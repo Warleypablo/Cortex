@@ -207,12 +207,12 @@ export default function VisaoGeral() {
                     <Tooltip 
                       formatter={(value: number) => [formatCurrency(value), 'MRR']}
                       contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
+                        backgroundColor: 'var(--background)',
+                        border: '1px solid var(--border)',
                         borderRadius: '6px',
                       }}
                     />
-                    <Bar dataKey="mrr" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="mrr" fill="var(--primary)" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -277,8 +277,8 @@ export default function VisaoGeral() {
                     <Tooltip 
                       formatter={(value: number) => [formatCurrency(value), 'MRR']}
                       contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
+                        backgroundColor: 'var(--background)',
+                        border: '1px solid var(--border)',
                         borderRadius: '6px',
                       }}
                     />

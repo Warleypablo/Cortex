@@ -18,8 +18,10 @@
   --foreground: oklch(0.3763 0.0160 359.5767);
   --card: oklch(1.0000 0 0);
   --card-foreground: oklch(0.3763 0.0160 359.5767);
+  --card-border: oklch(0.95 0.005 60);
   --popover: oklch(1.0000 0 0);
   --popover-foreground: oklch(0.3763 0.0160 359.5767);
+  --popover-border: oklch(0.95 0.005 60);
   --primary: oklch(0.8405 0.0889 33.5614);
   --primary-foreground: oklch(1.0000 0 0);
   --secondary: oklch(1.0000 0 0);
@@ -112,8 +114,10 @@
   --foreground: oklch(1.0000 0 0);
   --card: oklch(0.3564 0.0214 338.4295);
   --card-foreground: oklch(1.0000 0 0);
+  --card-border: oklch(0.4113 0.0228 342.8474);
   --popover: oklch(0.3564 0.0214 338.4295);
   --popover-foreground: oklch(1.0000 0 0);
+  --popover-border: oklch(0.4113 0.0228 342.8474);
   --primary: oklch(0.8405 0.0889 33.5614);
   --primary-foreground: oklch(1.0000 0 0);
   --secondary: oklch(0.4113 0.0228 342.8474);
@@ -228,7 +232,7 @@
   /* Placeholder styling for contentEditable div */
   [contenteditable][data-placeholder]:empty::before {
     content: attr(data-placeholder);
-    color: hsl(var(--muted-foreground));
+    color: var(--muted-foreground);
     pointer-events: none;
   }
 
