@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, TrendingUp, TrendingDown } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Users } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 export default function VisaoGeral() {
@@ -40,11 +40,16 @@ export default function VisaoGeral() {
     
     const multiplier = indice >= 0 ? 1.0 - ((mesesDisponiveis.length - 1 - indice) * 0.03) : 0.90;
     
+    const mrrAtivo = 450000 * multiplier;
+    const aquisicaoPontual = 120000 * multiplier;
+    const receitaTotal = mrrAtivo + aquisicaoPontual;
+    
     return {
-      mrrAtivo: 450000 * multiplier,
+      receitaTotal,
+      mrrAtivo,
       aquisicaoMrr: 85000 * multiplier,
-      aquisicaoPontual: 120000 * multiplier,
-      entreguePontual: 95000 * multiplier,
+      aquisicaoPontual,
+      cac: 2500 * multiplier,
       churnReais: 25000 * multiplier,
       churnPercentual: 5.5,
     };
@@ -97,17 +102,30 @@ export default function VisaoGeral() {
             </Select>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-            <Card data-testid="card-mrr-ativo">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+            <Card data-testid="card-receita-total">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">MRR Ativo</CardTitle>
+                <CardTitle className="text-sm font-medium">Receita Total</CardTitle>
                 <DollarSign className="w-4 h-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold" data-testid="text-mrr-ativo">
+                <div className="text-2xl font-bold" data-testid="text-receita-total">
+                  {formatCurrency(mockDataVisaoGeral.receitaTotal)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">MRR + Pontual</p>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-mrr">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">MRR</CardTitle>
+                <DollarSign className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-mrr">
                   {formatCurrency(mockDataVisaoGeral.mrrAtivo)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Receita recorrente mensal</p>
+                <p className="text-xs text-muted-foreground mt-1">Receita recorrente</p>
               </CardContent>
             </Card>
 
@@ -120,7 +138,7 @@ export default function VisaoGeral() {
                 <div className="text-2xl font-bold text-green-600" data-testid="text-aquisicao-mrr">
                   {formatCurrency(mockDataVisaoGeral.aquisicaoMrr)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Novos contratos recorrentes</p>
+                <p className="text-xs text-muted-foreground mt-1">Novos contratos MRR</p>
               </CardContent>
             </Card>
 
@@ -137,22 +155,22 @@ export default function VisaoGeral() {
               </CardContent>
             </Card>
 
-            <Card data-testid="card-entregue-pontual">
+            <Card data-testid="card-cac">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Entregue Pontual</CardTitle>
-                <TrendingUp className="w-4 h-4 text-purple-600" />
+                <CardTitle className="text-sm font-medium">CAC</CardTitle>
+                <Users className="w-4 h-4 text-purple-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-600" data-testid="text-entregue-pontual">
-                  {formatCurrency(mockDataVisaoGeral.entreguePontual)}
+                <div className="text-2xl font-bold text-purple-600" data-testid="text-cac">
+                  {formatCurrency(mockDataVisaoGeral.cac)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Serviços pontuais concluídos</p>
+                <p className="text-xs text-muted-foreground mt-1">Custo de aquisição</p>
               </CardContent>
             </Card>
 
             <Card data-testid="card-churn">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Churn R$</CardTitle>
+                <CardTitle className="text-sm font-medium">Churn</CardTitle>
                 <TrendingDown className="w-4 h-4 text-red-600" />
               </CardHeader>
               <CardContent>
