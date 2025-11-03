@@ -236,8 +236,8 @@ export default function DashboardFinanceiro() {
                   <Tooltip 
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{ 
-                      backgroundColor: 'hsl(var(--background))',
-                      border: '1px solid hsl(var(--border))',
+                      backgroundColor: 'var(--background)',
+                      border: '1px solid var(--border)',
                       borderRadius: '6px',
                     }}
                   />
@@ -339,8 +339,8 @@ export default function DashboardFinanceiro() {
                       <Tooltip 
                         formatter={(value: number, name: string) => [formatCurrency(value), name === 'saldoAcumulado' ? 'Saldo Acumulado' : name]}
                         contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))',
+                          backgroundColor: 'var(--background)',
+                          border: '1px solid var(--border)',
                           borderRadius: '6px',
                         }}
                       />
