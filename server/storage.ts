@@ -95,6 +95,15 @@ export interface CohortRetentionData {
   availableSquads: string[];
 }
 
+export interface VisaoGeralMetricas {
+  receitaTotal: number;
+  mrr: number;
+  aquisicaoMrr: number;
+  aquisicaoPontual: number;
+  cac: number;
+  churn: number;
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -120,6 +129,7 @@ export interface IStorage {
   getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]>;
   getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]>;
   getCohortRetention(filters?: { squad?: string; servico?: string; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
+  getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas>;
 }
 
 export class MemStorage implements IStorage {
@@ -227,6 +237,10 @@ export class MemStorage implements IStorage {
   }
 
   async getCohortRetention(filters?: { squad?: string; servico?: string; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -1003,6 +1017,75 @@ export class DbStorage implements IStorage {
       filters: filters || {},
       availableServicos,
       availableSquads,
+    };
+  }
+
+  async getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas> {
+    const [ano, mes] = mesAno.split('-').map(Number);
+    const inicioMes = new Date(ano, mes - 1, 1);
+    const fimMes = new Date(ano, mes, 0, 23, 59, 59);
+
+    const resultados = await db.execute(sql`
+      WITH contratos_periodo AS (
+        SELECT 
+          valorr::numeric,
+          valorp::numeric,
+          data_inicio,
+          data_encerramento
+        FROM ${schema.cupContratos}
+      )
+      SELECT 
+        -- MRR: contratos ativos (sem data_encerramento ou encerramento no período)
+        COALESCE(SUM(
+          CASE 
+            WHEN (data_encerramento IS NULL OR data_encerramento >= ${fimMes})
+            THEN valorr 
+            ELSE 0 
+          END
+        ), 0)::numeric as mrr,
+        
+        -- Aquisição MRR: contratos criados no período
+        COALESCE(SUM(
+          CASE 
+            WHEN data_inicio >= ${inicioMes} AND data_inicio <= ${fimMes}
+            THEN valorr 
+            ELSE 0 
+          END
+        ), 0)::numeric as aquisicao_mrr,
+        
+        -- Aquisição Pontual: valor_p dos contratos criados no período
+        COALESCE(SUM(
+          CASE 
+            WHEN data_inicio >= ${inicioMes} AND data_inicio <= ${fimMes}
+            THEN valorp 
+            ELSE 0 
+          END
+        ), 0)::numeric as aquisicao_pontual,
+        
+        -- Churn: contratos encerrados no período
+        COALESCE(SUM(
+          CASE 
+            WHEN data_encerramento >= ${inicioMes} AND data_encerramento <= ${fimMes}
+            THEN valorr 
+            ELSE 0 
+          END
+        ), 0)::numeric as churn
+      FROM contratos_periodo
+    `);
+
+    const row = resultados.rows[0] as any;
+    const mrr = parseFloat(row.mrr || '0');
+    const aquisicaoMrr = parseFloat(row.aquisicao_mrr || '0');
+    const aquisicaoPontual = parseFloat(row.aquisicao_pontual || '0');
+    const churn = parseFloat(row.churn || '0');
+
+    return {
+      receitaTotal: mrr + aquisicaoPontual,
+      mrr,
+      aquisicaoMrr,
+      aquisicaoPontual,
+      cac: 0,
+      churn,
     };
   }
 }
