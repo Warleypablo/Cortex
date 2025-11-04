@@ -38,12 +38,21 @@ export function MultiSelect({
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleSelect = (value: string) => {
+  const handleSelect = (value: string, e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    
     const newSelected = selected.includes(value)
       ? selected.filter((item) => item !== value)
       : [...selected, value];
     onChange(newSelected);
+    
+    // Manter o foco no input após seleção
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
   };
 
   const handleRemove = (value: string, e: React.MouseEvent) => {
@@ -113,6 +122,7 @@ export function MultiSelect({
       <PopoverContent className="w-full p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
+            ref={inputRef}
             placeholder={searchPlaceholder}
             value={searchQuery}
             onValueChange={setSearchQuery}
@@ -125,7 +135,10 @@ export function MultiSelect({
                 <CommandItem
                   key={option}
                   value={option}
-                  onSelect={() => handleSelect(option)}
+                  onSelect={(currentValue) => {
+                    // Prevenir o comportamento padrão de fechar
+                    handleSelect(currentValue);
+                  }}
                   data-testid={`option-${option}`}
                 >
                   <Check
