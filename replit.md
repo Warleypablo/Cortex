@@ -55,6 +55,8 @@ Preferred communication style: Simple, everyday language.
 - **DFC (Demonstração de Fluxo de Caixa)**: Hierarchical cash flow analysis with expandable tree structure
   - Processes semicolon-separated category data from caz_parcelas (categoria_nome, valor_categoria)
   - **Data reference**: Uses `data_quitacao` field from caz_parcelas for date filtering and grouping
+  - **Status filter**: Only includes parcelas with status='QUITADO' (settled/paid installments)
+  - **Type aggregation**: RECEITA categories (03/04) only sum parcelas with tipo_evento='RECEITA'; DESPESA categories (05-08) only sum tipo_evento='DESPESA'
   - **Code extraction**: Hierarchical codes (e.g., "03", "06.05.01") are extracted from the beginning of categoria_nome field
   - Expected format: "CODE NAME" (e.g., "03.01.01 Receita de Serviços")
   - Hierarchical display: Receitas/Despesas → subcategories → details (based on category code patterns)

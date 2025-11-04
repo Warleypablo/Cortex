@@ -1380,7 +1380,7 @@ export class DbStorage implements IStorage {
   }
 
   async getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse> {
-    const whereClauses: string[] = ['categoria_id IS NOT NULL', "categoria_id != ''"];
+    const whereClauses: string[] = ['categoria_id IS NOT NULL', "categoria_id != ''", "status = 'QUITADO'"];
     
     if (mesInicio) {
       const [ano, mes] = mesInicio.split('-').map(Number);
