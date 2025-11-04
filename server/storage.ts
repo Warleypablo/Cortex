@@ -141,6 +141,7 @@ export interface IStorage {
   getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]>;
   getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
   getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas>;
+  getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -252,6 +253,10 @@ export class MemStorage implements IStorage {
   }
 
   async getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -1125,6 +1130,80 @@ export class DbStorage implements IStorage {
       cac: 0,
       churn,
     };
+  }
+
+  async getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]> {
+    // Construir filtros SQL
+    const whereClauses: string[] = ['data_encerramento IS NOT NULL'];
+    
+    if (filters?.servicos && filters.servicos.length > 0) {
+      const servicosStr = filters.servicos.map(s => `'${s}'`).join(',');
+      whereClauses.push(`servico IN (${servicosStr})`);
+    }
+    
+    if (filters?.mesInicio) {
+      const [ano, mes] = filters.mesInicio.split('-').map(Number);
+      const dataInicio = new Date(ano, mes - 1, 1);
+      whereClauses.push(`data_encerramento >= '${dataInicio.toISOString()}'`);
+    }
+    
+    if (filters?.mesFim) {
+      const [ano, mes] = filters.mesFim.split('-').map(Number);
+      const dataFim = new Date(ano, mes, 0, 23, 59, 59);
+      whereClauses.push(`data_encerramento <= '${dataFim.toISOString()}'`);
+    }
+    
+    const whereClause = whereClauses.join(' AND ');
+    
+    const resultados = await db.execute(sql.raw(`
+      WITH churn_data AS (
+        SELECT 
+          servico,
+          TO_CHAR(data_encerramento, 'YYYY-MM') as mes,
+          COUNT(*) as quantidade_churn,
+          COALESCE(SUM(valorr::numeric), 0) as valor_churn,
+          data_encerramento
+        FROM ${schema.cupContratos}
+        WHERE ${whereClause}
+        GROUP BY servico, TO_CHAR(data_encerramento, 'YYYY-MM'), data_encerramento
+      ),
+      ativos_por_mes AS (
+        SELECT 
+          servico,
+          cd.mes,
+          COUNT(*) as total_ativos,
+          COALESCE(SUM(valorr::numeric), 0) as valor_total_ativo
+        FROM ${schema.cupContratos} c
+        CROSS JOIN (SELECT DISTINCT mes, MIN(data_encerramento) as data_ref FROM churn_data GROUP BY mes) cd
+        WHERE c.data_inicio <= cd.data_ref
+          AND (c.data_encerramento IS NULL OR c.data_encerramento >= cd.data_ref)
+        GROUP BY servico, cd.mes
+      )
+      SELECT 
+        cd.servico,
+        cd.mes,
+        SUM(cd.quantidade_churn)::integer as quantidade,
+        SUM(cd.valor_churn)::numeric as valor_total,
+        COALESCE(apm.valor_total_ativo, 0)::numeric as valor_ativo_mes,
+        CASE 
+          WHEN COALESCE(apm.total_ativos, 0) > 0 
+          THEN (SUM(cd.quantidade_churn)::numeric / apm.total_ativos::numeric * 100)
+          ELSE 0 
+        END as percentual_churn
+      FROM churn_data cd
+      LEFT JOIN ativos_por_mes apm ON cd.servico = apm.servico AND cd.mes = apm.mes
+      GROUP BY cd.servico, cd.mes, apm.total_ativos, apm.valor_total_ativo
+      ORDER BY cd.servico, cd.mes
+    `));
+    
+    return resultados.rows.map((row: any) => ({
+      servico: row.servico,
+      mes: row.mes,
+      quantidade: parseInt(row.quantidade || '0'),
+      valorTotal: parseFloat(row.valor_total || '0'),
+      percentualChurn: parseFloat(row.percentual_churn || '0'),
+      valorAtivoMes: parseFloat(row.valor_ativo_mes || '0'),
+    }));
   }
 }
 
