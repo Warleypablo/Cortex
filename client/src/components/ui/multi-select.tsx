@@ -35,10 +35,13 @@ export function MultiSelect({
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleToggle = (value: string) => {
+    console.log('handleToggle called with:', value);
+    console.log('current searchQuery:', searchQuery);
     const newSelected = selected.includes(value)
       ? selected.filter((item) => item !== value)
       : [...selected, value];
     onChange(newSelected);
+    console.log('searchQuery after toggle:', searchQuery);
   };
 
   const handleRemove = (value: string, e: React.MouseEvent) => {
@@ -112,7 +115,10 @@ export function MultiSelect({
             <Input
               placeholder={searchPlaceholder}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                console.log('Input onChange called with:', e.target.value);
+                setSearchQuery(e.target.value);
+              }}
               className="h-8 border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
               data-testid="input-multi-select-search"
             />
@@ -128,7 +134,7 @@ export function MultiSelect({
                   <div
                     key={option}
                     className="flex items-center space-x-2 rounded-md p-2 hover:bg-accent cursor-pointer"
-                    onClick={(e) => {
+                    onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       handleToggle(option);
@@ -137,24 +143,12 @@ export function MultiSelect({
                   >
                     <Checkbox
                       checked={selected.includes(option)}
-                      onCheckedChange={(checked) => {
-                        handleToggle(option);
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                      }}
+                      readOnly
                       data-testid={`checkbox-${option}`}
                     />
-                    <label 
-                      className="flex-1 text-sm cursor-pointer"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleToggle(option);
-                      }}
-                    >
+                    <span className="flex-1 text-sm">
                       {option}
-                    </label>
+                    </span>
                   </div>
                 ))}
               </div>
