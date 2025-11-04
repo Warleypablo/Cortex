@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { ChevronsUpDown, X, Search } from "lucide-react";
+import { ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Popover,
@@ -18,7 +17,6 @@ interface MultiSelectProps {
   onChange: (selected: string[]) => void;
   placeholder?: string;
   emptyText?: string;
-  searchPlaceholder?: string;
   className?: string;
 }
 
@@ -27,21 +25,16 @@ export function MultiSelect({
   selected,
   onChange,
   placeholder = "Selecione itens...",
-  emptyText = "Nenhum item encontrado",
-  searchPlaceholder = "Buscar...",
+  emptyText = "Nenhum item disponível",
   className,
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
 
   const handleToggle = (value: string) => {
-    console.log('handleToggle called with:', value);
-    console.log('current searchQuery:', searchQuery);
     const newSelected = selected.includes(value)
       ? selected.filter((item) => item !== value)
       : [...selected, value];
     onChange(newSelected);
-    console.log('searchQuery after toggle:', searchQuery);
   };
 
   const handleRemove = (value: string, e: React.MouseEvent) => {
@@ -53,10 +46,6 @@ export function MultiSelect({
     e.stopPropagation();
     onChange([]);
   };
-
-  const filteredOptions = options.filter((option) =>
-    option.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -109,52 +98,36 @@ export function MultiSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
-        <div className="flex flex-col">
-          <div className="flex items-center border-b px-3 py-2">
-            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-            <Input
-              placeholder={searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => {
-                console.log('Input onChange called with:', e.target.value);
-                setSearchQuery(e.target.value);
-              }}
-              className="h-8 border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-              data-testid="input-multi-select-search"
-            />
-          </div>
-          <ScrollArea className="h-64">
-            {filteredOptions.length === 0 ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                {emptyText}
-              </div>
-            ) : (
-              <div className="p-2">
-                {filteredOptions.map((option) => (
-                  <div
-                    key={option}
-                    className="flex items-center space-x-2 rounded-md p-2 hover:bg-accent cursor-pointer"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleToggle(option);
-                    }}
-                    data-testid={`option-${option}`}
-                  >
-                    <Checkbox
-                      checked={selected.includes(option)}
-                      readOnly
-                      data-testid={`checkbox-${option}`}
-                    />
-                    <span className="flex-1 text-sm">
-                      {option}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-        </div>
+        <ScrollArea className="h-64">
+          {options.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              {emptyText}
+            </div>
+          ) : (
+            <div className="p-2">
+              {options.map((option) => (
+                <div
+                  key={option}
+                  className="flex items-center space-x-2 rounded-md p-2 hover-elevate active-elevate-2 cursor-pointer"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleToggle(option);
+                  }}
+                  data-testid={`option-${option}`}
+                >
+                  <Checkbox
+                    checked={selected.includes(option)}
+                    data-testid={`checkbox-${option}`}
+                  />
+                  <span className="flex-1 text-sm">
+                    {option}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
       </PopoverContent>
     </Popover>
   );
