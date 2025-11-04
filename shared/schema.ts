@@ -251,10 +251,7 @@ export type DfcResponse = {
 
 export type DfcParcela = {
   id: number;
-  descricao: string;
-  valorBruto: number;
   dataQuitacao: string;
-  mes: string;
 };
 
 export type DfcNode = {
