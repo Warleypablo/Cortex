@@ -1377,13 +1377,13 @@ export class DbStorage implements IStorage {
     if (mesInicio) {
       const [ano, mes] = mesInicio.split('-').map(Number);
       const dataInicio = new Date(ano, mes - 1, 1);
-      whereClauses.push(`data_vencimento >= '${dataInicio.toISOString()}'`);
+      whereClauses.push(`data_quitacao >= '${dataInicio.toISOString()}'`);
     }
     
     if (mesFim) {
       const [ano, mes] = mesFim.split('-').map(Number);
       const dataFim = new Date(ano, mes, 0, 23, 59, 59);
-      whereClauses.push(`data_vencimento <= '${dataFim.toISOString()}'`);
+      whereClauses.push(`data_quitacao <= '${dataFim.toISOString()}'`);
     }
     
     const whereClause = whereClauses.join(' AND ');
@@ -1393,10 +1393,10 @@ export class DbStorage implements IStorage {
         categoria_id,
         categoria_nome,
         valor_categoria,
-        data_vencimento
+        data_quitacao
       FROM caz_parcelas
       WHERE ${whereClause}
-      ORDER BY data_vencimento
+      ORDER BY data_quitacao
     `));
 
     const dfcMap = new Map<string, Map<string, number>>();
@@ -1408,8 +1408,8 @@ export class DbStorage implements IStorage {
       
       if (categoriaNomes.length === 0) continue;
 
-      const dataVencimento = new Date(row.data_vencimento as string);
-      const mes = dataVencimento.toISOString().substring(0, 7);
+      const dataQuitacao = new Date(row.data_quitacao as string);
+      const mes = dataQuitacao.toISOString().substring(0, 7);
       mesesSet.add(mes);
 
       for (let i = 0; i < categoriaNomes.length; i++) {
