@@ -52,12 +52,17 @@ Preferred communication style: Simple, everyday language.
   - Distinguishes between recurring (valorr) and one-time (valorp) contract values
   - Squad mapping from codes (0-3) to names (Supreme, Forja, Squadra, Chama)
   - Status-based color coding for visual status tracking
-- **DFC (Demonstração de Fluxo de Caixa)**: Category-based cash flow analysis
+- **DFC (Demonstração de Fluxo de Caixa)**: Hierarchical cash flow analysis with expandable tree structure
   - Processes semicolon-separated category data from caz_parcelas (categoria_id, categoria_nome, valor_categoria)
+  - Hierarchical display: Receitas/Despesas → subcategories → details (based on category code patterns)
+  - Code-based hierarchy: "3"/"4" = Receitas, "1"/"2"/"5" = Despesas, dots indicate sub-levels
+  - Automatic parent node creation and value aggregation up the hierarchy tree
+  - Expandable/collapsible tree rows with ChevronRight/ChevronDown icons
+  - Visual indentation (24px per level) to show hierarchy depth
   - Month range filters (mesInicio/mesFim) for flexible date filtering
-  - Pivot table displaying categories × months with aggregated values
+  - Pivot table displaying hierarchical categories × months with aggregated values
   - KPI cards showing Total Categorias, Meses Analisados, and Valor Total
-  - Backend aggregation by categoria + mês with proper data splitting and grouping
+  - Backend builds complete hierarchy tree with parent/child relationships
   - Currency-formatted cells (R$) with "-" for empty values
 - Client detail pages showing contracts, invoices, team members, and revenue history (in development)
 - Revenue visualization using Recharts for bar charts (in development)
