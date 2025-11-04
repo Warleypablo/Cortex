@@ -52,6 +52,13 @@ Preferred communication style: Simple, everyday language.
   - Distinguishes between recurring (valorr) and one-time (valorp) contract values
   - Squad mapping from codes (0-3) to names (Supreme, Forja, Squadra, Chama)
   - Status-based color coding for visual status tracking
+- **DFC (Demonstração de Fluxo de Caixa)**: Category-based cash flow analysis
+  - Processes semicolon-separated category data from caz_parcelas (categoria_id, categoria_nome, valor_categoria)
+  - Month range filters (mesInicio/mesFim) for flexible date filtering
+  - Pivot table displaying categories × months with aggregated values
+  - KPI cards showing Total Categorias, Meses Analisados, and Valor Total
+  - Backend aggregation by categoria + mês with proper data splitting and grouping
+  - Currency-formatted cells (R$) with "-" for empty values
 - Client detail pages showing contracts, invoices, team members, and revenue history (in development)
 - Revenue visualization using Recharts for bar charts (in development)
 - No emojis in UI - uses Lucide React icons for all visual indicators
@@ -80,8 +87,9 @@ Preferred communication style: Simple, everyday language.
 - Client queries with JOIN between caz_clientes and cup_clientes using CNPJ
 - Contract queries with JOIN: cup_contratos → cup_clientes (via id_task/task_id) → caz_clientes (via CNPJ)
 - Employee CRUD operations with full field support
+- DFC queries processing semicolon-separated category fields with aggregation by categoria + mês
 - Storage abstraction layer (`IStorage`) for flexible implementation swapping
-- API endpoints: /api/clientes, /api/contratos, /api/colaboradores
+- API endpoints: /api/clientes, /api/contratos, /api/colaboradores, /api/dfc
 
 ### Data Storage Solutions
 
@@ -96,7 +104,9 @@ Preferred communication style: Simple, everyday language.
   - `caz_clientes`: Client master data with CNPJ as relationship key
   - `caz_receber`: Accounts receivable/invoices
   - `caz_pagar`: Accounts payable
-  - `caz_parcelas`: Detailed installment/payment information
+  - `caz_parcelas`: Detailed installment/payment information with category tracking
+    - `categoria_id`, `categoria_nome`, `valor_categoria`: Text fields storing semicolon-separated values for multi-category support
+    - Example: categoria_id="1;2", categoria_nome="Marketing;Vendas", valor_categoria="1000;500"
 - **ClickUp Tables (cup_*)**: Operational client and contract data from ClickUp
   - `cup_clientes`: Client operational data with CNPJ as primary key
   - `cup_contratos`: Contract details with squad assignments
