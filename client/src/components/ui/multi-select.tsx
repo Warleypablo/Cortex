@@ -33,11 +33,15 @@ export function MultiSelect({
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  console.log("[MultiSelect RENDER] placeholder:", placeholder, "selected:", selected, "length:", selected.length);
 
   const handleToggle = (value: string) => {
+    console.log("[MultiSelect] handleToggle called with:", value);
     const newSelected = selected.includes(value)
       ? selected.filter((item) => item !== value)
       : [...selected, value];
+    console.log("[MultiSelect] calling onChange with:", newSelected);
     onChange(newSelected);
   };
 
@@ -80,26 +84,30 @@ export function MultiSelect({
                   data-testid={`badge-selected-${value}`}
                 >
                   {value}
-                  <button
-                    className="ml-1 rounded-full outline-none hover:bg-accent"
+                  <span
+                    className="ml-1 rounded-full outline-none hover:bg-accent cursor-pointer inline-flex items-center justify-center"
                     onMouseDown={(e) => handleRemove(value, e)}
                     data-testid={`button-remove-${value}`}
+                    role="button"
+                    aria-label={`Remove ${value}`}
                   >
                     <X className="h-3 w-3" />
-                  </button>
+                  </span>
                 </Badge>
               ))
             )}
           </div>
           <div className="flex items-center gap-1 ml-2">
             {selected.length > 0 && (
-              <button
+              <span
                 onClick={handleClearAll}
-                className="rounded-full outline-none hover:bg-accent p-1"
+                className="rounded-full outline-none hover:bg-accent p-1 cursor-pointer inline-flex items-center justify-center"
                 data-testid="button-clear-all"
+                role="button"
+                aria-label="Clear all"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </span>
             )}
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
           </div>
@@ -130,18 +138,20 @@ export function MultiSelect({
                   <div
                     key={option}
                     className="flex items-center space-x-2 rounded-md p-2 hover-elevate active-elevate-2 cursor-pointer"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleToggle(option);
-                    }}
                     data-testid={`option-${option}`}
                   >
                     <Checkbox
                       checked={selected.includes(option)}
                       data-testid={`checkbox-${option}`}
+                      onCheckedChange={() => handleToggle(option)}
                     />
-                    <span className="flex-1 text-sm">
+                    <span 
+                      className="flex-1 text-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggle(option);
+                      }}
+                    >
                       {option}
                     </span>
                   </div>

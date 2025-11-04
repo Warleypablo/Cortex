@@ -1163,7 +1163,7 @@ export class DbStorage implements IStorage {
           COUNT(*) as quantidade_churn,
           COALESCE(SUM(valorr::numeric), 0) as valor_churn,
           data_encerramento
-        FROM ${schema.cupContratos}
+        FROM cup_contratos
         WHERE ${whereClause}
         GROUP BY servico, TO_CHAR(data_encerramento, 'YYYY-MM'), data_encerramento
       ),
@@ -1173,7 +1173,7 @@ export class DbStorage implements IStorage {
           cd.mes,
           COUNT(*) as total_ativos,
           COALESCE(SUM(valorr::numeric), 0) as valor_total_ativo
-        FROM ${schema.cupContratos} c
+        FROM cup_contratos c
         CROSS JOIN (SELECT DISTINCT mes, MIN(data_encerramento) as data_ref FROM churn_data GROUP BY mes) cd
         WHERE c.data_inicio <= cd.data_ref
           AND (c.data_encerramento IS NULL OR c.data_encerramento >= cd.data_ref)

@@ -59,6 +59,11 @@ export default function DashboardRetencao() {
   const [churnFilterMesFim, setChurnFilterMesFim] = useState<string>("");
   const [churnViewMode, setChurnViewMode] = useState<ViewModeChurn>("quantidade");
 
+  const handleChurnServicosChange = (selected: string[]) => {
+    console.log("Churn servicos changed:", selected);
+    setChurnFilterServicos(selected);
+  };
+
   const { data: cohortData, isLoading } = useQuery<CohortRetentionData>({
     queryKey: ["/api/analytics/cohort-retention", filterSquad, filterServicos, filterMesInicio, filterMesFim],
     queryFn: async () => {
@@ -519,11 +524,10 @@ export default function DashboardRetencao() {
                 <div className="flex-1 min-w-[250px]">
                   <label className="text-sm font-medium mb-2 block">Serviços</label>
                   <MultiSelect
-                    options={uniqueServicos.map(s => ({ label: s, value: s }))}
+                    options={uniqueServicos}
                     selected={churnFilterServicos}
-                    onChange={setChurnFilterServicos}
+                    onChange={handleChurnServicosChange}
                     placeholder="Todos os serviços"
-                    data-testid="multiselect-churn-servicos"
                   />
                 </div>
                 <div className="flex-1 min-w-[180px]">
