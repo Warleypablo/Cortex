@@ -168,6 +168,16 @@ export type ContratoCompleto = {
   responsavelGeral: string | null;
 };
 
+export type ClienteContratoDetail = {
+  clienteId: string;
+  nomeCliente: string;
+  servico: string;
+  squad: string;
+  valorr: number;
+  dataInicio: Date;
+  dataEncerramento: Date | null;
+};
+
 export const rhPatrimonio = pgTable("rh_patrimonio", {
   id: integer("id").primaryKey(),
   numeroAtivo: varchar("numero_ativo", { length: 100 }),

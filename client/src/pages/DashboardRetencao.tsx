@@ -11,15 +11,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-
-interface ClienteContratoDetail {
-  clienteId: string;
-  servico: string;
-  squad: string;
-  valorr: number;
-  dataInicio: string;
-  dataEncerramento: string | null;
-}
+import type { ClienteContratoDetail } from "@shared/schema";
 
 interface CohortRetentionRow {
   cohortMonth: string;
@@ -380,7 +372,7 @@ export default function DashboardRetencao() {
                                     }
                                   </span>
                                 </HoverCardTrigger>
-                                <HoverCardContent className="w-96 max-h-96 overflow-auto" data-testid={`hover-details-${cohort.cohortMonth}`}>
+                                <HoverCardContent className="w-80 max-h-96 overflow-auto z-50" data-testid={`hover-details-${cohort.cohortMonth}`}>
                                   <div className="space-y-2">
                                     <h4 className="font-semibold text-sm mb-3">
                                       Detalhes da Coorte {cohort.cohortLabel}
@@ -392,23 +384,9 @@ export default function DashboardRetencao() {
                                         cohort.clientesContratos.map((contrato, idx) => (
                                           <div 
                                             key={`${contrato.clienteId}-${idx}`}
-                                            className="flex flex-col gap-1 p-2 border-b last:border-0"
+                                            className="text-sm py-1 border-b last:border-0"
                                           >
-                                            <div className="flex items-center justify-between">
-                                              <span className="text-sm font-medium">{contrato.servico}</span>
-                                              <Badge variant="secondary" className="text-xs">
-                                                R$ {contrato.valorr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                              </Badge>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                              <span>Cliente: {contrato.clienteId}</span>
-                                              <span>•</span>
-                                              <span>Squad: {contrato.squad === '0' ? 'Supreme' : contrato.squad === '1' ? 'Forja' : contrato.squad === '2' ? 'Squadra' : 'Chama'}</span>
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                              Início: {new Date(contrato.dataInicio).toLocaleDateString('pt-BR')}
-                                              {contrato.dataEncerramento && ` • Fim: ${new Date(contrato.dataEncerramento).toLocaleDateString('pt-BR')}`}
-                                            </div>
+                                            {contrato.nomeCliente} - {contrato.servico}
                                           </div>
                                         ))
                                       )}
