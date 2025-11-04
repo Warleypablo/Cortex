@@ -11,7 +11,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import type { ClienteContratoDetail } from "@shared/schema";
+import type { ClienteContratoDetail, ChurnPorServico } from "@shared/schema";
 
 interface CohortRetentionRow {
   cohortMonth: string;
@@ -44,6 +44,7 @@ interface CohortRetentionData {
 }
 
 type ViewMode = "clientes" | "valor" | "contratos";
+type ViewModeChurn = "quantidade" | "valorTotal" | "percentual";
 
 export default function DashboardRetencao() {
   const [filterSquad, setFilterSquad] = useState<string>("todos");
@@ -51,6 +52,12 @@ export default function DashboardRetencao() {
   const [filterMesInicio, setFilterMesInicio] = useState<string>("");
   const [filterMesFim, setFilterMesFim] = useState<string>("");
   const [viewMode, setViewMode] = useState<ViewMode>("clientes");
+
+  // Estados para análise de churn por serviço
+  const [churnFilterServicos, setChurnFilterServicos] = useState<string[]>([]);
+  const [churnFilterMesInicio, setChurnFilterMesInicio] = useState<string>("");
+  const [churnFilterMesFim, setChurnFilterMesFim] = useState<string>("");
+  const [churnViewMode, setChurnViewMode] = useState<ViewModeChurn>("quantidade");
 
   const { data: cohortData, isLoading } = useQuery<CohortRetentionData>({
     queryKey: ["/api/analytics/cohort-retention", filterSquad, filterServicos, filterMesInicio, filterMesFim],
@@ -63,6 +70,20 @@ export default function DashboardRetencao() {
       
       const res = await fetch(`/api/analytics/cohort-retention?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch cohort data");
+      return res.json();
+    },
+  });
+
+  const { data: churnData, isLoading: isChurnLoading } = useQuery<ChurnPorServico[]>({
+    queryKey: ["/api/churn-por-servico", churnFilterServicos, churnFilterMesInicio, churnFilterMesFim],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (churnFilterServicos.length > 0) params.append("servico", churnFilterServicos.join(","));
+      if (churnFilterMesInicio) params.append("mesInicio", churnFilterMesInicio);
+      if (churnFilterMesFim) params.append("mesFim", churnFilterMesFim);
+      
+      const res = await fetch(`/api/churn-por-servico?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch churn data");
       return res.json();
     },
   });
@@ -137,6 +158,32 @@ export default function DashboardRetencao() {
     if (!cohortData) return [];
     return cohortData.availableServicos || [];
   }, [cohortData]);
+
+  // Processar dados de churn por serviço
+  const churnTableData = useMemo(() => {
+    if (!churnData || churnData.length === 0) {
+      return { servicos: [], meses: [], dataMap: new Map<string, Map<string, ChurnPorServico>>() };
+    }
+
+    const servicosSet = new Set<string>();
+    const mesesSet = new Set<string>();
+    const dataMap = new Map<string, Map<string, ChurnPorServico>>();
+
+    churnData.forEach(item => {
+      servicosSet.add(item.servico);
+      mesesSet.add(item.mes);
+
+      if (!dataMap.has(item.servico)) {
+        dataMap.set(item.servico, new Map());
+      }
+      dataMap.get(item.servico)!.set(item.mes, item);
+    });
+
+    const servicos = Array.from(servicosSet).sort();
+    const meses = Array.from(mesesSet).sort();
+
+    return { servicos, meses, dataMap };
+  }, [churnData]);
 
   return (
     <div className="flex flex-col h-full">
@@ -451,6 +498,219 @@ export default function DashboardRetencao() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Seção de Análise de Churn por Serviço */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Análise de Churn por Serviço</CardTitle>
+                  <CardDescription>Contratos encerrados por serviço ao longo dos meses</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Filtros */}
+              <div className="flex flex-wrap gap-4 mb-6">
+                <div className="flex-1 min-w-[250px]">
+                  <label className="text-sm font-medium mb-2 block">Serviços</label>
+                  <MultiSelect
+                    options={uniqueServicos.map(s => ({ label: s, value: s }))}
+                    selected={churnFilterServicos}
+                    onChange={setChurnFilterServicos}
+                    placeholder="Todos os serviços"
+                    data-testid="multiselect-churn-servicos"
+                  />
+                </div>
+                <div className="flex-1 min-w-[180px]">
+                  <label className="text-sm font-medium mb-2 block">Mês Início</label>
+                  <input
+                    type="month"
+                    value={churnFilterMesInicio}
+                    onChange={(e) => setChurnFilterMesInicio(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background"
+                    data-testid="input-churn-mes-inicio"
+                  />
+                </div>
+                <div className="flex-1 min-w-[180px]">
+                  <label className="text-sm font-medium mb-2 block">Mês Fim</label>
+                  <input
+                    type="month"
+                    value={churnFilterMesFim}
+                    onChange={(e) => setChurnFilterMesFim(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background"
+                    data-testid="input-churn-mes-fim"
+                  />
+                </div>
+              </div>
+
+              {/* Toggle de Visualização */}
+              <div className="flex gap-2 mb-6">
+                <Button
+                  variant={churnViewMode === "quantidade" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setChurnViewMode("quantidade")}
+                  data-testid="button-churn-view-quantidade"
+                >
+                  <TrendingDown className="h-4 w-4 mr-2" />
+                  Quantidade
+                </Button>
+                <Button
+                  variant={churnViewMode === "valorTotal" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setChurnViewMode("valorTotal")}
+                  data-testid="button-churn-view-valor"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Valor R$
+                </Button>
+                <Button
+                  variant={churnViewMode === "percentual" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setChurnViewMode("percentual")}
+                  data-testid="button-churn-view-percentual"
+                >
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  % Churn
+                </Button>
+              </div>
+
+              {/* Tabela de Churn */}
+              {isChurnLoading ? (
+                <div className="flex items-center justify-center p-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : churnTableData.servicos.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <p>Nenhum dado de churn disponível para os filtros selecionados</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="p-3 text-left font-semibold sticky left-0 bg-muted/50 z-10">Serviço</th>
+                        {churnTableData.meses.map(mes => {
+                          const [ano, mesNum] = mes.split('-');
+                          const data = new Date(parseInt(ano), parseInt(mesNum) - 1);
+                          const mesLabel = data.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+                          return (
+                            <th key={mes} className="p-3 text-center font-semibold" data-testid={`header-churn-mes-${mes}`}>
+                              {mesLabel}
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {churnTableData.servicos.map(servico => (
+                        <tr key={servico} className="border-b hover-elevate">
+                          <td className="p-3 font-medium sticky left-0 bg-background z-10" data-testid={`row-churn-servico-${servico}`}>
+                            {servico}
+                          </td>
+                          {churnTableData.meses.map(mes => {
+                            const data = churnTableData.dataMap.get(servico)?.get(mes);
+                            const valor = data 
+                              ? churnViewMode === "quantidade" 
+                                ? data.quantidade
+                                : churnViewMode === "valorTotal"
+                                ? data.valorTotal
+                                : data.percentualChurn
+                              : 0;
+
+                            return (
+                              <td key={mes} className="p-3 text-center" data-testid={`cell-churn-${servico}-${mes}`}>
+                                {data ? (
+                                  <HoverCard>
+                                    <HoverCardTrigger asChild>
+                                      <span className="cursor-help font-semibold hover-elevate px-2 py-1 rounded">
+                                        {churnViewMode === "quantidade" 
+                                          ? valor
+                                          : churnViewMode === "valorTotal"
+                                          ? `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                          : `${valor.toFixed(1)}%`
+                                        }
+                                      </span>
+                                    </HoverCardTrigger>
+                                    <HoverCardContent className="w-80" data-testid={`hover-churn-${servico}-${mes}`}>
+                                      <div className="space-y-2">
+                                        <h4 className="font-semibold text-sm">
+                                          {servico} - {mes}
+                                        </h4>
+                                        <div className="space-y-1 text-sm">
+                                          <p className="flex justify-between">
+                                            <span className="text-muted-foreground">Contratos:</span>
+                                            <span className="font-medium">{data.quantidade}</span>
+                                          </p>
+                                          <p className="flex justify-between">
+                                            <span className="text-muted-foreground">Valor:</span>
+                                            <span className="font-medium">R$ {data.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                          </p>
+                                          <p className="flex justify-between">
+                                            <span className="text-muted-foreground">% Churn:</span>
+                                            <span className="font-medium">{data.percentualChurn.toFixed(1)}%</span>
+                                          </p>
+                                          <p className="flex justify-between">
+                                            <span className="text-muted-foreground">Valor ativo mês:</span>
+                                            <span className="font-medium">R$ {data.valorAtivoMes.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </HoverCardContent>
+                                  </HoverCard>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+
+                      {/* Linha de TOTAL */}
+                      <tr className="border-t-2 font-bold bg-muted/30">
+                        <td className="p-3 sticky left-0 bg-muted/30 z-10" data-testid="row-churn-total">
+                          TOTAL
+                        </td>
+                        {churnTableData.meses.map(mes => {
+                          let total = 0;
+                          churnTableData.servicos.forEach(servico => {
+                            const data = churnTableData.dataMap.get(servico)?.get(mes);
+                            if (data) {
+                              if (churnViewMode === "quantidade") {
+                                total += data.quantidade;
+                              } else if (churnViewMode === "valorTotal") {
+                                total += data.valorTotal;
+                              } else {
+                                // Para percentual, calcular média ponderada
+                                total += data.percentualChurn;
+                              }
+                            }
+                          });
+
+                          // Para percentual, calcular média
+                          if (churnViewMode === "percentual" && churnTableData.servicos.length > 0) {
+                            total = total / churnTableData.servicos.length;
+                          }
+
+                          return (
+                            <td key={mes} className="p-3 text-center" data-testid={`cell-churn-total-${mes}`}>
+                              {churnViewMode === "quantidade" 
+                                ? total
+                                : churnViewMode === "valorTotal"
+                                ? `R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                : `${total.toFixed(1)}%`
+                              }
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               )}
             </CardContent>
