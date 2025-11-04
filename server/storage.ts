@@ -1414,8 +1414,13 @@ export class DbStorage implements IStorage {
     const dfcMap = new Map<string, Map<string, number>>();
     const parcelasByCategory = new Map<string, DfcParcela[]>();
     const mesesSet = new Set<string>();
+    const parcelaIdsProcessadas = new Set<number>();
+    let totalValorProcessado = 0;
+
+    console.log(`[DFC DEBUG] Total parcelas retornadas da query: ${parcelas.rows.length}`);
 
     for (const row of parcelas.rows) {
+      parcelaIdsProcessadas.add(row.id as number);
       const categoriaNomes = (row.categoria_nome as string || '').split(';').map(s => s.trim()).filter(Boolean);
       const valorCategorias = (row.valor_categoria as string || '').split(';').map(s => s.trim()).filter(Boolean);
       const tipoEvento = row.tipo_evento as string || '';
@@ -1461,6 +1466,7 @@ export class DbStorage implements IStorage {
         const categoriaMap = dfcMap.get(key)!;
         const currentValue = categoriaMap.get(mes) || 0;
         categoriaMap.set(mes, currentValue + valor);
+        totalValorProcessado += valor;
 
         if (!parcelasByCategory.has(key)) {
           parcelasByCategory.set(key, []);
@@ -1491,6 +1497,9 @@ export class DbStorage implements IStorage {
     }
 
     const meses = Array.from(mesesSet).sort();
+
+    console.log(`[DFC DEBUG] Parcelas únicas processadas: ${parcelaIdsProcessadas.size}`);
+    console.log(`[DFC DEBUG] Total valor processado (soma de valor_categoria): ${totalValorProcessado.toFixed(2)}`);
 
     return buildHierarchy(items, meses, parcelasByCategory);
   }
