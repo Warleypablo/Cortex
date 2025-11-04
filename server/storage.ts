@@ -277,21 +277,22 @@ function determineLevel(categoriaId: string): number {
 }
 
 function determineParent(categoriaId: string): string {
-  let firstNonZeroDigit = '';
-  for (const char of categoriaId) {
-    if (char >= '1' && char <= '9') {
-      firstNonZeroDigit = char;
-      break;
-    }
-  }
-  
   if (categoriaId.includes('.')) {
     const parts = categoriaId.split('.');
     parts.pop();
     return normalizeCode(parts.join('.'));
   }
   
-  return (firstNonZeroDigit === '3' || firstNonZeroDigit === '4') ? 'RECEITAS' : 'DESPESAS';
+  // Get first two digits for root classification
+  const firstTwoDigits = categoriaId.substring(0, 2);
+  if (firstTwoDigits === '03' || firstTwoDigits === '04') {
+    return 'RECEITAS';
+  } else if (firstTwoDigits === '05' || firstTwoDigits === '06') {
+    return 'DESPESAS';
+  } else {
+    // For other codes (01, 02, etc.), classify as OUTROS
+    return 'OUTROS';
+  }
 }
 
 function buildHierarchy(items: DfcItem[], meses: string[]): DfcHierarchicalResponse {
@@ -310,6 +311,16 @@ function buildHierarchy(items: DfcItem[], meses: string[]): DfcHierarchicalRespo
   nodeMap.set('DESPESAS', {
     categoriaId: 'DESPESAS',
     categoriaNome: 'Despesas',
+    nivel: 0,
+    parentId: null,
+    children: [],
+    valuesByMonth: {},
+    isLeaf: false,
+  });
+  
+  nodeMap.set('OUTROS', {
+    categoriaId: 'OUTROS',
+    categoriaNome: 'Outros',
     nivel: 0,
     parentId: null,
     children: [],
@@ -425,11 +436,12 @@ function buildHierarchy(items: DfcItem[], meses: string[]): DfcHierarchicalRespo
   
   aggregateValues('RECEITAS');
   aggregateValues('DESPESAS');
+  aggregateValues('OUTROS');
   
   return {
     nodes: Array.from(nodeMap.values()),
     meses,
-    rootIds: ['RECEITAS', 'DESPESAS'],
+    rootIds: ['RECEITAS', 'DESPESAS', 'OUTROS'],
   };
 }
 
