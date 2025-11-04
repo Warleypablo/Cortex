@@ -406,7 +406,7 @@ export default function DashboardRetencao() {
                         {cohortData.cohorts.map((cohort) => (
                           <tr 
                             key={cohort.cohortMonth} 
-                            className="border-b hover-elevate"
+                            className="border-b hover-elevate no-default-hover-elevate"
                             data-testid={`cohort-row-${cohort.cohortMonth}`}
                           >
                             <td className="p-3 font-medium bg-background sticky left-0 z-10">
