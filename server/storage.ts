@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -142,7 +142,7 @@ export interface IStorage {
   getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
   getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas>;
   getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]>;
-  getDfc(mesInicio?: string, mesFim?: string): Promise<DfcResponse>;
+  getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse>;
 }
 
 export class MemStorage implements IStorage {
@@ -261,9 +261,176 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getDfc(mesInicio?: string, mesFim?: string): Promise<DfcResponse> {
+  async getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse> {
     throw new Error("Not implemented in MemStorage");
   }
+}
+
+function normalizeCode(code: string): string {
+  const parts = code.split('.');
+  return parts.map(part => part.padStart(2, '0')).join('.');
+}
+
+function determineLevel(categoriaId: string): number {
+  const parts = categoriaId.split('.');
+  return parts.length;
+}
+
+function determineParent(categoriaId: string): string {
+  let firstNonZeroDigit = '';
+  for (const char of categoriaId) {
+    if (char >= '1' && char <= '9') {
+      firstNonZeroDigit = char;
+      break;
+    }
+  }
+  
+  if (categoriaId.includes('.')) {
+    const parts = categoriaId.split('.');
+    parts.pop();
+    return normalizeCode(parts.join('.'));
+  }
+  
+  return (firstNonZeroDigit === '3' || firstNonZeroDigit === '4') ? 'RECEITAS' : 'DESPESAS';
+}
+
+function buildHierarchy(items: DfcItem[], meses: string[]): DfcHierarchicalResponse {
+  const nodeMap = new Map<string, DfcNode>();
+  
+  nodeMap.set('RECEITAS', {
+    categoriaId: 'RECEITAS',
+    categoriaNome: 'Receitas',
+    nivel: 0,
+    parentId: null,
+    children: [],
+    valuesByMonth: {},
+    isLeaf: false,
+  });
+  
+  nodeMap.set('DESPESAS', {
+    categoriaId: 'DESPESAS',
+    categoriaNome: 'Despesas',
+    nivel: 0,
+    parentId: null,
+    children: [],
+    valuesByMonth: {},
+    isLeaf: false,
+  });
+  
+  const categoriasByNormalizedId = new Map<string, { nome: string; items: DfcItem[] }>();
+  
+  for (const item of items) {
+    const normalizedId = normalizeCode(item.categoriaId);
+    
+    if (!categoriasByNormalizedId.has(normalizedId)) {
+      categoriasByNormalizedId.set(normalizedId, {
+        nome: item.categoriaNome,
+        items: []
+      });
+    }
+    categoriasByNormalizedId.get(normalizedId)!.items.push(item);
+  }
+  
+  for (const [normalizedId, data] of Array.from(categoriasByNormalizedId.entries())) {
+    const nivel = determineLevel(normalizedId);
+    const parentId = determineParent(normalizedId);
+    
+    if (!nodeMap.has(normalizedId)) {
+      nodeMap.set(normalizedId, {
+        categoriaId: normalizedId,
+        categoriaNome: data.nome,
+        nivel,
+        parentId,
+        children: [],
+        valuesByMonth: {},
+        isLeaf: true,
+      });
+    }
+    
+    const node = nodeMap.get(normalizedId)!;
+    
+    for (const item of data.items) {
+      const currentValue = node.valuesByMonth[item.mes] || 0;
+      node.valuesByMonth[item.mes] = currentValue + item.valorTotal;
+    }
+  }
+  
+  const allNormalizedIds = new Set(categoriasByNormalizedId.keys());
+  for (const normalizedId of Array.from(allNormalizedIds)) {
+    let currentId = normalizedId;
+    
+    while (currentId.includes('.')) {
+      const parts = currentId.split('.');
+      parts.pop();
+      const parentNormalizedId = parts.join('.');
+      
+      if (!nodeMap.has(parentNormalizedId)) {
+        const parentLevel = determineLevel(parentNormalizedId);
+        const parentParentId = determineParent(parentNormalizedId);
+        
+        const parentName = `${parentNormalizedId.replace(/\./g, '.')}`;
+        
+        nodeMap.set(parentNormalizedId, {
+          categoriaId: parentNormalizedId,
+          categoriaNome: parentName,
+          nivel: parentLevel,
+          parentId: parentParentId,
+          children: [],
+          valuesByMonth: {},
+          isLeaf: false,
+        });
+      }
+      
+      currentId = parentNormalizedId;
+    }
+  }
+  
+  for (const [id, node] of Array.from(nodeMap.entries())) {
+    if (node.parentId && nodeMap.has(node.parentId)) {
+      const parent = nodeMap.get(node.parentId)!;
+      if (!parent.children.includes(id)) {
+        parent.children.push(id);
+      }
+    }
+  }
+  
+  for (const node of Array.from(nodeMap.values())) {
+    if (node.children.length > 0) {
+      node.isLeaf = false;
+      node.children.sort();
+    }
+  }
+  
+  function aggregateValues(nodeId: string): void {
+    const node = nodeMap.get(nodeId);
+    if (!node) return;
+    
+    if (node.children.length > 0) {
+      for (const childId of node.children) {
+        aggregateValues(childId);
+      }
+      
+      for (const mes of meses) {
+        let total = 0;
+        for (const childId of node.children) {
+          const child = nodeMap.get(childId);
+          if (child) {
+            total += child.valuesByMonth[mes] || 0;
+          }
+        }
+        node.valuesByMonth[mes] = total;
+      }
+    }
+  }
+  
+  aggregateValues('RECEITAS');
+  aggregateValues('DESPESAS');
+  
+  return {
+    nodes: Array.from(nodeMap.values()),
+    meses,
+    rootIds: ['RECEITAS', 'DESPESAS'],
+  };
 }
 
 export class DbStorage implements IStorage {
@@ -1211,7 +1378,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getDfc(mesInicio?: string, mesFim?: string): Promise<DfcResponse> {
+  async getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse> {
     const whereClauses: string[] = ['categoria_id IS NOT NULL', "categoria_id != ''"];
     
     if (mesInicio) {
@@ -1270,7 +1437,7 @@ export class DbStorage implements IStorage {
       }
     }
 
-    const items = [];
+    const items: DfcItem[] = [];
     for (const [key, mesesMap] of Array.from(dfcMap.entries())) {
       const [categoriaId, categoriaNome] = key.split('|');
       for (const [mes, valorTotal] of Array.from(mesesMap.entries())) {
@@ -1285,7 +1452,7 @@ export class DbStorage implements IStorage {
 
     const meses = Array.from(mesesSet).sort();
 
-    return { items, meses };
+    return buildHierarchy(items, meses);
   }
 }
 
