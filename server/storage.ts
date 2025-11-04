@@ -1404,7 +1404,8 @@ export class DbStorage implements IStorage {
         categoria_id,
         categoria_nome,
         valor_categoria,
-        data_quitacao
+        data_quitacao,
+        tipo_evento
       FROM caz_parcelas
       WHERE ${whereClause}
       ORDER BY data_quitacao
@@ -1417,6 +1418,7 @@ export class DbStorage implements IStorage {
     for (const row of parcelas.rows) {
       const categoriaNomes = (row.categoria_nome as string || '').split(';').map(s => s.trim()).filter(Boolean);
       const valorCategorias = (row.valor_categoria as string || '').split(';').map(s => s.trim()).filter(Boolean);
+      const tipoEvento = row.tipo_evento as string || '';
       
       if (categoriaNomes.length === 0) continue;
 
@@ -1436,6 +1438,19 @@ export class DbStorage implements IStorage {
 
         const categoriaId = codeMatch[1];
         const categoriaNome = codeMatch[2];
+        
+        const tipoEventoNormalized = (tipoEvento || '').toUpperCase().trim();
+        const twoDigitPrefix = categoriaId.substring(0, 2);
+        const isCategoriaReceita = (twoDigitPrefix === '03' || twoDigitPrefix === '04');
+        const isCategoriaDespesa = (twoDigitPrefix === '05' || twoDigitPrefix === '06' || twoDigitPrefix === '07' || twoDigitPrefix === '08');
+        
+        const hasMismatch = 
+          (isCategoriaReceita && tipoEventoNormalized === 'DESPESA') ||
+          (isCategoriaDespesa && tipoEventoNormalized === 'RECEITA');
+        
+        if (hasMismatch) {
+          continue;
+        }
 
         const key = `${categoriaId}|${categoriaNome}`;
         
@@ -1457,6 +1472,7 @@ export class DbStorage implements IStorage {
           valorBruto: parseFloat(row.valor_bruto as string || '0'),
           dataQuitacao: dataQuitacao.toISOString(),
           mes: mes,
+          tipoEvento: tipoEvento,
         });
       }
     }
