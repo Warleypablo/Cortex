@@ -1,21 +1,16 @@
-import { useState, useRef, useEffect } from "react";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { useState } from "react";
+import { ChevronsUpDown, X, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 
 interface MultiSelectProps {
   options: string[];
@@ -38,21 +33,12 @@ export function MultiSelect({
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleSelect = (value: string, e?: React.MouseEvent) => {
-    e?.preventDefault();
-    e?.stopPropagation();
-    
+  const handleToggle = (value: string) => {
     const newSelected = selected.includes(value)
       ? selected.filter((item) => item !== value)
       : [...selected, value];
     onChange(newSelected);
-    
-    // Manter o foco no input após seleção
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 0);
   };
 
   const handleRemove = (value: string, e: React.MouseEvent) => {
@@ -120,44 +106,45 @@ export function MultiSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
-        <Command shouldFilter={false}>
-          <CommandInput
-            ref={inputRef}
-            placeholder={searchPlaceholder}
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-            data-testid="input-multi-select-search"
-          />
-          <CommandList>
-            <CommandEmpty>{emptyText}</CommandEmpty>
-            <CommandGroup>
-              {filteredOptions.map((option) => (
-                <CommandItem
-                  key={option}
-                  value={option}
-                  onSelect={() => {
-                    // Não fazer nada no onSelect para evitar filtro automático
-                  }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleSelect(option);
-                  }}
-                  className="cursor-pointer"
-                  data-testid={`option-${option}`}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      selected.includes(option) ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {option}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+        <div className="flex flex-col">
+          <div className="flex items-center border-b px-3 py-2">
+            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+            <Input
+              placeholder={searchPlaceholder}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              data-testid="input-multi-select-search"
+            />
+          </div>
+          <ScrollArea className="h-64">
+            {filteredOptions.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                {emptyText}
+              </div>
+            ) : (
+              <div className="p-2">
+                {filteredOptions.map((option) => (
+                  <div
+                    key={option}
+                    className="flex items-center space-x-2 rounded-md p-2 hover:bg-accent cursor-pointer"
+                    onClick={() => handleToggle(option)}
+                    data-testid={`option-${option}`}
+                  >
+                    <Checkbox
+                      checked={selected.includes(option)}
+                      onCheckedChange={() => handleToggle(option)}
+                      data-testid={`checkbox-${option}`}
+                    />
+                    <label className="flex-1 text-sm cursor-pointer">
+                      {option}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
