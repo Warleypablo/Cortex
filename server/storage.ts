@@ -66,12 +66,22 @@ export interface DashboardAnaliseData {
   tempoPermanencia: TempoPermanencia;
 }
 
+export interface ClienteContratoDetail {
+  clienteId: string;
+  servico: string;
+  squad: string;
+  valorr: number;
+  dataInicio: Date;
+  dataEncerramento: Date | null;
+}
+
 export interface CohortRetentionRow {
   cohortMonth: string;
   cohortLabel: string;
   totalClients: number;
   totalValue: number;
   totalContracts: number;
+  clientesContratos: ClienteContratoDetail[];
   retentionByMonth: {
     [monthOffset: number]: {
       activeClients: number;
@@ -128,7 +138,7 @@ export interface IStorage {
   getFluxoCaixa(): Promise<FluxoCaixaItem[]>;
   getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]>;
   getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]>;
-  getCohortRetention(filters?: { squad?: string; servico?: string; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
+  getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
   getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas>;
 }
 
@@ -236,7 +246,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getCohortRetention(filters?: { squad?: string; servico?: string; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData> {
+  async getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -822,7 +832,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getCohortRetention(filters?: { squad?: string; servico?: string; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData> {
+  async getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData> {
     const result = await db.execute(sql`
       SELECT 
         id_task,
@@ -852,8 +862,8 @@ export class DbStorage implements IStorage {
     if (filters?.squad) {
       filteredContratos = filteredContratos.filter(c => c.squad === filters.squad);
     }
-    if (filters?.servico) {
-      filteredContratos = filteredContratos.filter(c => c.servico === filters.servico);
+    if (filters?.servicos && filters.servicos.length > 0) {
+      filteredContratos = filteredContratos.filter(c => c.servico && filters.servicos!.includes(c.servico));
     }
 
     const availableServicos = Array.from(new Set(filteredContratos.map(c => c.servico).filter(Boolean) as string[])).sort();
@@ -900,6 +910,8 @@ export class DbStorage implements IStorage {
     const cohortMap = new Map<string, {
       clients: Set<string>;
       allClientContracts: Map<string, Array<{
+        servico: string;
+        squad: string;
         dataInicio: Date;
         dataEncerramento: Date | null;
         valorr: number;
@@ -1001,12 +1013,29 @@ export class DbStorage implements IStorage {
         }
       }
 
+      const clientesContratos: ClienteContratoDetail[] = [];
+      cohortData.allClientContracts.forEach((contracts, clientId) => {
+        contracts.forEach(contract => {
+          if (!isNaN(contract.valorr) && contract.valorr > 0) {
+            clientesContratos.push({
+              clienteId: clientId,
+              servico: contract.servico || '',
+              squad: contract.squad || '',
+              valorr: contract.valorr,
+              dataInicio: contract.dataInicio,
+              dataEncerramento: contract.dataEncerramento,
+            });
+          }
+        });
+      });
+
       return {
         cohortMonth,
         cohortLabel,
         totalClients,
         totalValue,
         totalContracts,
+        clientesContratos,
         retentionByMonth,
       };
     });
