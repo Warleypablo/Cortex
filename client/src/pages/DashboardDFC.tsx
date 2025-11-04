@@ -9,9 +9,7 @@ import type { DfcHierarchicalResponse, DfcNode } from "@shared/schema";
 export default function DashboardDFC() {
   const [filterMesInicio, setFilterMesInicio] = useState<string>("");
   const [filterMesFim, setFilterMesFim] = useState<string>("");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(['RECEITAS', 'DESPESAS']));
-
-  console.log('[DFC] Filters:', { filterMesInicio, filterMesFim });
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(['RECEITAS', 'DESPESAS', 'OUTROS']));
 
   const { data: dfcData, isLoading } = useQuery<DfcHierarchicalResponse>({
     queryKey: ["/api/dfc", filterMesInicio, filterMesFim],
@@ -20,7 +18,6 @@ export default function DashboardDFC() {
       if (filterMesInicio) params.append("mesInicio", filterMesInicio);
       if (filterMesFim) params.append("mesFim", filterMesFim);
       
-      console.log('[DFC] Fetching with params:', params.toString());
       const res = await fetch(`/api/dfc?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch DFC data");
       return res.json();
