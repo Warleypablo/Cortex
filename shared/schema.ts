@@ -255,6 +255,7 @@ export type DfcParcela = {
   valorBruto: number;
   dataQuitacao: string;
   mes: string;
+  tipoEvento: string;
 };
 
 export type DfcNode = {
