@@ -5,6 +5,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Users, TrendingDown, TrendingUp, Calendar, DollarSign } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MultiSelect } from "@/components/ui/multi-select";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+
+interface ClienteContratoDetail {
+  clienteId: string;
+  servico: string;
+  squad: string;
+  valorr: number;
+  dataInicio: string;
+  dataEncerramento: string | null;
+}
 
 interface CohortRetentionRow {
   cohortMonth: string;
@@ -12,6 +27,7 @@ interface CohortRetentionRow {
   totalClients: number;
   totalValue: number;
   totalContracts: number;
+  clientesContratos: ClienteContratoDetail[];
   retentionByMonth: {
     [monthOffset: number]: {
       activeClients: number;
@@ -39,17 +55,17 @@ type ViewMode = "clientes" | "valor" | "contratos";
 
 export default function DashboardRetencao() {
   const [filterSquad, setFilterSquad] = useState<string>("todos");
-  const [filterServico, setFilterServico] = useState<string>("todos");
+  const [filterServicos, setFilterServicos] = useState<string[]>([]);
   const [filterMesInicio, setFilterMesInicio] = useState<string>("");
   const [filterMesFim, setFilterMesFim] = useState<string>("");
   const [viewMode, setViewMode] = useState<ViewMode>("clientes");
 
   const { data: cohortData, isLoading } = useQuery<CohortRetentionData>({
-    queryKey: ["/api/analytics/cohort-retention", filterSquad, filterServico, filterMesInicio, filterMesFim],
+    queryKey: ["/api/analytics/cohort-retention", filterSquad, filterServicos, filterMesInicio, filterMesFim],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filterSquad !== "todos") params.append("squad", filterSquad);
-      if (filterServico !== "todos") params.append("servico", filterServico);
+      if (filterServicos.length > 0) params.append("servico", filterServicos.join(","));
       if (filterMesInicio) params.append("mesInicio", filterMesInicio);
       if (filterMesFim) params.append("mesFim", filterMesFim);
       
@@ -302,17 +318,15 @@ export default function DashboardRetencao() {
                     </SelectContent>
                   </Select>
 
-                  <Select value={filterServico} onValueChange={setFilterServico}>
-                    <SelectTrigger className="w-[160px]" data-testid="select-servico-filter">
-                      <SelectValue placeholder="Filtrar Serviço" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos Serviços</SelectItem>
-                      {uniqueServicos.map(servico => (
-                        <SelectItem key={servico} value={servico}>{servico}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <MultiSelect
+                    options={uniqueServicos}
+                    selected={filterServicos}
+                    onChange={setFilterServicos}
+                    placeholder="Selecionar Serviços"
+                    searchPlaceholder="Buscar serviço..."
+                    emptyText="Nenhum serviço encontrado"
+                    className="w-[240px]"
+                  />
                 </div>
               </div>
             </CardHeader>
@@ -355,12 +369,53 @@ export default function DashboardRetencao() {
                               {cohort.cohortLabel}
                             </td>
                             <td className="p-3 text-center font-semibold" data-testid={`total-${cohort.cohortMonth}`}>
-                              {viewMode === "clientes" 
-                                ? cohort.totalClients
-                                : viewMode === "valor"
-                                ? `R$ ${cohort.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                                : cohort.totalContracts
-                              }
+                              <HoverCard>
+                                <HoverCardTrigger asChild>
+                                  <span className="hover:text-primary transition-colors cursor-help underline decoration-dotted inline-block">
+                                    {viewMode === "clientes" 
+                                      ? cohort.totalClients
+                                      : viewMode === "valor"
+                                      ? `R$ ${cohort.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                      : cohort.totalContracts
+                                    }
+                                  </span>
+                                </HoverCardTrigger>
+                                <HoverCardContent className="w-96 max-h-96 overflow-auto" data-testid={`hover-details-${cohort.cohortMonth}`}>
+                                  <div className="space-y-2">
+                                    <h4 className="font-semibold text-sm mb-3">
+                                      Detalhes da Coorte {cohort.cohortLabel}
+                                    </h4>
+                                    <div className="space-y-1">
+                                      {!cohort.clientesContratos || cohort.clientesContratos.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground">Nenhum contrato encontrado</p>
+                                      ) : (
+                                        cohort.clientesContratos.map((contrato, idx) => (
+                                          <div 
+                                            key={`${contrato.clienteId}-${idx}`}
+                                            className="flex flex-col gap-1 p-2 border-b last:border-0"
+                                          >
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-sm font-medium">{contrato.servico}</span>
+                                              <Badge variant="secondary" className="text-xs">
+                                                R$ {contrato.valorr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                              </Badge>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                              <span>Cliente: {contrato.clienteId}</span>
+                                              <span>•</span>
+                                              <span>Squad: {contrato.squad === '0' ? 'Supreme' : contrato.squad === '1' ? 'Forja' : contrato.squad === '2' ? 'Squadra' : 'Chama'}</span>
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                              Início: {new Date(contrato.dataInicio).toLocaleDateString('pt-BR')}
+                                              {contrato.dataEncerramento && ` • Fim: ${new Date(contrato.dataEncerramento).toLocaleDateString('pt-BR')}`}
+                                            </div>
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
                             </td>
                             {Array.from({ length: cohortData.maxMonthOffset + 1 }, (_, offset) => {
                               const data = cohort.retentionByMonth[offset];
