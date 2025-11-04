@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -142,6 +142,7 @@ export interface IStorage {
   getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
   getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas>;
   getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]>;
+  getDfc(mesInicio?: string, mesFim?: string): Promise<DfcResponse>;
 }
 
 export class MemStorage implements IStorage {
@@ -257,6 +258,10 @@ export class MemStorage implements IStorage {
   }
 
   async getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getDfc(mesInicio?: string, mesFim?: string): Promise<DfcResponse> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -1204,6 +1209,83 @@ export class DbStorage implements IStorage {
       percentualChurn: parseFloat(row.percentual_churn || '0'),
       valorAtivoMes: parseFloat(row.valor_ativo_mes || '0'),
     }));
+  }
+
+  async getDfc(mesInicio?: string, mesFim?: string): Promise<DfcResponse> {
+    const whereClauses: string[] = ['categoria_id IS NOT NULL', "categoria_id != ''"];
+    
+    if (mesInicio) {
+      const [ano, mes] = mesInicio.split('-').map(Number);
+      const dataInicio = new Date(ano, mes - 1, 1);
+      whereClauses.push(`data_vencimento >= '${dataInicio.toISOString()}'`);
+    }
+    
+    if (mesFim) {
+      const [ano, mes] = mesFim.split('-').map(Number);
+      const dataFim = new Date(ano, mes, 0, 23, 59, 59);
+      whereClauses.push(`data_vencimento <= '${dataFim.toISOString()}'`);
+    }
+    
+    const whereClause = whereClauses.join(' AND ');
+    
+    const parcelas = await db.execute(sql.raw(`
+      SELECT 
+        categoria_id,
+        categoria_nome,
+        valor_categoria,
+        data_vencimento
+      FROM caz_parcelas
+      WHERE ${whereClause}
+      ORDER BY data_vencimento
+    `));
+
+    const dfcMap = new Map<string, Map<string, number>>();
+    const mesesSet = new Set<string>();
+
+    for (const row of parcelas.rows) {
+      const categoriaIds = (row.categoria_id as string || '').split(';').map(s => s.trim()).filter(Boolean);
+      const categoriaNomes = (row.categoria_nome as string || '').split(';').map(s => s.trim()).filter(Boolean);
+      const valorCategorias = (row.valor_categoria as string || '').split(';').map(s => s.trim()).filter(Boolean);
+      
+      if (categoriaIds.length === 0) continue;
+
+      const dataVencimento = new Date(row.data_vencimento as string);
+      const mes = dataVencimento.toISOString().substring(0, 7);
+      mesesSet.add(mes);
+
+      for (let i = 0; i < categoriaIds.length; i++) {
+        const categoriaId = categoriaIds[i];
+        const categoriaNome = categoriaNomes[i] || categoriaId;
+        const valor = parseFloat(valorCategorias[i] || '0');
+
+        const key = `${categoriaId}|${categoriaNome}`;
+        
+        if (!dfcMap.has(key)) {
+          dfcMap.set(key, new Map());
+        }
+        
+        const categoriaMap = dfcMap.get(key)!;
+        const currentValue = categoriaMap.get(mes) || 0;
+        categoriaMap.set(mes, currentValue + valor);
+      }
+    }
+
+    const items = [];
+    for (const [key, mesesMap] of Array.from(dfcMap.entries())) {
+      const [categoriaId, categoriaNome] = key.split('|');
+      for (const [mes, valorTotal] of Array.from(mesesMap.entries())) {
+        items.push({
+          categoriaId,
+          categoriaNome,
+          mes,
+          valorTotal,
+        });
+      }
+    }
+
+    const meses = Array.from(mesesSet).sort();
+
+    return { items, meses };
   }
 }
 

@@ -66,6 +66,11 @@ const dashboardItems = [
     url: "/dashboard/retencao",
     icon: UserCheck,
   },
+  {
+    title: "DFC",
+    url: "/dashboard/dfc",
+    icon: TrendingUp,
+  },
 ];
 
 export function AppSidebar() {
