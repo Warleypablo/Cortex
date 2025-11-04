@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -287,7 +287,7 @@ function determineParent(categoriaId: string): string {
   return (twoDigitPrefix === '03' || twoDigitPrefix === '04') ? 'RECEITAS' : 'DESPESAS';
 }
 
-function buildHierarchy(items: DfcItem[], meses: string[]): DfcHierarchicalResponse {
+function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: Map<string, DfcParcela[]>): DfcHierarchicalResponse {
   const nodeMap = new Map<string, DfcNode>();
   
   nodeMap.set('RECEITAS', {
@@ -310,7 +310,7 @@ function buildHierarchy(items: DfcItem[], meses: string[]): DfcHierarchicalRespo
     isLeaf: false,
   });
   
-  const categoriasByNormalizedId = new Map<string, { nome: string; items: DfcItem[] }>();
+  const categoriasByNormalizedId = new Map<string, { nome: string; items: DfcItem[]; originalKey?: string }>();
   
   for (const item of items) {
     const normalizedId = normalizeCode(item.categoriaId);
@@ -318,7 +318,8 @@ function buildHierarchy(items: DfcItem[], meses: string[]): DfcHierarchicalRespo
     if (!categoriasByNormalizedId.has(normalizedId)) {
       categoriasByNormalizedId.set(normalizedId, {
         nome: item.categoriaNome,
-        items: []
+        items: [],
+        originalKey: `${item.categoriaId}|${item.categoriaNome}`
       });
     }
     categoriasByNormalizedId.get(normalizedId)!.items.push(item);
@@ -345,6 +346,13 @@ function buildHierarchy(items: DfcItem[], meses: string[]): DfcHierarchicalRespo
     for (const item of data.items) {
       const currentValue = node.valuesByMonth[item.mes] || 0;
       node.valuesByMonth[item.mes] = currentValue + item.valorTotal;
+    }
+
+    if (parcelasByCategory && data.originalKey) {
+      const parcelas = parcelasByCategory.get(data.originalKey);
+      if (parcelas) {
+        node.parcelas = parcelas;
+      }
     }
   }
   
@@ -1390,6 +1398,9 @@ export class DbStorage implements IStorage {
     
     const parcelas = await db.execute(sql.raw(`
       SELECT 
+        id,
+        descricao,
+        valor_bruto,
         categoria_id,
         categoria_nome,
         valor_categoria,
@@ -1400,6 +1411,7 @@ export class DbStorage implements IStorage {
     `));
 
     const dfcMap = new Map<string, Map<string, number>>();
+    const parcelasByCategory = new Map<string, DfcParcela[]>();
     const mesesSet = new Set<string>();
 
     for (const row of parcelas.rows) {
@@ -1434,6 +1446,18 @@ export class DbStorage implements IStorage {
         const categoriaMap = dfcMap.get(key)!;
         const currentValue = categoriaMap.get(mes) || 0;
         categoriaMap.set(mes, currentValue + valor);
+
+        if (!parcelasByCategory.has(key)) {
+          parcelasByCategory.set(key, []);
+        }
+        
+        parcelasByCategory.get(key)!.push({
+          id: row.id as number,
+          descricao: row.descricao as string || '',
+          valorBruto: parseFloat(row.valor_bruto as string || '0'),
+          dataQuitacao: dataQuitacao.toISOString(),
+          mes: mes,
+        });
       }
     }
 
@@ -1452,7 +1476,7 @@ export class DbStorage implements IStorage {
 
     const meses = Array.from(mesesSet).sort();
 
-    return buildHierarchy(items, meses);
+    return buildHierarchy(items, meses, parcelasByCategory);
   }
 }
 
