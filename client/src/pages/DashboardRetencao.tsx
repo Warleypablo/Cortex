@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Users, TrendingDown, TrendingUp, Calendar, DollarSign } from "lucide-react";
+import { Loader2, Users, TrendingDown, TrendingUp, Calendar, DollarSign, ChevronDown, ChevronUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -58,6 +58,10 @@ export default function DashboardRetencao() {
   const [churnFilterMesInicio, setChurnFilterMesInicio] = useState<string>("");
   const [churnFilterMesFim, setChurnFilterMesFim] = useState<string>("");
   const [churnViewMode, setChurnViewMode] = useState<ViewModeChurn>("quantidade");
+  
+  // Estados para minimizar cards
+  const [isCohortMinimized, setIsCohortMinimized] = useState<boolean>(true);
+  const [isChurnMinimized, setIsChurnMinimized] = useState<boolean>(true);
 
   const handleChurnServicosChange = (selected: string[]) => {
     console.log("Churn servicos changed:", selected);
@@ -193,42 +197,11 @@ export default function DashboardRetencao() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 border-b bg-background px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold" data-testid="text-page-title">Análise de Retenção</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Análise de coorte de clientes por mês de início do contrato
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={viewMode === "clientes" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("clientes")}
-              data-testid="button-view-clientes"
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Clientes
-            </Button>
-            <Button
-              variant={viewMode === "valor" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("valor")}
-              data-testid="button-view-valor"
-            >
-              <DollarSign className="h-4 w-4 mr-2" />
-              Valor MRR
-            </Button>
-            <Button
-              variant={viewMode === "contratos" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("contratos")}
-              data-testid="button-view-contratos"
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Contratos
-            </Button>
-          </div>
+        <div>
+          <h1 className="text-2xl font-semibold" data-testid="text-page-title">Análise de Retenção</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Análise de coorte de clientes por mês de início do contrato
+          </p>
         </div>
       </div>
 
@@ -316,7 +289,7 @@ export default function DashboardRetencao() {
 
           <Card>
             <CardHeader>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center justify-between mb-4">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Calendar className="h-5 w-5" />
@@ -326,56 +299,98 @@ export default function DashboardRetencao() {
                     Acompanhe a retenção de clientes mês a mês desde o início do contrato
                   </CardDescription>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-muted-foreground whitespace-nowrap">De:</label>
-                    <input
-                      type="month"
-                      value={filterMesInicio}
-                      onChange={(e) => setFilterMesInicio(e.target.value)}
-                      className="h-9 rounded-md border border-input bg-background px-3 text-sm hover-elevate"
-                      data-testid="input-mes-inicio"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-muted-foreground whitespace-nowrap">Até:</label>
-                    <input
-                      type="month"
-                      value={filterMesFim}
-                      onChange={(e) => setFilterMesFim(e.target.value)}
-                      className="h-9 rounded-md border border-input bg-background px-3 text-sm hover-elevate"
-                      data-testid="input-mes-fim"
-                    />
-                  </div>
-
-                  <Select value={filterSquad} onValueChange={setFilterSquad}>
-                    <SelectTrigger className="w-[160px]" data-testid="select-squad-filter">
-                      <SelectValue placeholder="Filtrar Squad" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todas Squads</SelectItem>
-                      <SelectItem value="0">Supreme</SelectItem>
-                      <SelectItem value="1">Forja</SelectItem>
-                      <SelectItem value="2">Squadra</SelectItem>
-                      <SelectItem value="3">Chama</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <MultiSelect
-                    options={uniqueServicos}
-                    selected={filterServicos}
-                    onChange={setFilterServicos}
-                    placeholder="Selecionar Serviços"
-                    searchPlaceholder="Buscar serviço..."
-                    emptyText="Nenhum serviço encontrado"
-                    className="w-[240px]"
-                  />
-                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setIsCohortMinimized(!isCohortMinimized)}
+                  data-testid="button-toggle-cohort"
+                >
+                  {isCohortMinimized ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
+                </Button>
               </div>
+              {!isCohortMinimized && (
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant={viewMode === "clientes" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setViewMode("clientes")}
+                      data-testid="button-view-clientes"
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Clientes
+                    </Button>
+                    <Button
+                      variant={viewMode === "valor" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setViewMode("valor")}
+                      data-testid="button-view-valor"
+                    >
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      Valor MRR
+                    </Button>
+                    <Button
+                      variant={viewMode === "contratos" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setViewMode("contratos")}
+                      data-testid="button-view-contratos"
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Contratos
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-muted-foreground whitespace-nowrap">De:</label>
+                      <input
+                        type="month"
+                        value={filterMesInicio}
+                        onChange={(e) => setFilterMesInicio(e.target.value)}
+                        className="h-9 rounded-md border border-input bg-background px-3 text-sm hover-elevate"
+                        data-testid="input-mes-inicio"
+                      />
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-muted-foreground whitespace-nowrap">Até:</label>
+                      <input
+                        type="month"
+                        value={filterMesFim}
+                        onChange={(e) => setFilterMesFim(e.target.value)}
+                        className="h-9 rounded-md border border-input bg-background px-3 text-sm hover-elevate"
+                        data-testid="input-mes-fim"
+                      />
+                    </div>
+
+                    <Select value={filterSquad} onValueChange={setFilterSquad}>
+                      <SelectTrigger className="w-[160px]" data-testid="select-squad-filter">
+                        <SelectValue placeholder="Filtrar Squad" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todas Squads</SelectItem>
+                        <SelectItem value="0">Supreme</SelectItem>
+                        <SelectItem value="1">Forja</SelectItem>
+                        <SelectItem value="2">Squadra</SelectItem>
+                        <SelectItem value="3">Chama</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <MultiSelect
+                      options={uniqueServicos}
+                      selected={filterServicos}
+                      onChange={setFilterServicos}
+                      placeholder="Selecionar Serviços"
+                      searchPlaceholder="Buscar serviço..."
+                      emptyText="Nenhum serviço encontrado"
+                      className="w-[240px]"
+                    />
+                  </div>
+                </div>
+              )}
             </CardHeader>
-            <CardContent>
-              {isLoading ? (
+            {!isCohortMinimized && (
+              <CardContent>
+                {isLoading ? (
                 <div className="flex items-center justify-center py-12" data-testid="loading-cohort">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 </div>
@@ -505,7 +520,8 @@ export default function DashboardRetencao() {
                   </div>
                 </div>
               )}
-            </CardContent>
+              </CardContent>
+            )}
           </Card>
 
           {/* Seção de Análise de Churn por Serviço */}
@@ -516,9 +532,18 @@ export default function DashboardRetencao() {
                   <CardTitle>Análise de Churn por Serviço</CardTitle>
                   <CardDescription>Contratos encerrados por serviço ao longo dos meses</CardDescription>
                 </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setIsChurnMinimized(!isChurnMinimized)}
+                  data-testid="button-toggle-churn"
+                >
+                  {isChurnMinimized ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
+                </Button>
               </div>
             </CardHeader>
-            <CardContent>
+            {!isChurnMinimized && (
+              <CardContent>
               {/* Filtros */}
               <div className="flex flex-wrap gap-4 mb-6">
                 <div className="flex-1 min-w-[250px]">
@@ -681,34 +706,66 @@ export default function DashboardRetencao() {
                           TOTAL
                         </td>
                         {churnTableData.meses.map(mes => {
-                          let total = 0;
+                          let totalQuantidade = 0;
+                          let totalValor = 0;
+                          let totalPercentual = 0;
+                          let totalValorAtivoMes = 0;
+                          let count = 0;
+
                           churnTableData.servicos.forEach(servico => {
                             const data = churnTableData.dataMap.get(servico)?.get(mes);
                             if (data) {
-                              if (churnViewMode === "quantidade") {
-                                total += data.quantidade;
-                              } else if (churnViewMode === "valorTotal") {
-                                total += data.valorTotal;
-                              } else {
-                                // Para percentual, calcular média ponderada
-                                total += data.percentualChurn;
-                              }
+                              totalQuantidade += data.quantidade;
+                              totalValor += data.valorTotal;
+                              totalPercentual += data.percentualChurn;
+                              totalValorAtivoMes += data.valorAtivoMes;
+                              count++;
                             }
                           });
 
                           // Para percentual, calcular média
-                          if (churnViewMode === "percentual" && churnTableData.servicos.length > 0) {
-                            total = total / churnTableData.servicos.length;
-                          }
+                          const avgPercentual = count > 0 ? totalPercentual / count : 0;
+
+                          const displayValue = churnViewMode === "quantidade" 
+                            ? totalQuantidade
+                            : churnViewMode === "valorTotal"
+                            ? `R$ ${totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                            : `${avgPercentual.toFixed(1)}%`;
 
                           return (
                             <td key={mes} className="p-3 text-center" data-testid={`cell-churn-total-${mes}`}>
-                              {churnViewMode === "quantidade" 
-                                ? total
-                                : churnViewMode === "valorTotal"
-                                ? `R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                                : `${total.toFixed(1)}%`
-                              }
+                              <HoverCard>
+                                <HoverCardTrigger asChild>
+                                  <span className="hover:text-primary transition-colors cursor-help underline decoration-dotted inline-block">
+                                    {displayValue}
+                                  </span>
+                                </HoverCardTrigger>
+                                <HoverCardContent className="w-64" data-testid={`hover-total-${mes}`}>
+                                  <div className="space-y-2">
+                                    <h4 className="font-semibold text-sm mb-3">
+                                      Total {mes}
+                                    </h4>
+                                    <div className="space-y-1 text-sm">
+                                      <p className="flex justify-between">
+                                        <span className="text-muted-foreground">Contratos:</span>
+                                        <span className="font-medium">{totalQuantidade}</span>
+                                      </p>
+                                      <p className="flex justify-between">
+                                        <span className="text-muted-foreground">Valor:</span>
+                                        <span className="font-medium">R$ {totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                      </p>
+                                      <p className="flex justify-between">
+                                        <span className="text-muted-foreground">% Churn:</span>
+                                        <span className="font-medium">{avgPercentual.toFixed(1)}%</span>
+                                      </p>
+                                      <p className="flex justify-between">
+                                        <span className="text-muted-foreground">Valor ativo mês:</span>
+                                        <span className="font-medium">R$ {totalValorAtivoMes.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                      </p>
+                                    </div>
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
                             </td>
                           );
                         })}
@@ -717,7 +774,8 @@ export default function DashboardRetencao() {
                   </table>
                 </div>
               )}
-            </CardContent>
+              </CardContent>
+            )}
           </Card>
 
           <Card>
