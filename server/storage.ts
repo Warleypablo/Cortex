@@ -859,15 +859,15 @@ export class DbStorage implements IStorage {
 
     let filteredContratos = contratos.filter(c => c.dataInicio && !isNaN(c.dataInicio.getTime()));
 
+    const availableServicos = Array.from(new Set(contratos.filter(c => c.dataInicio && !isNaN(c.dataInicio.getTime())).map(c => c.servico).filter(Boolean) as string[])).sort();
+    const availableSquads = Array.from(new Set(contratos.filter(c => c.dataInicio && !isNaN(c.dataInicio.getTime())).map(c => c.squad).filter(Boolean) as string[])).sort();
+
     if (filters?.squad) {
       filteredContratos = filteredContratos.filter(c => c.squad === filters.squad);
     }
     if (filters?.servicos && filters.servicos.length > 0) {
       filteredContratos = filteredContratos.filter(c => c.servico && filters.servicos!.includes(c.servico));
     }
-
-    const availableServicos = Array.from(new Set(filteredContratos.map(c => c.servico).filter(Boolean) as string[])).sort();
-    const availableSquads = Array.from(new Set(filteredContratos.map(c => c.squad).filter(Boolean) as string[])).sort();
 
     const clientContractMap = new Map<string, Array<{
       servico: string;
