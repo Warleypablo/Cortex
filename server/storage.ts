@@ -1403,26 +1403,27 @@ export class DbStorage implements IStorage {
     const mesesSet = new Set<string>();
 
     for (const row of parcelas.rows) {
-      const categoriaIds = (row.categoria_id as string || '').split(';').map(s => s.trim()).filter(Boolean);
       const categoriaNomes = (row.categoria_nome as string || '').split(';').map(s => s.trim()).filter(Boolean);
       const valorCategorias = (row.valor_categoria as string || '').split(';').map(s => s.trim()).filter(Boolean);
       
-      if (categoriaIds.length === 0) continue;
+      if (categoriaNomes.length === 0) continue;
 
       const dataVencimento = new Date(row.data_vencimento as string);
       const mes = dataVencimento.toISOString().substring(0, 7);
       mesesSet.add(mes);
 
-      for (let i = 0; i < categoriaIds.length; i++) {
-        let categoriaId = categoriaIds[i];
-        const categoriaNome = categoriaNomes[i] || categoriaId;
+      for (let i = 0; i < categoriaNomes.length; i++) {
+        const fullCategoriaNome = categoriaNomes[i];
         const valor = parseFloat(valorCategorias[i] || '0');
 
-        const isValidCode = /^[\d.]+$/.test(categoriaId);
-        if (!isValidCode) {
-          console.warn(`[DFC] Skipping invalid categoria_id: ${categoriaId} (not a numeric code)`);
+        const codeMatch = fullCategoriaNome.match(/^([\d.]+)\s+(.+)$/);
+        if (!codeMatch) {
+          console.warn(`[DFC] Skipping invalid categoria_nome format: ${fullCategoriaNome} (expected format: "CODE NAME")`);
           continue;
         }
+
+        const categoriaId = codeMatch[1];
+        const categoriaNome = codeMatch[2];
 
         const key = `${categoriaId}|${categoriaNome}`;
         
