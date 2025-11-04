@@ -243,14 +243,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/analytics/cohort-retention", async (req, res) => {
     try {
-      const filters: { squad?: string; servico?: string; mesInicio?: string; mesFim?: string } = {};
+      const filters: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string } = {};
       
       if (req.query.squad && req.query.squad !== 'todos') {
         filters.squad = req.query.squad as string;
       }
       
       if (req.query.servico && req.query.servico !== 'todos') {
-        filters.servico = req.query.servico as string;
+        const servicoParam = req.query.servico as string;
+        filters.servicos = servicoParam.split(',').map(s => s.trim()).filter(Boolean);
       }
       
       if (req.query.mesInicio) {
