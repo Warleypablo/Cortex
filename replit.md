@@ -54,6 +54,7 @@ Preferred communication style: Simple, everyday language.
   - Status-based color coding for visual status tracking
 - **DFC (Demonstração de Fluxo de Caixa)**: Hierarchical cash flow analysis with expandable tree structure
   - Processes semicolon-separated category data from caz_parcelas (categoria_nome, valor_categoria)
+  - **Data reference**: Uses `data_quitacao` field from caz_parcelas for date filtering and grouping
   - **Code extraction**: Hierarchical codes (e.g., "03", "06.05.01") are extracted from the beginning of categoria_nome field
   - Expected format: "CODE NAME" (e.g., "03.01.01 Receita de Serviços")
   - Hierarchical display: Receitas/Despesas → subcategories → details (based on category code patterns)
