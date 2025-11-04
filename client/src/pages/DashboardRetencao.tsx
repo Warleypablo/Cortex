@@ -426,17 +426,17 @@ export default function DashboardRetencao() {
                                 </HoverCardTrigger>
                                 <HoverCardContent className="w-80 max-h-96 overflow-auto" data-testid={`hover-details-${cohort.cohortMonth}`}>
                                   <div className="space-y-2">
-                                    <h4 className="font-semibold text-sm mb-3">
+                                    <h4 className="font-semibold text-sm mb-2 text-left">
                                       Detalhes da Coorte {cohort.cohortLabel}
                                     </h4>
-                                    <div className="space-y-1">
+                                    <div className="space-y-0.5">
                                       {!cohort.clientesContratos || cohort.clientesContratos.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground">Nenhum contrato encontrado</p>
+                                        <p className="text-xs text-muted-foreground text-left">Nenhum contrato encontrado</p>
                                       ) : (
                                         cohort.clientesContratos.map((contrato, idx) => (
                                           <div 
                                             key={`${contrato.clienteId}-${idx}`}
-                                            className="text-sm py-1 border-b last:border-0"
+                                            className="text-xs py-0.5 border-b last:border-0 text-left"
                                           >
                                             {contrato.nomeCliente} - {contrato.servico}
                                           </div>
