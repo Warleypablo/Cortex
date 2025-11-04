@@ -247,3 +247,19 @@ export type DfcResponse = {
   items: DfcItem[];
   meses: string[];
 };
+
+export type DfcNode = {
+  categoriaId: string;
+  categoriaNome: string;
+  nivel: number;
+  parentId: string | null;
+  children: string[];
+  valuesByMonth: Record<string, number>;
+  isLeaf: boolean;
+};
+
+export type DfcHierarchicalResponse = {
+  nodes: DfcNode[];
+  meses: string[];
+  rootIds: string[];
+};
