@@ -1453,7 +1453,10 @@ export class DbStorage implements IStorage {
         
         parcelasByCategory.get(key)!.push({
           id: row.id as number,
+          descricao: row.descricao as string || '',
+          valorBruto: parseFloat(row.valor_bruto as string || '0'),
           dataQuitacao: dataQuitacao.toISOString(),
+          mes: mes,
         });
       }
     }

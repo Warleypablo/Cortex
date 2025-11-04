@@ -227,14 +227,14 @@ export default function DashboardDFC() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {visibleItems.map((item) => {
+                        {visibleItems.map((item, index) => {
                           if (item.type === 'node') {
                             const node = item.node;
                             const hasParcelas = node.isLeaf && node.parcelas && node.parcelas.length > 0;
                             
                             return (
                               <TableRow 
-                                key={`node-${node.categoriaId}`}
+                                key={node.categoriaId}
                                 className="hover-elevate"
                                 data-testid={`dfc-row-${node.categoriaId}`}
                               >
@@ -288,30 +288,42 @@ export default function DashboardDFC() {
                           } else {
                             const parcela = item.parcela;
                             const parentNode = item.parentNode;
-                            const dataQuitacao = new Date(parcela.dataQuitacao);
-                            const dataFormatada = dataQuitacao.toLocaleDateString('pt-BR');
                             
                             return (
                               <TableRow 
-                                key={`${parentNode.categoriaId}-parcela-${parcela.id}`}
+                                key={`parcela-${parcela.id}`}
                                 className="hover-elevate bg-muted/30"
                                 data-testid={`dfc-row-parcela-${parcela.id}`}
                               >
                                 <TableCell 
                                   className="sticky left-0 bg-muted/30 z-10"
                                   style={{ paddingLeft: `${(parentNode.nivel + 1) * 24 + 12}px` }}
-                                  colSpan={dfcData.meses.length + 1}
                                 >
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-1">
                                     <div className="w-6" />
                                     <span className="text-sm text-muted-foreground">
-                                      ID: {parcela.id}
-                                    </span>
-                                    <span className="text-sm text-muted-foreground">
-                                      Data: {dataFormatada}
+                                      #{parcela.id} - {parcela.descricao || 'Sem descrição'}
                                     </span>
                                   </div>
                                 </TableCell>
+                                {dfcData.meses.map(mes => {
+                                  const valor = parcela.mes === mes ? parcela.valorBruto : 0;
+                                  return (
+                                    <TableCell 
+                                      key={mes} 
+                                      className="text-center"
+                                      data-testid={`dfc-cell-parcela-${parcela.id}-${mes}`}
+                                    >
+                                      {valor !== 0 ? (
+                                        <span className="text-sm">
+                                          {formatCurrency(valor)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-muted-foreground">-</span>
+                                      )}
+                                    </TableCell>
+                                  );
+                                })}
                               </TableRow>
                             );
                           }
