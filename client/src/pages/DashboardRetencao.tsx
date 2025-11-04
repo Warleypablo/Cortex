@@ -372,7 +372,7 @@ export default function DashboardRetencao() {
                                     }
                                   </span>
                                 </HoverCardTrigger>
-                                <HoverCardContent className="w-80 max-h-96 overflow-auto z-[9999]" data-testid={`hover-details-${cohort.cohortMonth}`}>
+                                <HoverCardContent className="w-80 max-h-96 overflow-auto" data-testid={`hover-details-${cohort.cohortMonth}`}>
                                   <div className="space-y-2">
                                     <h4 className="font-semibold text-sm mb-3">
                                       Detalhes da Coorte {cohort.cohortLabel}
