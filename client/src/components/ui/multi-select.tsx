@@ -135,10 +135,15 @@ export function MultiSelect({
                 <CommandItem
                   key={option}
                   value={option}
-                  onSelect={(currentValue) => {
-                    // Prevenir o comportamento padrão de fechar
-                    handleSelect(currentValue);
+                  onSelect={() => {
+                    // Não fazer nada no onSelect para evitar filtro automático
                   }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSelect(option);
+                  }}
+                  className="cursor-pointer"
                   data-testid={`option-${option}`}
                 >
                   <Check
