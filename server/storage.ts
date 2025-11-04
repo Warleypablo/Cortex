@@ -277,21 +277,14 @@ function determineLevel(categoriaId: string): number {
 }
 
 function determineParent(categoriaId: string): string {
-  let firstNonZeroDigit = '';
-  for (const char of categoriaId) {
-    if (char >= '1' && char <= '9') {
-      firstNonZeroDigit = char;
-      break;
-    }
-  }
-  
   if (categoriaId.includes('.')) {
     const parts = categoriaId.split('.');
     parts.pop();
     return normalizeCode(parts.join('.'));
   }
   
-  return (firstNonZeroDigit === '3' || firstNonZeroDigit === '4') ? 'RECEITAS' : 'DESPESAS';
+  const twoDigitPrefix = categoriaId.substring(0, 2);
+  return (twoDigitPrefix === '03' || twoDigitPrefix === '04') ? 'RECEITAS' : 'DESPESAS';
 }
 
 function buildHierarchy(items: DfcItem[], meses: string[]): DfcHierarchicalResponse {
@@ -1421,9 +1414,15 @@ export class DbStorage implements IStorage {
       mesesSet.add(mes);
 
       for (let i = 0; i < categoriaIds.length; i++) {
-        const categoriaId = categoriaIds[i];
+        let categoriaId = categoriaIds[i];
         const categoriaNome = categoriaNomes[i] || categoriaId;
         const valor = parseFloat(valorCategorias[i] || '0');
+
+        const isValidCode = /^[\d.]+$/.test(categoriaId);
+        if (!isValidCode) {
+          console.warn(`[DFC] Skipping invalid categoria_id: ${categoriaId} (not a numeric code)`);
+          continue;
+        }
 
         const key = `${categoriaId}|${categoriaNome}`;
         
