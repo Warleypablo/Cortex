@@ -286,6 +286,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/churn-por-servico", async (req, res) => {
+    try {
+      const filters: { servicos?: string[]; mesInicio?: string; mesFim?: string } = {};
+      
+      if (req.query.servico && req.query.servico !== 'todos') {
+        const servicoParam = req.query.servico as string;
+        filters.servicos = servicoParam.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      
+      if (req.query.mesInicio) {
+        filters.mesInicio = req.query.mesInicio as string;
+      }
+      
+      if (req.query.mesFim) {
+        filters.mesFim = req.query.mesFim as string;
+      }
+
+      const churnData = await storage.getChurnPorServico(filters);
+      res.json(churnData);
+    } catch (error) {
+      console.error("[api] Error fetching churn por servico:", error);
+      res.status(500).json({ error: "Failed to fetch churn por servico data" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
