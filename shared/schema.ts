@@ -57,6 +57,7 @@ export const cazParcelas = pgTable("caz_parcelas", {
   perda: decimal("perda"),
   naoPago: decimal("nao_pago"),
   dataVencimento: timestamp("data_vencimento"),
+  dataQuitacao: timestamp("data_quitacao"),
   descricao: text("descricao"),
   metodoPagamento: text("metodo_pagamento"),
   valorBruto: decimal("valor_bruto"),
@@ -248,6 +249,14 @@ export type DfcResponse = {
   meses: string[];
 };
 
+export type DfcParcela = {
+  id: number;
+  descricao: string;
+  valorBruto: number;
+  dataQuitacao: string;
+  mes: string;
+};
+
 export type DfcNode = {
   categoriaId: string;
   categoriaNome: string;
@@ -256,6 +265,7 @@ export type DfcNode = {
   children: string[];
   valuesByMonth: Record<string, number>;
   isLeaf: boolean;
+  parcelas?: DfcParcela[];
 };
 
 export type DfcHierarchicalResponse = {
