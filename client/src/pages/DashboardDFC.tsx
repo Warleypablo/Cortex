@@ -291,9 +291,9 @@ export default function DashboardDFC() {
                             
                             return (
                               <TableRow 
-                                key={`parcela-${parcela.id}`}
+                                key={`${parentNode.categoriaId}-parcela-${parcela.id}`}
                                 className="hover-elevate bg-muted/30"
-                                data-testid={`dfc-row-parcela-${parcela.id}`}
+                                data-testid={`dfc-row-parcela-${parcela.id}-${parentNode.categoriaId}`}
                               >
                                 <TableCell 
                                   className="sticky left-0 bg-muted/30 z-10"
