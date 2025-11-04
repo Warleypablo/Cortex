@@ -311,6 +311,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dfc", async (req, res) => {
+    try {
+      const mesInicio = req.query.mesInicio as string | undefined;
+      const mesFim = req.query.mesFim as string | undefined;
+      
+      if (mesInicio && !/^\d{4}-\d{2}$/.test(mesInicio)) {
+        return res.status(400).json({ error: "Invalid mesInicio parameter. Expected format: YYYY-MM" });
+      }
+      
+      if (mesFim && !/^\d{4}-\d{2}$/.test(mesFim)) {
+        return res.status(400).json({ error: "Invalid mesFim parameter. Expected format: YYYY-MM" });
+      }
+
+      const dfcData = await storage.getDfc(mesInicio, mesFim);
+      res.json(dfcData);
+    } catch (error) {
+      console.error("[api] Error fetching DFC data:", error);
+      res.status(500).json({ error: "Failed to fetch DFC data" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

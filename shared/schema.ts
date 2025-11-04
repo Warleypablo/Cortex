@@ -68,6 +68,9 @@ export const cazParcelas = pgTable("caz_parcelas", {
   idCliente: text("id_cliente"),
   urlCobranca: text("url_cobranca"),
   empresa: text("empresa"),
+  categoriaId: text("categoria_id"),
+  categoriaNome: text("categoria_nome"),
+  valorCategoria: text("valor_categoria"),
 });
 
 export const cazBancos = pgTable("caz_bancos", {
@@ -231,4 +234,16 @@ export type ChurnPorServico = {
   valorTotal: number;
   percentualChurn: number;
   valorAtivoMes: number;
+};
+
+export type DfcItem = {
+  categoriaId: string;
+  categoriaNome: string;
+  mes: string;
+  valorTotal: number;
+};
+
+export type DfcResponse = {
+  items: DfcItem[];
+  meses: string[];
 };
