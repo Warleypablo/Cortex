@@ -53,9 +53,11 @@ Preferred communication style: Simple, everyday language.
   - Squad mapping from codes (0-3) to names (Supreme, Forja, Squadra, Chama)
   - Status-based color coding for visual status tracking
 - **DFC (Demonstração de Fluxo de Caixa)**: Hierarchical cash flow analysis with expandable tree structure
-  - Processes semicolon-separated category data from caz_parcelas (categoria_id, categoria_nome, valor_categoria)
+  - Processes semicolon-separated category data from caz_parcelas (categoria_nome, valor_categoria)
+  - **Code extraction**: Hierarchical codes (e.g., "03", "06.05.01") are extracted from the beginning of categoria_nome field
+  - Expected format: "CODE NAME" (e.g., "03.01.01 Receita de Serviços")
   - Hierarchical display: Receitas/Despesas → subcategories → details (based on category code patterns)
-  - Code-based hierarchy: Categories starting with "03"/"04" = Receitas, "05"/"06" = Despesas
+  - Code-based hierarchy: Categories starting with "03"/"04" = Receitas, "05"/"06"/"07"/"08" = Despesas
   - Category codes guide the hierarchy structure (e.g., 06.05.01: 06 → 06.05 → 06.05.01)
   - Automatic parent node creation and value aggregation up the hierarchy tree
   - Expandable/collapsible tree rows with ChevronRight/ChevronDown icons
@@ -112,7 +114,10 @@ Preferred communication style: Simple, everyday language.
   - `caz_pagar`: Accounts payable
   - `caz_parcelas`: Detailed installment/payment information with category tracking
     - `categoria_id`, `categoria_nome`, `valor_categoria`: Text fields storing semicolon-separated values for multi-category support
-    - Example: categoria_id="1;2", categoria_nome="Marketing;Vendas", valor_categoria="1000;500"
+    - `categoria_id` contains UUIDs (not used for hierarchy)
+    - `categoria_nome` contains hierarchical code + name (e.g., "06.05.01 Salários")
+    - Hierarchical codes are extracted from the beginning of `categoria_nome` using regex pattern: `^([\d.]+)\s+(.+)$`
+    - Example: categoria_nome="03.01.01 Receita de Serviços;04.02 Outras Receitas", valor_categoria="50000;5000"
 - **ClickUp Tables (cup_*)**: Operational client and contract data from ClickUp
   - `cup_clientes`: Client operational data with CNPJ as primary key
   - `cup_contratos`: Contract details with squad assignments
