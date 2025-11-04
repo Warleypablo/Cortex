@@ -223,3 +223,12 @@ export type TransacaoDiaItem = {
 export type SaldoBancos = {
   saldoTotal: number;
 };
+
+export type ChurnPorServico = {
+  servico: string;
+  mes: string;
+  quantidade: number;
+  valorTotal: number;
+  percentualChurn: number;
+  valorAtivoMes: number;
+};
