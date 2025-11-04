@@ -68,6 +68,7 @@ export interface DashboardAnaliseData {
 
 export interface ClienteContratoDetail {
   clienteId: string;
+  nomeCliente: string;
   servico: string;
   squad: string;
   valorr: number;
@@ -835,20 +836,23 @@ export class DbStorage implements IStorage {
   async getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData> {
     const result = await db.execute(sql`
       SELECT 
-        id_task,
-        servico,
-        squad,
-        data_inicio,
-        data_encerramento,
-        valorr
-      FROM ${schema.cupContratos}
-      WHERE data_inicio IS NOT NULL
+        c.id_task,
+        c.servico,
+        c.squad,
+        c.data_inicio,
+        c.data_encerramento,
+        c.valorr,
+        cl.nome as nome_cliente
+      FROM ${schema.cupContratos} c
+      LEFT JOIN ${schema.cupClientes} cl ON c.id_task = cl.task_id
+      WHERE c.data_inicio IS NOT NULL
     `);
 
     const contratos = (result.rows as any[]).map((row: any) => {
       const valorr = parseFloat(row.valorr || '0');
       return {
         idTask: row.id_task,
+        nomeCliente: row.nome_cliente || row.id_task,
         servico: row.servico,
         squad: row.squad,
         dataInicio: row.data_inicio ? new Date(row.data_inicio) : null,
@@ -870,6 +874,7 @@ export class DbStorage implements IStorage {
     }
 
     const clientContractMap = new Map<string, Array<{
+      nomeCliente: string;
       servico: string;
       squad: string;
       dataInicio: Date;
@@ -885,6 +890,7 @@ export class DbStorage implements IStorage {
       }
       
       clientContractMap.get(contrato.idTask)!.push({
+        nomeCliente: contrato.nomeCliente,
         servico: contrato.servico || '',
         squad: contrato.squad || '',
         dataInicio: contrato.dataInicio!,
@@ -910,6 +916,7 @@ export class DbStorage implements IStorage {
     const cohortMap = new Map<string, {
       clients: Set<string>;
       allClientContracts: Map<string, Array<{
+        nomeCliente: string;
         servico: string;
         squad: string;
         dataInicio: Date;
@@ -1019,6 +1026,7 @@ export class DbStorage implements IStorage {
           if (!isNaN(contract.valorr) && contract.valorr > 0) {
             clientesContratos.push({
               clienteId: clientId,
+              nomeCliente: contract.nomeCliente,
               servico: contract.servico || '',
               squad: contract.squad || '',
               valorr: contract.valorr,
