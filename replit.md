@@ -55,11 +55,12 @@ Preferred communication style: Simple, everyday language.
 - **DFC (Demonstração de Fluxo de Caixa)**: Hierarchical cash flow analysis with expandable tree structure
   - Processes semicolon-separated category data from caz_parcelas (categoria_id, categoria_nome, valor_categoria)
   - Hierarchical display: Receitas/Despesas → subcategories → details (based on category code patterns)
-  - Code-based hierarchy: "3"/"4" = Receitas, "1"/"2"/"5" = Despesas, dots indicate sub-levels
+  - Code-based hierarchy: "03"/"04" = Receitas, "05"/"06" = Despesas, dots indicate sub-levels
   - Automatic parent node creation and value aggregation up the hierarchy tree
   - Expandable/collapsible tree rows with ChevronRight/ChevronDown icons
   - Visual indentation (24px per level) to show hierarchy depth
-  - Month range filters (mesInicio/mesFim) for flexible date filtering
+  - Month range filters (mesInicio/mesFim) with automatic query refetch via TanStack Query
+  - Filters use data_vencimento field from caz_parcelas for date-based filtering
   - Pivot table displaying hierarchical categories × months with aggregated values
   - KPI cards showing Total Categorias, Meses Analisados, and Valor Total
   - Backend builds complete hierarchy tree with parent/child relationships
