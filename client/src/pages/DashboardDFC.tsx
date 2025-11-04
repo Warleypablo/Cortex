@@ -227,7 +227,7 @@ export default function DashboardDFC() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {visibleItems.map((item, index) => {
+                        {visibleItems.map((item, idx) => {
                           if (item.type === 'node') {
                             const node = item.node;
                             const hasParcelas = node.isLeaf && node.parcelas && node.parcelas.length > 0;
@@ -291,7 +291,7 @@ export default function DashboardDFC() {
                             
                             return (
                               <TableRow 
-                                key={`${parentNode.categoriaId}-parcela-${parcela.id}`}
+                                key={`${parentNode.categoriaId}-parcela-${parcela.id}-${idx}`}
                                 className="hover-elevate bg-muted/30"
                                 data-testid={`dfc-row-parcela-${parcela.id}-${parentNode.categoriaId}`}
                               >
