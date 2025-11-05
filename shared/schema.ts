@@ -1,37 +1,12 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, decimal, integer, date, boolean, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, decimal, integer, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table for Replit Auth
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
-
-// User table for Replit Auth with custom fields
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  isSuperAdmin: boolean("is_super_admin").default(false).notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// User permissions table - maps users to pages they can access
-export const userPagePermissions = pgTable("user_page_permissions", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  pageSlug: varchar("page_slug").notNull(), // e.g., "clientes", "contratos", "dashboard-financeiro"
-  createdAt: timestamp("created_at").defaultNow(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
 });
 
 export const cazClientes = pgTable("caz_clientes", {
@@ -158,14 +133,18 @@ export const rhPessoal = pgTable("rh_pessoal", {
   mesesUltAumento: integer("meses_ult_aumento"),
 });
 
+export const insertUserSchema = createInsertSchema(users).pick({
+  username: true,
+  password: true,
+});
+
 export const insertColaboradorSchema = createInsertSchema(rhPessoal).partial({
   id: true,
 });
 
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
-export type UserPermission = typeof userPagePermissions.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertColaborador = z.infer<typeof insertColaboradorSchema>;
+export type User = typeof users.$inferSelect;
 export type Cliente = typeof cazClientes.$inferSelect;
 export type ContaReceber = typeof cazReceber.$inferSelect & {
   urlCobranca?: string | null;

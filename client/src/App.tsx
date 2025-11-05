@@ -8,7 +8,6 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import TopBar from "@/components/TopBar";
 import { Loader2 } from "lucide-react";
-import { AuthGuard } from "@/components/AuthGuard";
 import Clients from "@/pages/Clients";
 import Contracts from "@/pages/Contracts";
 import ClientDetail from "@/pages/ClientDetail";
@@ -22,8 +21,6 @@ import DashboardFinanceiro from "@/pages/DashboardFinanceiro";
 import DashboardGeG from "@/pages/DashboardGeG";
 import DashboardRetencao from "@/pages/DashboardRetencao";
 import DashboardDFC from "@/pages/DashboardDFC";
-import Usuarios from "@/pages/Usuarios";
-import AcessoNegado from "@/pages/AcessoNegado";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -38,93 +35,19 @@ function PageLoader() {
 function Router() {
   return (
     <Switch>
-      <Route path="/acesso-negado" component={AcessoNegado} />
-      <Route path="/">
-        {() => (
-          <AuthGuard requiredPermission="clientes">
-            <Clients />
-          </AuthGuard>
-        )}
-      </Route>
-      <Route path="/contratos">
-        {() => (
-          <AuthGuard requiredPermission="contratos">
-            <Contracts />
-          </AuthGuard>
-        )}
-      </Route>
-      <Route path="/colaboradores">
-        {() => (
-          <AuthGuard requiredPermission="colaboradores">
-            <Colaboradores />
-          </AuthGuard>
-        )}
-      </Route>
-      <Route path="/colaboradores/analise">
-        {() => (
-          <AuthGuard requiredPermission="colaboradores-analise">
-            <ColaboradoresAnalise />
-          </AuthGuard>
-        )}
-      </Route>
+      <Route path="/" component={Clients} />
+      <Route path="/contratos" component={Contracts} />
+      <Route path="/colaboradores" component={Colaboradores} />
+      <Route path="/colaboradores/analise" component={ColaboradoresAnalise} />
       <Route path="/patrimonio/:id" component={PatrimonioDetail} />
-      <Route path="/patrimonio">
-        {() => (
-          <AuthGuard requiredPermission="patrimonio">
-            <Patrimonio />
-          </AuthGuard>
-        )}
-      </Route>
-      <Route path="/ferramentas">
-        {() => (
-          <AuthGuard requiredPermission="ferramentas">
-            <Ferramentas />
-          </AuthGuard>
-        )}
-      </Route>
-      <Route path="/visao-geral">
-        {() => (
-          <AuthGuard requiredPermission="visao-geral">
-            <VisaoGeral />
-          </AuthGuard>
-        )}
-      </Route>
-      <Route path="/dashboard/financeiro">
-        {() => (
-          <AuthGuard requiredPermission="dashboard-financeiro">
-            <DashboardFinanceiro />
-          </AuthGuard>
-        )}
-      </Route>
-      <Route path="/dashboard/geg">
-        {() => (
-          <AuthGuard requiredPermission="dashboard-geg">
-            <DashboardGeG />
-          </AuthGuard>
-        )}
-      </Route>
-      <Route path="/dashboard/retencao">
-        {() => (
-          <AuthGuard requiredPermission="dashboard-retencao">
-            <DashboardRetencao />
-          </AuthGuard>
-        )}
-      </Route>
-      <Route path="/dashboard/dfc">
-        {() => (
-          <AuthGuard requiredPermission="dashboard-dfc">
-            <DashboardDFC />
-          </AuthGuard>
-        )}
-      </Route>
+      <Route path="/patrimonio" component={Patrimonio} />
+      <Route path="/ferramentas" component={Ferramentas} />
+      <Route path="/visao-geral" component={VisaoGeral} />
+      <Route path="/dashboard/financeiro" component={DashboardFinanceiro} />
+      <Route path="/dashboard/geg" component={DashboardGeG} />
+      <Route path="/dashboard/retencao" component={DashboardRetencao} />
+      <Route path="/dashboard/dfc" component={DashboardDFC} />
       <Route path="/cliente/:id" component={ClientDetail} />
-      <Route path="/usuarios">
-        {() => (
-          <AuthGuard superAdminOnly>
-            <Usuarios />
-          </AuthGuard>
-        )}
-      </Route>
       <Route>
         {() => (
           <Suspense fallback={<PageLoader />}>
