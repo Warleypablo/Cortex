@@ -237,6 +237,14 @@ export type ChurnPorServico = {
   valorAtivoMes: number;
 };
 
+export type ChurnPorResponsavel = {
+  responsavel: string;
+  quantidadeContratos: number;
+  valorTotal: number;
+  percentualChurn: number;
+  valorAtivoTotal: number;
+};
+
 export type DfcItem = {
   categoriaId: string;
   categoriaNome: string;

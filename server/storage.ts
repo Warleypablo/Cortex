@@ -1,7 +1,7 @@
 import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
-import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, inArray } from "drizzle-orm";
 
 export type ClienteCompleto = Cliente & {
   nomeClickup: string | null;
@@ -142,6 +142,7 @@ export interface IStorage {
   getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
   getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas>;
   getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]>;
+  getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]>;
   getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse>;
 }
 
@@ -258,6 +259,10 @@ export class MemStorage implements IStorage {
   }
 
   async getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1306,29 +1311,29 @@ export class DbStorage implements IStorage {
   }
 
   async getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]> {
-    // Construir filtros SQL
-    const whereClauses: string[] = ['data_encerramento IS NOT NULL'];
+    // Build filter conditions using SQL fragments
+    const whereConditions: any[] = [sql`data_encerramento IS NOT NULL`];
     
     if (filters?.servicos && filters.servicos.length > 0) {
-      const servicosStr = filters.servicos.map(s => `'${s}'`).join(',');
-      whereClauses.push(`servico IN (${servicosStr})`);
+      const servicosPlaceholders = sql.join(filters.servicos.map(s => sql`${s}`), sql`, `);
+      whereConditions.push(sql`servico IN (${servicosPlaceholders})`);
     }
     
     if (filters?.mesInicio) {
       const [ano, mes] = filters.mesInicio.split('-').map(Number);
       const dataInicio = new Date(ano, mes - 1, 1);
-      whereClauses.push(`data_encerramento >= '${dataInicio.toISOString()}'`);
+      whereConditions.push(sql`data_encerramento >= ${dataInicio.toISOString()}`);
     }
     
     if (filters?.mesFim) {
       const [ano, mes] = filters.mesFim.split('-').map(Number);
       const dataFim = new Date(ano, mes, 0, 23, 59, 59);
-      whereClauses.push(`data_encerramento <= '${dataFim.toISOString()}'`);
+      whereConditions.push(sql`data_encerramento <= ${dataFim.toISOString()}`);
     }
     
-    const whereClause = whereClauses.join(' AND ');
+    const whereClause = sql.join(whereConditions, sql` AND `);
     
-    const resultados = await db.execute(sql.raw(`
+    const resultados = await db.execute(sql`
       WITH churn_data AS (
         SELECT 
           servico,
@@ -1367,7 +1372,7 @@ export class DbStorage implements IStorage {
       LEFT JOIN ativos_por_mes apm ON cd.servico = apm.servico AND cd.mes = apm.mes
       GROUP BY cd.servico, cd.mes, apm.total_ativos, apm.valor_total_ativo
       ORDER BY cd.servico, cd.mes
-    `));
+    `);
     
     return resultados.rows.map((row: any) => ({
       servico: row.servico,
@@ -1376,6 +1381,108 @@ export class DbStorage implements IStorage {
       valorTotal: parseFloat(row.valor_total || '0'),
       percentualChurn: parseFloat(row.percentual_churn || '0'),
       valorAtivoMes: parseFloat(row.valor_ativo_mes || '0'),
+    }));
+  }
+
+  async getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]> {
+    // Build filter conditions using SQL fragments
+    const whereConditions: any[] = [sql`con.data_encerramento IS NOT NULL`];
+    
+    if (filters?.servicos && filters.servicos.length > 0) {
+      const servicosPlaceholders = sql.join(filters.servicos.map(s => sql`${s}`), sql`, `);
+      whereConditions.push(sql`con.servico IN (${servicosPlaceholders})`);
+    }
+    
+    if (filters?.squads && filters.squads.length > 0) {
+      const squadsPlaceholders = sql.join(filters.squads.map(s => sql`${s}`), sql`, `);
+      whereConditions.push(sql`con.squad IN (${squadsPlaceholders})`);
+    }
+    
+    if (filters?.colaboradores && filters.colaboradores.length > 0) {
+      const colaboradoresPlaceholders = sql.join(filters.colaboradores.map(c => sql`${c}`), sql`, `);
+      whereConditions.push(sql`cli.responsavel IN (${colaboradoresPlaceholders})`);
+    }
+    
+    if (filters?.mesInicio) {
+      const [ano, mes] = filters.mesInicio.split('-').map(Number);
+      const dataInicio = new Date(ano, mes - 1, 1);
+      whereConditions.push(sql`con.data_encerramento >= ${dataInicio.toISOString()}`);
+    }
+    
+    if (filters?.mesFim) {
+      const [ano, mes] = filters.mesFim.split('-').map(Number);
+      const dataFim = new Date(ano, mes, 0, 23, 59, 59);
+      whereConditions.push(sql`con.data_encerramento <= ${dataFim.toISOString()}`);
+    }
+    
+    const whereClause = sql.join(whereConditions, sql` AND `);
+    
+    // Build filter conditions for active contracts
+    const ativosConditions: any[] = [sql`con.data_encerramento IS NULL`];
+    
+    if (filters?.servicos && filters.servicos.length > 0) {
+      const servicosPlaceholders = sql.join(filters.servicos.map(s => sql`${s}`), sql`, `);
+      ativosConditions.push(sql`con.servico IN (${servicosPlaceholders})`);
+    }
+    if (filters?.squads && filters.squads.length > 0) {
+      const squadsPlaceholders = sql.join(filters.squads.map(s => sql`${s}`), sql`, `);
+      ativosConditions.push(sql`con.squad IN (${squadsPlaceholders})`);
+    }
+    if (filters?.colaboradores && filters.colaboradores.length > 0) {
+      const colaboradoresPlaceholders = sql.join(filters.colaboradores.map(c => sql`${c}`), sql`, `);
+      ativosConditions.push(sql`cli.responsavel IN (${colaboradoresPlaceholders})`);
+    }
+    
+    const ativosWhereClause = sql.join(ativosConditions, sql` AND `);
+    
+    const resultados = await db.execute(sql`
+      WITH contratos_filtrados AS (
+        SELECT 
+          con.*,
+          cli.responsavel
+        FROM cup_contratos con
+        LEFT JOIN cup_clientes cli ON con.id_task = cli.task_id
+        WHERE ${whereClause}
+      ),
+      churn_por_responsavel AS (
+        SELECT 
+          COALESCE(responsavel, 'Sem responsável') as responsavel,
+          COUNT(*) as quantidade_contratos,
+          COALESCE(SUM(valorr::numeric), 0) as valor_total_churn
+        FROM contratos_filtrados
+        GROUP BY responsavel
+      ),
+      total_ativos_por_responsavel AS (
+        SELECT 
+          COALESCE(cli.responsavel, 'Sem responsável') as responsavel,
+          COUNT(*) as total_contratos_ativos,
+          COALESCE(SUM(con.valorr::numeric), 0) as valor_total_ativo
+        FROM cup_contratos con
+        LEFT JOIN cup_clientes cli ON con.id_task = cli.task_id
+        WHERE ${ativosWhereClause}
+        GROUP BY cli.responsavel
+      )
+      SELECT 
+        c.responsavel,
+        c.quantidade_contratos::integer,
+        c.valor_total_churn::numeric as valor_total,
+        COALESCE(a.valor_total_ativo, 0)::numeric as valor_ativo_total,
+        CASE 
+          WHEN COALESCE(a.total_contratos_ativos, 0) > 0 
+          THEN (c.quantidade_contratos::numeric / (a.total_contratos_ativos::numeric + c.quantidade_contratos::numeric) * 100)
+          ELSE 0 
+        END as percentual_churn
+      FROM churn_por_responsavel c
+      LEFT JOIN total_ativos_por_responsavel a ON c.responsavel = a.responsavel
+      ORDER BY c.valor_total_churn DESC
+    `);
+    
+    return resultados.rows.map((row: any) => ({
+      responsavel: row.responsavel,
+      quantidadeContratos: parseInt(row.quantidade_contratos || '0'),
+      valorTotal: parseFloat(row.valor_total || '0'),
+      percentualChurn: parseFloat(row.percentual_churn || '0'),
+      valorAtivoTotal: parseFloat(row.valor_ativo_total || '0'),
     }));
   }
 
