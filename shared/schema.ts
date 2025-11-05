@@ -3,6 +3,24 @@ import { pgTable, text, varchar, timestamp, decimal, integer, date } from "drizz
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const authUsers = pgTable("auth_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  name: text("name"),
+  avatar: text("avatar"),
+  passwordHash: text("password_hash"),
+  googleId: text("google_id").unique(),
+  role: text("role").notNull().default("user"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const userPermissions = pgTable("user_permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => authUsers.id, { onDelete: "cascade" }),
+  pageName: text("page_name").notNull(),
+  canAccess: integer("can_access").notNull().default(0),
+});
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
@@ -282,3 +300,32 @@ export type DfcHierarchicalResponse = {
   meses: string[];
   rootIds: string[];
 };
+
+export type AuthUser = typeof authUsers.$inferSelect;
+export type UserPermission = typeof userPermissions.$inferSelect;
+
+export const insertAuthUserSchema = createInsertSchema(authUsers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserPermissionSchema = createInsertSchema(userPermissions).omit({
+  id: true,
+});
+
+export type InsertAuthUser = z.infer<typeof insertAuthUserSchema>;
+export type InsertUserPermission = z.infer<typeof insertUserPermissionSchema>;
+
+export const availablePages = [
+  "clientes",
+  "contratos",
+  "colaboradores",
+  "patrimonio",
+  "dashboard-financeiro",
+  "dashboard-geg",
+  "dashboard-retencao",
+  "dashboard-dfc",
+  "usuarios",
+] as const;
+
+export type PageName = typeof availablePages[number];
