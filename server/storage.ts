@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela } from "@shared/schema";
+import { type User, type UpsertUser, type UserPermission, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql, inArray } from "drizzle-orm";
@@ -117,8 +117,10 @@ export interface VisaoGeralMetricas {
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  getAllUsers(): Promise<User[]>;
+  getUserPermissions(userId: string): Promise<UserPermission[]>;
+  updateUserPermissions(userId: string, pageSlugs: string[]): Promise<void>;
   getClientes(): Promise<ClienteCompleto[]>;
   getClienteById(id: string): Promise<ClienteCompleto | undefined>;
   getClienteByCnpj(cnpj: string): Promise<Cliente | undefined>;
@@ -157,17 +159,32 @@ export class MemStorage implements IStorage {
     return this.users.get(id);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const id = userData.id || randomUUID();
+    const user: User = {
+      id,
+      email: userData.email || null,
+      firstName: userData.firstName || null,
+      lastName: userData.lastName || null,
+      profileImageUrl: userData.profileImageUrl || null,
+      isSuperAdmin: userData.isSuperAdmin || false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
     this.users.set(id, user);
     return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  async getUserPermissions(userId: string): Promise<UserPermission[]> {
+    return [];
+  }
+
+  async updateUserPermissions(userId: string, pageSlugs: string[]): Promise<void> {
+    // Not implemented in MemStorage
   }
 
   async getClientes(): Promise<ClienteCompleto[]> {
@@ -445,14 +462,50 @@ export class DbStorage implements IStorage {
     return user;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(schema.users).where(eq(schema.users.username, username));
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(schema.users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: schema.users.id,
+        set: {
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          profileImageUrl: userData.profileImageUrl,
+          isSuperAdmin: userData.isSuperAdmin,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
     return user;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(schema.users).values(insertUser).returning();
-    return user;
+  async getAllUsers(): Promise<User[]> {
+    const users = await db.select().from(schema.users).orderBy(schema.users.email);
+    return users;
+  }
+
+  async getUserPermissions(userId: string): Promise<UserPermission[]> {
+    const permissions = await db
+      .select()
+      .from(schema.userPagePermissions)
+      .where(eq(schema.userPagePermissions.userId, userId));
+    return permissions;
+  }
+
+  async updateUserPermissions(userId: string, pageSlugs: string[]): Promise<void> {
+    await db
+      .delete(schema.userPagePermissions)
+      .where(eq(schema.userPagePermissions.userId, userId));
+
+    if (pageSlugs.length > 0) {
+      const values = pageSlugs.map((slug) => ({
+        userId,
+        pageSlug: slug,
+      }));
+      await db.insert(schema.userPagePermissions).values(values);
+    }
   }
 
   async getClientes(): Promise<ClienteCompleto[]> {
