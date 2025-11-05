@@ -47,7 +47,7 @@ function ProtectedRoute({ component: Component, pageName }: { component: any; pa
     return <Redirect to="/login" />;
   }
 
-  if (pageName && !user.permissions.includes(pageName) && user.role !== "super_admin") {
+  if (pageName && user.role !== "super_admin" && !user.permissions?.includes(pageName)) {
     return <Redirect to="/ferramentas" />;
   }
 
