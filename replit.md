@@ -52,6 +52,18 @@ Preferred communication style: Simple, everyday language.
   - Distinguishes between recurring (valorr) and one-time (valorp) contract values
   - Squad mapping from codes (0-3) to names (Supreme, Forja, Squadra, Chama)
   - Status-based color coding for visual status tracking
+- **Retention Analysis (Análise de Retenção)**: Comprehensive churn and retention metrics
+  - **Churn by Service**: Aggregated churn metrics grouped by service type with monthly breakdown
+    - Filter by service types and date range (month start/end)
+    - Shows quantity of churned contracts, total value, percentage, and active value per month
+    - Secure parameter binding using Drizzle sql`` template literals to prevent SQL injection
+  - **Churn by Responsible Person**: Churn analysis grouped by client account responsible
+    - Multi-select filters for services, squads, and responsible persons
+    - Date range filters (month start/end) for focused analysis
+    - Bar chart visualization using Recharts showing total churn value per responsible
+    - Custom tooltip displaying: contract count, total churn value, churn percentage, active portfolio value
+    - Secure query implementation using sql.join() with individual parameter binding
+    - Aggregates data from cup_contratos joined with cup_clientes via id_task/task_id relationship
 - **DFC (Demonstração de Fluxo de Caixa)**: Hierarchical cash flow analysis with expandable tree structure
   - Processes semicolon-separated category data from caz_parcelas (categoria_nome, valor_categoria)
   - **Data reference**: Uses `data_quitacao` field from caz_parcelas for date filtering and grouping
@@ -99,8 +111,15 @@ Preferred communication style: Simple, everyday language.
 - Contract queries with JOIN: cup_contratos → cup_clientes (via id_task/task_id) → caz_clientes (via CNPJ)
 - Employee CRUD operations with full field support
 - DFC queries processing semicolon-separated category fields with aggregation by categoria + mês
+- Churn analysis queries using secure parameter binding with Drizzle sql`` template literals
 - Storage abstraction layer (`IStorage`) for flexible implementation swapping
-- API endpoints: /api/clientes, /api/contratos, /api/colaboradores, /api/dfc
+- API endpoints: /api/clientes, /api/contratos, /api/colaboradores, /api/dfc, /api/churn-por-servico, /api/churn-por-responsavel
+
+**Security Practices**
+- All user-supplied filter parameters use Drizzle sql`` template literals with parameter binding
+- Array filters (services, squads, collaborators) expanded using sql.join() with individual sql fragments
+- No raw string concatenation in SQL queries to prevent SQL injection vulnerabilities
+- Date filters converted to ISO strings and bound as parameters
 
 ### Data Storage Solutions
 
