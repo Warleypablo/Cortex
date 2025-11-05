@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,6 +8,8 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import TopBar from "@/components/TopBar";
 import { Loader2 } from "lucide-react";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import Login from "@/pages/Login";
 import Clients from "@/pages/Clients";
 import Contracts from "@/pages/Contracts";
 import ClientDetail from "@/pages/ClientDetail";
@@ -32,22 +34,54 @@ function PageLoader() {
   );
 }
 
+function ProtectedRoute({ component: Component, pageName }: { component: any; pageName?: string }) {
+  const { user, isLoading } = useAuth();
+  const [location] = useLocation();
+
+  if (isLoading) {
+    return <PageLoader />;
+  }
+
+  if (!user) {
+    return <Redirect to="/login" />;
+  }
+
+  if (pageName && !user.permissions.includes(pageName) && user.role !== "super_admin") {
+    return <Redirect to="/ferramentas" />;
+  }
+
+  return <Component />;
+}
+
 function Router() {
+  const { user, isLoading } = useAuth();
+  const [location] = useLocation();
+
+  if (location === "/login") {
+    if (isLoading) {
+      return <PageLoader />;
+    }
+    if (user) {
+      return <Redirect to="/ferramentas" />;
+    }
+    return <Login />;
+  }
+
   return (
     <Switch>
-      <Route path="/" component={Clients} />
-      <Route path="/contratos" component={Contracts} />
-      <Route path="/colaboradores" component={Colaboradores} />
-      <Route path="/colaboradores/analise" component={ColaboradoresAnalise} />
-      <Route path="/patrimonio/:id" component={PatrimonioDetail} />
-      <Route path="/patrimonio" component={Patrimonio} />
-      <Route path="/ferramentas" component={Ferramentas} />
-      <Route path="/visao-geral" component={VisaoGeral} />
-      <Route path="/dashboard/financeiro" component={DashboardFinanceiro} />
-      <Route path="/dashboard/geg" component={DashboardGeG} />
-      <Route path="/dashboard/retencao" component={DashboardRetencao} />
-      <Route path="/dashboard/dfc" component={DashboardDFC} />
-      <Route path="/cliente/:id" component={ClientDetail} />
+      <Route path="/" component={() => <ProtectedRoute component={Clients} pageName="clientes" />} />
+      <Route path="/contratos" component={() => <ProtectedRoute component={Contracts} pageName="contratos" />} />
+      <Route path="/colaboradores" component={() => <ProtectedRoute component={Colaboradores} pageName="colaboradores" />} />
+      <Route path="/colaboradores/analise" component={() => <ProtectedRoute component={ColaboradoresAnalise} pageName="colaboradores" />} />
+      <Route path="/patrimonio/:id" component={() => <ProtectedRoute component={PatrimonioDetail} pageName="patrimonio" />} />
+      <Route path="/patrimonio" component={() => <ProtectedRoute component={Patrimonio} pageName="patrimonio" />} />
+      <Route path="/ferramentas" component={() => <ProtectedRoute component={Ferramentas} />} />
+      <Route path="/visao-geral" component={() => <ProtectedRoute component={VisaoGeral} pageName="dashboard-financeiro" />} />
+      <Route path="/dashboard/financeiro" component={() => <ProtectedRoute component={DashboardFinanceiro} pageName="dashboard-financeiro" />} />
+      <Route path="/dashboard/geg" component={() => <ProtectedRoute component={DashboardGeG} pageName="dashboard-geg" />} />
+      <Route path="/dashboard/retencao" component={() => <ProtectedRoute component={DashboardRetencao} pageName="dashboard-retencao" />} />
+      <Route path="/dashboard/dfc" component={() => <ProtectedRoute component={DashboardDFC} pageName="dashboard-dfc" />} />
+      <Route path="/cliente/:id" component={() => <ProtectedRoute component={ClientDetail} pageName="clientes" />} />
       <Route>
         {() => (
           <Suspense fallback={<PageLoader />}>
@@ -59,27 +93,50 @@ function Router() {
   );
 }
 
-function App() {
+function AuthenticatedLayout() {
+  const { user, isLoading } = useAuth();
+  const [location] = useLocation();
+
+  if (location === "/login") {
+    return <Router />;
+  }
+
+  if (isLoading) {
+    return <PageLoader />;
+  }
+
+  if (!user) {
+    return <Redirect to="/login" />;
+  }
+
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
 
   return (
+    <SidebarProvider style={style as React.CSSProperties}>
+      <div className="flex h-screen w-full">
+        <AppSidebar />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <TopBar />
+          <main className="flex-1 overflow-auto">
+            <Router />
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full">
-            <AppSidebar />
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <TopBar />
-              <main className="flex-1 overflow-auto">
-                <Router />
-              </main>
-            </div>
-          </div>
-        </SidebarProvider>
-        <Toaster />
+        <AuthProvider>
+          <AuthenticatedLayout />
+          <Toaster />
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
