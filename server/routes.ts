@@ -311,6 +311,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/churn-por-responsavel", async (req, res) => {
+    try {
+      const filters: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string } = {};
+      
+      if (req.query.servico && req.query.servico !== 'todos') {
+        const servicoParam = req.query.servico as string;
+        filters.servicos = servicoParam.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      
+      if (req.query.squad && req.query.squad !== 'todos') {
+        const squadParam = req.query.squad as string;
+        filters.squads = squadParam.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      
+      if (req.query.colaborador && req.query.colaborador !== 'todos') {
+        const colaboradorParam = req.query.colaborador as string;
+        filters.colaboradores = colaboradorParam.split(',').map(c => c.trim()).filter(Boolean);
+      }
+      
+      if (req.query.mesInicio) {
+        filters.mesInicio = req.query.mesInicio as string;
+      }
+      
+      if (req.query.mesFim) {
+        filters.mesFim = req.query.mesFim as string;
+      }
+
+      const churnData = await storage.getChurnPorResponsavel(filters);
+      res.json(churnData);
+    } catch (error) {
+      console.error("[api] Error fetching churn por responsavel:", error);
+      res.status(500).json({ error: "Failed to fetch churn por responsavel data" });
+    }
+  });
+
   app.get("/api/dfc", async (req, res) => {
     try {
       const mesInicio = req.query.mesInicio as string | undefined;

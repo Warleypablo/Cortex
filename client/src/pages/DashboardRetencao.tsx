@@ -11,7 +11,8 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import type { ClienteContratoDetail, ChurnPorServico } from "@shared/schema";
+import type { ClienteContratoDetail, ChurnPorServico, ChurnPorResponsavel } from "@shared/schema";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from "recharts";
 
 interface CohortRetentionRow {
   cohortMonth: string;
@@ -59,9 +60,17 @@ export default function DashboardRetencao() {
   const [churnFilterMesFim, setChurnFilterMesFim] = useState<string>("");
   const [churnViewMode, setChurnViewMode] = useState<ViewModeChurn>("quantidade");
   
+  // Estados para análise de churn por responsável
+  const [churnRespFilterServicos, setChurnRespFilterServicos] = useState<string[]>([]);
+  const [churnRespFilterSquads, setChurnRespFilterSquads] = useState<string[]>([]);
+  const [churnRespFilterColaboradores, setChurnRespFilterColaboradores] = useState<string[]>([]);
+  const [churnRespFilterMesInicio, setChurnRespFilterMesInicio] = useState<string>("");
+  const [churnRespFilterMesFim, setChurnRespFilterMesFim] = useState<string>("");
+  
   // Estados para minimizar cards
   const [isCohortMinimized, setIsCohortMinimized] = useState<boolean>(true);
   const [isChurnMinimized, setIsChurnMinimized] = useState<boolean>(true);
+  const [isChurnRespMinimized, setIsChurnRespMinimized] = useState<boolean>(true);
 
   const handleChurnServicosChange = (selected: string[]) => {
     console.log("Churn servicos changed:", selected);
@@ -93,6 +102,22 @@ export default function DashboardRetencao() {
       
       const res = await fetch(`/api/churn-por-servico?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch churn data");
+      return res.json();
+    },
+  });
+
+  const { data: churnRespData, isLoading: isChurnRespLoading } = useQuery<ChurnPorResponsavel[]>({
+    queryKey: ["/api/churn-por-responsavel", churnRespFilterServicos, churnRespFilterSquads, churnRespFilterColaboradores, churnRespFilterMesInicio, churnRespFilterMesFim],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (churnRespFilterServicos.length > 0) params.append("servico", churnRespFilterServicos.join(","));
+      if (churnRespFilterSquads.length > 0) params.append("squad", churnRespFilterSquads.join(","));
+      if (churnRespFilterColaboradores.length > 0) params.append("colaborador", churnRespFilterColaboradores.join(","));
+      if (churnRespFilterMesInicio) params.append("mesInicio", churnRespFilterMesInicio);
+      if (churnRespFilterMesFim) params.append("mesFim", churnRespFilterMesFim);
+      
+      const res = await fetch(`/api/churn-por-responsavel?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch churn por responsavel data");
       return res.json();
     },
   });
@@ -167,6 +192,17 @@ export default function DashboardRetencao() {
     if (!cohortData) return [];
     return cohortData.availableServicos || [];
   }, [cohortData]);
+
+  const uniqueSquads = useMemo(() => {
+    if (!cohortData) return [];
+    return cohortData.availableSquads || [];
+  }, [cohortData]);
+
+  const uniqueResponsaveis = useMemo(() => {
+    if (!churnRespData) return [];
+    const responsaveisSet = new Set(churnRespData.map(item => item.responsavel));
+    return Array.from(responsaveisSet).filter(Boolean).sort();
+  }, [churnRespData]);
 
   // Processar dados de churn por serviço
   const churnTableData = useMemo(() => {
@@ -774,6 +810,154 @@ export default function DashboardRetencao() {
                   </table>
                 </div>
               )}
+              </CardContent>
+            )}
+          </Card>
+
+          {/* Seção de Churn por Responsável */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Churn por Responsável</CardTitle>
+                  <CardDescription>Contratos encerrados agrupados por responsável do cliente</CardDescription>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => setIsChurnRespMinimized(!isChurnRespMinimized)}
+                  data-testid="button-toggle-churn-resp"
+                >
+                  {isChurnRespMinimized ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
+                </Button>
+              </div>
+            </CardHeader>
+            {!isChurnRespMinimized && (
+              <CardContent>
+                {/* Filtros */}
+                <div className="flex flex-wrap gap-4 mb-6">
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="text-sm font-medium mb-2 block">Serviços</label>
+                    <MultiSelect
+                      options={uniqueServicos}
+                      selected={churnRespFilterServicos}
+                      onChange={setChurnRespFilterServicos}
+                      placeholder="Todos os serviços"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="text-sm font-medium mb-2 block">Squads</label>
+                    <MultiSelect
+                      options={uniqueSquads}
+                      selected={churnRespFilterSquads}
+                      onChange={setChurnRespFilterSquads}
+                      placeholder="Todos os squads"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="text-sm font-medium mb-2 block">Responsável</label>
+                    <MultiSelect
+                      options={uniqueResponsaveis}
+                      selected={churnRespFilterColaboradores}
+                      onChange={setChurnRespFilterColaboradores}
+                      placeholder="Todos os responsáveis"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[180px]">
+                    <label className="text-sm font-medium mb-2 block">Mês Início</label>
+                    <input
+                      type="month"
+                      value={churnRespFilterMesInicio}
+                      onChange={(e) => setChurnRespFilterMesInicio(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background"
+                      data-testid="input-churn-resp-mes-inicio"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[180px]">
+                    <label className="text-sm font-medium mb-2 block">Mês Fim</label>
+                    <input
+                      type="month"
+                      value={churnRespFilterMesFim}
+                      onChange={(e) => setChurnRespFilterMesFim(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-input rounded-md bg-background"
+                      data-testid="input-churn-resp-mes-fim"
+                    />
+                  </div>
+                </div>
+
+                {/* Gráfico */}
+                {isChurnRespLoading ? (
+                  <div className="flex items-center justify-center h-[400px]">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : !churnRespData || churnRespData.length === 0 ? (
+                  <div className="flex items-center justify-center h-[400px] text-muted-foreground">
+                    <div className="text-center">
+                      <TrendingDown className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>Nenhum dado de churn encontrado para os filtros selecionados</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full">
+                    <ResponsiveContainer width="100%" height={400}>
+                      <BarChart
+                        data={churnRespData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis 
+                          dataKey="responsavel" 
+                          angle={-45}
+                          textAnchor="end"
+                          height={100}
+                          className="text-xs"
+                        />
+                        <YAxis className="text-xs" />
+                        <Tooltip 
+                          content={(props: TooltipProps<number, string>) => {
+                            if (!props.active || !props.payload || props.payload.length === 0) {
+                              return null;
+                            }
+                            
+                            const data = props.payload[0].payload as ChurnPorResponsavel;
+                            return (
+                              <div className="bg-background border border-border rounded-lg shadow-lg p-4">
+                                <h4 className="font-semibold text-sm mb-2">{data.responsavel}</h4>
+                                <div className="space-y-1 text-sm">
+                                  <p className="flex justify-between gap-4">
+                                    <span className="text-muted-foreground">Contratos:</span>
+                                    <span className="font-medium">{data.quantidadeContratos}</span>
+                                  </p>
+                                  <p className="flex justify-between gap-4">
+                                    <span className="text-muted-foreground">Valor Total:</span>
+                                    <span className="font-medium">
+                                      R$ {data.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                    </span>
+                                  </p>
+                                  <p className="flex justify-between gap-4">
+                                    <span className="text-muted-foreground">% Churn:</span>
+                                    <span className="font-medium">{data.percentualChurn.toFixed(1)}%</span>
+                                  </p>
+                                  <p className="flex justify-between gap-4">
+                                    <span className="text-muted-foreground">Valor Ativo:</span>
+                                    <span className="font-medium">
+                                      R$ {data.valorAtivoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                    </span>
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }}
+                        />
+                        <Bar 
+                          dataKey="valorTotal" 
+                          fill="hsl(var(--primary))" 
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </CardContent>
             )}
           </Card>
