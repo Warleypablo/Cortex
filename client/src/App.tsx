@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Switch, Route, Redirect, useLocation } from "wouter";
+import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,8 +8,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import TopBar from "@/components/TopBar";
 import { Loader2 } from "lucide-react";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import Login from "@/pages/Login";
+import { AuthGuard } from "@/components/AuthGuard";
 import Clients from "@/pages/Clients";
 import Contracts from "@/pages/Contracts";
 import ClientDetail from "@/pages/ClientDetail";
@@ -24,6 +23,7 @@ import DashboardGeG from "@/pages/DashboardGeG";
 import DashboardRetencao from "@/pages/DashboardRetencao";
 import DashboardDFC from "@/pages/DashboardDFC";
 import Usuarios from "@/pages/Usuarios";
+import AcessoNegado from "@/pages/AcessoNegado";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -35,55 +35,96 @@ function PageLoader() {
   );
 }
 
-function ProtectedRoute({ component: Component, pageName }: { component: any; pageName?: string }) {
-  const { user, isLoading } = useAuth();
-  const [location] = useLocation();
-
-  if (isLoading) {
-    return <PageLoader />;
-  }
-
-  if (!user) {
-    return <Redirect to="/login" />;
-  }
-
-  if (pageName && user.role !== "super_admin" && !user.permissions?.includes(pageName)) {
-    return <Redirect to="/ferramentas" />;
-  }
-
-  return <Component />;
-}
-
 function Router() {
-  const { user, isLoading } = useAuth();
-  const [location] = useLocation();
-
-  if (location === "/login") {
-    if (isLoading) {
-      return <PageLoader />;
-    }
-    if (user) {
-      return <Redirect to="/ferramentas" />;
-    }
-    return <Login />;
-  }
-
   return (
     <Switch>
-      <Route path="/" component={() => <ProtectedRoute component={Clients} pageName="clientes" />} />
-      <Route path="/contratos" component={() => <ProtectedRoute component={Contracts} pageName="contratos" />} />
-      <Route path="/colaboradores" component={() => <ProtectedRoute component={Colaboradores} pageName="colaboradores" />} />
-      <Route path="/colaboradores/analise" component={() => <ProtectedRoute component={ColaboradoresAnalise} pageName="colaboradores" />} />
-      <Route path="/patrimonio/:id" component={() => <ProtectedRoute component={PatrimonioDetail} pageName="patrimonio" />} />
-      <Route path="/patrimonio" component={() => <ProtectedRoute component={Patrimonio} pageName="patrimonio" />} />
-      <Route path="/ferramentas" component={() => <ProtectedRoute component={Ferramentas} />} />
-      <Route path="/visao-geral" component={() => <ProtectedRoute component={VisaoGeral} pageName="dashboard-financeiro" />} />
-      <Route path="/dashboard/financeiro" component={() => <ProtectedRoute component={DashboardFinanceiro} pageName="dashboard-financeiro" />} />
-      <Route path="/dashboard/geg" component={() => <ProtectedRoute component={DashboardGeG} pageName="dashboard-geg" />} />
-      <Route path="/dashboard/retencao" component={() => <ProtectedRoute component={DashboardRetencao} pageName="dashboard-retencao" />} />
-      <Route path="/dashboard/dfc" component={() => <ProtectedRoute component={DashboardDFC} pageName="dashboard-dfc" />} />
-      <Route path="/usuarios" component={() => <ProtectedRoute component={Usuarios} pageName="usuarios" />} />
-      <Route path="/cliente/:id" component={() => <ProtectedRoute component={ClientDetail} pageName="clientes" />} />
+      <Route path="/acesso-negado" component={AcessoNegado} />
+      <Route path="/">
+        {() => (
+          <AuthGuard requiredPermission="clientes">
+            <Clients />
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/contratos">
+        {() => (
+          <AuthGuard requiredPermission="contratos">
+            <Contracts />
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/colaboradores">
+        {() => (
+          <AuthGuard requiredPermission="colaboradores">
+            <Colaboradores />
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/colaboradores/analise">
+        {() => (
+          <AuthGuard requiredPermission="colaboradores-analise">
+            <ColaboradoresAnalise />
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/patrimonio/:id" component={PatrimonioDetail} />
+      <Route path="/patrimonio">
+        {() => (
+          <AuthGuard requiredPermission="patrimonio">
+            <Patrimonio />
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/ferramentas">
+        {() => (
+          <AuthGuard requiredPermission="ferramentas">
+            <Ferramentas />
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/visao-geral">
+        {() => (
+          <AuthGuard requiredPermission="visao-geral">
+            <VisaoGeral />
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/dashboard/financeiro">
+        {() => (
+          <AuthGuard requiredPermission="dashboard-financeiro">
+            <DashboardFinanceiro />
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/dashboard/geg">
+        {() => (
+          <AuthGuard requiredPermission="dashboard-geg">
+            <DashboardGeG />
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/dashboard/retencao">
+        {() => (
+          <AuthGuard requiredPermission="dashboard-retencao">
+            <DashboardRetencao />
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/dashboard/dfc">
+        {() => (
+          <AuthGuard requiredPermission="dashboard-dfc">
+            <DashboardDFC />
+          </AuthGuard>
+        )}
+      </Route>
+      <Route path="/cliente/:id" component={ClientDetail} />
+      <Route path="/usuarios">
+        {() => (
+          <AuthGuard superAdminOnly>
+            <Usuarios />
+          </AuthGuard>
+        )}
+      </Route>
       <Route>
         {() => (
           <Suspense fallback={<PageLoader />}>
@@ -95,50 +136,27 @@ function Router() {
   );
 }
 
-function AuthenticatedLayout() {
-  const { user, isLoading } = useAuth();
-  const [location] = useLocation();
-
-  if (location === "/login") {
-    return <Router />;
-  }
-
-  if (isLoading) {
-    return <PageLoader />;
-  }
-
-  if (!user) {
-    return <Redirect to="/login" />;
-  }
-
+function App() {
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
 
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <TopBar />
-          <main className="flex-1 overflow-auto">
-            <Router />
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
-  );
-}
-
-function App() {
-  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthProvider>
-          <AuthenticatedLayout />
-          <Toaster />
-        </AuthProvider>
+        <SidebarProvider style={style as React.CSSProperties}>
+          <div className="flex h-screen w-full">
+            <AppSidebar />
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <TopBar />
+              <main className="flex-1 overflow-auto">
+                <Router />
+              </main>
+            </div>
+          </div>
+        </SidebarProvider>
+        <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -1,28 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
-import session from "express-session";
-import passport from "./auth/passport";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "turbo-crm-secret-key-change-in-production",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    },
-  })
-);
-
-app.use(passport.initialize());
-app.use(passport.session());
 
 app.use((req, res, next) => {
   const start = Date.now();

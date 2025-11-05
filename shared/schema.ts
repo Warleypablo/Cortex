@@ -1,30 +1,37 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, decimal, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, decimal, integer, date, boolean, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const authUsers = pgTable("auth_users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: text("email").notNull().unique(),
-  name: text("name"),
-  avatar: text("avatar"),
-  passwordHash: text("password_hash"),
-  googleId: text("google_id").unique(),
-  role: text("role").notNull().default("user"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// Session storage table for Replit Auth
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
 
-export const userPermissions = pgTable("user_permissions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => authUsers.id, { onDelete: "cascade" }),
-  pageName: text("page_name").notNull(),
-  canAccess: integer("can_access").notNull().default(0),
-});
-
+// User table for Replit Auth with custom fields
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  isSuperAdmin: boolean("is_super_admin").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// User permissions table - maps users to pages they can access
+export const userPagePermissions = pgTable("user_page_permissions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  pageSlug: varchar("page_slug").notNull(), // e.g., "clientes", "contratos", "dashboard-financeiro"
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const cazClientes = pgTable("caz_clientes", {
@@ -151,18 +158,14 @@ export const rhPessoal = pgTable("rh_pessoal", {
   mesesUltAumento: integer("meses_ult_aumento"),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
-
 export const insertColaboradorSchema = createInsertSchema(rhPessoal).partial({
   id: true,
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type InsertColaborador = z.infer<typeof insertColaboradorSchema>;
+export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type UserPermission = typeof userPagePermissions.$inferSelect;
+export type InsertColaborador = z.infer<typeof insertColaboradorSchema>;
 export type Cliente = typeof cazClientes.$inferSelect;
 export type ContaReceber = typeof cazReceber.$inferSelect & {
   urlCobranca?: string | null;
@@ -300,32 +303,3 @@ export type DfcHierarchicalResponse = {
   meses: string[];
   rootIds: string[];
 };
-
-export type AuthUser = typeof authUsers.$inferSelect;
-export type UserPermission = typeof userPermissions.$inferSelect;
-
-export const insertAuthUserSchema = createInsertSchema(authUsers).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertUserPermissionSchema = createInsertSchema(userPermissions).omit({
-  id: true,
-});
-
-export type InsertAuthUser = z.infer<typeof insertAuthUserSchema>;
-export type InsertUserPermission = z.infer<typeof insertUserPermissionSchema>;
-
-export const availablePages = [
-  "clientes",
-  "contratos",
-  "colaboradores",
-  "patrimonio",
-  "dashboard-financeiro",
-  "dashboard-geg",
-  "dashboard-retencao",
-  "dashboard-dfc",
-  "usuarios",
-] as const;
-
-export type PageName = typeof availablePages[number];

@@ -1,6 +1,8 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { LogOut, Shield } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,22 +11,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/contexts/AuthContext";
-import { LogOut, User, Shield } from "lucide-react";
 
 export default function TopBar() {
-  const { user, logout, isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
 
-  if (!user) return null;
-
-  const initials = user.name
-    ? user.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
-    : (user.email ? user.email[0].toUpperCase() : "U");
+  const handleLogout = () => {
+    window.location.href = "/api/logout";
+  };
 
   return (
     <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
@@ -32,44 +25,47 @@ export default function TopBar() {
         <SidebarTrigger data-testid="button-sidebar-toggle" />
       </div>
 
-      <div className="flex items-center gap-3">
+      {user && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="flex items-center gap-2 h-auto p-2 hover-elevate"
-              data-testid="button-user-menu"
-            >
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium leading-none">{user.name || user.email}</p>
-                {isSuperAdmin && (
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1 justify-end">
-                    <Shield className="w-3 h-3" />
-                    Super Admin
-                  </p>
-                )}
-              </div>
-              <Avatar className="w-9 h-9" data-testid="avatar-user">
-                <AvatarImage src={user.avatar || undefined} alt={user.name || user.email} />
-                <AvatarFallback>{initials}</AvatarFallback>
+            <Button variant="ghost" className="gap-2" data-testid="button-user-menu">
+              <Avatar className="w-8 h-8">
+                <AvatarImage src={user.profileImageUrl || undefined} />
+                <AvatarFallback>
+                  {user.firstName?.[0]}{user.lastName?.[0]}
+                </AvatarFallback>
               </Avatar>
+              <span className="text-sm font-medium">
+                {user.firstName} {user.lastName}
+              </span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">{user.name || user.email}</p>
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium">
+                  {user.firstName} {user.lastName}
+                </p>
                 <p className="text-xs text-muted-foreground">{user.email}</p>
               </div>
             </DropdownMenuLabel>
+            {isSuperAdmin && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled className="gap-2">
+                  <Shield className="w-4 h-4" />
+                  Super Admin
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => logout()} data-testid="button-logout">
-              <LogOut className="w-4 h-4 mr-2" />
+            <DropdownMenuItem onClick={handleLogout} className="gap-2" data-testid="button-logout">
+              <LogOut className="w-4 h-4" />
               Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
+      )}
     </header>
   );
 }

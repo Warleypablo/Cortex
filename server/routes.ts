@@ -1,103 +1,97 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express } from "express";
 import { createServer, type Server } from "http";
-import passport from "./auth/passport";
 import { storage } from "./storage";
 import { insertColaboradorSchema, insertPatrimonioSchema } from "@shared/schema";
-
-function isAuthenticated(req: Request, res: Response, next: NextFunction) {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.status(401).json({ error: "Not authenticated" });
-}
-
-function isSuperAdmin(req: Request, res: Response, next: NextFunction) {
-  if (req.isAuthenticated() && (req.user as any)?.role === "super_admin") {
-    return next();
-  }
-  res.status(403).json({ error: "Forbidden: Super admin access required" });
-}
+import { setupAuth, isAuthenticated, hasPagePermission } from "./replitAuth";
+import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.post("/auth/login", (req, res, next) => {
-    passport.authenticate("local", (err: any, user: any, info: any) => {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
+  // Setup authentication
+  await setupAuth(app);
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
       if (!user) {
-        return res.status(401).json({ error: info?.message || "Invalid credentials" });
+        return res.status(404).json({ message: "User not found" });
       }
-      req.logIn(user, (err) => {
-        if (err) {
-          return res.status(500).json({ error: err.message });
-        }
-        return res.json({ user });
+
+      // Get user permissions
+      const permissions = await storage.getUserPermissions(userId);
+      const permissionSlugs = permissions.map(p => p.pageSlug);
+
+      res.json({
+        ...user,
+        permissions: permissionSlugs,
       });
-    })(req, res, next);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
   });
 
-  app.get("/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+  // Get all users (Super Admin only)
+  app.get('/api/users', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const currentUser = await storage.getUser(userId);
 
-  app.get(
-    "/auth/google/callback",
-    passport.authenticate("google", { failureRedirect: "/login" }),
-    (req, res) => {
-      res.redirect("/ferramentas");
-    }
-  );
-
-  app.post("/auth/logout", (req, res) => {
-    req.logout((err) => {
-      if (err) {
-        return res.status(500).json({ error: "Logout failed" });
+      if (!currentUser || !currentUser.isSuperAdmin) {
+        return res.status(403).json({ message: "Forbidden: Super Admin access required" });
       }
-      res.json({ success: true });
-    });
-  });
 
-  app.get("/auth/me", (req, res) => {
-    if (req.isAuthenticated()) {
-      res.json({ user: req.user });
-    } else {
-      res.status(401).json({ error: "Not authenticated" });
-    }
-  });
+      const users = await storage.getAllUsers();
+      
+      // Get permissions for each user
+      const usersWithPermissions = await Promise.all(
+        users.map(async (user) => {
+          const permissions = await storage.getUserPermissions(user.id);
+          return {
+            ...user,
+            permissions: permissions.map(p => p.pageSlug),
+          };
+        })
+      );
 
-  app.get("/api/users", isSuperAdmin, async (req, res) => {
-    try {
-      const users = await storage.getUsers();
-      res.json(users);
+      res.json(usersWithPermissions);
     } catch (error) {
-      console.error("[api] Error fetching users:", error);
-      res.status(500).json({ error: "Failed to fetch users" });
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
     }
   });
 
-  app.delete("/api/users/:id", isSuperAdmin, async (req, res) => {
+  // Update user permissions (Super Admin only)
+  app.patch('/api/users/:userId/permissions', isAuthenticated, async (req: any, res) => {
     try {
-      await storage.deleteUser(req.params.id);
-      res.status(204).send();
-    } catch (error) {
-      console.error("[api] Error deleting user:", error);
-      res.status(500).json({ error: "Failed to delete user" });
-    }
-  });
+      const currentUserId = req.user.claims.sub;
+      const currentUser = await storage.getUser(currentUserId);
 
-  app.patch("/api/users/:id/permissions", isSuperAdmin, async (req, res) => {
-    try {
-      const { permissions } = req.body;
-      if (!Array.isArray(permissions)) {
-        return res.status(400).json({ error: "Permissions must be an array" });
+      if (!currentUser || !currentUser.isSuperAdmin) {
+        return res.status(403).json({ message: "Forbidden: Super Admin access required" });
       }
-      await storage.updateUserPermissions(req.params.id, permissions);
-      res.json({ success: true });
+
+      const { userId } = req.params;
+      const schema = z.object({
+        permissions: z.array(z.string()),
+      });
+
+      const validation = schema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid data", details: validation.error });
+      }
+
+      await storage.updateUserPermissions(userId, validation.data.permissions);
+      res.json({ message: "Permissions updated successfully" });
     } catch (error) {
-      console.error("[api] Error updating permissions:", error);
-      res.status(500).json({ error: "Failed to update permissions" });
+      console.error("Error updating permissions:", error);
+      res.status(500).json({ message: "Failed to update permissions" });
     }
   });
 
-  app.get("/api/clientes", isAuthenticated, async (req, res) => {
+  app.get("/api/clientes", isAuthenticated, hasPagePermission("clientes"), async (req, res) => {
     try {
       const clientes = await storage.getClientes();
       res.json(clientes);

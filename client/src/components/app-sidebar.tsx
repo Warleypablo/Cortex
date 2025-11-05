@@ -16,38 +16,38 @@ import {
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useLocation, Link } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 const menuItems = [
   {
     title: "Clientes",
     url: "/",
     icon: Users,
-    pageName: "clientes",
+    permission: "clientes",
   },
   {
     title: "Contratos",
     url: "/contratos",
     icon: FileText,
-    pageName: "contratos",
+    permission: "contratos",
   },
   {
     title: "Colaboradores",
     url: "/colaboradores",
     icon: UserCog,
-    pageName: "colaboradores",
+    permission: "colaboradores",
   },
   {
     title: "Patrimônio",
     url: "/patrimonio",
     icon: Building2,
-    pageName: "patrimonio",
+    permission: "patrimonio",
   },
   {
     title: "Ferramentas",
     url: "/ferramentas",
     icon: Wrench,
-    pageName: null,
+    permission: "ferramentas",
   },
 ];
 
@@ -56,50 +56,49 @@ const dashboardItems = [
     title: "Visão Geral",
     url: "/visao-geral",
     icon: Eye,
-    pageName: "dashboard-financeiro",
+    permission: "visao-geral",
   },
   {
     title: "Financeiro",
     url: "/dashboard/financeiro",
     icon: TrendingUp,
-    pageName: "dashboard-financeiro",
+    permission: "dashboard-financeiro",
   },
   {
     title: "G&G",
     url: "/dashboard/geg",
     icon: UsersRound,
-    pageName: "dashboard-geg",
+    permission: "dashboard-geg",
   },
   {
     title: "Análise de Retenção",
     url: "/dashboard/retencao",
     icon: UserCheck,
-    pageName: "dashboard-retencao",
+    permission: "dashboard-retencao",
   },
   {
     title: "DFC",
     url: "/dashboard/dfc",
     icon: TrendingUp,
-    pageName: "dashboard-dfc",
+    permission: "dashboard-dfc",
   },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { hasPermission, isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const [isDashboardOpen, setIsDashboardOpen] = useState(
     location.startsWith("/dashboard")
   );
 
-  const visibleDashboardItems = dashboardItems.filter(
-    (item) => !item.pageName || hasPermission(item.pageName)
-  );
+  const userPermissions = (user as any)?.permissions || [];
 
-  const visibleMenuItems = menuItems.filter(
-    (item) => !item.pageName || hasPermission(item.pageName)
-  );
+  const hasPermission = (permission: string) => {
+    return isSuperAdmin || userPermissions.includes(permission);
+  };
 
-  const showDashboards = visibleDashboardItems.length > 0;
+  const visibleMenuItems = menuItems.filter(item => hasPermission(item.permission));
+  const visibleDashboardItems = dashboardItems.filter(item => hasPermission(item.permission));
 
   return (
     <Sidebar>
@@ -119,7 +118,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {showDashboards && (
+              {visibleDashboardItems.length > 0 && (
                 <Collapsible
                   open={isDashboardOpen}
                   onOpenChange={setIsDashboardOpen}
