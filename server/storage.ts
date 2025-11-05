@@ -119,6 +119,9 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getUsers(): Promise<import("@shared/schema").AuthUser[]>;
+  deleteUser(id: string): Promise<void>;
+  updateUserPermissions(userId: string, permissions: string[]): Promise<void>;
   getClientes(): Promise<ClienteCompleto[]>;
   getClienteById(id: string): Promise<ClienteCompleto | undefined>;
   getClienteByCnpj(cnpj: string): Promise<Cliente | undefined>;
@@ -453,6 +456,32 @@ export class DbStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(schema.users).values(insertUser).returning();
     return user;
+  }
+
+  async getUsers(): Promise<import("@shared/schema").AuthUser[]> {
+    const users = await db
+      .select()
+      .from(schema.authUsers)
+      .orderBy(schema.authUsers.createdAt);
+    return users;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.delete(schema.authUsers).where(eq(schema.authUsers.id, id));
+  }
+
+  async updateUserPermissions(userId: string, permissions: string[]): Promise<void> {
+    await db.delete(schema.userPermissions).where(eq(schema.userPermissions.userId, userId));
+    
+    if (permissions.length > 0) {
+      const permissionRecords = permissions.map((pageName) => ({
+        userId,
+        pageName,
+        canAccess: 1,
+      }));
+      
+      await db.insert(schema.userPermissions).values(permissionRecords);
+    }
   }
 
   async getClientes(): Promise<ClienteCompleto[]> {
