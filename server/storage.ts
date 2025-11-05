@@ -173,6 +173,18 @@ export class MemStorage implements IStorage {
     return user;
   }
 
+  async getUsers(): Promise<import("@shared/schema").AuthUser[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async updateUserPermissions(userId: string, permissions: string[]): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
   async getClientes(): Promise<ClienteCompleto[]> {
     throw new Error("Not implemented in MemStorage");
   }
