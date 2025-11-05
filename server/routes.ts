@@ -2,96 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertColaboradorSchema, insertPatrimonioSchema } from "@shared/schema";
-import { setupAuth, isAuthenticated, hasPagePermission } from "./replitAuth";
-import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup authentication
-  await setupAuth(app);
-
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Get user permissions
-      const permissions = await storage.getUserPermissions(userId);
-      const permissionSlugs = permissions.map(p => p.pageSlug);
-
-      res.json({
-        ...user,
-        permissions: permissionSlugs,
-      });
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-
-  // Get all users (Super Admin only)
-  app.get('/api/users', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const currentUser = await storage.getUser(userId);
-
-      if (!currentUser || !currentUser.isSuperAdmin) {
-        return res.status(403).json({ message: "Forbidden: Super Admin access required" });
-      }
-
-      const users = await storage.getAllUsers();
-      
-      // Get permissions for each user
-      const usersWithPermissions = await Promise.all(
-        users.map(async (user) => {
-          const permissions = await storage.getUserPermissions(user.id);
-          return {
-            ...user,
-            permissions: permissions.map(p => p.pageSlug),
-          };
-        })
-      );
-
-      res.json(usersWithPermissions);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      res.status(500).json({ message: "Failed to fetch users" });
-    }
-  });
-
-  // Update user permissions (Super Admin only)
-  app.patch('/api/users/:userId/permissions', isAuthenticated, async (req: any, res) => {
-    try {
-      const currentUserId = req.user.claims.sub;
-      const currentUser = await storage.getUser(currentUserId);
-
-      if (!currentUser || !currentUser.isSuperAdmin) {
-        return res.status(403).json({ message: "Forbidden: Super Admin access required" });
-      }
-
-      const { userId } = req.params;
-      const schema = z.object({
-        permissions: z.array(z.string()),
-      });
-
-      const validation = schema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ error: "Invalid data", details: validation.error });
-      }
-
-      await storage.updateUserPermissions(userId, validation.data.permissions);
-      res.json({ message: "Permissions updated successfully" });
-    } catch (error) {
-      console.error("Error updating permissions:", error);
-      res.status(500).json({ message: "Failed to update permissions" });
-    }
-  });
-
-  app.get("/api/clientes", isAuthenticated, hasPagePermission("clientes"), async (req, res) => {
+  app.get("/api/clientes", async (req, res) => {
     try {
       const clientes = await storage.getClientes();
       res.json(clientes);
