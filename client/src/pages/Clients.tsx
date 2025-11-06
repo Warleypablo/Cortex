@@ -248,6 +248,7 @@ export default function Clients() {
           <ClientsTable
             clients={paginatedClients}
             onClientClick={(id) => setLocation(`/cliente/${id}`)}
+            ltvMap={ltvMap}
           />
         </div>
 
