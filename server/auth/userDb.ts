@@ -18,7 +18,7 @@ export async function findUserById(id: string): Promise<User | null> {
   try {
     const userData = await db.get(`${USERS_PREFIX}${id}`);
     if (!userData) return null;
-    return JSON.parse(String(userData)) as User;
+    return (typeof userData === 'string' ? JSON.parse(userData) : userData) as User;
   } catch (error) {
     console.error("Error finding user by id:", error);
     return null;
