@@ -277,17 +277,32 @@ function normalizeCode(code: string): string {
 }
 
 const CATEGORIA_NOMES_PADRAO: Record<string, string> = {
+  // Nível 1
   '03': 'Receitas',
   '04': 'Outras Receitas',
   '05': 'Custos',
   '06': 'Despesas Operacionais',
   '07': 'Despesas Financeiras',
   '08': 'Outras Despesas',
+  
+  // Nível 2 - Receitas
   '03.01': 'Receitas de Serviços',
   '03.02': 'Receitas de Vendas',
   '03.03': 'Receitas Recorrentes',
   '03.04': 'Receitas Não Recorrentes',
   '03.05': 'Outras Receitas Operacionais',
+  
+  // Nível 2 - Custos
+  '05.01': 'Custos de Produção',
+  '05.02': 'Custos de Serviços',
+  '05.03': 'Custos de Materiais',
+  '05.04': 'Custos de Pessoal',
+  '05.05': 'Custos Variáveis',
+  '05.06': 'Custos Fixos',
+  '05.07': 'Custos Diretos',
+  '05.08': 'Custos Indiretos',
+  
+  // Nível 2 - Despesas Operacionais
   '06.01': 'Despesas Administrativas',
   '06.02': 'Despesas Comerciais',
   '06.03': 'Despesas com Pessoal',
@@ -304,6 +319,85 @@ const CATEGORIA_NOMES_PADRAO: Record<string, string> = {
 
 function getCategoriaName(code: string): string {
   return CATEGORIA_NOMES_PADRAO[code] || code;
+}
+
+/**
+ * Infere nomes de categorias intermediárias a partir das categorias filhas.
+ * Ex: "06.11.01 Computadores e periféricos" → "06.11" recebe "Computadores"
+ */
+function inferIntermediateNames(items: DfcItem[]): Map<string, string> {
+  const inferredNames = new Map<string, string>();
+  
+  // Agrupa categorias por prefixo pai
+  const childrenByParent = new Map<string, { code: string; name: string }[]>();
+  
+  for (const item of items) {
+    const normalizedId = normalizeCode(item.categoriaId);
+    const parts = normalizedId.split('.');
+    
+    // Para cada nível de hierarquia
+    for (let i = 1; i < parts.length; i++) {
+      const parentCode = parts.slice(0, i).join('.');
+      const childInfo = { code: normalizedId, name: item.categoriaNome };
+      
+      if (!childrenByParent.has(parentCode)) {
+        childrenByParent.set(parentCode, []);
+      }
+      childrenByParent.get(parentCode)!.push(childInfo);
+    }
+  }
+  
+  // Para cada categoria pai, tenta inferir um nome
+  for (const [parentCode, children] of Array.from(childrenByParent.entries())) {
+    // Se já temos nome no mapeamento padrão, pula
+    if (CATEGORIA_NOMES_PADRAO[parentCode]) {
+      continue;
+    }
+    
+    // Tenta encontrar um prefixo comum nos nomes dos filhos
+    if (children.length > 0) {
+      const firstChildName = children[0].name;
+      
+      // Estratégia 1: Usar a primeira palavra do nome do filho
+      const firstWord = firstChildName.split(/[\s-]/)[0];
+      if (firstWord && firstWord.length > 3) {
+        inferredNames.set(parentCode, firstWord);
+        continue;
+      }
+      
+      // Estratégia 2: Se todos os filhos começam com o mesmo prefixo, usa esse prefixo
+      const commonPrefix = findCommonPrefix(children.map((c: { code: string; name: string }) => c.name));
+      if (commonPrefix && commonPrefix.length > 3) {
+        inferredNames.set(parentCode, commonPrefix.trim());
+      }
+    }
+  }
+  
+  return inferredNames;
+}
+
+/**
+ * Encontra o prefixo comum em um array de strings
+ */
+function findCommonPrefix(strings: string[]): string {
+  if (strings.length === 0) return '';
+  if (strings.length === 1) return strings[0];
+  
+  let prefix = strings[0];
+  for (let i = 1; i < strings.length; i++) {
+    while (strings[i].indexOf(prefix) !== 0) {
+      prefix = prefix.substring(0, prefix.length - 1);
+      if (prefix === '') return '';
+    }
+  }
+  
+  // Remove palavras incompletas no final
+  const lastSpaceIndex = prefix.lastIndexOf(' ');
+  if (lastSpaceIndex > 0) {
+    prefix = prefix.substring(0, lastSpaceIndex);
+  }
+  
+  return prefix;
 }
 
 function determineLevel(categoriaId: string): number {
@@ -347,6 +441,9 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
   
   const categoriasByNormalizedId = new Map<string, { nome: string; items: DfcItem[]; originalKey?: string }>();
   const realCategoryNames = new Map<string, string>();
+  
+  // Infere nomes de categorias intermediárias a partir dos filhos
+  const inferredNames = inferIntermediateNames(items);
   
   for (const item of items) {
     const normalizedId = normalizeCode(item.categoriaId);
@@ -410,8 +507,15 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
         const parentLevel = determineLevel(parentNormalizedId);
         const parentParentId = determineParent(parentNormalizedId);
         
-        // Usa o nome real do banco se existir, senão usa o mapeamento padrão, senão usa o código
-        const parentName = realCategoryNames.get(parentNormalizedId) || getCategoriaName(parentNormalizedId);
+        // Estratégia híbrida de nomes (em ordem de prioridade):
+        // 1. Nome real do banco (categoria existe diretamente)
+        // 2. Nome inferido dos filhos
+        // 3. Nome do mapeamento padrão
+        // 4. Código (fallback)
+        const parentName = 
+          realCategoryNames.get(parentNormalizedId) || 
+          inferredNames.get(parentNormalizedId) || 
+          getCategoriaName(parentNormalizedId);
         
         nodeMap.set(parentNormalizedId, {
           categoriaId: parentNormalizedId,
