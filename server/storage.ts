@@ -1643,21 +1643,30 @@ export class DbStorage implements IStorage {
 
   async getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse> {
     // Buscar nomes reais das categorias da tabela caz_categorias
+    // IMPORTANTE: O campo 'nome' contém CÓDIGO + DESCRIÇÃO juntos, ex: "06.10 Despesas Administrativas"
     const categoriasReais = await db.execute(sql.raw(`
-      SELECT id, nome 
+      SELECT nome 
       FROM caz_categorias 
-      WHERE id IS NOT NULL
+      WHERE nome IS NOT NULL
     `));
     
     const categoriaNamesMap = new Map<string, string>();
     for (const row of categoriasReais.rows) {
-      const categoriaId = normalizeCode(row.id as string);
-      categoriaNamesMap.set(categoriaId, row.nome as string);
+      const fullName = (row.nome as string) || '';
+      
+      // Parsear o campo nome que tem formato "CODIGO DESCRICAO" ou "CODIGO\tDESCRICAO"
+      const parts = fullName.split(/[\s\t]+/, 2);
+      if (parts.length >= 2) {
+        const codigo = parts[0]; // Ex: "06.10"
+        const descricao = parts.slice(1).join(' '); // Ex: "Despesas Administrativas"
+        
+        // Normalizar o código (sem pontos, sem zeros à esquerda)
+        const categoriaId = normalizeCode(codigo);
+        categoriaNamesMap.set(categoriaId, descricao);
+      }
     }
     
     console.log(`[DFC] Carregadas ${categoriaNamesMap.size} categorias da tabela caz_categorias`);
-    console.log(`[DFC DEBUG] Categoria 06.10 no mapa:`, categoriaNamesMap.get('06.10'));
-    console.log(`[DFC DEBUG] Categoria 6.10 no mapa:`, categoriaNamesMap.get('6.10'));
     
     const whereClauses: string[] = ['categoria_id IS NOT NULL', "categoria_id != ''", "status = 'QUITADO'"];
     
