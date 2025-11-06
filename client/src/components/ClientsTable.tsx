@@ -184,9 +184,10 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
               </div>
               <div className="px-4 py-3 text-muted-foreground text-sm" data-testid={`text-date-${client.ids || client.id}`}>
                 {client.dataInicio ? new Date(client.dataInicio).toLocaleDateString('pt-BR') : "-"}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
