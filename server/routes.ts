@@ -3,9 +3,13 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertColaboradorSchema, insertPatrimonioSchema } from "@shared/schema";
 import authRoutes from "./auth/routes";
+import { isAuthenticated } from "./auth/middleware";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use(authRoutes);
+  
+  app.use("/api", isAuthenticated);
+  
   app.get("/api/clientes", async (req, res) => {
     try {
       const clientes = await storage.getClientes();

@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -21,6 +21,7 @@ import DashboardFinanceiro from "@/pages/DashboardFinanceiro";
 import DashboardGeG from "@/pages/DashboardGeG";
 import DashboardRetencao from "@/pages/DashboardRetencao";
 import DashboardDFC from "@/pages/DashboardDFC";
+import Login from "@/pages/Login";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -32,7 +33,31 @@ function PageLoader() {
   );
 }
 
-function Router() {
+interface User {
+  id: string;
+  googleId: string;
+  email: string;
+  name: string;
+  picture: string;
+  createdAt: string;
+}
+
+function ProtectedRouter() {
+  const [, setLocation] = useLocation();
+  
+  const { data: user, isLoading, error } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  if (isLoading) {
+    return <PageLoader />;
+  }
+
+  if (error || !user) {
+    setLocation("/login");
+    return null;
+  }
+
   return (
     <Switch>
       <Route path="/" component={Clients} />
@@ -59,26 +84,48 @@ function Router() {
   );
 }
 
-function App() {
+function Router() {
+  return (
+    <Switch>
+      <Route path="/login" component={Login} />
+      <Route><ProtectedRouter /></Route>
+    </Switch>
+  );
+}
+
+function AppLayout() {
+  const [location] = useLocation();
+  const isLoginPage = location === "/login";
+
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
 
+  if (isLoginPage) {
+    return <Router />;
+  }
+
+  return (
+    <SidebarProvider style={style as React.CSSProperties}>
+      <div className="flex h-screen w-full">
+        <AppSidebar />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <TopBar />
+          <main className="flex-1 overflow-auto">
+            <Router />
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full">
-            <AppSidebar />
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <TopBar />
-              <main className="flex-1 overflow-auto">
-                <Router />
-              </main>
-            </div>
-          </div>
-        </SidebarProvider>
+        <AppLayout />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
