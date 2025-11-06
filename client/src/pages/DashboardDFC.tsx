@@ -261,7 +261,7 @@ export default function DashboardDFC() {
                                       <div className="w-6" />
                                     )}
                                     <span className={node.isLeaf ? "" : "font-semibold"}>
-                                      {node.categoriaNome}
+                                      {node.categoriaId} - {node.categoriaNome}
                                     </span>
                                   </div>
                                 </TableCell>
