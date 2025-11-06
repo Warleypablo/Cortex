@@ -1713,6 +1713,7 @@ export class DbStorage implements IStorage {
       const categoriaNomes = (row.categoria_nome as string || '').split(';').map(s => s.trim()).filter(Boolean);
       const valorCategorias = (row.valor_categoria as string || '').split(';').map(s => s.trim()).filter(Boolean);
       const tipoEvento = row.tipo_evento as string || '';
+      const valorPago = parseFloat(row.valor_pago as string || '0');
       
       if (categoriaNomes.length === 0) continue;
 
@@ -1720,9 +1721,28 @@ export class DbStorage implements IStorage {
       const mes = dataQuitacao.toISOString().substring(0, 7);
       mesesSet.add(mes);
 
+      // Calcular a soma total dos valores de categoria para rateio proporcional
+      const somaValorCategorias = valorCategorias.reduce((acc, v) => acc + parseFloat(v || '0'), 0);
+
       for (let i = 0; i < categoriaNomes.length; i++) {
         const fullCategoriaNome = categoriaNomes[i];
-        const valor = parseFloat(valorCategorias[i] || '0');
+        
+        // Usar valor_pago da parcela, rateado proporcionalmente se houver múltiplas categorias
+        let valor: number;
+        if (categoriaNomes.length === 1) {
+          // Se há apenas uma categoria, usar o valor_pago total
+          valor = valorPago;
+        } else {
+          // Se há múltiplas categorias, ratear proporcionalmente baseado em valor_categoria
+          const valorCategoriaAtual = parseFloat(valorCategorias[i] || '0');
+          if (somaValorCategorias > 0) {
+            const proporcao = valorCategoriaAtual / somaValorCategorias;
+            valor = valorPago * proporcao;
+          } else {
+            // Se não houver soma de categorias, dividir igualmente
+            valor = valorPago / categoriaNomes.length;
+          }
+        }
 
         const codeMatch = fullCategoriaNome.match(/^([\d.]+)\s+(.+)$/);
         if (!codeMatch) {
