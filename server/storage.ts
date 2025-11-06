@@ -346,9 +346,15 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
   });
   
   const categoriasByNormalizedId = new Map<string, { nome: string; items: DfcItem[]; originalKey?: string }>();
+  const realCategoryNames = new Map<string, string>();
   
   for (const item of items) {
     const normalizedId = normalizeCode(item.categoriaId);
+    
+    // Armazena o nome real da categoria vindo do banco
+    if (!realCategoryNames.has(normalizedId)) {
+      realCategoryNames.set(normalizedId, item.categoriaNome);
+    }
     
     if (!categoriasByNormalizedId.has(normalizedId)) {
       categoriasByNormalizedId.set(normalizedId, {
@@ -404,7 +410,8 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
         const parentLevel = determineLevel(parentNormalizedId);
         const parentParentId = determineParent(parentNormalizedId);
         
-        const parentName = getCategoriaName(parentNormalizedId);
+        // Usa o nome real do banco se existir, senão usa o mapeamento padrão, senão usa o código
+        const parentName = realCategoryNames.get(parentNormalizedId) || getCategoriaName(parentNormalizedId);
         
         nodeMap.set(parentNormalizedId, {
           categoriaId: parentNormalizedId,
