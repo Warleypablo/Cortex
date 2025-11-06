@@ -1634,7 +1634,7 @@ export class DbStorage implements IStorage {
     const categoriasReais = await db.execute(sql.raw(`
       SELECT id, nome 
       FROM caz_categorias 
-      WHERE id IS NOT NULL AND id != ''
+      WHERE id IS NOT NULL
     `));
     
     const categoriaNamesMap = new Map<string, string>();
