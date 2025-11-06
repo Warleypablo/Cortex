@@ -3,8 +3,8 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import ClientsTable from "@/components/ClientsTable";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Filter } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Loader2, Search, Filter, Users, UserCheck, TrendingUp } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -25,6 +25,10 @@ export default function Clients() {
 
   const { data: clientes, isLoading, error } = useQuery<ClienteCompleto[]>({
     queryKey: ["/api/clientes"],
+  });
+
+  const { data: ltvMap } = useQuery<Record<string, number>>({
+    queryKey: ["/api/clientes-ltv"],
   });
 
   const servicosUnicos = useMemo(() => {
@@ -49,6 +53,31 @@ export default function Clients() {
     });
     return Array.from(statusSet).sort();
   }, [clientes]);
+
+  const kpis = useMemo(() => {
+    if (!clientes) return { totalClientes: 0, clientesAtivos: 0, ltvMedio: 0 };
+    
+    const totalClientes = clientes.length;
+    const clientesAtivos = clientes.filter(c => {
+      const status = (c.statusClickup || "").toLowerCase();
+      return status.includes("ativo") || status.includes("active");
+    }).length;
+    
+    let somaLtv = 0;
+    let countLtv = 0;
+    if (ltvMap) {
+      clientes.forEach(c => {
+        const ltv = ltvMap[c.ids || String(c.id)] || 0;
+        if (ltv > 0) {
+          somaLtv += ltv;
+          countLtv++;
+        }
+      });
+    }
+    const ltvMedio = countLtv > 0 ? somaLtv / countLtv : 0;
+    
+    return { totalClientes, clientesAtivos, ltvMedio };
+  }, [clientes, ltvMap]);
 
   const filteredClients = useMemo(() => {
     if (!clientes) return [];
@@ -114,9 +143,60 @@ export default function Clients() {
     );
   }
 
+  const formatCurrency = (value: number) => {
+    return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
   return (
     <div className="bg-background h-full">
       <div className="container mx-auto px-4 py-4 max-w-7xl h-full flex flex-col">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <Card data-testid="card-total-clientes">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-total-clientes">
+                {kpis.totalClientes}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Todos os clientes cadastrados
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-clientes-ativos">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
+              <UserCheck className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-clientes-ativos">
+                {kpis.clientesAtivos}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {kpis.totalClientes > 0 ? `${((kpis.clientesAtivos / kpis.totalClientes) * 100).toFixed(1)}% do total` : '0% do total'}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-ltv-medio">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium">LTV Médio</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-ltv-medio">
+                {formatCurrency(kpis.ltvMedio)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Lifetime value médio por cliente
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
