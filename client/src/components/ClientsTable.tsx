@@ -58,12 +58,12 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
     if (!status) return "bg-muted text-muted-foreground";
     const statusLower = status.toLowerCase();
     
-    if (statusLower.includes("ativo") || statusLower.includes("active")) {
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
-    } else if (statusLower.includes("pausado") || statusLower.includes("paused")) {
+    if (statusLower.includes("pausado") || statusLower.includes("paused")) {
       return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
-    } else if (statusLower.includes("cancelado") || statusLower.includes("canceled")) {
+    } else if (statusLower.includes("cancelado") || statusLower.includes("canceled") || statusLower.includes("inativo") || statusLower.includes("inactive")) {
       return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+    } else if (statusLower.includes("ativo") || statusLower.includes("active")) {
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
     }
     return "bg-muted text-muted-foreground";
   };
