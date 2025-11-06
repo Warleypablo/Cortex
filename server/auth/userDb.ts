@@ -14,6 +14,43 @@ export interface User {
 const USERS_PREFIX = "user:";
 const GOOGLE_ID_INDEX_PREFIX = "googleId:";
 
+export async function listAllKeys(): Promise<string[]> {
+  try {
+    const result: any = await db.list();
+    const keys = result.value || result;
+    return Array.isArray(keys) ? keys : [];
+  } catch (error) {
+    console.error("❌ Erro ao listar chaves:", error);
+    return [];
+  }
+}
+
+export async function getAllUsers(): Promise<User[]> {
+  try {
+    const result: any = await db.list(USERS_PREFIX);
+    const keys = result.value || result;
+    const users: User[] = [];
+    
+    if (!Array.isArray(keys)) {
+      return [];
+    }
+    
+    for (const key of keys) {
+      const userResult: any = await db.get(key);
+      if (userResult && userResult.ok !== false) {
+        const userData = userResult.value || userResult;
+        const parsedUser = (typeof userData === 'string' ? JSON.parse(userData) : userData) as User;
+        users.push(parsedUser);
+      }
+    }
+    
+    return users;
+  } catch (error) {
+    console.error("❌ Erro ao buscar todos os usuários:", error);
+    return [];
+  }
+}
+
 export async function findUserById(id: string): Promise<User | null> {
   try {
     console.log("🔍 Buscando usuário por ID:", id);

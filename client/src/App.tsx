@@ -21,6 +21,7 @@ import DashboardFinanceiro from "@/pages/DashboardFinanceiro";
 import DashboardGeG from "@/pages/DashboardGeG";
 import DashboardRetencao from "@/pages/DashboardRetencao";
 import DashboardDFC from "@/pages/DashboardDFC";
+import AdminUsuarios from "@/pages/AdminUsuarios";
 import Login from "@/pages/Login";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -77,6 +78,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/geg" component={DashboardGeG} />
       <Route path="/dashboard/retencao" component={DashboardRetencao} />
       <Route path="/dashboard/dfc" component={DashboardDFC} />
+      <Route path="/admin/usuarios" component={AdminUsuarios} />
       <Route path="/cliente/:id" component={ClientDetail} />
       <Route>
         {() => (
