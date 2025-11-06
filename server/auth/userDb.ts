@@ -9,10 +9,32 @@ export interface User {
   name: string;
   picture: string;
   createdAt: string;
+  role: 'admin' | 'user';
+  allowedRoutes: string[];
 }
 
 const USERS_PREFIX = "user:";
 const GOOGLE_ID_INDEX_PREFIX = "googleId:";
+
+export async function updateUserPermissions(userId: string, allowedRoutes: string[]): Promise<User | null> {
+  try {
+    const user = await findUserById(userId);
+    if (!user) {
+      return null;
+    }
+    
+    const updatedUser: User = {
+      ...user,
+      allowedRoutes,
+    };
+    
+    await db.set(`${USERS_PREFIX}${userId}`, JSON.stringify(updatedUser));
+    return updatedUser;
+  } catch (error) {
+    console.error("❌ Erro ao atualizar permissões:", error);
+    return null;
+  }
+}
 
 export async function listAllKeys(): Promise<string[]> {
   try {
@@ -93,6 +115,23 @@ export async function findUserByGoogleId(googleId: string): Promise<User | null>
   }
 }
 
+const ADMIN_EMAILS = ['caio.massaroni@turbopartners.com.br'];
+const ALL_ROUTES = [
+  '/',
+  '/contratos',
+  '/colaboradores',
+  '/colaboradores/analise',
+  '/patrimonio',
+  '/ferramentas',
+  '/visao-geral',
+  '/dashboard/financeiro',
+  '/dashboard/geg',
+  '/dashboard/retencao',
+  '/dashboard/dfc',
+  '/admin/usuarios'
+];
+const DEFAULT_USER_ROUTES = ['/ferramentas'];
+
 export async function createOrUpdateUser(profile: {
   id: string;
   emails?: Array<{ value: string }>;
@@ -104,6 +143,7 @@ export async function createOrUpdateUser(profile: {
   const name = profile.displayName;
   const picture = profile.photos?.[0]?.value || "";
 
+  const isAdmin = ADMIN_EMAILS.includes(email);
   const existingUser = await findUserByGoogleId(googleId);
 
   if (existingUser) {
@@ -113,6 +153,8 @@ export async function createOrUpdateUser(profile: {
       email,
       name,
       picture,
+      role: isAdmin ? 'admin' : existingUser.role,
+      allowedRoutes: isAdmin ? ALL_ROUTES : (existingUser.allowedRoutes || DEFAULT_USER_ROUTES),
     };
     
     await db.set(`${USERS_PREFIX}${existingUser.id}`, JSON.stringify(updatedUser));
@@ -129,6 +171,8 @@ export async function createOrUpdateUser(profile: {
     name,
     picture,
     createdAt: new Date().toISOString(),
+    role: isAdmin ? 'admin' : 'user',
+    allowedRoutes: isAdmin ? ALL_ROUTES : DEFAULT_USER_ROUTES,
   };
 
   await db.set(`${USERS_PREFIX}${userId}`, JSON.stringify(newUser));

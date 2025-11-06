@@ -1,11 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
-import { Users, Database, Key } from "lucide-react";
+import { Users, Database, Key, Shield, Edit, UserCog } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface User {
   id: string;
@@ -14,6 +21,8 @@ interface User {
   name: string;
   picture: string;
   createdAt: string;
+  role: 'admin' | 'user';
+  allowedRoutes: string[];
 }
 
 interface DebugData {
@@ -23,7 +32,150 @@ interface DebugData {
   totalKeys: number;
 }
 
+const AVAILABLE_ROUTES = [
+  { path: '/', label: 'Clientes' },
+  { path: '/contratos', label: 'Contratos' },
+  { path: '/colaboradores', label: 'Colaboradores' },
+  { path: '/colaboradores/analise', label: 'Análise de Colaboradores' },
+  { path: '/patrimonio', label: 'Patrimônio' },
+  { path: '/ferramentas', label: 'Ferramentas' },
+  { path: '/visao-geral', label: 'Visão Geral' },
+  { path: '/dashboard/financeiro', label: 'Dashboard Financeiro' },
+  { path: '/dashboard/geg', label: 'Dashboard G&G' },
+  { path: '/dashboard/retencao', label: 'Análise de Retenção' },
+  { path: '/dashboard/dfc', label: 'DFC' },
+  { path: '/admin/usuarios', label: 'Gerenciar Usuários' },
+];
+
+function EditPermissionsDialog({ user, open, onOpenChange }: {
+  user: User;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [selectedRoutes, setSelectedRoutes] = useState<string[]>(user.allowedRoutes || []);
+
+  const updatePermissionsMutation = useMutation({
+    mutationFn: async (allowedRoutes: string[]) => {
+      return await apiRequest(`/api/users/${user.id}/permissions`, {
+        method: 'POST',
+        body: JSON.stringify({ allowedRoutes }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/debug/users'] });
+      toast({
+        title: "Permissões atualizadas",
+        description: `Permissões de ${user.name} foram atualizadas com sucesso.`,
+      });
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar permissões",
+        description: error.message || "Ocorreu um erro ao atualizar as permissões.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleToggleRoute = (route: string) => {
+    if (selectedRoutes.includes(route)) {
+      setSelectedRoutes(selectedRoutes.filter((r) => r !== route));
+    } else {
+      setSelectedRoutes([...selectedRoutes, route]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    setSelectedRoutes(AVAILABLE_ROUTES.map((r) => r.path));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedRoutes([]);
+  };
+
+  const handleSave = () => {
+    updatePermissionsMutation.mutate(selectedRoutes);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Editar Permissões</DialogTitle>
+          <DialogDescription>
+            Defina quais páginas {user.name} pode acessar
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSelectAll}
+              data-testid="button-select-all"
+            >
+              Selecionar Todas
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDeselectAll}
+              data-testid="button-deselect-all"
+            >
+              Desmarcar Todas
+            </Button>
+            <div className="ml-auto text-sm text-muted-foreground">
+              {selectedRoutes.length} de {AVAILABLE_ROUTES.length} selecionadas
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {AVAILABLE_ROUTES.map((route) => (
+              <div key={route.path} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`route-${route.path}`}
+                  checked={selectedRoutes.includes(route.path)}
+                  onCheckedChange={() => handleToggleRoute(route.path)}
+                  data-testid={`checkbox-${route.path}`}
+                />
+                <Label
+                  htmlFor={`route-${route.path}`}
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  {route.label}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            data-testid="button-cancel"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={updatePermissionsMutation.isPending}
+            data-testid="button-save"
+          >
+            {updatePermissionsMutation.isPending ? "Salvando..." : "Salvar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AdminUsuarios() {
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+
   const { data, isLoading, error } = useQuery<DebugData>({
     queryKey: ["/api/debug/users"],
   });
@@ -76,6 +228,8 @@ export default function AdminUsuarios() {
   }
 
   const { users = [], allKeys = [], count = 0, totalKeys = 0 } = data || {};
+  const adminCount = users.filter((u) => u.role === 'admin').length;
+  const userCount = users.filter((u) => u.role === 'user').length;
 
   return (
     <div className="p-6 space-y-6">
@@ -84,11 +238,11 @@ export default function AdminUsuarios() {
           Gerenciar Usuários
         </h1>
         <p className="text-muted-foreground mt-2">
-          Visualize todos os usuários cadastrados no Replit Database
+          Controle de acesso e permissões de usuários
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
@@ -103,16 +257,25 @@ export default function AdminUsuarios() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Chaves</CardTitle>
-            <Key className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Administradores</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-total-keys">
-              {totalKeys}
+            <div className="text-2xl font-bold" data-testid="text-admin-count">
+              {adminCount}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Inclui usuários, índices e sessões
-            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Usuários Comuns</CardTitle>
+            <UserCog className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-user-count">
+              {userCount}
+            </div>
           </CardContent>
         </Card>
 
@@ -133,7 +296,7 @@ export default function AdminUsuarios() {
         <CardHeader>
           <CardTitle>Usuários Cadastrados</CardTitle>
           <CardDescription>
-            Lista de todos os usuários que fizeram login via Google OAuth
+            Gerencie permissões e controle de acesso dos usuários
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -148,8 +311,10 @@ export default function AdminUsuarios() {
                 <TableRow>
                   <TableHead>Usuário</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Google ID</TableHead>
+                  <TableHead>Função</TableHead>
+                  <TableHead>Páginas Permitidas</TableHead>
                   <TableHead>Data de Cadastro</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -177,9 +342,20 @@ export default function AdminUsuarios() {
                       {user.email}
                     </TableCell>
                     <TableCell>
-                      <code className="text-xs bg-muted px-2 py-1 rounded">
-                        {user.googleId}
-                      </code>
+                      <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                        {user.role === 'admin' ? 'Admin' : 'Usuário'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        {user.role === 'admin' ? (
+                          <span className="text-muted-foreground">Acesso Total</span>
+                        ) : (
+                          <span data-testid={`text-routes-${user.id}`}>
+                            {user.allowedRoutes?.length || 0} página{user.allowedRoutes?.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell data-testid={`text-created-${user.id}`}>
                       {(() => {
@@ -192,6 +368,19 @@ export default function AdminUsuarios() {
                         }
                       })()}
                     </TableCell>
+                    <TableCell className="text-right">
+                      {user.role !== 'admin' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingUser(user)}
+                          data-testid={`button-edit-${user.id}`}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Editar Permissões
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -200,33 +389,12 @@ export default function AdminUsuarios() {
         </CardContent>
       </Card>
 
-      {allKeys.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Todas as Chaves do Database</CardTitle>
-            <CardDescription>
-              Chaves armazenadas no Replit Database (usuários, índices, sessões)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-2 font-mono text-xs">
-              {allKeys.map((key) => (
-                <div
-                  key={key}
-                  className="bg-muted px-3 py-2 rounded flex items-center justify-between"
-                  data-testid={`key-${key}`}
-                >
-                  <span>{key}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {key.startsWith('user:') ? 'Usuário' : 
-                     key.startsWith('googleId:') ? 'Índice' : 
-                     key.startsWith('session:') ? 'Sessão' : 'Outro'}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      {editingUser && (
+        <EditPermissionsDialog
+          user={editingUser}
+          open={!!editingUser}
+          onOpenChange={(open) => !open && setEditingUser(null)}
+        />
       )}
     </div>
   );
