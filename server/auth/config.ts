@@ -33,9 +33,12 @@ export function configurePassport() {
       },
       async (_accessToken, _refreshToken, profile, done) => {
         try {
+          console.log("👤 Perfil do Google recebido:", profile.id, profile.displayName);
           const user = await createOrUpdateUser(profile);
+          console.log("✅ Usuário criado/atualizado:", user.id);
           return done(null, user);
         } catch (error) {
+          console.error("❌ Erro ao criar/atualizar usuário:", error);
           return done(error as Error);
         }
       }
