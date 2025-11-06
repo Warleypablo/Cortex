@@ -63,6 +63,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/clientes-ltv", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          cliente_id,
+          COALESCE(SUM(CAST(pago AS DECIMAL)), 0) as ltv
+        FROM caz_receber
+        WHERE cliente_id IS NOT NULL 
+          AND UPPER(status) IN ('PAGO', 'ACQUITTED')
+        GROUP BY cliente_id
+      `);
+      
+      const ltvMap: Record<string, number> = {};
+      for (const row of result.rows) {
+        ltvMap[row.cliente_id as string] = parseFloat(row.ltv as string) || 0;
+      }
+      
+      res.json(ltvMap);
+    } catch (error) {
+      console.error("[api] Error fetching clients LTV:", error);
+      res.status(500).json({ error: "Failed to fetch clients LTV" });
+    }
+  });
+
   app.get("/api/cliente/:id", async (req, res) => {
     try {
       const cliente = await storage.getClienteById(req.params.id);
