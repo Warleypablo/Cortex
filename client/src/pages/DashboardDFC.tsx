@@ -206,12 +206,12 @@ export default function DashboardDFC() {
                   Nenhum dado de DFC disponível para os filtros selecionados.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto relative">
                   <div className="inline-block min-w-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="sticky left-0 bg-background z-10 min-w-[300px]">
+                          <TableHead className="sticky left-0 bg-background z-10 min-w-[300px] shadow-[2px_0_4px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
                             Categoria
                           </TableHead>
                           {dfcData.meses.map(mes => {
@@ -239,7 +239,7 @@ export default function DashboardDFC() {
                                 data-testid={`dfc-row-${node.categoriaId}`}
                               >
                                 <TableCell 
-                                  className="sticky left-0 bg-background z-10"
+                                  className="sticky left-0 bg-background z-10 shadow-[2px_0_4px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_rgba(0,0,0,0.3)]"
                                   style={{ paddingLeft: `${node.nivel * 24 + 12}px` }}
                                 >
                                   <div className="flex items-center gap-1">
@@ -296,7 +296,7 @@ export default function DashboardDFC() {
                                 data-testid={`dfc-row-parcela-${parcela.id}-${parentNode.categoriaId}`}
                               >
                                 <TableCell 
-                                  className="sticky left-0 bg-muted/30 z-10"
+                                  className="sticky left-0 bg-muted/30 z-10 shadow-[2px_0_4px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_rgba(0,0,0,0.3)]"
                                   style={{ paddingLeft: `${(parentNode.nivel + 1) * 24 + 12}px` }}
                                 >
                                   <div className="flex items-center gap-1">

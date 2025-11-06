@@ -20,7 +20,7 @@ Preferred communication style: Simple, everyday language.
     - **Employee Management**: CRUD operations for 25 employee fields from `rh_pessoal` table.
     - **Contract Management**: Comprehensive tracking from `cup_contratos`, displaying service type, status, squad, and financial values. Includes status-based color coding.
     - **Retention Analysis**: Churn metrics by service and responsible person with monthly breakdowns, filtering, and Recharts visualizations. Secure parameter binding prevents SQL injection.
-    - **DFC (Demonstração de Fluxo de Caixa)**: Hierarchical cash flow analysis from `caz_parcelas` with expandable tree structure, month range filters, and pivot table display.
+    - **DFC (Demonstração de Fluxo de Caixa)**: Hierarchical cash flow analysis from `caz_parcelas` with expandable tree structure, month range filters, pivot table display, and sticky first column (categoria) for horizontal scrolling. Uses `valor_pago` with proportional distribution for parcelas with multiple categories.
 - **Theming**: Dark mode support via CSS variables; light mode is primary.
 
 ### Backend Architecture
@@ -41,7 +41,7 @@ Preferred communication style: Simple, everyday language.
 ### Authentication & Authorization
 - **Authentication**: Google OAuth2.0 via Passport.js, storing user data in Replit Database.
 - **Authorization**: Role-Based Access Control (RBAC) with `admin` and `user` roles.
-    - `admin` (hardcoded for `caio.massaroni@turbopartners.com.br`) has full access.
+    - `admin` (hardcoded for `caio.massaroni@turbopartners.com.br` and `warley.silva@turbopartners.com.br`) has full access.
     - `user` has limited `allowedRoutes`.
 - **Protected Routes**: Backend API routes secured with `isAuthenticated` and `isAdmin` middleware. Frontend routes protected by `ProtectedRoute` component.
 - **Admin Interface**: `/admin/usuarios` allows managing user permissions.
