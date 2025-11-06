@@ -57,10 +57,7 @@ function EditPermissionsDialog({ user, open, onOpenChange }: {
 
   const updatePermissionsMutation = useMutation({
     mutationFn: async (allowedRoutes: string[]) => {
-      return await apiRequest(`/api/users/${user.id}/permissions`, {
-        method: 'POST',
-        body: JSON.stringify({ allowedRoutes }),
-      });
+      return await apiRequest('POST', `/api/users/${user.id}/permissions`, { allowedRoutes });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/debug/users'] });
