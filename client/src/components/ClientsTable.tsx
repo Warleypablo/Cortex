@@ -7,12 +7,13 @@ import type { ClienteCompleto } from "../../../server/storage";
 interface ClientsTableProps {
   clients: ClienteCompleto[];
   onClientClick: (clientId: string) => void;
+  ltvMap?: Record<string, number>;
 }
 
-type SortField = "name" | "cnpj" | "status" | "startDate";
+type SortField = "name" | "cnpj" | "ltv" | "status" | "startDate";
 type SortDirection = "asc" | "desc";
 
-export default function ClientsTable({ clients, onClientClick }: ClientsTableProps) {
+export default function ClientsTable({ clients, onClientClick, ltvMap }: ClientsTableProps) {
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
@@ -36,6 +37,10 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
       const cnpjA = a.cnpjCliente || a.cnpj || "";
       const cnpjB = b.cnpjCliente || b.cnpj || "";
       comparison = cnpjA.localeCompare(cnpjB);
+    } else if (sortField === "ltv") {
+      const ltvA = ltvMap?.[a.ids || String(a.id)] || 0;
+      const ltvB = ltvMap?.[b.ids || String(b.id)] || 0;
+      comparison = ltvA - ltvB;
     } else if (sortField === "status") {
       const statusA = a.statusClickup || "";
       const statusB = b.statusClickup || "";
@@ -72,11 +77,15 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
     return cnpj;
   };
 
+  const formatCurrency = (value: number) => {
+    return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
   return (
     <div className="rounded-lg border border-border bg-card overflow-auto h-full">
       {/* Sticky Header */}
       <div className="sticky top-0 z-10 bg-background border-b">
-        <div className="grid grid-cols-[minmax(300px,2fr)_minmax(180px,1.5fr)_minmax(200px,2fr)_minmax(150px,1fr)_minmax(150px,1fr)] text-sm font-medium text-muted-foreground">
+        <div className="grid grid-cols-[minmax(300px,2fr)_minmax(180px,1.5fr)_minmax(200px,2fr)_minmax(140px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)] text-sm font-medium text-muted-foreground">
           <div className="h-12 flex items-center px-4">
             <Button 
               variant="ghost" 
@@ -108,6 +117,18 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
             <Button 
               variant="ghost" 
               size="sm" 
+              onClick={() => handleSort("ltv")}
+              className="hover-elevate -ml-3"
+              data-testid="sort-ltv"
+            >
+              LTV
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+          <div className="h-12 flex items-center px-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
               onClick={() => handleSort("status")}
               className="hover-elevate -ml-3"
               data-testid="sort-status"
@@ -133,31 +154,36 @@ export default function ClientsTable({ clients, onClientClick }: ClientsTablePro
 
       {/* Table Body */}
       <div>
-        {sortedClients.map((client) => (
-          <div 
-            key={client.ids || client.id} 
-            className="grid grid-cols-[minmax(300px,2fr)_minmax(180px,1.5fr)_minmax(200px,2fr)_minmax(150px,1fr)_minmax(150px,1fr)] cursor-pointer hover-elevate"
-            onClick={() => onClientClick(client.ids || String(client.id))}
-            data-testid={`client-row-${client.ids || client.id}`}
-          >
-            <div className="px-4 py-3 font-medium text-sm" data-testid={`text-client-name-${client.ids || client.id}`}>
-              {client.nomeClickup || client.nome || "-"}
-            </div>
-            <div className="px-4 py-3 font-mono text-sm" data-testid={`text-cnpj-${client.ids || client.id}`}>
-              {formatCNPJ(client.cnpjCliente || client.cnpj)}
-            </div>
-            <div className="px-4 py-3 text-sm" data-testid={`text-services-${client.ids || client.id}`}>
-              <div className="text-muted-foreground max-w-[300px] truncate" title={client.servicos || undefined}>
-                {client.servicos || "-"}
+        {sortedClients.map((client) => {
+          const ltv = ltvMap?.[client.ids || String(client.id)] || 0;
+          return (
+            <div 
+              key={client.ids || client.id} 
+              className="grid grid-cols-[minmax(300px,2fr)_minmax(180px,1.5fr)_minmax(200px,2fr)_minmax(140px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)] cursor-pointer hover-elevate"
+              onClick={() => onClientClick(client.ids || String(client.id))}
+              data-testid={`client-row-${client.ids || client.id}`}
+            >
+              <div className="px-4 py-3 font-medium text-sm" data-testid={`text-client-name-${client.ids || client.id}`}>
+                {client.nomeClickup || client.nome || "-"}
               </div>
-            </div>
-            <div className="px-4 py-3 text-sm" data-testid={`text-status-${client.ids || client.id}`}>
-              <Badge className={`${getStatusColor(client.statusClickup)}`} variant="outline">
-                {client.statusClickup || "N/A"}
-              </Badge>
-            </div>
-            <div className="px-4 py-3 text-muted-foreground text-sm" data-testid={`text-date-${client.ids || client.id}`}>
-              {client.dataInicio ? new Date(client.dataInicio).toLocaleDateString('pt-BR') : "-"}
+              <div className="px-4 py-3 font-mono text-sm" data-testid={`text-cnpj-${client.ids || client.id}`}>
+                {formatCNPJ(client.cnpjCliente || client.cnpj)}
+              </div>
+              <div className="px-4 py-3 text-sm" data-testid={`text-services-${client.ids || client.id}`}>
+                <div className="text-muted-foreground max-w-[300px] truncate" title={client.servicos || undefined}>
+                  {client.servicos || "-"}
+                </div>
+              </div>
+              <div className="px-4 py-3 font-medium text-sm" data-testid={`text-ltv-${client.ids || client.id}`}>
+                {ltv > 0 ? formatCurrency(ltv) : "-"}
+              </div>
+              <div className="px-4 py-3 text-sm" data-testid={`text-status-${client.ids || client.id}`}>
+                <Badge className={`${getStatusColor(client.statusClickup)}`} variant="outline">
+                  {client.statusClickup || "N/A"}
+                </Badge>
+              </div>
+              <div className="px-4 py-3 text-muted-foreground text-sm" data-testid={`text-date-${client.ids || client.id}`}>
+                {client.dataInicio ? new Date(client.dataInicio).toLocaleDateString('pt-BR') : "-"}
             </div>
           </div>
         ))}
