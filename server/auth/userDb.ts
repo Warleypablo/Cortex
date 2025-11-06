@@ -16,23 +16,36 @@ const GOOGLE_ID_INDEX_PREFIX = "googleId:";
 
 export async function findUserById(id: string): Promise<User | null> {
   try {
+    console.log("🔍 Buscando usuário por ID:", id);
     const userData = await db.get(`${USERS_PREFIX}${id}`);
-    if (!userData) return null;
-    return (typeof userData === 'string' ? JSON.parse(userData) : userData) as User;
+    console.log("📦 Dados brutos do DB:", userData, "Tipo:", typeof userData);
+    if (!userData) {
+      console.log("❌ Usuário não encontrado");
+      return null;
+    }
+    const parsedUser = (typeof userData === 'string' ? JSON.parse(userData) : userData) as User;
+    console.log("✅ Usuário parseado:", parsedUser);
+    return parsedUser;
   } catch (error) {
-    console.error("Error finding user by id:", error);
+    console.error("❌ Erro ao buscar usuário por id:", error);
     return null;
   }
 }
 
 export async function findUserByGoogleId(googleId: string): Promise<User | null> {
   try {
+    console.log("🔍 Buscando por Google ID:", googleId);
     const userIdData = await db.get(`${GOOGLE_ID_INDEX_PREFIX}${googleId}`);
-    if (!userIdData) return null;
+    console.log("📦 User ID retornado:", userIdData, "Tipo:", typeof userIdData);
+    if (!userIdData) {
+      console.log("❌ Nenhum usuário encontrado para este Google ID");
+      return null;
+    }
     const userId = typeof userIdData === 'string' ? userIdData : String(userIdData);
+    console.log("📝 User ID string:", userId);
     return findUserById(userId);
   } catch (error) {
-    console.error("Error finding user by Google ID:", error);
+    console.error("❌ Erro ao buscar por Google ID:", error);
     return null;
   }
 }
