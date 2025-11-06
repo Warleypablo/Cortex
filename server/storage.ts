@@ -1655,10 +1655,11 @@ export class DbStorage implements IStorage {
       const fullName = (row.nome as string) || '';
       
       // Parsear o campo nome que tem formato "CODIGO DESCRICAO" ou "CODIGO\tDESCRICAO"
-      const parts = fullName.split(/[\s\t]+/, 2);
-      if (parts.length >= 2) {
-        const codigo = parts[0]; // Ex: "06.10"
-        const descricao = parts.slice(1).join(' '); // Ex: "Despesas Administrativas"
+      // Dividir no primeiro espaço/tab e pegar todo o resto como descrição
+      const match = fullName.match(/^([^\s\t]+)[\s\t]+(.+)$/);
+      if (match) {
+        const codigo = match[1]; // Ex: "06.10"
+        const descricao = match[2]; // Ex: "Despesas Administrativas" (nome completo!)
         
         // Normalizar o código (sem pontos, sem zeros à esquerda)
         const categoriaId = normalizeCode(codigo);
