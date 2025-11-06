@@ -292,7 +292,14 @@ const CATEGORIA_NOMES_PADRAO: Record<string, string> = {
   '06.02': 'Despesas Comerciais',
   '06.03': 'Despesas com Pessoal',
   '06.04': 'Despesas Tributárias',
-  '06.05': 'Despesas Operacionais',
+  '06.05': 'Despesas com Serviços',
+  '06.06': 'Despesas com Marketing',
+  '06.07': 'Despesas com Tecnologia',
+  '06.08': 'Despesas com Infraestrutura',
+  '06.09': 'Despesas com Manutenção',
+  '06.10': 'Despesas com Viagens',
+  '06.11': 'Despesas com Treinamento',
+  '06.12': 'Despesas Diversas',
 };
 
 function getCategoriaName(code: string): string {
