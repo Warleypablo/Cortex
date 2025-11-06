@@ -468,9 +468,21 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
     const parentId = determineParent(normalizedId);
     
     if (!nodeMap.has(normalizedId)) {
+      // Estratégia híbrida de nomes (em ordem de prioridade):
+      // 1. Nome da tabela caz_categorias (fonte oficial do Conta Azul)
+      // 2. Nome real do banco de parcelas (categoria existe diretamente)
+      // 3. Nome inferido dos filhos
+      // 4. Nome do mapeamento padrão (DEPRECATED - apenas fallback)
+      // 5. Código (fallback final)
+      const categoriaNome = 
+        (categoriaNamesMap && categoriaNamesMap.get(normalizedId)) ||
+        data.nome ||
+        inferredNames.get(normalizedId) ||
+        getCategoriaName(normalizedId);
+      
       nodeMap.set(normalizedId, {
         categoriaId: normalizedId,
-        categoriaNome: data.nome,
+        categoriaNome,
         nivel,
         parentId,
         children: [],
@@ -1644,6 +1656,8 @@ export class DbStorage implements IStorage {
     }
     
     console.log(`[DFC] Carregadas ${categoriaNamesMap.size} categorias da tabela caz_categorias`);
+    console.log(`[DFC DEBUG] Categoria 06.10 no mapa:`, categoriaNamesMap.get('06.10'));
+    console.log(`[DFC DEBUG] Categoria 6.10 no mapa:`, categoriaNamesMap.get('6.10'));
     
     const whereClauses: string[] = ['categoria_id IS NOT NULL', "categoria_id != ''", "status = 'QUITADO'"];
     
