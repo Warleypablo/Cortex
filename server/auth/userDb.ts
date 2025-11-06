@@ -17,12 +17,15 @@ const GOOGLE_ID_INDEX_PREFIX = "googleId:";
 export async function findUserById(id: string): Promise<User | null> {
   try {
     console.log("🔍 Buscando usuário por ID:", id);
-    const userData = await db.get(`${USERS_PREFIX}${id}`);
-    console.log("📦 Dados brutos do DB:", userData, "Tipo:", typeof userData);
-    if (!userData) {
+    const result: any = await db.get(`${USERS_PREFIX}${id}`);
+    console.log("📦 Dados brutos do DB:", result, "Tipo:", typeof result);
+    
+    if (!result || (result.ok === false)) {
       console.log("❌ Usuário não encontrado");
       return null;
     }
+    
+    const userData = result.value || result;
     const parsedUser = (typeof userData === 'string' ? JSON.parse(userData) : userData) as User;
     console.log("✅ Usuário parseado:", parsedUser);
     return parsedUser;
@@ -35,12 +38,15 @@ export async function findUserById(id: string): Promise<User | null> {
 export async function findUserByGoogleId(googleId: string): Promise<User | null> {
   try {
     console.log("🔍 Buscando por Google ID:", googleId);
-    const userIdData = await db.get(`${GOOGLE_ID_INDEX_PREFIX}${googleId}`);
-    console.log("📦 User ID retornado:", userIdData, "Tipo:", typeof userIdData);
-    if (!userIdData) {
+    const result: any = await db.get(`${GOOGLE_ID_INDEX_PREFIX}${googleId}`);
+    console.log("📦 User ID retornado:", result, "Tipo:", typeof result);
+    
+    if (!result || (result.ok === false)) {
       console.log("❌ Nenhum usuário encontrado para este Google ID");
       return null;
     }
+    
+    const userIdData = result.value || result;
     const userId = typeof userIdData === 'string' ? userIdData : String(userIdData);
     console.log("📝 User ID string:", userId);
     return findUserById(userId);
