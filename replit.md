@@ -32,8 +32,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage Solutions
 - **Primary Database**: Google Cloud SQL (PostgreSQL) for all business data (clients, contracts, employees, financial records).
-    - **Schema**: `caz_` tables for Conta Azul data (`caz_clientes`, `caz_parcelas`), `cup_` tables for ClickUp data (`cup_clientes`, `cup_contratos`), and `rh_pessoal` for employee data.
+    - **Schema**: `caz_` tables for Conta Azul data (`caz_clientes`, `caz_parcelas`, `caz_categorias`), `cup_` tables for ClickUp data (`cup_clientes`, `cup_contratos`), and `rh_pessoal` for employee data.
     - **Key Relationships**: CNPJ links Conta Azul and ClickUp client data. `caz_parcelas` stores hierarchical category data in `categoria_nome`.
+    - **Category Names**: `caz_categorias` table contains official category names in format "CODE DESCRIPTION" (e.g., "06.10 Despesas Administrativas"). The `nome` field is parsed to extract code and description separately.
 - **Authentication Database**: Replit Database for user authentication data (users, sessions).
 - **ORM**: Drizzle ORM for Google Cloud SQL.
 
