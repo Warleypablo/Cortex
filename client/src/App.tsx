@@ -22,6 +22,7 @@ import DashboardGeG from "@/pages/DashboardGeG";
 import DashboardRetencao from "@/pages/DashboardRetencao";
 import DashboardDFC from "@/pages/DashboardDFC";
 import AdminUsuarios from "@/pages/AdminUsuarios";
+import AccessDenied from "@/pages/AccessDenied";
 import Login from "@/pages/Login";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -41,10 +42,30 @@ interface User {
   name: string;
   picture: string;
   createdAt: string;
+  role: 'admin' | 'user';
+  allowedRoutes: string[];
+}
+
+function ProtectedRoute({ path, component: Component }: { path: string; component: React.ComponentType }) {
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/me"],
+  });
+
+  if (!user) {
+    return <PageLoader />;
+  }
+
+  const hasAccess = user.role === 'admin' || (user.allowedRoutes && user.allowedRoutes.includes(path));
+
+  if (!hasAccess) {
+    return <AccessDenied />;
+  }
+
+  return <Component />;
 }
 
 function ProtectedRouter() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   
   const { data: user, isLoading, error } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -56,6 +77,16 @@ function ProtectedRouter() {
     }
   }, [isLoading, error, user, setLocation]);
 
+  useEffect(() => {
+    if (!isLoading && user && location === '/') {
+      if (user.role !== 'admin' && (!user.allowedRoutes || !user.allowedRoutes.includes('/'))) {
+        if (user.allowedRoutes && user.allowedRoutes.length > 0) {
+          setLocation(user.allowedRoutes[0]);
+        }
+      }
+    }
+  }, [isLoading, user, location, setLocation]);
+
   if (isLoading) {
     return <PageLoader />;
   }
@@ -66,20 +97,20 @@ function ProtectedRouter() {
 
   return (
     <Switch>
-      <Route path="/" component={Clients} />
-      <Route path="/contratos" component={Contracts} />
-      <Route path="/colaboradores" component={Colaboradores} />
-      <Route path="/colaboradores/analise" component={ColaboradoresAnalise} />
-      <Route path="/patrimonio/:id" component={PatrimonioDetail} />
-      <Route path="/patrimonio" component={Patrimonio} />
-      <Route path="/ferramentas" component={Ferramentas} />
-      <Route path="/visao-geral" component={VisaoGeral} />
-      <Route path="/dashboard/financeiro" component={DashboardFinanceiro} />
-      <Route path="/dashboard/geg" component={DashboardGeG} />
-      <Route path="/dashboard/retencao" component={DashboardRetencao} />
-      <Route path="/dashboard/dfc" component={DashboardDFC} />
-      <Route path="/admin/usuarios" component={AdminUsuarios} />
-      <Route path="/cliente/:id" component={ClientDetail} />
+      <Route path="/">{() => <ProtectedRoute path="/" component={Clients} />}</Route>
+      <Route path="/contratos">{() => <ProtectedRoute path="/contratos" component={Contracts} />}</Route>
+      <Route path="/colaboradores">{() => <ProtectedRoute path="/colaboradores" component={Colaboradores} />}</Route>
+      <Route path="/colaboradores/analise">{() => <ProtectedRoute path="/colaboradores/analise" component={ColaboradoresAnalise} />}</Route>
+      <Route path="/patrimonio/:id">{() => <ProtectedRoute path="/patrimonio" component={PatrimonioDetail} />}</Route>
+      <Route path="/patrimonio">{() => <ProtectedRoute path="/patrimonio" component={Patrimonio} />}</Route>
+      <Route path="/ferramentas">{() => <ProtectedRoute path="/ferramentas" component={Ferramentas} />}</Route>
+      <Route path="/visao-geral">{() => <ProtectedRoute path="/visao-geral" component={VisaoGeral} />}</Route>
+      <Route path="/dashboard/financeiro">{() => <ProtectedRoute path="/dashboard/financeiro" component={DashboardFinanceiro} />}</Route>
+      <Route path="/dashboard/geg">{() => <ProtectedRoute path="/dashboard/geg" component={DashboardGeG} />}</Route>
+      <Route path="/dashboard/retencao">{() => <ProtectedRoute path="/dashboard/retencao" component={DashboardRetencao} />}</Route>
+      <Route path="/dashboard/dfc">{() => <ProtectedRoute path="/dashboard/dfc" component={DashboardDFC} />}</Route>
+      <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
+      <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>
       <Route>
         {() => (
           <Suspense fallback={<PageLoader />}>

@@ -4,14 +4,21 @@ import { storage } from "./storage";
 import { insertColaboradorSchema, insertPatrimonioSchema } from "@shared/schema";
 import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
-import { getAllUsers, listAllKeys } from "./auth/userDb";
+import { getAllUsers, listAllKeys, updateUserPermissions } from "./auth/userDb";
+
+function isAdmin(req: any, res: any, next: any) {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: "Forbidden - Admin access required" });
+  }
+  next();
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use(authRoutes);
   
   app.use("/api", isAuthenticated);
   
-  app.get("/api/debug/users", async (req, res) => {
+  app.get("/api/debug/users", isAdmin, async (req, res) => {
     try {
       const users = await getAllUsers();
       const allKeys = await listAllKeys();
@@ -19,6 +26,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching debug info:", error);
       res.status(500).json({ error: "Failed to fetch debug info" });
+    }
+  });
+
+  app.post("/api/users/:userId/permissions", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { allowedRoutes } = req.body;
+
+      if (!Array.isArray(allowedRoutes)) {
+        return res.status(400).json({ error: "allowedRoutes must be an array" });
+      }
+
+      const updatedUser = await updateUserPermissions(userId, allowedRoutes);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("[api] Error updating permissions:", error);
+      res.status(500).json({ error: "Failed to update permissions" });
     }
   });
   
