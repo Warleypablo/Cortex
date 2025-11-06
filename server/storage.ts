@@ -276,6 +276,29 @@ function normalizeCode(code: string): string {
   return parts.map(part => part.padStart(2, '0')).join('.');
 }
 
+const CATEGORIA_NOMES_PADRAO: Record<string, string> = {
+  '03': 'Receitas',
+  '04': 'Outras Receitas',
+  '05': 'Custos',
+  '06': 'Despesas Operacionais',
+  '07': 'Despesas Financeiras',
+  '08': 'Outras Despesas',
+  '03.01': 'Receitas de Serviços',
+  '03.02': 'Receitas de Vendas',
+  '03.03': 'Receitas Recorrentes',
+  '03.04': 'Receitas Não Recorrentes',
+  '03.05': 'Outras Receitas Operacionais',
+  '06.01': 'Despesas Administrativas',
+  '06.02': 'Despesas Comerciais',
+  '06.03': 'Despesas com Pessoal',
+  '06.04': 'Despesas Tributárias',
+  '06.05': 'Despesas Operacionais',
+};
+
+function getCategoriaName(code: string): string {
+  return CATEGORIA_NOMES_PADRAO[code] || code;
+}
+
 function determineLevel(categoriaId: string): number {
   const parts = categoriaId.split('.');
   return parts.length;
@@ -374,7 +397,7 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
         const parentLevel = determineLevel(parentNormalizedId);
         const parentParentId = determineParent(parentNormalizedId);
         
-        const parentName = `${parentNormalizedId.replace(/\./g, '.')}`;
+        const parentName = getCategoriaName(parentNormalizedId);
         
         nodeMap.set(parentNormalizedId, {
           categoriaId: parentNormalizedId,
