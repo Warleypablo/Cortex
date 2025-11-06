@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, Shield } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -73,6 +73,14 @@ const dashboardItems = [
   },
 ];
 
+const adminItems = [
+  {
+    title: "Gerenciar Usuários",
+    url: "/admin/usuarios",
+    icon: Shield,
+  },
+];
+
 export function AppSidebar() {
   const [location] = useLocation();
   const [isDashboardOpen, setIsDashboardOpen] = useState(
@@ -137,6 +145,28 @@ export function AppSidebar() {
                     asChild 
                     isActive={location === item.url}
                     data-testid={`nav-${item.title.toLowerCase()}`}
+                  >
+                    <Link href={item.url}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Administração</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {adminItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === item.url}
+                    data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
                   >
                     <Link href={item.url}>
                       <item.icon />

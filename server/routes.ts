@@ -4,11 +4,23 @@ import { storage } from "./storage";
 import { insertColaboradorSchema, insertPatrimonioSchema } from "@shared/schema";
 import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
+import { getAllUsers, listAllKeys } from "./auth/userDb";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use(authRoutes);
   
   app.use("/api", isAuthenticated);
+  
+  app.get("/api/debug/users", async (req, res) => {
+    try {
+      const users = await getAllUsers();
+      const allKeys = await listAllKeys();
+      res.json({ users, allKeys, count: users.length, totalKeys: allKeys.length });
+    } catch (error) {
+      console.error("[api] Error fetching debug info:", error);
+      res.status(500).json({ error: "Failed to fetch debug info" });
+    }
+  });
   
   app.get("/api/clientes", async (req, res) => {
     try {
