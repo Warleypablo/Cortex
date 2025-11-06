@@ -1689,7 +1689,7 @@ export class DbStorage implements IStorage {
       SELECT 
         id,
         descricao,
-        valor_bruto,
+        valor_pago,
         categoria_id,
         categoria_nome,
         valor_categoria,
