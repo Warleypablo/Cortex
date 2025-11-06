@@ -2,8 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertColaboradorSchema, insertPatrimonioSchema } from "@shared/schema";
+import authRoutes from "./auth/routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.use(authRoutes);
   app.get("/api/clientes", async (req, res) => {
     try {
       const clientes = await storage.getClientes();
