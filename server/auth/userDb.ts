@@ -115,7 +115,10 @@ export async function findUserByGoogleId(googleId: string): Promise<User | null>
   }
 }
 
-const ADMIN_EMAILS = ['caio.massaroni@turbopartners.com.br'];
+const ADMIN_EMAILS = [
+  'caio.massaroni@turbopartners.com.br',
+  'warley.silva@turbopartners.com.br'
+];
 const ALL_ROUTES = [
   '/',
   '/contratos',
