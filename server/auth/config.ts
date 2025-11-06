@@ -20,6 +20,10 @@ export function configurePassport() {
     return;
   }
 
+  console.log("✅ Google OAuth configured successfully");
+  console.log("📍 Client ID starts with:", clientID.substring(0, 20) + "...");
+  console.log("📍 Callback URL:", getCallbackURL());
+
   passport.use(
     new GoogleStrategy(
       {

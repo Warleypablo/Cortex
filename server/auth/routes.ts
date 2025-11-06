@@ -4,9 +4,12 @@ import type { User } from "./userDb";
 
 const router = Router();
 
-router.get("/auth/google", passport.authenticate("google", {
-  scope: ["profile", "email"],
-}));
+router.get("/auth/google", (req, res, next) => {
+  console.log("🚀 Iniciando autenticação Google OAuth...");
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+  })(req, res, next);
+});
 
 router.get("/auth/google/callback",
   passport.authenticate("google", { failureRedirect: "/login" }),
