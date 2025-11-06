@@ -206,14 +206,96 @@ export default function DashboardDFC() {
                   Nenhum dado de DFC disponível para os filtros selecionados.
                 </div>
               ) : (
-                <div className="overflow-x-auto relative">
-                  <div className="inline-block min-w-full">
+                <div className="border rounded-md overflow-hidden">
+                  {/* Headers */}
+                  <div className="flex border-b bg-muted/50">
+                    <div className="flex-shrink-0 w-[350px] px-4 py-3 font-medium border-r">
+                      Categoria
+                    </div>
+                    <div className="flex-1 overflow-x-auto">
+                      <div className="flex">
+                        {dfcData.meses.map(mes => {
+                          const [ano, mesNum] = mes.split('-');
+                          const data = new Date(parseInt(ano), parseInt(mesNum) - 1);
+                          const mesFormatado = data.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+                          return (
+                            <div key={mes} className="min-w-[140px] px-4 py-3 font-medium text-center">
+                              {mesFormatado}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Content with synchronized scroll */}
+                  <div className="flex max-h-[600px] overflow-y-auto">
+                    {/* Painel esquerdo fixo - Categorias */}
+                    <div className="flex-shrink-0 w-[350px] border-r">
+                      {visibleItems.map((item, idx) => {
+                        if (item.type === 'node') {
+                          const node = item.node;
+                          const hasParcelas = node.isLeaf && node.parcelas && node.parcelas.length > 0;
+                          
+                          return (
+                            <div
+                              key={node.categoriaId}
+                              className="border-b px-4 py-3 hover-elevate bg-background"
+                              style={{ paddingLeft: `${node.nivel * 24 + 16}px` }}
+                              data-testid={`dfc-row-${node.categoriaId}`}
+                            >
+                              <div className="flex items-center gap-1">
+                                {!node.isLeaf || hasParcelas ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 flex-shrink-0"
+                                    onClick={() => toggleExpand(node.categoriaId)}
+                                    data-testid={`button-toggle-${node.categoriaId}`}
+                                  >
+                                    {expanded.has(node.categoriaId) ? (
+                                      <ChevronDown className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                ) : (
+                                  <div className="w-6 flex-shrink-0" />
+                                )}
+                                <span className={node.isLeaf ? "" : "font-semibold"}>
+                                  {node.categoriaId} - {node.categoriaNome}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        } else {
+                          const parcela = item.parcela;
+                          const parentNode = item.parentNode;
+                          
+                          return (
+                            <div
+                              key={`${parentNode.categoriaId}-parcela-${parcela.id}-${idx}`}
+                              className="border-b px-4 py-3 hover-elevate bg-muted/30"
+                              style={{ paddingLeft: `${(parentNode.nivel + 1) * 24 + 16}px` }}
+                              data-testid={`dfc-row-parcela-${parcela.id}-${parentNode.categoriaId}`}
+                            >
+                              <div className="flex items-center gap-1">
+                                <div className="w-6 flex-shrink-0" />
+                                <span className="text-sm text-muted-foreground">
+                                  #{parcela.id} - {parcela.descricao || 'Sem descrição'}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        }
+                      })}
+                    </div>
+
+                    {/* Painel direito scrollável - Meses */}
+                    <div className="flex-1 overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="sticky left-0 bg-background z-10 min-w-[300px] shadow-[2px_0_4px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
-                            Categoria
-                          </TableHead>
                           {dfcData.meses.map(mes => {
                             const [ano, mesNum] = mes.split('-');
                             const data = new Date(parseInt(ano), parseInt(mesNum) - 1);
@@ -230,41 +312,12 @@ export default function DashboardDFC() {
                         {visibleItems.map((item, idx) => {
                           if (item.type === 'node') {
                             const node = item.node;
-                            const hasParcelas = node.isLeaf && node.parcelas && node.parcelas.length > 0;
                             
                             return (
                               <TableRow 
                                 key={node.categoriaId}
                                 className="hover-elevate"
-                                data-testid={`dfc-row-${node.categoriaId}`}
                               >
-                                <TableCell 
-                                  className="sticky left-0 bg-background z-10 shadow-[2px_0_4px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_rgba(0,0,0,0.3)]"
-                                  style={{ paddingLeft: `${node.nivel * 24 + 12}px` }}
-                                >
-                                  <div className="flex items-center gap-1">
-                                    {!node.isLeaf || hasParcelas ? (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6"
-                                        onClick={() => toggleExpand(node.categoriaId)}
-                                        data-testid={`button-toggle-${node.categoriaId}`}
-                                      >
-                                        {expanded.has(node.categoriaId) ? (
-                                          <ChevronDown className="h-4 w-4" />
-                                        ) : (
-                                          <ChevronRight className="h-4 w-4" />
-                                        )}
-                                      </Button>
-                                    ) : (
-                                      <div className="w-6" />
-                                    )}
-                                    <span className={node.isLeaf ? "" : "font-semibold"}>
-                                      {node.categoriaId} - {node.categoriaNome}
-                                    </span>
-                                  </div>
-                                </TableCell>
                                 {dfcData.meses.map(mes => {
                                   const valor = node.valuesByMonth[mes] || 0;
                                   return (
@@ -287,25 +340,12 @@ export default function DashboardDFC() {
                             );
                           } else {
                             const parcela = item.parcela;
-                            const parentNode = item.parentNode;
                             
                             return (
                               <TableRow 
-                                key={`${parentNode.categoriaId}-parcela-${parcela.id}-${idx}`}
+                                key={`parcela-${parcela.id}-${idx}`}
                                 className="hover-elevate bg-muted/30"
-                                data-testid={`dfc-row-parcela-${parcela.id}-${parentNode.categoriaId}`}
                               >
-                                <TableCell 
-                                  className="sticky left-0 bg-muted/30 z-10 shadow-[2px_0_4px_rgba(0,0,0,0.1)] dark:shadow-[2px_0_4px_rgba(0,0,0,0.3)]"
-                                  style={{ paddingLeft: `${(parentNode.nivel + 1) * 24 + 12}px` }}
-                                >
-                                  <div className="flex items-center gap-1">
-                                    <div className="w-6" />
-                                    <span className="text-sm text-muted-foreground">
-                                      #{parcela.id} - {parcela.descricao || 'Sem descrição'}
-                                    </span>
-                                  </div>
-                                </TableCell>
                                 {dfcData.meses.map(mes => {
                                   const valor = parcela.mes === mes ? parcela.valorBruto : 0;
                                   return (
@@ -330,6 +370,7 @@ export default function DashboardDFC() {
                         })}
                       </TableBody>
                     </Table>
+                    </div>
                   </div>
                 </div>
               )}
