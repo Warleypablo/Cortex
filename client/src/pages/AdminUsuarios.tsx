@@ -182,7 +182,15 @@ export default function AdminUsuarios() {
                       </code>
                     </TableCell>
                     <TableCell data-testid={`text-created-${user.id}`}>
-                      {format(new Date(user.createdAt), "dd/MM/yyyy 'às' HH:mm")}
+                      {(() => {
+                        try {
+                          const date = new Date(user.createdAt);
+                          if (isNaN(date.getTime())) return '-';
+                          return format(date, "dd/MM/yyyy 'às' HH:mm");
+                        } catch {
+                          return '-';
+                        }
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}
