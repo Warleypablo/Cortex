@@ -5,6 +5,8 @@ import { insertColaboradorSchema, insertPatrimonioSchema } from "@shared/schema"
 import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
 import { getAllUsers, listAllKeys, updateUserPermissions } from "./auth/userDb";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== 'admin') {
