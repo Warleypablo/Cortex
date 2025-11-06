@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -49,12 +49,17 @@ function ProtectedRouter() {
     queryKey: ["/api/auth/me"],
   });
 
+  useEffect(() => {
+    if (!isLoading && (error || !user)) {
+      setLocation("/login");
+    }
+  }, [isLoading, error, user, setLocation]);
+
   if (isLoading) {
     return <PageLoader />;
   }
 
   if (error || !user) {
-    setLocation("/login");
     return null;
   }
 
