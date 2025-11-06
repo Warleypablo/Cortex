@@ -16,7 +16,7 @@ export class ReplitSessionStore extends Store {
       if (!data) {
         return callback(null, null);
       }
-      const session = JSON.parse(String(data));
+      const session = typeof data === 'string' ? JSON.parse(data) : data;
       callback(null, session);
     } catch (error) {
       callback(error);
