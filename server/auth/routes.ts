@@ -4,6 +4,21 @@ import type { User } from "./userDb";
 
 const router = Router();
 
+router.get("/auth/debug", (req, res) => {
+  const clientID = process.env.GOOGLE_CLIENT_ID;
+  const domain = process.env.REPLIT_DEV_DOMAIN;
+  const callbackURL = domain 
+    ? `https://${domain}/auth/google/callback`
+    : "http://localhost:5000/auth/google/callback";
+  
+  res.json({
+    clientIDExists: !!clientID,
+    clientIDStart: clientID?.substring(0, 30),
+    callbackURL,
+    domain
+  });
+});
+
 router.get("/auth/google", (req, res, next) => {
   console.log("🚀 Iniciando autenticação Google OAuth...");
   passport.authenticate("google", {
@@ -12,9 +27,27 @@ router.get("/auth/google", (req, res, next) => {
 });
 
 router.get("/auth/google/callback",
-  passport.authenticate("google", { failureRedirect: "/login" }),
-  (req, res) => {
-    res.redirect("/");
+  (req, res, next) => {
+    console.log("📥 Callback do Google recebido");
+    console.log("Query params:", req.query);
+    passport.authenticate("google", { failureRedirect: "/login" }, (err, user, info) => {
+      if (err) {
+        console.error("❌ Erro na autenticação Google:", err);
+        return res.redirect("/login");
+      }
+      if (!user) {
+        console.error("❌ Usuário não retornado. Info:", info);
+        return res.redirect("/login");
+      }
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error("❌ Erro ao fazer login:", loginErr);
+          return res.redirect("/login");
+        }
+        console.log("✅ Login bem-sucedido!");
+        res.redirect("/");
+      });
+    })(req, res, next);
   }
 );
 
