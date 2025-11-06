@@ -416,7 +416,7 @@ function determineParent(categoriaId: string): string {
   return (twoDigitPrefix === '03' || twoDigitPrefix === '04') ? 'RECEITAS' : 'DESPESAS';
 }
 
-function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: Map<string, DfcParcela[]>): DfcHierarchicalResponse {
+function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: Map<string, DfcParcela[]>, categoriaNamesMap?: Map<string, string>): DfcHierarchicalResponse {
   const nodeMap = new Map<string, DfcNode>();
   
   nodeMap.set('RECEITAS', {
@@ -508,11 +508,13 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
         const parentParentId = determineParent(parentNormalizedId);
         
         // Estratégia híbrida de nomes (em ordem de prioridade):
-        // 1. Nome real do banco (categoria existe diretamente)
-        // 2. Nome inferido dos filhos
-        // 3. Nome do mapeamento padrão
-        // 4. Código (fallback)
+        // 1. Nome da tabela caz_categorias (fonte oficial)
+        // 2. Nome real do banco de parcelas (categoria existe diretamente)
+        // 3. Nome inferido dos filhos
+        // 4. Nome do mapeamento padrão (DEPRECATED - apenas fallback)
+        // 5. Código (fallback final)
         const parentName = 
+          (categoriaNamesMap && categoriaNamesMap.get(parentNormalizedId)) ||
           realCategoryNames.get(parentNormalizedId) || 
           inferredNames.get(parentNormalizedId) || 
           getCategoriaName(parentNormalizedId);
@@ -1628,6 +1630,21 @@ export class DbStorage implements IStorage {
   }
 
   async getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse> {
+    // Buscar nomes reais das categorias da tabela caz_categorias
+    const categoriasReais = await db.execute(sql.raw(`
+      SELECT id, nome 
+      FROM caz_categorias 
+      WHERE id IS NOT NULL AND id != ''
+    `));
+    
+    const categoriaNamesMap = new Map<string, string>();
+    for (const row of categoriasReais.rows) {
+      const categoriaId = normalizeCode(row.id as string);
+      categoriaNamesMap.set(categoriaId, row.nome as string);
+    }
+    
+    console.log(`[DFC] Carregadas ${categoriaNamesMap.size} categorias da tabela caz_categorias`);
+    
     const whereClauses: string[] = ['categoria_id IS NOT NULL', "categoria_id != ''", "status = 'QUITADO'"];
     
     if (mesInicio) {
@@ -1749,7 +1766,7 @@ export class DbStorage implements IStorage {
     console.log(`[DFC DEBUG] Parcelas únicas processadas: ${parcelaIdsProcessadas.size}`);
     console.log(`[DFC DEBUG] Total valor processado (soma de valor_categoria): ${totalValorProcessado.toFixed(2)}`);
 
-    return buildHierarchy(items, meses, parcelasByCategory);
+    return buildHierarchy(items, meses, parcelasByCategory, categoriaNamesMap);
   }
 }
 

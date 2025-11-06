@@ -74,6 +74,13 @@ export const cazParcelas = pgTable("caz_parcelas", {
   valorCategoria: text("valor_categoria"),
 });
 
+export const cazCategorias = pgTable("caz_categorias", {
+  id: text("id").primaryKey(),
+  nome: text("nome"),
+  tipo: text("tipo"),
+  empresa: text("empresa"),
+});
+
 export const cazBancos = pgTable("caz_bancos", {
   id: integer("id").primaryKey(),
   nome: text("nome"),
