@@ -4,6 +4,7 @@ import passport from "passport";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
+import { ReplitSessionStore } from "./auth/sessionStore";
 
 const app = express();
 app.use(express.json());
@@ -11,6 +12,7 @@ app.use(express.urlencoded({ extended: false }));
 
 app.use(
   session({
+    store: new ReplitSessionStore(),
     secret: process.env.SESSION_SECRET || "development-secret-change-in-production",
     resave: false,
     saveUninitialized: false,

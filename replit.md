@@ -143,9 +143,13 @@ Preferred communication style: Simple, everyday language.
 - **ClickUp Tables (cup_*)**: Operational client and contract data from ClickUp
   - `cup_clientes`: Client operational data with CNPJ as primary key
   - `cup_contratos`: Contract details with squad assignments
-- **Internal Tables**:
+- **Internal Tables (Google Cloud SQL)**:
   - `rh_pessoal`: Employee/collaborator data with full HR information (25 fields)
-  - `users`: Authentication data (not actively used)
+- **Replit Database**: User authentication data (separate from Google Cloud SQL)
+  - User records stored with prefix `user:{id}` containing: id, googleId, email, name, picture, createdAt
+  - Google ID index stored with prefix `googleId:{googleId}` for fast lookups
+  - Session data stored with prefix `session:{sid}` using custom ReplitSessionStore
+  - Sessions persist across server restarts with 7-day expiration
 
 **Data Integration Strategy**
 - CNPJ field used as relationship key between Conta Azul and ClickUp systems
@@ -170,9 +174,11 @@ Preferred communication style: Simple, everyday language.
 - nanoid for generating unique identifiers
 
 **Database & Session**
-- @neondatabase/serverless for PostgreSQL connections
-- connect-pg-simple for PostgreSQL-backed session storage (configured but not actively used yet)
-- Drizzle ORM and Drizzle Kit for database operations and migrations
+- @neondatabase/serverless for PostgreSQL connections to Google Cloud SQL
+- @replit/database for user authentication data and session persistence (separate from business data)
+- express-session with custom ReplitSessionStore for persistent session management
+- Passport.js with passport-google-oauth20 for Google OAuth authentication
+- Drizzle ORM and Drizzle Kit for database operations and migrations on Google Cloud SQL
 
 **Development Tools**
 - Replit-specific plugins for vite (cartographer, dev-banner, runtime-error-modal) for enhanced development experience on Replit platform
@@ -182,6 +188,38 @@ Preferred communication style: Simple, everyday language.
 **Design Assets**
 - Google Fonts (Poppins) for typography
 - Generated avatar images stored in `attached_assets/generated_images/`
+
+## Authentication & Authorization
+
+**Dual-Database Architecture**
+- **Google Cloud SQL (PostgreSQL)**: Stores all business data (clients, contracts, employees, financials)
+- **Replit Database**: Stores only user authentication data (users, sessions)
+- This separation ensures authentication data is isolated from business operational data
+
+**Google OAuth Flow**
+1. User clicks "Continuar com Google" on `/login` page
+2. Redirects to `/auth/google` which initiates Google OAuth flow
+3. Google redirects back to `/auth/google/callback` with authorization code
+4. Server exchanges code for user profile (email, name, picture)
+5. User created/updated in Replit Database with Google profile data
+6. Session established and user redirected to dashboard
+
+**Protected Routes**
+- All `/api/*` routes require authentication via `isAuthenticated` middleware
+- Frontend checks authentication status via `/api/auth/me` endpoint
+- Unauthenticated users automatically redirected to `/login` page
+- Session persists for 7 days with secure cookies
+
+**User Interface**
+- Login page: Clean card design with Google OAuth button
+- TopBar: Displays user avatar (from Google profile) and name
+- Logout dropdown: Shows user email and logout option
+- All user data (name, email, picture) sourced from Google OAuth profile
+
+**Configuration**
+- Requires `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in Replit Secrets
+- Authorized Redirect URI displayed in server logs on startup
+- Example: `https://{REPLIT_DEV_DOMAIN}/auth/google/callback`
 
 ## Notes
 
@@ -194,7 +232,5 @@ Preferred communication style: Simple, everyday language.
   - Within Conta Azul: `caz_parcelas.id_cliente` ↔ `caz_clientes.ids`
   - Within ClickUp: `cup_contratos.id_task` ↔ `cup_clientes.task_id`
 - **Squad Mapping**: ClickUp squad codes map to names (0=Supreme, 1=Forja, 2=Squadra, 3=Chama)
-- Session management infrastructure is in place but not actively implemented
-- Authentication and authorization mechanisms are defined in schema but not yet implemented in routes
 - The design system emphasizes light mode as primary with dark mode support through CSS custom properties
 - All UI icons use Lucide React - no emojis per design guidelines
