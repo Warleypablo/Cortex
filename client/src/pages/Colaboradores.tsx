@@ -8,6 +8,7 @@ import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { z } from "zod";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -430,8 +431,23 @@ function AddColaboradorDialog() {
 function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborador: Colaborador; open: boolean; onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
 
-  const form = useForm<InsertColaborador>({
-    resolver: zodResolver(insertColaboradorSchema),
+  const editColaboradorSchema = insertColaboradorSchema.extend({
+    demissao: z.string().optional(),
+  }).refine(
+    (data) => {
+      if (data.status === "Dispensado") {
+        return !!data.demissao;
+      }
+      return true;
+    },
+    {
+      message: "Data de demissão é obrigatória quando o status é 'Dispensado'",
+      path: ["demissao"],
+    }
+  );
+
+  const form = useForm<InsertColaborador & { demissao?: string }>({
+    resolver: zodResolver(editColaboradorSchema),
     defaultValues: {
       nome: colaborador.nome || "",
       status: colaborador.status || "Ativo",
@@ -449,8 +465,17 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
       cnpj: colaborador.cnpj || "",
       aniversario: colaborador.aniversario ? new Date(colaborador.aniversario).toISOString().split('T')[0] : undefined,
       admissao: colaborador.admissao ? new Date(colaborador.admissao).toISOString().split('T')[0] : undefined,
+      demissao: colaborador.demissao ? new Date(colaborador.demissao).toISOString().split('T')[0] : undefined,
     },
   });
+
+  const status = form.watch("status");
+
+  useEffect(() => {
+    if (status !== "Dispensado") {
+      form.setValue("demissao", undefined, { shouldValidate: true });
+    }
+  }, [status, form]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertColaborador) => {
@@ -737,6 +762,27 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                 )}
               />
             </div>
+
+            {status === "Dispensado" && (
+              <FormField
+                control={form.control}
+                name="demissao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data de Demissão *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-edit-demissao"
+                        type="date"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <DialogFooter>
               <Button
