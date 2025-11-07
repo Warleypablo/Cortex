@@ -1975,10 +1975,12 @@ export class DbStorage implements IStorage {
           END) as headcount,
           COUNT(DISTINCT CASE 
             WHEN date_trunc('month', r.admissao) = m.mes
+              AND r.status = 'Ativo'
             THEN r.id 
           END) as admissoes,
           COUNT(DISTINCT CASE 
             WHEN date_trunc('month', r.demissao) = m.mes
+              AND r.status = 'Dispensado'
             THEN r.id 
           END) as demissoes
         FROM meses m
@@ -2014,10 +2016,12 @@ export class DbStorage implements IStorage {
         TO_CHAR(m.mes, 'YYYY-MM') as mes,
         COUNT(DISTINCT CASE 
           WHEN date_trunc('month', r.admissao) = m.mes
+            AND r.status = 'Ativo'
           THEN r.id 
         END) as admissoes,
         COUNT(DISTINCT CASE 
           WHEN date_trunc('month', r.demissao) = m.mes
+            AND r.status = 'Dispensado'
           THEN r.id 
         END) as demissoes
       FROM meses m
