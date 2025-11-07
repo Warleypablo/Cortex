@@ -1858,18 +1858,18 @@ export class DbStorage implements IStorage {
   async getGegMetricas(periodo: string, squad: string, setor: string): Promise<any> {
     const { dataInicio, dataFim } = this.calcularPeriodo(periodo);
     
-    let whereConditions = [sql`status = 'ativo'`];
+    let whereCurrentConditions = [sql`status = 'ativo'`];
     if (squad !== 'todos') {
-      whereConditions.push(sql`squad = ${squad}`);
+      whereCurrentConditions.push(sql`squad = ${squad}`);
     }
     if (setor !== 'todos') {
-      whereConditions.push(sql`setor = ${setor}`);
+      whereCurrentConditions.push(sql`setor = ${setor}`);
     }
 
     const headcountResult = await db.execute(sql`
       SELECT COUNT(*) as total
       FROM rh_pessoal
-      WHERE ${sql.join(whereConditions, sql` AND `)}
+      WHERE ${sql.join(whereCurrentConditions, sql` AND `)}
     `);
     
     const headcount = parseInt(headcountResult.rows[0]?.total as string || '0');
@@ -1932,7 +1932,7 @@ export class DbStorage implements IStorage {
     const tempoMedioResult = await db.execute(sql`
       SELECT AVG(meses_de_turbo) as tempo_medio
       FROM rh_pessoal
-      WHERE ${sql.join(whereConditions, sql` AND `)}
+      WHERE ${sql.join(whereCurrentConditions, sql` AND `)}
         AND meses_de_turbo IS NOT NULL
     `);
 
