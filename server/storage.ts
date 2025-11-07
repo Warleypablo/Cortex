@@ -1962,8 +1962,14 @@ export class DbStorage implements IStorage {
         SELECT 
           TO_CHAR(m.mes, 'YYYY-MM') as mes,
           COUNT(DISTINCT CASE 
-            WHEN r.admissao <= m.mes 
-              AND (r.demissao IS NULL OR r.demissao > m.mes)
+            WHEN r.admissao <= CASE 
+              WHEN m.mes = date_trunc('month', CURRENT_DATE) THEN CURRENT_DATE
+              ELSE m.mes
+            END
+              AND (r.demissao IS NULL OR r.demissao > CASE 
+                WHEN m.mes = date_trunc('month', CURRENT_DATE) THEN CURRENT_DATE
+                ELSE m.mes
+              END)
             THEN r.id 
           END) as headcount,
           COUNT(DISTINCT CASE 
