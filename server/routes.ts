@@ -18,6 +18,20 @@ function isAdmin(req: any, res: any, next: any) {
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use(authRoutes);
   
+  app.get("/debug-colaboradores-count", async (req, res) => {
+    try {
+      const colaboradores = await storage.getColaboradores();
+      res.json({ 
+        total: colaboradores.length, 
+        ativos: colaboradores.filter(c => c.status === 'ativo').length,
+        primeiros5: colaboradores.slice(0, 5).map(c => ({ id: c.id, nome: c.nome, status: c.status }))
+      });
+    } catch (error) {
+      console.error("[debug] Error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
   app.use("/api", isAuthenticated);
   
   app.get("/api/debug/users", isAdmin, async (req, res) => {
@@ -145,6 +159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/colaboradores", async (req, res) => {
     try {
       const colaboradores = await storage.getColaboradores();
+      console.log(`[DEBUG] Colaboradores encontrados no banco: ${colaboradores.length} total, ${colaboradores.filter(c => c.status === 'ativo').length} ativos`);
       res.json(colaboradores);
     } catch (error) {
       console.error("[api] Error fetching colaboradores:", error);
