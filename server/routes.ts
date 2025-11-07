@@ -440,6 +440,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/geg/metricas", async (req, res) => {
+    try {
+      const periodo = req.query.periodo as string || 'trimestre';
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const metricas = await storage.getGegMetricas(periodo, squad, setor);
+      res.json(metricas);
+    } catch (error) {
+      console.error("[api] Error fetching GEG metricas:", error);
+      res.status(500).json({ error: "Failed to fetch GEG metricas" });
+    }
+  });
+
+  app.get("/api/geg/evolucao-headcount", async (req, res) => {
+    try {
+      const periodo = req.query.periodo as string || 'trimestre';
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const evolucao = await storage.getGegEvolucaoHeadcount(periodo, squad, setor);
+      res.json(evolucao);
+    } catch (error) {
+      console.error("[api] Error fetching GEG evolucao headcount:", error);
+      res.status(500).json({ error: "Failed to fetch GEG evolucao headcount" });
+    }
+  });
+
+  app.get("/api/geg/admissoes-demissoes", async (req, res) => {
+    try {
+      const periodo = req.query.periodo as string || 'trimestre';
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const dados = await storage.getGegAdmissoesDemissoes(periodo, squad, setor);
+      res.json(dados);
+    } catch (error) {
+      console.error("[api] Error fetching GEG admissoes demissoes:", error);
+      res.status(500).json({ error: "Failed to fetch GEG admissoes demissoes" });
+    }
+  });
+
+  app.get("/api/geg/tempo-promocao", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const tempoPromocao = await storage.getGegTempoPromocao(squad, setor);
+      res.json(tempoPromocao);
+    } catch (error) {
+      console.error("[api] Error fetching GEG tempo promocao:", error);
+      res.status(500).json({ error: "Failed to fetch GEG tempo promocao" });
+    }
+  });
+
+  app.get("/api/geg/aniversariantes-mes", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const aniversariantes = await storage.getGegAniversariantesMes(squad, setor);
+      res.json(aniversariantes);
+    } catch (error) {
+      console.error("[api] Error fetching GEG aniversariantes mes:", error);
+      res.status(500).json({ error: "Failed to fetch GEG aniversariantes mes" });
+    }
+  });
+
+  app.get("/api/geg/aniversarios-empresa", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const aniversarios = await storage.getGegAniversariosEmpresa(squad, setor);
+      res.json(aniversarios);
+    } catch (error) {
+      console.error("[api] Error fetching GEG aniversarios empresa:", error);
+      res.status(500).json({ error: "Failed to fetch GEG aniversarios empresa" });
+    }
+  });
+
+  app.get("/api/geg/filtros", async (req, res) => {
+    try {
+      const filtros = await storage.getGegFiltros();
+      res.json(filtros);
+    } catch (error) {
+      console.error("[api] Error fetching GEG filtros:", error);
+      res.status(500).json({ error: "Failed to fetch GEG filtros" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
