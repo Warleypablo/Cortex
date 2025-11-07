@@ -314,6 +314,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/geg/overview", async (req, res) => {
+    try {
+      const filters: { mesInicio?: string; mesFim?: string; squad?: string; setor?: string } = {};
+      
+      if (req.query.mesInicio) {
+        filters.mesInicio = req.query.mesInicio as string;
+      }
+      
+      if (req.query.mesFim) {
+        filters.mesFim = req.query.mesFim as string;
+      }
+      
+      if (req.query.squad && req.query.squad !== 'todos') {
+        filters.squad = req.query.squad as string;
+      }
+      
+      if (req.query.setor && req.query.setor !== 'todos') {
+        filters.setor = req.query.setor as string;
+      }
+
+      const overview = await storage.getGegOverview(filters);
+      res.json(overview);
+    } catch (error) {
+      console.error("[api] Error fetching GEG overview:", error);
+      res.status(500).json({ error: "Failed to fetch GEG overview" });
+    }
+  });
+
+  app.get("/api/geg/headcount-trend", async (req, res) => {
+    try {
+      const filters: { mesInicio?: string; mesFim?: string; squad?: string; setor?: string } = {};
+      
+      if (req.query.mesInicio) {
+        filters.mesInicio = req.query.mesInicio as string;
+      }
+      
+      if (req.query.mesFim) {
+        filters.mesFim = req.query.mesFim as string;
+      }
+      
+      if (req.query.squad && req.query.squad !== 'todos') {
+        filters.squad = req.query.squad as string;
+      }
+      
+      if (req.query.setor && req.query.setor !== 'todos') {
+        filters.setor = req.query.setor as string;
+      }
+
+      const trend = await storage.getGegHeadcountTrend(filters);
+      res.json(trend);
+    } catch (error) {
+      console.error("[api] Error fetching GEG headcount trend:", error);
+      res.status(500).json({ error: "Failed to fetch GEG headcount trend" });
+    }
+  });
+
+  app.get("/api/geg/demissoes-breakdown", async (req, res) => {
+    try {
+      const filters: { mesInicio?: string; mesFim?: string; squad?: string; setor?: string } = {};
+      
+      if (req.query.mesInicio) {
+        filters.mesInicio = req.query.mesInicio as string;
+      }
+      
+      if (req.query.mesFim) {
+        filters.mesFim = req.query.mesFim as string;
+      }
+      
+      if (req.query.squad && req.query.squad !== 'todos') {
+        filters.squad = req.query.squad as string;
+      }
+      
+      if (req.query.setor && req.query.setor !== 'todos') {
+        filters.setor = req.query.setor as string;
+      }
+
+      const breakdown = await storage.getGegDemissoesBreakdown(filters);
+      res.json(breakdown);
+    } catch (error) {
+      console.error("[api] Error fetching GEG demissoes breakdown:", error);
+      res.status(500).json({ error: "Failed to fetch GEG demissoes breakdown" });
+    }
+  });
+
+  app.get("/api/geg/tempo-medio-promocao", async (req, res) => {
+    try {
+      const filters: { mesInicio?: string; mesFim?: string } = {};
+      
+      if (req.query.mesInicio) {
+        filters.mesInicio = req.query.mesInicio as string;
+      }
+      
+      if (req.query.mesFim) {
+        filters.mesFim = req.query.mesFim as string;
+      }
+
+      const tempoMedio = await storage.getTempoMedioPromocaoPorSquad(filters);
+      res.json(tempoMedio);
+    } catch (error) {
+      console.error("[api] Error fetching GEG tempo medio promocao:", error);
+      res.status(500).json({ error: "Failed to fetch GEG tempo medio promocao" });
+    }
+  });
+
   app.get("/api/analytics/cohort-retention", async (req, res) => {
     try {
       const filters: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string } = {};
