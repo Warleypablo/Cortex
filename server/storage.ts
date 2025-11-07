@@ -1970,7 +1970,6 @@ export class DbStorage implements IStorage {
                 WHEN m.mes = date_trunc('month', CURRENT_DATE) THEN CURRENT_DATE
                 ELSE m.mes
               END)
-              AND r.status = 'Ativo'
             THEN r.id 
           END) as headcount,
           COUNT(DISTINCT CASE 
