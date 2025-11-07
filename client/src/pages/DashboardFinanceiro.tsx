@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +12,9 @@ export default function DashboardFinanceiro() {
   const [periodoMeses, setPeriodoMeses] = useState(6);
   const [mesSelecionado, setMesSelecionado] = useState<{ ano: number; mes: number; mesAno: string } | null>(null);
   const [diaSelecionado, setDiaSelecionado] = useState<{ ano: number; mes: number; dia: number; diaFormatado: string } | null>(null);
+  
+  const detalhamentoDiarioRef = useRef<HTMLDivElement>(null);
+  const transacoesDiaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setDiaSelecionado(null);
@@ -112,6 +115,13 @@ export default function DashboardFinanceiro() {
     if (data && data.payload && data.payload.mes) {
       const [mes, ano] = data.payload.mes.split('/').map(Number);
       setMesSelecionado({ ano, mes, mesAno: data.payload.mes });
+      
+      setTimeout(() => {
+        detalhamentoDiarioRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 100);
     }
   };
 
@@ -123,6 +133,13 @@ export default function DashboardFinanceiro() {
     if (data && data.payload && data.payload.dia && mesSelecionado) {
       const [dia, mes, ano] = data.payload.dia.split('/').map(Number);
       setDiaSelecionado({ ano, mes, dia, diaFormatado: data.payload.dia });
+      
+      setTimeout(() => {
+        transacoesDiaRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 100);
     }
   };
 
