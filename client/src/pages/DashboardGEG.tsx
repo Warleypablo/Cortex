@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { GegOverview, GegHeadcountTrend, GegDemissoesBreakdown, TempoMedioPromocaoPorSquad } from "@shared/schema";
 
 export default function DashboardGEG() {
-  const [periodo, setPeriodo] = useState<string>("mes-atual");
+  const [periodo, setPeriodo] = useState<string>("ytd");
   const [squad, setSquad] = useState<string>("todos");
   const [setor, setSetor] = useState<string>("todos");
 
