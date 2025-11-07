@@ -144,6 +144,13 @@ export interface IStorage {
   getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]>;
   getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]>;
   getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse>;
+  getGegMetricas(periodo: string, squad: string, setor: string): Promise<any>;
+  getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string): Promise<any>;
+  getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string): Promise<any>;
+  getGegTempoPromocao(squad: string, setor: string): Promise<any>;
+  getGegAniversariantesMes(squad: string, setor: string): Promise<any>;
+  getGegAniversariosEmpresa(squad: string, setor: string): Promise<any>;
+  getGegFiltros(): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
@@ -267,6 +274,34 @@ export class MemStorage implements IStorage {
   }
 
   async getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegMetricas(periodo: string, squad: string, setor: string): Promise<any> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string): Promise<any> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string): Promise<any> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegTempoPromocao(squad: string, setor: string): Promise<any> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegAniversariantesMes(squad: string, setor: string): Promise<any> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegAniversariosEmpresa(squad: string, setor: string): Promise<any> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegFiltros(): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -1811,6 +1846,314 @@ export class DbStorage implements IStorage {
     console.log(`[DFC DEBUG] Total valor processado (soma de valor_categoria): ${totalValorProcessado.toFixed(2)}`);
 
     return buildHierarchy(items, meses, parcelasByCategory, categoriaNamesMap);
+  }
+
+  async getGegMetricas(periodo: string, squad: string, setor: string): Promise<any> {
+    const { dataInicio, dataFim } = this.calcularPeriodo(periodo);
+    
+    let whereConditions = [sql`status = 'ativo'`];
+    if (squad !== 'todos') {
+      whereConditions.push(sql`squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      whereConditions.push(sql`setor = ${setor}`);
+    }
+
+    const headcountResult = await db.execute(sql`
+      SELECT COUNT(*) as total
+      FROM rh_pessoal
+      WHERE ${sql.join(whereConditions, sql` AND `)}
+    `);
+    
+    const headcount = parseInt(headcountResult.rows[0]?.total as string || '0');
+
+    let whereAdmissoes = [`admissao >= ${dataInicio}`, `admissao <= ${dataFim}`];
+    let whereDemissoes = [`demissao >= ${dataInicio}`, `demissao <= ${dataFim}`, `demissao IS NOT NULL`];
+    
+    if (squad !== 'todos') {
+      whereAdmissoes.push(`squad = ${sql.raw(`'${squad}'`)}`);
+      whereDemissoes.push(`squad = ${sql.raw(`'${squad}'`)}`);
+    }
+    if (setor !== 'todos') {
+      whereAdmissoes.push(`setor = ${sql.raw(`'${setor}'`)}`);
+      whereDemissoes.push(`setor = ${sql.raw(`'${setor}'`)}`);
+    }
+
+    const admissoesResult = await db.execute(sql.raw(`
+      SELECT COUNT(*) as total
+      FROM rh_pessoal
+      WHERE ${whereAdmissoes.join(' AND ')}
+    `));
+    
+    const demissoesResult = await db.execute(sql.raw(`
+      SELECT COUNT(*) as total
+      FROM rh_pessoal
+      WHERE ${whereDemissoes.join(' AND ')}
+    `));
+
+    const admissoes = parseInt(admissoesResult.rows[0]?.total as string || '0');
+    const demissoes = parseInt(demissoesResult.rows[0]?.total as string || '0');
+
+    const headcountInicioResult = await db.execute(sql.raw(`
+      SELECT COUNT(*) as total
+      FROM rh_pessoal
+      WHERE admissao < ${sql.raw(`'${dataInicio}'`)}
+        AND (demissao IS NULL OR demissao >= ${sql.raw(`'${dataInicio}'`)})
+        ${squad !== 'todos' ? `AND squad = ${sql.raw(`'${squad}'`)}` : ''}
+        ${setor !== 'todos' ? `AND setor = ${sql.raw(`'${setor}'`)}` : ''}
+    `));
+
+    const headcountInicio = parseInt(headcountInicioResult.rows[0]?.total as string || '0');
+    const headcountMedio = (headcountInicio + headcount) / 2;
+    const turnover = headcountMedio > 0 ? (demissoes / headcountMedio) * 100 : 0;
+
+    const tempoMedioResult = await db.execute(sql`
+      SELECT AVG(meses_de_turbo) as tempo_medio
+      FROM rh_pessoal
+      WHERE ${sql.join(whereConditions, sql` AND `)}
+        AND meses_de_turbo IS NOT NULL
+    `);
+
+    const tempoMedioAtivo = parseFloat(tempoMedioResult.rows[0]?.tempo_medio as string || '0');
+
+    return {
+      headcount,
+      turnover: parseFloat(turnover.toFixed(1)),
+      admissoes,
+      demissoes,
+      tempoMedioAtivo: parseFloat(tempoMedioAtivo.toFixed(1)),
+    };
+  }
+
+  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string): Promise<any> {
+    const { dataInicio } = this.calcularPeriodo(periodo);
+    
+    const result = await db.execute(sql.raw(`
+      WITH meses AS (
+        SELECT generate_series(
+          date_trunc('month', ${sql.raw(`'${dataInicio}'::date`)}),
+          date_trunc('month', CURRENT_DATE),
+          '1 month'::interval
+        )::date AS mes
+      ),
+      dados_mensais AS (
+        SELECT 
+          TO_CHAR(m.mes, 'YYYY-MM') as mes,
+          COUNT(DISTINCT CASE 
+            WHEN r.admissao <= m.mes 
+              AND (r.demissao IS NULL OR r.demissao > m.mes)
+            THEN r.id 
+          END) as headcount,
+          COUNT(DISTINCT CASE 
+            WHEN date_trunc('month', r.admissao) = m.mes
+            THEN r.id 
+          END) as admissoes,
+          COUNT(DISTINCT CASE 
+            WHEN date_trunc('month', r.demissao) = m.mes
+            THEN r.id 
+          END) as demissoes
+        FROM meses m
+        LEFT JOIN rh_pessoal r ON 1=1
+          ${squad !== 'todos' ? `AND r.squad = ${sql.raw(`'${squad}'`)}` : ''}
+          ${setor !== 'todos' ? `AND r.setor = ${sql.raw(`'${setor}'`)}` : ''}
+        GROUP BY m.mes
+        ORDER BY m.mes
+      )
+      SELECT * FROM dados_mensais
+    `));
+
+    return result.rows.map(row => ({
+      mes: row.mes as string,
+      headcount: parseInt(row.headcount as string),
+      admissoes: parseInt(row.admissoes as string),
+      demissoes: parseInt(row.demissoes as string),
+    }));
+  }
+
+  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string): Promise<any> {
+    const { dataInicio } = this.calcularPeriodo(periodo);
+    
+    const result = await db.execute(sql.raw(`
+      WITH meses AS (
+        SELECT generate_series(
+          date_trunc('month', ${sql.raw(`'${dataInicio}'::date`)}),
+          date_trunc('month', CURRENT_DATE),
+          '1 month'::interval
+        )::date AS mes
+      )
+      SELECT 
+        TO_CHAR(m.mes, 'YYYY-MM') as mes,
+        COUNT(DISTINCT CASE 
+          WHEN date_trunc('month', r.admissao) = m.mes
+          THEN r.id 
+        END) as admissoes,
+        COUNT(DISTINCT CASE 
+          WHEN date_trunc('month', r.demissao) = m.mes
+          THEN r.id 
+        END) as demissoes
+      FROM meses m
+      LEFT JOIN rh_pessoal r ON 1=1
+        ${squad !== 'todos' ? `AND r.squad = ${sql.raw(`'${squad}'`)}` : ''}
+        ${setor !== 'todos' ? `AND r.setor = ${sql.raw(`'${setor}'`)}` : ''}
+      GROUP BY m.mes
+      ORDER BY m.mes
+    `));
+
+    return result.rows.map(row => ({
+      mes: row.mes as string,
+      admissoes: parseInt(row.admissoes as string),
+      demissoes: parseInt(row.demissoes as string),
+    }));
+  }
+
+  async getGegTempoPromocao(squad: string, setor: string): Promise<any> {
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        COALESCE(r.squad, 'Sem Squad') as squad,
+        AVG(r.meses_ult_aumento) as tempo_medio_meses,
+        COUNT(*) as total_colaboradores
+      FROM rh_pessoal r
+      WHERE r.status = 'ativo'
+        AND r.meses_ult_aumento IS NOT NULL
+        ${squad !== 'todos' ? `AND r.squad = ${sql.raw(`'${squad}'`)}` : ''}
+        ${setor !== 'todos' ? `AND r.setor = ${sql.raw(`'${setor}'`)}` : ''}
+      GROUP BY r.squad
+      ORDER BY tempo_medio_meses DESC
+    `));
+
+    return result.rows.map(row => ({
+      squad: row.squad as string,
+      tempoMedioMeses: parseFloat((row.tempo_medio_meses as string) || '0'),
+      totalColaboradores: parseInt(row.total_colaboradores as string),
+    }));
+  }
+
+  async getGegAniversariantesMes(squad: string, setor: string): Promise<any> {
+    const mesAtual = new Date().getMonth() + 1;
+    
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        id,
+        nome,
+        aniversario,
+        cargo,
+        squad,
+        EXTRACT(DAY FROM aniversario) as dia_aniversario,
+        EXTRACT(DAY FROM CURRENT_DATE) as dia_atual
+      FROM rh_pessoal
+      WHERE status = 'ativo'
+        AND EXTRACT(MONTH FROM aniversario) = ${mesAtual}
+        ${squad !== 'todos' ? `AND squad = ${sql.raw(`'${squad}'`)}` : ''}
+        ${setor !== 'todos' ? `AND setor = ${sql.raw(`'${setor}'`)}` : ''}
+      ORDER BY EXTRACT(DAY FROM aniversario)
+    `));
+
+    return result.rows.map(row => ({
+      id: row.id as number,
+      nome: row.nome as string,
+      aniversario: row.aniversario as string,
+      cargo: row.cargo as string || null,
+      squad: row.squad as string || null,
+      diaAniversario: parseInt(row.dia_aniversario as string),
+    }));
+  }
+
+  async getGegAniversariosEmpresa(squad: string, setor: string): Promise<any> {
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        id,
+        nome,
+        admissao,
+        cargo,
+        squad,
+        meses_de_turbo,
+        EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) as anos_completos,
+        DATE_PART('day', 
+          DATE(EXTRACT(YEAR FROM CURRENT_DATE) || '-' || 
+               EXTRACT(MONTH FROM admissao) || '-' || 
+               EXTRACT(DAY FROM admissao)) - CURRENT_DATE
+        ) as dias_ate_aniversario
+      FROM rh_pessoal
+      WHERE status = 'ativo'
+        ${squad !== 'todos' ? `AND squad = ${sql.raw(`'${squad}'`)}` : ''}
+        ${setor !== 'todos' ? `AND setor = ${sql.raw(`'${setor}'`)}` : ''}
+        AND admissao IS NOT NULL
+      ORDER BY 
+        CASE 
+          WHEN DATE(EXTRACT(YEAR FROM CURRENT_DATE) || '-' || 
+                   EXTRACT(MONTH FROM admissao) || '-' || 
+                   EXTRACT(DAY FROM admissao)) >= CURRENT_DATE
+          THEN DATE(EXTRACT(YEAR FROM CURRENT_DATE) || '-' || 
+                   EXTRACT(MONTH FROM admissao) || '-' || 
+                   EXTRACT(DAY FROM admissao))
+          ELSE DATE((EXTRACT(YEAR FROM CURRENT_DATE) + 1) || '-' || 
+                   EXTRACT(MONTH FROM admissao) || '-' || 
+                   EXTRACT(DAY FROM admissao))
+        END
+      LIMIT 10
+    `));
+
+    return result.rows.map(row => ({
+      id: row.id as number,
+      nome: row.nome as string,
+      admissao: row.admissao as string,
+      cargo: row.cargo as string || null,
+      squad: row.squad as string || null,
+      anosDeEmpresa: parseInt(row.anos_completos as string) + 1,
+      diasAteAniversario: parseInt(row.dias_ate_aniversario as string),
+    }));
+  }
+
+  async getGegFiltros(): Promise<any> {
+    const squadResult = await db.execute(sql`
+      SELECT DISTINCT squad
+      FROM rh_pessoal
+      WHERE squad IS NOT NULL AND squad != ''
+      ORDER BY squad
+    `);
+
+    const setorResult = await db.execute(sql`
+      SELECT DISTINCT setor
+      FROM rh_pessoal
+      WHERE setor IS NOT NULL AND setor != ''
+      ORDER BY setor
+    `);
+
+    return {
+      squads: squadResult.rows.map(row => row.squad as string),
+      setores: setorResult.rows.map(row => row.setor as string),
+    };
+  }
+
+  private calcularPeriodo(periodo: string): { dataInicio: string; dataFim: string } {
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = hoje.getMonth();
+    
+    let dataInicio: Date;
+    let dataFim: Date = hoje;
+
+    switch(periodo) {
+      case 'mes':
+        dataInicio = new Date(ano, mes, 1);
+        break;
+      case 'trimestre':
+        dataInicio = new Date(ano, mes - 3, 1);
+        break;
+      case 'semestre':
+        dataInicio = new Date(ano, mes - 6, 1);
+        break;
+      case 'ano':
+        dataInicio = new Date(ano, 0, 1);
+        break;
+      default:
+        dataInicio = new Date(ano, mes - 3, 1);
+    }
+
+    return {
+      dataInicio: dataInicio.toISOString().split('T')[0],
+      dataFim: dataFim.toISOString().split('T')[0],
+    };
   }
 }
 
