@@ -1858,16 +1858,7 @@ export class DbStorage implements IStorage {
   async getGegMetricas(periodo: string, squad: string, setor: string): Promise<any> {
     const { dataInicio, dataFim } = this.calcularPeriodo(periodo);
     
-    const debugResult = await db.execute(sql`
-      SELECT COUNT(*) as total, COUNT(CASE WHEN status = 'ativo' THEN 1 END) as ativos,
-             STRING_AGG(DISTINCT status, ', ') as status_list
-      FROM rh_pessoal
-    `);
-    console.log('[GEG DEBUG] Total registros rh_pessoal:', debugResult.rows[0]?.total);
-    console.log('[GEG DEBUG] Registros ativos:', debugResult.rows[0]?.ativos);
-    console.log('[GEG DEBUG] Status encontrados:', debugResult.rows[0]?.status_list);
-    
-    let whereCurrentConditions = [sql`status = 'ativo'`];
+    let whereCurrentConditions = [sql`status = 'Ativo'`];
     if (squad !== 'todos') {
       whereCurrentConditions.push(sql`squad = ${squad}`);
     }
@@ -2044,7 +2035,7 @@ export class DbStorage implements IStorage {
         AVG(r.meses_ult_aumento) as tempo_medio_meses,
         COUNT(*) as total_colaboradores
       FROM rh_pessoal r
-      WHERE r.status = 'ativo'
+      WHERE r.status = 'Ativo'
         AND r.meses_ult_aumento IS NOT NULL
         ${squad !== 'todos' ? `AND r.squad = '${squad}'` : ''}
         ${setor !== 'todos' ? `AND r.setor = '${setor}'` : ''}
@@ -2072,7 +2063,7 @@ export class DbStorage implements IStorage {
         EXTRACT(DAY FROM aniversario) as dia_aniversario,
         EXTRACT(DAY FROM CURRENT_DATE) as dia_atual
       FROM rh_pessoal
-      WHERE status = 'ativo'
+      WHERE status = 'Ativo'
         AND EXTRACT(MONTH FROM aniversario) = ${mesAtual}
         ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
         ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
@@ -2111,7 +2102,7 @@ export class DbStorage implements IStorage {
             EXTRACT(DAY FROM admissao)::int
           ) as aniversario_ano_proximo
         FROM rh_pessoal
-        WHERE status = 'ativo'
+        WHERE status = 'Ativo'
           ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
           ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
           AND admissao IS NOT NULL
