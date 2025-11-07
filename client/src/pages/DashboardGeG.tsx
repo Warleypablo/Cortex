@@ -247,7 +247,7 @@ export default function DashboardGeG() {
           <Card data-testid="card-evolucao-headcount">
             <CardHeader>
               <CardTitle>Evolução do Headcount</CardTitle>
-              <CardDescription>Histórico de colaboradores, admissões e demissões</CardDescription>
+              <CardDescription>Histórico de colaboradores ativos</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingEvolucao ? (
@@ -256,16 +256,14 @@ export default function DashboardGeG() {
                 </div>
               ) : evolucaoHeadcount && evolucaoHeadcount.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart data={evolucaoHeadcount}>
+                  <LineChart data={evolucaoHeadcount}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="mes" tickFormatter={formatMesAno} />
                     <YAxis />
                     <Tooltip labelFormatter={formatMesAno} />
                     <Legend />
                     <Line type="monotone" dataKey="headcount" name="Headcount" stroke="#0ea5e9" strokeWidth={2} />
-                    <Bar dataKey="admissoes" name="Admissões" fill="#10b981" />
-                    <Bar dataKey="demissoes" name="Demissões" fill="#ef4444" />
-                  </ComposedChart>
+                  </LineChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-[300px]" data-testid="text-no-data-evolucao">
