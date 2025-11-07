@@ -1874,41 +1874,56 @@ export class DbStorage implements IStorage {
     
     const headcount = parseInt(headcountResult.rows[0]?.total as string || '0');
 
-    let whereAdmissoes = [`admissao >= ${dataInicio}`, `admissao <= ${dataFim}`];
-    let whereDemissoes = [`demissao >= ${dataInicio}`, `demissao <= ${dataFim}`, `demissao IS NOT NULL`];
+    let whereAdmissoesConditions = [
+      sql`admissao >= ${dataInicio}`,
+      sql`admissao <= ${dataFim}`
+    ];
+    let whereDemissoesConditions = [
+      sql`demissao >= ${dataInicio}`,
+      sql`demissao <= ${dataFim}`,
+      sql`demissao IS NOT NULL`
+    ];
     
     if (squad !== 'todos') {
-      whereAdmissoes.push(`squad = ${sql.raw(`'${squad}'`)}`);
-      whereDemissoes.push(`squad = ${sql.raw(`'${squad}'`)}`);
+      whereAdmissoesConditions.push(sql`squad = ${squad}`);
+      whereDemissoesConditions.push(sql`squad = ${squad}`);
     }
     if (setor !== 'todos') {
-      whereAdmissoes.push(`setor = ${sql.raw(`'${setor}'`)}`);
-      whereDemissoes.push(`setor = ${sql.raw(`'${setor}'`)}`);
+      whereAdmissoesConditions.push(sql`setor = ${setor}`);
+      whereDemissoesConditions.push(sql`setor = ${setor}`);
     }
 
-    const admissoesResult = await db.execute(sql.raw(`
+    const admissoesResult = await db.execute(sql`
       SELECT COUNT(*) as total
       FROM rh_pessoal
-      WHERE ${whereAdmissoes.join(' AND ')}
-    `));
+      WHERE ${sql.join(whereAdmissoesConditions, sql` AND `)}
+    `);
     
-    const demissoesResult = await db.execute(sql.raw(`
+    const demissoesResult = await db.execute(sql`
       SELECT COUNT(*) as total
       FROM rh_pessoal
-      WHERE ${whereDemissoes.join(' AND ')}
-    `));
+      WHERE ${sql.join(whereDemissoesConditions, sql` AND `)}
+    `);
 
     const admissoes = parseInt(admissoesResult.rows[0]?.total as string || '0');
     const demissoes = parseInt(demissoesResult.rows[0]?.total as string || '0');
 
-    const headcountInicioResult = await db.execute(sql.raw(`
+    let whereHeadcountInicio = [
+      sql`admissao < ${dataInicio}`,
+      sql.raw(`(demissao IS NULL OR demissao >= '${dataInicio}')`)
+    ];
+    if (squad !== 'todos') {
+      whereHeadcountInicio.push(sql`squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      whereHeadcountInicio.push(sql`setor = ${setor}`);
+    }
+
+    const headcountInicioResult = await db.execute(sql`
       SELECT COUNT(*) as total
       FROM rh_pessoal
-      WHERE admissao < ${sql.raw(`'${dataInicio}'`)}
-        AND (demissao IS NULL OR demissao >= ${sql.raw(`'${dataInicio}'`)})
-        ${squad !== 'todos' ? `AND squad = ${sql.raw(`'${squad}'`)}` : ''}
-        ${setor !== 'todos' ? `AND setor = ${sql.raw(`'${setor}'`)}` : ''}
-    `));
+      WHERE ${sql.join(whereHeadcountInicio, sql` AND `)}
+    `);
 
     const headcountInicio = parseInt(headcountInicioResult.rows[0]?.total as string || '0');
     const headcountMedio = (headcountInicio + headcount) / 2;
@@ -1938,7 +1953,7 @@ export class DbStorage implements IStorage {
     const result = await db.execute(sql.raw(`
       WITH meses AS (
         SELECT generate_series(
-          date_trunc('month', ${sql.raw(`'${dataInicio}'::date`)}),
+          date_trunc('month', '${dataInicio}'::date),
           date_trunc('month', CURRENT_DATE),
           '1 month'::interval
         )::date AS mes
@@ -1961,8 +1976,8 @@ export class DbStorage implements IStorage {
           END) as demissoes
         FROM meses m
         LEFT JOIN rh_pessoal r ON 1=1
-          ${squad !== 'todos' ? `AND r.squad = ${sql.raw(`'${squad}'`)}` : ''}
-          ${setor !== 'todos' ? `AND r.setor = ${sql.raw(`'${setor}'`)}` : ''}
+          ${squad !== 'todos' ? `AND r.squad = '${squad}'` : ''}
+          ${setor !== 'todos' ? `AND r.setor = '${setor}'` : ''}
         GROUP BY m.mes
         ORDER BY m.mes
       )
@@ -1983,7 +1998,7 @@ export class DbStorage implements IStorage {
     const result = await db.execute(sql.raw(`
       WITH meses AS (
         SELECT generate_series(
-          date_trunc('month', ${sql.raw(`'${dataInicio}'::date`)}),
+          date_trunc('month', '${dataInicio}'::date),
           date_trunc('month', CURRENT_DATE),
           '1 month'::interval
         )::date AS mes
@@ -2000,8 +2015,8 @@ export class DbStorage implements IStorage {
         END) as demissoes
       FROM meses m
       LEFT JOIN rh_pessoal r ON 1=1
-        ${squad !== 'todos' ? `AND r.squad = ${sql.raw(`'${squad}'`)}` : ''}
-        ${setor !== 'todos' ? `AND r.setor = ${sql.raw(`'${setor}'`)}` : ''}
+        ${squad !== 'todos' ? `AND r.squad = '${squad}'` : ''}
+        ${setor !== 'todos' ? `AND r.setor = '${setor}'` : ''}
       GROUP BY m.mes
       ORDER BY m.mes
     `));
@@ -2022,8 +2037,8 @@ export class DbStorage implements IStorage {
       FROM rh_pessoal r
       WHERE r.status = 'ativo'
         AND r.meses_ult_aumento IS NOT NULL
-        ${squad !== 'todos' ? `AND r.squad = ${sql.raw(`'${squad}'`)}` : ''}
-        ${setor !== 'todos' ? `AND r.setor = ${sql.raw(`'${setor}'`)}` : ''}
+        ${squad !== 'todos' ? `AND r.squad = '${squad}'` : ''}
+        ${setor !== 'todos' ? `AND r.setor = '${setor}'` : ''}
       GROUP BY r.squad
       ORDER BY tempo_medio_meses DESC
     `));
@@ -2050,8 +2065,8 @@ export class DbStorage implements IStorage {
       FROM rh_pessoal
       WHERE status = 'ativo'
         AND EXTRACT(MONTH FROM aniversario) = ${mesAtual}
-        ${squad !== 'todos' ? `AND squad = ${sql.raw(`'${squad}'`)}` : ''}
-        ${setor !== 'todos' ? `AND setor = ${sql.raw(`'${setor}'`)}` : ''}
+        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
+        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
       ORDER BY EXTRACT(DAY FROM aniversario)
     `));
 
@@ -2067,36 +2082,45 @@ export class DbStorage implements IStorage {
 
   async getGegAniversariosEmpresa(squad: string, setor: string): Promise<any> {
     const result = await db.execute(sql.raw(`
+      WITH aniversarios AS (
+        SELECT 
+          id,
+          nome,
+          admissao,
+          cargo,
+          squad,
+          meses_de_turbo,
+          EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) as anos_completos,
+          MAKE_DATE(
+            EXTRACT(YEAR FROM CURRENT_DATE)::int,
+            EXTRACT(MONTH FROM admissao)::int,
+            EXTRACT(DAY FROM admissao)::int
+          ) as aniversario_ano_atual,
+          MAKE_DATE(
+            EXTRACT(YEAR FROM CURRENT_DATE)::int + 1,
+            EXTRACT(MONTH FROM admissao)::int,
+            EXTRACT(DAY FROM admissao)::int
+          ) as aniversario_ano_proximo
+        FROM rh_pessoal
+        WHERE status = 'ativo'
+          ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
+          ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+          AND admissao IS NOT NULL
+      )
       SELECT 
         id,
         nome,
         admissao,
         cargo,
         squad,
-        meses_de_turbo,
-        EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) as anos_completos,
-        DATE_PART('day', 
-          DATE(EXTRACT(YEAR FROM CURRENT_DATE) || '-' || 
-               EXTRACT(MONTH FROM admissao) || '-' || 
-               EXTRACT(DAY FROM admissao)) - CURRENT_DATE
-        ) as dias_ate_aniversario
-      FROM rh_pessoal
-      WHERE status = 'ativo'
-        ${squad !== 'todos' ? `AND squad = ${sql.raw(`'${squad}'`)}` : ''}
-        ${setor !== 'todos' ? `AND setor = ${sql.raw(`'${setor}'`)}` : ''}
-        AND admissao IS NOT NULL
-      ORDER BY 
+        anos_completos,
         CASE 
-          WHEN DATE(EXTRACT(YEAR FROM CURRENT_DATE) || '-' || 
-                   EXTRACT(MONTH FROM admissao) || '-' || 
-                   EXTRACT(DAY FROM admissao)) >= CURRENT_DATE
-          THEN DATE(EXTRACT(YEAR FROM CURRENT_DATE) || '-' || 
-                   EXTRACT(MONTH FROM admissao) || '-' || 
-                   EXTRACT(DAY FROM admissao))
-          ELSE DATE((EXTRACT(YEAR FROM CURRENT_DATE) + 1) || '-' || 
-                   EXTRACT(MONTH FROM admissao) || '-' || 
-                   EXTRACT(DAY FROM admissao))
-        END
+          WHEN aniversario_ano_atual >= CURRENT_DATE 
+          THEN (aniversario_ano_atual - CURRENT_DATE)
+          ELSE (aniversario_ano_proximo - CURRENT_DATE)
+        END as dias_ate_aniversario
+      FROM aniversarios
+      ORDER BY dias_ate_aniversario
       LIMIT 10
     `));
 
