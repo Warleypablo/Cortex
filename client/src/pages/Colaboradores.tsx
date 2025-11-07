@@ -986,6 +986,7 @@ export default function Colaboradores() {
                 <SelectItem value="all">Todos os status</SelectItem>
                 <SelectItem value="Ativo">Ativo</SelectItem>
                 <SelectItem value="Inativo">Inativo</SelectItem>
+                <SelectItem value="Dispensado">Dispensado</SelectItem>
               </SelectContent>
             </Select>
 
