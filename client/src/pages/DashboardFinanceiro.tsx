@@ -300,7 +300,7 @@ export default function DashboardFinanceiro() {
         </Card>
 
         {mesSelecionado && (
-          <Card data-testid="card-detalhamento-diario">
+          <Card ref={detalhamentoDiarioRef} data-testid="card-detalhamento-diario">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -417,7 +417,7 @@ export default function DashboardFinanceiro() {
         )}
 
         {diaSelecionado && (
-          <Card data-testid="card-transacoes-dia">
+          <Card ref={transacoesDiaRef} data-testid="card-transacoes-dia">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
