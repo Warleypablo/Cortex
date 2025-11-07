@@ -8,6 +8,13 @@ This CRM dashboard provides a unified view of client relationships, contracts, s
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### November 7, 2025
+- **Dashboard GEG - Headcount Evolution Fix**: Corrected discrepancy between headcount card (90) and evolution chart (92) for November 2025 by adding `status = 'Ativo'` filter to headcount evolution query. Previously, 2 employees with status 'Dispensado' but null dismissal dates were incorrectly included in the chart.
+- **Employee Management - Status Filter**: Added "Dispensado" option to status filter dropdown in `/colaboradores` page, allowing users to filter dismissed employees.
+- **Employee Management - Dismissal Date Validation**: Implemented conditional required field for dismissal date when employee status is changed to "Dispensado", with automatic field clearing when status changes away from "Dispensado" to prevent stale data.
+
 ## System Architecture
 
 ### Frontend Architecture
