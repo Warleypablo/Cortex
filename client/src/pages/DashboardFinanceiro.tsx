@@ -127,6 +127,7 @@ export default function DashboardFinanceiro() {
 
   const handleLimparSelecao = () => {
     setMesSelecionado(null);
+    setDiaSelecionado(null);
   };
 
   const handleDiaClick = (data: any) => {
