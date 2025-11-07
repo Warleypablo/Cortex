@@ -1858,6 +1858,15 @@ export class DbStorage implements IStorage {
   async getGegMetricas(periodo: string, squad: string, setor: string): Promise<any> {
     const { dataInicio, dataFim } = this.calcularPeriodo(periodo);
     
+    const debugResult = await db.execute(sql`
+      SELECT COUNT(*) as total, COUNT(CASE WHEN status = 'ativo' THEN 1 END) as ativos,
+             STRING_AGG(DISTINCT status, ', ') as status_list
+      FROM rh_pessoal
+    `);
+    console.log('[GEG DEBUG] Total registros rh_pessoal:', debugResult.rows[0]?.total);
+    console.log('[GEG DEBUG] Registros ativos:', debugResult.rows[0]?.ativos);
+    console.log('[GEG DEBUG] Status encontrados:', debugResult.rows[0]?.status_list);
+    
     let whereCurrentConditions = [sql`status = 'ativo'`];
     if (squad !== 'todos') {
       whereCurrentConditions.push(sql`squad = ${squad}`);
