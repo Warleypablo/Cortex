@@ -1834,6 +1834,8 @@ export class DbStorage implements IStorage {
   }
 
   async getGegOverview(filters?: { mesInicio?: string; mesFim?: string; squad?: string; setor?: string }): Promise<import("@shared/schema").GegOverview> {
+    console.log('[GEG Overview] Filtros recebidos:', filters);
+    
     const now = new Date();
     const conditions: SQL[] = [];
     
@@ -1892,6 +1894,8 @@ export class DbStorage implements IStorage {
         ${filters?.setor ? sql`AND setor = ${filters.setor}` : sql``}
       `);
       headcountInicialPeriodo = parseInt((headcountInicialResult.rows[0] as any).count || '0');
+      
+      console.log('[GEG Overview] Admissões:', admissoesPeriodo, 'Demissões:', demissoesPeriodo, 'Headcount inicial:', headcountInicialPeriodo);
     }
 
     const headcountMedio = headcountInicialPeriodo + (admissoesPeriodo / 2) - (demissoesPeriodo / 2);
@@ -1967,7 +1971,7 @@ export class DbStorage implements IStorage {
       cargo: row.cargo,
     }));
 
-    return {
+    const result = {
       headcountAtual,
       turnoverPeriodo,
       admissoesPeriodo,
@@ -1978,6 +1982,10 @@ export class DbStorage implements IStorage {
       aniversariantes,
       proximosAniversariosEmpresa,
     };
+    
+    console.log('[GEG Overview] Resultado final:', JSON.stringify(result, null, 2));
+    
+    return result;
   }
 
   async getGegHeadcountTrend(filters?: { mesInicio?: string; mesFim?: string; squad?: string; setor?: string }): Promise<import("@shared/schema").GegHeadcountTrend[]> {
