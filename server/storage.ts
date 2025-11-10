@@ -151,6 +151,7 @@ export interface IStorage {
   getGegAniversariantesMes(squad: string, setor: string): Promise<any>;
   getGegAniversariosEmpresa(squad: string, setor: string): Promise<any>;
   getGegFiltros(): Promise<any>;
+  getTopResponsaveis(limit?: number): Promise<{ nome: string; mrr: number; posicao: number }[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -302,6 +303,10 @@ export class MemStorage implements IStorage {
   }
 
   async getGegFiltros(): Promise<any> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTopResponsaveis(limit?: number): Promise<{ nome: string; mrr: number; posicao: number }[]> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -2162,6 +2167,40 @@ export class DbStorage implements IStorage {
       squads: squadResult.rows.map(row => row.squad as string),
       setores: setorResult.rows.map(row => row.setor as string),
     };
+  }
+
+  async getTopResponsaveis(limit: number = 5): Promise<{ nome: string; mrr: number; posicao: number }[]> {
+    const resultados = await db.execute(sql`
+      SELECT 
+        responsavel as nome,
+        COALESCE(SUM(
+          CASE 
+            WHEN valorr ~ '^[0-9]+(\.[0-9]+)?$' 
+            THEN valorr::numeric 
+            ELSE 0 
+          END
+        ), 0) as mrr
+      FROM ${schema.cupContratos}
+      WHERE responsavel IS NOT NULL 
+        AND responsavel != ''
+        AND valorr IS NOT NULL
+      GROUP BY responsavel
+      HAVING COALESCE(SUM(
+        CASE 
+          WHEN valorr ~ '^[0-9]+(\.[0-9]+)?$' 
+          THEN valorr::numeric 
+          ELSE 0 
+        END
+      ), 0) > 0
+      ORDER BY mrr DESC
+      LIMIT ${limit}
+    `);
+
+    return resultados.rows.map((row, index) => ({
+      nome: row.nome as string,
+      mrr: parseFloat(row.mrr as string || '0'),
+      posicao: index + 1,
+    }));
   }
 
   private calcularPeriodo(periodo: string): { dataInicio: string; dataFim: string } {
