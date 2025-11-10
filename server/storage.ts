@@ -1448,15 +1448,17 @@ export class DbStorage implements IStorage {
           valorr::numeric,
           valorp::numeric,
           data_inicio,
-          data_encerramento
+          data_encerramento,
+          status
         FROM ${schema.cupContratos}
       )
       SELECT 
-        -- MRR: contratos ativos no mês (sem data_encerramento ou encerrados no/após o mês)
+        -- MRR Ativo: contratos ativos no mês com status ativo, onboarding ou triagem
         COALESCE(SUM(
           CASE 
             WHEN (data_encerramento IS NULL OR 
                   (data_encerramento >= ${inicioMes} AND data_encerramento <= ${fimMes}))
+                 AND status IN ('ativo', 'onboarding', 'triagem')
             THEN valorr 
             ELSE 0 
           END
