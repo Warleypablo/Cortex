@@ -209,30 +209,88 @@ export default function VisaoGeral() {
                 <CardDescription>Líderes em MRR gerenciado</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {mockTopResponsaveis.map((resp, idx) => (
-                    <div 
-                      key={resp.nome} 
-                      className="flex items-center justify-between p-3 rounded-lg hover-elevate"
-                      data-testid={`row-responsavel-${idx + 1}`}
-                    >
-                      <div className="flex items-center gap-3">
+                <div className="flex items-end justify-center gap-2 pb-4">
+                  {(() => {
+                    const top5 = mockTopResponsaveis.slice(0, 5);
+                    const slots = [
+                      top5[0] || null,
+                      top5[1] || null,
+                      top5[2] || null,
+                      top5[3] || null,
+                      top5[4] || null,
+                    ];
+                    const podiumOrder = [3, 1, 0, 2, 4];
+                    
+                    return podiumOrder.map((slotIndex) => {
+                      const resp = slots[slotIndex];
+                      const rank = slotIndex + 1;
+                      const heights: Record<number, string> = {
+                        1: 'h-40',
+                        2: 'h-32', 
+                        3: 'h-28',
+                        4: 'h-20',
+                        5: 'h-16'
+                      };
+                      
+                      if (!resp) {
+                        return (
+                          <div 
+                            key={`empty-${rank}`}
+                            className="flex flex-col items-center flex-1"
+                          >
+                            <div className="mb-2 text-center">
+                              <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg mx-auto mb-1 bg-muted/30 text-muted-foreground/30">
+                                -
+                              </div>
+                              <p className="text-xs font-medium text-muted-foreground/50">-</p>
+                              <p className="text-xs font-bold text-muted-foreground/50">-</p>
+                            </div>
+                            <div className={`w-full ${heights[rank]} rounded-t-lg bg-muted/20`} />
+                          </div>
+                        );
+                      }
+                      
+                      return (
                         <div 
-                          className={`
-                            flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm
-                            ${idx === 0 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' : ''}
-                            ${idx === 1 ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300' : ''}
-                            ${idx === 2 ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' : ''}
-                            ${idx > 2 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : ''}
-                          `}
+                          key={resp.nome}
+                          className="flex flex-col items-center flex-1"
+                          data-testid={`podium-responsavel-${rank}`}
                         >
-                          {resp.posicao}º
+                          <div className="mb-2 text-center">
+                            <div className={`
+                              w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg mx-auto mb-1
+                              ${rank === 1 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' : ''}
+                              ${rank === 2 ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300' : ''}
+                              ${rank === 3 ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' : ''}
+                              ${rank > 3 ? 'bg-muted text-muted-foreground' : ''}
+                            `}>
+                              {rank}º
+                            </div>
+                            <p className="text-xs font-medium truncate px-1" title={resp.nome}>
+                              {resp.nome.split(' ')[0]}
+                            </p>
+                            <p className="text-xs font-bold text-primary">
+                              {formatCurrency(resp.mrr)}
+                            </p>
+                          </div>
+                          <div 
+                            className={`
+                              w-full ${heights[rank]} rounded-t-lg
+                              ${rank === 1 ? 'bg-gradient-to-t from-yellow-200 to-yellow-100 dark:from-yellow-900/40 dark:to-yellow-900/20' : ''}
+                              ${rank === 2 ? 'bg-gradient-to-t from-gray-200 to-gray-100 dark:from-gray-800/40 dark:to-gray-800/20' : ''}
+                              ${rank === 3 ? 'bg-gradient-to-t from-orange-200 to-orange-100 dark:from-orange-900/40 dark:to-orange-900/20' : ''}
+                              ${rank > 3 ? 'bg-gradient-to-t from-muted to-muted/50' : ''}
+                              flex items-center justify-center
+                            `}
+                          >
+                            <span className="font-bold text-2xl text-muted-foreground/30">
+                              {rank}
+                            </span>
+                          </div>
                         </div>
-                        <span className="font-medium">{resp.nome}</span>
-                      </div>
-                      <span className="font-bold text-primary">{formatCurrency(resp.mrr)}</span>
-                    </div>
-                  ))}
+                      );
+                    });
+                  })()}
                 </div>
               </CardContent>
             </Card>
