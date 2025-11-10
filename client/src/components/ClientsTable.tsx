@@ -10,7 +10,7 @@ interface ClientsTableProps {
   ltvMap?: Record<string, number>;
 }
 
-type SortField = "name" | "cnpj" | "ltv" | "status" | "startDate";
+type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
 type SortDirection = "asc" | "desc";
 
 export default function ClientsTable({ clients, onClientClick, ltvMap }: ClientsTableProps) {
@@ -41,6 +41,10 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
       const ltvA = ltvMap?.[a.ids || String(a.id)] || 0;
       const ltvB = ltvMap?.[b.ids || String(b.id)] || 0;
       comparison = ltvA - ltvB;
+    } else if (sortField === "lt") {
+      const ltA = a.ltMeses || 0;
+      const ltB = b.ltMeses || 0;
+      comparison = ltA - ltB;
     } else if (sortField === "status") {
       const statusA = a.statusClickup || "";
       const statusB = b.statusClickup || "";
@@ -85,7 +89,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
     <div className="rounded-lg border border-border bg-card overflow-auto h-full">
       {/* Sticky Header */}
       <div className="sticky top-0 z-10 bg-background border-b">
-        <div className="grid grid-cols-[minmax(300px,2fr)_minmax(180px,1.5fr)_minmax(200px,2fr)_minmax(140px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)] text-sm font-medium text-muted-foreground">
+        <div className="grid grid-cols-[minmax(300px,2fr)_minmax(180px,1.5fr)_minmax(200px,2fr)_minmax(140px,1fr)_minmax(120px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)] text-sm font-medium text-muted-foreground">
           <div className="h-12 flex items-center px-4">
             <Button 
               variant="ghost" 
@@ -129,6 +133,18 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
             <Button 
               variant="ghost" 
               size="sm" 
+              onClick={() => handleSort("lt")}
+              className="hover-elevate -ml-3"
+              data-testid="sort-lt"
+            >
+              LT
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+          <div className="h-12 flex items-center px-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
               onClick={() => handleSort("status")}
               className="hover-elevate -ml-3"
               data-testid="sort-status"
@@ -156,10 +172,11 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
       <div>
         {sortedClients.map((client) => {
           const ltv = ltvMap?.[client.ids || String(client.id)] || 0;
+          const ltMeses = client.ltMeses || 0;
           return (
             <div 
               key={client.ids || client.id} 
-              className="grid grid-cols-[minmax(300px,2fr)_minmax(180px,1.5fr)_minmax(200px,2fr)_minmax(140px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)] cursor-pointer hover-elevate"
+              className="grid grid-cols-[minmax(300px,2fr)_minmax(180px,1.5fr)_minmax(200px,2fr)_minmax(140px,1fr)_minmax(120px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)] cursor-pointer hover-elevate"
               onClick={() => onClientClick(client.ids || String(client.id))}
               data-testid={`client-row-${client.ids || client.id}`}
             >
@@ -176,6 +193,9 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
               </div>
               <div className="px-4 py-3 font-medium text-sm" data-testid={`text-ltv-${client.ids || client.id}`}>
                 {ltv > 0 ? formatCurrency(ltv) : "-"}
+              </div>
+              <div className="px-4 py-3 font-medium text-sm" data-testid={`text-lt-${client.ids || client.id}`}>
+                {ltMeses > 0 ? `${ltMeses.toFixed(1)} m` : "-"}
               </div>
               <div className="px-4 py-3 text-sm" data-testid={`text-status-${client.ids || client.id}`}>
                 <Badge className={`${getStatusColor(client.statusClickup)}`} variant="outline">
