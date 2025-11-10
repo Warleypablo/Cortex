@@ -105,14 +105,14 @@ export default function VisaoGeral() {
 
             <Card data-testid="card-mrr">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">MRR</CardTitle>
+                <CardTitle className="text-sm font-medium">MRR Ativo</CardTitle>
                 <DollarSign className="w-4 h-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-mrr">
                   {isLoadingMetricas ? "..." : formatCurrency(metricas?.mrr || 0)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Receita recorrente</p>
+                <p className="text-xs text-muted-foreground mt-1">Contratos ativos, onboarding e triagem</p>
               </CardContent>
             </Card>
 
