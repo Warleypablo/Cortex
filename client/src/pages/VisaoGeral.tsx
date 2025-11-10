@@ -91,19 +91,6 @@ export default function VisaoGeral() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            <Card data-testid="card-receita-total">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Receita Total</CardTitle>
-                <DollarSign className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold" data-testid="text-receita-total">
-                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.receitaTotal || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">MRR + Pontual</p>
-              </CardContent>
-            </Card>
-
             <Card data-testid="card-mrr">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">MRR Ativo</CardTitle>
