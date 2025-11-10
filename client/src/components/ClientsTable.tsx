@@ -172,7 +172,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
       <div>
         {sortedClients.map((client) => {
           const ltv = ltvMap?.[client.ids || String(client.id)] || 0;
-          const ltMeses = client.ltMeses || 0;
+          const ltMeses = typeof client.ltMeses === 'number' ? client.ltMeses : 0;
           return (
             <div 
               key={client.ids || client.id} 
