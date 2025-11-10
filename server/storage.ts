@@ -2173,25 +2173,14 @@ export class DbStorage implements IStorage {
     const resultados = await db.execute(sql`
       SELECT 
         responsavel as nome,
-        COALESCE(SUM(
-          CASE 
-            WHEN valorr ~ '^[0-9]+(\.[0-9]+)?$' 
-            THEN valorr::numeric 
-            ELSE 0 
-          END
-        ), 0) as mrr
+        COALESCE(SUM(valorr), 0) as mrr
       FROM ${schema.cupContratos}
       WHERE responsavel IS NOT NULL 
         AND responsavel != ''
         AND valorr IS NOT NULL
+        AND valorr > 0
       GROUP BY responsavel
-      HAVING COALESCE(SUM(
-        CASE 
-          WHEN valorr ~ '^[0-9]+(\.[0-9]+)?$' 
-          THEN valorr::numeric 
-          ELSE 0 
-        END
-      ), 0) > 0
+      HAVING COALESCE(SUM(valorr), 0) > 0
       ORDER BY mrr DESC
       LIMIT ${limit}
     `);
