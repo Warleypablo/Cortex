@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, TrendingUp, TrendingDown, Users } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Users, PauseCircle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 
@@ -90,20 +90,7 @@ export default function VisaoGeral() {
             </Select>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-            <Card data-testid="card-receita-total">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Receita Total</CardTitle>
-                <DollarSign className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold" data-testid="text-receita-total">
-                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.receitaTotal || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">MRR + Pontual</p>
-              </CardContent>
-            </Card>
-
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
             <Card data-testid="card-mrr">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">MRR Ativo</CardTitle>
@@ -166,6 +153,19 @@ export default function VisaoGeral() {
                   {isLoadingMetricas ? "..." : formatCurrency(metricas?.churn || 0)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Contratos encerrados</p>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-pausados">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pausados</CardTitle>
+                <PauseCircle className="w-4 h-4 text-orange-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600" data-testid="text-pausados">
+                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.pausados || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Contratos pausados no mês</p>
               </CardContent>
             </Card>
           </div>
