@@ -374,6 +374,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/top-responsaveis", async (req, res) => {
+    try {
+      let limit = 5;
+      if (req.query.limit) {
+        const limitStr = req.query.limit as string;
+        if (/^\d+$/.test(limitStr)) {
+          const parsedLimit = Number(limitStr);
+          if (parsedLimit > 0) {
+            limit = Math.min(parsedLimit, 100);
+          }
+        }
+      }
+      const topResponsaveis = await storage.getTopResponsaveis(limit);
+      res.json(topResponsaveis);
+    } catch (error) {
+      console.error("[api] Error fetching top responsaveis:", error);
+      res.status(500).json({ error: "Failed to fetch top responsaveis" });
+    }
+  });
+
   app.get("/api/churn-por-servico", async (req, res) => {
     try {
       const filters: { servicos?: string[]; mesInicio?: string; mesFim?: string } = {};

@@ -44,16 +44,17 @@ export default function VisaoGeral() {
     },
   });
 
+  const { data: topResponsaveis, isLoading: isLoadingTopResponsaveis, isError: isErrorTopResponsaveis } = useQuery<{ nome: string; mrr: number; posicao: number }[]>({
+    queryKey: ['/api/top-responsaveis'],
+    queryFn: async () => {
+      const response = await fetch('/api/top-responsaveis');
+      if (!response.ok) throw new Error('Failed to fetch top responsaveis');
+      return response.json();
+    },
+  });
+
   const mockMrrEvolution = [
     { mes: mesVisaoGeral, mrr: metricas?.mrr || 0 }
-  ];
-
-  const mockTopResponsaveis = [
-    { nome: 'João Silva', mrr: 125000, posicao: 1 },
-    { nome: 'Maria Santos', mrr: 98000, posicao: 2 },
-    { nome: 'Pedro Costa', mrr: 87000, posicao: 3 },
-    { nome: 'Ana Oliveira', mrr: 72000, posicao: 4 },
-    { nome: 'Carlos Souza', mrr: 68000, posicao: 5 },
   ];
 
   const mockMrrSquad = [
@@ -209,17 +210,26 @@ export default function VisaoGeral() {
                 <CardDescription>Líderes em MRR gerenciado</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-end justify-center gap-2 pb-4">
-                  {(() => {
-                    const top5 = mockTopResponsaveis.slice(0, 5);
-                    const slots = [
-                      top5[0] || null,
-                      top5[1] || null,
-                      top5[2] || null,
-                      top5[3] || null,
-                      top5[4] || null,
-                    ];
-                    const podiumOrder = [3, 1, 0, 2, 4];
+                {isLoadingTopResponsaveis ? (
+                  <div className="flex items-center justify-center h-48">
+                    <p className="text-muted-foreground">Carregando...</p>
+                  </div>
+                ) : isErrorTopResponsaveis ? (
+                  <div className="flex items-center justify-center h-48">
+                    <p className="text-destructive">Erro ao carregar dados. Tente novamente.</p>
+                  </div>
+                ) : (
+                  <div className="flex items-end justify-center gap-2 pb-4">
+                    {(() => {
+                      const top5 = (topResponsaveis || []).slice(0, 5);
+                      const slots = [
+                        top5[0] || null,
+                        top5[1] || null,
+                        top5[2] || null,
+                        top5[3] || null,
+                        top5[4] || null,
+                      ];
+                      const podiumOrder = [3, 1, 0, 2, 4];
                     
                     return podiumOrder.map((slotIndex) => {
                       const resp = slots[slotIndex];
@@ -292,6 +302,7 @@ export default function VisaoGeral() {
                     });
                   })()}
                 </div>
+                )}
               </CardContent>
             </Card>
 
