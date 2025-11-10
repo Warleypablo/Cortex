@@ -2179,6 +2179,7 @@ export class DbStorage implements IStorage {
         AND responsavel != ''
         AND valorr IS NOT NULL
         AND valorr > 0
+        AND status IN ('ativo', 'onboarding', 'triagem')
       GROUP BY responsavel
       HAVING COALESCE(SUM(valorr), 0) > 0
       ORDER BY mrr DESC
