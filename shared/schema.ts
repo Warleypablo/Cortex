@@ -109,6 +109,7 @@ export const cupContratos = pgTable("cup_contratos", {
   idSubtask: text("id_subtask").primaryKey(),
   dataInicio: timestamp("data_inicio"),
   dataEncerramento: timestamp("data_encerramento"),
+  dataPausa: timestamp("data_pausa"),
   squad: text("squad"),
 });
 
