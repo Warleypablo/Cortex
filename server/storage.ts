@@ -12,6 +12,8 @@ export type ClienteCompleto = Cliente & {
   cnpjCliente: string | null;
   servicos: string | null;
   dataInicio: Date | null;
+  ltMeses: number | null;
+  ltDias: number | null;
 };
 
 export interface AniversariantesMes {
@@ -654,7 +656,7 @@ export class DbStorage implements IStorage {
   async getClientes(): Promise<ClienteCompleto[]> {
     const result = await db
       .select({
-        id: schema.cazClientes.id,
+        id: sql<number>`COALESCE(${schema.cazClientes.id}, ('x' || substr(md5(${schema.cupClientes.taskId}), 1, 8))::bit(32)::int)`,
         nome: schema.cazClientes.nome,
         cnpj: schema.cazClientes.cnpj,
         endereco: schema.cazClientes.endereco,
@@ -678,11 +680,37 @@ export class DbStorage implements IStorage {
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
+        ltMeses: sql<number>`(
+          SELECT ROUND(
+            (EXTRACT(YEAR FROM AGE(
+              MAX(COALESCE(data_encerramento, NOW())),
+              MIN(data_inicio)
+            )) * 12 + 
+            EXTRACT(MONTH FROM AGE(
+              MAX(COALESCE(data_encerramento, NOW())),
+              MIN(data_inicio)
+            )))::numeric,
+            1
+          )
+          FROM ${schema.cupContratos}
+          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+          AND data_inicio IS NOT NULL
+        )`,
+        ltDias: sql<number>`(
+          SELECT ROUND(
+            EXTRACT(EPOCH FROM (
+              MAX(COALESCE(data_encerramento, NOW())) - MIN(data_inicio)
+            )) / 86400
+          )::integer
+          FROM ${schema.cupContratos}
+          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+          AND data_inicio IS NOT NULL
+        )`,
       })
-      .from(schema.cazClientes)
+      .from(schema.cupClientes)
       .leftJoin(
-        schema.cupClientes,
-        eq(schema.cazClientes.cnpj, schema.cupClientes.cnpj)
+        schema.cazClientes,
+        eq(schema.cupClientes.cnpj, schema.cazClientes.cnpj)
       )
       .orderBy(schema.cupClientes.nome);
 
@@ -692,7 +720,7 @@ export class DbStorage implements IStorage {
   async getClienteById(id: string): Promise<ClienteCompleto | undefined> {
     const result = await db
       .select({
-        id: schema.cazClientes.id,
+        id: sql<number>`COALESCE(${schema.cazClientes.id}, ('x' || substr(md5(${schema.cupClientes.taskId}), 1, 8))::bit(32)::int)`,
         nome: schema.cazClientes.nome,
         cnpj: schema.cazClientes.cnpj,
         endereco: schema.cazClientes.endereco,
@@ -716,14 +744,40 @@ export class DbStorage implements IStorage {
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
+        ltMeses: sql<number>`(
+          SELECT ROUND(
+            (EXTRACT(YEAR FROM AGE(
+              MAX(COALESCE(data_encerramento, NOW())),
+              MIN(data_inicio)
+            )) * 12 + 
+            EXTRACT(MONTH FROM AGE(
+              MAX(COALESCE(data_encerramento, NOW())),
+              MIN(data_inicio)
+            )))::numeric,
+            1
+          )
+          FROM ${schema.cupContratos}
+          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+          AND data_inicio IS NOT NULL
+        )`,
+        ltDias: sql<number>`(
+          SELECT ROUND(
+            EXTRACT(EPOCH FROM (
+              MAX(COALESCE(data_encerramento, NOW())) - MIN(data_inicio)
+            )) / 86400
+          )::integer
+          FROM ${schema.cupContratos}
+          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+          AND data_inicio IS NOT NULL
+        )`,
       })
-      .from(schema.cazClientes)
+      .from(schema.cupClientes)
       .leftJoin(
-        schema.cupClientes,
-        eq(schema.cazClientes.cnpj, schema.cupClientes.cnpj)
+        schema.cazClientes,
+        eq(schema.cupClientes.cnpj, schema.cazClientes.cnpj)
       )
       .where(
-        sql`${schema.cazClientes.ids} = ${id} OR ${schema.cazClientes.id}::text = ${id}`
+        sql`${schema.cazClientes.ids} = ${id} OR ${schema.cazClientes.id}::text = ${id} OR ${schema.cupClientes.taskId} = ${id}`
       )
       .limit(1);
 
