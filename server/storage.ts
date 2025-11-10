@@ -113,6 +113,7 @@ export interface VisaoGeralMetricas {
   aquisicaoPontual: number;
   cac: number;
   churn: number;
+  pausados: number;
 }
 
 export interface IStorage {
@@ -1454,6 +1455,7 @@ export class DbStorage implements IStorage {
           valorp::numeric,
           data_inicio,
           data_encerramento,
+          data_pausa,
           status
         FROM ${schema.cupContratos}
       )
@@ -1494,7 +1496,18 @@ export class DbStorage implements IStorage {
             THEN valorr 
             ELSE 0 
           END
-        ), 0)::numeric as churn
+        ), 0)::numeric as churn,
+        
+        -- Pausados: contratos pausados no mês
+        COALESCE(SUM(
+          CASE 
+            WHEN status = 'pausado' 
+                 AND data_pausa >= ${inicioMes} 
+                 AND data_pausa <= ${fimMes}
+            THEN valorr 
+            ELSE 0 
+          END
+        ), 0)::numeric as pausados
       FROM contratos_periodo
     `);
 
@@ -1503,6 +1516,7 @@ export class DbStorage implements IStorage {
     const aquisicaoMrr = parseFloat(row.aquisicao_mrr || '0');
     const aquisicaoPontual = parseFloat(row.aquisicao_pontual || '0');
     const churn = parseFloat(row.churn || '0');
+    const pausados = parseFloat(row.pausados || '0');
 
     return {
       receitaTotal: mrr + aquisicaoPontual,
@@ -1511,6 +1525,7 @@ export class DbStorage implements IStorage {
       aquisicaoPontual,
       cac: 0,
       churn,
+      pausados,
     };
   }
 
