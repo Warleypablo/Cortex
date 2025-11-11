@@ -182,6 +182,8 @@ export type ContratoCompleto = {
   cnpjCliente: string | null;
   idCliente: string | null;
   responsavel: string | null;
+  csResponsavel: string | null;
+  responsavelCliente: string | null;
   responsavelGeral: string | null;
 };
 
