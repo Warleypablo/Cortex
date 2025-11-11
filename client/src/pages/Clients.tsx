@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import ClientsTable from "@/components/ClientsTable";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Filter, Users, UserCheck, TrendingUp, Clock } from "lucide-react";
+import { Loader2, Search, Filter, Users, UserCheck, TrendingUp, Clock, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -123,7 +123,7 @@ export default function Clients() {
 
   const kpis = useMemo(() => {
     if (!filteredClients || filteredClients.length === 0) {
-      return { totalClientes: 0, clientesAtivos: 0, ltvMedio: 0, ltMedio: 0 };
+      return { totalClientes: 0, clientesAtivos: 0, ltvMedio: 0, ltMedio: 0, aov: 0 };
     }
     
     const totalClientes = filteredClients.length;
@@ -156,7 +156,9 @@ export default function Clients() {
     });
     const ltMedio = countLt > 0 ? somaLt / countLt : 0;
     
-    return { totalClientes, clientesAtivos, ltvMedio, ltMedio };
+    const aov = ltMedio > 0 ? ltvMedio / ltMedio : 0;
+    
+    return { totalClientes, clientesAtivos, ltvMedio, ltMedio, aov };
   }, [filteredClients, ltvMap]);
 
   const totalPages = Math.ceil(sortedClients.length / itemsPerPage);
@@ -211,7 +213,7 @@ export default function Clients() {
   return (
     <div className="bg-background h-full">
       <div className="container mx-auto px-4 py-4 max-w-7xl h-full flex flex-col">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
           <Card data-testid="card-total-clientes">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
@@ -268,6 +270,21 @@ export default function Clients() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Meses ativos (com pagamento)
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-aov">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium">AOV</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-aov">
+                {formatCurrency(kpis.aov)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Ticket médio mensal
               </p>
             </CardContent>
           </Card>
