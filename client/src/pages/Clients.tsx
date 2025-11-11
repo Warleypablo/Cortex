@@ -219,7 +219,7 @@ export default function Clients() {
                 {kpis.ltMedio.toFixed(1)} meses
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Lifetime médio
+                Meses ativos (com pagamento)
               </p>
             </CardContent>
           </Card>

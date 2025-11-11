@@ -16,7 +16,8 @@ Preferred communication style: Simple, everyday language.
 - **State Management**: TanStack Query for server state management; React hooks for local component state.
 - **Form Handling**: React Hook Form with Zod for validation, Drizzle-Zod for schema generation.
 - **Key Features**:
-    - **Client Management**: Integrated client listing from Conta Azul and ClickUp, with search, filter, pagination, and sortable columns.
+    - **Client Management**: Integrated client listing from Conta Azul and ClickUp, with search, filter, pagination, and sortable columns. Includes LTV (Lifetime Value) and LT (Lifetime) metrics.
+    - **LT (Lifetime) Calculation**: LT represents "meses ativos" (active months) - the count of distinct months with paid revenue (status PAGO or ACQUITTED) from `caz_receber` table. Uses `COALESCE(data_vencimento, data_criacao)` to determine the month. Displayed consistently in both the client list table and individual client detail pages.
     - **Employee Management**: CRUD operations for 25 employee fields from `rh_pessoal` table.
     - **Contract Management**: Comprehensive tracking from `cup_contratos`, displaying service type, status, squad, and financial values. Includes status-based color coding.
     - **Retention Analysis**: Churn metrics by service and responsible person with monthly breakdowns, filtering, and Recharts visualizations. Secure parameter binding prevents SQL injection.
