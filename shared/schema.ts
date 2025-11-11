@@ -111,6 +111,11 @@ export const cupContratos = pgTable("cup_contratos", {
   dataEncerramento: timestamp("data_encerramento"),
   dataPausa: timestamp("data_pausa"),
   squad: text("squad"),
+  produto: text("produto"),
+  dataSolicitacaoEncerramento: timestamp("data_solicitacao_encerramento"),
+  responsavel: text("responsavel"),
+  csResponsavel: text("cs_responsavel"),
+  vendedor: text("vendedor"),
 });
 
 export const rhPessoal = pgTable("rh_pessoal", {
