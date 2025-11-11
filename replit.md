@@ -16,10 +16,11 @@ Preferred communication style: Simple, everyday language.
 - **State Management**: TanStack Query for server state management; React hooks for local component state.
 - **Form Handling**: React Hook Form with Zod for validation, Drizzle-Zod for schema generation.
 - **Key Features**:
-    - **Client Management**: Integrated client listing from Conta Azul and ClickUp, with search, filter, pagination, and sortable columns. Includes LTV (Lifetime Value) and LT (Lifetime) metrics.
+    - **Client Management**: Integrated client listing from Conta Azul and ClickUp, with search, filter, pagination, and sortable columns. Includes LTV (Lifetime Value) and LT (Lifetime) metrics. Services column displays colorful icons with tooltips instead of text, using accent-insensitive pattern matching.
     - **LT (Lifetime) Calculation**: LT represents "meses ativos" (active months) - the count of distinct months with paid revenue (status PAGO or ACQUITTED) from `caz_receber` table. Uses `COALESCE(data_vencimento, data_criacao)` to determine the month. Displayed consistently in both the client list table and individual client detail pages.
+    - **Service Icons**: Visual service representation system (`client/src/lib/service-icons.tsx`) maps service names from `cup_contratos.servico` to category-specific Lucide icons with color coding. Uses NFD normalization for accent-insensitive matching. Covers 20+ service categories including Performance, Social Media, Creators, CRM, E-mail, E-commerce, SEO, Automação, etc. Displayed in `ServiceIcons` component with shadcn Tooltips showing full service name on hover.
     - **Employee Management**: CRUD operations for 25 employee fields from `rh_pessoal` table.
-    - **Contract Management**: Comprehensive tracking from `cup_contratos`, displaying service type, status, squad, and financial values. Includes status-based color coding.
+    - **Contract Management**: Comprehensive tracking from `cup_contratos`, displaying service type, status, squad, and financial values. Includes status-based color coding. "Responsável" column shows `cup_contratos.responsavel`, "CS" column shows `cup_contratos.csResponsavel`.
     - **Retention Analysis**: Churn metrics by service and responsible person with monthly breakdowns, filtering, and Recharts visualizations. Secure parameter binding prevents SQL injection.
     - **DFC (Demonstração de Fluxo de Caixa)**: Hierarchical cash flow analysis from `caz_parcelas` with expandable tree structure, month range filters, pivot table display, and sticky first column (categoria) for horizontal scrolling. Uses `valor_pago` with proportional distribution for parcelas with multiple categories.
 - **Theming**: Dark mode support via CSS variables; light mode is primary.

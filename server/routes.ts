@@ -31,7 +31,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: String(error) });
     }
   });
-  
+
   app.use("/api", isAuthenticated);
   
   app.get("/api/debug/users", isAdmin, async (req, res) => {
