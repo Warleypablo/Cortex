@@ -23,6 +23,7 @@ export default function Clients() {
   const [searchQuery, setSearchQuery] = useState("");
   const [servicoFilter, setServicoFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [tipoContratoFilter, setTipoContratoFilter] = useState<string>("ambos");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [sortField, setSortField] = useState<SortField>("name");
@@ -74,9 +75,14 @@ export default function Clients() {
       const matchesStatus = statusFilter === "all" || 
         client.statusClickup === statusFilter;
 
-      return matchesSearch && matchesServico && matchesStatus;
+      const matchesTipoContrato = 
+        tipoContratoFilter === "ambos" ||
+        (tipoContratoFilter === "recorrente" && (client.totalRecorrente || 0) > 0) ||
+        (tipoContratoFilter === "pontual" && (client.totalPontual || 0) > 0);
+
+      return matchesSearch && matchesServico && matchesStatus && matchesTipoContrato;
     });
-  }, [clientes, searchQuery, servicoFilter, statusFilter]);
+  }, [clientes, searchQuery, servicoFilter, statusFilter, tipoContratoFilter]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -175,7 +181,7 @@ export default function Clients() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, servicoFilter, statusFilter, itemsPerPage, sortField, sortDirection]);
+  }, [searchQuery, servicoFilter, statusFilter, tipoContratoFilter, itemsPerPage, sortField, sortDirection]);
 
   if (error) {
     return (
@@ -303,8 +309,22 @@ export default function Clients() {
             />
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Filter className="w-4 h-4 text-muted-foreground" />
+            <Select
+              value={tipoContratoFilter}
+              onValueChange={setTipoContratoFilter}
+            >
+              <SelectTrigger className="w-[140px]" data-testid="select-filter-tipo-contrato">
+                <SelectValue placeholder="Tipo de contrato" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ambos">Ambos</SelectItem>
+                <SelectItem value="recorrente">Recorrente</SelectItem>
+                <SelectItem value="pontual">Pontual</SelectItem>
+              </SelectContent>
+            </Select>
+
             <Select
               value={servicoFilter}
               onValueChange={setServicoFilter}

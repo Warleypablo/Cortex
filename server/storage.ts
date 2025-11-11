@@ -14,6 +14,8 @@ export type ClienteCompleto = Cliente & {
   dataInicio: Date | null;
   ltMeses: number | null;
   ltDias: number | null;
+  totalRecorrente: number | null;
+  totalPontual: number | null;
 };
 
 export interface AniversariantesMes {
@@ -671,7 +673,7 @@ export class DbStorage implements IStorage {
         cluster: schema.cupClientes.cluster,
         cnpjCliente: schema.cupClientes.cnpj,
         servicos: sql<string>`(
-          SELECT string_agg(DISTINCT produto, ', ')
+          SELECT string_agg(DISTINCT servico, ', ')
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
@@ -699,6 +701,20 @@ export class DbStorage implements IStorage {
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
           AND data_inicio IS NOT NULL
+        ), 0)`,
+        totalRecorrente: sql<number>`COALESCE((
+          SELECT SUM(valorr::double precision)
+          FROM ${schema.cupContratos}
+          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+            AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
+            AND valorr IS NOT NULL
+        ), 0)`,
+        totalPontual: sql<number>`COALESCE((
+          SELECT SUM(valorp::double precision)
+          FROM ${schema.cupContratos}
+          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+            AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
+            AND valorp IS NOT NULL
         ), 0)`,
       })
       .from(schema.cupClientes)
@@ -729,7 +745,7 @@ export class DbStorage implements IStorage {
         cluster: schema.cupClientes.cluster,
         cnpjCliente: schema.cupClientes.cnpj,
         servicos: sql<string>`(
-          SELECT string_agg(DISTINCT produto, ', ')
+          SELECT string_agg(DISTINCT servico, ', ')
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
@@ -757,6 +773,20 @@ export class DbStorage implements IStorage {
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
           AND data_inicio IS NOT NULL
+        ), 0)`,
+        totalRecorrente: sql<number>`COALESCE((
+          SELECT SUM(valorr::double precision)
+          FROM ${schema.cupContratos}
+          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+            AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
+            AND valorr IS NOT NULL
+        ), 0)`,
+        totalPontual: sql<number>`COALESCE((
+          SELECT SUM(valorp::double precision)
+          FROM ${schema.cupContratos}
+          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+            AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
+            AND valorp IS NOT NULL
         ), 0)`,
       })
       .from(schema.cupClientes)
