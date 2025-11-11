@@ -680,7 +680,7 @@ export class DbStorage implements IStorage {
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
-        ltMeses: sql<number>`(
+        ltMeses: sql<number>`COALESCE((
           SELECT ROUND(
             (EXTRACT(YEAR FROM AGE(
               MAX(COALESCE(data_encerramento, NOW())),
@@ -695,8 +695,8 @@ export class DbStorage implements IStorage {
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
           AND data_inicio IS NOT NULL
-        )`,
-        ltDias: sql<number>`(
+        ), 0)`,
+        ltDias: sql<number>`COALESCE((
           SELECT ROUND(
             EXTRACT(EPOCH FROM (
               MAX(COALESCE(data_encerramento, NOW())) - MIN(data_inicio)
@@ -705,7 +705,7 @@ export class DbStorage implements IStorage {
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
           AND data_inicio IS NOT NULL
-        )`,
+        ), 0)`,
       })
       .from(schema.cupClientes)
       .leftJoin(
@@ -744,7 +744,7 @@ export class DbStorage implements IStorage {
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
-        ltMeses: sql<number>`(
+        ltMeses: sql<number>`COALESCE((
           SELECT ROUND(
             (EXTRACT(YEAR FROM AGE(
               MAX(COALESCE(data_encerramento, NOW())),
@@ -759,8 +759,8 @@ export class DbStorage implements IStorage {
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
           AND data_inicio IS NOT NULL
-        )`,
-        ltDias: sql<number>`(
+        ), 0)`,
+        ltDias: sql<number>`COALESCE((
           SELECT ROUND(
             EXTRACT(EPOCH FROM (
               MAX(COALESCE(data_encerramento, NOW())) - MIN(data_inicio)
@@ -769,7 +769,7 @@ export class DbStorage implements IStorage {
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
           AND data_inicio IS NOT NULL
-        )`,
+        ), 0)`,
       })
       .from(schema.cupClientes)
       .leftJoin(
