@@ -4,10 +4,12 @@ import { useLocation } from "wouter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowUpDown, FileText, FileCheck, Clock } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ContratoCompleto } from "@shared/schema";
+import type { ClienteCompleto } from "../../../server/storage";
 
 interface Contract {
   id: string;
@@ -38,6 +40,8 @@ const mapSquadCodeToName = (code: string | null): string => {
 export default function Contracts() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [servicoFilter, setServicoFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("createdDate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -45,6 +49,10 @@ export default function Contracts() {
 
   const { data: contratos = [], isLoading, error } = useQuery<ContratoCompleto[]>({
     queryKey: ["/api/contratos"],
+  });
+
+  const { data: clientes = [] } = useQuery<ClienteCompleto[]>({
+    queryKey: ["/api/clientes"],
   });
 
   const contracts: Contract[] = useMemo(() => {
@@ -61,6 +69,26 @@ export default function Contracts() {
     }));
   }, [contratos]);
 
+  const servicosUnicos = useMemo(() => {
+    const servicosSet = new Set<string>();
+    contracts.forEach(contract => {
+      if (contract.service && contract.service !== "Sem serviço") {
+        servicosSet.add(contract.service);
+      }
+    });
+    return Array.from(servicosSet).sort();
+  }, [contracts]);
+
+  const statusUnicos = useMemo(() => {
+    const statusSet = new Set<string>();
+    contracts.forEach(contract => {
+      if (contract.status && contract.status !== "Desconhecido") {
+        statusSet.add(contract.status);
+      }
+    });
+    return Array.from(statusSet).sort();
+  }, [contracts]);
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -76,9 +104,12 @@ export default function Contracts() {
         contract.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
         contract.clientName.toLowerCase().includes(searchQuery.toLowerCase());
       
-      return matchesSearch;
+      const matchesServico = servicoFilter === "all" || contract.service === servicoFilter;
+      const matchesStatus = statusFilter === "all" || contract.status === statusFilter;
+      
+      return matchesSearch && matchesServico && matchesStatus;
     });
-  }, [contracts, searchQuery]);
+  }, [contracts, searchQuery, servicoFilter, statusFilter]);
 
   const sortedContracts = useMemo(() => {
     return [...filteredContracts].sort((a, b) => {
@@ -100,6 +131,38 @@ export default function Contracts() {
     });
   }, [filteredContracts, sortField, sortDirection]);
 
+  const kpis = useMemo(() => {
+    if (!filteredContracts || filteredContracts.length === 0) {
+      return { totalContratos: 0, contratosAtivos: 0, ltMedio: 0 };
+    }
+    
+    const totalContratos = filteredContracts.length;
+    const contratosAtivos = filteredContracts.filter(c => {
+      const status = c.status.toLowerCase();
+      return status === "ativo" || status === "onboarding" || status === "triagem";
+    }).length;
+    
+    const clientesUnicosIds = new Set(
+      filteredContracts
+        .map(c => c.clientId)
+        .filter(id => id)
+    );
+    
+    let somaLt = 0;
+    let countLt = 0;
+    clientesUnicosIds.forEach(clienteId => {
+      const cliente = clientes.find(c => c.ids === clienteId || String(c.id) === clienteId);
+      if (cliente && cliente.ltMeses && cliente.ltMeses > 0) {
+        somaLt += cliente.ltMeses;
+        countLt++;
+      }
+    });
+    
+    const ltMedio = countLt > 0 ? somaLt / countLt : 0;
+    
+    return { totalContratos, contratosAtivos, ltMedio };
+  }, [filteredContracts, clientes]);
+
   const totalPages = Math.ceil(sortedContracts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -110,6 +173,10 @@ export default function Contracts() {
       setCurrentPage(totalPages);
     }
   }, [totalPages]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, servicoFilter, statusFilter]);
 
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();
@@ -179,8 +246,55 @@ export default function Contracts() {
           <p className="text-muted-foreground">Gerencie contratos e acompanhe status de serviços</p>
         </div>
 
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card data-testid="card-total-contratos">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total de Contratos</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-total-contratos">
+                {kpis.totalContratos}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Contratos {servicoFilter !== "all" || statusFilter !== "all" ? "filtrados" : "cadastrados"}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-contratos-ativos">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Contratos Ativos</CardTitle>
+              <FileCheck className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-contratos-ativos">
+                {kpis.contratosAtivos}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Ativo, onboarding e triagem
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-lt-medio">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">LT Médio</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-lt-medio">
+                {kpis.ltMedio.toFixed(1)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Meses ativos (média dos clientes)
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-6">
+          <div className="flex-1 w-full">
             <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
@@ -188,6 +302,28 @@ export default function Contracts() {
               data-testid="input-search-contracts"
             />
           </div>
+          <Select value={servicoFilter} onValueChange={setServicoFilter}>
+            <SelectTrigger className="w-full md:w-[200px]" data-testid="select-servico-filter">
+              <SelectValue placeholder="Todos os serviços" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os serviços</SelectItem>
+              {servicosUnicos.map(servico => (
+                <SelectItem key={servico} value={servico}>{servico}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full md:w-[200px]" data-testid="select-status-filter">
+              <SelectValue placeholder="Todos os status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os status</SelectItem>
+              {statusUnicos.map(status => (
+                <SelectItem key={status} value={status}>{status}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button 
             variant="default" 
             data-testid="button-add-contract"
