@@ -671,7 +671,7 @@ export class DbStorage implements IStorage {
         cluster: schema.cupClientes.cluster,
         cnpjCliente: schema.cupClientes.cnpj,
         servicos: sql<string>`(
-          SELECT string_agg(DISTINCT servico, ', ')
+          SELECT string_agg(DISTINCT produto, ', ')
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
@@ -729,7 +729,7 @@ export class DbStorage implements IStorage {
         cluster: schema.cupClientes.cluster,
         cnpjCliente: schema.cupClientes.cnpj,
         servicos: sql<string>`(
-          SELECT string_agg(DISTINCT servico, ', ')
+          SELECT string_agg(DISTINCT produto, ', ')
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
