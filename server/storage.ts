@@ -691,7 +691,7 @@ export class DbStorage implements IStorage {
               MIN(data_inicio)
             )))::numeric,
             1
-          )
+          )::double precision
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
           AND data_inicio IS NOT NULL
@@ -701,7 +701,7 @@ export class DbStorage implements IStorage {
             EXTRACT(EPOCH FROM (
               MAX(COALESCE(data_encerramento, NOW())) - MIN(data_inicio)
             )) / 86400
-          )::integer
+          )::double precision
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
           AND data_inicio IS NOT NULL
@@ -755,7 +755,7 @@ export class DbStorage implements IStorage {
               MIN(data_inicio)
             )))::numeric,
             1
-          )
+          )::double precision
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
           AND data_inicio IS NOT NULL
@@ -765,7 +765,7 @@ export class DbStorage implements IStorage {
             EXTRACT(EPOCH FROM (
               MAX(COALESCE(data_encerramento, NOW())) - MIN(data_inicio)
             )) / 86400
-          )::integer
+          )::double precision
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
           AND data_inicio IS NOT NULL
