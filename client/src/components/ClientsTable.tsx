@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ServiceIcons } from "@/components/ServiceIcons";
 import type { ClienteCompleto } from "../../../server/storage";
 
 type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
@@ -146,9 +147,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
                 {formatCNPJ(client.cnpjCliente || client.cnpj)}
               </div>
               <div className="px-4 py-3 text-sm" data-testid={`text-services-${client.ids || client.id}`}>
-                <div className="text-muted-foreground max-w-[300px] truncate" title={client.servicos || undefined}>
-                  {client.servicos || "-"}
-                </div>
+                <ServiceIcons services={client.servicos} />
               </div>
               <div className="px-4 py-3 font-medium text-sm" data-testid={`text-ltv-${client.ids || client.id}`}>
                 {ltv > 0 ? formatCurrency(ltv) : "-"}
