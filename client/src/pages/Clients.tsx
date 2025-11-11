@@ -129,7 +129,7 @@ export default function Clients() {
     const totalClientes = filteredClients.length;
     const clientesAtivos = filteredClients.filter(c => {
       const status = (c.statusClickup || "").toLowerCase();
-      return status.includes("ativo") || status.includes("active");
+      return status === "ativo" || status === "onboarding" || status === "triagem";
     }).length;
     
     let somaLtv = 0;
