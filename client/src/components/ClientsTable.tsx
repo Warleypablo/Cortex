@@ -1,62 +1,21 @@
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ClienteCompleto } from "../../../server/storage";
 
+type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
+type SortDirection = "asc" | "desc";
+
 interface ClientsTableProps {
   clients: ClienteCompleto[];
   onClientClick: (clientId: string) => void;
   ltvMap?: Record<string, number>;
+  sortField: SortField;
+  sortDirection: SortDirection;
+  onSort: (field: SortField) => void;
 }
 
-type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
-type SortDirection = "asc" | "desc";
-
-export default function ClientsTable({ clients, onClientClick, ltvMap }: ClientsTableProps) {
-  const [sortField, setSortField] = useState<SortField>("name");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
-
-  const sortedClients = [...clients].sort((a, b) => {
-    let comparison = 0;
-    
-    if (sortField === "name") {
-      const nameA = a.nomeClickup || a.nome || "";
-      const nameB = b.nomeClickup || b.nome || "";
-      comparison = nameA.localeCompare(nameB);
-    } else if (sortField === "cnpj") {
-      const cnpjA = a.cnpjCliente || a.cnpj || "";
-      const cnpjB = b.cnpjCliente || b.cnpj || "";
-      comparison = cnpjA.localeCompare(cnpjB);
-    } else if (sortField === "ltv") {
-      const ltvA = ltvMap?.[a.ids || String(a.id)] || 0;
-      const ltvB = ltvMap?.[b.ids || String(b.id)] || 0;
-      comparison = ltvA - ltvB;
-    } else if (sortField === "lt") {
-      const ltA = a.ltMeses || 0;
-      const ltB = b.ltMeses || 0;
-      comparison = ltA - ltB;
-    } else if (sortField === "status") {
-      const statusA = a.statusClickup || "";
-      const statusB = b.statusClickup || "";
-      comparison = statusA.localeCompare(statusB);
-    } else if (sortField === "startDate") {
-      const dateA = a.dataInicio ? new Date(a.dataInicio).getTime() : 0;
-      const dateB = b.dataInicio ? new Date(b.dataInicio).getTime() : 0;
-      comparison = dateA - dateB;
-    }
-    
-    return sortDirection === "asc" ? comparison : -comparison;
-  });
+export default function ClientsTable({ clients, onClientClick, ltvMap, sortField, sortDirection, onSort }: ClientsTableProps) {
 
   const getStatusColor = (status: string | null) => {
     if (!status) return "bg-muted text-muted-foreground";
@@ -94,7 +53,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => handleSort("name")}
+              onClick={() => onSort("name")}
               className="hover-elevate -ml-3"
               data-testid="sort-name"
             >
@@ -106,7 +65,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => handleSort("cnpj")}
+              onClick={() => onSort("cnpj")}
               className="hover-elevate -ml-3"
               data-testid="sort-cnpj"
             >
@@ -121,7 +80,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => handleSort("ltv")}
+              onClick={() => onSort("ltv")}
               className="hover-elevate -ml-3"
               data-testid="sort-ltv"
             >
@@ -133,7 +92,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => handleSort("lt")}
+              onClick={() => onSort("lt")}
               className="hover-elevate -ml-3"
               data-testid="sort-lt"
             >
@@ -145,7 +104,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => handleSort("status")}
+              onClick={() => onSort("status")}
               className="hover-elevate -ml-3"
               data-testid="sort-status"
             >
@@ -157,7 +116,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => handleSort("startDate")}
+              onClick={() => onSort("startDate")}
               className="hover-elevate -ml-3"
               data-testid="sort-date"
             >
@@ -170,7 +129,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap }: Clients
 
       {/* Table Body */}
       <div>
-        {sortedClients.map((client) => {
+        {clients.map((client) => {
           const ltv = ltvMap?.[client.ids || String(client.id)] || 0;
           const ltMeses = typeof client.ltMeses === 'number' ? client.ltMeses : 0;
           return (
