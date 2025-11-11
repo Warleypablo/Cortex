@@ -439,7 +439,7 @@ export default function ClientDetail() {
                           {contrato.responsavel || '-'}
                         </TableCell>
                         <TableCell className="text-muted-foreground" data-testid={`text-cs-${contrato.idSubtask}`}>
-                          {contrato.responsavelGeral || '-'}
+                          {contrato.csResponsavel || '-'}
                         </TableCell>
                         <TableCell className="text-muted-foreground" data-testid={`text-date-${contrato.idSubtask}`}>
                           {contrato.dataInicio ? new Date(contrato.dataInicio).toLocaleDateString('pt-BR') : '-'}
