@@ -436,10 +436,10 @@ export default function ClientDetail() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground" data-testid={`text-responsavel-${contrato.idSubtask}`}>
-                          {contrato.responsavelGeral || '-'}
+                          {contrato.responsavel || '-'}
                         </TableCell>
                         <TableCell className="text-muted-foreground" data-testid={`text-cs-${contrato.idSubtask}`}>
-                          {contrato.responsavel || '-'}
+                          {contrato.responsavelGeral || '-'}
                         </TableCell>
                         <TableCell className="text-muted-foreground" data-testid={`text-date-${contrato.idSubtask}`}>
                           {contrato.dataInicio ? new Date(contrato.dataInicio).toLocaleDateString('pt-BR') : '-'}
