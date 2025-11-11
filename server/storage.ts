@@ -681,20 +681,14 @@ export class DbStorage implements IStorage {
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
         ltMeses: sql<number>`COALESCE((
-          SELECT ROUND(
-            (EXTRACT(YEAR FROM AGE(
-              MAX(COALESCE(data_encerramento, NOW())),
-              MIN(data_inicio)
-            )) * 12 + 
-            EXTRACT(MONTH FROM AGE(
-              MAX(COALESCE(data_encerramento, NOW())),
-              MIN(data_inicio)
-            )))::numeric,
-            1
-          )::double precision
-          FROM ${schema.cupContratos}
-          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
-          AND data_inicio IS NOT NULL
+          SELECT COUNT(DISTINCT TO_CHAR(
+            COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}), 
+            'YYYY-MM'
+          ))::double precision
+          FROM ${schema.cazReceber}
+          WHERE ${schema.cazReceber.clienteId} = ${schema.cazClientes.ids}
+            AND UPPER(${schema.cazReceber.status}) IN ('PAGO', 'ACQUITTED')
+            AND COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}) IS NOT NULL
         ), 0)`,
         ltDias: sql<number>`COALESCE((
           SELECT ROUND(
@@ -745,20 +739,14 @@ export class DbStorage implements IStorage {
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
         ltMeses: sql<number>`COALESCE((
-          SELECT ROUND(
-            (EXTRACT(YEAR FROM AGE(
-              MAX(COALESCE(data_encerramento, NOW())),
-              MIN(data_inicio)
-            )) * 12 + 
-            EXTRACT(MONTH FROM AGE(
-              MAX(COALESCE(data_encerramento, NOW())),
-              MIN(data_inicio)
-            )))::numeric,
-            1
-          )::double precision
-          FROM ${schema.cupContratos}
-          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
-          AND data_inicio IS NOT NULL
+          SELECT COUNT(DISTINCT TO_CHAR(
+            COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}), 
+            'YYYY-MM'
+          ))::double precision
+          FROM ${schema.cazReceber}
+          WHERE ${schema.cazReceber.clienteId} = ${schema.cazClientes.ids}
+            AND UPPER(${schema.cazReceber.status}) IN ('PAGO', 'ACQUITTED')
+            AND COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}) IS NOT NULL
         ), 0)`,
         ltDias: sql<number>`COALESCE((
           SELECT ROUND(
