@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/select";
 import type { ClienteCompleto } from "../../../server/storage";
 
+type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
+type SortDirection = "asc" | "desc";
+
 export default function Clients() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -22,6 +25,8 @@ export default function Clients() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const { data: clientes, isLoading, error } = useQuery<ClienteCompleto[]>({
     queryKey: ["/api/clientes"],
@@ -73,6 +78,49 @@ export default function Clients() {
     });
   }, [clientes, searchQuery, servicoFilter, statusFilter]);
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortedClients = useMemo(() => {
+    return [...filteredClients].sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortField === "name") {
+        const nameA = a.nomeClickup || a.nome || "";
+        const nameB = b.nomeClickup || b.nome || "";
+        comparison = nameA.localeCompare(nameB);
+      } else if (sortField === "cnpj") {
+        const cnpjA = a.cnpjCliente || a.cnpj || "";
+        const cnpjB = b.cnpjCliente || b.cnpj || "";
+        comparison = cnpjA.localeCompare(cnpjB);
+      } else if (sortField === "ltv") {
+        const ltvA = ltvMap?.[a.ids || String(a.id)] || 0;
+        const ltvB = ltvMap?.[b.ids || String(b.id)] || 0;
+        comparison = ltvA - ltvB;
+      } else if (sortField === "lt") {
+        const ltA = a.ltMeses || 0;
+        const ltB = b.ltMeses || 0;
+        comparison = ltA - ltB;
+      } else if (sortField === "status") {
+        const statusA = a.statusClickup || "";
+        const statusB = b.statusClickup || "";
+        comparison = statusA.localeCompare(statusB);
+      } else if (sortField === "startDate") {
+        const dateA = a.dataInicio ? new Date(a.dataInicio).getTime() : 0;
+        const dateB = b.dataInicio ? new Date(b.dataInicio).getTime() : 0;
+        comparison = dateA - dateB;
+      }
+      
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [filteredClients, sortField, sortDirection, ltvMap]);
+
   const kpis = useMemo(() => {
     if (!filteredClients || filteredClients.length === 0) {
       return { totalClientes: 0, clientesAtivos: 0, ltvMedio: 0, ltMedio: 0 };
@@ -111,7 +159,7 @@ export default function Clients() {
     return { totalClientes, clientesAtivos, ltvMedio, ltMedio };
   }, [filteredClients, ltvMap]);
 
-  const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedClients.length / itemsPerPage);
 
   useEffect(() => {
     if (totalPages > 0 && currentPage > totalPages) {
@@ -121,11 +169,11 @@ export default function Clients() {
 
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedClients = filteredClients.slice(startIndex, endIndex);
+  const paginatedClients = sortedClients.slice(startIndex, endIndex);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, servicoFilter, statusFilter, itemsPerPage]);
+  }, [searchQuery, servicoFilter, statusFilter, itemsPerPage, sortField, sortDirection]);
 
   if (error) {
     return (
@@ -277,6 +325,9 @@ export default function Clients() {
             clients={paginatedClients}
             onClientClick={(id) => setLocation(`/cliente/${id}`)}
             ltvMap={ltvMap}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
           />
         </div>
 
