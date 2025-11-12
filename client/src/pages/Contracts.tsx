@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowUpDown, FileText, FileCheck, Clock } from "lucide-react";
+import { ArrowUpDown, FileText, FileCheck, DollarSign } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ContratoCompleto } from "@shared/schema";
@@ -55,10 +55,14 @@ export default function Contracts() {
     queryKey: ["/api/clientes"],
   });
 
+  const { data: ltvMap } = useQuery<Record<string, number>>({
+    queryKey: ["/api/clientes-ltv"],
+  });
+
   const contracts: Contract[] = useMemo(() => {
     return contratos.map(c => ({
       id: c.idSubtask || "",
-      service: c.servico || "Sem serviço",
+      service: c.produto || c.servico || "Sem serviço",
       clientName: c.nomeCliente || "Cliente não identificado",
       clientId: c.idCliente || "",
       status: c.status || "Desconhecido",
@@ -133,7 +137,7 @@ export default function Contracts() {
 
   const kpis = useMemo(() => {
     if (!filteredContracts || filteredContracts.length === 0) {
-      return { totalContratos: 0, contratosAtivos: 0, ltMedio: 0 };
+      return { totalContratos: 0, contratosAtivos: 0, aovMedio: 0 };
     }
     
     const totalContratos = filteredContracts.length;
@@ -148,20 +152,26 @@ export default function Contracts() {
         .filter(id => id)
     );
     
-    let somaLt = 0;
-    let countLt = 0;
+    let somaAov = 0;
+    let countAov = 0;
     clientesUnicosIds.forEach(clienteId => {
       const cliente = clientes.find(c => c.ids === clienteId || String(c.id) === clienteId);
-      if (cliente && cliente.ltMeses && cliente.ltMeses > 0) {
-        somaLt += cliente.ltMeses;
-        countLt++;
+      if (!cliente) return;
+      
+      const ltvKey = cliente.ids || String(cliente.id);
+      const ltv = ltvMap?.[ltvKey] || 0;
+      
+      if (cliente.ltMeses && cliente.ltMeses > 0 && ltv > 0) {
+        const aov = ltv / cliente.ltMeses;
+        somaAov += aov;
+        countAov++;
       }
     });
     
-    const ltMedio = countLt > 0 ? somaLt / countLt : 0;
+    const aovMedio = countAov > 0 ? somaAov / countAov : 0;
     
-    return { totalContratos, contratosAtivos, ltMedio };
-  }, [filteredContracts, clientes]);
+    return { totalContratos, contratosAtivos, aovMedio };
+  }, [filteredContracts, clientes, ltvMap]);
 
   const totalPages = Math.ceil(sortedContracts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -277,17 +287,17 @@ export default function Contracts() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-lt-medio">
+          <Card data-testid="card-aov-medio">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">LT Médio</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">AOV Médio</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-lt-medio">
-                {kpis.ltMedio.toFixed(1)}
+              <div className="text-2xl font-bold" data-testid="text-aov-medio">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(kpis.aovMedio)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Meses ativos (média dos clientes)
+                Ticket médio mensal (LTV ÷ LT)
               </p>
             </CardContent>
           </Card>

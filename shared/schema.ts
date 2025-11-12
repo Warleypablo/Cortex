@@ -171,6 +171,7 @@ export type Contrato = typeof cupContratos.$inferSelect;
 export type ContratoCompleto = {
   idSubtask: string | null;
   servico: string | null;
+  produto: string | null;
   status: string | null;
   valorr: string | null;
   valorp: string | null;

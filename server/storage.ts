@@ -910,6 +910,7 @@ export class DbStorage implements IStorage {
       .select({
         idSubtask: schema.cupContratos.idSubtask,
         servico: schema.cupContratos.servico,
+        produto: schema.cupContratos.produto,
         status: schema.cupContratos.status,
         valorr: schema.cupContratos.valorr,
         valorp: schema.cupContratos.valorp,
@@ -944,6 +945,7 @@ export class DbStorage implements IStorage {
       .select({
         idSubtask: schema.cupContratos.idSubtask,
         servico: schema.cupContratos.servico,
+        produto: schema.cupContratos.produto,
         status: schema.cupContratos.status,
         valorr: schema.cupContratos.valorr,
         valorp: schema.cupContratos.valorp,
