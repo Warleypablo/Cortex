@@ -656,75 +656,72 @@ export class DbStorage implements IStorage {
   }
 
   async getClientes(): Promise<ClienteCompleto[]> {
-    const result = await db
-      .select({
-        id: sql<number>`COALESCE(${schema.cazClientes.id}, ('x' || substr(md5(${schema.cupClientes.taskId}), 1, 8))::bit(32)::int)`,
-        nome: schema.cazClientes.nome,
-        cnpj: schema.cazClientes.cnpj,
-        endereco: schema.cazClientes.endereco,
-        ativo: schema.cazClientes.ativo,
-        createdAt: schema.cazClientes.createdAt,
-        empresa: schema.cazClientes.empresa,
-        ids: schema.cazClientes.ids,
-        nomeClickup: schema.cupClientes.nome,
-        statusClickup: schema.cupClientes.status,
-        telefone: schema.cupClientes.telefone,
-        responsavel: schema.cupClientes.responsavel,
-        cluster: schema.cupClientes.cluster,
-        cnpjCliente: schema.cupClientes.cnpj,
-        servicos: sql<string>`(
+    const result = await db.execute(sql`
+      SELECT DISTINCT ON (cc.task_id)
+        COALESCE(caz.id, ('x' || substr(md5(cc.task_id), 1, 8))::bit(32)::int) as id,
+        caz.nome,
+        caz.cnpj,
+        caz.endereco,
+        caz.ativo,
+        caz.created_at as "createdAt",
+        caz.empresa,
+        caz.ids,
+        cc.nome as "nomeClickup",
+        cc.status as "statusClickup",
+        cc.telefone,
+        cc.responsavel,
+        cc.cluster,
+        cc.cnpj as "cnpjCliente",
+        (
           SELECT string_agg(DISTINCT produto, ', ')
-          FROM ${schema.cupContratos}
-          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
-        )`,
-        dataInicio: sql<Date>`(
+          FROM cup_contratos
+          WHERE id_task = cc.task_id
+        ) as servicos,
+        (
           SELECT MIN(data_inicio)
-          FROM ${schema.cupContratos}
-          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
-        )`,
-        ltMeses: sql<number>`COALESCE((
+          FROM cup_contratos
+          WHERE id_task = cc.task_id
+        ) as "dataInicio",
+        COALESCE((
           SELECT COUNT(DISTINCT TO_CHAR(
-            COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}), 
+            COALESCE(cr.data_vencimento, cr.data_criacao), 
             'YYYY-MM'
           ))::double precision
-          FROM ${schema.cazReceber}
-          WHERE ${schema.cazReceber.clienteId} = ${schema.cazClientes.ids}
-            AND UPPER(${schema.cazReceber.status}) IN ('PAGO', 'ACQUITTED')
-            AND COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}) IS NOT NULL
-        ), 0)`,
-        ltDias: sql<number>`COALESCE((
+          FROM caz_receber cr
+          WHERE cr.cliente_id = caz.ids
+            AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
+            AND COALESCE(cr.data_vencimento, cr.data_criacao) IS NOT NULL
+        ), 0) as "ltMeses",
+        COALESCE((
           SELECT ROUND(
             EXTRACT(EPOCH FROM (
               MAX(COALESCE(data_encerramento, NOW())) - MIN(data_inicio)
             )) / 86400
           )::double precision
-          FROM ${schema.cupContratos}
-          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+          FROM cup_contratos
+          WHERE id_task = cc.task_id
           AND data_inicio IS NOT NULL
-        ), 0)`,
-        totalRecorrente: sql<number>`COALESCE((
+        ), 0) as "ltDias",
+        COALESCE((
           SELECT SUM(valorr::double precision)
-          FROM ${schema.cupContratos}
-          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+          FROM cup_contratos
+          WHERE id_task = cc.task_id
             AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
             AND valorr IS NOT NULL
-        ), 0)`,
-        totalPontual: sql<number>`COALESCE((
+        ), 0) as "totalRecorrente",
+        COALESCE((
           SELECT SUM(valorp::double precision)
-          FROM ${schema.cupContratos}
-          WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
+          FROM cup_contratos
+          WHERE id_task = cc.task_id
             AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
             AND valorp IS NOT NULL
-        ), 0)`,
-      })
-      .from(schema.cupClientes)
-      .leftJoin(
-        schema.cazClientes,
-        eq(schema.cupClientes.cnpj, schema.cazClientes.cnpj)
-      )
-      .orderBy(schema.cupClientes.nome);
+        ), 0) as "totalPontual"
+      FROM cup_clientes cc
+      LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
+      ORDER BY cc.task_id, caz.id DESC NULLS LAST, cc.nome
+    `);
 
-    return result;
+    return result.rows as ClienteCompleto[];
   }
 
   async getClienteById(id: string): Promise<ClienteCompleto | undefined> {
