@@ -9,11 +9,11 @@ import { ArrowUpDown, FileText, FileCheck, DollarSign } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ContratoCompleto } from "@shared/schema";
-import type { ClienteCompleto } from "../../../server/storage";
 
 interface Contract {
   id: string;
   service: string;
+  produto: string;
   clientName: string;
   clientId: string;
   status: string;
@@ -42,6 +42,7 @@ export default function Contracts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [servicoFilter, setServicoFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [tipoContratoFilter, setTipoContratoFilter] = useState<string>("ambos");
   const [sortField, setSortField] = useState<SortField>("createdDate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,18 +52,11 @@ export default function Contracts() {
     queryKey: ["/api/contratos"],
   });
 
-  const { data: clientes = [] } = useQuery<ClienteCompleto[]>({
-    queryKey: ["/api/clientes"],
-  });
-
-  const { data: ltvMap } = useQuery<Record<string, number>>({
-    queryKey: ["/api/clientes-ltv"],
-  });
-
   const contracts: Contract[] = useMemo(() => {
     return contratos.map(c => ({
       id: c.idSubtask || "",
-      service: c.produto || c.servico || "Sem serviço",
+      service: c.servico || c.produto || "Sem serviço",
+      produto: c.produto || c.servico || "",
       clientName: c.nomeCliente || "Cliente não identificado",
       clientId: c.idCliente || "",
       status: c.status || "Desconhecido",
@@ -76,8 +70,8 @@ export default function Contracts() {
   const servicosUnicos = useMemo(() => {
     const servicosSet = new Set<string>();
     contracts.forEach(contract => {
-      if (contract.service && contract.service !== "Sem serviço") {
-        servicosSet.add(contract.service);
+      if (contract.produto && contract.produto !== "") {
+        servicosSet.add(contract.produto);
       }
     });
     return Array.from(servicosSet).sort();
@@ -108,12 +102,17 @@ export default function Contracts() {
         contract.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
         contract.clientName.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesServico = servicoFilter === "all" || contract.service === servicoFilter;
+      const matchesServico = servicoFilter === "all" || contract.produto === servicoFilter;
       const matchesStatus = statusFilter === "all" || contract.status === statusFilter;
       
-      return matchesSearch && matchesServico && matchesStatus;
+      const matchesTipoContrato = 
+        tipoContratoFilter === "ambos" ||
+        (tipoContratoFilter === "recorrente" && contract.recurringValue > 0) ||
+        (tipoContratoFilter === "pontual" && contract.oneTimeValue > 0);
+      
+      return matchesSearch && matchesServico && matchesStatus && matchesTipoContrato;
     });
-  }, [contracts, searchQuery, servicoFilter, statusFilter]);
+  }, [contracts, searchQuery, servicoFilter, statusFilter, tipoContratoFilter]);
 
   const sortedContracts = useMemo(() => {
     return [...filteredContracts].sort((a, b) => {
@@ -146,32 +145,14 @@ export default function Contracts() {
       return status === "ativo" || status === "onboarding" || status === "triagem";
     }).length;
     
-    const clientesUnicosIds = new Set(
-      filteredContracts
-        .map(c => c.clientId)
-        .filter(id => id)
-    );
+    const somaValorTotal = filteredContracts.reduce((acc, contract) => {
+      return acc + contract.recurringValue + contract.oneTimeValue;
+    }, 0);
     
-    let somaAov = 0;
-    let countAov = 0;
-    clientesUnicosIds.forEach(clienteId => {
-      const cliente = clientes.find(c => c.ids === clienteId || String(c.id) === clienteId);
-      if (!cliente) return;
-      
-      const ltvKey = cliente.ids || String(cliente.id);
-      const ltv = ltvMap?.[ltvKey] || 0;
-      
-      if (cliente.ltMeses && cliente.ltMeses > 0 && ltv > 0) {
-        const aov = ltv / cliente.ltMeses;
-        somaAov += aov;
-        countAov++;
-      }
-    });
-    
-    const aovMedio = countAov > 0 ? somaAov / countAov : 0;
+    const aovMedio = totalContratos > 0 ? somaValorTotal / totalContratos : 0;
     
     return { totalContratos, contratosAtivos, aovMedio };
-  }, [filteredContracts, clientes, ltvMap]);
+  }, [filteredContracts]);
 
   const totalPages = Math.ceil(sortedContracts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -186,7 +167,7 @@ export default function Contracts() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, servicoFilter, statusFilter]);
+  }, [searchQuery, servicoFilter, statusFilter, tipoContratoFilter]);
 
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();
@@ -297,7 +278,7 @@ export default function Contracts() {
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(kpis.aovMedio)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Ticket médio mensal (LTV ÷ LT)
+                Ticket médio por contrato
               </p>
             </CardContent>
           </Card>
@@ -332,6 +313,16 @@ export default function Contracts() {
               {statusUnicos.map(status => (
                 <SelectItem key={status} value={status}>{status}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={tipoContratoFilter} onValueChange={setTipoContratoFilter}>
+            <SelectTrigger className="w-full md:w-[200px]" data-testid="select-tipo-contrato-filter">
+              <SelectValue placeholder="Tipo de contrato" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ambos">Ambos</SelectItem>
+              <SelectItem value="recorrente">Recorrente</SelectItem>
+              <SelectItem value="pontual">Pontual</SelectItem>
             </SelectContent>
           </Select>
           <Button 
