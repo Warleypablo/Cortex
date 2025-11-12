@@ -1,21 +1,23 @@
 import { Router } from "express";
 import passport from "passport";
 import type { User } from "./userDb";
+import { getCallbackURL } from "./config";
 
 const router = Router();
 
 router.get("/auth/debug", (req, res) => {
   const clientID = process.env.GOOGLE_CLIENT_ID;
-  const domain = process.env.REPLIT_DEV_DOMAIN;
-  const callbackURL = domain 
-    ? `https://${domain}/auth/google/callback`
-    : "http://localhost:5000/auth/google/callback";
+  const customDomain = process.env.CUSTOM_DOMAIN;
+  const replitDomains = process.env.REPLIT_DOMAINS;
+  const devDomain = process.env.REPLIT_DEV_DOMAIN;
   
   res.json({
     clientIDExists: !!clientID,
     clientIDStart: clientID?.substring(0, 30),
-    callbackURL,
-    domain
+    callbackURL: getCallbackURL(),
+    customDomain: customDomain || null,
+    replitDomains: replitDomains || null,
+    devDomain: devDomain || null
   });
 });
 
