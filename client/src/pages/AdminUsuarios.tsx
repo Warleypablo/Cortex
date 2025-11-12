@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
-import { Users, Database, Key, Shield, Edit, UserCog } from "lucide-react";
+import { Users, Database, Key, Shield, Edit, UserCog, ShieldCheck, ShieldOff } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -172,10 +172,36 @@ function EditPermissionsDialog({ user, open, onOpenChange }: {
 
 export default function AdminUsuarios() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const { toast } = useToast();
 
   const { data, isLoading, error } = useQuery<DebugData>({
     queryKey: ["/api/debug/users"],
   });
+
+  const toggleRoleMutation = useMutation({
+    mutationFn: async ({ userId, newRole }: { userId: string; newRole: 'admin' | 'user' }) => {
+      return await apiRequest('POST', `/api/users/${userId}/role`, { role: newRole });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/debug/users'] });
+      toast({
+        title: "Função atualizada",
+        description: `Usuário ${variables.newRole === 'admin' ? 'promovido a administrador' : 'rebaixado a usuário comum'} com sucesso.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar função",
+        description: error.message || "Ocorreu um erro ao atualizar a função do usuário.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleToggleRole = (user: User) => {
+    const newRole = user.role === 'admin' ? 'user' : 'admin';
+    toggleRoleMutation.mutate({ userId: user.id, newRole });
+  };
 
   if (isLoading) {
     return (
@@ -366,17 +392,38 @@ export default function AdminUsuarios() {
                       })()}
                     </TableCell>
                     <TableCell className="text-right">
-                      {user.role !== 'admin' && (
+                      <div className="flex items-center justify-end gap-2">
+                        {user.role !== 'admin' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingUser(user)}
+                            data-testid={`button-edit-${user.id}`}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar Permissões
+                          </Button>
+                        )}
                         <Button
-                          variant="ghost"
+                          variant={user.role === 'admin' ? 'outline' : 'default'}
                           size="sm"
-                          onClick={() => setEditingUser(user)}
-                          data-testid={`button-edit-${user.id}`}
+                          onClick={() => handleToggleRole(user)}
+                          disabled={toggleRoleMutation.isPending}
+                          data-testid={`button-toggle-role-${user.id}`}
                         >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Editar Permissões
+                          {user.role === 'admin' ? (
+                            <>
+                              <ShieldOff className="h-4 w-4 mr-2" />
+                              Remover Admin
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="h-4 w-4 mr-2" />
+                              Tornar Admin
+                            </>
+                          )}
                         </Button>
-                      )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
