@@ -3,10 +3,24 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { findUserById, createOrUpdateUser, type User } from "./userDb";
 
 export function getCallbackURL(): string {
-  const domain = process.env.REPLIT_DEV_DOMAIN;
-  if (domain) {
-    return `https://${domain}/auth/google/callback`;
+  const customDomain = process.env.CUSTOM_DOMAIN;
+  if (customDomain) {
+    return `https://${customDomain}/auth/google/callback`;
   }
+
+  const replitDomains = process.env.REPLIT_DOMAINS;
+  if (replitDomains) {
+    const firstDomain = replitDomains.split(',')[0].trim();
+    if (firstDomain) {
+      return `https://${firstDomain}/auth/google/callback`;
+    }
+  }
+
+  const devDomain = process.env.REPLIT_DEV_DOMAIN;
+  if (devDomain) {
+    return `https://${devDomain}/auth/google/callback`;
+  }
+
   return "http://localhost:5000/auth/google/callback";
 }
 

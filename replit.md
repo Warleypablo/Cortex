@@ -44,6 +44,15 @@ Preferred communication style: Simple, everyday language.
 
 ### Authentication & Authorization
 - **Authentication**: Google OAuth2.0 via Passport.js, storing user data in Replit Database.
+    - **Callback URL Strategy**: System automatically detects environment and uses appropriate callback URL:
+        1. `CUSTOM_DOMAIN` (if set manually)
+        2. `REPLIT_DOMAINS` (published/production domain - e.g., Turbodata.replit.app)
+        3. `REPLIT_DEV_DOMAIN` (development domain - e.g., *.worf.replit.dev)
+        4. `localhost:5000` (local fallback)
+    - **Google Console Configuration**: Both callback URLs must be registered:
+        - Development: `https://[REPLIT_DEV_DOMAIN]/auth/google/callback`
+        - Production: `https://Turbodata.replit.app/auth/google/callback`
+    - **Environment Variables**: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` stored in Replit Secrets
 - **Authorization**: Role-Based Access Control (RBAC) with `admin` and `user` roles.
     - `admin` (hardcoded for `caio.massaroni@turbopartners.com.br` and `warley.silva@turbopartners.com.br`) has full access to all routes.
     - `user` has limited `allowedRoutes` (default: `/ferramentas`).
