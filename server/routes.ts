@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertColaboradorSchema, insertPatrimonioSchema } from "@shared/schema";
 import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
-import { getAllUsers, listAllKeys, updateUserPermissions } from "./auth/userDb";
+import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole } from "./auth/userDb";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 
@@ -64,6 +64,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error updating permissions:", error);
       res.status(500).json({ error: "Failed to update permissions" });
+    }
+  });
+
+  app.post("/api/users/:userId/role", isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (role !== 'admin' && role !== 'user') {
+        return res.status(400).json({ error: "Role must be 'admin' or 'user'" });
+      }
+
+      const updatedUser = await updateUserRole(userId, role);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("[api] Error updating role:", error);
+      res.status(500).json({ error: "Failed to update role" });
     }
   });
   

@@ -36,6 +36,27 @@ export async function updateUserPermissions(userId: string, allowedRoutes: strin
   }
 }
 
+export async function updateUserRole(userId: string, role: 'admin' | 'user'): Promise<User | null> {
+  try {
+    const user = await findUserById(userId);
+    if (!user) {
+      return null;
+    }
+    
+    const updatedUser: User = {
+      ...user,
+      role,
+      allowedRoutes: role === 'admin' ? ALL_ROUTES : DEFAULT_USER_ROUTES,
+    };
+    
+    await db.set(`${USERS_PREFIX}${userId}`, JSON.stringify(updatedUser));
+    return updatedUser;
+  } catch (error) {
+    console.error("❌ Erro ao atualizar role:", error);
+    return null;
+  }
+}
+
 export async function listAllKeys(): Promise<string[]> {
   try {
     const result: any = await db.list();
