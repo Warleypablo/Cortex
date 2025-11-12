@@ -903,74 +903,62 @@ export class DbStorage implements IStorage {
   }
 
   async getContratos(): Promise<ContratoCompleto[]> {
-    const result = await db
-      .select({
-        idSubtask: schema.cupContratos.idSubtask,
-        servico: schema.cupContratos.servico,
-        produto: schema.cupContratos.produto,
-        status: schema.cupContratos.status,
-        valorr: schema.cupContratos.valorr,
-        valorp: schema.cupContratos.valorp,
-        dataInicio: schema.cupContratos.dataInicio,
-        dataEncerramento: schema.cupContratos.dataEncerramento,
-        squad: schema.cupContratos.squad,
-        idTask: schema.cupContratos.idTask,
-        nomeCliente: sql<string>`COALESCE(${schema.cupClientes.nome}, ${schema.cazClientes.nome})`,
-        cnpjCliente: schema.cupClientes.cnpj,
-        idCliente: schema.cazClientes.ids,
-        responsavel: schema.cupContratos.responsavel,
-        csResponsavel: schema.cupContratos.csResponsavel,
-        responsavelCliente: schema.cupClientes.responsavel,
-        responsavelGeral: schema.cupClientes.responsavelGeral,
-      })
-      .from(schema.cupContratos)
-      .leftJoin(
-        schema.cupClientes,
-        eq(schema.cupContratos.idTask, schema.cupClientes.taskId)
-      )
-      .leftJoin(
-        schema.cazClientes,
-        eq(schema.cupClientes.cnpj, schema.cazClientes.cnpj)
-      )
-      .orderBy(desc(schema.cupContratos.dataInicio));
+    const result = await db.execute(sql`
+      SELECT DISTINCT ON (ct.id_subtask)
+        ct.id_subtask as "idSubtask",
+        ct.servico,
+        ct.produto,
+        ct.status,
+        ct.valorr,
+        ct.valorp,
+        ct.data_inicio as "dataInicio",
+        ct.data_encerramento as "dataEncerramento",
+        ct.squad,
+        ct.id_task as "idTask",
+        COALESCE(cc.nome, caz.nome) as "nomeCliente",
+        cc.cnpj as "cnpjCliente",
+        caz.ids as "idCliente",
+        ct.responsavel,
+        ct.cs_responsavel as "csResponsavel",
+        cc.responsavel as "responsavelCliente",
+        cc.responsavel_geral as "responsavelGeral"
+      FROM cup_contratos ct
+      LEFT JOIN cup_clientes cc ON ct.id_task = cc.task_id
+      LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
+      ORDER BY ct.id_subtask, caz.id DESC NULLS LAST, ct.data_inicio DESC
+    `);
 
-    return result;
+    return result.rows as ContratoCompleto[];
   }
 
   async getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]> {
-    const result = await db
-      .select({
-        idSubtask: schema.cupContratos.idSubtask,
-        servico: schema.cupContratos.servico,
-        produto: schema.cupContratos.produto,
-        status: schema.cupContratos.status,
-        valorr: schema.cupContratos.valorr,
-        valorp: schema.cupContratos.valorp,
-        dataInicio: schema.cupContratos.dataInicio,
-        dataEncerramento: schema.cupContratos.dataEncerramento,
-        squad: schema.cupContratos.squad,
-        idTask: schema.cupContratos.idTask,
-        nomeCliente: sql<string>`COALESCE(${schema.cupClientes.nome}, ${schema.cazClientes.nome})`,
-        cnpjCliente: schema.cupClientes.cnpj,
-        idCliente: schema.cazClientes.ids,
-        responsavel: schema.cupContratos.responsavel,
-        csResponsavel: schema.cupContratos.csResponsavel,
-        responsavelCliente: schema.cupClientes.responsavel,
-        responsavelGeral: schema.cupClientes.responsavelGeral,
-      })
-      .from(schema.cupContratos)
-      .leftJoin(
-        schema.cupClientes,
-        eq(schema.cupContratos.idTask, schema.cupClientes.taskId)
-      )
-      .leftJoin(
-        schema.cazClientes,
-        eq(schema.cupClientes.cnpj, schema.cazClientes.cnpj)
-      )
-      .where(eq(schema.cazClientes.ids, clienteId))
-      .orderBy(desc(schema.cupContratos.dataInicio));
+    const result = await db.execute(sql`
+      SELECT DISTINCT ON (ct.id_subtask)
+        ct.id_subtask as "idSubtask",
+        ct.servico,
+        ct.produto,
+        ct.status,
+        ct.valorr,
+        ct.valorp,
+        ct.data_inicio as "dataInicio",
+        ct.data_encerramento as "dataEncerramento",
+        ct.squad,
+        ct.id_task as "idTask",
+        COALESCE(cc.nome, caz.nome) as "nomeCliente",
+        cc.cnpj as "cnpjCliente",
+        caz.ids as "idCliente",
+        ct.responsavel,
+        ct.cs_responsavel as "csResponsavel",
+        cc.responsavel as "responsavelCliente",
+        cc.responsavel_geral as "responsavelGeral"
+      FROM cup_contratos ct
+      LEFT JOIN cup_clientes cc ON ct.id_task = cc.task_id
+      LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
+      WHERE caz.ids = ${clienteId}
+      ORDER BY ct.id_subtask, caz.id DESC NULLS LAST, ct.data_inicio DESC
+    `);
 
-    return result;
+    return result.rows as ContratoCompleto[];
   }
 
   async getPatrimonios(): Promise<Patrimonio[]> {
