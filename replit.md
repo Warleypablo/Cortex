@@ -45,10 +45,13 @@ Preferred communication style: Simple, everyday language.
 ### Authentication & Authorization
 - **Authentication**: Google OAuth2.0 via Passport.js, storing user data in Replit Database.
 - **Authorization**: Role-Based Access Control (RBAC) with `admin` and `user` roles.
-    - `admin` (hardcoded for `caio.massaroni@turbopartners.com.br` and `warley.silva@turbopartners.com.br`) has full access.
-    - `user` has limited `allowedRoutes`.
+    - `admin` (hardcoded for `caio.massaroni@turbopartners.com.br` and `warley.silva@turbopartners.com.br`) has full access to all routes.
+    - `user` has limited `allowedRoutes` (default: `/ferramentas`).
 - **Protected Routes**: Backend API routes secured with `isAuthenticated` and `isAdmin` middleware. Frontend routes protected by `ProtectedRoute` component.
-- **Admin Interface**: `/admin/usuarios` allows managing user permissions.
+- **Admin Interface**: `/admin/usuarios` allows managing user permissions and roles.
+    - Admins can edit allowed routes for regular users
+    - Admins can promote users to admin role (grants ALL_ROUTES)
+    - Admins can demote admins to user role (resets to DEFAULT_USER_ROUTES)
 
 ## External Dependencies
 
