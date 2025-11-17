@@ -792,7 +792,11 @@ export class DbStorage implements IStorage {
         eq(schema.cupClientes.cnpj, schema.cazClientes.cnpj)
       )
       .where(
-        sql`${schema.cazClientes.ids} = ${id} OR ${schema.cazClientes.id}::text = ${id} OR ${schema.cupClientes.taskId} = ${id}`
+        sql`
+          COALESCE(${schema.cazClientes.id}, ('x' || substr(md5(${schema.cupClientes.taskId}), 1, 8))::bit(32)::int)::text = ${id}
+          OR ${schema.cazClientes.ids} = ${id} 
+          OR ${schema.cupClientes.taskId} = ${id}
+        `
       )
       .limit(1);
 
