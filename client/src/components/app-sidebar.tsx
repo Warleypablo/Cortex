@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, Shield } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, Shield } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -54,6 +54,11 @@ const menuItems = [
     title: "Ferramentas",
     url: "/ferramentas",
     icon: Wrench,
+  },
+  {
+    title: "TurboZap",
+    url: "/turbozap",
+    icon: MessageSquare,
   },
 ];
 
