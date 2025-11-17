@@ -17,6 +17,7 @@ import ColaboradoresAnalise from "@/pages/ColaboradoresAnalise";
 import Patrimonio from "@/pages/Patrimonio";
 import PatrimonioDetail from "@/pages/PatrimonioDetail";
 import Ferramentas from "@/pages/Ferramentas";
+import TurboZap from "@/pages/TurboZap";
 import VisaoGeral from "@/pages/VisaoGeral";
 import DashboardFinanceiro from "@/pages/DashboardFinanceiro";
 import DashboardGeG from "@/pages/DashboardGeG";
@@ -105,6 +106,7 @@ function ProtectedRouter() {
       <Route path="/patrimonio/:id">{() => <ProtectedRoute path="/patrimonio" component={PatrimonioDetail} />}</Route>
       <Route path="/patrimonio">{() => <ProtectedRoute path="/patrimonio" component={Patrimonio} />}</Route>
       <Route path="/ferramentas">{() => <ProtectedRoute path="/ferramentas" component={Ferramentas} />}</Route>
+      <Route path="/turbozap">{() => <ProtectedRoute path="/turbozap" component={TurboZap} />}</Route>
       <Route path="/visao-geral">{() => <ProtectedRoute path="/visao-geral" component={VisaoGeral} />}</Route>
       <Route path="/dashboard/financeiro">{() => <ProtectedRoute path="/dashboard/financeiro" component={DashboardFinanceiro} />}</Route>
       <Route path="/dashboard/geg">{() => <ProtectedRoute path="/dashboard/geg" component={DashboardGeG} />}</Route>
