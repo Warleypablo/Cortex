@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import TopBar from "@/components/TopBar";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { Loader2 } from "lucide-react";
 import Clients from "@/pages/Clients";
 import Contracts from "@/pages/Contracts";
@@ -162,10 +163,12 @@ function AppLayout() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AppLayout />
-        <Toaster />
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <AppLayout />
+          <Toaster />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
