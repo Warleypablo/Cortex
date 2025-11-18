@@ -106,7 +106,7 @@ export default function DashboardInhire() {
               <Skeleton className="h-8 w-24" data-testid="skeleton-total-candidaturas" />
             ) : (
               <div className="text-2xl font-bold" data-testid="text-total-candidaturas">
-                {metrics?.totalCandidaturas.toLocaleString() || 0}
+                {(metrics?.totalCandidaturas ?? 0).toLocaleString()}
               </div>
             )}
           </CardContent>
@@ -122,7 +122,7 @@ export default function DashboardInhire() {
               <Skeleton className="h-8 w-24" data-testid="skeleton-candidatos-ativos" />
             ) : (
               <div className="text-2xl font-bold" data-testid="text-candidatos-ativos">
-                {metrics?.candidatosAtivos.toLocaleString() || 0}
+                {(metrics?.candidatosAtivos ?? 0).toLocaleString()}
               </div>
             )}
           </CardContent>
@@ -138,7 +138,7 @@ export default function DashboardInhire() {
               <Skeleton className="h-8 w-24" data-testid="skeleton-total-vagas" />
             ) : (
               <div className="text-2xl font-bold" data-testid="text-total-vagas">
-                {metrics?.totalVagas.toLocaleString() || 0}
+                {(metrics?.totalVagas ?? 0).toLocaleString()}
               </div>
             )}
           </CardContent>
@@ -154,7 +154,7 @@ export default function DashboardInhire() {
               <Skeleton className="h-8 w-24" data-testid="skeleton-vagas-abertas" />
             ) : (
               <div className="text-2xl font-bold" data-testid="text-vagas-abertas">
-                {metrics?.vagasAbertas.toLocaleString() || 0}
+                {(metrics?.vagasAbertas ?? 0).toLocaleString()}
               </div>
             )}
           </CardContent>
@@ -170,7 +170,7 @@ export default function DashboardInhire() {
               <Skeleton className="h-8 w-24" data-testid="skeleton-taxa-conversao" />
             ) : (
               <div className="text-2xl font-bold" data-testid="text-taxa-conversao">
-                {metrics?.taxaConversao.toFixed(1) || 0}%
+                {(metrics?.taxaConversao ?? 0).toFixed(1)}%
               </div>
             )}
           </CardContent>
@@ -186,7 +186,7 @@ export default function DashboardInhire() {
               <Skeleton className="h-8 w-24" data-testid="skeleton-tempo-medio" />
             ) : (
               <div className="text-2xl font-bold" data-testid="text-tempo-medio">
-                {metrics?.tempoMedioContratacao.toFixed(0) || 0} dias
+                {(metrics?.tempoMedioContratacao ?? 0).toFixed(0)} dias
               </div>
             )}
           </CardContent>
