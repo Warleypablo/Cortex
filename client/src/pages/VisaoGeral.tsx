@@ -53,9 +53,29 @@ export default function VisaoGeral() {
     },
   });
 
-  const mockMrrEvolution = [
-    { mes: mesVisaoGeral, mrr: metricas?.mrr || 0 }
-  ];
+  const { data: mrrEvolucaoData, isLoading: isLoadingMrrEvolucao } = useQuery<{ mes: string; mrr: number }[]>({
+    queryKey: ['/api/visao-geral/mrr-evolucao', mesVisaoGeral],
+    queryFn: async () => {
+      const response = await fetch(`/api/visao-geral/mrr-evolucao?mesAno=${mesVisaoGeral}`);
+      if (!response.ok) throw new Error('Failed to fetch MRR evolucao');
+      return response.json();
+    },
+  });
+
+  const formatMesLabel = (mesAno: string) => {
+    const [ano, mes] = mesAno.split('-');
+    const mesNum = parseInt(mes, 10);
+    const mesNomes = [
+      'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+      'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
+    ];
+    return `${mesNomes[mesNum - 1]}/${ano.slice(2)}`;
+  };
+
+  const mrrEvolution = (mrrEvolucaoData || []).map(item => ({
+    mes: formatMesLabel(item.mes),
+    mrr: item.mrr,
+  }));
 
   const mockMrrSquad = [
     { squad: 'Supreme', mrr: 145000, cor: '#3b82f6' },
@@ -174,33 +194,43 @@ export default function VisaoGeral() {
             <Card className="lg:col-span-2" data-testid="card-evolucao-mrr">
               <CardHeader>
                 <CardTitle>Evolução MRR Mensal</CardTitle>
-                <CardDescription>Histórico de receita recorrente mensal</CardDescription>
+                <CardDescription>Histórico de receita recorrente mensal desde Nov/2025</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={mockMrrEvolution}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="mes" 
-                      className="text-sm"
-                      tick={{ fill: 'currentColor' }}
-                    />
-                    <YAxis 
-                      className="text-sm"
-                      tick={{ fill: 'currentColor' }}
-                      tickFormatter={(value) => formatCurrency(value)}
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => [formatCurrency(value), 'MRR']}
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px',
-                      }}
-                    />
-                    <Bar dataKey="mrr" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {isLoadingMrrEvolucao ? (
+                  <div className="flex items-center justify-center h-[300px]">
+                    <p className="text-muted-foreground">Carregando...</p>
+                  </div>
+                ) : mrrEvolution.length === 0 ? (
+                  <div className="flex items-center justify-center h-[300px]">
+                    <p className="text-muted-foreground">Sem dados disponíveis para o período</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={mrrEvolution}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis 
+                        dataKey="mes" 
+                        className="text-sm"
+                        tick={{ fill: 'currentColor' }}
+                      />
+                      <YAxis 
+                        className="text-sm"
+                        tick={{ fill: 'currentColor' }}
+                        tickFormatter={(value) => formatCurrency(value)}
+                      />
+                      <Tooltip 
+                        formatter={(value: number) => [formatCurrency(value), 'MRR']}
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '6px',
+                        }}
+                      />
+                      <Bar dataKey="mrr" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 

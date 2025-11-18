@@ -396,6 +396,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/visao-geral/mrr-evolucao", async (req, res) => {
+    try {
+      const mesAno = req.query.mesAno as string;
+      
+      if (!mesAno || !/^\d{4}-\d{2}$/.test(mesAno)) {
+        return res.status(400).json({ error: "Invalid mesAno parameter. Expected format: YYYY-MM" });
+      }
+
+      const evolucao = await storage.getMrrEvolucaoMensal(mesAno);
+      res.json(evolucao);
+    } catch (error) {
+      console.error("[api] Error fetching MRR evolucao mensal:", error);
+      res.status(500).json({ error: "Failed to fetch MRR evolucao mensal" });
+    }
+  });
+
   app.get("/api/top-responsaveis", async (req, res) => {
     try {
       let limit = 5;

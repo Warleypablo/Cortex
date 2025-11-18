@@ -146,6 +146,7 @@ export interface IStorage {
   getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]>;
   getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
   getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas>;
+  getMrrEvolucaoMensal(mesAnoFim: string): Promise<import("@shared/schema").MrrEvolucaoMensal[]>;
   getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]>;
   getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]>;
   getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse>;
@@ -268,6 +269,10 @@ export class MemStorage implements IStorage {
   }
 
   async getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getMrrEvolucaoMensal(mesAnoFim: string): Promise<import("@shared/schema").MrrEvolucaoMensal[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1594,6 +1599,63 @@ export class DbStorage implements IStorage {
       churn,
       pausados,
     };
+  }
+
+  async getMrrEvolucaoMensal(mesAnoFim: string): Promise<import("@shared/schema").MrrEvolucaoMensal[]> {
+    const [anoFim, mesFim] = mesAnoFim.split('-').map(Number);
+    
+    // Gerar lista de meses desde novembro/2025 até mesAnoFim
+    const meses: string[] = [];
+    const mesInicio = new Date(2025, 10, 1); // Novembro 2025 (mês 10 = novembro)
+    const mesFimDate = new Date(anoFim, mesFim - 1, 1);
+    
+    let mesAtual = new Date(mesInicio);
+    while (mesAtual <= mesFimDate) {
+      const ano = mesAtual.getFullYear();
+      const mes = mesAtual.getMonth() + 1;
+      meses.push(`${ano}-${String(mes).padStart(2, '0')}`);
+      mesAtual = new Date(ano, mes, 1);
+    }
+
+    // Para cada mês, buscar MRR do último snapshot disponível daquele mês
+    const resultado: import("@shared/schema").MrrEvolucaoMensal[] = [];
+    
+    for (const mes of meses) {
+      const [ano, mesNum] = mes.split('-').map(Number);
+      const inicioMes = new Date(ano, mesNum - 1, 1);
+      const fimMes = new Date(ano, mesNum, 0, 23, 59, 59);
+
+      // Buscar o último snapshot do mês e somar valor_r dos contratos ativos
+      const query = await db.execute(sql`
+        WITH ultimo_snapshot AS (
+          SELECT MAX(data_snapshot) as data_ultimo_snapshot
+          FROM ${schema.cupDataHist}
+          WHERE data_snapshot >= ${inicioMes}::timestamp
+            AND data_snapshot <= ${fimMes}::timestamp
+        )
+        SELECT 
+          us.data_ultimo_snapshot,
+          COALESCE(SUM(h.valorr::numeric), 0) as mrr
+        FROM ultimo_snapshot us
+        LEFT JOIN ${schema.cupDataHist} h 
+          ON h.data_snapshot = us.data_ultimo_snapshot
+          AND h.status IN ('ativo', 'onboarding', 'triagem')
+        GROUP BY us.data_ultimo_snapshot
+      `);
+
+      const row = query.rows[0] as any;
+      
+      // Só adiciona o mês se houver snapshot disponível (data_ultimo_snapshot não é NULL)
+      if (row?.data_ultimo_snapshot) {
+        const mrr = parseFloat(row.mrr || '0');
+        resultado.push({
+          mes,
+          mrr,
+        });
+      }
+    }
+
+    return resultado;
   }
 
   async getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]> {
