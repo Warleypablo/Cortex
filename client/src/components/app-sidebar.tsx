@@ -79,6 +79,11 @@ const dashboardItems = [
     icon: UsersRound,
   },
   {
+    title: "Inhire",
+    url: "/dashboard/inhire",
+    icon: UserCheck,
+  },
+  {
     title: "Análise de Retenção",
     url: "/dashboard/retencao",
     icon: UserCheck,
