@@ -161,7 +161,8 @@ export interface IStorage {
   getGegPatrimonioResumo(): Promise<{ totalAtivos: number; valorTotalPago: number; valorTotalMercado: number; porTipo: { tipo: string; quantidade: number }[] }>;
   getGegUltimasPromocoes(squad: string, setor: string, limit?: number): Promise<any[]>;
   getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
-  getTopResponsaveis(limit?: number): Promise<{ nome: string; mrr: number; posicao: number }[]>;
+  getTopResponsaveis(limit?: number, mesAno?: string): Promise<{ nome: string; mrr: number; posicao: number }[]>;
+  getTopSquads(limit?: number, mesAno?: string): Promise<{ squad: string; mrr: number; posicao: number }[]>;
   getInhireMetrics(): Promise<InhireMetrics>;
   getInhireStatusDistribution(): Promise<InhireStatusDistribution[]>;
   getInhireStageDistribution(): Promise<InhireStageDistribution[]>;
@@ -1570,67 +1571,74 @@ export class DbStorage implements IStorage {
     const inicioMes = new Date(ano, mes - 1, 1);
     const fimMes = new Date(ano, mes, 0, 23, 59, 59);
 
+    // Buscar último snapshot do mês filtrado
+    const ultimoSnapshotQuery = await db.execute(sql`
+      SELECT MAX(data_snapshot) as data_ultimo_snapshot
+      FROM ${schema.cupDataHist}
+      WHERE data_snapshot >= ${inicioMes}::timestamp
+        AND data_snapshot <= ${fimMes}::timestamp
+    `);
+
+    const dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
+
+    if (!dataUltimoSnapshot) {
+      return {
+        receitaTotal: 0,
+        mrr: 0,
+        aquisicaoMrr: 0,
+        aquisicaoPontual: 0,
+        cac: 0,
+        churn: 0,
+        pausados: 0,
+      };
+    }
+
+    // Buscar métricas do snapshot
     const resultados = await db.execute(sql`
-      WITH contratos_periodo AS (
-        SELECT 
-          valorr::numeric,
-          valorp::numeric,
-          data_inicio,
-          data_encerramento,
-          data_pausa,
-          status
-        FROM ${schema.cupContratos}
-      )
       SELECT 
-        -- MRR Ativo: contratos ativos no mês com status ativo, onboarding ou triagem
+        -- MRR Ativo: soma dos valorr dos contratos ativos no snapshot
         COALESCE(SUM(
           CASE 
-            WHEN (data_encerramento IS NULL OR 
-                  (data_encerramento >= ${inicioMes} AND data_encerramento <= ${fimMes}))
-                 AND status IN ('ativo', 'onboarding', 'triagem')
-            THEN valorr 
+            WHEN status IN ('ativo', 'onboarding', 'triagem')
+            THEN valorr::numeric
             ELSE 0 
           END
-        ), 0)::numeric as mrr,
+        ), 0) as mrr,
         
-        -- Aquisição MRR: contratos criados no período
-        COALESCE(SUM(
-          CASE 
-            WHEN data_inicio >= ${inicioMes} AND data_inicio <= ${fimMes}
-            THEN valorr 
-            ELSE 0 
-          END
-        ), 0)::numeric as aquisicao_mrr,
+        -- Aquisição MRR: contratos criados no período (da tabela cup_contratos)
+        COALESCE((
+          SELECT SUM(valorr::numeric)
+          FROM ${schema.cupContratos}
+          WHERE data_inicio >= ${inicioMes}
+            AND data_inicio <= ${fimMes}
+        ), 0) as aquisicao_mrr,
         
         -- Aquisição Pontual: valor_p dos contratos criados no período
-        COALESCE(SUM(
-          CASE 
-            WHEN data_inicio >= ${inicioMes} AND data_inicio <= ${fimMes}
-            THEN valorp 
-            ELSE 0 
-          END
-        ), 0)::numeric as aquisicao_pontual,
+        COALESCE((
+          SELECT SUM(valorp::numeric)
+          FROM ${schema.cupContratos}
+          WHERE data_inicio >= ${inicioMes}
+            AND data_inicio <= ${fimMes}
+        ), 0) as aquisicao_pontual,
         
         -- Churn: contratos encerrados no período
-        COALESCE(SUM(
-          CASE 
-            WHEN data_encerramento >= ${inicioMes} AND data_encerramento <= ${fimMes}
-            THEN valorr 
-            ELSE 0 
-          END
-        ), 0)::numeric as churn,
+        COALESCE((
+          SELECT SUM(valorr::numeric)
+          FROM ${schema.cupContratos}
+          WHERE data_encerramento >= ${inicioMes}
+            AND data_encerramento <= ${fimMes}
+        ), 0) as churn,
         
         -- Pausados: contratos pausados no mês
-        COALESCE(SUM(
-          CASE 
-            WHEN status = 'pausado' 
-                 AND data_pausa >= ${inicioMes} 
-                 AND data_pausa <= ${fimMes}
-            THEN valorr 
-            ELSE 0 
-          END
-        ), 0)::numeric as pausados
-      FROM contratos_periodo
+        COALESCE((
+          SELECT SUM(valorr::numeric)
+          FROM ${schema.cupContratos}
+          WHERE status = 'pausado'
+            AND data_pausa >= ${inicioMes}
+            AND data_pausa <= ${fimMes}
+        ), 0) as pausados
+      FROM ${schema.cupDataHist}
+      WHERE data_snapshot = ${dataUltimoSnapshot}::timestamp
     `);
 
     const row = resultados.rows[0] as any;
@@ -2471,19 +2479,48 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getTopResponsaveis(limit: number = 5): Promise<{ nome: string; mrr: number; posicao: number }[]> {
+  async getTopResponsaveis(limit: number = 5, mesAno?: string): Promise<{ nome: string; mrr: number; posicao: number }[]> {
+    let dataUltimoSnapshot: any = null;
+
+    if (mesAno) {
+      const [ano, mes] = mesAno.split('-').map(Number);
+      const inicioMes = new Date(ano, mes - 1, 1);
+      const fimMes = new Date(ano, mes, 0, 23, 59, 59);
+
+      const ultimoSnapshotQuery = await db.execute(sql`
+        SELECT MAX(data_snapshot) as data_ultimo_snapshot
+        FROM ${schema.cupDataHist}
+        WHERE data_snapshot >= ${inicioMes}::timestamp
+          AND data_snapshot <= ${fimMes}::timestamp
+      `);
+
+      dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
+    } else {
+      const ultimoSnapshotQuery = await db.execute(sql`
+        SELECT MAX(data_snapshot) as data_ultimo_snapshot
+        FROM ${schema.cupDataHist}
+      `);
+
+      dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
+    }
+
+    if (!dataUltimoSnapshot) {
+      return [];
+    }
+
     const resultados = await db.execute(sql`
       SELECT 
-        responsavel as nome,
-        COALESCE(SUM(valorr), 0) as mrr
-      FROM ${schema.cupContratos}
-      WHERE responsavel IS NOT NULL 
-        AND responsavel != ''
+        responsavel_geral as nome,
+        COALESCE(SUM(valorr::numeric), 0) as mrr
+      FROM ${schema.cupDataHist}
+      WHERE data_snapshot = ${dataUltimoSnapshot}::timestamp
+        AND responsavel_geral IS NOT NULL 
+        AND responsavel_geral != ''
         AND valorr IS NOT NULL
         AND valorr > 0
         AND status IN ('ativo', 'onboarding', 'triagem')
-      GROUP BY responsavel
-      HAVING COALESCE(SUM(valorr), 0) > 0
+      GROUP BY responsavel_geral
+      HAVING COALESCE(SUM(valorr::numeric), 0) > 0
       ORDER BY mrr DESC
       LIMIT ${limit}
     `);
