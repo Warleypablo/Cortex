@@ -424,11 +424,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      const topResponsaveis = await storage.getTopResponsaveis(limit);
+      const mesAno = req.query.mesAno as string | undefined;
+      const topResponsaveis = await storage.getTopResponsaveis(limit, mesAno);
       res.json(topResponsaveis);
     } catch (error) {
       console.error("[api] Error fetching top responsaveis:", error);
       res.status(500).json({ error: "Failed to fetch top responsaveis" });
+    }
+  });
+
+  app.get("/api/top-squads", async (req, res) => {
+    try {
+      let limit = 4;
+      if (req.query.limit) {
+        const limitStr = req.query.limit as string;
+        if (/^\d+$/.test(limitStr)) {
+          const parsedLimit = Number(limitStr);
+          if (parsedLimit > 0) {
+            limit = Math.min(parsedLimit, 100);
+          }
+        }
+      }
+      const mesAno = req.query.mesAno as string | undefined;
+      const topSquads = await storage.getTopSquads(limit, mesAno);
+      res.json(topSquads);
+    } catch (error) {
+      console.error("[api] Error fetching top squads:", error);
+      res.status(500).json({ error: "Failed to fetch top squads" });
     }
   });
 
