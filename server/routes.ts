@@ -425,6 +425,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       const mesAno = req.query.mesAno as string | undefined;
+      
+      if (mesAno && !/^\d{4}-\d{2}$/.test(mesAno)) {
+        return res.status(400).json({ error: "Invalid mesAno parameter. Expected format: YYYY-MM" });
+      }
+      
       const topResponsaveis = await storage.getTopResponsaveis(limit, mesAno);
       res.json(topResponsaveis);
     } catch (error) {
@@ -446,6 +451,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       const mesAno = req.query.mesAno as string | undefined;
+      
+      if (mesAno && !/^\d{4}-\d{2}$/.test(mesAno)) {
+        return res.status(400).json({ error: "Invalid mesAno parameter. Expected format: YYYY-MM" });
+      }
+      
       const topSquads = await storage.getTopSquads(limit, mesAno);
       res.json(topSquads);
     } catch (error) {
