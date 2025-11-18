@@ -2532,6 +2532,59 @@ export class DbStorage implements IStorage {
     }));
   }
 
+  async getTopSquads(limit: number = 4, mesAno?: string): Promise<{ squad: string; mrr: number; posicao: number }[]> {
+    let dataUltimoSnapshot: any = null;
+
+    if (mesAno) {
+      const [ano, mes] = mesAno.split('-').map(Number);
+      const inicioMes = new Date(ano, mes - 1, 1);
+      const fimMes = new Date(ano, mes, 0, 23, 59, 59);
+
+      const ultimoSnapshotQuery = await db.execute(sql`
+        SELECT MAX(data_snapshot) as data_ultimo_snapshot
+        FROM ${schema.cupDataHist}
+        WHERE data_snapshot >= ${inicioMes}::timestamp
+          AND data_snapshot <= ${fimMes}::timestamp
+      `);
+
+      dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
+    } else {
+      const ultimoSnapshotQuery = await db.execute(sql`
+        SELECT MAX(data_snapshot) as data_ultimo_snapshot
+        FROM ${schema.cupDataHist}
+      `);
+
+      dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
+    }
+
+    if (!dataUltimoSnapshot) {
+      return [];
+    }
+
+    const resultados = await db.execute(sql`
+      SELECT 
+        squad,
+        COALESCE(SUM(valorr::numeric), 0) as mrr
+      FROM ${schema.cupDataHist}
+      WHERE data_snapshot = ${dataUltimoSnapshot}::timestamp
+        AND squad IS NOT NULL 
+        AND squad != ''
+        AND valorr IS NOT NULL
+        AND valorr > 0
+        AND status IN ('ativo', 'onboarding', 'triagem')
+      GROUP BY squad
+      HAVING COALESCE(SUM(valorr::numeric), 0) > 0
+      ORDER BY mrr DESC
+      LIMIT ${limit}
+    `);
+
+    return resultados.rows.map((row, index) => ({
+      squad: row.squad as string,
+      mrr: parseFloat(row.mrr as string || '0'),
+      posicao: index + 1,
+    }));
+  }
+
   async getInhireMetrics(): Promise<InhireMetrics> {
     const [candidaturasResult, vagasResult, ativosResult, vagasAbertasResult] = await Promise.all([
       db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhCandidaturas}`),
