@@ -162,6 +162,12 @@ export interface IStorage {
   getGegUltimasPromocoes(squad: string, setor: string, limit?: number): Promise<any[]>;
   getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
   getTopResponsaveis(limit?: number): Promise<{ nome: string; mrr: number; posicao: number }[]>;
+  getInhireMetrics(): Promise<import("@shared/schema").InhireMetrics>;
+  getInhireStatusDistribution(): Promise<import("@shared/schema").InhireStatusDistribution[]>;
+  getInhireStageDistribution(): Promise<import("@shared/schema").InhireStageDistribution[]>;
+  getInhireSourceDistribution(): Promise<import("@shared/schema").InhireSourceDistribution[]>;
+  getInhireFunnel(): Promise<import("@shared/schema").InhireFunnel[]>;
+  getInhireVagasComCandidaturas(limit?: number): Promise<import("@shared/schema").InhireVagaComCandidaturas[]>;
 }
 
 export class MemStorage implements IStorage {

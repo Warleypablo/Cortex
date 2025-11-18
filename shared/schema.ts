@@ -323,3 +323,75 @@ export type MrrEvolucaoMensal = {
   mes: string;
   mrr: number;
 };
+
+export const rhCandidaturas = pgTable("rh_candidaturas", {
+  id: integer("id").primaryKey(),
+  talentStatus: text("talent_status"),
+  stageName: text("stage_name"),
+  source: text("source"),
+  jobIdHash: text("job_id_hash"),
+  createdAt: timestamp("created_at"),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const rhVagas = pgTable("rh_vagas", {
+  id: text("id").primaryKey(),
+  nome: text("nome"),
+  status: text("status"),
+  atualizacao: timestamp("atualizacao"),
+});
+
+export const rhTalentos = pgTable("rh_talentos", {
+  id: integer("id").primaryKey(),
+  nome: text("nome"),
+  email: text("email"),
+  telefone: text("telefone"),
+  createdAt: timestamp("created_at"),
+});
+
+export type InhireCandidatura = typeof rhCandidaturas.$inferSelect;
+export type InhireVaga = typeof rhVagas.$inferSelect;
+export type InhireTalento = typeof rhTalentos.$inferSelect;
+
+export type InhireStatusDistribution = {
+  talentStatus: string;
+  total: number;
+  percentual: number;
+};
+
+export type InhireStageDistribution = {
+  stageName: string;
+  total: number;
+  percentual: number;
+};
+
+export type InhireSourceDistribution = {
+  source: string;
+  total: number;
+  percentual: number;
+};
+
+export type InhireFunnel = {
+  stageName: string;
+  total: number;
+  percentual: number;
+  ordem: number;
+};
+
+export type InhireVagaComCandidaturas = {
+  vagaId: string;
+  vagaNome: string;
+  vagaStatus: string;
+  totalCandidaturas: number;
+  candidatosPorStatus: {
+    status: string;
+    total: number;
+  }[];
+};
+
+export type InhireMetrics = {
+  totalCandidaturas: number;
+  totalVagas: number;
+  totalTalentos: number;
+  taxaConversao: number;
+};
