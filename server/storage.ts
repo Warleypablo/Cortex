@@ -345,6 +345,30 @@ export class MemStorage implements IStorage {
   async getTopResponsaveis(limit?: number): Promise<{ nome: string; mrr: number; posicao: number }[]> {
     throw new Error("Not implemented in MemStorage");
   }
+
+  async getInhireMetrics(): Promise<import("@shared/schema").InhireMetrics> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getInhireStatusDistribution(): Promise<import("@shared/schema").InhireStatusDistribution[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getInhireStageDistribution(): Promise<import("@shared/schema").InhireStageDistribution[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getInhireSourceDistribution(): Promise<import("@shared/schema").InhireSourceDistribution[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getInhireFunnel(): Promise<import("@shared/schema").InhireFunnel[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getInhireVagasComCandidaturas(limit?: number): Promise<import("@shared/schema").InhireVagaComCandidaturas[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
 }
 
 function normalizeCode(code: string): string {
@@ -2469,6 +2493,160 @@ export class DbStorage implements IStorage {
       mrr: parseFloat(row.mrr as string || '0'),
       posicao: index + 1,
     }));
+  }
+
+  async getInhireMetrics(): Promise<import("@shared/schema").InhireMetrics> {
+    const [candidaturasResult, vagasResult, talentosResult] = await Promise.all([
+      db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhCandidaturas}`),
+      db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhVagas}`),
+      db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhTalentos}`)
+    ]);
+
+    const totalCandidaturas = parseInt((candidaturasResult.rows[0] as any).total || '0');
+    const totalVagas = parseInt((vagasResult.rows[0] as any).total || '0');
+    const totalTalentos = parseInt((talentosResult.rows[0] as any).total || '0');
+
+    const taxaConversao = totalCandidaturas > 0 ? (totalTalentos / totalCandidaturas) * 100 : 0;
+
+    return {
+      totalCandidaturas,
+      totalVagas,
+      totalTalentos,
+      taxaConversao: parseFloat(taxaConversao.toFixed(2))
+    };
+  }
+
+  async getInhireStatusDistribution(): Promise<import("@shared/schema").InhireStatusDistribution[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        talent_status as "talentStatus",
+        COUNT(*)::int as total,
+        ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as percentual
+      FROM ${schema.rhCandidaturas}
+      WHERE talent_status IS NOT NULL
+      GROUP BY talent_status
+      ORDER BY total DESC
+    `);
+
+    return result.rows.map((row: any) => ({
+      talentStatus: row.talentStatus || 'Não informado',
+      total: parseInt(row.total || '0'),
+      percentual: parseFloat(row.percentual || '0')
+    }));
+  }
+
+  async getInhireStageDistribution(): Promise<import("@shared/schema").InhireStageDistribution[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        stage_name as "stageName",
+        COUNT(*)::int as total,
+        ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as percentual
+      FROM ${schema.rhCandidaturas}
+      WHERE stage_name IS NOT NULL
+      GROUP BY stage_name
+      ORDER BY total DESC
+    `);
+
+    return result.rows.map((row: any) => ({
+      stageName: row.stageName || 'Não informado',
+      total: parseInt(row.total || '0'),
+      percentual: parseFloat(row.percentual || '0')
+    }));
+  }
+
+  async getInhireSourceDistribution(): Promise<import("@shared/schema").InhireSourceDistribution[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        source,
+        COUNT(*)::int as total,
+        ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as percentual
+      FROM ${schema.rhCandidaturas}
+      WHERE source IS NOT NULL
+      GROUP BY source
+      ORDER BY total DESC
+    `);
+
+    return result.rows.map((row: any) => ({
+      source: row.source || 'Não informado',
+      total: parseInt(row.total || '0'),
+      percentual: parseFloat(row.percentual || '0')
+    }));
+  }
+
+  async getInhireFunnel(): Promise<import("@shared/schema").InhireFunnel[]> {
+    const stageOrder: Record<string, number> = {
+      'Candidatura Recebida': 1,
+      'Triagem': 2,
+      'Entrevista Inicial': 3,
+      'Teste Técnico': 4,
+      'Entrevista Final': 5,
+      'Proposta Enviada': 6,
+      'Contratado': 7,
+      'Recusado': 8,
+      'Desistiu': 9
+    };
+
+    const result = await db.execute(sql`
+      SELECT 
+        stage_name as "stageName",
+        COUNT(*)::int as total,
+        ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as percentual
+      FROM ${schema.rhCandidaturas}
+      WHERE stage_name IS NOT NULL
+      GROUP BY stage_name
+      ORDER BY total DESC
+    `);
+
+    return result.rows.map((row: any) => ({
+      stageName: row.stageName || 'Não informado',
+      total: parseInt(row.total || '0'),
+      percentual: parseFloat(row.percentual || '0'),
+      ordem: stageOrder[row.stageName] || 99
+    })).sort((a, b) => a.ordem - b.ordem);
+  }
+
+  async getInhireVagasComCandidaturas(limit: number = 10): Promise<import("@shared/schema").InhireVagaComCandidaturas[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        v.id as "vagaId",
+        v.nome as "vagaNome",
+        v.status as "vagaStatus",
+        COUNT(c.id)::int as "totalCandidaturas",
+        json_agg(
+          json_build_object(
+            'status', c.talent_status,
+            'total', 1
+          )
+        ) as "candidatosPorStatus"
+      FROM ${schema.rhVagas} v
+      LEFT JOIN ${schema.rhCandidaturas} c ON c.job_id_hash = v.id
+      GROUP BY v.id, v.nome, v.status
+      ORDER BY "totalCandidaturas" DESC
+      LIMIT ${limit}
+    `);
+
+    return result.rows.map((row: any) => {
+      const statusMap = new Map<string, number>();
+      if (row.candidatosPorStatus) {
+        const statuses = Array.isArray(row.candidatosPorStatus) ? row.candidatosPorStatus : [];
+        statuses.forEach((item: any) => {
+          if (item.status) {
+            statusMap.set(item.status, (statusMap.get(item.status) || 0) + 1);
+          }
+        });
+      }
+
+      return {
+        vagaId: row.vagaId,
+        vagaNome: row.vagaNome || 'Vaga sem nome',
+        vagaStatus: row.vagaStatus || 'Não informado',
+        totalCandidaturas: parseInt(row.totalCandidaturas || '0'),
+        candidatosPorStatus: Array.from(statusMap.entries()).map(([status, total]) => ({
+          status,
+          total
+        }))
+      };
+    });
   }
 
   private calcularPeriodo(periodo: string): { dataInicio: string; dataFim: string } {
