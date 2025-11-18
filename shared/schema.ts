@@ -391,7 +391,9 @@ export type InhireVagaComCandidaturas = {
 
 export type InhireMetrics = {
   totalCandidaturas: number;
+  candidatosAtivos: number;
   totalVagas: number;
-  totalTalentos: number;
+  vagasAbertas: number;
   taxaConversao: number;
+  tempoMedioContratacao: number;
 };

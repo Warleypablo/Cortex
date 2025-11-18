@@ -25,6 +25,14 @@ Preferred communication style: Simple, everyday language.
     - **Contract Management**: Comprehensive tracking from `cup_contratos`. Service column displays name from `servico` field, while service filter uses `produto` column for categorization. Includes status-based color coding, squad assignment, and financial values (valorr for recurring, valorp for one-time). "Responsável" column shows `cup_contratos.responsavel`, "CS" column shows `cup_contratos.csResponsavel`. Contracts page displays AOV Médio (ticket médio por contrato = soma de valorr + valorp dividido pelo número de contratos filtrados) and includes Recorrente/Pontual/Ambos contract type filter.
     - **Retention Analysis**: Churn metrics by service and responsible person with monthly breakdowns, filtering, and Recharts visualizations. Secure parameter binding prevents SQL injection.
     - **DFC (Demonstração de Fluxo de Caixa)**: Hierarchical cash flow analysis from `caz_parcelas` with expandable tree structure, month range filters, pivot table display, and sticky first column (categoria) for horizontal scrolling. Uses `valor_pago` with proportional distribution for parcelas with multiple categories.
+    - **Inhire Recruitment Analytics**: Sub-dashboard under HR (G&G) section displaying recruitment metrics from Google Cloud SQL tables (`rh_candidaturas`, `rh_vagas`, `rh_talentos`). Features include:
+        - **KPI Cards**: Total applications, active candidates, open positions, conversion rate, average hiring time
+        - **Status Distribution**: Pie chart showing talent_status breakdown with percentages
+        - **Stage Distribution**: Bar chart displaying candidates per recruitment stage
+        - **Source Analysis**: Horizontal bar chart of top candidate sources
+        - **Conversion Funnel**: Dual bar chart showing total candidates and conversion % per stage
+        - **Vacancy Tracking**: Table listing top 10 vacancies by application count with status distribution badges
+        - **Route**: `/dashboard/inhire` with proper RBAC controls
 - **Theming**: Dark mode support via CSS variables; light mode is primary.
 
 ### Backend Architecture
@@ -32,11 +40,11 @@ Preferred communication style: Simple, everyday language.
 - **API**: RESTful API (`/api` prefix) with middleware for JSON parsing, URL encoding, and logging.
 - **Data Access**: Drizzle ORM for PostgreSQL, with an `IStorage` abstraction layer.
 - **Security**: Drizzle `sql`` template literals and `sql.join()` for all user-supplied parameters to prevent SQL injection.
-- **API Endpoints**: `/api/clientes`, `/api/contratos`, `/api/colaboradores`, `/api/dfc`, `/api/churn-por-servico`, `/api/churn-por-responsavel`.
+- **API Endpoints**: `/api/clientes`, `/api/contratos`, `/api/colaboradores`, `/api/dfc`, `/api/churn-por-servico`, `/api/churn-por-responsavel`, `/api/inhire/*`.
 
 ### Data Storage Solutions
 - **Primary Database**: Google Cloud SQL (PostgreSQL) for all business data (clients, contracts, employees, financial records).
-    - **Schema**: `caz_` tables for Conta Azul data (`caz_clientes`, `caz_parcelas`, `caz_categorias`), `cup_` tables for ClickUp data (`cup_clientes`, `cup_contratos`), and `rh_pessoal` for employee data.
+    - **Schema**: `caz_` tables for Conta Azul data (`caz_clientes`, `caz_parcelas`, `caz_categorias`), `cup_` tables for ClickUp data (`cup_clientes`, `cup_contratos`), `rh_pessoal` for employee data, and `rh_candidaturas`/`rh_vagas`/`rh_talentos` for Inhire recruitment analytics.
     - **Key Relationships**: CNPJ links Conta Azul and ClickUp client data. `caz_parcelas` stores hierarchical category data in `categoria_nome`.
     - **Category Names**: `caz_categorias` table contains official category names in format "CODE DESCRIPTION" (e.g., "06.10 Despesas Administrativas"). The `nome` field is parsed to extract code and description separately.
 - **Authentication Database**: Replit Database for user authentication data (users, sessions).

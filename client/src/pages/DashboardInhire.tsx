@@ -212,11 +212,11 @@ export default function DashboardInhire() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ status, percentage }) => `${status}: ${percentage.toFixed(1)}%`}
+                    label={({ talentStatus, percentual }) => `${talentStatus}: ${percentual.toFixed(1)}%`}
                     outerRadius={100}
                     fill={COLORS.chart1}
-                    dataKey="count"
-                    nameKey="status"
+                    dataKey="total"
+                    nameKey="talentStatus"
                   >
                     {(statusDistribution || []).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={Object.values(COLORS)[index % Object.values(COLORS).length]} />
@@ -242,10 +242,10 @@ export default function DashboardInhire() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={stageDistribution || []}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="stage" />
+                  <XAxis dataKey="stageName" />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="count" fill={COLORS.chart1} />
+                  <Bar dataKey="total" fill={COLORS.chart1} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -268,7 +268,7 @@ export default function DashboardInhire() {
                   <XAxis type="number" />
                   <YAxis dataKey="source" type="category" width={100} />
                   <Tooltip />
-                  <Bar dataKey="count" fill={COLORS.chart2} />
+                  <Bar dataKey="total" fill={COLORS.chart2} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -288,11 +288,11 @@ export default function DashboardInhire() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={funnel || []}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="stage" />
+                  <XAxis dataKey="stageName" />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="count" fill={COLORS.chart3} />
-                  <Bar dataKey="conversionRate" fill={COLORS.chart4} />
+                  <Bar dataKey="total" fill={COLORS.chart3} name="Total" />
+                  <Bar dataKey="percentual" fill={COLORS.chart4} name="%" />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -318,26 +318,31 @@ export default function DashboardInhire() {
               <table className="w-full" data-testid="table-vagas">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-2 font-medium" data-testid="header-titulo">Título</th>
-                    <th className="text-left p-2 font-medium" data-testid="header-departamento">Departamento</th>
+                    <th className="text-left p-2 font-medium" data-testid="header-titulo">Vaga</th>
                     <th className="text-left p-2 font-medium" data-testid="header-status">Status</th>
-                    <th className="text-right p-2 font-medium" data-testid="header-candidaturas">Candidaturas</th>
-                    <th className="text-right p-2 font-medium" data-testid="header-ativos">Ativos</th>
-                    <th className="text-right p-2 font-medium" data-testid="header-contratados">Contratados</th>
-                    <th className="text-left p-2 font-medium" data-testid="header-abertura">Data Abertura</th>
+                    <th className="text-right p-2 font-medium" data-testid="header-candidaturas">Total Candidaturas</th>
+                    <th className="text-left p-2 font-medium" data-testid="header-distribuicao">Distribuição por Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(vagas || []).map((vaga, index) => (
                     <tr key={vaga.vagaId} className="border-b" data-testid={`row-vaga-${index}`}>
-                      <td className="p-2" data-testid={`text-titulo-${index}`}>{vaga.titulo}</td>
-                      <td className="p-2" data-testid={`text-departamento-${index}`}>{vaga.departamento || '-'}</td>
-                      <td className="p-2" data-testid={`text-status-${index}`}>{vaga.status}</td>
+                      <td className="p-2" data-testid={`text-titulo-${index}`}>{vaga.vagaNome}</td>
+                      <td className="p-2" data-testid={`text-status-${index}`}>{vaga.vagaStatus}</td>
                       <td className="text-right p-2" data-testid={`text-candidaturas-${index}`}>{vaga.totalCandidaturas}</td>
-                      <td className="text-right p-2" data-testid={`text-ativos-${index}`}>{vaga.candidatosAtivos}</td>
-                      <td className="text-right p-2" data-testid={`text-contratados-${index}`}>{vaga.candidatosContratados}</td>
-                      <td className="p-2" data-testid={`text-abertura-${index}`}>
-                        {new Date(vaga.dataAbertura).toLocaleDateString('pt-BR')}
+                      <td className="p-2" data-testid={`text-distribuicao-${index}`}>
+                        <div className="flex gap-2 flex-wrap">
+                          {vaga.candidatosPorStatus.slice(0, 3).map((item, idx) => (
+                            <span key={idx} className="text-xs bg-muted px-2 py-1 rounded">
+                              {item.status}: {item.total}
+                            </span>
+                          ))}
+                          {vaga.candidatosPorStatus.length > 3 && (
+                            <span className="text-xs text-muted-foreground">
+                              +{vaga.candidatosPorStatus.length - 3} mais
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
