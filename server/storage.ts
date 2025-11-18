@@ -1593,60 +1593,85 @@ export class DbStorage implements IStorage {
       };
     }
 
-    // Buscar métricas do snapshot
-    const resultados = await db.execute(sql`
+    // Buscar MRR do snapshot (estado atual)
+    const mrrQuery = await db.execute(sql`
       SELECT 
-        -- MRR Ativo: soma dos valorr dos contratos ativos no snapshot
         COALESCE(SUM(
           CASE 
             WHEN status IN ('ativo', 'onboarding', 'triagem')
+              AND valorr IS NOT NULL
+              AND valorr > 0
             THEN valorr::numeric
             ELSE 0 
           END
-        ), 0) as mrr,
-        
-        -- Aquisição MRR: contratos criados no período (da tabela cup_contratos)
-        COALESCE((
-          SELECT SUM(valorr::numeric)
-          FROM ${schema.cupContratos}
-          WHERE data_inicio >= ${inicioMes}
-            AND data_inicio <= ${fimMes}
-        ), 0) as aquisicao_mrr,
-        
-        -- Aquisição Pontual: valor_p dos contratos criados no período
-        COALESCE((
-          SELECT SUM(valorp::numeric)
-          FROM ${schema.cupContratos}
-          WHERE data_inicio >= ${inicioMes}
-            AND data_inicio <= ${fimMes}
-        ), 0) as aquisicao_pontual,
-        
-        -- Churn: contratos encerrados no período
-        COALESCE((
-          SELECT SUM(valorr::numeric)
-          FROM ${schema.cupContratos}
-          WHERE data_encerramento >= ${inicioMes}
-            AND data_encerramento <= ${fimMes}
-        ), 0) as churn,
-        
-        -- Pausados: contratos pausados no mês
-        COALESCE((
-          SELECT SUM(valorr::numeric)
-          FROM ${schema.cupContratos}
-          WHERE status = 'pausado'
-            AND data_pausa >= ${inicioMes}
-            AND data_pausa <= ${fimMes}
-        ), 0) as pausados
+        ), 0) as mrr
       FROM ${schema.cupDataHist}
       WHERE data_snapshot = ${dataUltimoSnapshot}::timestamp
     `);
+    
+    // Buscar métricas de transição da tabela cup_contratos (eventos, não estado)
+    // Estas representam mudanças que ocorreram no período, não estado em um ponto no tempo
+    const transicoesQuery = await db.execute(sql`
+      SELECT 
+        -- Aquisição MRR: contratos criados no período
+        COALESCE(SUM(
+          CASE 
+            WHEN data_inicio >= ${inicioMes}
+              AND data_inicio <= ${fimMes}
+              AND valorr IS NOT NULL
+              AND valorr > 0
+            THEN valorr::numeric
+            ELSE 0 
+          END
+        ), 0) as aquisicao_mrr,
+        
+        -- Aquisição Pontual: valor_p dos contratos criados no período
+        COALESCE(SUM(
+          CASE 
+            WHEN data_inicio >= ${inicioMes}
+              AND data_inicio <= ${fimMes}
+              AND valorp IS NOT NULL
+              AND valorp > 0
+            THEN valorp::numeric
+            ELSE 0 
+          END
+        ), 0) as aquisicao_pontual,
+        
+        -- Churn: contratos encerrados no período
+        COALESCE(SUM(
+          CASE 
+            WHEN data_encerramento >= ${inicioMes}
+              AND data_encerramento <= ${fimMes}
+              AND valorr IS NOT NULL
+              AND valorr > 0
+            THEN valorr::numeric
+            ELSE 0 
+          END
+        ), 0) as churn,
+        
+        -- Pausados: contratos pausados no mês
+        COALESCE(SUM(
+          CASE 
+            WHEN status = 'pausado'
+              AND data_pausa >= ${inicioMes}
+              AND data_pausa <= ${fimMes}
+              AND valorr IS NOT NULL
+              AND valorr > 0
+            THEN valorr::numeric
+            ELSE 0 
+          END
+        ), 0) as pausados
+      FROM ${schema.cupContratos}
+    `);
 
-    const row = resultados.rows[0] as any;
-    const mrr = parseFloat(row.mrr || '0');
-    const aquisicaoMrr = parseFloat(row.aquisicao_mrr || '0');
-    const aquisicaoPontual = parseFloat(row.aquisicao_pontual || '0');
-    const churn = parseFloat(row.churn || '0');
-    const pausados = parseFloat(row.pausados || '0');
+    const mrrRow = mrrQuery.rows[0] as any;
+    const transRow = transicoesQuery.rows[0] as any;
+
+    const mrr = parseFloat(mrrRow.mrr || '0');
+    const aquisicaoMrr = parseFloat(transRow.aquisicao_mrr || '0');
+    const aquisicaoPontual = parseFloat(transRow.aquisicao_pontual || '0');
+    const churn = parseFloat(transRow.churn || '0');
+    const pausados = parseFloat(transRow.pausados || '0');
 
     return {
       receitaTotal: mrr + aquisicaoPontual,
