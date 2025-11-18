@@ -118,6 +118,25 @@ export const cupContratos = pgTable("cup_contratos", {
   vendedor: text("vendedor"),
 });
 
+export const cupDataHist = pgTable("cup_data_hist", {
+  id: integer("id").primaryKey(),
+  dataSnapshot: timestamp("data_snapshot"),
+  servico: text("servico"),
+  status: text("status"),
+  valorr: decimal("valorr"),
+  valorp: decimal("valorp"),
+  idTask: text("id_task"),
+  idSubtask: text("id_subtask"),
+  dataInicio: timestamp("data_inicio"),
+  dataEncerramento: timestamp("data_encerramento"),
+  dataPausa: timestamp("data_pausa"),
+  squad: text("squad"),
+  produto: text("produto"),
+  responsavel: text("responsavel"),
+  csResponsavel: text("cs_responsavel"),
+  vendedor: text("vendedor"),
+});
+
 export const rhPessoal = pgTable("rh_pessoal", {
   id: integer("id").primaryKey(),
   status: varchar("status", { length: 50 }),
@@ -167,6 +186,7 @@ export type Colaborador = typeof rhPessoal.$inferSelect;
 export type Parcela = typeof cazParcelas.$inferSelect;
 export type ClienteClickup = typeof cupClientes.$inferSelect;
 export type Contrato = typeof cupContratos.$inferSelect;
+export type ContratoHistorico = typeof cupDataHist.$inferSelect;
 
 export type ContratoCompleto = {
   idSubtask: string | null;
@@ -297,4 +317,9 @@ export type DfcHierarchicalResponse = {
   nodes: DfcNode[];
   meses: string[];
   rootIds: string[];
+};
+
+export type MrrEvolucaoMensal = {
+  mes: string;
+  mrr: number;
 };
