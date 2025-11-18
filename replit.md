@@ -37,7 +37,7 @@ Preferred communication style: Simple, everyday language.
         - **Data Strategy**: Hybrid approach combining snapshot state and event-based metrics
             - **MRR Ativo**: Uses last snapshot of filtered month from `cup_data_hist` (state at point in time)
             - **Aquisições/Churn/Pausados**: Uses `cup_contratos` table (event-based transitions with timestamps)
-            - **Rankings**: Top responsáveis and squads calculated from snapshot data, grouped by `responsavel_geral` and `squad`
+            - **Rankings**: Top responsáveis and squads calculated from snapshot data, grouped by `responsavel` and `squad` from `cup_data_hist`
         - **Month Filter**: Controls all metrics, passed as `mesAno` parameter (YYYY-MM format) with validation
         - **React Query**: Proper cache invalidation using `mesVisaoGeral` in query keys for automatic refetch
         - **API Endpoints**: `/api/visao-geral/metricas`, `/api/visao-geral/mrr-evolucao`, `/api/top-responsaveis`, `/api/top-squads`
