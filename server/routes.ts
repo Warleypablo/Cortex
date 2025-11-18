@@ -694,24 +694,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/inhire/funnel-conversion", async (req, res) => {
+  app.get("/api/inhire/funnel", async (req, res) => {
     try {
-      const funnel = await storage.getInhireFunnelConversion();
+      const funnel = await storage.getInhireFunnel();
       res.json(funnel);
     } catch (error) {
-      console.error("[api] Error fetching Inhire funnel conversion:", error);
-      res.status(500).json({ error: "Failed to fetch Inhire funnel conversion" });
+      console.error("[api] Error fetching Inhire funnel:", error);
+      res.status(500).json({ error: "Failed to fetch Inhire funnel" });
     }
   });
 
-  app.get("/api/inhire/top-sources", async (req, res) => {
+  app.get("/api/inhire/vagas-com-candidaturas", async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 10;
-      const topSources = await storage.getInhireTopSources(limit);
-      res.json(topSources);
+      const vagas = await storage.getInhireVagasComCandidaturas(limit);
+      res.json(vagas);
     } catch (error) {
-      console.error("[api] Error fetching Inhire top sources:", error);
-      res.status(500).json({ error: "Failed to fetch Inhire top sources" });
+      console.error("[api] Error fetching Inhire vagas com candidaturas:", error);
+      res.status(500).json({ error: "Failed to fetch Inhire vagas com candidaturas" });
     }
   });
 
