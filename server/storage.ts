@@ -2496,26 +2496,17 @@ export class DbStorage implements IStorage {
   }
 
   async getInhireMetrics(): Promise<InhireMetrics> {
-    const [candidaturasResult, vagasResult, ativosResult, vagasAbertasResult, tempoResult] = await Promise.all([
+    const [candidaturasResult, vagasResult, ativosResult, vagasAbertasResult] = await Promise.all([
       db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhCandidaturas}`),
       db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhVagas}`),
       db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhCandidaturas} WHERE talent_status = 'active'`),
-      db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhVagas} WHERE status NOT IN ('closed', 'cancelada', 'preenchida')`),
-      db.execute(sql`
-        SELECT 
-          AVG(EXTRACT(DAY FROM (updated_at - created_at)))::int as dias_medios
-        FROM ${schema.rhCandidaturas}
-        WHERE stage_name IN ('Contratado', 'contratado', 'Hired')
-          AND created_at IS NOT NULL
-          AND updated_at IS NOT NULL
-      `)
+      db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhVagas} WHERE status NOT IN ('closed', 'cancelada', 'preenchida')`)
     ]);
 
     const totalCandidaturas = parseInt((candidaturasResult.rows[0] as any).total || '0');
     const totalVagas = parseInt((vagasResult.rows[0] as any).total || '0');
     const candidatosAtivos = parseInt((ativosResult.rows[0] as any).total || '0');
     const vagasAbertas = parseInt((vagasAbertasResult.rows[0] as any).total || '0');
-    const tempoMedioContratacao = parseInt((tempoResult.rows[0] as any).dias_medios || '0');
 
     const taxaConversao = totalCandidaturas > 0 ? (candidatosAtivos / totalCandidaturas) * 100 : 0;
 
@@ -2525,7 +2516,7 @@ export class DbStorage implements IStorage {
       totalVagas,
       vagasAbertas,
       taxaConversao: parseFloat(taxaConversao.toFixed(2)),
-      tempoMedioContratacao
+      tempoMedioContratacao: 0
     };
   }
 
