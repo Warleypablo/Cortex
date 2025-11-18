@@ -654,6 +654,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/inhire/metrics", async (req, res) => {
+    try {
+      const metrics = await storage.getInhireMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("[api] Error fetching Inhire metrics:", error);
+      res.status(500).json({ error: "Failed to fetch Inhire metrics" });
+    }
+  });
+
+  app.get("/api/inhire/status-distribution", async (req, res) => {
+    try {
+      const distribution = await storage.getInhireStatusDistribution();
+      res.json(distribution);
+    } catch (error) {
+      console.error("[api] Error fetching Inhire status distribution:", error);
+      res.status(500).json({ error: "Failed to fetch Inhire status distribution" });
+    }
+  });
+
+  app.get("/api/inhire/stage-distribution", async (req, res) => {
+    try {
+      const distribution = await storage.getInhireStageDistribution();
+      res.json(distribution);
+    } catch (error) {
+      console.error("[api] Error fetching Inhire stage distribution:", error);
+      res.status(500).json({ error: "Failed to fetch Inhire stage distribution" });
+    }
+  });
+
+  app.get("/api/inhire/source-distribution", async (req, res) => {
+    try {
+      const distribution = await storage.getInhireSourceDistribution();
+      res.json(distribution);
+    } catch (error) {
+      console.error("[api] Error fetching Inhire source distribution:", error);
+      res.status(500).json({ error: "Failed to fetch Inhire source distribution" });
+    }
+  });
+
+  app.get("/api/inhire/funnel-conversion", async (req, res) => {
+    try {
+      const funnel = await storage.getInhireFunnelConversion();
+      res.json(funnel);
+    } catch (error) {
+      console.error("[api] Error fetching Inhire funnel conversion:", error);
+      res.status(500).json({ error: "Failed to fetch Inhire funnel conversion" });
+    }
+  });
+
+  app.get("/api/inhire/top-sources", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const topSources = await storage.getInhireTopSources(limit);
+      res.json(topSources);
+    } catch (error) {
+      console.error("[api] Error fetching Inhire top sources:", error);
+      res.status(500).json({ error: "Failed to fetch Inhire top sources" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
