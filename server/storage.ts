@@ -2535,16 +2535,16 @@ export class DbStorage implements IStorage {
 
     const resultados = await db.execute(sql`
       SELECT 
-        responsavel_geral as nome,
+        responsavel as nome,
         COALESCE(SUM(valorr::numeric), 0) as mrr
       FROM ${schema.cupDataHist}
       WHERE data_snapshot = ${dataUltimoSnapshot}::timestamp
-        AND responsavel_geral IS NOT NULL 
-        AND responsavel_geral != ''
+        AND responsavel IS NOT NULL 
+        AND responsavel != ''
         AND valorr IS NOT NULL
         AND valorr > 0
         AND status IN ('ativo', 'onboarding', 'triagem')
-      GROUP BY responsavel_geral
+      GROUP BY responsavel
       HAVING COALESCE(SUM(valorr::numeric), 0) > 0
       ORDER BY mrr DESC
       LIMIT ${limit}
