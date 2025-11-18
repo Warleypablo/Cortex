@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql, inArray } from "drizzle-orm";
@@ -162,12 +162,12 @@ export interface IStorage {
   getGegUltimasPromocoes(squad: string, setor: string, limit?: number): Promise<any[]>;
   getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
   getTopResponsaveis(limit?: number): Promise<{ nome: string; mrr: number; posicao: number }[]>;
-  getInhireMetrics(): Promise<import("@shared/schema").InhireMetrics>;
-  getInhireStatusDistribution(): Promise<import("@shared/schema").InhireStatusDistribution[]>;
-  getInhireStageDistribution(): Promise<import("@shared/schema").InhireStageDistribution[]>;
-  getInhireSourceDistribution(): Promise<import("@shared/schema").InhireSourceDistribution[]>;
-  getInhireFunnel(): Promise<import("@shared/schema").InhireFunnel[]>;
-  getInhireVagasComCandidaturas(limit?: number): Promise<import("@shared/schema").InhireVagaComCandidaturas[]>;
+  getInhireMetrics(): Promise<InhireMetrics>;
+  getInhireStatusDistribution(): Promise<InhireStatusDistribution[]>;
+  getInhireStageDistribution(): Promise<InhireStageDistribution[]>;
+  getInhireSourceDistribution(): Promise<InhireSourceDistribution[]>;
+  getInhireFunnel(): Promise<InhireFunnel[]>;
+  getInhireVagasComCandidaturas(limit?: number): Promise<InhireVagaComCandidaturas[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -346,27 +346,27 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getInhireMetrics(): Promise<import("@shared/schema").InhireMetrics> {
+  async getInhireMetrics(): Promise<InhireMetrics> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getInhireStatusDistribution(): Promise<import("@shared/schema").InhireStatusDistribution[]> {
+  async getInhireStatusDistribution(): Promise<InhireStatusDistribution[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getInhireStageDistribution(): Promise<import("@shared/schema").InhireStageDistribution[]> {
+  async getInhireStageDistribution(): Promise<InhireStageDistribution[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getInhireSourceDistribution(): Promise<import("@shared/schema").InhireSourceDistribution[]> {
+  async getInhireSourceDistribution(): Promise<InhireSourceDistribution[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getInhireFunnel(): Promise<import("@shared/schema").InhireFunnel[]> {
+  async getInhireFunnel(): Promise<InhireFunnel[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getInhireVagasComCandidaturas(limit?: number): Promise<import("@shared/schema").InhireVagaComCandidaturas[]> {
+  async getInhireVagasComCandidaturas(limit?: number): Promise<InhireVagaComCandidaturas[]> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -2495,28 +2495,41 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getInhireMetrics(): Promise<import("@shared/schema").InhireMetrics> {
-    const [candidaturasResult, vagasResult, talentosResult] = await Promise.all([
+  async getInhireMetrics(): Promise<InhireMetrics> {
+    const [candidaturasResult, vagasResult, ativosResult, vagasAbertasResult, tempoResult] = await Promise.all([
       db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhCandidaturas}`),
       db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhVagas}`),
-      db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhTalentos}`)
+      db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhCandidaturas} WHERE talent_status = 'active'`),
+      db.execute(sql`SELECT COUNT(*) as total FROM ${schema.rhVagas} WHERE status NOT IN ('closed', 'cancelada', 'preenchida')`),
+      db.execute(sql`
+        SELECT 
+          AVG(EXTRACT(DAY FROM (updated_at - created_at)))::int as dias_medios
+        FROM ${schema.rhCandidaturas}
+        WHERE stage_name IN ('Contratado', 'contratado', 'Hired')
+          AND created_at IS NOT NULL
+          AND updated_at IS NOT NULL
+      `)
     ]);
 
     const totalCandidaturas = parseInt((candidaturasResult.rows[0] as any).total || '0');
     const totalVagas = parseInt((vagasResult.rows[0] as any).total || '0');
-    const totalTalentos = parseInt((talentosResult.rows[0] as any).total || '0');
+    const candidatosAtivos = parseInt((ativosResult.rows[0] as any).total || '0');
+    const vagasAbertas = parseInt((vagasAbertasResult.rows[0] as any).total || '0');
+    const tempoMedioContratacao = parseInt((tempoResult.rows[0] as any).dias_medios || '0');
 
-    const taxaConversao = totalCandidaturas > 0 ? (totalTalentos / totalCandidaturas) * 100 : 0;
+    const taxaConversao = totalCandidaturas > 0 ? (candidatosAtivos / totalCandidaturas) * 100 : 0;
 
     return {
       totalCandidaturas,
+      candidatosAtivos,
       totalVagas,
-      totalTalentos,
-      taxaConversao: parseFloat(taxaConversao.toFixed(2))
+      vagasAbertas,
+      taxaConversao: parseFloat(taxaConversao.toFixed(2)),
+      tempoMedioContratacao
     };
   }
 
-  async getInhireStatusDistribution(): Promise<import("@shared/schema").InhireStatusDistribution[]> {
+  async getInhireStatusDistribution(): Promise<InhireStatusDistribution[]> {
     const result = await db.execute(sql`
       SELECT 
         talent_status as "talentStatus",
@@ -2535,7 +2548,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getInhireStageDistribution(): Promise<import("@shared/schema").InhireStageDistribution[]> {
+  async getInhireStageDistribution(): Promise<InhireStageDistribution[]> {
     const result = await db.execute(sql`
       SELECT 
         stage_name as "stageName",
@@ -2554,7 +2567,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getInhireSourceDistribution(): Promise<import("@shared/schema").InhireSourceDistribution[]> {
+  async getInhireSourceDistribution(): Promise<InhireSourceDistribution[]> {
     const result = await db.execute(sql`
       SELECT 
         source,
@@ -2573,7 +2586,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getInhireFunnel(): Promise<import("@shared/schema").InhireFunnel[]> {
+  async getInhireFunnel(): Promise<InhireFunnel[]> {
     const stageOrder: Record<string, number> = {
       'Candidatura Recebida': 1,
       'Triagem': 2,
@@ -2605,7 +2618,7 @@ export class DbStorage implements IStorage {
     })).sort((a, b) => a.ordem - b.ordem);
   }
 
-  async getInhireVagasComCandidaturas(limit: number = 10): Promise<import("@shared/schema").InhireVagaComCandidaturas[]> {
+  async getInhireVagasComCandidaturas(limit: number = 10): Promise<InhireVagaComCandidaturas[]> {
     const result = await db.execute(sql`
       SELECT 
         v.id as "vagaId",
