@@ -157,6 +157,10 @@ export interface IStorage {
   getGegAniversariantesMes(squad: string, setor: string): Promise<any>;
   getGegAniversariosEmpresa(squad: string, setor: string): Promise<any>;
   getGegFiltros(): Promise<any>;
+  getGegValorMedioSalario(squad: string, setor: string): Promise<{ valorMedio: number; totalColaboradores: number }>;
+  getGegPatrimonioResumo(): Promise<{ totalAtivos: number; valorTotalPago: number; valorTotalMercado: number; porTipo: { tipo: string; quantidade: number }[] }>;
+  getGegUltimasPromocoes(squad: string, setor: string, limit?: number): Promise<any[]>;
+  getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
   getTopResponsaveis(limit?: number): Promise<{ nome: string; mrr: number; posicao: number }[]>;
 }
 
@@ -313,6 +317,22 @@ export class MemStorage implements IStorage {
   }
 
   async getGegFiltros(): Promise<any> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegValorMedioSalario(squad: string, setor: string): Promise<{ valorMedio: number; totalColaboradores: number }> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegPatrimonioResumo(): Promise<{ totalAtivos: number; valorTotalPago: number; valorTotalMercado: number; porTipo: { tipo: string; quantidade: number }[] }> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegUltimasPromocoes(squad: string, setor: string, limit?: number): Promise<any[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -2310,6 +2330,114 @@ export class DbStorage implements IStorage {
     return {
       squads: squadResult.rows.map(row => row.squad as string),
       setores: setorResult.rows.map(row => row.setor as string),
+    };
+  }
+
+  async getGegValorMedioSalario(squad: string, setor: string): Promise<{ valorMedio: number; totalColaboradores: number }> {
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        AVG(proporcional) as valor_medio,
+        COUNT(*) as total_colaboradores
+      FROM rh_pessoal
+      WHERE status = 'Ativo'
+        AND proporcional IS NOT NULL
+        AND proporcional > 0
+        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
+        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+    `));
+
+    const row = result.rows[0] as any;
+    return {
+      valorMedio: parseFloat(row.valor_medio || '0'),
+      totalColaboradores: parseInt(row.total_colaboradores || '0'),
+    };
+  }
+
+  async getGegPatrimonioResumo(): Promise<{ totalAtivos: number; valorTotalPago: number; valorTotalMercado: number; porTipo: { tipo: string; quantidade: number }[] }> {
+    const resumoResult = await db.execute(sql`
+      SELECT 
+        COUNT(*) as total_ativos,
+        COALESCE(SUM(valor_pago), 0) as valor_total_pago,
+        COALESCE(SUM(valor_mercado), 0) as valor_total_mercado
+      FROM rh_patrimonio
+    `);
+
+    const porTipoResult = await db.execute(sql`
+      SELECT 
+        ativo as tipo,
+        COUNT(*) as quantidade
+      FROM rh_patrimonio
+      WHERE ativo IS NOT NULL AND ativo != ''
+      GROUP BY ativo
+      ORDER BY quantidade DESC
+    `);
+
+    const resumo = resumoResult.rows[0] as any;
+    
+    return {
+      totalAtivos: parseInt(resumo.total_ativos || '0'),
+      valorTotalPago: parseFloat(resumo.valor_total_pago || '0'),
+      valorTotalMercado: parseFloat(resumo.valor_total_mercado || '0'),
+      porTipo: porTipoResult.rows.map(row => ({
+        tipo: row.tipo as string,
+        quantidade: parseInt(row.quantidade as string),
+      })),
+    };
+  }
+
+  async getGegUltimasPromocoes(squad: string, setor: string, limit: number = 10): Promise<any[]> {
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        id,
+        nome,
+        cargo,
+        nivel,
+        squad,
+        setor,
+        ultimo_aumento,
+        meses_ult_aumento
+      FROM rh_pessoal
+      WHERE status = 'Ativo'
+        AND ultimo_aumento IS NOT NULL
+        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
+        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+      ORDER BY ultimo_aumento DESC
+      LIMIT ${limit}
+    `));
+
+    return result.rows.map(row => ({
+      id: row.id as number,
+      nome: row.nome as string,
+      cargo: row.cargo as string || null,
+      nivel: row.nivel as string || null,
+      squad: row.squad as string || null,
+      setor: row.setor as string || null,
+      ultimoAumento: row.ultimo_aumento as string,
+      mesesUltAumento: parseInt((row.meses_ult_aumento as string) || '0'),
+    }));
+  }
+
+  async getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }> {
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        AVG(CASE WHEN status = 'Ativo' THEN 
+          EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + 
+          EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao))
+        END) as tempo_medio_ativos,
+        AVG(CASE WHEN status = 'Dispensado' AND demissao IS NOT NULL THEN 
+          EXTRACT(YEAR FROM AGE(demissao, admissao)) * 12 + 
+          EXTRACT(MONTH FROM AGE(demissao, admissao))
+        END) as tempo_medio_desligados
+      FROM rh_pessoal
+      WHERE admissao IS NOT NULL
+        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
+        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+    `));
+
+    const row = result.rows[0] as any;
+    return {
+      tempoMedioAtivos: parseFloat(row.tempo_medio_ativos || '0'),
+      tempoMedioDesligados: parseFloat(row.tempo_medio_desligados || '0'),
     };
   }
 

@@ -604,6 +604,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/geg/valor-medio-salario", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const resultado = await storage.getGegValorMedioSalario(squad, setor);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG valor medio salario:", error);
+      res.status(500).json({ error: "Failed to fetch GEG valor medio salario" });
+    }
+  });
+
+  app.get("/api/geg/patrimonio-resumo", async (req, res) => {
+    try {
+      const resultado = await storage.getGegPatrimonioResumo();
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG patrimonio resumo:", error);
+      res.status(500).json({ error: "Failed to fetch GEG patrimonio resumo" });
+    }
+  });
+
+  app.get("/api/geg/ultimas-promocoes", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      const resultado = await storage.getGegUltimasPromocoes(squad, setor, limit);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG ultimas promocoes:", error);
+      res.status(500).json({ error: "Failed to fetch GEG ultimas promocoes" });
+    }
+  });
+
+  app.get("/api/geg/tempo-permanencia", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const resultado = await storage.getGegTempoPermanencia(squad, setor);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG tempo permanencia:", error);
+      res.status(500).json({ error: "Failed to fetch GEG tempo permanencia" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
