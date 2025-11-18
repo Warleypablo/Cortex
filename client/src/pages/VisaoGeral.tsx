@@ -45,10 +45,19 @@ export default function VisaoGeral() {
   });
 
   const { data: topResponsaveis, isLoading: isLoadingTopResponsaveis, isError: isErrorTopResponsaveis } = useQuery<{ nome: string; mrr: number; posicao: number }[]>({
-    queryKey: ['/api/top-responsaveis'],
+    queryKey: ['/api/top-responsaveis', mesVisaoGeral],
     queryFn: async () => {
-      const response = await fetch('/api/top-responsaveis');
+      const response = await fetch(`/api/top-responsaveis?mesAno=${mesVisaoGeral}`);
       if (!response.ok) throw new Error('Failed to fetch top responsaveis');
+      return response.json();
+    },
+  });
+
+  const { data: topSquads, isLoading: isLoadingTopSquads } = useQuery<{ squad: string; mrr: number; posicao: number }[]>({
+    queryKey: ['/api/top-squads', mesVisaoGeral],
+    queryFn: async () => {
+      const response = await fetch(`/api/top-squads?mesAno=${mesVisaoGeral}`);
+      if (!response.ok) throw new Error('Failed to fetch top squads');
       return response.json();
     },
   });
@@ -77,12 +86,18 @@ export default function VisaoGeral() {
     mrr: item.mrr,
   }));
 
-  const mockMrrSquad = [
-    { squad: 'Supreme', mrr: 145000, cor: '#3b82f6' },
-    { squad: 'Forja', mrr: 132000, cor: '#a855f7' },
-    { squad: 'Squadra', mrr: 108000, cor: '#14b8a6' },
-    { squad: 'Chama', mrr: 65000, cor: '#f97316' },
-  ];
+  const squadColors: Record<string, string> = {
+    'Supreme': '#3b82f6',
+    'Forja': '#a855f7',
+    'Squadra': '#14b8a6',
+    'Chama': '#f97316',
+  };
+
+  const mrrSquadData = (topSquads || []).map(item => ({
+    squad: item.squad,
+    mrr: item.mrr,
+    cor: squadColors[item.squad] || '#6b7280',
+  }));
 
   return (
     <div className="bg-background min-h-screen">
@@ -343,7 +358,7 @@ export default function VisaoGeral() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={mockMrrSquad} layout="vertical">
+                  <BarChart data={mrrSquadData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis 
                       type="number"
@@ -367,7 +382,7 @@ export default function VisaoGeral() {
                       }}
                     />
                     <Bar dataKey="mrr" radius={[0, 8, 8, 0]}>
-                      {mockMrrSquad.map((entry, index) => (
+                      {mrrSquadData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.cor} />
                       ))}
                     </Bar>
