@@ -57,6 +57,34 @@ interface Filtros {
   setores: string[];
 }
 
+interface ValorMedioSalario {
+  valorMedio: number;
+  totalColaboradores: number;
+}
+
+interface PatrimonioResumo {
+  totalAtivos: number;
+  valorTotalPago: number;
+  valorTotalMercado: number;
+  porTipo: { tipo: string; quantidade: number }[];
+}
+
+interface UltimaPromocao {
+  id: number;
+  nome: string;
+  cargo: string | null;
+  nivel: string | null;
+  squad: string | null;
+  setor: string | null;
+  ultimoAumento: string;
+  mesesUltAumento: number;
+}
+
+interface TempoPermanencia {
+  tempoMedioAtivos: number;
+  tempoMedioDesligados: number;
+}
+
 export default function DashboardGeG() {
   const [periodo, setPeriodo] = useState("trimestre");
   const [squad, setSquad] = useState("todos");
@@ -88,6 +116,22 @@ export default function DashboardGeG() {
 
   const { data: filtros } = useQuery<Filtros>({
     queryKey: ['/api/geg/filtros'],
+  });
+
+  const { data: valorMedioSalario, isLoading: isLoadingValorMedio } = useQuery<ValorMedioSalario>({
+    queryKey: ['/api/geg/valor-medio-salario', { squad, setor }],
+  });
+
+  const { data: patrimonioResumo, isLoading: isLoadingPatrimonio } = useQuery<PatrimonioResumo>({
+    queryKey: ['/api/geg/patrimonio-resumo'],
+  });
+
+  const { data: ultimasPromocoes, isLoading: isLoadingPromocoes } = useQuery<UltimaPromocao[]>({
+    queryKey: ['/api/geg/ultimas-promocoes', { squad, setor, limit: 10 }],
+  });
+
+  const { data: tempoPermanencia, isLoading: isLoadingTempoPermanencia } = useQuery<TempoPermanencia>({
+    queryKey: ['/api/geg/tempo-permanencia', { squad, setor }],
   });
 
   const formatMesAno = (mesAno: string) => {
@@ -227,17 +271,80 @@ export default function DashboardGeG() {
 
           <Card data-testid="card-tempo-medio">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Tempo Médio Ativo</CardTitle>
+              <CardTitle className="text-sm font-medium">Tempo de Permanência</CardTitle>
               <Clock className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {isLoadingMetricas ? (
-                <Skeleton className="h-8 w-16" />
+              {isLoadingTempoPermanencia ? (
+                <Skeleton className="h-16 w-full" />
+              ) : (
+                <div className="space-y-2">
+                  <div>
+                    <div className="text-xl font-bold" data-testid="text-tempo-ativos">
+                      {tempoPermanencia?.tempoMedioAtivos ? tempoPermanencia.tempoMedioAtivos.toFixed(1) : '0'} meses
+                    </div>
+                    <p className="text-xs text-muted-foreground">Ativos</p>
+                  </div>
+                  <div>
+                    <div className="text-xl font-bold text-muted-foreground" data-testid="text-tempo-desligados">
+                      {tempoPermanencia?.tempoMedioDesligados ? tempoPermanencia.tempoMedioDesligados.toFixed(1) : '0'} meses
+                    </div>
+                    <p className="text-xs text-muted-foreground">Desligados</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <Card data-testid="card-valor-medio">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Valor Médio</CardTitle>
+              <Award className="w-4 h-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {isLoadingValorMedio ? (
+                <Skeleton className="h-8 w-24" />
               ) : (
                 <>
-                  <div className="text-2xl font-bold" data-testid="text-tempo-medio">{metricas?.tempoMedioAtivo || 0}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Meses de permanência</p>
+                  <div className="text-2xl font-bold" data-testid="text-valor-medio">
+                    R$ {valorMedioSalario?.valorMedio ? valorMedioSalario.valorMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00'}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {valorMedioSalario?.totalColaboradores || 0} colaboradores
+                  </p>
                 </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-patrimonio" className="col-span-2">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Resumo de Patrimônio</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingPatrimonio ? (
+                <Skeleton className="h-20 w-full" />
+              ) : (
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <div className="text-2xl font-bold" data-testid="text-total-ativos">{patrimonioResumo?.totalAtivos || 0}</div>
+                    <p className="text-xs text-muted-foreground mt-1">Total de Ativos</p>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold" data-testid="text-valor-pago">
+                      R$ {patrimonioResumo?.valorTotalPago ? (patrimonioResumo.valorTotalPago / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '0,0'}k
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Valor Pago Total</p>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold" data-testid="text-valor-mercado">
+                      R$ {patrimonioResumo?.valorTotalMercado ? (patrimonioResumo.valorTotalMercado / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '0,0'}k
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Valor de Mercado</p>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -328,6 +435,50 @@ export default function DashboardGeG() {
             ) : (
               <div className="flex items-center justify-center h-[300px]" data-testid="text-no-data-tempo-promocao">
                 <p className="text-muted-foreground">Nenhum dado disponível</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mb-8" data-testid="card-ultimas-promocoes">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-purple-500" />
+              <CardTitle>Últimas Promoções</CardTitle>
+            </div>
+            <CardDescription>Colaboradores promovidos recentemente</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingPromocoes ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : ultimasPromocoes && ultimasPromocoes.length > 0 ? (
+              <div className="space-y-3">
+                {ultimasPromocoes.map((promo) => (
+                  <div key={promo.id} className="flex items-center justify-between p-3 bg-card rounded-lg border" data-testid={`promocao-${promo.id}`}>
+                    <div>
+                      <p className="font-medium">{promo.nome}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {promo.cargo || 'N/A'} {promo.nivel ? `- ${promo.nivel}` : ''} | {promo.squad || 'N/A'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">
+                        {promo.ultimoAumento ? new Date(promo.ultimoAumento).toLocaleDateString('pt-BR') : 'N/A'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Há {promo.mesesUltAumento} {promo.mesesUltAumento === 1 ? 'mês' : 'meses'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[200px]" data-testid="text-no-promocoes">
+                <p className="text-muted-foreground">Nenhuma promoção registrada</p>
               </div>
             )}
           </CardContent>
