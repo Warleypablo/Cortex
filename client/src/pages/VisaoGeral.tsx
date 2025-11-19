@@ -20,19 +20,23 @@ export default function VisaoGeral() {
     }).format(value);
   };
 
-  const getUltimos6Meses = () => {
+  const getMesesDesdeNovembro2025 = () => {
     const meses = [];
     const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const data = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const inicio = new Date(2025, 10, 1);
+    
+    let data = new Date(inicio);
+    while (data <= now) {
       const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
       const mesNome = [
         'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
         'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
       ][data.getMonth()];
       meses.push({ valor: mesAno, label: `${mesNome} ${data.getFullYear()}` });
+      data.setMonth(data.getMonth() + 1);
     }
-    return meses;
+    
+    return meses.reverse();
   };
 
   const { data: metricas, isLoading: isLoadingMetricas } = useQuery({
@@ -118,7 +122,7 @@ export default function VisaoGeral() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {getUltimos6Meses().map(m => (
+                {getMesesDesdeNovembro2025().map(m => (
                   <SelectItem key={m.valor} value={m.valor}>{m.label}</SelectItem>
                 ))}
               </SelectContent>
