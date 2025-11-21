@@ -1786,7 +1786,7 @@ export class DbStorage implements IStorage {
     
     if (filters?.servicos && filters.servicos.length > 0) {
       const servicosPlaceholders = sql.join(filters.servicos.map(s => sql`${s}`), sql`, `);
-      whereConditions.push(sql`servico IN (${servicosPlaceholders})`);
+      whereConditions.push(sql`produto IN (${servicosPlaceholders})`);
     }
     
     if (filters?.mesInicio) {
@@ -1806,18 +1806,18 @@ export class DbStorage implements IStorage {
     const resultados = await db.execute(sql`
       WITH churn_data AS (
         SELECT 
-          servico,
+          produto,
           TO_CHAR(data_encerramento, 'YYYY-MM') as mes,
           COUNT(*) as quantidade_churn,
           COALESCE(SUM(valorr::numeric), 0) as valor_churn,
           data_encerramento
         FROM cup_contratos
         WHERE ${whereClause}
-        GROUP BY servico, TO_CHAR(data_encerramento, 'YYYY-MM'), data_encerramento
+        GROUP BY produto, TO_CHAR(data_encerramento, 'YYYY-MM'), data_encerramento
       ),
       ativos_por_mes AS (
         SELECT 
-          servico,
+          produto,
           cd.mes,
           COUNT(*) as total_ativos,
           COALESCE(SUM(valorr::numeric), 0) as valor_total_ativo
@@ -1825,10 +1825,10 @@ export class DbStorage implements IStorage {
         CROSS JOIN (SELECT DISTINCT mes, MIN(data_encerramento) as data_ref FROM churn_data GROUP BY mes) cd
         WHERE c.data_inicio <= cd.data_ref
           AND (c.data_encerramento IS NULL OR c.data_encerramento >= cd.data_ref)
-        GROUP BY servico, cd.mes
+        GROUP BY produto, cd.mes
       )
       SELECT 
-        cd.servico,
+        cd.produto,
         cd.mes,
         SUM(cd.quantidade_churn)::integer as quantidade,
         SUM(cd.valor_churn)::numeric as valor_total,
@@ -1839,13 +1839,13 @@ export class DbStorage implements IStorage {
           ELSE 0 
         END as percentual_churn
       FROM churn_data cd
-      LEFT JOIN ativos_por_mes apm ON cd.servico = apm.servico AND cd.mes = apm.mes
-      GROUP BY cd.servico, cd.mes, apm.total_ativos, apm.valor_total_ativo
-      ORDER BY cd.servico, cd.mes
+      LEFT JOIN ativos_por_mes apm ON cd.produto = apm.produto AND cd.mes = apm.mes
+      GROUP BY cd.produto, cd.mes, apm.total_ativos, apm.valor_total_ativo
+      ORDER BY cd.produto, cd.mes
     `);
     
     return resultados.rows.map((row: any) => ({
-      servico: row.servico,
+      servico: row.produto,
       mes: row.mes,
       quantidade: parseInt(row.quantidade || '0'),
       valorTotal: parseFloat(row.valor_total || '0'),
