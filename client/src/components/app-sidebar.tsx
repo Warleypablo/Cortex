@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, Shield, Target } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, Shield, Target, ShieldAlert } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -97,6 +97,11 @@ const dashboardItems = [
     title: "DFC",
     url: "/dashboard/dfc",
     icon: TrendingUp,
+  },
+  {
+    title: "Auditoria de Sistemas",
+    url: "/dashboard/auditoria-sistemas",
+    icon: ShieldAlert,
   },
 ];
 
