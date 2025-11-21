@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, gte, lte, sql, inArray } from "drizzle-orm";
@@ -169,6 +169,12 @@ export interface IStorage {
   getInhireSourceDistribution(): Promise<InhireSourceDistribution[]>;
   getInhireFunnel(): Promise<InhireFunnel[]>;
   getInhireVagasComCandidaturas(limit?: number): Promise<InhireVagaComCandidaturas[]>;
+  getMetaOverview(startDate?: string, endDate?: string): Promise<MetaOverview>;
+  getCampaignPerformance(startDate?: string, endDate?: string): Promise<CampaignPerformance[]>;
+  getAdsetPerformance(startDate?: string, endDate?: string): Promise<AdsetPerformance[]>;
+  getAdPerformance(startDate?: string, endDate?: string): Promise<AdPerformance[]>;
+  getCreativePerformance(startDate?: string, endDate?: string): Promise<CreativePerformance[]>;
+  getConversionFunnel(startDate?: string, endDate?: string): Promise<ConversionFunnel>;
 }
 
 export class MemStorage implements IStorage {
@@ -368,6 +374,34 @@ export class MemStorage implements IStorage {
   }
 
   async getInhireVagasComCandidaturas(limit?: number): Promise<InhireVagaComCandidaturas[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTopSquads(limit?: number, mesAno?: string): Promise<{ squad: string; mrr: number; posicao: number }[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getMetaOverview(startDate?: string, endDate?: string): Promise<MetaOverview> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getCampaignPerformance(startDate?: string, endDate?: string): Promise<CampaignPerformance[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getAdsetPerformance(startDate?: string, endDate?: string): Promise<AdsetPerformance[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getAdPerformance(startDate?: string, endDate?: string): Promise<AdPerformance[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getCreativePerformance(startDate?: string, endDate?: string): Promise<CreativePerformance[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getConversionFunnel(startDate?: string, endDate?: string): Promise<ConversionFunnel> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -2766,6 +2800,500 @@ export class DbStorage implements IStorage {
         }))
       };
     });
+  }
+
+  async getMetaOverview(startDate?: string, endDate?: string): Promise<MetaOverview> {
+    const result = await db.execute(sql`
+      WITH meta_metrics AS (
+        SELECT 
+          COALESCE(SUM(spend), 0) as total_spend,
+          COALESCE(SUM(impressions), 0) as total_impressions,
+          COALESCE(SUM(clicks), 0) as total_clicks,
+          COALESCE(SUM(reach), 0) as total_reach
+        FROM ${schema.metaInsightsDaily}
+        WHERE 1=1
+          ${startDate ? sql`AND date_start >= ${startDate}::date` : sql``}
+          ${endDate ? sql`AND date_stop <= ${endDate}::date` : sql``}
+      ),
+      crm_metrics AS (
+        SELECT 
+          COUNT(*) as total_leads,
+          COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as total_won,
+          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) END), 0) as total_won_value
+        FROM ${schema.crmDeal}
+        WHERE utm_campaign IS NOT NULL
+          ${startDate ? sql`AND date_create >= ${startDate}::timestamp` : sql``}
+          ${endDate ? sql`AND date_create <= ${endDate}::timestamp` : sql``}
+      )
+      SELECT 
+        mm.total_spend::numeric as "totalSpend",
+        mm.total_impressions::bigint as "totalImpressions",
+        mm.total_clicks::bigint as "totalClicks",
+        mm.total_reach::bigint as "totalReach",
+        CASE 
+          WHEN mm.total_impressions > 0 THEN (mm.total_clicks::numeric / mm.total_impressions::numeric * 100)
+          ELSE 0 
+        END as "avgCtr",
+        CASE 
+          WHEN mm.total_clicks > 0 THEN (mm.total_spend::numeric / mm.total_clicks::numeric)
+          ELSE 0 
+        END as "avgCpc",
+        CASE 
+          WHEN mm.total_impressions > 0 THEN (mm.total_spend::numeric / mm.total_impressions::numeric * 1000)
+          ELSE 0 
+        END as "avgCpm",
+        cm.total_leads::bigint as "totalLeads",
+        cm.total_won::bigint as "totalWon",
+        cm.total_won_value::numeric as "totalWonValue",
+        CASE 
+          WHEN mm.total_spend > 0 THEN (cm.total_won_value::numeric / mm.total_spend::numeric)
+          ELSE 0 
+        END as "roas",
+        CASE 
+          WHEN cm.total_leads > 0 THEN (mm.total_spend::numeric / cm.total_leads::numeric)
+          ELSE 0 
+        END as "costPerLead",
+        CASE 
+          WHEN cm.total_won > 0 THEN (mm.total_spend::numeric / cm.total_won::numeric)
+          ELSE 0 
+        END as "cac",
+        CASE 
+          WHEN cm.total_leads > 0 THEN (cm.total_won::numeric / cm.total_leads::numeric * 100)
+          ELSE 0 
+        END as "conversionRate"
+      FROM meta_metrics mm, crm_metrics cm
+    `);
+
+    const row = result.rows[0] as any;
+    return {
+      totalSpend: parseFloat(row.totalSpend || '0'),
+      totalImpressions: parseInt(row.totalImpressions || '0'),
+      totalClicks: parseInt(row.totalClicks || '0'),
+      totalReach: parseInt(row.totalReach || '0'),
+      avgCtr: parseFloat(row.avgCtr || '0'),
+      avgCpc: parseFloat(row.avgCpc || '0'),
+      avgCpm: parseFloat(row.avgCpm || '0'),
+      totalLeads: parseInt(row.totalLeads || '0'),
+      totalWon: parseInt(row.totalWon || '0'),
+      totalWonValue: parseFloat(row.totalWonValue || '0'),
+      roas: parseFloat(row.roas || '0'),
+      costPerLead: parseFloat(row.costPerLead || '0'),
+      cac: parseFloat(row.cac || '0'),
+      conversionRate: parseFloat(row.conversionRate || '0')
+    };
+  }
+
+  async getCampaignPerformance(startDate?: string, endDate?: string): Promise<CampaignPerformance[]> {
+    const result = await db.execute(sql`
+      WITH campaign_metrics AS (
+        SELECT 
+          c.campaign_id,
+          c.campaign_name,
+          c.objective,
+          c.status,
+          COALESCE(SUM(mi.spend), 0) as spend,
+          COALESCE(SUM(mi.impressions), 0) as impressions,
+          COALESCE(SUM(mi.clicks), 0) as clicks
+        FROM ${schema.metaCampaigns} c
+        LEFT JOIN ${schema.metaInsightsDaily} mi ON c.campaign_id = mi.campaign_id
+        WHERE 1=1
+          ${startDate ? sql`AND mi.date_start >= ${startDate}::date` : sql``}
+          ${endDate ? sql`AND mi.date_stop <= ${endDate}::date` : sql``}
+        GROUP BY c.campaign_id, c.campaign_name, c.objective, c.status
+      ),
+      campaign_crm AS (
+        SELECT 
+          utm_campaign as campaign_id,
+          COUNT(*) as leads,
+          COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as won,
+          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) END), 0) as won_value
+        FROM ${schema.crmDeal}
+        WHERE utm_campaign IS NOT NULL
+          ${startDate ? sql`AND date_create >= ${startDate}::timestamp` : sql``}
+          ${endDate ? sql`AND date_create <= ${endDate}::timestamp` : sql``}
+        GROUP BY utm_campaign
+      )
+      SELECT 
+        cm.campaign_id as "campaignId",
+        cm.campaign_name as "campaignName",
+        cm.objective,
+        cm.status,
+        cm.spend::numeric,
+        cm.impressions::bigint,
+        cm.clicks::bigint,
+        CASE 
+          WHEN cm.impressions > 0 THEN (cm.clicks::numeric / cm.impressions::numeric * 100)
+          ELSE 0 
+        END as ctr,
+        CASE 
+          WHEN cm.clicks > 0 THEN (cm.spend::numeric / cm.clicks::numeric)
+          ELSE 0 
+        END as cpc,
+        COALESCE(cc.leads, 0)::bigint as leads,
+        COALESCE(cc.won, 0)::bigint as won,
+        COALESCE(cc.won_value, 0)::numeric as "wonValue",
+        CASE 
+          WHEN cm.spend > 0 THEN (COALESCE(cc.won_value, 0)::numeric / cm.spend::numeric)
+          ELSE 0 
+        END as roas,
+        CASE 
+          WHEN COALESCE(cc.leads, 0) > 0 THEN (COALESCE(cc.won, 0)::numeric / COALESCE(cc.leads, 1)::numeric * 100)
+          ELSE 0 
+        END as "conversionRate"
+      FROM campaign_metrics cm
+      LEFT JOIN campaign_crm cc ON cm.campaign_id = cc.campaign_id
+      WHERE cm.spend > 0 OR cm.impressions > 0
+      ORDER BY cm.spend DESC
+    `);
+
+    return result.rows.map((row: any) => ({
+      campaignId: row.campaignId,
+      campaignName: row.campaignName || 'Sem nome',
+      objective: row.objective,
+      status: row.status,
+      spend: parseFloat(row.spend || '0'),
+      impressions: parseInt(row.impressions || '0'),
+      clicks: parseInt(row.clicks || '0'),
+      ctr: parseFloat(row.ctr || '0'),
+      cpc: parseFloat(row.cpc || '0'),
+      leads: parseInt(row.leads || '0'),
+      won: parseInt(row.won || '0'),
+      wonValue: parseFloat(row.wonValue || '0'),
+      roas: parseFloat(row.roas || '0'),
+      conversionRate: parseFloat(row.conversionRate || '0')
+    }));
+  }
+
+  async getAdsetPerformance(startDate?: string, endDate?: string): Promise<AdsetPerformance[]> {
+    const result = await db.execute(sql`
+      WITH adset_metrics AS (
+        SELECT 
+          a.adset_id,
+          a.adset_name,
+          a.status,
+          a.optimization_goal,
+          a.targeting_age_min,
+          a.targeting_age_max,
+          c.campaign_name,
+          COALESCE(SUM(mi.spend), 0) as spend,
+          COALESCE(SUM(mi.impressions), 0) as impressions,
+          COALESCE(SUM(mi.clicks), 0) as clicks
+        FROM ${schema.metaAdsets} a
+        LEFT JOIN ${schema.metaCampaigns} c ON a.campaign_id = c.campaign_id
+        LEFT JOIN ${schema.metaInsightsDaily} mi ON a.adset_id = mi.adset_id
+        WHERE 1=1
+          ${startDate ? sql`AND mi.date_start >= ${startDate}::date` : sql``}
+          ${endDate ? sql`AND mi.date_stop <= ${endDate}::date` : sql``}
+        GROUP BY a.adset_id, a.adset_name, a.status, a.optimization_goal, a.targeting_age_min, a.targeting_age_max, c.campaign_name
+      ),
+      adset_crm AS (
+        SELECT 
+          utm_term as adset_id,
+          COUNT(*) as leads,
+          COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as won,
+          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) END), 0) as won_value
+        FROM ${schema.crmDeal}
+        WHERE utm_term IS NOT NULL
+          ${startDate ? sql`AND date_create >= ${startDate}::timestamp` : sql``}
+          ${endDate ? sql`AND date_create <= ${endDate}::timestamp` : sql``}
+        GROUP BY utm_term
+      )
+      SELECT 
+        am.adset_id as "adsetId",
+        am.adset_name as "adsetName",
+        am.campaign_name as "campaignName",
+        am.status,
+        am.optimization_goal as "optimizationGoal",
+        am.targeting_age_min as "targetingAgeMin",
+        am.targeting_age_max as "targetingAgeMax",
+        am.spend::numeric,
+        am.impressions::bigint,
+        am.clicks::bigint,
+        CASE 
+          WHEN am.impressions > 0 THEN (am.clicks::numeric / am.impressions::numeric * 100)
+          ELSE 0 
+        END as ctr,
+        CASE 
+          WHEN am.clicks > 0 THEN (am.spend::numeric / am.clicks::numeric)
+          ELSE 0 
+        END as cpc,
+        COALESCE(ac.leads, 0)::bigint as leads,
+        COALESCE(ac.won, 0)::bigint as won,
+        COALESCE(ac.won_value, 0)::numeric as "wonValue",
+        CASE 
+          WHEN am.spend > 0 THEN (COALESCE(ac.won_value, 0)::numeric / am.spend::numeric)
+          ELSE 0 
+        END as roas,
+        CASE 
+          WHEN COALESCE(ac.leads, 0) > 0 THEN (COALESCE(ac.won, 0)::numeric / COALESCE(ac.leads, 1)::numeric * 100)
+          ELSE 0 
+        END as "conversionRate"
+      FROM adset_metrics am
+      LEFT JOIN adset_crm ac ON am.adset_id = ac.adset_id
+      WHERE am.spend > 0 OR am.impressions > 0
+      ORDER BY am.spend DESC
+    `);
+
+    return result.rows.map((row: any) => ({
+      adsetId: row.adsetId,
+      adsetName: row.adsetName || 'Sem nome',
+      campaignName: row.campaignName || 'Sem campanha',
+      status: row.status,
+      optimizationGoal: row.optimizationGoal,
+      targetingAgeMin: row.targetingAgeMin ? parseInt(row.targetingAgeMin) : null,
+      targetingAgeMax: row.targetingAgeMax ? parseInt(row.targetingAgeMax) : null,
+      spend: parseFloat(row.spend || '0'),
+      impressions: parseInt(row.impressions || '0'),
+      clicks: parseInt(row.clicks || '0'),
+      ctr: parseFloat(row.ctr || '0'),
+      cpc: parseFloat(row.cpc || '0'),
+      leads: parseInt(row.leads || '0'),
+      won: parseInt(row.won || '0'),
+      wonValue: parseFloat(row.wonValue || '0'),
+      roas: parseFloat(row.roas || '0'),
+      conversionRate: parseFloat(row.conversionRate || '0')
+    }));
+  }
+
+  async getAdPerformance(startDate?: string, endDate?: string): Promise<AdPerformance[]> {
+    const result = await db.execute(sql`
+      WITH ad_metrics AS (
+        SELECT 
+          a.ad_id,
+          a.ad_name,
+          a.status,
+          a.creative_id,
+          c.campaign_name,
+          ads.adset_name,
+          COALESCE(SUM(mi.spend), 0) as spend,
+          COALESCE(SUM(mi.impressions), 0) as impressions,
+          COALESCE(SUM(mi.clicks), 0) as clicks
+        FROM ${schema.metaAds} a
+        LEFT JOIN ${schema.metaCampaigns} c ON a.campaign_id = c.campaign_id
+        LEFT JOIN ${schema.metaAdsets} ads ON a.adset_id = ads.adset_id
+        LEFT JOIN ${schema.metaInsightsDaily} mi ON a.ad_id = mi.ad_id
+        WHERE 1=1
+          ${startDate ? sql`AND mi.date_start >= ${startDate}::date` : sql``}
+          ${endDate ? sql`AND mi.date_stop <= ${endDate}::date` : sql``}
+        GROUP BY a.ad_id, a.ad_name, a.status, a.creative_id, c.campaign_name, ads.adset_name
+      ),
+      ad_crm AS (
+        SELECT 
+          utm_content as ad_id,
+          COUNT(*) as leads,
+          COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as won,
+          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) END), 0) as won_value
+        FROM ${schema.crmDeal}
+        WHERE utm_content IS NOT NULL
+          ${startDate ? sql`AND date_create >= ${startDate}::timestamp` : sql``}
+          ${endDate ? sql`AND date_create <= ${endDate}::timestamp` : sql``}
+        GROUP BY utm_content
+      )
+      SELECT 
+        am.ad_id as "adId",
+        am.ad_name as "adName",
+        am.campaign_name as "campaignName",
+        am.adset_name as "adsetName",
+        am.status,
+        am.creative_id as "creativeId",
+        am.spend::numeric,
+        am.impressions::bigint,
+        am.clicks::bigint,
+        CASE 
+          WHEN am.impressions > 0 THEN (am.clicks::numeric / am.impressions::numeric * 100)
+          ELSE 0 
+        END as ctr,
+        CASE 
+          WHEN am.clicks > 0 THEN (am.spend::numeric / am.clicks::numeric)
+          ELSE 0 
+        END as cpc,
+        COALESCE(ac.leads, 0)::bigint as leads,
+        COALESCE(ac.won, 0)::bigint as won,
+        COALESCE(ac.won_value, 0)::numeric as "wonValue",
+        CASE 
+          WHEN am.spend > 0 THEN (COALESCE(ac.won_value, 0)::numeric / am.spend::numeric)
+          ELSE 0 
+        END as roas,
+        CASE 
+          WHEN COALESCE(ac.leads, 0) > 0 THEN (COALESCE(ac.won, 0)::numeric / COALESCE(ac.leads, 1)::numeric * 100)
+          ELSE 0 
+        END as "conversionRate"
+      FROM ad_metrics am
+      LEFT JOIN ad_crm ac ON am.ad_id = ac.ad_id
+      WHERE am.spend > 0 OR am.impressions > 0
+      ORDER BY am.spend DESC
+    `);
+
+    return result.rows.map((row: any) => ({
+      adId: row.adId,
+      adName: row.adName || 'Sem nome',
+      campaignName: row.campaignName || 'Sem campanha',
+      adsetName: row.adsetName || 'Sem adset',
+      status: row.status,
+      creativeId: row.creativeId,
+      spend: parseFloat(row.spend || '0'),
+      impressions: parseInt(row.impressions || '0'),
+      clicks: parseInt(row.clicks || '0'),
+      ctr: parseFloat(row.ctr || '0'),
+      cpc: parseFloat(row.cpc || '0'),
+      leads: parseInt(row.leads || '0'),
+      won: parseInt(row.won || '0'),
+      wonValue: parseFloat(row.wonValue || '0'),
+      roas: parseFloat(row.roas || '0'),
+      conversionRate: parseFloat(row.conversionRate || '0')
+    }));
+  }
+
+  async getCreativePerformance(startDate?: string, endDate?: string): Promise<CreativePerformance[]> {
+    const result = await db.execute(sql`
+      WITH creative_metrics AS (
+        SELECT 
+          cr.creative_id,
+          cr.creative_name,
+          cr.object_type,
+          cr.title,
+          cr.image_url,
+          cr.video_url,
+          COUNT(DISTINCT a.ad_id) as total_ads,
+          COALESCE(SUM(mi.spend), 0) as spend,
+          COALESCE(SUM(mi.impressions), 0) as impressions,
+          COALESCE(SUM(mi.clicks), 0) as clicks,
+          COALESCE(SUM(mi.video_p25_watched_actions), 0) as video_p25,
+          COALESCE(SUM(mi.video_p50_watched_actions), 0) as video_p50,
+          COALESCE(SUM(mi.video_p75_watched_actions), 0) as video_p75,
+          COALESCE(SUM(mi.video_p100_watched_actions), 0) as video_p100
+        FROM ${schema.metaCreatives} cr
+        LEFT JOIN ${schema.metaAds} a ON cr.creative_id = a.creative_id
+        LEFT JOIN ${schema.metaInsightsDaily} mi ON a.ad_id = mi.ad_id
+        WHERE 1=1
+          ${startDate ? sql`AND mi.date_start >= ${startDate}::date` : sql``}
+          ${endDate ? sql`AND mi.date_stop <= ${endDate}::date` : sql``}
+        GROUP BY cr.creative_id, cr.creative_name, cr.object_type, cr.title, cr.image_url, cr.video_url
+      ),
+      creative_crm AS (
+        SELECT 
+          a.creative_id,
+          COUNT(*) as leads,
+          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as won,
+          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_pontual, 0) + COALESCE(d.valor_recorrente, 0) END), 0) as won_value
+        FROM ${schema.crmDeal} d
+        JOIN ${schema.metaAds} a ON d.utm_content = a.ad_id
+        WHERE d.utm_content IS NOT NULL
+          ${startDate ? sql`AND d.date_create >= ${startDate}::timestamp` : sql``}
+          ${endDate ? sql`AND d.date_create <= ${endDate}::timestamp` : sql``}
+        GROUP BY a.creative_id
+      )
+      SELECT 
+        cm.creative_id as "creativeId",
+        cm.creative_name as "creativeName",
+        cm.object_type as "objectType",
+        cm.title,
+        cm.image_url as "imageUrl",
+        cm.video_url as "videoUrl",
+        cm.total_ads::bigint as "totalAds",
+        cm.spend::numeric,
+        cm.impressions::bigint,
+        cm.clicks::bigint,
+        CASE 
+          WHEN cm.impressions > 0 THEN (cm.clicks::numeric / cm.impressions::numeric * 100)
+          ELSE 0 
+        END as ctr,
+        cm.video_p25::bigint as "videoP25",
+        cm.video_p50::bigint as "videoP50",
+        cm.video_p75::bigint as "videoP75",
+        cm.video_p100::bigint as "videoP100",
+        COALESCE(cc.leads, 0)::bigint as leads,
+        COALESCE(cc.won, 0)::bigint as won,
+        COALESCE(cc.won_value, 0)::numeric as "wonValue",
+        CASE 
+          WHEN cm.spend > 0 THEN (COALESCE(cc.won_value, 0)::numeric / cm.spend::numeric)
+          ELSE 0 
+        END as roas
+      FROM creative_metrics cm
+      LEFT JOIN creative_crm cc ON cm.creative_id = cc.creative_id
+      WHERE cm.spend > 0 OR cm.impressions > 0
+      ORDER BY cm.spend DESC
+    `);
+
+    return result.rows.map((row: any) => ({
+      creativeId: row.creativeId,
+      creativeName: row.creativeName,
+      objectType: row.objectType,
+      title: row.title,
+      imageUrl: row.imageUrl,
+      videoUrl: row.videoUrl,
+      totalAds: parseInt(row.totalAds || '0'),
+      spend: parseFloat(row.spend || '0'),
+      impressions: parseInt(row.impressions || '0'),
+      clicks: parseInt(row.clicks || '0'),
+      ctr: parseFloat(row.ctr || '0'),
+      videoP25: parseInt(row.videoP25 || '0'),
+      videoP50: parseInt(row.videoP50 || '0'),
+      videoP75: parseInt(row.videoP75 || '0'),
+      videoP100: parseInt(row.videoP100 || '0'),
+      leads: parseInt(row.leads || '0'),
+      won: parseInt(row.won || '0'),
+      wonValue: parseFloat(row.wonValue || '0'),
+      roas: parseFloat(row.roas || '0')
+    }));
+  }
+
+  async getConversionFunnel(startDate?: string, endDate?: string): Promise<ConversionFunnel> {
+    const result = await db.execute(sql`
+      WITH funnel_data AS (
+        SELECT 
+          COALESCE(SUM(mi.impressions), 0) as impressions,
+          COALESCE(SUM(mi.clicks), 0) as clicks,
+          (
+            SELECT COUNT(*)
+            FROM ${schema.crmDeal}
+            WHERE utm_campaign IS NOT NULL
+              ${startDate ? sql`AND date_create >= ${startDate}::timestamp` : sql``}
+              ${endDate ? sql`AND date_create <= ${endDate}::timestamp` : sql``}
+          ) as leads,
+          (
+            SELECT COUNT(*)
+            FROM ${schema.crmDeal}
+            WHERE utm_campaign IS NOT NULL
+              AND stage_name = 'Negócio Ganho'
+              ${startDate ? sql`AND date_create >= ${startDate}::timestamp` : sql``}
+              ${endDate ? sql`AND date_create <= ${endDate}::timestamp` : sql``}
+          ) as won
+        FROM ${schema.metaInsightsDaily} mi
+        WHERE 1=1
+          ${startDate ? sql`AND mi.date_start >= ${startDate}::date` : sql``}
+          ${endDate ? sql`AND mi.date_stop <= ${endDate}::date` : sql``}
+      )
+      SELECT 
+        impressions::bigint,
+        clicks::bigint,
+        leads::bigint,
+        won::bigint,
+        CASE 
+          WHEN impressions > 0 THEN (clicks::numeric / impressions::numeric * 100)
+          ELSE 0 
+        END as "clickRate",
+        CASE 
+          WHEN clicks > 0 THEN (leads::numeric / clicks::numeric * 100)
+          ELSE 0 
+        END as "leadRate",
+        CASE 
+          WHEN leads > 0 THEN (won::numeric / leads::numeric * 100)
+          ELSE 0 
+        END as "wonRate"
+      FROM funnel_data
+    `);
+
+    const row = result.rows[0] as any;
+    return {
+      impressions: parseInt(row.impressions || '0'),
+      clicks: parseInt(row.clicks || '0'),
+      leads: parseInt(row.leads || '0'),
+      won: parseInt(row.won || '0'),
+      clickRate: parseFloat(row.clickRate || '0'),
+      leadRate: parseFloat(row.leadRate || '0'),
+      wonRate: parseFloat(row.wonRate || '0')
+    };
   }
 
   private calcularPeriodo(periodo: string): { dataInicio: string; dataFim: string } {
