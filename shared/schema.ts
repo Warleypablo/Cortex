@@ -397,3 +397,317 @@ export type InhireMetrics = {
   taxaConversao: number;
   tempoMedioContratacao: number;
 };
+
+// Meta Ads tables
+export const metaAccounts = pgTable("meta_accounts", {
+  accountId: varchar("account_id", { length: 50 }).primaryKey(),
+  accountName: varchar("account_name", { length: 255 }),
+  businessId: varchar("business_id", { length: 50 }),
+  currency: varchar("currency", { length: 10 }),
+  timezoneName: varchar("timezone_name", { length: 100 }),
+  accountStatus: varchar("account_status", { length: 50 }),
+  createdTime: timestamp("created_time"),
+  updatedTime: timestamp("updated_time"),
+  dataImportacao: timestamp("data_importacao"),
+  ativo: varchar("ativo", { length: 10 }),
+});
+
+export const metaCampaigns = pgTable("meta_campaigns", {
+  campaignId: varchar("campaign_id", { length: 50 }).primaryKey(),
+  accountId: varchar("account_id", { length: 50 }).notNull(),
+  campaignName: varchar("campaign_name", { length: 255 }).notNull(),
+  objective: varchar("objective", { length: 100 }),
+  status: varchar("status", { length: 50 }),
+  configuredStatus: varchar("configured_status", { length: 50 }),
+  effectiveStatus: varchar("effective_status", { length: 50 }),
+  buyingType: varchar("buying_type", { length: 50 }),
+  dailyBudget: decimal("daily_budget", { precision: 15, scale: 4 }),
+  lifetimeBudget: decimal("lifetime_budget", { precision: 15, scale: 4 }),
+  budgetRemaining: decimal("budget_remaining", { precision: 15, scale: 4 }),
+  spendCap: decimal("spend_cap", { precision: 15, scale: 4 }),
+  createdTime: timestamp("created_time"),
+  updatedTime: timestamp("updated_time"),
+  startTime: timestamp("start_time"),
+  stopTime: timestamp("stop_time"),
+  bidStrategy: varchar("bid_strategy", { length: 100 }),
+  dataImportacao: timestamp("data_importacao"),
+  dataAtualizacao: timestamp("data_atualizacao"),
+  ativo: varchar("ativo", { length: 10 }),
+});
+
+export const metaAdsets = pgTable("meta_adsets", {
+  adsetId: varchar("adset_id", { length: 50 }).primaryKey(),
+  campaignId: varchar("campaign_id", { length: 50 }).notNull(),
+  accountId: varchar("account_id", { length: 50 }).notNull(),
+  adsetName: varchar("adset_name", { length: 255 }).notNull(),
+  status: varchar("status", { length: 50 }),
+  configuredStatus: varchar("configured_status", { length: 50 }),
+  effectiveStatus: varchar("effective_status", { length: 50 }),
+  dailyBudget: decimal("daily_budget", { precision: 15, scale: 4 }),
+  lifetimeBudget: decimal("lifetime_budget", { precision: 15, scale: 4 }),
+  budgetRemaining: decimal("budget_remaining", { precision: 15, scale: 4 }),
+  bidAmount: decimal("bid_amount", { precision: 15, scale: 4 }),
+  bidStrategy: varchar("bid_strategy", { length: 100 }),
+  optimizationGoal: varchar("optimization_goal", { length: 100 }),
+  billingEvent: varchar("billing_event", { length: 100 }),
+  createdTime: timestamp("created_time"),
+  updatedTime: timestamp("updated_time"),
+  startTime: timestamp("start_time"),
+  endTime: timestamp("end_time"),
+  targetingAgeMin: integer("targeting_age_min"),
+  targetingAgeMax: integer("targeting_age_max"),
+  learningStageStatus: varchar("learning_stage_status", { length: 100 }),
+  learningStageConversions: integer("learning_stage_conversions"),
+  dataImportacao: timestamp("data_importacao"),
+  dataAtualizacao: timestamp("data_atualizacao"),
+  ativo: varchar("ativo", { length: 10 }),
+});
+
+export const metaAds = pgTable("meta_ads", {
+  adId: varchar("ad_id", { length: 50 }).primaryKey(),
+  adsetId: varchar("adset_id", { length: 50 }).notNull(),
+  campaignId: varchar("campaign_id", { length: 50 }).notNull(),
+  accountId: varchar("account_id", { length: 50 }).notNull(),
+  adName: varchar("ad_name", { length: 255 }).notNull(),
+  status: varchar("status", { length: 50 }),
+  configuredStatus: varchar("configured_status", { length: 50 }),
+  effectiveStatus: varchar("effective_status", { length: 50 }),
+  bidType: varchar("bid_type", { length: 50 }),
+  bidAmount: decimal("bid_amount", { precision: 15, scale: 4 }),
+  creativeId: varchar("creative_id", { length: 50 }),
+  createdTime: timestamp("created_time"),
+  updatedTime: timestamp("updated_time"),
+  demolinkHash: varchar("demolink_hash", { length: 255 }),
+  previewShareableLink: text("preview_shareable_link"),
+  dataImportacao: timestamp("data_importacao"),
+  dataAtualizacao: timestamp("data_atualizacao"),
+  ativo: varchar("ativo", { length: 10 }),
+});
+
+export const metaCreatives = pgTable("meta_creatives", {
+  creativeId: varchar("creative_id", { length: 50 }).primaryKey(),
+  accountId: varchar("account_id", { length: 50 }).notNull(),
+  creativeName: varchar("creative_name", { length: 255 }),
+  objectType: varchar("object_type", { length: 50 }),
+  status: varchar("status", { length: 50 }),
+  title: varchar("title", { length: 500 }),
+  body: text("body"),
+  callToActionType: varchar("call_to_action_type", { length: 100 }),
+  imageUrl: text("image_url"),
+  videoUrl: text("video_url"),
+  createdTime: timestamp("created_time"),
+  updatedTime: timestamp("updated_time"),
+  dataImportacao: timestamp("data_importacao"),
+  ativo: varchar("ativo", { length: 10 }),
+});
+
+export const metaInsightsDaily = pgTable("meta_insights_daily", {
+  id: integer("id").primaryKey(),
+  accountId: varchar("account_id", { length: 50 }).notNull(),
+  campaignId: varchar("campaign_id", { length: 50 }),
+  adsetId: varchar("adset_id", { length: 50 }),
+  adId: varchar("ad_id", { length: 50 }),
+  dateStart: date("date_start").notNull(),
+  dateStop: date("date_stop").notNull(),
+  impressions: integer("impressions"),
+  clicks: integer("clicks"),
+  spend: decimal("spend", { precision: 15, scale: 4 }),
+  reach: integer("reach"),
+  frequency: decimal("frequency", { precision: 10, scale: 4 }),
+  cpm: decimal("cpm", { precision: 10, scale: 4 }),
+  cpc: decimal("cpc", { precision: 10, scale: 4 }),
+  ctr: decimal("ctr", { precision: 10, scale: 6 }),
+  cpp: decimal("cpp", { precision: 10, scale: 4 }),
+  inlineLinkClicks: integer("inline_link_clicks"),
+  inlineLinkClickCtr: decimal("inline_link_click_ctr", { precision: 10, scale: 6 }),
+  outboundClicks: integer("outbound_clicks"),
+  outboundClicksCtr: decimal("outbound_clicks_ctr", { precision: 10, scale: 6 }),
+  uniqueClicks: integer("unique_clicks"),
+  uniqueCtr: decimal("unique_ctr", { precision: 10, scale: 6 }),
+  uniqueInlineLinkClicks: integer("unique_inline_link_clicks"),
+  uniqueInlineLinkClickCtr: decimal("unique_inline_link_click_ctr", { precision: 10, scale: 6 }),
+  conversions: integer("conversions"),
+  conversionRate: decimal("conversion_rate", { precision: 10, scale: 6 }),
+  costPerConversion: decimal("cost_per_conversion", { precision: 10, scale: 4 }),
+  videoPlayActions: integer("video_play_actions"),
+  videoP25WatchedActions: integer("video_p25_watched_actions"),
+  videoP50WatchedActions: integer("video_p50_watched_actions"),
+  videoP75WatchedActions: integer("video_p75_watched_actions"),
+  videoP100WatchedActions: integer("video_p100_watched_actions"),
+  videoAvgTimeWatchedActions: decimal("video_avg_time_watched_actions", { precision: 10, scale: 2 }),
+  purchaseRoas: decimal("purchase_roas", { precision: 10, scale: 4 }),
+  websitePurchaseRoas: decimal("website_purchase_roas", { precision: 10, scale: 4 }),
+  qualityRanking: varchar("quality_ranking", { length: 50 }),
+  engagementRateRanking: varchar("engagement_rate_ranking", { length: 50 }),
+  conversionRateRanking: varchar("conversion_rate_ranking", { length: 50 }),
+  dataImportacao: timestamp("data_importacao"),
+  hashDados: varchar("hash_dados", { length: 64 }),
+});
+
+// CRM Deal table
+export const crmDeal = pgTable("crm_deal", {
+  id: integer("id").primaryKey(),
+  dateCreate: timestamp("date_create"),
+  dateModify: timestamp("date_modify"),
+  createdById: integer("created_by_id"),
+  createdByName: text("created_by_name"),
+  createdBy: text("created_by"),
+  modifyById: integer("modify_by_id"),
+  modifiedByName: text("modified_by_name"),
+  modifiedBy: text("modified_by"),
+  assignedById: integer("assigned_by_id"),
+  assignedBy: text("assigned_by"),
+  companyId: integer("company_id"),
+  companyName: text("company_name"),
+  company: text("company"),
+  contactId: integer("contact_id"),
+  contactName: text("contact_name"),
+  contact: text("contact"),
+  title: text("title"),
+  categoryId: integer("category_id"),
+  categoryName: text("category_name"),
+  category: text("category"),
+  stageId: integer("stage_id"),
+  stageName: text("stage_name"),
+  stage: text("stage"),
+  stageSemantic: text("stage_semantic"),
+  comments: text("comments"),
+  createdAt: timestamp("created_at"),
+  updatedAt: timestamp("updated_at"),
+  assignedByName: text("assigned_by_name"),
+  closer: text("closer"),
+  sdr: text("sdr"),
+  funil: varchar("funil", { length: 255 }),
+  dataReuniaoRealizada: date("data_reuniao_realizada"),
+  faturamentoMensal: varchar("faturamento_mensal", { length: 255 }),
+  lpDaConversao: varchar("lp_da_conversao", { length: 255 }),
+  fonte: varchar("fonte", { length: 255 }),
+  valorPontual: decimal("valor_pontual", { precision: 15, scale: 2 }),
+  valorRecorrente: decimal("valor_recorrente", { precision: 15, scale: 2 }),
+  segmento: varchar("segmento", { length: 255 }),
+  lpConversao: text("lp_conversao"),
+  mql: text("mql"),
+  dataFechamento: date("data_fechamento"),
+  source: varchar("source", { length: 255 }),
+  empresa: varchar("empresa", { length: 255 }),
+  utmSource: varchar("utm_source", { length: 255 }),
+  utmCampaign: varchar("utm_campaign", { length: 255 }),
+  utmTerm: varchar("utm_term", { length: 255 }),
+  utmContent: varchar("utm_content", { length: 255 }),
+  fnlNgc: text("fnl_ngc"),
+});
+
+// Meta Ads + CRM types
+export type MetaAccount = typeof metaAccounts.$inferSelect;
+export type MetaCampaign = typeof metaCampaigns.$inferSelect;
+export type MetaAdset = typeof metaAdsets.$inferSelect;
+export type MetaAd = typeof metaAds.$inferSelect;
+export type MetaCreative = typeof metaCreatives.$inferSelect;
+export type MetaInsight = typeof metaInsightsDaily.$inferSelect;
+export type CrmDeal = typeof crmDeal.$inferSelect;
+
+// Meta Ads Analytics types
+export type MetaOverview = {
+  totalSpend: number;
+  totalImpressions: number;
+  totalClicks: number;
+  totalReach: number;
+  avgCtr: number;
+  avgCpc: number;
+  avgCpm: number;
+  totalLeads: number;
+  totalWon: number;
+  totalWonValue: number;
+  roas: number;
+  costPerLead: number;
+  cac: number;
+  conversionRate: number;
+};
+
+export type CampaignPerformance = {
+  campaignId: string;
+  campaignName: string;
+  objective: string | null;
+  status: string | null;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  leads: number;
+  won: number;
+  wonValue: number;
+  roas: number;
+  conversionRate: number;
+};
+
+export type AdsetPerformance = {
+  adsetId: string;
+  adsetName: string;
+  campaignName: string;
+  status: string | null;
+  optimizationGoal: string | null;
+  targetingAgeMin: number | null;
+  targetingAgeMax: number | null;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  leads: number;
+  won: number;
+  wonValue: number;
+  roas: number;
+  conversionRate: number;
+};
+
+export type AdPerformance = {
+  adId: string;
+  adName: string;
+  campaignName: string;
+  adsetName: string;
+  status: string | null;
+  creativeId: string | null;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  leads: number;
+  won: number;
+  wonValue: number;
+  roas: number;
+  conversionRate: number;
+};
+
+export type CreativePerformance = {
+  creativeId: string;
+  creativeName: string | null;
+  objectType: string | null;
+  title: string | null;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  totalAds: number;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  videoP25: number;
+  videoP50: number;
+  videoP75: number;
+  videoP100: number;
+  leads: number;
+  won: number;
+  wonValue: number;
+  roas: number;
+};
+
+export type ConversionFunnel = {
+  impressions: number;
+  clicks: number;
+  leads: number;
+  won: number;
+  clickRate: number;
+  leadRate: number;
+  wonRate: number;
+};

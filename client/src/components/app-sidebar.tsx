@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, Shield } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, Shield, Target } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -82,6 +82,11 @@ const dashboardItems = [
     title: "Inhire",
     url: "/dashboard/inhire",
     icon: UserCheck,
+  },
+  {
+    title: "Meta Ads",
+    url: "/dashboard/meta-ads",
+    icon: Target,
   },
   {
     title: "Análise de Retenção",

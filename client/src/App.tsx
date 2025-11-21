@@ -24,6 +24,7 @@ import DashboardGeG from "@/pages/DashboardGeG";
 import DashboardRetencao from "@/pages/DashboardRetencao";
 import DashboardDFC from "@/pages/DashboardDFC";
 import DashboardInhire from "@/pages/DashboardInhire";
+import MetaAds from "@/pages/MetaAds";
 import AdminUsuarios from "@/pages/AdminUsuarios";
 import AccessDenied from "@/pages/AccessDenied";
 import Login from "@/pages/Login";
@@ -114,6 +115,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/retencao">{() => <ProtectedRoute path="/dashboard/retencao" component={DashboardRetencao} />}</Route>
       <Route path="/dashboard/dfc">{() => <ProtectedRoute path="/dashboard/dfc" component={DashboardDFC} />}</Route>
       <Route path="/dashboard/inhire">{() => <ProtectedRoute path="/dashboard/inhire" component={DashboardInhire} />}</Route>
+      <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>
       <Route>
