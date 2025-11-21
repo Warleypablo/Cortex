@@ -41,6 +41,23 @@ Preferred communication style: Simple, everyday language.
         - **Month Filter**: Controls all metrics, passed as `mesAno` parameter (YYYY-MM format) with validation
         - **React Query**: Proper cache invalidation using `mesVisaoGeral` in query keys for automatic refetch
         - **API Endpoints**: `/api/visao-geral/metricas`, `/api/visao-geral/mrr-evolucao`, `/api/top-responsaveis`, `/api/top-squads`
+    - **Meta Ads Analytics Dashboard**: Comprehensive Meta advertising performance dashboard (`/dashboard/meta-ads`) correlating Meta Ads data with CRM conversion tracking:
+        - **Data Sources**: Integrates `meta_insights_daily`, `meta_campaigns`, `meta_adsets`, `meta_ads`, `meta_creatives` with `crm_deal` table
+        - **UTM Mapping Strategy**: 
+            - ✅ `utm_campaign` → `campaign_id` (campaign-level conversions)
+            - ✅ `utm_term` → `adset_id` (adset-level conversions)
+            - ❌ Ad/Creative-level: No tracking (crm_deal lacks `utm_content` field for ad_id)
+        - **Conversion Attribution**: Deals marked "Negócio Ganho" in stage_name contribute to won count and revenue (valor_pontual + valor_recorrente)
+        - **KPI Cards**: Total spend, impressions, clicks, reach, CTR, CPC, CPM, leads, conversions, revenue, ROAS, cost per lead, CAC, conversion rate
+        - **Conversion Funnel**: Recharts visualization showing Impressions → Clicks → Leads → Won with conversion rates
+        - **Analysis Tabs**:
+            - **Campaigns**: Full CRM attribution (utm_campaign mapping)
+            - **AdSets**: Full CRM attribution (utm_term mapping)
+            - **Ads**: Meta metrics only (spend, impressions, clicks, CTR, CPC) - no CRM data
+            - **Creatives**: Meta metrics + video engagement (P25/P50/P75/P100) - no CRM data
+        - **Period Filters**: 7/30/90/365 days with date range selection
+        - **Route**: `/dashboard/meta-ads` with RBAC protection
+        - **API Endpoints**: `/api/meta-ads/overview`, `/api/meta-ads/campaigns`, `/api/meta-ads/adsets`, `/api/meta-ads/ads`, `/api/meta-ads/creatives`, `/api/meta-ads/funnel`
 - **Theming**: Dark mode support via CSS variables; light mode is primary.
 
 ### Backend Architecture
@@ -48,11 +65,11 @@ Preferred communication style: Simple, everyday language.
 - **API**: RESTful API (`/api` prefix) with middleware for JSON parsing, URL encoding, and logging.
 - **Data Access**: Drizzle ORM for PostgreSQL, with an `IStorage` abstraction layer.
 - **Security**: Drizzle `sql`` template literals and `sql.join()` for all user-supplied parameters to prevent SQL injection.
-- **API Endpoints**: `/api/clientes`, `/api/contratos`, `/api/colaboradores`, `/api/dfc`, `/api/churn-por-servico`, `/api/churn-por-responsavel`, `/api/inhire/*`.
+- **API Endpoints**: `/api/clientes`, `/api/contratos`, `/api/colaboradores`, `/api/dfc`, `/api/churn-por-servico`, `/api/churn-por-responsavel`, `/api/inhire/*`, `/api/meta-ads/*`.
 
 ### Data Storage Solutions
 - **Primary Database**: Google Cloud SQL (PostgreSQL) for all business data (clients, contracts, employees, financial records).
-    - **Schema**: `caz_` tables for Conta Azul data (`caz_clientes`, `caz_parcelas`, `caz_categorias`), `cup_` tables for ClickUp data (`cup_clientes`, `cup_contratos`), `rh_pessoal` for employee data, and `rh_candidaturas`/`rh_vagas`/`rh_talentos` for Inhire recruitment analytics.
+    - **Schema**: `caz_` tables for Conta Azul data (`caz_clientes`, `caz_parcelas`, `caz_categorias`), `cup_` tables for ClickUp data (`cup_clientes`, `cup_contratos`, `cup_data_hist`), `rh_pessoal` for employee data, `rh_candidaturas`/`rh_vagas`/`rh_talentos` for Inhire recruitment analytics, and `meta_*` tables for Meta Ads data (`meta_insights_daily`, `meta_campaigns`, `meta_adsets`, `meta_ads`, `meta_creatives`, `crm_deal`).
     - **Key Relationships**: CNPJ links Conta Azul and ClickUp client data. `caz_parcelas` stores hierarchical category data in `categoria_nome`.
     - **Category Names**: `caz_categorias` table contains official category names in format "CODE DESCRIPTION" (e.g., "06.10 Despesas Administrativas"). The `nome` field is parsed to extract code and description separately.
 - **Authentication Database**: Replit Database for user authentication data (users, sessions).

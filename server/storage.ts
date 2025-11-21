@@ -3056,6 +3056,9 @@ export class DbStorage implements IStorage {
   }
 
   async getAdPerformance(startDate?: string, endDate?: string): Promise<AdPerformance[]> {
+    // NOTE: Ad-level CRM conversions are intentionally zeroed because crm_deal table
+    // lacks utm_content field (ad_id tracking). Only campaign/adset-level conversions
+    // are tracked via utm_campaign and utm_term respectively.
     const result = await db.execute(sql`
       SELECT 
         a.ad_id as "adId",
@@ -3113,6 +3116,9 @@ export class DbStorage implements IStorage {
   }
 
   async getCreativePerformance(startDate?: string, endDate?: string): Promise<CreativePerformance[]> {
+    // NOTE: Creative-level CRM conversions are intentionally zeroed because crm_deal table
+    // lacks utm_content field (ad_id tracking). Only campaign/adset-level conversions
+    // are tracked via utm_campaign and utm_term respectively.
     const result = await db.execute(sql`
       SELECT 
         cr.creative_id as "creativeId",
