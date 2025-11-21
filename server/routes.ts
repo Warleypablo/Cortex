@@ -747,6 +747,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/meta-ads/overview", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const overview = await storage.getMetaOverview(startDate, endDate);
+      res.json(overview);
+    } catch (error) {
+      console.error("[api] Error fetching Meta Ads overview:", error);
+      res.status(500).json({ error: "Failed to fetch Meta Ads overview" });
+    }
+  });
+
+  app.get("/api/meta-ads/campaigns", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const campaigns = await storage.getCampaignPerformance(startDate, endDate);
+      res.json(campaigns);
+    } catch (error) {
+      console.error("[api] Error fetching campaign performance:", error);
+      res.status(500).json({ error: "Failed to fetch campaign performance" });
+    }
+  });
+
+  app.get("/api/meta-ads/adsets", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const adsets = await storage.getAdsetPerformance(startDate, endDate);
+      res.json(adsets);
+    } catch (error) {
+      console.error("[api] Error fetching adset performance:", error);
+      res.status(500).json({ error: "Failed to fetch adset performance" });
+    }
+  });
+
+  app.get("/api/meta-ads/ads", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const ads = await storage.getAdPerformance(startDate, endDate);
+      res.json(ads);
+    } catch (error) {
+      console.error("[api] Error fetching ad performance:", error);
+      res.status(500).json({ error: "Failed to fetch ad performance" });
+    }
+  });
+
+  app.get("/api/meta-ads/creatives", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const creatives = await storage.getCreativePerformance(startDate, endDate);
+      res.json(creatives);
+    } catch (error) {
+      console.error("[api] Error fetching creative performance:", error);
+      res.status(500).json({ error: "Failed to fetch creative performance" });
+    }
+  });
+
+  app.get("/api/meta-ads/funnel", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const funnel = await storage.getConversionFunnel(startDate, endDate);
+      res.json(funnel);
+    } catch (error) {
+      console.error("[api] Error fetching conversion funnel:", error);
+      res.status(500).json({ error: "Failed to fetch conversion funnel" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
