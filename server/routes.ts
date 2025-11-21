@@ -545,6 +545,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/auditoria-sistemas", async (req, res) => {
+    try {
+      const filters: {
+        mesAno?: string;
+        dataInicio?: string;
+        dataFim?: string;
+        squad?: string;
+        apenasDivergentes?: boolean;
+        statusFiltro?: string;
+        threshold?: number;
+      } = {};
+      
+      if (req.query.mesAno) {
+        const mesAno = req.query.mesAno as string;
+        if (!/^\d{4}-\d{2}$/.test(mesAno)) {
+          return res.status(400).json({ error: "Invalid mesAno parameter. Expected format: YYYY-MM" });
+        }
+        filters.mesAno = mesAno;
+      }
+      
+      if (req.query.dataInicio) {
+        filters.dataInicio = req.query.dataInicio as string;
+      }
+      
+      if (req.query.dataFim) {
+        filters.dataFim = req.query.dataFim as string;
+      }
+      
+      if (req.query.squad && req.query.squad !== 'todos') {
+        filters.squad = req.query.squad as string;
+      }
+      
+      if (req.query.statusFiltro && req.query.statusFiltro !== 'todos') {
+        filters.statusFiltro = req.query.statusFiltro as string;
+      }
+      
+      if (req.query.apenasDivergentes === 'true') {
+        filters.apenasDivergentes = true;
+      }
+      
+      if (req.query.threshold) {
+        const threshold = parseFloat(req.query.threshold as string);
+        if (!isNaN(threshold)) {
+          filters.threshold = threshold;
+        }
+      }
+
+      const auditoriaData = await storage.getAuditoriaSistemas(filters);
+      res.json(auditoriaData);
+    } catch (error) {
+      console.error("[api] Error fetching auditoria sistemas:", error);
+      res.status(500).json({ error: "Failed to fetch auditoria sistemas data" });
+    }
+  });
+
   app.get("/api/geg/metricas", async (req, res) => {
     try {
       const periodo = req.query.periodo as string || 'trimestre';

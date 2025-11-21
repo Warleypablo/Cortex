@@ -711,3 +711,16 @@ export type ConversionFunnel = {
   leadRate: number;
   wonRate: number;
 };
+
+// Auditoria de Sistemas - Comparação ClickUp vs Conta Azul
+export type AuditoriaSistemas = {
+  cnpj: string;
+  nomeCliente: string;
+  valorClickUp: number;
+  valorContaAzul: number;
+  diferenca: number;
+  percentualDivergencia: number;
+  status: 'ok' | 'alerta' | 'critico';
+  quantidadeContratosClickUp: number;
+  quantidadeTitulosContaAzul: number;
+};

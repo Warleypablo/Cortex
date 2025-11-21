@@ -176,6 +176,7 @@ export interface IStorage {
   getAdPerformance(startDate?: string, endDate?: string): Promise<AdPerformance[]>;
   getCreativePerformance(startDate?: string, endDate?: string): Promise<CreativePerformance[]>;
   getConversionFunnel(startDate?: string, endDate?: string): Promise<ConversionFunnel>;
+  getAuditoriaSistemas(filters?: { mesAno?: string; dataInicio?: string; dataFim?: string; squad?: string; apenasDivergentes?: boolean; statusFiltro?: string; threshold?: number }): Promise<import("@shared/schema").AuditoriaSistemas[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -407,6 +408,10 @@ export class MemStorage implements IStorage {
   }
 
   async getConversionFunnel(startDate?: string, endDate?: string): Promise<ConversionFunnel> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getAuditoriaSistemas(filters?: { mesAno?: string; dataInicio?: string; dataFim?: string; squad?: string; apenasDivergentes?: boolean; statusFiltro?: string; threshold?: number }): Promise<import("@shared/schema").AuditoriaSistemas[]> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -3253,6 +3258,159 @@ export class DbStorage implements IStorage {
       leadRate: parseFloat(row.leadRate || '0'),
       wonRate: parseFloat(row.wonRate || '0')
     };
+  }
+
+  async getAuditoriaSistemas(filters?: { mesAno?: string; dataInicio?: string; dataFim?: string; squad?: string; apenasDivergentes?: boolean; statusFiltro?: string; threshold?: number }): Promise<import("@shared/schema").AuditoriaSistemas[]> {
+    const threshold = filters?.threshold || 5; // 5% padrão
+    
+    // Determinar período de filtro - processa cada limite independentemente
+    let dataInicio: Date | null = null;
+    let dataFim: Date | null = null;
+    
+    if (filters?.mesAno) {
+      // Filtro por mês específico: define ambos limites
+      const [ano, mes] = filters.mesAno.split('-').map(Number);
+      dataInicio = new Date(ano, mes - 1, 1);
+      dataFim = new Date(ano, mes, 0, 23, 59, 59);
+    } else {
+      // Filtros explícitos: aceita um ou ambos
+      if (filters?.dataInicio) {
+        dataInicio = new Date(filters.dataInicio);
+      }
+      if (filters?.dataFim) {
+        dataFim = new Date(filters.dataFim);
+      }
+    }
+    
+    // Conta Azul: filtra data_vencimento
+    const whereDataInicioCaz = dataInicio ? sql`caz.data_vencimento >= ${dataInicio.toISOString()}` : sql`1=1`;
+    const whereDataFimCaz = dataFim ? sql`caz.data_vencimento <= ${dataFim.toISOString()}` : sql`1=1`;
+    
+    // ClickUp: contrato está ativo no período se:
+    // - data_inicio <= fim do período (ou sem limite superior se dataFim não definido)
+    // - data_encerramento IS NULL OU data_encerramento >= início do período (ou sem limite inferior se dataInicio não definido)
+    const whereDataInicioCup = dataFim ? sql`cup.data_inicio <= ${dataFim.toISOString()}` : sql`1=1`;
+    const whereDataFimCup = dataInicio ? sql`(cup.data_encerramento IS NULL OR cup.data_encerramento >= ${dataInicio.toISOString()})` : sql`1=1`;
+    
+    // Filtro de squad (ClickUp)
+    const whereSquad = filters?.squad ? sql`cup.squad = ${filters.squad}` : sql`1=1`;
+    
+    const result = await db.execute(sql`
+      WITH clickup_agg AS (
+        SELECT 
+          CASE 
+            WHEN REGEXP_REPLACE(COALESCE(cli.cnpj, ''), '[^0-9]', '', 'g') = '' THEN 'SEM_CNPJ'
+            ELSE REGEXP_REPLACE(COALESCE(cli.cnpj, ''), '[^0-9]', '', 'g')
+          END as cnpj,
+          COALESCE(cli.nome, 'Cliente ClickUp') as nome_cliente,
+          COUNT(cup.id_subtask)::integer as quantidade_contratos,
+          COALESCE(SUM((COALESCE(cup.valorr, 0) + COALESCE(cup.valorp, 0))::numeric), 0) as valor_total
+        FROM ${schema.cupContratos} cup
+        LEFT JOIN ${schema.cupClientes} cli ON cup.id_task = cli.task_id
+        WHERE cup.status IN ('ativo', 'onboarding')
+          AND ${whereSquad}
+          AND ${whereDataInicioCup}
+          AND ${whereDataFimCup}
+        GROUP BY 
+          CASE 
+            WHEN REGEXP_REPLACE(COALESCE(cli.cnpj, ''), '[^0-9]', '', 'g') = '' THEN 'SEM_CNPJ'
+            ELSE REGEXP_REPLACE(COALESCE(cli.cnpj, ''), '[^0-9]', '', 'g')
+          END,
+          cli.nome
+      ),
+      contaazul_agg AS (
+        SELECT 
+          CASE 
+            WHEN REGEXP_REPLACE(COALESCE(cli.cnpj, ''), '[^0-9]', '', 'g') = '' THEN 'SEM_CNPJ'
+            ELSE REGEXP_REPLACE(COALESCE(cli.cnpj, ''), '[^0-9]', '', 'g')
+          END as cnpj,
+          COALESCE(cli.nome, 'Cliente Conta Azul') as nome_cliente,
+          COUNT(caz.id)::integer as quantidade_titulos,
+          COALESCE(SUM(caz.total::numeric), 0) as valor_total
+        FROM ${schema.cazReceber} caz
+        LEFT JOIN ${schema.cazClientes} cli ON caz.cliente_id = cli.id::text
+        WHERE ${whereDataInicioCaz}
+          AND ${whereDataFimCaz}
+          AND caz.status IN ('PENDING', 'OPEN', 'OVERDUE')
+        GROUP BY 
+          CASE 
+            WHEN REGEXP_REPLACE(COALESCE(cli.cnpj, ''), '[^0-9]', '', 'g') = '' THEN 'SEM_CNPJ'
+            ELSE REGEXP_REPLACE(COALESCE(cli.cnpj, ''), '[^0-9]', '', 'g')
+          END,
+          cli.nome
+      ),
+      combined AS (
+        SELECT 
+          COALESCE(cup.cnpj, caz.cnpj, 'SEM_CNPJ') as cnpj,
+          COALESCE(cup.nome_cliente, caz.nome_cliente, 'Cliente Desconhecido') as nome_cliente,
+          COALESCE(cup.valor_total, 0) as valor_clickup,
+          COALESCE(caz.valor_total, 0) as valor_contaazul,
+          COALESCE(cup.quantidade_contratos, 0) as quantidade_contratos,
+          COALESCE(caz.quantidade_titulos, 0) as quantidade_titulos
+        FROM clickup_agg cup
+        FULL OUTER JOIN contaazul_agg caz ON cup.cnpj = caz.cnpj
+      ),
+      calculated AS (
+        SELECT 
+          cnpj,
+          nome_cliente,
+          valor_clickup,
+          valor_contaazul,
+          (valor_contaazul - valor_clickup) as diferenca,
+          CASE 
+            WHEN valor_clickup > 0 THEN 
+              ABS((valor_contaazul - valor_clickup) / valor_clickup * 100)
+            WHEN valor_contaazul > 0 AND valor_clickup = 0 THEN 
+              ABS((valor_contaazul - valor_clickup) / valor_contaazul * 100)
+            ELSE 
+              0 
+          END as percentual_divergencia,
+          quantidade_contratos,
+          quantidade_titulos
+        FROM combined
+      )
+      SELECT 
+        cnpj,
+        nome_cliente,
+        valor_clickup,
+        valor_contaazul,
+        diferenca,
+        percentual_divergencia,
+        CASE 
+          WHEN percentual_divergencia <= ${threshold} THEN 'ok'
+          WHEN percentual_divergencia <= 20 THEN 'alerta'
+          ELSE 'critico'
+        END as status,
+        quantidade_contratos,
+        quantidade_titulos
+      FROM calculated
+      WHERE 1=1
+        ${filters?.apenasDivergentes 
+          ? sql`AND percentual_divergencia > ${threshold}` 
+          : sql``
+        }
+        ${filters?.statusFiltro === 'ok'
+          ? sql`AND percentual_divergencia <= ${threshold}`
+          : filters?.statusFiltro === 'alerta'
+          ? sql`AND percentual_divergencia > ${threshold} AND percentual_divergencia <= 20`
+          : filters?.statusFiltro === 'critico'
+          ? sql`AND percentual_divergencia > 20`
+          : sql``
+        }
+      ORDER BY percentual_divergencia DESC
+    `);
+    
+    return result.rows.map((row: any) => ({
+      cnpj: row.cnpj || '',
+      nomeCliente: row.nome_cliente || 'Cliente Desconhecido',
+      valorClickUp: parseFloat(row.valor_clickup || '0'),
+      valorContaAzul: parseFloat(row.valor_contaazul || '0'),
+      diferenca: parseFloat(row.diferenca || '0'),
+      percentualDivergencia: parseFloat(row.percentual_divergencia || '0'),
+      status: row.status || 'critico',
+      quantidadeContratosClickUp: parseInt(row.quantidade_contratos || '0'),
+      quantidadeTitulosContaAzul: parseInt(row.quantidade_titulos || '0'),
+    }));
   }
 
   private calcularPeriodo(periodo: string): { dataInicio: string; dataFim: string } {
