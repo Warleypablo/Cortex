@@ -468,9 +468,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const filters: { servicos?: string[]; mesInicio?: string; mesFim?: string } = {};
       
-      if (req.query.servico && req.query.servico !== 'todos') {
-        const servicoParam = req.query.servico as string;
-        filters.servicos = servicoParam.split(',').map(s => s.trim()).filter(Boolean);
+      if (req.query.produto && req.query.produto !== 'todos') {
+        const produtoParam = req.query.produto as string;
+        filters.servicos = produtoParam.split(',').map(s => s.trim()).filter(Boolean);
       }
       
       if (req.query.mesInicio) {

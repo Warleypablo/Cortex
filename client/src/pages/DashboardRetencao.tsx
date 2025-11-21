@@ -96,7 +96,7 @@ export default function DashboardRetencao() {
     queryKey: ["/api/churn-por-servico", churnFilterServicos, churnFilterMesInicio, churnFilterMesFim],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (churnFilterServicos.length > 0) params.append("servico", churnFilterServicos.join(","));
+      if (churnFilterServicos.length > 0) params.append("produto", churnFilterServicos.join(","));
       if (churnFilterMesInicio) params.append("mesInicio", churnFilterMesInicio);
       if (churnFilterMesFim) params.append("mesFim", churnFilterMesFim);
       
@@ -192,6 +192,14 @@ export default function DashboardRetencao() {
     if (!cohortData) return [];
     return cohortData.availableServicos || [];
   }, [cohortData]);
+
+  // Produtos únicos para o filtro de churn (vem dos dados de churn)
+  const uniqueProdutos = useMemo(() => {
+    if (!churnData) return [];
+    const produtos = new Set<string>();
+    churnData.forEach(item => produtos.add(item.servico));
+    return Array.from(produtos).sort();
+  }, [churnData]);
 
   const uniqueSquads = useMemo(() => {
     if (!cohortData) return [];
@@ -583,12 +591,12 @@ export default function DashboardRetencao() {
               {/* Filtros */}
               <div className="flex flex-wrap gap-4 mb-6">
                 <div className="flex-1 min-w-[250px]">
-                  <label className="text-sm font-medium mb-2 block">Serviços</label>
+                  <label className="text-sm font-medium mb-2 block">Produtos</label>
                   <MultiSelect
-                    options={uniqueServicos}
+                    options={uniqueProdutos}
                     selected={churnFilterServicos}
                     onChange={handleChurnServicosChange}
-                    placeholder="Todos os serviços"
+                    placeholder="Todos os produtos"
                   />
                 </div>
                 <div className="flex-1 min-w-[180px]">
@@ -658,7 +666,7 @@ export default function DashboardRetencao() {
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
-                        <th className="p-3 text-left font-semibold sticky left-0 bg-muted/50 z-10">Serviço</th>
+                        <th className="p-3 text-left font-semibold sticky left-0 bg-muted/50 z-10">Produto</th>
                         {churnTableData.meses.map(mes => {
                           const [ano, mesNum] = mes.split('-');
                           const data = new Date(parseInt(ano), parseInt(mesNum) - 1);
