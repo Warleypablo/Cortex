@@ -169,6 +169,7 @@ export interface IStorage {
   getInhireSourceDistribution(): Promise<InhireSourceDistribution[]>;
   getInhireFunnel(): Promise<InhireFunnel[]>;
   getInhireVagasComCandidaturas(limit?: number): Promise<InhireVagaComCandidaturas[]>;
+  getMetaDateRange(): Promise<{ minDate: string; maxDate: string }>;
   getMetaOverview(startDate?: string, endDate?: string): Promise<MetaOverview>;
   getCampaignPerformance(startDate?: string, endDate?: string): Promise<CampaignPerformance[]>;
   getAdsetPerformance(startDate?: string, endDate?: string): Promise<AdsetPerformance[]>;
@@ -378,6 +379,10 @@ export class MemStorage implements IStorage {
   }
 
   async getTopSquads(limit?: number, mesAno?: string): Promise<{ squad: string; mrr: number; posicao: number }[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getMetaDateRange(): Promise<{ minDate: string; maxDate: string }> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -2800,6 +2805,21 @@ export class DbStorage implements IStorage {
         }))
       };
     });
+  }
+
+  async getMetaDateRange(): Promise<{ minDate: string; maxDate: string }> {
+    const result = await db.execute(sql`
+      SELECT 
+        MIN(date_start)::text as "minDate",
+        MAX(date_stop)::text as "maxDate"
+      FROM ${schema.metaInsightsDaily}
+    `);
+    
+    const row = result.rows[0] as any;
+    return {
+      minDate: row.minDate || '',
+      maxDate: row.maxDate || ''
+    };
   }
 
   async getMetaOverview(startDate?: string, endDate?: string): Promise<MetaOverview> {

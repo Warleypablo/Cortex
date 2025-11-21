@@ -747,6 +747,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/meta-ads/date-range", async (req, res) => {
+    try {
+      const dateRange = await storage.getMetaDateRange();
+      res.json(dateRange);
+    } catch (error) {
+      console.error("[api] Error fetching Meta Ads date range:", error);
+      res.status(500).json({ error: "Failed to fetch Meta Ads date range" });
+    }
+  });
+
   app.get("/api/meta-ads/overview", async (req, res) => {
     try {
       const startDate = req.query.startDate as string | undefined;

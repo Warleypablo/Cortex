@@ -11,9 +11,20 @@ import type { MetaOverview, CampaignPerformance, AdsetPerformance, AdPerformance
 export default function MetaAds() {
   const [periodo, setPeriodo] = useState<string>("30");
 
+  // Busca o range de datas disponível no banco
+  const { data: dataRange } = useQuery<{ minDate: string; maxDate: string }>({
+    queryKey: ['/api/meta-ads/date-range'],
+    queryFn: async () => {
+      const response = await fetch('/api/meta-ads/date-range');
+      if (!response.ok) throw new Error('Failed to fetch date range');
+      return response.json();
+    },
+  });
+
   const getDateRange = () => {
-    const endDate = new Date();
-    const startDate = new Date();
+    // Usa a última data disponível como referência ao invés de "hoje"
+    const endDate = dataRange?.maxDate ? new Date(dataRange.maxDate) : new Date();
+    const startDate = new Date(endDate);
     
     switch(periodo) {
       case "7":
