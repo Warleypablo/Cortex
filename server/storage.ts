@@ -3328,10 +3328,10 @@ export class DbStorage implements IStorage {
           COUNT(caz.id)::integer as quantidade_titulos,
           COALESCE(SUM(caz.total::numeric), 0) as valor_total
         FROM ${schema.cazReceber} caz
-        LEFT JOIN ${schema.cazClientes} cli ON caz.cliente_id = cli.id::text
+        LEFT JOIN ${schema.cazClientes} cli ON caz.cliente_id = cli.ids
         WHERE ${whereDataInicioCaz}
           AND ${whereDataFimCaz}
-          AND caz.status IN ('PENDING', 'OPEN', 'OVERDUE')
+          AND UPPER(caz.status) IN ('PAGO', 'ACQUITTED', 'PENDING', 'OPEN', 'OVERDUE')
         GROUP BY 
           CASE 
             WHEN REGEXP_REPLACE(COALESCE(cli.cnpj, ''), '[^0-9]', '', 'g') = '' THEN 'SEM_CNPJ'
