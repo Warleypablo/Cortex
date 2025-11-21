@@ -3057,71 +3057,39 @@ export class DbStorage implements IStorage {
 
   async getAdPerformance(startDate?: string, endDate?: string): Promise<AdPerformance[]> {
     const result = await db.execute(sql`
-      WITH ad_metrics AS (
-        SELECT 
-          a.ad_id,
-          a.ad_name,
-          a.status,
-          a.creative_id,
-          c.campaign_name,
-          ads.adset_name,
-          COALESCE(SUM(mi.spend), 0) as spend,
-          COALESCE(SUM(mi.impressions), 0) as impressions,
-          COALESCE(SUM(mi.clicks), 0) as clicks
-        FROM ${schema.metaAds} a
-        LEFT JOIN ${schema.metaCampaigns} c ON a.campaign_id = c.campaign_id
-        LEFT JOIN ${schema.metaAdsets} ads ON a.adset_id = ads.adset_id
-        LEFT JOIN ${schema.metaInsightsDaily} mi ON a.ad_id = mi.ad_id
-        WHERE 1=1
-          ${startDate ? sql`AND mi.date_start >= ${startDate}::date` : sql``}
-          ${endDate ? sql`AND mi.date_stop <= ${endDate}::date` : sql``}
-        GROUP BY a.ad_id, a.ad_name, a.status, a.creative_id, c.campaign_name, ads.adset_name
-      ),
-      ad_crm AS (
-        SELECT 
-          utm_content as ad_id,
-          COUNT(*) as leads,
-          COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as won,
-          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) END), 0) as won_value
-        FROM ${schema.crmDeal}
-        WHERE utm_content IS NOT NULL
-          ${startDate ? sql`AND date_create >= ${startDate}::timestamp` : sql``}
-          ${endDate ? sql`AND date_create <= ${endDate}::timestamp` : sql``}
-        GROUP BY utm_content
-      )
       SELECT 
-        am.ad_id as "adId",
-        am.ad_name as "adName",
-        am.campaign_name as "campaignName",
-        am.adset_name as "adsetName",
-        am.status,
-        am.creative_id as "creativeId",
-        am.spend::numeric,
-        am.impressions::bigint,
-        am.clicks::bigint,
+        a.ad_id as "adId",
+        a.ad_name as "adName",
+        c.campaign_name as "campaignName",
+        ads.adset_name as "adsetName",
+        a.status,
+        a.creative_id as "creativeId",
+        COALESCE(SUM(mi.spend), 0)::numeric as spend,
+        COALESCE(SUM(mi.impressions), 0)::bigint as impressions,
+        COALESCE(SUM(mi.clicks), 0)::bigint as clicks,
         CASE 
-          WHEN am.impressions > 0 THEN (am.clicks::numeric / am.impressions::numeric * 100)
+          WHEN COALESCE(SUM(mi.impressions), 0) > 0 THEN (COALESCE(SUM(mi.clicks), 0)::numeric / COALESCE(SUM(mi.impressions), 1)::numeric * 100)
           ELSE 0 
         END as ctr,
         CASE 
-          WHEN am.clicks > 0 THEN (am.spend::numeric / am.clicks::numeric)
+          WHEN COALESCE(SUM(mi.clicks), 0) > 0 THEN (COALESCE(SUM(mi.spend), 0)::numeric / COALESCE(SUM(mi.clicks), 1)::numeric)
           ELSE 0 
         END as cpc,
-        COALESCE(ac.leads, 0)::bigint as leads,
-        COALESCE(ac.won, 0)::bigint as won,
-        COALESCE(ac.won_value, 0)::numeric as "wonValue",
-        CASE 
-          WHEN am.spend > 0 THEN (COALESCE(ac.won_value, 0)::numeric / am.spend::numeric)
-          ELSE 0 
-        END as roas,
-        CASE 
-          WHEN COALESCE(ac.leads, 0) > 0 THEN (COALESCE(ac.won, 0)::numeric / COALESCE(ac.leads, 1)::numeric * 100)
-          ELSE 0 
-        END as "conversionRate"
-      FROM ad_metrics am
-      LEFT JOIN ad_crm ac ON am.ad_id = ac.ad_id
-      WHERE am.spend > 0 OR am.impressions > 0
-      ORDER BY am.spend DESC
+        0::bigint as leads,
+        0::bigint as won,
+        0::numeric as "wonValue",
+        0::numeric as roas,
+        0::numeric as "conversionRate"
+      FROM ${schema.metaAds} a
+      LEFT JOIN ${schema.metaCampaigns} c ON a.campaign_id = c.campaign_id
+      LEFT JOIN ${schema.metaAdsets} ads ON a.adset_id = ads.adset_id
+      LEFT JOIN ${schema.metaInsightsDaily} mi ON a.ad_id = mi.ad_id
+      WHERE 1=1
+        ${startDate ? sql`AND mi.date_start >= ${startDate}::date` : sql``}
+        ${endDate ? sql`AND mi.date_stop <= ${endDate}::date` : sql``}
+      GROUP BY a.ad_id, a.ad_name, a.status, a.creative_id, c.campaign_name, ads.adset_name
+      HAVING COALESCE(SUM(mi.spend), 0) > 0 OR COALESCE(SUM(mi.impressions), 0) > 0
+      ORDER BY COALESCE(SUM(mi.spend), 0) DESC
     `);
 
     return result.rows.map((row: any) => ({
@@ -3146,73 +3114,38 @@ export class DbStorage implements IStorage {
 
   async getCreativePerformance(startDate?: string, endDate?: string): Promise<CreativePerformance[]> {
     const result = await db.execute(sql`
-      WITH creative_metrics AS (
-        SELECT 
-          cr.creative_id,
-          cr.creative_name,
-          cr.object_type,
-          cr.title,
-          cr.image_url,
-          cr.video_url,
-          COUNT(DISTINCT a.ad_id) as total_ads,
-          COALESCE(SUM(mi.spend), 0) as spend,
-          COALESCE(SUM(mi.impressions), 0) as impressions,
-          COALESCE(SUM(mi.clicks), 0) as clicks,
-          COALESCE(SUM(mi.video_p25_watched_actions), 0) as video_p25,
-          COALESCE(SUM(mi.video_p50_watched_actions), 0) as video_p50,
-          COALESCE(SUM(mi.video_p75_watched_actions), 0) as video_p75,
-          COALESCE(SUM(mi.video_p100_watched_actions), 0) as video_p100
-        FROM ${schema.metaCreatives} cr
-        LEFT JOIN ${schema.metaAds} a ON cr.creative_id = a.creative_id
-        LEFT JOIN ${schema.metaInsightsDaily} mi ON a.ad_id = mi.ad_id
-        WHERE 1=1
-          ${startDate ? sql`AND mi.date_start >= ${startDate}::date` : sql``}
-          ${endDate ? sql`AND mi.date_stop <= ${endDate}::date` : sql``}
-        GROUP BY cr.creative_id, cr.creative_name, cr.object_type, cr.title, cr.image_url, cr.video_url
-      ),
-      creative_crm AS (
-        SELECT 
-          a.creative_id,
-          COUNT(*) as leads,
-          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as won,
-          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_pontual, 0) + COALESCE(d.valor_recorrente, 0) END), 0) as won_value
-        FROM ${schema.crmDeal} d
-        JOIN ${schema.metaAds} a ON d.utm_content = a.ad_id
-        WHERE d.utm_content IS NOT NULL
-          ${startDate ? sql`AND d.date_create >= ${startDate}::timestamp` : sql``}
-          ${endDate ? sql`AND d.date_create <= ${endDate}::timestamp` : sql``}
-        GROUP BY a.creative_id
-      )
       SELECT 
-        cm.creative_id as "creativeId",
-        cm.creative_name as "creativeName",
-        cm.object_type as "objectType",
-        cm.title,
-        cm.image_url as "imageUrl",
-        cm.video_url as "videoUrl",
-        cm.total_ads::bigint as "totalAds",
-        cm.spend::numeric,
-        cm.impressions::bigint,
-        cm.clicks::bigint,
+        cr.creative_id as "creativeId",
+        cr.creative_name as "creativeName",
+        cr.object_type as "objectType",
+        cr.title,
+        cr.image_url as "imageUrl",
+        cr.video_url as "videoUrl",
+        COUNT(DISTINCT a.ad_id)::bigint as "totalAds",
+        COALESCE(SUM(mi.spend), 0)::numeric as spend,
+        COALESCE(SUM(mi.impressions), 0)::bigint as impressions,
+        COALESCE(SUM(mi.clicks), 0)::bigint as clicks,
         CASE 
-          WHEN cm.impressions > 0 THEN (cm.clicks::numeric / cm.impressions::numeric * 100)
+          WHEN COALESCE(SUM(mi.impressions), 0) > 0 THEN (COALESCE(SUM(mi.clicks), 0)::numeric / COALESCE(SUM(mi.impressions), 1)::numeric * 100)
           ELSE 0 
         END as ctr,
-        cm.video_p25::bigint as "videoP25",
-        cm.video_p50::bigint as "videoP50",
-        cm.video_p75::bigint as "videoP75",
-        cm.video_p100::bigint as "videoP100",
-        COALESCE(cc.leads, 0)::bigint as leads,
-        COALESCE(cc.won, 0)::bigint as won,
-        COALESCE(cc.won_value, 0)::numeric as "wonValue",
-        CASE 
-          WHEN cm.spend > 0 THEN (COALESCE(cc.won_value, 0)::numeric / cm.spend::numeric)
-          ELSE 0 
-        END as roas
-      FROM creative_metrics cm
-      LEFT JOIN creative_crm cc ON cm.creative_id = cc.creative_id
-      WHERE cm.spend > 0 OR cm.impressions > 0
-      ORDER BY cm.spend DESC
+        COALESCE(SUM(mi.video_p25_watched_actions), 0)::bigint as "videoP25",
+        COALESCE(SUM(mi.video_p50_watched_actions), 0)::bigint as "videoP50",
+        COALESCE(SUM(mi.video_p75_watched_actions), 0)::bigint as "videoP75",
+        COALESCE(SUM(mi.video_p100_watched_actions), 0)::bigint as "videoP100",
+        0::bigint as leads,
+        0::bigint as won,
+        0::numeric as "wonValue",
+        0::numeric as roas
+      FROM ${schema.metaCreatives} cr
+      LEFT JOIN ${schema.metaAds} a ON cr.creative_id = a.creative_id
+      LEFT JOIN ${schema.metaInsightsDaily} mi ON a.ad_id = mi.ad_id
+      WHERE 1=1
+        ${startDate ? sql`AND mi.date_start >= ${startDate}::date` : sql``}
+        ${endDate ? sql`AND mi.date_stop <= ${endDate}::date` : sql``}
+      GROUP BY cr.creative_id, cr.creative_name, cr.object_type, cr.title, cr.image_url, cr.video_url
+      HAVING COALESCE(SUM(mi.spend), 0) > 0 OR COALESCE(SUM(mi.impressions), 0) > 0
+      ORDER BY COALESCE(SUM(mi.spend), 0) DESC
     `);
 
     return result.rows.map((row: any) => ({
