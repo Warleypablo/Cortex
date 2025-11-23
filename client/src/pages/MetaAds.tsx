@@ -3,13 +3,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DollarSign, Eye, MousePointer, Users, TrendingUp, Target, Smartphone, Image, Video } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DollarSign, Eye, MousePointer, Users, TrendingUp, Target, Smartphone, Image, Video, Filter, X } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, FunnelChart, Funnel, LabelList } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import type { MetaOverview, CampaignPerformance, AdsetPerformance, AdPerformance, CreativePerformance, ConversionFunnel } from "@shared/schema";
+import type { MetaOverview, CampaignPerformance, AdsetPerformance, AdPerformance, CreativePerformance, ConversionFunnel, MetaLeadFilters } from "@shared/schema";
 
 export default function MetaAds() {
   const [periodo, setPeriodo] = useState<string>("30");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedStages, setSelectedStages] = useState<string[]>([]);
+  const [selectedUtmSources, setSelectedUtmSources] = useState<string[]>([]);
+  const [selectedUtmCampaigns, setSelectedUtmCampaigns] = useState<string[]>([]);
+  const [selectedUtmTerms, setSelectedUtmTerms] = useState<string[]>([]);
 
   // Busca o range de datas disponível no banco
   const { data: dataRange } = useQuery<{ minDate: string; maxDate: string }>({
@@ -20,6 +30,46 @@ export default function MetaAds() {
       return response.json();
     },
   });
+
+  // Busca as opções de filtros de leads
+  const { data: leadFilters } = useQuery<MetaLeadFilters>({
+    queryKey: ['/api/meta-ads/filtros-leads'],
+    queryFn: async () => {
+      const response = await fetch('/api/meta-ads/filtros-leads');
+      if (!response.ok) throw new Error('Failed to fetch lead filters');
+      return response.json();
+    },
+  });
+
+  // Função auxiliar para construir query params com filtros
+  const buildQueryParams = (startDate: string, endDate: string) => {
+    const params = new URLSearchParams();
+    params.append('startDate', startDate);
+    params.append('endDate', endDate);
+
+    // Append each value individually for array-style query params
+    selectedCategories.forEach(category => params.append('categoryNames', category));
+    selectedStages.forEach(stage => params.append('stageNames', stage));
+    selectedUtmSources.forEach(source => params.append('utmSources', source));
+    selectedUtmCampaigns.forEach(campaign => params.append('utmCampaigns', campaign));
+    selectedUtmTerms.forEach(term => params.append('utmTerms', term));
+
+    const queryString = params.toString();
+    return queryString || '';
+  };
+
+  // Limpar todos os filtros
+  const clearAllFilters = () => {
+    setSelectedCategories([]);
+    setSelectedStages([]);
+    setSelectedUtmSources([]);
+    setSelectedUtmCampaigns([]);
+    setSelectedUtmTerms([]);
+  };
+
+  // Conta total de filtros ativos
+  const activeFiltersCount = selectedCategories.length + selectedStages.length + 
+    selectedUtmSources.length + selectedUtmCampaigns.length + selectedUtmTerms.length;
 
   const getDateRange = () => {
     // Usa a última data disponível como referência ao invés de "hoje"
@@ -52,36 +102,40 @@ export default function MetaAds() {
   const dateRange = getDateRange();
 
   const { data: overview, isLoading: isLoadingOverview } = useQuery<MetaOverview>({
-    queryKey: ['/api/meta-ads/overview', dateRange.startDate, dateRange.endDate],
+    queryKey: ['/api/meta-ads/overview', dateRange.startDate, dateRange.endDate, selectedCategories, selectedStages, selectedUtmSources, selectedUtmCampaigns, selectedUtmTerms],
     queryFn: async () => {
-      const response = await fetch(`/api/meta-ads/overview?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const queryParams = buildQueryParams(dateRange.startDate, dateRange.endDate);
+      const response = await fetch(`/api/meta-ads/overview?${queryParams}`);
       if (!response.ok) throw new Error('Failed to fetch overview');
       return response.json();
     },
   });
 
   const { data: campaigns, isLoading: isLoadingCampaigns } = useQuery<CampaignPerformance[]>({
-    queryKey: ['/api/meta-ads/campaigns', dateRange.startDate, dateRange.endDate],
+    queryKey: ['/api/meta-ads/campaigns', dateRange.startDate, dateRange.endDate, selectedCategories, selectedStages, selectedUtmSources, selectedUtmCampaigns, selectedUtmTerms],
     queryFn: async () => {
-      const response = await fetch(`/api/meta-ads/campaigns?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const queryParams = buildQueryParams(dateRange.startDate, dateRange.endDate);
+      const response = await fetch(`/api/meta-ads/campaigns?${queryParams}`);
       if (!response.ok) throw new Error('Failed to fetch campaigns');
       return response.json();
     },
   });
 
   const { data: adsets, isLoading: isLoadingAdsets } = useQuery<AdsetPerformance[]>({
-    queryKey: ['/api/meta-ads/adsets', dateRange.startDate, dateRange.endDate],
+    queryKey: ['/api/meta-ads/adsets', dateRange.startDate, dateRange.endDate, selectedCategories, selectedStages, selectedUtmSources, selectedUtmCampaigns, selectedUtmTerms],
     queryFn: async () => {
-      const response = await fetch(`/api/meta-ads/adsets?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const queryParams = buildQueryParams(dateRange.startDate, dateRange.endDate);
+      const response = await fetch(`/api/meta-ads/adsets?${queryParams}`);
       if (!response.ok) throw new Error('Failed to fetch adsets');
       return response.json();
     },
   });
 
   const { data: ads, isLoading: isLoadingAds } = useQuery<AdPerformance[]>({
-    queryKey: ['/api/meta-ads/ads', dateRange.startDate, dateRange.endDate],
+    queryKey: ['/api/meta-ads/ads', dateRange.startDate, dateRange.endDate, selectedCategories, selectedStages, selectedUtmSources, selectedUtmCampaigns, selectedUtmTerms],
     queryFn: async () => {
-      const response = await fetch(`/api/meta-ads/ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const queryParams = buildQueryParams(dateRange.startDate, dateRange.endDate);
+      const response = await fetch(`/api/meta-ads/ads?${queryParams}`);
       if (!response.ok) throw new Error('Failed to fetch ads');
       return response.json();
     },
@@ -97,9 +151,10 @@ export default function MetaAds() {
   });
 
   const { data: funnel, isLoading: isLoadingFunnel } = useQuery<ConversionFunnel>({
-    queryKey: ['/api/meta-ads/funnel', dateRange.startDate, dateRange.endDate],
+    queryKey: ['/api/meta-ads/funnel', dateRange.startDate, dateRange.endDate, selectedCategories, selectedStages, selectedUtmSources, selectedUtmCampaigns, selectedUtmTerms],
     queryFn: async () => {
-      const response = await fetch(`/api/meta-ads/funnel?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const queryParams = buildQueryParams(dateRange.startDate, dateRange.endDate);
+      const response = await fetch(`/api/meta-ads/funnel?${queryParams}`);
       if (!response.ok) throw new Error('Failed to fetch funnel');
       return response.json();
     },
@@ -155,6 +210,294 @@ export default function MetaAds() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Filtros de Leads */}
+          <Card className="mt-6" data-testid="card-filtros-leads">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Filter className="h-5 w-5" />
+                    Filtros de Conversões CRM
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Filtre as métricas de conversão (leads, vendas, ROAS). Não afeta métricas Meta (gasto, impressões)
+                  </CardDescription>
+                </div>
+                {activeFiltersCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllFilters}
+                    data-testid="button-limpar-filtros"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Limpar {activeFiltersCount} filtro{activeFiltersCount > 1 ? 's' : ''}
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3">
+                {/* Filtro de Categoria */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid="button-filtro-categoria">
+                      Categoria
+                      {selectedCategories.length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {selectedCategories.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[250px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar categoria..." />
+                      <CommandEmpty>Nenhuma categoria encontrada</CommandEmpty>
+                      <CommandGroup className="max-h-64 overflow-auto">
+                        {leadFilters?.categories.map((category) => (
+                          <CommandItem
+                            key={category}
+                            onSelect={() => {
+                              setSelectedCategories(prev =>
+                                prev.includes(category)
+                                  ? prev.filter(c => c !== category)
+                                  : [...prev, category]
+                              );
+                            }}
+                          >
+                            <Checkbox
+                              checked={selectedCategories.includes(category)}
+                              className="mr-2"
+                            />
+                            <span>{category}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Filtro de Estágio */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid="button-filtro-estagio">
+                      Estágio
+                      {selectedStages.length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {selectedStages.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[250px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar estágio..." />
+                      <CommandEmpty>Nenhum estágio encontrado</CommandEmpty>
+                      <CommandGroup className="max-h-64 overflow-auto">
+                        {leadFilters?.stages.map((stage) => (
+                          <CommandItem
+                            key={stage}
+                            onSelect={() => {
+                              setSelectedStages(prev =>
+                                prev.includes(stage)
+                                  ? prev.filter(s => s !== stage)
+                                  : [...prev, stage]
+                              );
+                            }}
+                          >
+                            <Checkbox
+                              checked={selectedStages.includes(stage)}
+                              className="mr-2"
+                            />
+                            <span>{stage}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Filtro de UTM Source */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid="button-filtro-utm-source">
+                      UTM Source
+                      {selectedUtmSources.length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {selectedUtmSources.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[250px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar source..." />
+                      <CommandEmpty>Nenhum source encontrado</CommandEmpty>
+                      <CommandGroup className="max-h-64 overflow-auto">
+                        {leadFilters?.utmSources.map((source) => (
+                          <CommandItem
+                            key={source}
+                            onSelect={() => {
+                              setSelectedUtmSources(prev =>
+                                prev.includes(source)
+                                  ? prev.filter(s => s !== source)
+                                  : [...prev, source]
+                              );
+                            }}
+                          >
+                            <Checkbox
+                              checked={selectedUtmSources.includes(source)}
+                              className="mr-2"
+                            />
+                            <span>{source}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Filtro de Campanha */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid="button-filtro-campanha">
+                      Campanha
+                      {selectedUtmCampaigns.length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {selectedUtmCampaigns.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar campanha..." />
+                      <CommandEmpty>Nenhuma campanha encontrada</CommandEmpty>
+                      <CommandGroup className="max-h-64 overflow-auto">
+                        {leadFilters?.utmCampaigns.map((campaign) => (
+                          <CommandItem
+                            key={campaign.id}
+                            onSelect={() => {
+                              setSelectedUtmCampaigns(prev =>
+                                prev.includes(campaign.id)
+                                  ? prev.filter(c => c !== campaign.id)
+                                  : [...prev, campaign.id]
+                              );
+                            }}
+                          >
+                            <Checkbox
+                              checked={selectedUtmCampaigns.includes(campaign.id)}
+                              className="mr-2"
+                            />
+                            <span className="text-sm">{campaign.name}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Filtro de Conjunto de Anúncios */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid="button-filtro-conjunto">
+                      Conjunto de Anúncios
+                      {selectedUtmTerms.length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {selectedUtmTerms.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar conjunto..." />
+                      <CommandEmpty>Nenhum conjunto encontrado</CommandEmpty>
+                      <CommandGroup className="max-h-64 overflow-auto">
+                        {leadFilters?.utmTerms.map((term) => (
+                          <CommandItem
+                            key={term.id}
+                            onSelect={() => {
+                              setSelectedUtmTerms(prev =>
+                                prev.includes(term.id)
+                                  ? prev.filter(t => t !== term.id)
+                                  : [...prev, term.id]
+                              );
+                            }}
+                          >
+                            <Checkbox
+                              checked={selectedUtmTerms.includes(term.id)}
+                              className="mr-2"
+                            />
+                            <span className="text-sm">{term.name}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Badges de filtros ativos */}
+              {activeFiltersCount > 0 && (
+                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
+                  {selectedCategories.map(category => (
+                    <Badge key={category} variant="secondary" className="gap-1">
+                      {category}
+                      <X
+                        className="h-3 w-3 cursor-pointer hover:text-destructive"
+                        onClick={() => setSelectedCategories(prev => prev.filter(c => c !== category))}
+                      />
+                    </Badge>
+                  ))}
+                  {selectedStages.map(stage => (
+                    <Badge key={stage} variant="secondary" className="gap-1">
+                      {stage}
+                      <X
+                        className="h-3 w-3 cursor-pointer hover:text-destructive"
+                        onClick={() => setSelectedStages(prev => prev.filter(s => s !== stage))}
+                      />
+                    </Badge>
+                  ))}
+                  {selectedUtmSources.map(source => (
+                    <Badge key={source} variant="secondary" className="gap-1">
+                      Source: {source}
+                      <X
+                        className="h-3 w-3 cursor-pointer hover:text-destructive"
+                        onClick={() => setSelectedUtmSources(prev => prev.filter(s => s !== source))}
+                      />
+                    </Badge>
+                  ))}
+                  {selectedUtmCampaigns.map(campaignId => {
+                    const campaign = leadFilters?.utmCampaigns.find(c => c.id === campaignId);
+                    return (
+                      <Badge key={campaignId} variant="secondary" className="gap-1">
+                        Camp: {campaign?.name || campaignId}
+                        <X
+                          className="h-3 w-3 cursor-pointer hover:text-destructive"
+                          onClick={() => setSelectedUtmCampaigns(prev => prev.filter(c => c !== campaignId))}
+                        />
+                      </Badge>
+                    );
+                  })}
+                  {selectedUtmTerms.map(termId => {
+                    const term = leadFilters?.utmTerms.find(t => t.id === termId);
+                    return (
+                      <Badge key={termId} variant="secondary" className="gap-1">
+                        Conjunto: {term?.name || termId}
+                        <X
+                          className="h-3 w-3 cursor-pointer hover:text-destructive"
+                          onClick={() => setSelectedUtmTerms(prev => prev.filter(t => t !== termId))}
+                        />
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* KPIs Overview */}
