@@ -20,6 +20,13 @@ export default function MetaAds() {
   const [selectedUtmSources, setSelectedUtmSources] = useState<string[]>([]);
   const [selectedUtmCampaigns, setSelectedUtmCampaigns] = useState<string[]>([]);
   const [selectedUtmTerms, setSelectedUtmTerms] = useState<string[]>([]);
+  
+  // Drill-down navigation states
+  const [activeTab, setActiveTab] = useState<string>("campaigns");
+  const [drilldownCampaignId, setDrilldownCampaignId] = useState<string | null>(null);
+  const [drilldownCampaignName, setDrilldownCampaignName] = useState<string | null>(null);
+  const [drilldownAdsetId, setDrilldownAdsetId] = useState<string | null>(null);
+  const [drilldownAdsetName, setDrilldownAdsetName] = useState<string | null>(null);
 
   // Busca o range de datas disponível no banco
   const { data: dataRange } = useQuery<{ minDate: string; maxDate: string }>({
@@ -65,6 +72,30 @@ export default function MetaAds() {
     setSelectedUtmSources([]);
     setSelectedUtmCampaigns([]);
     setSelectedUtmTerms([]);
+  };
+
+  // Drill-down navigation handlers
+  const handleCampaignClick = (campaignId: string, campaignName: string) => {
+    // Clear adset selection when selecting a new (or same) campaign
+    setDrilldownAdsetId(null);
+    setDrilldownAdsetName(null);
+    setDrilldownCampaignId(campaignId);
+    setDrilldownCampaignName(campaignName);
+    setActiveTab("adsets");
+  };
+
+  const handleAdsetClick = (adsetId: string, adsetName: string) => {
+    setDrilldownAdsetId(adsetId);
+    setDrilldownAdsetName(adsetName);
+    setActiveTab("ads");
+  };
+
+  const clearDrilldown = () => {
+    setDrilldownCampaignId(null);
+    setDrilldownCampaignName(null);
+    setDrilldownAdsetId(null);
+    setDrilldownAdsetName(null);
+    setActiveTab("campaigns");
   };
 
   // Conta total de filtros ativos
@@ -122,23 +153,35 @@ export default function MetaAds() {
   });
 
   const { data: adsets, isLoading: isLoadingAdsets } = useQuery<AdsetPerformance[]>({
-    queryKey: ['/api/meta-ads/adsets', dateRange.startDate, dateRange.endDate, selectedCategories, selectedStages, selectedUtmSources, selectedUtmCampaigns, selectedUtmTerms],
+    queryKey: ['/api/meta-ads/adsets', dateRange.startDate, dateRange.endDate, selectedCategories, selectedStages, selectedUtmSources, selectedUtmCampaigns, selectedUtmTerms, drilldownCampaignId],
     queryFn: async () => {
+      // Only fetch if campaign is selected (drill-down prerequisite)
+      if (!drilldownCampaignId) {
+        return [];
+      }
       const queryParams = buildQueryParams(dateRange.startDate, dateRange.endDate);
-      const response = await fetch(`/api/meta-ads/adsets?${queryParams}`);
+      const campaignParam = `&campaignId=${drilldownCampaignId}`;
+      const response = await fetch(`/api/meta-ads/adsets?${queryParams}${campaignParam}`);
       if (!response.ok) throw new Error('Failed to fetch adsets');
       return response.json();
     },
+    enabled: !!drilldownCampaignId, // Only run query when campaign is selected
   });
 
   const { data: ads, isLoading: isLoadingAds } = useQuery<AdPerformance[]>({
-    queryKey: ['/api/meta-ads/ads', dateRange.startDate, dateRange.endDate, selectedCategories, selectedStages, selectedUtmSources, selectedUtmCampaigns, selectedUtmTerms],
+    queryKey: ['/api/meta-ads/ads', dateRange.startDate, dateRange.endDate, selectedCategories, selectedStages, selectedUtmSources, selectedUtmCampaigns, selectedUtmTerms, drilldownAdsetId],
     queryFn: async () => {
+      // Only fetch if adset is selected (drill-down prerequisite)
+      if (!drilldownAdsetId) {
+        return [];
+      }
       const queryParams = buildQueryParams(dateRange.startDate, dateRange.endDate);
-      const response = await fetch(`/api/meta-ads/ads?${queryParams}`);
+      const adsetParam = `&adsetId=${drilldownAdsetId}`;
+      const response = await fetch(`/api/meta-ads/ads?${queryParams}${adsetParam}`);
       if (!response.ok) throw new Error('Failed to fetch ads');
       return response.json();
     },
+    enabled: !!drilldownAdsetId, // Only run query when adset is selected
   });
 
   const { data: funnel, isLoading: isLoadingFunnel } = useQuery<ConversionFunnel>({
@@ -649,11 +692,71 @@ export default function MetaAds() {
             <CardDescription>Performance por campanha, conjunto de anúncios e anúncios</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="campaigns">
+            {/* Breadcrumb Navigation */}
+            {(drilldownCampaignId || drilldownAdsetId) && (
+              <div className="flex items-center gap-2 mb-4 text-sm">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearDrilldown}
+                  data-testid="button-breadcrumb-all"
+                >
+                  Todas as Campanhas
+                </Button>
+                {drilldownCampaignId && (
+                  <>
+                    <span className="text-muted-foreground">/</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setDrilldownAdsetId(null);
+                        setDrilldownAdsetName(null);
+                        setActiveTab("adsets");
+                      }}
+                      data-testid="button-breadcrumb-campaign"
+                    >
+                      {drilldownCampaignName}
+                    </Button>
+                  </>
+                )}
+                {drilldownAdsetId && (
+                  <>
+                    <span className="text-muted-foreground">/</span>
+                    <span className="font-medium">{drilldownAdsetName}</span>
+                  </>
+                )}
+              </div>
+            )}
+            
+            <Tabs value={activeTab} onValueChange={(value) => {
+              // Enforce hierarchy: can only switch to adsets if campaign selected, ads if adset selected
+              if (value === "adsets" && !drilldownCampaignId) {
+                // Prevent switching to adsets without a campaign selected
+                return;
+              }
+              if (value === "ads" && !drilldownAdsetId) {
+                // Prevent switching to ads without an adset selected
+                return;
+              }
+              setActiveTab(value);
+            }}>
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="campaigns" data-testid="tab-campaigns">Campanhas</TabsTrigger>
-                <TabsTrigger value="adsets" data-testid="tab-adsets">Conjuntos</TabsTrigger>
-                <TabsTrigger value="ads" data-testid="tab-ads">Anúncios</TabsTrigger>
+                <TabsTrigger 
+                  value="adsets" 
+                  data-testid="tab-adsets"
+                  disabled={!drilldownCampaignId}
+                >
+                  Conjuntos
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="ads" 
+                  data-testid="tab-ads"
+                  disabled={!drilldownAdsetId}
+                >
+                  Anúncios
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="campaigns" className="mt-6">
@@ -680,7 +783,12 @@ export default function MetaAds() {
                       </TableHeader>
                       <TableBody>
                         {(campaigns || []).map((campaign) => (
-                          <TableRow key={campaign.campaignId} data-testid={`row-campaign-${campaign.campaignId}`}>
+                          <TableRow 
+                            key={campaign.campaignId} 
+                            data-testid={`row-campaign-${campaign.campaignId}`}
+                            onClick={() => handleCampaignClick(campaign.campaignId, campaign.campaignName)}
+                            className="cursor-pointer hover:bg-muted/50"
+                          >
                             <TableCell className="font-medium">{campaign.campaignName}</TableCell>
                             <TableCell>
                               <Badge variant={campaign.status === 'ACTIVE' ? 'default' : 'secondary'}>
@@ -735,7 +843,12 @@ export default function MetaAds() {
                       </TableHeader>
                       <TableBody>
                         {(adsets || []).map((adset) => (
-                          <TableRow key={adset.adsetId} data-testid={`row-adset-${adset.adsetId}`}>
+                          <TableRow 
+                            key={adset.adsetId} 
+                            data-testid={`row-adset-${adset.adsetId}`}
+                            onClick={() => handleAdsetClick(adset.adsetId, adset.adsetName)}
+                            className="cursor-pointer hover:bg-muted/50"
+                          >
                             <TableCell className="font-medium">{adset.adsetName}</TableCell>
                             <TableCell>{adset.campaignName}</TableCell>
                             <TableCell>
@@ -756,7 +869,10 @@ export default function MetaAds() {
                         {(adsets || []).length === 0 && (
                           <TableRow>
                             <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                              Nenhum conjunto de anúncios encontrado no período selecionado
+                              {!drilldownCampaignId 
+                                ? "Selecione uma campanha na aba Campanhas para ver os conjuntos de anúncios"
+                                : "Nenhum conjunto de anúncios encontrado para esta campanha no período selecionado"
+                              }
                             </TableCell>
                           </TableRow>
                         )}
@@ -812,7 +928,10 @@ export default function MetaAds() {
                         {(ads || []).length === 0 && (
                           <TableRow>
                             <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
-                              Nenhum anúncio encontrado no período selecionado
+                              {!drilldownAdsetId 
+                                ? "Selecione um conjunto de anúncios na aba Conjuntos para ver os anúncios"
+                                : "Nenhum anúncio encontrado para este conjunto no período selecionado"
+                              }
                             </TableCell>
                           </TableRow>
                         )}
