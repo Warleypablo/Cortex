@@ -8,15 +8,20 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DollarSign, Eye, MousePointer, Users, TrendingUp, Target, Smartphone, Filter, X } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { DollarSign, Eye, MousePointer, Users, TrendingUp, Target, Smartphone, Filter, X, CalendarIcon } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, FunnelChart, Funnel, LabelList } from "recharts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MetaOverview, CampaignPerformance, AdsetPerformance, AdPerformance, ConversionFunnel, MetaLeadFilters } from "@shared/schema";
+import type { DateRange } from "react-day-picker";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function MetaAds() {
   const queryClient = useQueryClient();
   
   const [periodo, setPeriodo] = useState<string>("30");
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedStages, setSelectedStages] = useState<string[]>([]);
   const [selectedUtmSources, setSelectedUtmSources] = useState<string[]>([]);
@@ -121,6 +126,14 @@ export default function MetaAds() {
     selectedUtmSources.length + selectedUtmCampaigns.length + selectedUtmTerms.length;
 
   const getDateRange = () => {
+    // Se modo custom estiver selecionado e datas estiverem definidas
+    if (periodo === "custom" && customDateRange?.from) {
+      return {
+        startDate: format(customDateRange.from, 'yyyy-MM-dd'),
+        endDate: customDateRange.to ? format(customDateRange.to, 'yyyy-MM-dd') : format(customDateRange.from, 'yyyy-MM-dd')
+      };
+    }
+    
     // Usa a última data disponível como referência ao invés de "hoje"
     const endDate = dataRange?.maxDate ? new Date(dataRange.maxDate) : new Date();
     const startDate = new Date(endDate);
@@ -248,9 +261,22 @@ export default function MetaAds() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-xl font-semibold">Período de Análise</h2>
-              <p className="text-sm text-muted-foreground mt-1">Últimos {periodo} dias</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {periodo === "custom" && customDateRange?.from
+                  ? `${format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })} até ${customDateRange.to ? format(customDateRange.to, "dd/MM/yyyy", { locale: ptBR }) : format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })}`
+                  : periodo === "365" 
+                    ? "Último ano"
+                    : `Últimos ${periodo} dias`
+                }
+              </p>
             </div>
-            <Select value={periodo} onValueChange={setPeriodo}>
+            <Select value={periodo} onValueChange={(value) => {
+              setPeriodo(value);
+              // Limpar customDateRange se mudar para período predefinido
+              if (value !== "custom") {
+                setCustomDateRange(undefined);
+              }
+            }}>
               <SelectTrigger className="w-[180px]" data-testid="select-periodo">
                 <SelectValue />
               </SelectTrigger>
@@ -259,8 +285,50 @@ export default function MetaAds() {
                 <SelectItem value="30">Últimos 30 dias</SelectItem>
                 <SelectItem value="90">Últimos 90 dias</SelectItem>
                 <SelectItem value="365">Último ano</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
               </SelectContent>
             </Select>
+            
+            {/* Date Range Picker - só aparece quando período = custom */}
+            {periodo === "custom" && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-[280px] justify-start text-left font-normal"
+                    data-testid="button-date-picker"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {customDateRange?.from ? (
+                      customDateRange.to ? (
+                        <>
+                          {format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })} -{" "}
+                          {format(customDateRange.to, "dd/MM/yyyy", { locale: ptBR })}
+                        </>
+                      ) : (
+                        format(customDateRange.from, "dd/MM/yyyy", { locale: ptBR })
+                      )
+                    ) : (
+                      <span>Selecione o período</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="range"
+                    selected={customDateRange}
+                    onSelect={setCustomDateRange}
+                    numberOfMonths={2}
+                    disabled={(date) => {
+                      // Não permite datas futuras
+                      const maxDate = dataRange?.maxDate ? new Date(dataRange.maxDate) : new Date();
+                      return date > maxDate;
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
 
           {/* Filtros de Leads */}
