@@ -170,12 +170,13 @@ export interface IStorage {
   getInhireFunnel(): Promise<InhireFunnel[]>;
   getInhireVagasComCandidaturas(limit?: number): Promise<InhireVagaComCandidaturas[]>;
   getMetaDateRange(): Promise<{ minDate: string; maxDate: string }>;
-  getMetaOverview(startDate?: string, endDate?: string): Promise<MetaOverview>;
-  getCampaignPerformance(startDate?: string, endDate?: string): Promise<CampaignPerformance[]>;
-  getAdsetPerformance(startDate?: string, endDate?: string): Promise<AdsetPerformance[]>;
-  getAdPerformance(startDate?: string, endDate?: string): Promise<AdPerformance[]>;
+  getMetaLeadFilters(): Promise<import("@shared/schema").MetaLeadFilters>;
+  getMetaOverview(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams): Promise<MetaOverview>;
+  getCampaignPerformance(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams): Promise<CampaignPerformance[]>;
+  getAdsetPerformance(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams, campaignId?: string): Promise<AdsetPerformance[]>;
+  getAdPerformance(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams, adsetId?: string): Promise<AdPerformance[]>;
   getCreativePerformance(startDate?: string, endDate?: string): Promise<CreativePerformance[]>;
-  getConversionFunnel(startDate?: string, endDate?: string): Promise<ConversionFunnel>;
+  getConversionFunnel(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams): Promise<ConversionFunnel>;
   getAuditoriaSistemas(filters?: { mesAno?: string; dataInicio?: string; dataFim?: string; squad?: string; apenasDivergentes?: boolean; statusFiltro?: string; threshold?: number }): Promise<import("@shared/schema").AuditoriaSistemas[]>;
 }
 
@@ -387,19 +388,23 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getMetaOverview(startDate?: string, endDate?: string): Promise<MetaOverview> {
+  async getMetaLeadFilters(): Promise<import("@shared/schema").MetaLeadFilters> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getCampaignPerformance(startDate?: string, endDate?: string): Promise<CampaignPerformance[]> {
+  async getMetaOverview(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams): Promise<MetaOverview> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getAdsetPerformance(startDate?: string, endDate?: string): Promise<AdsetPerformance[]> {
+  async getCampaignPerformance(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams): Promise<CampaignPerformance[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getAdPerformance(startDate?: string, endDate?: string): Promise<AdPerformance[]> {
+  async getAdsetPerformance(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams, campaignId?: string): Promise<AdsetPerformance[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getAdPerformance(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams, adsetId?: string): Promise<AdPerformance[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -407,7 +412,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getConversionFunnel(startDate?: string, endDate?: string): Promise<ConversionFunnel> {
+  async getConversionFunnel(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams): Promise<ConversionFunnel> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -2827,7 +2832,69 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getMetaOverview(startDate?: string, endDate?: string): Promise<MetaOverview> {
+  async getMetaLeadFilters(): Promise<import("@shared/schema").MetaLeadFilters> {
+    // Get distinct categories
+    const categoriesResult = await db.execute(sql`
+      SELECT DISTINCT category_name
+      FROM ${schema.crmDeal}
+      WHERE category_name IS NOT NULL
+      ORDER BY category_name
+    `);
+
+    // Get distinct stages
+    const stagesResult = await db.execute(sql`
+      SELECT DISTINCT stage_name
+      FROM ${schema.crmDeal}
+      WHERE stage_name IS NOT NULL
+      ORDER BY stage_name
+    `);
+
+    // Get distinct UTM sources
+    const utmSourcesResult = await db.execute(sql`
+      SELECT DISTINCT utm_source
+      FROM ${schema.crmDeal}
+      WHERE utm_source IS NOT NULL
+      ORDER BY utm_source
+    `);
+
+    // Get distinct UTM campaigns with names from meta_campaigns
+    const utmCampaignsResult = await db.execute(sql`
+      SELECT DISTINCT 
+        d.utm_campaign as id,
+        COALESCE(c.campaign_name, d.utm_campaign) as name
+      FROM ${schema.crmDeal} d
+      LEFT JOIN ${schema.metaCampaigns} c ON d.utm_campaign = c.campaign_id
+      WHERE d.utm_campaign IS NOT NULL
+      ORDER BY name
+    `);
+
+    // Get distinct UTM terms (adset IDs) with names from meta_adsets
+    const utmTermsResult = await db.execute(sql`
+      SELECT DISTINCT 
+        d.utm_term as id,
+        COALESCE(a.adset_name, d.utm_term) as name
+      FROM ${schema.crmDeal} d
+      LEFT JOIN ${schema.metaAdsets} a ON d.utm_term = a.adset_id
+      WHERE d.utm_term IS NOT NULL
+      ORDER BY name
+    `);
+
+    return {
+      categories: categoriesResult.rows.map((r: any) => r.category_name),
+      stages: stagesResult.rows.map((r: any) => r.stage_name),
+      utmSources: utmSourcesResult.rows.map((r: any) => r.utm_source),
+      utmCampaigns: utmCampaignsResult.rows.map((r: any) => ({
+        id: r.id,
+        name: r.name
+      })),
+      utmTerms: utmTermsResult.rows.map((r: any) => ({
+        id: r.id,
+        name: r.name
+      }))
+    };
+  }
+
+  async getMetaOverview(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams): Promise<MetaOverview> {
     const result = await db.execute(sql`
       WITH meta_metrics AS (
         SELECT 
@@ -2849,6 +2916,11 @@ export class DbStorage implements IStorage {
         WHERE utm_campaign IS NOT NULL
           ${startDate ? sql`AND date_create >= ${startDate}::timestamp` : sql``}
           ${endDate ? sql`AND date_create <= ${endDate}::timestamp` : sql``}
+          ${leadFilters?.categoryNames?.length ? sql`AND category_name = ANY(${leadFilters.categoryNames})` : sql``}
+          ${leadFilters?.stageNames?.length ? sql`AND stage_name = ANY(${leadFilters.stageNames})` : sql``}
+          ${leadFilters?.utmSources?.length ? sql`AND utm_source = ANY(${leadFilters.utmSources})` : sql``}
+          ${leadFilters?.utmCampaigns?.length ? sql`AND utm_campaign = ANY(${leadFilters.utmCampaigns})` : sql``}
+          ${leadFilters?.utmTerms?.length ? sql`AND utm_term = ANY(${leadFilters.utmTerms})` : sql``}
       )
       SELECT 
         mm.total_spend::numeric as "totalSpend",
@@ -2908,7 +2980,7 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getCampaignPerformance(startDate?: string, endDate?: string): Promise<CampaignPerformance[]> {
+  async getCampaignPerformance(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams): Promise<CampaignPerformance[]> {
     const result = await db.execute(sql`
       WITH campaign_metrics AS (
         SELECT 
@@ -2936,6 +3008,11 @@ export class DbStorage implements IStorage {
         WHERE utm_campaign IS NOT NULL
           ${startDate ? sql`AND date_create >= ${startDate}::timestamp` : sql``}
           ${endDate ? sql`AND date_create <= ${endDate}::timestamp` : sql``}
+          ${leadFilters?.categoryNames?.length ? sql`AND category_name = ANY(${leadFilters.categoryNames})` : sql``}
+          ${leadFilters?.stageNames?.length ? sql`AND stage_name = ANY(${leadFilters.stageNames})` : sql``}
+          ${leadFilters?.utmSources?.length ? sql`AND utm_source = ANY(${leadFilters.utmSources})` : sql``}
+          ${leadFilters?.utmCampaigns?.length ? sql`AND utm_campaign = ANY(${leadFilters.utmCampaigns})` : sql``}
+          ${leadFilters?.utmTerms?.length ? sql`AND utm_term = ANY(${leadFilters.utmTerms})` : sql``}
         GROUP BY utm_campaign
       )
       SELECT 
@@ -2989,7 +3066,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getAdsetPerformance(startDate?: string, endDate?: string): Promise<AdsetPerformance[]> {
+  async getAdsetPerformance(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams, campaignId?: string): Promise<AdsetPerformance[]> {
     const result = await db.execute(sql`
       WITH adset_metrics AS (
         SELECT 
@@ -3007,6 +3084,7 @@ export class DbStorage implements IStorage {
         LEFT JOIN ${schema.metaCampaigns} c ON a.campaign_id = c.campaign_id
         LEFT JOIN ${schema.metaInsightsDaily} mi ON a.adset_id = mi.adset_id
         WHERE 1=1
+          ${campaignId ? sql`AND a.campaign_id = ${campaignId}` : sql``}
           ${startDate ? sql`AND mi.date_start >= ${startDate}::date` : sql``}
           ${endDate ? sql`AND mi.date_stop <= ${endDate}::date` : sql``}
         GROUP BY a.adset_id, a.adset_name, a.status, a.optimization_goal, a.targeting_age_min, a.targeting_age_max, c.campaign_name
@@ -3021,6 +3099,11 @@ export class DbStorage implements IStorage {
         WHERE utm_term IS NOT NULL
           ${startDate ? sql`AND date_create >= ${startDate}::timestamp` : sql``}
           ${endDate ? sql`AND date_create <= ${endDate}::timestamp` : sql``}
+          ${leadFilters?.categoryNames?.length ? sql`AND category_name = ANY(${leadFilters.categoryNames})` : sql``}
+          ${leadFilters?.stageNames?.length ? sql`AND stage_name = ANY(${leadFilters.stageNames})` : sql``}
+          ${leadFilters?.utmSources?.length ? sql`AND utm_source = ANY(${leadFilters.utmSources})` : sql``}
+          ${leadFilters?.utmCampaigns?.length ? sql`AND utm_campaign = ANY(${leadFilters.utmCampaigns})` : sql``}
+          ${leadFilters?.utmTerms?.length ? sql`AND utm_term = ANY(${leadFilters.utmTerms})` : sql``}
         GROUP BY utm_term
       )
       SELECT 
@@ -3080,7 +3163,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getAdPerformance(startDate?: string, endDate?: string): Promise<AdPerformance[]> {
+  async getAdPerformance(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams, adsetId?: string): Promise<AdPerformance[]> {
     // NOTE: Ad-level CRM conversions are intentionally zeroed because crm_deal table
     // lacks utm_content field (ad_id tracking). Only campaign/adset-level conversions
     // are tracked via utm_campaign and utm_term respectively.
@@ -3113,6 +3196,7 @@ export class DbStorage implements IStorage {
       LEFT JOIN ${schema.metaAdsets} ads ON a.adset_id = ads.adset_id
       LEFT JOIN ${schema.metaInsightsDaily} mi ON a.ad_id = mi.ad_id
       WHERE 1=1
+        ${adsetId ? sql`AND a.adset_id = ${adsetId}` : sql``}
         ${startDate ? sql`AND mi.date_start >= ${startDate}::date` : sql``}
         ${endDate ? sql`AND mi.date_stop <= ${endDate}::date` : sql``}
       GROUP BY a.ad_id, a.ad_name, a.status, a.creative_id, c.campaign_name, ads.adset_name
@@ -3202,7 +3286,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getConversionFunnel(startDate?: string, endDate?: string): Promise<ConversionFunnel> {
+  async getConversionFunnel(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams): Promise<ConversionFunnel> {
     const result = await db.execute(sql`
       WITH funnel_data AS (
         SELECT 
@@ -3214,6 +3298,11 @@ export class DbStorage implements IStorage {
             WHERE utm_campaign IS NOT NULL
               ${startDate ? sql`AND date_create >= ${startDate}::timestamp` : sql``}
               ${endDate ? sql`AND date_create <= ${endDate}::timestamp` : sql``}
+              ${leadFilters?.categoryNames?.length ? sql`AND category_name = ANY(${leadFilters.categoryNames})` : sql``}
+              ${leadFilters?.stageNames?.length ? sql`AND stage_name = ANY(${leadFilters.stageNames})` : sql``}
+              ${leadFilters?.utmSources?.length ? sql`AND utm_source = ANY(${leadFilters.utmSources})` : sql``}
+              ${leadFilters?.utmCampaigns?.length ? sql`AND utm_campaign = ANY(${leadFilters.utmCampaigns})` : sql``}
+              ${leadFilters?.utmTerms?.length ? sql`AND utm_term = ANY(${leadFilters.utmTerms})` : sql``}
           ) as leads,
           (
             SELECT COUNT(*)
@@ -3222,6 +3311,11 @@ export class DbStorage implements IStorage {
               AND stage_name = 'Negócio Ganho'
               ${startDate ? sql`AND date_create >= ${startDate}::timestamp` : sql``}
               ${endDate ? sql`AND date_create <= ${endDate}::timestamp` : sql``}
+              ${leadFilters?.categoryNames?.length ? sql`AND category_name = ANY(${leadFilters.categoryNames})` : sql``}
+              ${leadFilters?.stageNames?.length ? sql`AND stage_name = ANY(${leadFilters.stageNames})` : sql``}
+              ${leadFilters?.utmSources?.length ? sql`AND utm_source = ANY(${leadFilters.utmSources})` : sql``}
+              ${leadFilters?.utmCampaigns?.length ? sql`AND utm_campaign = ANY(${leadFilters.utmCampaigns})` : sql``}
+              ${leadFilters?.utmTerms?.length ? sql`AND utm_term = ANY(${leadFilters.utmTerms})` : sql``}
           ) as won
         FROM ${schema.metaInsightsDaily} mi
         WHERE 1=1
