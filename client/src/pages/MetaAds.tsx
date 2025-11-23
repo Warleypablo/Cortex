@@ -8,10 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DollarSign, Eye, MousePointer, Users, TrendingUp, Target, Smartphone, Image, Video, Filter, X } from "lucide-react";
+import { DollarSign, Eye, MousePointer, Users, TrendingUp, Target, Smartphone, Filter, X } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, FunnelChart, Funnel, LabelList } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import type { MetaOverview, CampaignPerformance, AdsetPerformance, AdPerformance, CreativePerformance, ConversionFunnel, MetaLeadFilters } from "@shared/schema";
+import type { MetaOverview, CampaignPerformance, AdsetPerformance, AdPerformance, ConversionFunnel, MetaLeadFilters } from "@shared/schema";
 
 export default function MetaAds() {
   const [periodo, setPeriodo] = useState<string>("30");
@@ -137,15 +137,6 @@ export default function MetaAds() {
       const queryParams = buildQueryParams(dateRange.startDate, dateRange.endDate);
       const response = await fetch(`/api/meta-ads/ads?${queryParams}`);
       if (!response.ok) throw new Error('Failed to fetch ads');
-      return response.json();
-    },
-  });
-
-  const { data: creatives, isLoading: isLoadingCreatives } = useQuery<CreativePerformance[]>({
-    queryKey: ['/api/meta-ads/creatives', dateRange.startDate, dateRange.endDate],
-    queryFn: async () => {
-      const response = await fetch(`/api/meta-ads/creatives?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
-      if (!response.ok) throw new Error('Failed to fetch creatives');
       return response.json();
     },
   });
@@ -655,15 +646,14 @@ export default function MetaAds() {
         <Card data-testid="card-analises">
           <CardHeader>
             <CardTitle>Análises Detalhadas</CardTitle>
-            <CardDescription>Performance por campanha, conjunto de anúncios, anúncios e criativos</CardDescription>
+            <CardDescription>Performance por campanha, conjunto de anúncios e anúncios</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="campaigns">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="campaigns" data-testid="tab-campaigns">Campanhas</TabsTrigger>
                 <TabsTrigger value="adsets" data-testid="tab-adsets">Conjuntos</TabsTrigger>
                 <TabsTrigger value="ads" data-testid="tab-ads">Anúncios</TabsTrigger>
-                <TabsTrigger value="creatives" data-testid="tab-creatives">Criativos</TabsTrigger>
               </TabsList>
 
               <TabsContent value="campaigns" className="mt-6">
@@ -675,7 +665,7 @@ export default function MetaAds() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Campanha</TableHead>
-                          <TableHead>Objetivo</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead className="text-right">Gasto</TableHead>
                           <TableHead className="text-right">Impressões</TableHead>
                           <TableHead className="text-right">Cliques</TableHead>
@@ -692,7 +682,11 @@ export default function MetaAds() {
                         {(campaigns || []).map((campaign) => (
                           <TableRow key={campaign.campaignId} data-testid={`row-campaign-${campaign.campaignId}`}>
                             <TableCell className="font-medium">{campaign.campaignName}</TableCell>
-                            <TableCell>{campaign.objective || '-'}</TableCell>
+                            <TableCell>
+                              <Badge variant={campaign.status === 'ACTIVE' ? 'default' : 'secondary'}>
+                                {campaign.status || 'N/A'}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-right">{formatCurrency(campaign.spend)}</TableCell>
                             <TableCell className="text-right">{formatNumber(campaign.impressions)}</TableCell>
                             <TableCell className="text-right">{formatNumber(campaign.clicks)}</TableCell>
@@ -728,7 +722,7 @@ export default function MetaAds() {
                         <TableRow>
                           <TableHead>Conjunto de Anúncios</TableHead>
                           <TableHead>Campanha</TableHead>
-                          <TableHead>Objetivo</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead className="text-right">Gasto</TableHead>
                           <TableHead className="text-right">Impressões</TableHead>
                           <TableHead className="text-right">Cliques</TableHead>
@@ -744,7 +738,11 @@ export default function MetaAds() {
                           <TableRow key={adset.adsetId} data-testid={`row-adset-${adset.adsetId}`}>
                             <TableCell className="font-medium">{adset.adsetName}</TableCell>
                             <TableCell>{adset.campaignName}</TableCell>
-                            <TableCell className="text-sm">{adset.optimizationGoal || '-'}</TableCell>
+                            <TableCell>
+                              <Badge variant={adset.status === 'ACTIVE' ? 'default' : 'secondary'}>
+                                {adset.status || 'N/A'}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-right">{formatCurrency(adset.spend)}</TableCell>
                             <TableCell className="text-right">{formatNumber(adset.impressions)}</TableCell>
                             <TableCell className="text-right">{formatNumber(adset.clicks)}</TableCell>
@@ -779,6 +777,7 @@ export default function MetaAds() {
                           <TableHead>Anúncio</TableHead>
                           <TableHead>Campanha</TableHead>
                           <TableHead>Conjunto</TableHead>
+                          <TableHead>Status</TableHead>
                           <TableHead className="text-right">Gasto</TableHead>
                           <TableHead className="text-right">Impressões</TableHead>
                           <TableHead className="text-right">Cliques</TableHead>
@@ -795,6 +794,11 @@ export default function MetaAds() {
                             <TableCell className="font-medium">{ad.adName}</TableCell>
                             <TableCell>{ad.campaignName}</TableCell>
                             <TableCell>{ad.adsetName}</TableCell>
+                            <TableCell>
+                              <Badge variant={ad.status === 'ACTIVE' ? 'default' : 'secondary'}>
+                                {ad.status || 'N/A'}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-right">{formatCurrency(ad.spend)}</TableCell>
                             <TableCell className="text-right">{formatNumber(ad.impressions)}</TableCell>
                             <TableCell className="text-right">{formatNumber(ad.clicks)}</TableCell>
@@ -807,7 +811,7 @@ export default function MetaAds() {
                         ))}
                         {(ads || []).length === 0 && (
                           <TableRow>
-                            <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                            <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                               Nenhum anúncio encontrado no período selecionado
                             </TableCell>
                           </TableRow>
@@ -818,71 +822,6 @@ export default function MetaAds() {
                 )}
               </TabsContent>
 
-              <TabsContent value="creatives" className="mt-6">
-                {isLoadingCreatives ? (
-                  <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Criativo</TableHead>
-                          <TableHead>Tipo</TableHead>
-                          <TableHead className="text-right">Anúncios</TableHead>
-                          <TableHead className="text-right">Gasto</TableHead>
-                          <TableHead className="text-right">Impressões</TableHead>
-                          <TableHead className="text-right">Cliques</TableHead>
-                          <TableHead className="text-right">CTR</TableHead>
-                          <TableHead className="text-right">Video 25%</TableHead>
-                          <TableHead className="text-right">Video 100%</TableHead>
-                          <TableHead className="text-right">Leads</TableHead>
-                          <TableHead className="text-right">WON</TableHead>
-                          <TableHead className="text-right">ROAS</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(creatives || []).map((creative) => (
-                          <TableRow key={creative.creativeId} data-testid={`row-creative-${creative.creativeId}`}>
-                            <TableCell className="font-medium">{creative.title || creative.creativeName || '-'}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {creative.objectType === 'VIDEO' || creative.videoUrl ? (
-                                  <>
-                                    <Video className="h-4 w-4 text-purple-500" />
-                                    <span className="text-sm">Vídeo</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Image className="h-4 w-4 text-blue-500" />
-                                    <span className="text-sm">Imagem</span>
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">{formatNumber(creative.totalAds)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(creative.spend)}</TableCell>
-                            <TableCell className="text-right">{formatNumber(creative.impressions)}</TableCell>
-                            <TableCell className="text-right">{formatNumber(creative.clicks)}</TableCell>
-                            <TableCell className="text-right">{formatPercent(creative.ctr)}</TableCell>
-                            <TableCell className="text-right">{formatNumber(creative.videoP25)}</TableCell>
-                            <TableCell className="text-right">{formatNumber(creative.videoP100)}</TableCell>
-                            <TableCell className="text-right">{formatNumber(creative.leads)}</TableCell>
-                            <TableCell className="text-right font-medium">{formatNumber(creative.won)}</TableCell>
-                            <TableCell className="text-right font-bold text-primary">{creative.roas.toFixed(2)}x</TableCell>
-                          </TableRow>
-                        ))}
-                        {(creatives || []).length === 0 && (
-                          <TableRow>
-                            <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
-                              Nenhum criativo encontrado no período selecionado
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
