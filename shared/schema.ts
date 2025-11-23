@@ -724,3 +724,20 @@ export type AuditoriaSistemas = {
   quantidadeContratosClickUp: number;
   quantidadeTitulosContaAzul: number;
 };
+
+// Meta Ads - Filtros de Leads
+export type MetaLeadFilters = {
+  categories: string[];
+  stages: string[];
+  utmSources: string[];
+  utmCampaigns: Array<{ id: string; name: string }>;
+  utmTerms: Array<{ id: string; name: string }>;
+};
+
+export type MetaLeadFilterParams = {
+  categoryNames?: string[];
+  stageNames?: string[];
+  utmSources?: string[];
+  utmCampaigns?: string[];
+  utmTerms?: string[];
+};

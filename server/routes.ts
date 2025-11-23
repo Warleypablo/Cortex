@@ -812,11 +812,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/meta-ads/filtros-leads", async (req, res) => {
+    try {
+      const filters = await storage.getMetaLeadFilters();
+      res.json(filters);
+    } catch (error) {
+      console.error("[api] Error fetching Meta Ads lead filters:", error);
+      res.status(500).json({ error: "Failed to fetch Meta Ads lead filters" });
+    }
+  });
+
   app.get("/api/meta-ads/overview", async (req, res) => {
     try {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
-      const overview = await storage.getMetaOverview(startDate, endDate);
+      
+      const leadFilters: import("@shared/schema").MetaLeadFilterParams = {};
+      if (req.query.categoryNames) leadFilters.categoryNames = (req.query.categoryNames as string).split(',');
+      if (req.query.stageNames) leadFilters.stageNames = (req.query.stageNames as string).split(',');
+      if (req.query.utmSources) leadFilters.utmSources = (req.query.utmSources as string).split(',');
+      if (req.query.utmCampaigns) leadFilters.utmCampaigns = (req.query.utmCampaigns as string).split(',');
+      if (req.query.utmTerms) leadFilters.utmTerms = (req.query.utmTerms as string).split(',');
+
+      const overview = await storage.getMetaOverview(startDate, endDate, Object.keys(leadFilters).length > 0 ? leadFilters : undefined);
       res.json(overview);
     } catch (error) {
       console.error("[api] Error fetching Meta Ads overview:", error);
@@ -828,7 +846,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
-      const campaigns = await storage.getCampaignPerformance(startDate, endDate);
+      
+      const leadFilters: import("@shared/schema").MetaLeadFilterParams = {};
+      if (req.query.categoryNames) leadFilters.categoryNames = (req.query.categoryNames as string).split(',');
+      if (req.query.stageNames) leadFilters.stageNames = (req.query.stageNames as string).split(',');
+      if (req.query.utmSources) leadFilters.utmSources = (req.query.utmSources as string).split(',');
+      if (req.query.utmCampaigns) leadFilters.utmCampaigns = (req.query.utmCampaigns as string).split(',');
+      if (req.query.utmTerms) leadFilters.utmTerms = (req.query.utmTerms as string).split(',');
+
+      const campaigns = await storage.getCampaignPerformance(startDate, endDate, Object.keys(leadFilters).length > 0 ? leadFilters : undefined);
       res.json(campaigns);
     } catch (error) {
       console.error("[api] Error fetching campaign performance:", error);
@@ -840,7 +866,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
-      const adsets = await storage.getAdsetPerformance(startDate, endDate);
+      const campaignId = req.query.campaignId as string | undefined;
+      
+      const leadFilters: import("@shared/schema").MetaLeadFilterParams = {};
+      if (req.query.categoryNames) leadFilters.categoryNames = (req.query.categoryNames as string).split(',');
+      if (req.query.stageNames) leadFilters.stageNames = (req.query.stageNames as string).split(',');
+      if (req.query.utmSources) leadFilters.utmSources = (req.query.utmSources as string).split(',');
+      if (req.query.utmCampaigns) leadFilters.utmCampaigns = (req.query.utmCampaigns as string).split(',');
+      if (req.query.utmTerms) leadFilters.utmTerms = (req.query.utmTerms as string).split(',');
+
+      const adsets = await storage.getAdsetPerformance(startDate, endDate, Object.keys(leadFilters).length > 0 ? leadFilters : undefined, campaignId);
       res.json(adsets);
     } catch (error) {
       console.error("[api] Error fetching adset performance:", error);
@@ -852,7 +887,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
-      const ads = await storage.getAdPerformance(startDate, endDate);
+      const adsetId = req.query.adsetId as string | undefined;
+      
+      const leadFilters: import("@shared/schema").MetaLeadFilterParams = {};
+      if (req.query.categoryNames) leadFilters.categoryNames = (req.query.categoryNames as string).split(',');
+      if (req.query.stageNames) leadFilters.stageNames = (req.query.stageNames as string).split(',');
+      if (req.query.utmSources) leadFilters.utmSources = (req.query.utmSources as string).split(',');
+      if (req.query.utmCampaigns) leadFilters.utmCampaigns = (req.query.utmCampaigns as string).split(',');
+      if (req.query.utmTerms) leadFilters.utmTerms = (req.query.utmTerms as string).split(',');
+
+      const ads = await storage.getAdPerformance(startDate, endDate, Object.keys(leadFilters).length > 0 ? leadFilters : undefined, adsetId);
       res.json(ads);
     } catch (error) {
       console.error("[api] Error fetching ad performance:", error);
@@ -876,7 +920,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
-      const funnel = await storage.getConversionFunnel(startDate, endDate);
+      
+      const leadFilters: import("@shared/schema").MetaLeadFilterParams = {};
+      if (req.query.categoryNames) leadFilters.categoryNames = (req.query.categoryNames as string).split(',');
+      if (req.query.stageNames) leadFilters.stageNames = (req.query.stageNames as string).split(',');
+      if (req.query.utmSources) leadFilters.utmSources = (req.query.utmSources as string).split(',');
+      if (req.query.utmCampaigns) leadFilters.utmCampaigns = (req.query.utmCampaigns as string).split(',');
+      if (req.query.utmTerms) leadFilters.utmTerms = (req.query.utmTerms as string).split(',');
+
+      const funnel = await storage.getConversionFunnel(startDate, endDate, Object.keys(leadFilters).length > 0 ? leadFilters : undefined);
       res.json(funnel);
     } catch (error) {
       console.error("[api] Error fetching conversion funnel:", error);
