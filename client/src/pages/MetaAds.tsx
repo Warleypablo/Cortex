@@ -10,10 +10,12 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { DollarSign, Eye, MousePointer, Users, TrendingUp, Target, Smartphone, Filter, X } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, FunnelChart, Funnel, LabelList } from "recharts";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MetaOverview, CampaignPerformance, AdsetPerformance, AdPerformance, ConversionFunnel, MetaLeadFilters } from "@shared/schema";
 
 export default function MetaAds() {
+  const queryClient = useQueryClient();
+  
   const [periodo, setPeriodo] = useState<string>("30");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedStages, setSelectedStages] = useState<string[]>([]);
@@ -76,6 +78,14 @@ export default function MetaAds() {
 
   // Drill-down navigation handlers
   const handleCampaignClick = (campaignId: string, campaignName: string) => {
+    // Force refetch BEFORE updating state - invalidate all adset queries using prefix match
+    queryClient.invalidateQueries({ 
+      predicate: (query) => {
+        const firstKey = query.queryKey[0];
+        return typeof firstKey === 'string' && firstKey === '/api/meta-ads/adsets';
+      }
+    });
+    
     // Clear adset selection when selecting a new (or same) campaign
     setDrilldownAdsetId(null);
     setDrilldownAdsetName(null);
@@ -85,6 +95,14 @@ export default function MetaAds() {
   };
 
   const handleAdsetClick = (adsetId: string, adsetName: string) => {
+    // Force refetch BEFORE updating state - invalidate all ads queries using prefix match
+    queryClient.invalidateQueries({ 
+      predicate: (query) => {
+        const firstKey = query.queryKey[0];
+        return typeof firstKey === 'string' && firstKey === '/api/meta-ads/ads';
+      }
+    });
+    
     setDrilldownAdsetId(adsetId);
     setDrilldownAdsetName(adsetName);
     setActiveTab("ads");
