@@ -812,6 +812,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to parse lead filters from query params
+  const parseLeadFilters = (query: any): import("@shared/schema").MetaLeadFilterParams | undefined => {
+    const leadFilters: import("@shared/schema").MetaLeadFilterParams = {};
+    
+    // Normalize query params to arrays (handle both single values and arrays)
+    if (query.categoryNames) {
+      leadFilters.categoryNames = Array.isArray(query.categoryNames) ? query.categoryNames : [query.categoryNames];
+    }
+    if (query.stageNames) {
+      leadFilters.stageNames = Array.isArray(query.stageNames) ? query.stageNames : [query.stageNames];
+    }
+    if (query.utmSources) {
+      leadFilters.utmSources = Array.isArray(query.utmSources) ? query.utmSources : [query.utmSources];
+    }
+    if (query.utmCampaigns) {
+      leadFilters.utmCampaigns = Array.isArray(query.utmCampaigns) ? query.utmCampaigns : [query.utmCampaigns];
+    }
+    if (query.utmTerms) {
+      leadFilters.utmTerms = Array.isArray(query.utmTerms) ? query.utmTerms : [query.utmTerms];
+    }
+
+    return Object.keys(leadFilters).length > 0 ? leadFilters : undefined;
+  };
+
   app.get("/api/meta-ads/filtros-leads", async (req, res) => {
     try {
       const filters = await storage.getMetaLeadFilters();
@@ -826,15 +850,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
-      
-      const leadFilters: import("@shared/schema").MetaLeadFilterParams = {};
-      if (req.query.categoryNames) leadFilters.categoryNames = (req.query.categoryNames as string).split(',');
-      if (req.query.stageNames) leadFilters.stageNames = (req.query.stageNames as string).split(',');
-      if (req.query.utmSources) leadFilters.utmSources = (req.query.utmSources as string).split(',');
-      if (req.query.utmCampaigns) leadFilters.utmCampaigns = (req.query.utmCampaigns as string).split(',');
-      if (req.query.utmTerms) leadFilters.utmTerms = (req.query.utmTerms as string).split(',');
+      const leadFilters = parseLeadFilters(req.query);
 
-      const overview = await storage.getMetaOverview(startDate, endDate, Object.keys(leadFilters).length > 0 ? leadFilters : undefined);
+      const overview = await storage.getMetaOverview(startDate, endDate, leadFilters);
       res.json(overview);
     } catch (error) {
       console.error("[api] Error fetching Meta Ads overview:", error);
@@ -846,15 +864,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
-      
-      const leadFilters: import("@shared/schema").MetaLeadFilterParams = {};
-      if (req.query.categoryNames) leadFilters.categoryNames = (req.query.categoryNames as string).split(',');
-      if (req.query.stageNames) leadFilters.stageNames = (req.query.stageNames as string).split(',');
-      if (req.query.utmSources) leadFilters.utmSources = (req.query.utmSources as string).split(',');
-      if (req.query.utmCampaigns) leadFilters.utmCampaigns = (req.query.utmCampaigns as string).split(',');
-      if (req.query.utmTerms) leadFilters.utmTerms = (req.query.utmTerms as string).split(',');
+      const leadFilters = parseLeadFilters(req.query);
 
-      const campaigns = await storage.getCampaignPerformance(startDate, endDate, Object.keys(leadFilters).length > 0 ? leadFilters : undefined);
+      const campaigns = await storage.getCampaignPerformance(startDate, endDate, leadFilters);
       res.json(campaigns);
     } catch (error) {
       console.error("[api] Error fetching campaign performance:", error);
@@ -867,15 +879,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
       const campaignId = req.query.campaignId as string | undefined;
-      
-      const leadFilters: import("@shared/schema").MetaLeadFilterParams = {};
-      if (req.query.categoryNames) leadFilters.categoryNames = (req.query.categoryNames as string).split(',');
-      if (req.query.stageNames) leadFilters.stageNames = (req.query.stageNames as string).split(',');
-      if (req.query.utmSources) leadFilters.utmSources = (req.query.utmSources as string).split(',');
-      if (req.query.utmCampaigns) leadFilters.utmCampaigns = (req.query.utmCampaigns as string).split(',');
-      if (req.query.utmTerms) leadFilters.utmTerms = (req.query.utmTerms as string).split(',');
+      const leadFilters = parseLeadFilters(req.query);
 
-      const adsets = await storage.getAdsetPerformance(startDate, endDate, Object.keys(leadFilters).length > 0 ? leadFilters : undefined, campaignId);
+      const adsets = await storage.getAdsetPerformance(startDate, endDate, leadFilters, campaignId);
       res.json(adsets);
     } catch (error) {
       console.error("[api] Error fetching adset performance:", error);
@@ -888,15 +894,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
       const adsetId = req.query.adsetId as string | undefined;
-      
-      const leadFilters: import("@shared/schema").MetaLeadFilterParams = {};
-      if (req.query.categoryNames) leadFilters.categoryNames = (req.query.categoryNames as string).split(',');
-      if (req.query.stageNames) leadFilters.stageNames = (req.query.stageNames as string).split(',');
-      if (req.query.utmSources) leadFilters.utmSources = (req.query.utmSources as string).split(',');
-      if (req.query.utmCampaigns) leadFilters.utmCampaigns = (req.query.utmCampaigns as string).split(',');
-      if (req.query.utmTerms) leadFilters.utmTerms = (req.query.utmTerms as string).split(',');
+      const leadFilters = parseLeadFilters(req.query);
 
-      const ads = await storage.getAdPerformance(startDate, endDate, Object.keys(leadFilters).length > 0 ? leadFilters : undefined, adsetId);
+      const ads = await storage.getAdPerformance(startDate, endDate, leadFilters, adsetId);
       res.json(ads);
     } catch (error) {
       console.error("[api] Error fetching ad performance:", error);
@@ -920,15 +920,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
-      
-      const leadFilters: import("@shared/schema").MetaLeadFilterParams = {};
-      if (req.query.categoryNames) leadFilters.categoryNames = (req.query.categoryNames as string).split(',');
-      if (req.query.stageNames) leadFilters.stageNames = (req.query.stageNames as string).split(',');
-      if (req.query.utmSources) leadFilters.utmSources = (req.query.utmSources as string).split(',');
-      if (req.query.utmCampaigns) leadFilters.utmCampaigns = (req.query.utmCampaigns as string).split(',');
-      if (req.query.utmTerms) leadFilters.utmTerms = (req.query.utmTerms as string).split(',');
+      const leadFilters = parseLeadFilters(req.query);
 
-      const funnel = await storage.getConversionFunnel(startDate, endDate, Object.keys(leadFilters).length > 0 ? leadFilters : undefined);
+      const funnel = await storage.getConversionFunnel(startDate, endDate, leadFilters);
       res.json(funnel);
     } catch (error) {
       console.error("[api] Error fetching conversion funnel:", error);
