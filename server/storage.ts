@@ -1021,53 +1021,25 @@ export class DbStorage implements IStorage {
       .from(schema.rhPatrimonio)
       .where(sql`${schema.rhPatrimonio.responsavelAtual} IS NOT NULL AND ${schema.rhPatrimonio.responsavelAtual} != ''`);
     
-    console.log(`[PATRIMONIO DEBUG] Colaboradores encontrados: ${colaboradores.length}`);
-    console.log(`[PATRIMONIO DEBUG] Patrimônios com responsável: ${patrimonios.length}`);
-    if (patrimonios.length > 0) {
-      console.log(`[PATRIMONIO DEBUG] Primeiros 5 patrimônios:`, patrimonios.slice(0, 5).map(p => ({ id: p.id, responsavel: p.responsavelAtual })));
-    }
-    if (colaboradores.length > 0) {
-      console.log(`[PATRIMONIO DEBUG] Primeiros 5 colaboradores:`, colaboradores.slice(0, 5).map(c => ({ id: c.id, nome: c.nome })));
-    }
-    
-    const normalizeName = (name: string | null): string => {
-      if (!name) return '';
-      return name
-        .trim()
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '');
-    };
-    
-    const patrimoniosPorColaborador = new Map<string, { id: number; descricao: string | null }[]>();
+    const patrimoniosPorNomeExato = new Map<string, { id: number; descricao: string | null }[]>();
     
     for (const p of patrimonios) {
       if (p.responsavelAtual) {
-        const normalizedName = normalizeName(p.responsavelAtual);
-        const existing = patrimoniosPorColaborador.get(normalizedName) || [];
+        const trimmedName = p.responsavelAtual.trim();
+        const existing = patrimoniosPorNomeExato.get(trimmedName) || [];
         existing.push({ id: p.id, descricao: p.descricao });
-        patrimoniosPorColaborador.set(normalizedName, existing);
+        patrimoniosPorNomeExato.set(trimmedName, existing);
       }
     }
     
-    console.log(`[PATRIMONIO DEBUG] Nomes normalizados no Map:`, Array.from(patrimoniosPorColaborador.keys()).slice(0, 10));
-    
-    const result = colaboradores.map(col => {
-      const normalizedColName = normalizeName(col.nome);
-      const matchedPatrimonios = patrimoniosPorColaborador.get(normalizedColName) || [];
-      if (matchedPatrimonios.length > 0) {
-        console.log(`[PATRIMONIO DEBUG] Match encontrado: "${col.nome}" (normalizado: "${normalizedColName}") -> ${matchedPatrimonios.length} patrimônio(s)`);
-      }
+    return colaboradores.map(col => {
+      const colName = (col.nome || '').trim();
+      const matchedPatrimonios = patrimoniosPorNomeExato.get(colName) || [];
       return {
         ...col,
         patrimonios: matchedPatrimonios,
       };
     });
-    
-    const totalComPatrimonio = result.filter(c => c.patrimonios.length > 0).length;
-    console.log(`[PATRIMONIO DEBUG] Total de colaboradores com patrimônio: ${totalComPatrimonio}`);
-    
-    return result;
   }
 
   async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
