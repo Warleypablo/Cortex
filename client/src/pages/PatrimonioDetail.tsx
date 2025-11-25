@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { ArrowLeft, Package, User, DollarSign, Info, FileText, Mail, Phone, MapPin, Briefcase, Calendar } from "lucide-react";
+import { ArrowLeft, Package, User, DollarSign, Info, FileText, Mail, Phone, Briefcase, Calendar, Check, ChevronsUpDown, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,6 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface Colaborador {
   id: number;
@@ -51,10 +57,18 @@ interface PatrimonioComResponsavel {
   colaborador?: Colaborador;
 }
 
+interface ColaboradorDropdown {
+  id: number;
+  nome: string;
+}
+
 export default function PatrimonioDetail() {
   const params = useParams();
   const [, setLocation] = useLocation();
   const patrimonioId = params.id;
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [comboboxOpen, setComboboxOpen] = useState(false);
 
   const { data: patrimonio, isLoading, error } = useQuery<PatrimonioComResponsavel>({
     queryKey: ["/api/patrimonio", patrimonioId],
@@ -67,6 +81,46 @@ export default function PatrimonioDetail() {
     },
     enabled: !!patrimonioId,
   });
+
+  const { data: colaboradoresDropdown = [] } = useQuery<ColaboradorDropdown[]>({
+    queryKey: ["/api/colaboradores/dropdown"],
+  });
+
+  const updateResponsavelMutation = useMutation({
+    mutationFn: async (responsavelNome: string | null) => {
+      return apiRequest("PATCH", `/api/patrimonio/${patrimonioId}/responsavel`, {
+        responsavelNome,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patrimonio", patrimonioId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patrimonio"] });
+      toast({
+        title: "Responsável atualizado",
+        description: "O responsável pelo patrimônio foi atualizado com sucesso.",
+      });
+      setComboboxOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar",
+        description: error.message || "Não foi possível atualizar o responsável.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSelectResponsavel = (nome: string) => {
+    if (nome === patrimonio?.responsavelAtual) {
+      setComboboxOpen(false);
+      return;
+    }
+    updateResponsavelMutation.mutate(nome);
+  };
+
+  const handleRemoveResponsavel = () => {
+    updateResponsavelMutation.mutate(null);
+  };
 
   const formatCurrency = (value: string | null) => {
     if (!value) return "-";
@@ -254,18 +308,66 @@ export default function PatrimonioDetail() {
                 </Card>
               </div>
 
-              {patrimonio.colaborador && (
-                <Card>
-                  <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-4">
+                  <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                       <User className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <CardTitle>Colaborador Vinculado</CardTitle>
-                      <CardDescription>Responsável atual pelo patrimônio</CardDescription>
+                      <CardTitle>Responsável pelo Patrimônio</CardTitle>
+                      <CardDescription>Colaborador atualmente responsável pelo bem</CardDescription>
                     </div>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={comboboxOpen}
+                        className="w-[280px] justify-between"
+                        data-testid="button-atribuir-responsavel"
+                      >
+                        {patrimonio.responsavelAtual ? (
+                          <span className="truncate">{patrimonio.responsavelAtual}</span>
+                        ) : (
+                          <span className="text-muted-foreground">Atribuir responsável...</span>
+                        )}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[280px] p-0" align="end">
+                      <Command>
+                        <CommandInput placeholder="Buscar colaborador..." data-testid="input-buscar-colaborador" />
+                        <CommandList>
+                          <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                          <CommandGroup>
+                            {colaboradoresDropdown.map((colaborador) => (
+                              <CommandItem
+                                key={colaborador.id}
+                                value={colaborador.nome}
+                                onSelect={() => handleSelectResponsavel(colaborador.nome)}
+                                data-testid={`option-colaborador-${colaborador.id}`}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    patrimonio.responsavelAtual === colaborador.nome
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                {colaborador.nome}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </CardHeader>
+                <CardContent>
+                  {patrimonio.colaborador ? (
                     <div className="flex items-start gap-4">
                       <Avatar className="h-16 w-16">
                         <AvatarFallback className="text-lg bg-primary/10 text-primary">
@@ -273,17 +375,33 @@ export default function PatrimonioDetail() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 space-y-4">
-                        <div>
-                          <div className="text-xl font-semibold" data-testid="colaborador-nome">
-                            {patrimonio.colaborador.nome}
-                          </div>
-                          {patrimonio.colaborador.cargo && (
-                            <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                              <Briefcase className="h-3 w-3" />
-                              {patrimonio.colaborador.cargo}
-                              {patrimonio.colaborador.setor && ` • ${patrimonio.colaborador.setor}`}
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="text-xl font-semibold" data-testid="colaborador-nome">
+                              {patrimonio.colaborador.nome}
                             </div>
-                          )}
+                            {patrimonio.colaborador.cargo && (
+                              <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                                <Briefcase className="h-3 w-3" />
+                                {patrimonio.colaborador.cargo}
+                                {patrimonio.colaborador.setor && ` • ${patrimonio.colaborador.setor}`}
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleRemoveResponsavel}
+                            disabled={updateResponsavelMutation.isPending}
+                            data-testid="button-remover-responsavel"
+                            title="Remover responsável"
+                          >
+                            {updateResponsavelMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <X className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </Button>
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -313,9 +431,21 @@ export default function PatrimonioDetail() {
                         </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+                        <UserPlus className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Nenhum responsável atribuído.
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use o botão acima para atribuir um colaborador.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="tecnicas" className="space-y-6 mt-6">
