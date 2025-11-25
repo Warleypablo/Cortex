@@ -1021,13 +1021,13 @@ export class DbStorage implements IStorage {
       .from(schema.rhPatrimonio)
       .where(sql`${schema.rhPatrimonio.responsavelAtual} IS NOT NULL AND ${schema.rhPatrimonio.responsavelAtual} != ''`);
     
-    const patrimoniosPorNomeExato = new Map<string, { id: number; descricao: string | null }[]>();
+    const patrimoniosPorNomeExato = new Map<string, { id: number; descricao: string | null; responsavelOriginal: string }[]>();
     
     for (const p of patrimonios) {
       if (p.responsavelAtual) {
         const trimmedName = p.responsavelAtual.trim();
         const existing = patrimoniosPorNomeExato.get(trimmedName) || [];
-        existing.push({ id: p.id, descricao: p.descricao });
+        existing.push({ id: p.id, descricao: p.descricao, responsavelOriginal: p.responsavelAtual });
         patrimoniosPorNomeExato.set(trimmedName, existing);
       }
     }
@@ -1037,7 +1037,7 @@ export class DbStorage implements IStorage {
       const matchedPatrimonios = patrimoniosPorNomeExato.get(colName) || [];
       return {
         ...col,
-        patrimonios: matchedPatrimonios,
+        patrimonios: matchedPatrimonios.map(p => ({ id: p.id, descricao: p.descricao })),
       };
     });
   }
