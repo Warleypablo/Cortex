@@ -3,8 +3,12 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3 } from "lucide-react";
+import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package } from "lucide-react";
 import { Link } from "wouter";
+
+type ColaboradorComPatrimonios = Colaborador & {
+  patrimonios: { id: number; descricao: string | null }[];
+};
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -115,7 +119,7 @@ function AddColaboradorDialog() {
       return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores/com-patrimonios"] });
       toast({
         title: "Colaborador adicionado",
         description: "O colaborador foi adicionado com sucesso.",
@@ -483,7 +487,7 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
       return await response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores/com-patrimonios"] });
       toast({
         title: "Colaborador atualizado",
         description: "As informações do colaborador foram atualizadas com sucesso.",
@@ -826,7 +830,7 @@ function DeleteConfirmDialog({ colaborador, open, onOpenChange }: { colaborador:
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores/com-patrimonios"] });
       toast({
         title: "Colaborador excluído",
         description: `${colaborador.nome} foi removido com sucesso.`,
@@ -879,13 +883,13 @@ export default function Colaboradores() {
   const [searchQuery, setSearchQuery] = useState("");
   const [squadFilter, setSquadFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [editingColaborador, setEditingColaborador] = useState<Colaborador | null>(null);
-  const [deletingColaborador, setDeletingColaborador] = useState<Colaborador | null>(null);
+  const [editingColaborador, setEditingColaborador] = useState<ColaboradorComPatrimonios | null>(null);
+  const [deletingColaborador, setDeletingColaborador] = useState<ColaboradorComPatrimonios | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
-  const { data: colaboradores = [], isLoading } = useQuery<Colaborador[]>({
-    queryKey: ["/api/colaboradores"],
+  const { data: colaboradores = [], isLoading } = useQuery<ColaboradorComPatrimonios[]>({
+    queryKey: ["/api/colaboradores/com-patrimonios"],
   });
 
   const uniqueSquads = useMemo(() => {
@@ -1029,13 +1033,14 @@ export default function Colaboradores() {
                   <TableHead className="min-w-[140px] bg-background">Proporcional</TableHead>
                   <TableHead className="min-w-[120px] bg-background">Tempo Turbo</TableHead>
                   <TableHead className="min-w-[140px] bg-background">Último Aumento</TableHead>
+                  <TableHead className="min-w-[150px] bg-background">Patrimônios</TableHead>
                   <TableHead className="min-w-[120px] sticky right-0 bg-background">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedColaboradores.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={18} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={19} className="text-center py-8 text-muted-foreground">
                       Nenhum colaborador encontrado
                     </TableCell>
                   </TableRow>
@@ -1251,6 +1256,27 @@ export default function Colaboradores() {
                                 </div>
                               )}
                             </>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1" data-testid={`patrimonios-${colaborador.id}`}>
+                          {colaborador.patrimonios && colaborador.patrimonios.length > 0 ? (
+                            colaborador.patrimonios.map((p) => (
+                              <Link key={p.id} href={`/dashboard/patrimonio/${p.id}`}>
+                                <Badge
+                                  variant="outline"
+                                  className="cursor-pointer hover:bg-primary/10"
+                                  title={p.descricao || `Patrimônio #${p.id}`}
+                                  data-testid={`badge-patrimonio-${p.id}`}
+                                >
+                                  <Package className="w-3 h-3 mr-1" />
+                                  {p.id}
+                                </Badge>
+                              </Link>
+                            ))
                           ) : (
                             <span className="text-muted-foreground text-sm">-</span>
                           )}

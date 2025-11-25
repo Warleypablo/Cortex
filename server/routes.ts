@@ -189,6 +189,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/colaboradores/com-patrimonios", async (req, res) => {
+    try {
+      const colaboradores = await storage.getColaboradoresComPatrimonios();
+      res.json(colaboradores);
+    } catch (error) {
+      console.error("[api] Error fetching colaboradores com patrimonios:", error);
+      res.status(500).json({ error: "Failed to fetch colaboradores com patrimonios" });
+    }
+  });
+
   app.post("/api/colaboradores", async (req, res) => {
     try {
       const validation = insertColaboradorSchema.safeParse(req.body);

@@ -131,6 +131,7 @@ export interface IStorage {
   getContasPagarByFornecedor(fornecedorId: string, limit?: number): Promise<ContaPagar[]>;
   getClienteRevenue(clienteId: string): Promise<{ mes: string; valor: number }[]>;
   getColaboradores(): Promise<Colaborador[]>;
+  getColaboradoresComPatrimonios(): Promise<(Colaborador & { patrimonios: { id: number; descricao: string | null }[] })[]>;
   createColaborador(colaborador: InsertColaborador): Promise<Colaborador>;
   updateColaborador(id: number, colaborador: Partial<InsertColaborador>): Promise<Colaborador>;
   deleteColaborador(id: number): Promise<void>;
@@ -231,6 +232,10 @@ export class MemStorage implements IStorage {
   }
 
   async getColaboradores(): Promise<Colaborador[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getColaboradoresComPatrimonios(): Promise<(Colaborador & { patrimonios: { id: number; descricao: string | null }[] })[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1002,6 +1007,44 @@ export class DbStorage implements IStorage {
       console.log(`[STORAGE DEBUG] Total ativos: ${ativos}`);
     }
     return result;
+  }
+
+  async getColaboradoresComPatrimonios(): Promise<(Colaborador & { patrimonios: { id: number; descricao: string | null }[] })[]> {
+    const colaboradores = await db.select().from(schema.rhPessoal).orderBy(schema.rhPessoal.nome);
+    
+    const patrimonios = await db
+      .select({
+        id: schema.rhPatrimonio.id,
+        descricao: schema.rhPatrimonio.descricao,
+        responsavelAtual: schema.rhPatrimonio.responsavelAtual,
+      })
+      .from(schema.rhPatrimonio)
+      .where(sql`${schema.rhPatrimonio.responsavelAtual} IS NOT NULL AND ${schema.rhPatrimonio.responsavelAtual} != ''`);
+    
+    const normalizeName = (name: string | null): string => {
+      if (!name) return '';
+      return name
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    };
+    
+    const patrimoniosPorColaborador = new Map<string, { id: number; descricao: string | null }[]>();
+    
+    for (const p of patrimonios) {
+      if (p.responsavelAtual) {
+        const normalizedName = normalizeName(p.responsavelAtual);
+        const existing = patrimoniosPorColaborador.get(normalizedName) || [];
+        existing.push({ id: p.id, descricao: p.descricao });
+        patrimoniosPorColaborador.set(normalizedName, existing);
+      }
+    }
+    
+    return colaboradores.map(col => ({
+      ...col,
+      patrimonios: patrimoniosPorColaborador.get(normalizeName(col.nome)) || [],
+    }));
   }
 
   async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
