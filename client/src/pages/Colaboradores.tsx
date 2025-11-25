@@ -1265,7 +1265,7 @@ export default function Colaboradores() {
                         <div className="flex flex-wrap gap-1" data-testid={`patrimonios-${colaborador.id}`}>
                           {colaborador.patrimonios && colaborador.patrimonios.length > 0 ? (
                             colaborador.patrimonios.map((p) => (
-                              <Link key={p.id} href={`/dashboard/patrimonio/${p.id}`}>
+                              <Link key={p.id} href={`/patrimonio/${p.id}`}>
                                 <Badge
                                   variant="outline"
                                   className="cursor-pointer hover:bg-primary/10"
