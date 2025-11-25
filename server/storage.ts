@@ -139,6 +139,8 @@ export interface IStorage {
   getPatrimonios(): Promise<Patrimonio[]>;
   getPatrimonioById(id: number): Promise<PatrimonioComResponsavel | undefined>;
   createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio>;
+  getColaboradoresDropdown(): Promise<{ id: number; nome: string }[]>;
+  updatePatrimonioResponsavel(id: number, responsavelNome: string | null): Promise<Patrimonio>;
   getColaboradoresAnalise(): Promise<DashboardAnaliseData>;
   getSaldoAtualBancos(): Promise<SaldoBancos>;
   getFluxoCaixa(): Promise<FluxoCaixaItem[]>;
@@ -261,6 +263,14 @@ export class MemStorage implements IStorage {
   }
 
   async createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getColaboradoresDropdown(): Promise<{ id: number; nome: string }[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async updatePatrimonioResponsavel(id: number, responsavelNome: string | null): Promise<Patrimonio> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1120,6 +1130,33 @@ export class DbStorage implements IStorage {
   async createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio> {
     const [newPatrimonio] = await db.insert(schema.rhPatrimonio).values(patrimonio as any).returning();
     return newPatrimonio;
+  }
+
+  async getColaboradoresDropdown(): Promise<{ id: number; nome: string }[]> {
+    const result = await db
+      .select({
+        id: schema.rhPessoal.id,
+        nome: schema.rhPessoal.nome,
+      })
+      .from(schema.rhPessoal)
+      .where(eq(schema.rhPessoal.status, 'Ativo'))
+      .orderBy(schema.rhPessoal.nome);
+    
+    return result;
+  }
+
+  async updatePatrimonioResponsavel(id: number, responsavelNome: string | null): Promise<Patrimonio> {
+    const [updated] = await db
+      .update(schema.rhPatrimonio)
+      .set({ responsavelAtual: responsavelNome })
+      .where(eq(schema.rhPatrimonio.id, id))
+      .returning();
+    
+    if (!updated) {
+      throw new Error("Patrimônio não encontrado");
+    }
+    
+    return updated;
   }
 
   async getColaboradoresAnalise(): Promise<DashboardAnaliseData> {

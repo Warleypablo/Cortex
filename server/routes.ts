@@ -296,6 +296,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/colaboradores/dropdown", async (req, res) => {
+    try {
+      const colaboradores = await storage.getColaboradoresDropdown();
+      res.json(colaboradores);
+    } catch (error) {
+      console.error("[api] Error fetching colaboradores dropdown:", error);
+      res.status(500).json({ error: "Failed to fetch colaboradores" });
+    }
+  });
+
+  app.patch("/api/patrimonio/:id/responsavel", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid patrimonio ID" });
+      }
+      
+      const { responsavelNome } = req.body;
+      if (responsavelNome !== null && typeof responsavelNome !== 'string') {
+        return res.status(400).json({ error: "responsavelNome deve ser uma string ou null" });
+      }
+
+      const patrimonio = await storage.updatePatrimonioResponsavel(id, responsavelNome);
+      res.json(patrimonio);
+    } catch (error) {
+      console.error("[api] Error updating patrimonio responsavel:", error);
+      res.status(500).json({ error: "Failed to update patrimonio responsavel" });
+    }
+  });
+
   app.get("/api/dashboard/saldo-atual", async (req, res) => {
     try {
       const saldo = await storage.getSaldoAtualBancos();
