@@ -7,7 +7,7 @@ import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Build
 import { Link } from "wouter";
 
 type ColaboradorComPatrimonios = Colaborador & {
-  patrimonios: { id: number; descricao: string | null }[];
+  patrimonios: { id: number; numeroAtivo: string | null; descricao: string | null }[];
 };
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1269,11 +1269,11 @@ export default function Colaboradores() {
                                 <Badge
                                   variant="outline"
                                   className="cursor-pointer hover:bg-primary/10"
-                                  title={p.descricao || `Patrimônio #${p.id}`}
+                                  title={p.descricao || `Patrimônio #${p.numeroAtivo || p.id}`}
                                   data-testid={`badge-patrimonio-${p.id}`}
                                 >
                                   <Package className="w-3 h-3 mr-1" />
-                                  {p.id}
+                                  {p.numeroAtivo || p.id}
                                 </Badge>
                               </Link>
                             ))

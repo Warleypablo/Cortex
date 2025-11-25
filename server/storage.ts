@@ -1009,25 +1009,26 @@ export class DbStorage implements IStorage {
     return result;
   }
 
-  async getColaboradoresComPatrimonios(): Promise<(Colaborador & { patrimonios: { id: number; descricao: string | null }[] })[]> {
+  async getColaboradoresComPatrimonios(): Promise<(Colaborador & { patrimonios: { id: number; numeroAtivo: string | null; descricao: string | null }[] })[]> {
     const colaboradores = await db.select().from(schema.rhPessoal).orderBy(schema.rhPessoal.nome);
     
     const patrimonios = await db
       .select({
         id: schema.rhPatrimonio.id,
+        numeroAtivo: schema.rhPatrimonio.numeroAtivo,
         descricao: schema.rhPatrimonio.descricao,
         responsavelAtual: schema.rhPatrimonio.responsavelAtual,
       })
       .from(schema.rhPatrimonio)
       .where(sql`${schema.rhPatrimonio.responsavelAtual} IS NOT NULL AND ${schema.rhPatrimonio.responsavelAtual} != ''`);
     
-    const patrimoniosPorNomeExato = new Map<string, { id: number; descricao: string | null; responsavelOriginal: string }[]>();
+    const patrimoniosPorNomeExato = new Map<string, { id: number; numeroAtivo: string | null; descricao: string | null }[]>();
     
     for (const p of patrimonios) {
       if (p.responsavelAtual) {
         const trimmedName = p.responsavelAtual.trim();
         const existing = patrimoniosPorNomeExato.get(trimmedName) || [];
-        existing.push({ id: p.id, descricao: p.descricao, responsavelOriginal: p.responsavelAtual });
+        existing.push({ id: p.id, numeroAtivo: p.numeroAtivo, descricao: p.descricao });
         patrimoniosPorNomeExato.set(trimmedName, existing);
       }
     }
@@ -1037,7 +1038,7 @@ export class DbStorage implements IStorage {
       const matchedPatrimonios = patrimoniosPorNomeExato.get(colName) || [];
       return {
         ...col,
-        patrimonios: matchedPatrimonios.map(p => ({ id: p.id, descricao: p.descricao })),
+        patrimonios: matchedPatrimonios,
       };
     });
   }
