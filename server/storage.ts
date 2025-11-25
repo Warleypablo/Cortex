@@ -1,7 +1,7 @@
 import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
-import { eq, desc, and, gte, lte, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
 
 export type ClienteCompleto = Cliente & {
   nomeClickup: string | null;
@@ -1018,27 +1018,37 @@ export class DbStorage implements IStorage {
         numeroAtivo: schema.rhPatrimonio.numeroAtivo,
         descricao: schema.rhPatrimonio.descricao,
         responsavelAtual: schema.rhPatrimonio.responsavelAtual,
+        responsavelId: schema.rhPatrimonio.responsavelId,
       })
       .from(schema.rhPatrimonio)
-      .where(sql`${schema.rhPatrimonio.responsavelAtual} IS NOT NULL AND ${schema.rhPatrimonio.responsavelAtual} != ''`);
+      .where(sql`(${schema.rhPatrimonio.responsavelId} IS NOT NULL) OR (${schema.rhPatrimonio.responsavelAtual} IS NOT NULL AND ${schema.rhPatrimonio.responsavelAtual} != '')`);
     
-    const patrimoniosPorNomeExato = new Map<string, { id: number; numeroAtivo: string | null; descricao: string | null }[]>();
+    const patrimoniosPorId = new Map<number, { id: number; numeroAtivo: string | null; descricao: string | null }[]>();
+    const patrimoniosPorNome = new Map<string, { id: number; numeroAtivo: string | null; descricao: string | null }[]>();
     
     for (const p of patrimonios) {
-      if (p.responsavelAtual) {
+      const patrimonioData = { id: p.id, numeroAtivo: p.numeroAtivo, descricao: p.descricao };
+      
+      if (p.responsavelId) {
+        const existing = patrimoniosPorId.get(p.responsavelId) || [];
+        existing.push(patrimonioData);
+        patrimoniosPorId.set(p.responsavelId, existing);
+      } else if (p.responsavelAtual) {
         const trimmedName = p.responsavelAtual.trim();
-        const existing = patrimoniosPorNomeExato.get(trimmedName) || [];
-        existing.push({ id: p.id, numeroAtivo: p.numeroAtivo, descricao: p.descricao });
-        patrimoniosPorNomeExato.set(trimmedName, existing);
+        const existing = patrimoniosPorNome.get(trimmedName) || [];
+        existing.push(patrimonioData);
+        patrimoniosPorNome.set(trimmedName, existing);
       }
     }
     
     return colaboradores.map(col => {
+      const byId = patrimoniosPorId.get(col.id) || [];
       const colName = (col.nome || '').trim();
-      const matchedPatrimonios = patrimoniosPorNomeExato.get(colName) || [];
+      const byName = patrimoniosPorNome.get(colName) || [];
+      const allPatrimonios = [...byId, ...byName];
       return {
         ...col,
-        patrimonios: matchedPatrimonios,
+        patrimonios: allPatrimonios,
       };
     });
   }
@@ -1132,6 +1142,7 @@ export class DbStorage implements IStorage {
         marca: schema.rhPatrimonio.marca,
         estadoConservacao: schema.rhPatrimonio.estadoConservacao,
         responsavelAtual: schema.rhPatrimonio.responsavelAtual,
+        responsavelId: schema.rhPatrimonio.responsavelId,
         valorPago: schema.rhPatrimonio.valorPago,
         valorMercado: schema.rhPatrimonio.valorMercado,
         valorVenda: schema.rhPatrimonio.valorVenda,
@@ -1141,7 +1152,13 @@ export class DbStorage implements IStorage {
       .from(schema.rhPatrimonio)
       .leftJoin(
         schema.rhPessoal,
-        eq(schema.rhPatrimonio.responsavelAtual, schema.rhPessoal.nome)
+        or(
+          eq(schema.rhPatrimonio.responsavelId, schema.rhPessoal.id),
+          and(
+            isNull(schema.rhPatrimonio.responsavelId),
+            eq(schema.rhPatrimonio.responsavelAtual, schema.rhPessoal.nome)
+          )
+        )
       )
       .where(eq(schema.rhPatrimonio.id, id))
       .limit(1);
@@ -1158,6 +1175,7 @@ export class DbStorage implements IStorage {
       marca: row.marca,
       estadoConservacao: row.estadoConservacao,
       responsavelAtual: row.responsavelAtual,
+      responsavelId: row.responsavelId,
       valorPago: row.valorPago,
       valorMercado: row.valorMercado,
       valorVenda: row.valorVenda,
