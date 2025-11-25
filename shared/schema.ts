@@ -225,6 +225,7 @@ export const rhPatrimonio = pgTable("rh_patrimonio", {
   marca: varchar("marca", { length: 150 }),
   estadoConservacao: varchar("estado_conservacao", { length: 100 }),
   responsavelAtual: varchar("responsavel_atual", { length: 200 }),
+  responsavelId: integer("responsavel_id"),
   valorPago: decimal("valor_pago"),
   valorMercado: decimal("valor_mercado"),
   valorVenda: decimal("valor_venda"),

@@ -32,6 +32,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/debug-patrimonio-mapping", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          p.id,
+          p.numero_ativo,
+          p.responsavel_atual,
+          p.responsavel_id,
+          p.descricao,
+          c.id as colaborador_id,
+          c.nome as colaborador_nome
+        FROM rh_patrimonio p
+        LEFT JOIN rh_pessoal c ON TRIM(c.nome) = TRIM(p.responsavel_atual)
+        WHERE p.responsavel_atual IS NOT NULL AND p.responsavel_atual != ''
+        ORDER BY p.numero_ativo::integer NULLS LAST
+      `);
+      
+      const patrimonios = result.rows;
+      const semMatch = patrimonios.filter((p: any) => !p.colaborador_id && !p.responsavel_id);
+      const comMatch = patrimonios.filter((p: any) => p.colaborador_id || p.responsavel_id);
+      
+      res.json({
+        total: patrimonios.length,
+        comMatch: comMatch.length,
+        semMatch: semMatch.length,
+        patrimoniosSemMatch: semMatch,
+        patrimoniosComMatch: comMatch
+      });
+    } catch (error) {
+      console.error("[debug] Error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.post("/debug-add-responsavel-id-column", async (req, res) => {
+    try {
+      await db.execute(sql`
+        ALTER TABLE rh_patrimonio 
+        ADD COLUMN IF NOT EXISTS responsavel_id INTEGER
+      `);
+      res.json({ success: true, message: "Coluna responsavel_id adicionada com sucesso" });
+    } catch (error) {
+      console.error("[debug] Error adding column:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.post("/debug-backfill-responsavel-id", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        UPDATE rh_patrimonio p
+        SET responsavel_id = c.id
+        FROM rh_pessoal c
+        WHERE TRIM(p.responsavel_atual) = TRIM(c.nome)
+        AND p.responsavel_id IS NULL
+        RETURNING p.id, p.numero_ativo, p.responsavel_atual, c.id as colaborador_id, c.nome
+      `);
+      res.json({ 
+        success: true, 
+        updated: result.rowCount,
+        rows: result.rows
+      });
+    } catch (error) {
+      console.error("[debug] Error backfilling:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.post("/debug-set-responsavel-id", async (req, res) => {
+    try {
+      const { patrimonioId, colaboradorId } = req.body;
+      if (!patrimonioId || !colaboradorId) {
+        return res.status(400).json({ error: "patrimonioId e colaboradorId são obrigatórios" });
+      }
+      await db.execute(sql`
+        UPDATE rh_patrimonio 
+        SET responsavel_id = ${colaboradorId}
+        WHERE id = ${patrimonioId}
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[debug] Error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.get("/debug-patrimonios-sem-match", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          p.id,
+          p.numero_ativo,
+          p.responsavel_atual,
+          p.responsavel_id
+        FROM rh_patrimonio p
+        WHERE p.responsavel_atual IS NOT NULL 
+          AND p.responsavel_atual != ''
+          AND p.responsavel_id IS NULL
+        ORDER BY p.numero_ativo::integer NULLS LAST
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[debug] Error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.get("/debug-colaboradores-busca", async (req, res) => {
+    try {
+      const { nome } = req.query;
+      if (!nome) {
+        return res.status(400).json({ error: "nome é obrigatório" });
+      }
+      const result = await db.execute(sql`
+        SELECT id, nome
+        FROM rh_pessoal
+        WHERE LOWER(nome) LIKE LOWER(${'%' + nome + '%'})
+        ORDER BY nome
+        LIMIT 10
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[debug] Error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  app.post("/debug-smart-backfill", async (req, res) => {
+    try {
+      const patrimoniosResult = await db.execute(sql`
+        SELECT id, numero_ativo, responsavel_atual
+        FROM rh_patrimonio
+        WHERE responsavel_atual IS NOT NULL 
+          AND responsavel_atual != ''
+          AND responsavel_id IS NULL
+      `);
+      
+      const colaboradoresResult = await db.execute(sql`
+        SELECT id, nome FROM rh_pessoal
+      `);
+      
+      const colaboradores = colaboradoresResult.rows as { id: number; nome: string }[];
+      const patrimonios = patrimoniosResult.rows as { id: number; numero_ativo: string; responsavel_atual: string }[];
+      
+      const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      
+      const updates: { patrimonioId: number; numeroAtivo: string; responsavelAtual: string; colaboradorId: number; colaboradorNome: string }[] = [];
+      
+      for (const p of patrimonios) {
+        const respNorm = normalize(p.responsavel_atual);
+        const palavras = respNorm.split(/\s+/).filter(w => w.length > 2);
+        
+        if (palavras.length < 2) continue;
+        
+        const primeiroNome = palavras[0];
+        const ultimoNome = palavras[palavras.length - 1];
+        
+        let melhorMatch: { id: number; nome: string } | null = null;
+        let melhorScore = 0;
+        
+        for (const c of colaboradores) {
+          const colNorm = normalize(c.nome);
+          const palavrasCol = colNorm.split(/\s+/).filter(w => w.length > 2);
+          
+          if (palavrasCol.length < 2) continue;
+          
+          const primNomeCol = palavrasCol[0];
+          const ultNomeCol = palavrasCol[palavrasCol.length - 1];
+          
+          if (primeiroNome === primNomeCol && ultimoNome === ultNomeCol) {
+            melhorMatch = c;
+            melhorScore = 2;
+            break;
+          }
+          
+          if (primeiroNome === primNomeCol && melhorScore < 1) {
+            melhorMatch = c;
+            melhorScore = 1;
+          }
+        }
+        
+        if (melhorMatch && melhorScore >= 2) {
+          await db.execute(sql`
+            UPDATE rh_patrimonio SET responsavel_id = ${melhorMatch.id} WHERE id = ${p.id}
+          `);
+          updates.push({
+            patrimonioId: p.id,
+            numeroAtivo: p.numero_ativo,
+            responsavelAtual: p.responsavel_atual,
+            colaboradorId: melhorMatch.id,
+            colaboradorNome: melhorMatch.nome
+          });
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        updated: updates.length,
+        matches: updates
+      });
+    } catch (error) {
+      console.error("[debug] Error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
   app.use("/api", isAuthenticated);
   
   app.get("/api/debug/users", isAdmin, async (req, res) => {
