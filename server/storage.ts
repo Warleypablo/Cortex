@@ -1043,13 +1043,12 @@ export class DbStorage implements IStorage {
     
     return colaboradores.map(col => {
       const byId = patrimoniosPorId.get(col.id) || [];
+      if (byId.length > 0) {
+        return { ...col, patrimonios: byId };
+      }
       const colName = (col.nome || '').trim();
       const byName = patrimoniosPorNome.get(colName) || [];
-      const allPatrimonios = [...byId, ...byName];
-      return {
-        ...col,
-        patrimonios: allPatrimonios,
-      };
+      return { ...col, patrimonios: byName };
     });
   }
 
