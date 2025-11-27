@@ -1246,6 +1246,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Recruitment Analytics API Routes (Power BI style G&G Dashboard)
+  app.get("/api/recrutamento/kpis", async (req, res) => {
+    try {
+      const kpis = await storage.getRecrutamentoKPIs();
+      res.json(kpis);
+    } catch (error) {
+      console.error("[api] Error fetching recruitment KPIs:", error);
+      res.status(500).json({ error: "Failed to fetch recruitment KPIs" });
+    }
+  });
+
+  app.get("/api/recrutamento/funil", async (req, res) => {
+    try {
+      const funil = await storage.getRecrutamentoFunil();
+      res.json(funil);
+    } catch (error) {
+      console.error("[api] Error fetching recruitment funnel:", error);
+      res.status(500).json({ error: "Failed to fetch recruitment funnel" });
+    }
+  });
+
+  app.get("/api/recrutamento/fontes", async (req, res) => {
+    try {
+      const fontes = await storage.getRecrutamentoFontes();
+      res.json(fontes);
+    } catch (error) {
+      console.error("[api] Error fetching recruitment sources:", error);
+      res.status(500).json({ error: "Failed to fetch recruitment sources" });
+    }
+  });
+
+  app.get("/api/recrutamento/evolucao", async (req, res) => {
+    try {
+      const meses = parseInt(req.query.meses as string) || 6;
+      const evolucao = await storage.getRecrutamentoEvolucao(meses);
+      res.json(evolucao);
+    } catch (error) {
+      console.error("[api] Error fetching recruitment evolution:", error);
+      res.status(500).json({ error: "Failed to fetch recruitment evolution" });
+    }
+  });
+
+  app.get("/api/recrutamento/vagas", async (req, res) => {
+    try {
+      const area = req.query.area as string | undefined;
+      const status = req.query.status as string | undefined;
+      const vagas = await storage.getRecrutamentoVagas({ area, status });
+      res.json(vagas);
+    } catch (error) {
+      console.error("[api] Error fetching recruitment vacancies:", error);
+      res.status(500).json({ error: "Failed to fetch recruitment vacancies" });
+    }
+  });
+
+  app.get("/api/recrutamento/areas", async (req, res) => {
+    try {
+      const areas = await storage.getRecrutamentoAreas();
+      res.json(areas);
+    } catch (error) {
+      console.error("[api] Error fetching recruitment areas:", error);
+      res.status(500).json({ error: "Failed to fetch recruitment areas" });
+    }
+  });
+
+  app.get("/api/recrutamento/filtros", async (req, res) => {
+    try {
+      const filtros = await storage.getRecrutamentoFiltros();
+      res.json(filtros);
+    } catch (error) {
+      console.error("[api] Error fetching recruitment filters:", error);
+      res.status(500).json({ error: "Failed to fetch recruitment filters" });
+    }
+  });
+
+  app.get("/api/recrutamento/conversao-por-vaga", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const conversao = await storage.getRecrutamentoConversaoPorVaga(limit);
+      res.json(conversao);
+    } catch (error) {
+      console.error("[api] Error fetching recruitment conversion by vacancy:", error);
+      res.status(500).json({ error: "Failed to fetch recruitment conversion by vacancy" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

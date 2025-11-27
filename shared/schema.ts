@@ -797,3 +797,94 @@ export type FinanceiroContaBancaria = {
   saldo: number;
   empresa: string;
 };
+
+// Recruitment Analytics Types (Power BI style G&G Dashboard)
+export type RecrutamentoKPIs = {
+  totalCandidaturas: number;
+  candidatosAtivos: number;
+  candidatosRejeitados: number;
+  candidatosDeclinados: number;
+  vagasAbertas: number;
+  vagasPausadas: number;
+  vagasCanceladas: number;
+  taxaConversaoGeral: number;
+  tempoMedioContratacao: number;
+  huntingTotal: number;
+  passivoTotal: number;
+};
+
+export type RecrutamentoFunilEtapa = {
+  etapa: string;
+  ordem: number;
+  total: number;
+  percentual: number;
+  conversaoAnterior: number;
+};
+
+export type RecrutamentoFonteDistribuicao = {
+  fonte: string;
+  total: number;
+  percentual: number;
+  ativos: number;
+  rejeitados: number;
+  declinados: number;
+};
+
+export type RecrutamentoEvolucaoMensal = {
+  mes: string;
+  mesLabel: string;
+  totalCandidaturas: number;
+  hunting: number;
+  passivo: number;
+  aprovados: number;
+  rejeitados: number;
+};
+
+export type RecrutamentoVagaDetalhe = {
+  vagaId: number;
+  vagaNome: string;
+  area: string | null;
+  seniority: string | null;
+  status: string;
+  totalCandidatos: number;
+  candidatosAtivos: number;
+  etapas: {
+    etapa: string;
+    total: number;
+    percentual: number;
+  }[];
+  fontes: {
+    fonte: string;
+    total: number;
+  }[];
+  conversaoOferta: number;
+};
+
+export type RecrutamentoAreaDistribuicao = {
+  area: string;
+  totalVagas: number;
+  vagasAbertas: number;
+  totalCandidatos: number;
+  conversaoMedia: number;
+};
+
+export type RecrutamentoFiltros = {
+  areas: string[];
+  seniorities: string[];
+  fontes: string[];
+  statusVagas: string[];
+  etapas: string[];
+};
+
+export type RecrutamentoConversaoPorVaga = {
+  vagaId: number;
+  vagaNome: string;
+  area: string | null;
+  inscricao: number;
+  triagem: number;
+  entrevistaRS: number;
+  entrevistaTecnica: number;
+  entrevistaFinal: number;
+  oferta: number;
+  taxaConversao: number;
+};
