@@ -181,6 +181,14 @@ export interface IStorage {
   getCreativePerformance(startDate?: string, endDate?: string): Promise<CreativePerformance[]>;
   getConversionFunnel(startDate?: string, endDate?: string, leadFilters?: import("@shared/schema").MetaLeadFilterParams): Promise<ConversionFunnel>;
   getAuditoriaSistemas(filters?: { mesAno?: string; dataInicio?: string; dataFim?: string; squad?: string; apenasDivergentes?: boolean; statusFiltro?: string; threshold?: number }): Promise<import("@shared/schema").AuditoriaSistemas[]>;
+  getRecrutamentoKPIs(): Promise<import("@shared/schema").RecrutamentoKPIs>;
+  getRecrutamentoFunil(): Promise<import("@shared/schema").RecrutamentoFunilEtapa[]>;
+  getRecrutamentoFontes(): Promise<import("@shared/schema").RecrutamentoFonteDistribuicao[]>;
+  getRecrutamentoEvolucao(meses?: number): Promise<import("@shared/schema").RecrutamentoEvolucaoMensal[]>;
+  getRecrutamentoVagas(filters?: { area?: string; status?: string }): Promise<import("@shared/schema").RecrutamentoVagaDetalhe[]>;
+  getRecrutamentoAreas(): Promise<import("@shared/schema").RecrutamentoAreaDistribuicao[]>;
+  getRecrutamentoFiltros(): Promise<import("@shared/schema").RecrutamentoFiltros>;
+  getRecrutamentoConversaoPorVaga(limit?: number): Promise<import("@shared/schema").RecrutamentoConversaoPorVaga[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -432,6 +440,38 @@ export class MemStorage implements IStorage {
   }
 
   async getAuditoriaSistemas(filters?: { mesAno?: string; dataInicio?: string; dataFim?: string; squad?: string; apenasDivergentes?: boolean; statusFiltro?: string; threshold?: number }): Promise<import("@shared/schema").AuditoriaSistemas[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getRecrutamentoKPIs(): Promise<import("@shared/schema").RecrutamentoKPIs> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getRecrutamentoFunil(): Promise<import("@shared/schema").RecrutamentoFunilEtapa[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getRecrutamentoFontes(): Promise<import("@shared/schema").RecrutamentoFonteDistribuicao[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getRecrutamentoEvolucao(meses?: number): Promise<import("@shared/schema").RecrutamentoEvolucaoMensal[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getRecrutamentoVagas(filters?: { area?: string; status?: string }): Promise<import("@shared/schema").RecrutamentoVagaDetalhe[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getRecrutamentoAreas(): Promise<import("@shared/schema").RecrutamentoAreaDistribuicao[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getRecrutamentoFiltros(): Promise<import("@shared/schema").RecrutamentoFiltros> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getRecrutamentoConversaoPorVaga(limit?: number): Promise<import("@shared/schema").RecrutamentoConversaoPorVaga[]> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -3855,6 +3895,314 @@ export class DbStorage implements IStorage {
       saldo: parseFloat(row.saldo || '0'),
       empresa: row.empresa || '',
     }));
+  }
+
+  async getRecrutamentoKPIs(): Promise<import("@shared/schema").RecrutamentoKPIs> {
+    const result = await db.execute(sql`
+      WITH candidaturas_stats AS (
+        SELECT 
+          COUNT(*) as total,
+          COUNT(CASE WHEN talent_status = 'active' THEN 1 END) as ativos,
+          COUNT(CASE WHEN talent_status = 'rejected' THEN 1 END) as rejeitados,
+          COUNT(CASE WHEN talent_status = 'declined' THEN 1 END) as declinados,
+          COUNT(CASE WHEN source = 'manual' THEN 1 END) as hunting,
+          COUNT(CASE WHEN source != 'manual' THEN 1 END) as passivo,
+          COUNT(CASE WHEN stage_name = 'Oferta' THEN 1 END) as ofertas
+        FROM rh_candidaturas
+      ),
+      vagas_stats AS (
+        SELECT
+          COUNT(CASE WHEN status = 'open' THEN 1 END) as abertas,
+          COUNT(CASE WHEN status = 'paused' THEN 1 END) as pausadas,
+          COUNT(CASE WHEN status = 'canceled' THEN 1 END) as canceladas
+        FROM rh_vagas
+      )
+      SELECT 
+        cs.total::int as "totalCandidaturas",
+        cs.ativos::int as "candidatosAtivos",
+        cs.rejeitados::int as "candidatosRejeitados",
+        cs.declinados::int as "candidatosDeclinados",
+        vs.abertas::int as "vagasAbertas",
+        vs.pausadas::int as "vagasPausadas",
+        vs.canceladas::int as "vagasCanceladas",
+        CASE WHEN cs.total > 0 THEN (cs.ofertas::float / cs.total::float * 100) ELSE 0 END as "taxaConversaoGeral",
+        0 as "tempoMedioContratacao",
+        cs.hunting::int as "huntingTotal",
+        cs.passivo::int as "passivoTotal"
+      FROM candidaturas_stats cs, vagas_stats vs
+    `);
+
+    const row = result.rows[0] as any;
+    return {
+      totalCandidaturas: parseInt(row.totalCandidaturas || '0'),
+      candidatosAtivos: parseInt(row.candidatosAtivos || '0'),
+      candidatosRejeitados: parseInt(row.candidatosRejeitados || '0'),
+      candidatosDeclinados: parseInt(row.candidatosDeclinados || '0'),
+      vagasAbertas: parseInt(row.vagasAbertas || '0'),
+      vagasPausadas: parseInt(row.vagasPausadas || '0'),
+      vagasCanceladas: parseInt(row.vagasCanceladas || '0'),
+      taxaConversaoGeral: parseFloat(row.taxaConversaoGeral || '0'),
+      tempoMedioContratacao: parseFloat(row.tempoMedioContratacao || '0'),
+      huntingTotal: parseInt(row.huntingTotal || '0'),
+      passivoTotal: parseInt(row.passivoTotal || '0'),
+    };
+  }
+
+  async getRecrutamentoFunil(): Promise<import("@shared/schema").RecrutamentoFunilEtapa[]> {
+    const etapasOrdem: Record<string, number> = {
+      'Inscrição': 1,
+      'Triagem': 2,
+      'Entrevista R&S': 3,
+      'Teste tecnico': 4,
+      'Entrevista técnica': 5,
+      'Entrevista final': 6,
+      'Oferta': 7,
+    };
+
+    const result = await db.execute(sql`
+      SELECT 
+        stage_name as etapa,
+        COUNT(*) as total
+      FROM rh_candidaturas
+      WHERE stage_name IS NOT NULL
+      GROUP BY stage_name
+      ORDER BY COUNT(*) DESC
+    `);
+
+    const rows = result.rows as any[];
+    const totalGeral = rows.reduce((sum, r) => sum + parseInt(r.total || '0'), 0);
+    
+    const sortedRows = rows
+      .map(row => ({
+        etapa: row.etapa,
+        ordem: etapasOrdem[row.etapa] || 99,
+        total: parseInt(row.total || '0'),
+      }))
+      .sort((a, b) => a.ordem - b.ordem);
+
+    return sortedRows.map((row, index) => {
+      const anteriorTotal = index > 0 ? sortedRows[index - 1].total : totalGeral;
+      return {
+        etapa: row.etapa,
+        ordem: row.ordem,
+        total: row.total,
+        percentual: totalGeral > 0 ? (row.total / totalGeral) * 100 : 0,
+        conversaoAnterior: anteriorTotal > 0 ? (row.total / anteriorTotal) * 100 : 0,
+      };
+    });
+  }
+
+  async getRecrutamentoFontes(): Promise<import("@shared/schema").RecrutamentoFonteDistribuicao[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(source, 'Não informado') as fonte,
+        COUNT(*) as total,
+        COUNT(CASE WHEN talent_status = 'active' THEN 1 END) as ativos,
+        COUNT(CASE WHEN talent_status = 'rejected' THEN 1 END) as rejeitados,
+        COUNT(CASE WHEN talent_status = 'declined' THEN 1 END) as declinados
+      FROM rh_candidaturas
+      GROUP BY source
+      ORDER BY total DESC
+    `);
+
+    const rows = result.rows as any[];
+    const totalGeral = rows.reduce((sum, r) => sum + parseInt(r.total || '0'), 0);
+
+    return rows.map(row => ({
+      fonte: row.fonte || 'Não informado',
+      total: parseInt(row.total || '0'),
+      percentual: totalGeral > 0 ? (parseInt(row.total || '0') / totalGeral) * 100 : 0,
+      ativos: parseInt(row.ativos || '0'),
+      rejeitados: parseInt(row.rejeitados || '0'),
+      declinados: parseInt(row.declinados || '0'),
+    }));
+  }
+
+  async getRecrutamentoEvolucao(meses: number = 6): Promise<import("@shared/schema").RecrutamentoEvolucaoMensal[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        TO_CHAR(inserted_at, 'YYYY-MM') as mes,
+        COUNT(*) as total,
+        COUNT(CASE WHEN source = 'manual' THEN 1 END) as hunting,
+        COUNT(CASE WHEN source != 'manual' THEN 1 END) as passivo,
+        COUNT(CASE WHEN stage_name = 'Oferta' THEN 1 END) as aprovados,
+        COUNT(CASE WHEN talent_status = 'rejected' THEN 1 END) as rejeitados
+      FROM rh_candidaturas
+      WHERE inserted_at >= NOW() - INTERVAL '1 month' * ${meses}
+      GROUP BY TO_CHAR(inserted_at, 'YYYY-MM')
+      ORDER BY mes
+    `);
+
+    const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+    return (result.rows as any[]).map(row => {
+      const [ano, mesNum] = row.mes.split('-');
+      return {
+        mes: row.mes,
+        mesLabel: `${mesesNomes[parseInt(mesNum) - 1]}/${ano.slice(2)}`,
+        totalCandidaturas: parseInt(row.total || '0'),
+        hunting: parseInt(row.hunting || '0'),
+        passivo: parseInt(row.passivo || '0'),
+        aprovados: parseInt(row.aprovados || '0'),
+        rejeitados: parseInt(row.rejeitados || '0'),
+      };
+    });
+  }
+
+  async getRecrutamentoVagas(filters?: { area?: string; status?: string }): Promise<import("@shared/schema").RecrutamentoVagaDetalhe[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        v.id as vaga_id,
+        v.nome as vaga_nome,
+        v.area,
+        v.seniority,
+        v.status,
+        COUNT(c.id) as total_candidatos,
+        COUNT(CASE WHEN c.talent_status = 'active' THEN 1 END) as candidatos_ativos,
+        COUNT(CASE WHEN c.stage_name = 'Inscrição' THEN 1 END) as inscricao,
+        COUNT(CASE WHEN c.stage_name = 'Triagem' THEN 1 END) as triagem,
+        COUNT(CASE WHEN c.stage_name = 'Entrevista R&S' THEN 1 END) as entrevista_rs,
+        COUNT(CASE WHEN c.stage_name = 'Entrevista técnica' THEN 1 END) as entrevista_tecnica,
+        COUNT(CASE WHEN c.stage_name = 'Entrevista final' THEN 1 END) as entrevista_final,
+        COUNT(CASE WHEN c.stage_name = 'Oferta' THEN 1 END) as oferta,
+        json_agg(DISTINCT c.source) FILTER (WHERE c.source IS NOT NULL) as fontes
+      FROM rh_vagas v
+      LEFT JOIN rh_candidaturas c ON c.job_id_hash = v.id::text
+      WHERE 1=1
+        ${filters?.area && filters.area !== 'todos' ? sql`AND v.area = ${filters.area}` : sql``}
+        ${filters?.status && filters.status !== 'todos' ? sql`AND v.status = ${filters.status}` : sql``}
+      GROUP BY v.id, v.nome, v.area, v.seniority, v.status
+      ORDER BY total_candidatos DESC
+    `);
+
+    return (result.rows as any[]).map(row => {
+      const total = parseInt(row.total_candidatos || '0');
+      const oferta = parseInt(row.oferta || '0');
+      const inscricao = parseInt(row.inscricao || '0');
+      const triagem = parseInt(row.triagem || '0');
+      const entrevistaRS = parseInt(row.entrevista_rs || '0');
+      const entrevistaTecnica = parseInt(row.entrevista_tecnica || '0');
+      const entrevistaFinal = parseInt(row.entrevista_final || '0');
+
+      const etapas = [
+        { etapa: 'Inscrição', total: inscricao, percentual: total > 0 ? (inscricao / total) * 100 : 0 },
+        { etapa: 'Triagem', total: triagem, percentual: total > 0 ? (triagem / total) * 100 : 0 },
+        { etapa: 'Entrevista R&S', total: entrevistaRS, percentual: total > 0 ? (entrevistaRS / total) * 100 : 0 },
+        { etapa: 'Entrevista técnica', total: entrevistaTecnica, percentual: total > 0 ? (entrevistaTecnica / total) * 100 : 0 },
+        { etapa: 'Entrevista final', total: entrevistaFinal, percentual: total > 0 ? (entrevistaFinal / total) * 100 : 0 },
+        { etapa: 'Oferta', total: oferta, percentual: total > 0 ? (oferta / total) * 100 : 0 },
+      ];
+
+      const fontesArray = row.fontes || [];
+      const fontes = Array.isArray(fontesArray) 
+        ? fontesArray.filter((f: any) => f).map((f: any) => ({ fonte: f, total: 1 }))
+        : [];
+
+      return {
+        vagaId: parseInt(row.vaga_id),
+        vagaNome: row.vaga_nome || 'Vaga sem nome',
+        area: row.area,
+        seniority: row.seniority,
+        status: row.status || 'unknown',
+        totalCandidatos: total,
+        candidatosAtivos: parseInt(row.candidatos_ativos || '0'),
+        etapas,
+        fontes,
+        conversaoOferta: total > 0 ? (oferta / total) * 100 : 0,
+      };
+    });
+  }
+
+  async getRecrutamentoAreas(): Promise<import("@shared/schema").RecrutamentoAreaDistribuicao[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(v.area, 'Não informada') as area,
+        COUNT(DISTINCT v.id) as total_vagas,
+        COUNT(DISTINCT CASE WHEN v.status = 'open' THEN v.id END) as vagas_abertas,
+        COUNT(c.id) as total_candidatos,
+        CASE 
+          WHEN COUNT(c.id) > 0 THEN 
+            (COUNT(CASE WHEN c.stage_name = 'Oferta' THEN 1 END)::float / COUNT(c.id)::float * 100)
+          ELSE 0 
+        END as conversao_media
+      FROM rh_vagas v
+      LEFT JOIN rh_candidaturas c ON c.job_id_hash = v.id::text
+      GROUP BY v.area
+      ORDER BY total_candidatos DESC
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      area: row.area || 'Não informada',
+      totalVagas: parseInt(row.total_vagas || '0'),
+      vagasAbertas: parseInt(row.vagas_abertas || '0'),
+      totalCandidatos: parseInt(row.total_candidatos || '0'),
+      conversaoMedia: parseFloat(row.conversao_media || '0'),
+    }));
+  }
+
+  async getRecrutamentoFiltros(): Promise<import("@shared/schema").RecrutamentoFiltros> {
+    const areasResult = await db.execute(sql`
+      SELECT DISTINCT area FROM rh_vagas WHERE area IS NOT NULL ORDER BY area
+    `);
+    const senioritiesResult = await db.execute(sql`
+      SELECT DISTINCT seniority FROM rh_vagas WHERE seniority IS NOT NULL ORDER BY seniority
+    `);
+    const fontesResult = await db.execute(sql`
+      SELECT DISTINCT source FROM rh_candidaturas WHERE source IS NOT NULL ORDER BY source
+    `);
+    const statusResult = await db.execute(sql`
+      SELECT DISTINCT status FROM rh_vagas WHERE status IS NOT NULL ORDER BY status
+    `);
+    const etapasResult = await db.execute(sql`
+      SELECT DISTINCT stage_name FROM rh_candidaturas WHERE stage_name IS NOT NULL ORDER BY stage_name
+    `);
+
+    return {
+      areas: (areasResult.rows as any[]).map(r => r.area),
+      seniorities: (senioritiesResult.rows as any[]).map(r => r.seniority),
+      fontes: (fontesResult.rows as any[]).map(r => r.source),
+      statusVagas: (statusResult.rows as any[]).map(r => r.status),
+      etapas: (etapasResult.rows as any[]).map(r => r.stage_name),
+    };
+  }
+
+  async getRecrutamentoConversaoPorVaga(limit: number = 10): Promise<import("@shared/schema").RecrutamentoConversaoPorVaga[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        v.id as vaga_id,
+        v.nome as vaga_nome,
+        v.area,
+        COUNT(CASE WHEN c.stage_name = 'Inscrição' THEN 1 END) as inscricao,
+        COUNT(CASE WHEN c.stage_name = 'Triagem' THEN 1 END) as triagem,
+        COUNT(CASE WHEN c.stage_name = 'Entrevista R&S' THEN 1 END) as entrevista_rs,
+        COUNT(CASE WHEN c.stage_name = 'Entrevista técnica' THEN 1 END) as entrevista_tecnica,
+        COUNT(CASE WHEN c.stage_name = 'Entrevista final' THEN 1 END) as entrevista_final,
+        COUNT(CASE WHEN c.stage_name = 'Oferta' THEN 1 END) as oferta,
+        COUNT(c.id) as total
+      FROM rh_vagas v
+      LEFT JOIN rh_candidaturas c ON c.job_id_hash = v.id::text
+      GROUP BY v.id, v.nome, v.area
+      HAVING COUNT(c.id) > 0
+      ORDER BY total DESC
+      LIMIT ${limit}
+    `);
+
+    return (result.rows as any[]).map(row => {
+      const total = parseInt(row.total || '0');
+      const oferta = parseInt(row.oferta || '0');
+      return {
+        vagaId: parseInt(row.vaga_id),
+        vagaNome: row.vaga_nome || 'Vaga sem nome',
+        area: row.area,
+        inscricao: parseInt(row.inscricao || '0'),
+        triagem: parseInt(row.triagem || '0'),
+        entrevistaRS: parseInt(row.entrevista_rs || '0'),
+        entrevistaTecnica: parseInt(row.entrevista_tecnica || '0'),
+        entrevistaFinal: parseInt(row.entrevista_final || '0'),
+        oferta,
+        taxaConversao: total > 0 ? (oferta / total) * 100 : 0,
+      };
+    });
   }
 }
 
