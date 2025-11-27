@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -62,51 +62,36 @@ const menuItems = [
   },
 ];
 
-const dashboardItems = [
-  {
-    title: "Visão Geral",
-    url: "/visao-geral",
-    icon: Eye,
-  },
+const dashboardCategories = [
   {
     title: "Financeiro",
-    url: "/dashboard/financeiro",
-    icon: TrendingUp,
+    icon: DollarSign,
+    baseUrl: "/dashboard/financeiro",
+    subItems: [
+      { title: "Visão Geral", url: "/dashboard/financeiro", icon: TrendingUp },
+      { title: "DFC", url: "/dashboard/dfc", icon: BarChart3 },
+      { title: "Auditoria de Sistemas", url: "/dashboard/auditoria-sistemas", icon: ShieldAlert },
+    ],
   },
   {
     title: "G&G",
-    url: "/dashboard/geg",
     icon: UsersRound,
+    baseUrl: "/dashboard/geg",
+    subItems: [
+      { title: "Visão Geral", url: "/dashboard/geg", icon: UsersRound },
+      { title: "Inhire", url: "/dashboard/inhire", icon: UserCheck },
+      { title: "Recrutamento", url: "/dashboard/recrutamento", icon: UserPlus },
+    ],
   },
   {
-    title: "Inhire",
-    url: "/dashboard/inhire",
-    icon: UserCheck,
-  },
-  {
-    title: "Recrutamento",
-    url: "/dashboard/recrutamento",
-    icon: UserPlus,
-  },
-  {
-    title: "Meta Ads",
-    url: "/dashboard/meta-ads",
-    icon: Target,
-  },
-  {
-    title: "Análise de Retenção",
-    url: "/dashboard/retencao",
-    icon: UserCheck,
-  },
-  {
-    title: "DFC",
-    url: "/dashboard/dfc",
-    icon: TrendingUp,
-  },
-  {
-    title: "Auditoria de Sistemas",
-    url: "/dashboard/auditoria-sistemas",
-    icon: ShieldAlert,
+    title: "Operação",
+    icon: Briefcase,
+    baseUrl: "/visao-geral",
+    subItems: [
+      { title: "Visão Geral", url: "/visao-geral", icon: Eye },
+      { title: "Análise de Retenção", url: "/dashboard/retencao", icon: UserCheck },
+      { title: "Meta Ads", url: "/dashboard/meta-ads", icon: Target },
+    ],
   },
 ];
 
@@ -120,9 +105,14 @@ const adminItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const [isDashboardOpen, setIsDashboardOpen] = useState(
-    location.startsWith("/dashboard")
-  );
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    dashboardCategories.forEach(cat => {
+      const isActive = cat.subItems.some(sub => location === sub.url || location.startsWith(sub.url));
+      initial[cat.title] = isActive;
+    });
+    return initial;
+  });
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -134,8 +124,11 @@ export function AppSidebar() {
   };
 
   const visibleMenuItems = menuItems.filter((item) => hasAccess(item.url));
-  const visibleDashboardItems = dashboardItems.filter((item) => hasAccess(item.url));
   const visibleAdminItems = adminItems.filter((item) => hasAccess(item.url));
+
+  const toggleCategory = (title: string) => {
+    setOpenCategories(prev => ({ ...prev, [title]: !prev[title] }));
+  };
 
   return (
     <Sidebar>
@@ -152,45 +145,64 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
+          <SidebarGroupLabel>Dashboards</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {dashboardCategories.map((category) => {
+                const visibleSubItems = category.subItems.filter(sub => hasAccess(sub.url));
+                if (visibleSubItems.length === 0) return null;
+                
+                const isOpen = openCategories[category.title] || false;
+                const isActive = category.subItems.some(sub => location === sub.url);
+
+                return (
+                  <Collapsible
+                    key={category.title}
+                    open={isOpen}
+                    onOpenChange={() => toggleCategory(category.title)}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton 
+                          data-testid={`nav-${category.title.toLowerCase()}`}
+                          className={isActive ? "bg-sidebar-accent" : ""}
+                        >
+                          <category.icon />
+                          <span>{category.title}</span>
+                          <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {visibleSubItems.map((item) => (
+                            <SidebarMenuSubItem key={item.url}>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={location === item.url}
+                                data-testid={`nav-${category.title.toLowerCase()}-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                              >
+                                <Link href={item.url}>
+                                  <item.icon className="w-4 h-4" />
+                                  <span>{item.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleDashboardItems.length > 0 && (
-                <Collapsible
-                  open={isDashboardOpen}
-                  onOpenChange={setIsDashboardOpen}
-                  className="group/collapsible"
-                >
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton data-testid="nav-dashboards">
-                        <BarChart3 />
-                        <span>Dashboards</span>
-                        <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {visibleDashboardItems.map((item) => (
-                          <SidebarMenuSubItem key={item.title}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={location === item.url}
-                              data-testid={`nav-dashboard-${item.title.toLowerCase().replace('&', '')}`}
-                            >
-                              <Link href={item.url}>
-                                <item.icon className="w-4 h-4" />
-                                <span>{item.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
-
               {visibleMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
