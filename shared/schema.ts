@@ -742,3 +742,58 @@ export type MetaLeadFilterParams = {
   utmCampaigns?: string[];
   utmTerms?: string[];
 };
+
+export type FinanceiroResumo = {
+  receitaTotal: number;
+  despesaTotal: number;
+  resultado: number;
+  margemOperacional: number;
+  receitaMesAnterior: number;
+  despesaMesAnterior: number;
+  variacaoReceita: number;
+  variacaoDespesa: number;
+  totalParcelas: number;
+  parcelasPagas: number;
+  parcelasPendentes: number;
+};
+
+export type FinanceiroEvolucaoMensal = {
+  mes: string;
+  mesLabel: string;
+  receita: number;
+  despesa: number;
+  resultado: number;
+  margemPercentual: number;
+};
+
+export type FinanceiroCategoria = {
+  categoriaId: string;
+  categoriaNome: string;
+  tipo: 'RECEITA' | 'DESPESA';
+  valor: number;
+  percentual: number;
+  quantidade: number;
+};
+
+export type FinanceiroTopCliente = {
+  clienteId: string;
+  clienteNome: string;
+  receitaTotal: number;
+  quantidadeTitulos: number;
+  ticketMedio: number;
+  ultimoPagamento: string | null;
+};
+
+export type FinanceiroMetodoPagamento = {
+  metodo: string;
+  valor: number;
+  quantidade: number;
+  percentual: number;
+};
+
+export type FinanceiroContaBancaria = {
+  id: string;
+  nome: string;
+  saldo: number;
+  empresa: string;
+};

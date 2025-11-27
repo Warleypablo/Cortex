@@ -3630,6 +3630,232 @@ export class DbStorage implements IStorage {
       dataFim: dataFim.toISOString().split('T')[0],
     };
   }
+
+  async getFinanceiroResumo(mesAno?: string): Promise<any> {
+    const hoje = new Date();
+    let mesAtual: string;
+    let mesAnterior: string;
+    
+    if (mesAno) {
+      mesAtual = mesAno;
+      const [ano, mes] = mesAno.split('-').map(Number);
+      const dataAnterior = new Date(ano, mes - 2, 1);
+      mesAnterior = `${dataAnterior.getFullYear()}-${String(dataAnterior.getMonth() + 1).padStart(2, '0')}`;
+    } else {
+      mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+      const dataAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+      mesAnterior = `${dataAnterior.getFullYear()}-${String(dataAnterior.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    const result = await db.execute(sql`
+      WITH mes_atual AS (
+        SELECT 
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receita,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesa,
+          COUNT(*) as total_parcelas,
+          COUNT(CASE WHEN status = 'QUITADO' THEN 1 END) as parcelas_pagas,
+          COUNT(CASE WHEN status != 'QUITADO' THEN 1 END) as parcelas_pendentes
+        FROM caz_parcelas
+        WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = ${mesAtual}
+          AND tipo_evento IN ('RECEITA', 'DESPESA')
+      ),
+      mes_anterior AS (
+        SELECT 
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receita,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesa
+        FROM caz_parcelas
+        WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = ${mesAnterior}
+          AND tipo_evento IN ('RECEITA', 'DESPESA')
+          AND status = 'QUITADO'
+      )
+      SELECT 
+        ma.receita as receita_atual,
+        ma.despesa as despesa_atual,
+        ma.total_parcelas,
+        ma.parcelas_pagas,
+        ma.parcelas_pendentes,
+        ant.receita as receita_anterior,
+        ant.despesa as despesa_anterior
+      FROM mes_atual ma, mes_anterior ant
+    `);
+
+    const row = result.rows[0] as any;
+    const receitaAtual = parseFloat(row?.receita_atual || '0');
+    const despesaAtual = parseFloat(row?.despesa_atual || '0');
+    const receitaAnterior = parseFloat(row?.receita_anterior || '0');
+    const despesaAnterior = parseFloat(row?.despesa_anterior || '0');
+    
+    return {
+      receitaTotal: receitaAtual,
+      despesaTotal: despesaAtual,
+      resultado: receitaAtual - despesaAtual,
+      margemOperacional: receitaAtual > 0 ? ((receitaAtual - despesaAtual) / receitaAtual) * 100 : 0,
+      receitaMesAnterior: receitaAnterior,
+      despesaMesAnterior: despesaAnterior,
+      variacaoReceita: receitaAnterior > 0 ? ((receitaAtual - receitaAnterior) / receitaAnterior) * 100 : 0,
+      variacaoDespesa: despesaAnterior > 0 ? ((despesaAtual - despesaAnterior) / despesaAnterior) * 100 : 0,
+      totalParcelas: parseInt(row?.total_parcelas || '0'),
+      parcelasPagas: parseInt(row?.parcelas_pagas || '0'),
+      parcelasPendentes: parseInt(row?.parcelas_pendentes || '0'),
+    };
+  }
+
+  async getFinanceiroEvolucaoMensal(meses: number = 12): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receita,
+        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesa
+      FROM caz_parcelas
+      WHERE COALESCE(data_quitacao, data_vencimento) >= NOW() - INTERVAL '1 month' * ${meses}
+        AND tipo_evento IN ('RECEITA', 'DESPESA')
+        AND status = 'QUITADO'
+      GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+      ORDER BY mes
+    `);
+
+    const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    
+    return (result.rows as any[]).map(row => {
+      const receita = parseFloat(row.receita || '0');
+      const despesa = parseFloat(row.despesa || '0');
+      const [ano, mes] = (row.mes || '').split('-');
+      const mesIndex = parseInt(mes) - 1;
+      
+      return {
+        mes: row.mes,
+        mesLabel: `${mesesNomes[mesIndex] || mes}/${ano?.slice(2)}`,
+        receita,
+        despesa,
+        resultado: receita - despesa,
+        margemPercentual: receita > 0 ? ((receita - despesa) / receita) * 100 : 0,
+      };
+    });
+  }
+
+  async getFinanceiroCategorias(tipo: 'RECEITA' | 'DESPESA' | 'AMBOS' = 'AMBOS', meses: number = 6): Promise<any[]> {
+    const tipoFilter = tipo === 'AMBOS' 
+      ? sql`tipo_evento IN ('RECEITA', 'DESPESA')` 
+      : sql`tipo_evento = ${tipo}`;
+
+    const result = await db.execute(sql`
+      SELECT 
+        categoria_id,
+        categoria_nome,
+        tipo_evento,
+        COALESCE(SUM(valor_pago::numeric), 0) as valor,
+        COUNT(*) as quantidade
+      FROM caz_parcelas
+      WHERE COALESCE(data_quitacao, data_vencimento) >= NOW() - INTERVAL '1 month' * ${meses}
+        AND ${tipoFilter}
+        AND status = 'QUITADO'
+        AND categoria_id IS NOT NULL
+        AND categoria_id != ''
+      GROUP BY categoria_id, categoria_nome, tipo_evento
+      ORDER BY valor DESC
+      LIMIT 20
+    `);
+
+    const totalReceita = (result.rows as any[])
+      .filter(r => r.tipo_evento === 'RECEITA')
+      .reduce((sum, r) => sum + parseFloat(r.valor || '0'), 0);
+    const totalDespesa = (result.rows as any[])
+      .filter(r => r.tipo_evento === 'DESPESA')
+      .reduce((sum, r) => sum + parseFloat(r.valor || '0'), 0);
+
+    return (result.rows as any[]).map(row => {
+      const valor = parseFloat(row.valor || '0');
+      const total = row.tipo_evento === 'RECEITA' ? totalReceita : totalDespesa;
+      
+      return {
+        categoriaId: row.categoria_id || '',
+        categoriaNome: row.categoria_nome || 'Sem categoria',
+        tipo: row.tipo_evento,
+        valor,
+        percentual: total > 0 ? (valor / total) * 100 : 0,
+        quantidade: parseInt(row.quantidade || '0'),
+      };
+    });
+  }
+
+  async getFinanceiroTopClientes(limite: number = 10, meses: number = 12): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        cliente_id,
+        cliente_nome,
+        COALESCE(SUM(pago::numeric), 0) as receita_total,
+        COUNT(*) as quantidade_titulos,
+        MAX(data_vencimento) as ultimo_pagamento
+      FROM caz_receber
+      WHERE UPPER(status) IN ('PAGO', 'ACQUITTED')
+        AND cliente_id IS NOT NULL
+        AND data_vencimento >= NOW() - INTERVAL '1 month' * ${meses}
+      GROUP BY cliente_id, cliente_nome
+      ORDER BY receita_total DESC
+      LIMIT ${limite}
+    `);
+
+    return (result.rows as any[]).map(row => {
+      const receitaTotal = parseFloat(row.receita_total || '0');
+      const quantidade = parseInt(row.quantidade_titulos || '1');
+      
+      return {
+        clienteId: row.cliente_id || '',
+        clienteNome: row.cliente_nome || 'Cliente Desconhecido',
+        receitaTotal,
+        quantidadeTitulos: quantidade,
+        ticketMedio: quantidade > 0 ? receitaTotal / quantidade : 0,
+        ultimoPagamento: row.ultimo_pagamento ? new Date(row.ultimo_pagamento).toISOString().split('T')[0] : null,
+      };
+    });
+  }
+
+  async getFinanceiroMetodosPagamento(meses: number = 6): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(metodo_pagamento, 'Não informado') as metodo,
+        COALESCE(SUM(valor_pago::numeric), 0) as valor,
+        COUNT(*) as quantidade
+      FROM caz_parcelas
+      WHERE COALESCE(data_quitacao, data_vencimento) >= NOW() - INTERVAL '1 month' * ${meses}
+        AND status = 'QUITADO'
+        AND tipo_evento = 'RECEITA'
+      GROUP BY metodo_pagamento
+      ORDER BY valor DESC
+    `);
+
+    const total = (result.rows as any[]).reduce((sum, r) => sum + parseFloat(r.valor || '0'), 0);
+
+    return (result.rows as any[]).map(row => {
+      const valor = parseFloat(row.valor || '0');
+      return {
+        metodo: row.metodo || 'Não informado',
+        valor,
+        quantidade: parseInt(row.quantidade || '0'),
+        percentual: total > 0 ? (valor / total) * 100 : 0,
+      };
+    });
+  }
+
+  async getFinanceiroContasBancarias(): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        id::text,
+        nome,
+        COALESCE(balance::numeric, 0) as saldo,
+        empresa
+      FROM caz_bancos
+      WHERE ativo = 'true' OR ativo = 'Ativo'
+      ORDER BY balance::numeric DESC
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      id: row.id || '',
+      nome: row.nome || 'Conta Desconhecida',
+      saldo: parseFloat(row.saldo || '0'),
+      empresa: row.empresa || '',
+    }));
+  }
 }
 
 export const storage = new DbStorage();
