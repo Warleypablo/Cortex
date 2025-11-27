@@ -597,6 +597,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/financeiro/resumo", async (req, res) => {
+    try {
+      const mesAno = req.query.mesAno as string | undefined;
+      if (mesAno && !/^\d{4}-\d{2}$/.test(mesAno)) {
+        return res.status(400).json({ error: "Invalid mesAno parameter. Expected format: YYYY-MM" });
+      }
+      const resumo = await storage.getFinanceiroResumo(mesAno);
+      res.json(resumo);
+    } catch (error) {
+      console.error("[api] Error fetching financeiro resumo:", error);
+      res.status(500).json({ error: "Failed to fetch financeiro resumo" });
+    }
+  });
+
+  app.get("/api/financeiro/evolucao-mensal", async (req, res) => {
+    try {
+      const meses = req.query.meses ? parseInt(req.query.meses as string) : 12;
+      const evolucao = await storage.getFinanceiroEvolucaoMensal(meses);
+      res.json(evolucao);
+    } catch (error) {
+      console.error("[api] Error fetching financeiro evolucao:", error);
+      res.status(500).json({ error: "Failed to fetch financeiro evolucao" });
+    }
+  });
+
+  app.get("/api/financeiro/categorias", async (req, res) => {
+    try {
+      const tipo = (req.query.tipo as 'RECEITA' | 'DESPESA' | 'AMBOS') || 'AMBOS';
+      const meses = req.query.meses ? parseInt(req.query.meses as string) : 6;
+      const categorias = await storage.getFinanceiroCategorias(tipo, meses);
+      res.json(categorias);
+    } catch (error) {
+      console.error("[api] Error fetching financeiro categorias:", error);
+      res.status(500).json({ error: "Failed to fetch financeiro categorias" });
+    }
+  });
+
+  app.get("/api/financeiro/top-clientes", async (req, res) => {
+    try {
+      const limite = req.query.limite ? parseInt(req.query.limite as string) : 10;
+      const meses = req.query.meses ? parseInt(req.query.meses as string) : 12;
+      const clientes = await storage.getFinanceiroTopClientes(limite, meses);
+      res.json(clientes);
+    } catch (error) {
+      console.error("[api] Error fetching financeiro top clientes:", error);
+      res.status(500).json({ error: "Failed to fetch financeiro top clientes" });
+    }
+  });
+
+  app.get("/api/financeiro/metodos-pagamento", async (req, res) => {
+    try {
+      const meses = req.query.meses ? parseInt(req.query.meses as string) : 6;
+      const metodos = await storage.getFinanceiroMetodosPagamento(meses);
+      res.json(metodos);
+    } catch (error) {
+      console.error("[api] Error fetching financeiro metodos:", error);
+      res.status(500).json({ error: "Failed to fetch financeiro metodos" });
+    }
+  });
+
+  app.get("/api/financeiro/contas-bancarias", async (req, res) => {
+    try {
+      const contas = await storage.getFinanceiroContasBancarias();
+      res.json(contas);
+    } catch (error) {
+      console.error("[api] Error fetching financeiro contas:", error);
+      res.status(500).json({ error: "Failed to fetch financeiro contas" });
+    }
+  });
+
   app.get("/api/analytics/cohort-retention", async (req, res) => {
     try {
       const filters: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string } = {};
