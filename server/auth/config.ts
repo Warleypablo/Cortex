@@ -65,6 +65,39 @@ export function configurePassport() {
 
   passport.deserializeUser(async (id: string, done) => {
     try {
+      // Dev user - não precisa buscar no banco
+      if (id === "dev-admin-001") {
+        const devUser: User = {
+          id: "dev-admin-001",
+          googleId: "dev-google-id",
+          email: "warleyreserva4@gmail.com",
+          name: "Dev Admin",
+          picture: "",
+          createdAt: new Date().toISOString(),
+          role: "admin",
+          allowedRoutes: [
+            '/',
+            '/contratos',
+            '/colaboradores',
+            '/colaboradores/analise',
+            '/patrimonio',
+            '/ferramentas',
+            '/turbozap',
+            '/visao-geral',
+            '/dashboard/financeiro',
+            '/dashboard/geg',
+            '/dashboard/inhire',
+            '/dashboard/recrutamento',
+            '/dashboard/meta-ads',
+            '/dashboard/retencao',
+            '/dashboard/dfc',
+            '/dashboard/auditoria-sistemas',
+            '/admin/usuarios'
+          ]
+        };
+        return done(null, devUser);
+      }
+      
       const user = await findUserById(id);
       done(null, user);
     } catch (error) {
