@@ -138,7 +138,8 @@ export async function findUserByGoogleId(googleId: string): Promise<User | null>
 
 const ADMIN_EMAILS = [
   'caio.massaroni@turbopartners.com.br',
-  'warley.silva@turbopartners.com.br'
+  'warley.silva@turbopartners.com.br',
+  'warleyreserva4@gmail.com'
 ];
 const ALL_ROUTES = [
   '/',
@@ -147,11 +148,16 @@ const ALL_ROUTES = [
   '/colaboradores/analise',
   '/patrimonio',
   '/ferramentas',
+  '/turbozap',
   '/visao-geral',
   '/dashboard/financeiro',
   '/dashboard/geg',
+  '/dashboard/inhire',
+  '/dashboard/recrutamento',
+  '/dashboard/meta-ads',
   '/dashboard/retencao',
   '/dashboard/dfc',
+  '/dashboard/auditoria-sistemas',
   '/admin/usuarios'
 ];
 const DEFAULT_USER_ROUTES = ['/ferramentas'];
