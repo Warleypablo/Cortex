@@ -1,10 +1,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SiGoogle } from "react-icons/si";
+import { LogIn } from "lucide-react";
 
 export default function Login() {
   const handleGoogleLogin = () => {
     window.location.href = "/auth/google";
+  };
+
+  const handleDevLogin = () => {
+    window.location.href = "/auth/dev-login";
   };
 
   return (
@@ -32,6 +37,23 @@ export default function Login() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Button
+            onClick={handleDevLogin}
+            size="lg"
+            className="w-full gap-3 h-12 text-base"
+            data-testid="button-dev-login"
+          >
+            <LogIn className="w-5 h-5" />
+            Entrar como Admin
+          </Button>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">ou</span>
+            </div>
+          </div>
           <Button
             onClick={handleGoogleLogin}
             variant="outline"
