@@ -1403,6 +1403,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Tech Dashboard API routes
+  app.get("/api/tech/metricas", async (req, res) => {
+    try {
+      const metricas = await storage.getTechMetricas();
+      res.json(metricas);
+    } catch (error) {
+      console.error("[api] Error fetching tech metrics:", error);
+      res.status(500).json({ error: "Failed to fetch tech metrics" });
+    }
+  });
+
+  app.get("/api/tech/projetos-por-status", async (req, res) => {
+    try {
+      const projetos = await storage.getTechProjetosPorStatus();
+      res.json(projetos);
+    } catch (error) {
+      console.error("[api] Error fetching tech projects by status:", error);
+      res.status(500).json({ error: "Failed to fetch tech projects by status" });
+    }
+  });
+
+  app.get("/api/tech/projetos-por-responsavel", async (req, res) => {
+    try {
+      const projetos = await storage.getTechProjetosPorResponsavel();
+      res.json(projetos);
+    } catch (error) {
+      console.error("[api] Error fetching tech projects by responsible:", error);
+      res.status(500).json({ error: "Failed to fetch tech projects by responsible" });
+    }
+  });
+
+  app.get("/api/tech/projetos-por-tipo", async (req, res) => {
+    try {
+      const projetos = await storage.getTechProjetosPorTipo();
+      res.json(projetos);
+    } catch (error) {
+      console.error("[api] Error fetching tech projects by type:", error);
+      res.status(500).json({ error: "Failed to fetch tech projects by type" });
+    }
+  });
+
+  app.get("/api/tech/projetos-em-andamento", async (req, res) => {
+    try {
+      const projetos = await storage.getTechProjetosEmAndamento();
+      res.json(projetos);
+    } catch (error) {
+      console.error("[api] Error fetching active tech projects:", error);
+      res.status(500).json({ error: "Failed to fetch active tech projects" });
+    }
+  });
+
+  app.get("/api/tech/projetos-fechados", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const projetos = await storage.getTechProjetosFechados(limit);
+      res.json(projetos);
+    } catch (error) {
+      console.error("[api] Error fetching closed tech projects:", error);
+      res.status(500).json({ error: "Failed to fetch closed tech projects" });
+    }
+  });
+
+  app.get("/api/tech/tasks-por-status", async (req, res) => {
+    try {
+      const tasks = await storage.getTechTasksPorStatus();
+      res.json(tasks);
+    } catch (error) {
+      console.error("[api] Error fetching tech tasks by status:", error);
+      res.status(500).json({ error: "Failed to fetch tech tasks by status" });
+    }
+  });
+
+  app.get("/api/tech/velocidade", async (req, res) => {
+    try {
+      const velocidade = await storage.getTechVelocidade();
+      res.json(velocidade);
+    } catch (error) {
+      console.error("[api] Error fetching tech velocity:", error);
+      res.status(500).json({ error: "Failed to fetch tech velocity" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

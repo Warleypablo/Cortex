@@ -189,6 +189,70 @@ export interface IStorage {
   getRecrutamentoAreas(): Promise<import("@shared/schema").RecrutamentoAreaDistribuicao[]>;
   getRecrutamentoFiltros(): Promise<import("@shared/schema").RecrutamentoFiltros>;
   getRecrutamentoConversaoPorVaga(limit?: number): Promise<import("@shared/schema").RecrutamentoConversaoPorVaga[]>;
+  
+  // Tech Dashboard
+  getTechMetricas(): Promise<TechMetricas>;
+  getTechProjetosPorStatus(): Promise<TechProjetoStatus[]>;
+  getTechProjetosPorResponsavel(): Promise<TechProjetoResponsavel[]>;
+  getTechProjetosPorTipo(): Promise<TechProjetoTipo[]>;
+  getTechProjetosEmAndamento(): Promise<TechProjetoDetalhe[]>;
+  getTechProjetosFechados(limit?: number): Promise<TechProjetoDetalhe[]>;
+  getTechTasksPorStatus(): Promise<TechTaskStatus[]>;
+  getTechVelocidade(): Promise<TechVelocidade>;
+}
+
+// Tech Dashboard Types
+export interface TechMetricas {
+  projetosEmAndamento: number;
+  projetosFechados: number;
+  totalTasks: number;
+  valorTotalProjetos: number;
+  valorMedioProjeto: number;
+  tempoMedioEntrega: number;
+}
+
+export interface TechProjetoStatus {
+  status: string;
+  quantidade: number;
+  percentual: number;
+}
+
+export interface TechProjetoResponsavel {
+  responsavel: string;
+  projetosAtivos: number;
+  projetosFechados: number;
+  valorTotal: number;
+}
+
+export interface TechProjetoTipo {
+  tipo: string;
+  quantidade: number;
+  valorTotal: number;
+}
+
+export interface TechProjetoDetalhe {
+  clickupTaskId: string;
+  taskName: string;
+  statusProjeto: string;
+  responsavel: string | null;
+  faseProjeto: string | null;
+  tipo: string | null;
+  tipoProjeto: string | null;
+  valorP: number | null;
+  dataVencimento: string | null;
+  lancamento: string | null;
+  dataCriada: string | null;
+}
+
+export interface TechTaskStatus {
+  status: string;
+  quantidade: number;
+}
+
+export interface TechVelocidade {
+  projetosEntreguesMes: number;
+  tempoMedioEntrega: number;
+  taxaCumprimentoPrazo: number;
 }
 
 export class MemStorage implements IStorage {
@@ -472,6 +536,39 @@ export class MemStorage implements IStorage {
   }
 
   async getRecrutamentoConversaoPorVaga(limit?: number): Promise<import("@shared/schema").RecrutamentoConversaoPorVaga[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  // Tech Dashboard MemStorage implementations
+  async getTechMetricas(): Promise<TechMetricas> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechProjetosPorStatus(): Promise<TechProjetoStatus[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechProjetosPorResponsavel(): Promise<TechProjetoResponsavel[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechProjetosPorTipo(): Promise<TechProjetoTipo[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechProjetosEmAndamento(): Promise<TechProjetoDetalhe[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechProjetosFechados(limit?: number): Promise<TechProjetoDetalhe[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechTasksPorStatus(): Promise<TechTaskStatus[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechVelocidade(): Promise<TechVelocidade> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -4344,6 +4441,251 @@ export class DbStorage implements IStorage {
         taxaConversao: total > 0 ? (oferta / total) * 100 : 0,
       };
     });
+  }
+
+  // Tech Dashboard - DatabaseStorage implementations
+  async getTechMetricas(): Promise<TechMetricas> {
+    const [projetosAtivos, projetosFechados, tasks] = await Promise.all([
+      db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(valor_p), 0) as valor_total FROM staging.cup_projetos_tech`),
+      db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(valor_p), 0) as valor_total FROM staging.cup_projetos_tech_fechados`),
+      db.execute(sql`SELECT COUNT(*) as count FROM staging.cup_tech_tasks`)
+    ]);
+
+    const projetosEmAndamento = parseInt((projetosAtivos.rows[0] as any).count || '0');
+    const totalFechados = parseInt((projetosFechados.rows[0] as any).count || '0');
+    const valorAtivos = parseFloat((projetosAtivos.rows[0] as any).valor_total || '0');
+    const valorFechados = parseFloat((projetosFechados.rows[0] as any).valor_total || '0');
+    const totalTasks = parseInt((tasks.rows[0] as any).count || '0');
+    const valorTotal = valorAtivos + valorFechados;
+    const totalProjetos = projetosEmAndamento + totalFechados;
+
+    // Calcular tempo médio de entrega (diferença entre lancamento e data_criada para projetos fechados)
+    const tempoMedioResult = await db.execute(sql`
+      SELECT AVG(
+        CASE 
+          WHEN lancamento IS NOT NULL AND data_criada IS NOT NULL 
+          THEN EXTRACT(DAY FROM (lancamento::date - data_criada::date))
+          ELSE NULL 
+        END
+      ) as tempo_medio
+      FROM staging.cup_projetos_tech_fechados
+      WHERE lancamento IS NOT NULL AND data_criada IS NOT NULL
+    `);
+    const tempoMedioEntrega = parseFloat((tempoMedioResult.rows[0] as any).tempo_medio || '0');
+
+    return {
+      projetosEmAndamento,
+      projetosFechados: totalFechados,
+      totalTasks,
+      valorTotalProjetos: valorTotal,
+      valorMedioProjeto: totalProjetos > 0 ? valorTotal / totalProjetos : 0,
+      tempoMedioEntrega,
+    };
+  }
+
+  async getTechProjetosPorStatus(): Promise<TechProjetoStatus[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(status_projeto, 'Não definido') as status,
+        COUNT(*) as quantidade
+      FROM staging.cup_projetos_tech
+      GROUP BY status_projeto
+      ORDER BY quantidade DESC
+    `);
+
+    const total = (result.rows as any[]).reduce((acc, row) => acc + parseInt(row.quantidade), 0);
+    
+    return (result.rows as any[]).map(row => ({
+      status: row.status,
+      quantidade: parseInt(row.quantidade),
+      percentual: total > 0 ? (parseInt(row.quantidade) / total) * 100 : 0,
+    }));
+  }
+
+  async getTechProjetosPorResponsavel(): Promise<TechProjetoResponsavel[]> {
+    const result = await db.execute(sql`
+      WITH ativos AS (
+        SELECT 
+          COALESCE(responsavel, 'Não atribuído') as responsavel,
+          COUNT(*) as projetos_ativos,
+          COALESCE(SUM(valor_p), 0) as valor_ativos
+        FROM staging.cup_projetos_tech
+        GROUP BY responsavel
+      ),
+      fechados AS (
+        SELECT 
+          COALESCE(responsavel, 'Não atribuído') as responsavel,
+          COUNT(*) as projetos_fechados,
+          COALESCE(SUM(valor_p), 0) as valor_fechados
+        FROM staging.cup_projetos_tech_fechados
+        GROUP BY responsavel
+      )
+      SELECT 
+        COALESCE(a.responsavel, f.responsavel) as responsavel,
+        COALESCE(a.projetos_ativos, 0) as projetos_ativos,
+        COALESCE(f.projetos_fechados, 0) as projetos_fechados,
+        COALESCE(a.valor_ativos, 0) + COALESCE(f.valor_fechados, 0) as valor_total
+      FROM ativos a
+      FULL OUTER JOIN fechados f ON a.responsavel = f.responsavel
+      ORDER BY projetos_ativos DESC, projetos_fechados DESC
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      responsavel: row.responsavel,
+      projetosAtivos: parseInt(row.projetos_ativos || '0'),
+      projetosFechados: parseInt(row.projetos_fechados || '0'),
+      valorTotal: parseFloat(row.valor_total || '0'),
+    }));
+  }
+
+  async getTechProjetosPorTipo(): Promise<TechProjetoTipo[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(tipo, 'Não definido') as tipo,
+        COUNT(*) as quantidade,
+        COALESCE(SUM(valor_p), 0) as valor_total
+      FROM (
+        SELECT tipo, valor_p FROM staging.cup_projetos_tech
+        UNION ALL
+        SELECT tipo, valor_p FROM staging.cup_projetos_tech_fechados
+      ) combined
+      GROUP BY tipo
+      ORDER BY quantidade DESC
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      tipo: row.tipo,
+      quantidade: parseInt(row.quantidade),
+      valorTotal: parseFloat(row.valor_total || '0'),
+    }));
+  }
+
+  async getTechProjetosEmAndamento(): Promise<TechProjetoDetalhe[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        clickup_task_id,
+        task_name,
+        status_projeto,
+        responsavel,
+        fase_projeto,
+        tipo,
+        tipo_projeto,
+        valor_p,
+        data_vencimento,
+        lancamento,
+        data_criada
+      FROM staging.cup_projetos_tech
+      ORDER BY data_criada DESC
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      clickupTaskId: row.clickup_task_id,
+      taskName: row.task_name,
+      statusProjeto: row.status_projeto,
+      responsavel: row.responsavel,
+      faseProjeto: row.fase_projeto,
+      tipo: row.tipo,
+      tipoProjeto: row.tipo_projeto,
+      valorP: row.valor_p ? parseFloat(row.valor_p) : null,
+      dataVencimento: row.data_vencimento,
+      lancamento: row.lancamento,
+      dataCriada: row.data_criada,
+    }));
+  }
+
+  async getTechProjetosFechados(limit: number = 20): Promise<TechProjetoDetalhe[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        clickup_task_id,
+        task_name,
+        status_projeto,
+        responsavel,
+        fase_projeto,
+        tipo,
+        tipo_projeto,
+        valor_p,
+        data_vencimento,
+        lancamento,
+        data_criada
+      FROM staging.cup_projetos_tech_fechados
+      ORDER BY lancamento DESC NULLS LAST
+      LIMIT ${limit}
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      clickupTaskId: row.clickup_task_id,
+      taskName: row.task_name,
+      statusProjeto: row.status_projeto,
+      responsavel: row.responsavel,
+      faseProjeto: row.fase_projeto,
+      tipo: row.tipo,
+      tipoProjeto: row.tipo_projeto,
+      valorP: row.valor_p ? parseFloat(row.valor_p) : null,
+      dataVencimento: row.data_vencimento,
+      lancamento: row.lancamento,
+      dataCriada: row.data_criada,
+    }));
+  }
+
+  async getTechTasksPorStatus(): Promise<TechTaskStatus[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(status_projeto, 'Não definido') as status,
+        COUNT(*) as quantidade
+      FROM staging.cup_tech_tasks
+      GROUP BY status_projeto
+      ORDER BY quantidade DESC
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      status: row.status,
+      quantidade: parseInt(row.quantidade),
+    }));
+  }
+
+  async getTechVelocidade(): Promise<TechVelocidade> {
+    // Projetos entregues no mês atual
+    const mesAtual = new Date();
+    const inicioMes = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1);
+    
+    const entreguesMesResult = await db.execute(sql`
+      SELECT COUNT(*) as count
+      FROM staging.cup_projetos_tech_fechados
+      WHERE lancamento >= ${inicioMes.toISOString().split('T')[0]}
+    `);
+    const projetosEntreguesMes = parseInt((entreguesMesResult.rows[0] as any).count || '0');
+
+    // Tempo médio de entrega
+    const tempoMedioResult = await db.execute(sql`
+      SELECT AVG(
+        CASE 
+          WHEN lancamento IS NOT NULL AND data_criada IS NOT NULL 
+          THEN EXTRACT(DAY FROM (lancamento::date - data_criada::date))
+          ELSE NULL 
+        END
+      ) as tempo_medio
+      FROM staging.cup_projetos_tech_fechados
+      WHERE lancamento IS NOT NULL AND data_criada IS NOT NULL
+    `);
+    const tempoMedioEntrega = parseFloat((tempoMedioResult.rows[0] as any).tempo_medio || '0');
+
+    // Taxa de cumprimento de prazo
+    const taxaPrazoResult = await db.execute(sql`
+      SELECT 
+        COUNT(CASE WHEN lancamento <= data_vencimento THEN 1 END) as no_prazo,
+        COUNT(*) as total
+      FROM staging.cup_projetos_tech_fechados
+      WHERE lancamento IS NOT NULL AND data_vencimento IS NOT NULL
+    `);
+    const noPrazo = parseInt((taxaPrazoResult.rows[0] as any).no_prazo || '0');
+    const total = parseInt((taxaPrazoResult.rows[0] as any).total || '0');
+    const taxaCumprimentoPrazo = total > 0 ? (noPrazo / total) * 100 : 0;
+
+    return {
+      projetosEntreguesMes,
+      tempoMedioEntrega,
+      taxaCumprimentoPrazo,
+    };
   }
 }
 
