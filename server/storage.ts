@@ -2129,9 +2129,14 @@ export class DbStorage implements IStorage {
     
     const whereClauses: string[] = ['categoria_id IS NOT NULL', "categoria_id != ''", "status = 'QUITADO'"];
     
+    // Sempre filtrar a partir de janeiro de 2025 (mínimo)
+    const dataMinima = '2025-01-01';
+    
     // Filtrar por data de vencimento
-    if (dataInicio) {
+    if (dataInicio && dataInicio >= dataMinima) {
       whereClauses.push(`data_vencimento >= '${dataInicio}'`);
+    } else {
+      whereClauses.push(`data_vencimento >= '${dataMinima}'`);
     }
     
     if (dataFim) {
