@@ -4725,7 +4725,7 @@ export class DbStorage implements IStorage {
         COUNT(CASE WHEN c.stage_name = 'Oferta' THEN 1 END) as oferta,
         json_agg(DISTINCT c.source) FILTER (WHERE c.source IS NOT NULL) as fontes
       FROM rh_vagas v
-      LEFT JOIN rh_candidaturas c ON c.job_id_hash = v.id::text
+      LEFT JOIN rh_candidaturas c ON c.job_id_hash = CAST(v.id AS TEXT)
       WHERE 1=1
         ${filters?.area && filters.area !== 'todos' ? sql`AND v.area = ${filters.area}` : sql``}
         ${filters?.status && filters.status !== 'todos' ? sql`AND v.status = ${filters.status}` : sql``}
@@ -4784,7 +4784,7 @@ export class DbStorage implements IStorage {
           ELSE 0 
         END as conversao_media
       FROM rh_vagas v
-      LEFT JOIN rh_candidaturas c ON c.job_id_hash = v.id::text
+      LEFT JOIN rh_candidaturas c ON c.job_id_hash = CAST(v.id AS TEXT)
       GROUP BY v.area
       ORDER BY total_candidatos DESC
     `);
@@ -4838,7 +4838,7 @@ export class DbStorage implements IStorage {
         COUNT(CASE WHEN c.stage_name = 'Oferta' THEN 1 END) as oferta,
         COUNT(c.id) as total
       FROM rh_vagas v
-      LEFT JOIN rh_candidaturas c ON c.job_id_hash = v.id::text
+      LEFT JOIN rh_candidaturas c ON c.job_id_hash = CAST(v.id AS TEXT)
       GROUP BY v.id, v.nome, v.area
       HAVING COUNT(c.id) > 0
       ORDER BY total DESC
@@ -4877,13 +4877,13 @@ export class DbStorage implements IStorage {
     const result = await db.execute(sql`
       SELECT 
         stage_name as etapa,
-        AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 86400) as tempo_medio_dias,
+        AVG(EXTRACT(EPOCH FROM (updated_at - inserted_at)) / 86400) as tempo_medio_dias,
         COUNT(*) as total_candidatos
       FROM rh_candidaturas
       WHERE stage_name IS NOT NULL
-        AND created_at IS NOT NULL
+        AND inserted_at IS NOT NULL
         AND updated_at IS NOT NULL
-        AND updated_at > created_at
+        AND updated_at > inserted_at
       GROUP BY stage_name
       ORDER BY tempo_medio_dias DESC
     `);
@@ -4909,7 +4909,7 @@ export class DbStorage implements IStorage {
       vagas_com_entrevistas AS (
         SELECT COUNT(DISTINCT v.id) as total_vagas
         FROM rh_vagas v
-        INNER JOIN rh_candidaturas c ON c.job_id_hash = v.id::text
+        INNER JOIN rh_candidaturas c ON c.job_id_hash = CAST(v.id AS TEXT)
         WHERE c.stage_name IN ('Entrevista R&S', 'Entrevista técnica', 'Entrevista final')
       )
       SELECT 
@@ -4944,7 +4944,7 @@ export class DbStorage implements IStorage {
           COUNT(CASE WHEN c.stage_name = 'Entrevista técnica' THEN 1 END) as entrevista_tecnica,
           COUNT(CASE WHEN c.stage_name = 'Entrevista final' THEN 1 END) as entrevista_final
         FROM rh_vagas v
-        INNER JOIN rh_candidaturas c ON c.job_id_hash = v.id::text
+        INNER JOIN rh_candidaturas c ON c.job_id_hash = CAST(v.id AS TEXT)
         WHERE c.stage_name IN ('Entrevista R&S', 'Entrevista técnica', 'Entrevista final')
         GROUP BY v.nome, v.area
       )
@@ -4982,7 +4982,7 @@ export class DbStorage implements IStorage {
         COUNT(CASE WHEN c.talent_status = 'rejected' THEN 1 END) as candidatos_rejeitados,
         COUNT(DISTINCT CASE WHEN v.status = 'open' THEN v.id END) as vagas_abertas
       FROM rh_vagas v
-      LEFT JOIN rh_candidaturas c ON c.job_id_hash = v.id::text
+      LEFT JOIN rh_candidaturas c ON c.job_id_hash = CAST(v.id AS TEXT)
       GROUP BY v.area
       ORDER BY total_candidaturas DESC
     `);
