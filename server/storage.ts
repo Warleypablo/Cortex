@@ -3897,6 +3897,135 @@ export class DbStorage implements IStorage {
     }));
   }
 
+  async getFinanceiroKPIsCompletos(): Promise<any> {
+    const result = await db.execute(sql`
+      WITH saldo_bancos AS (
+        SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
+        FROM caz_bancos
+        WHERE ativo = true
+      ),
+      a_receber AS (
+        SELECT 
+          COALESCE(SUM(nao_pago::numeric), 0) as total_aberto,
+          COUNT(*) as qtd_titulos,
+          COUNT(CASE WHEN data_vencimento < CURRENT_DATE THEN 1 END) as qtd_vencidos,
+          COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE THEN nao_pago::numeric ELSE 0 END), 0) as valor_vencido
+        FROM caz_receber
+        WHERE status != 'ACQUITTED' AND nao_pago::numeric > 0
+      ),
+      a_pagar AS (
+        SELECT 
+          COALESCE(SUM(nao_pago::numeric), 0) as total_aberto,
+          COUNT(*) as qtd_titulos,
+          COUNT(CASE WHEN data_vencimento < CURRENT_DATE THEN 1 END) as qtd_vencidos,
+          COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE THEN nao_pago::numeric ELSE 0 END), 0) as valor_vencido
+        FROM caz_pagar
+        WHERE status != 'ACQUITTED' AND nao_pago::numeric > 0
+      ),
+      fluxo_mes_atual AS (
+        SELECT 
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas
+        FROM caz_parcelas
+        WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+          AND status = 'QUITADO'
+      ),
+      fluxo_mes_anterior AS (
+        SELECT 
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receitas,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas
+        FROM caz_parcelas
+        WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE - INTERVAL '1 month', 'YYYY-MM')
+          AND status = 'QUITADO'
+      )
+      SELECT 
+        sb.saldo_total,
+        ar.total_aberto as a_receber_total,
+        ar.qtd_titulos as a_receber_qtd,
+        ar.qtd_vencidos as a_receber_vencidos_qtd,
+        ar.valor_vencido as a_receber_vencido_valor,
+        ap.total_aberto as a_pagar_total,
+        ap.qtd_titulos as a_pagar_qtd,
+        ap.qtd_vencidos as a_pagar_vencidos_qtd,
+        ap.valor_vencido as a_pagar_vencido_valor,
+        fma.receitas as receita_mes_atual,
+        fma.despesas as despesa_mes_atual,
+        fmant.receitas as receita_mes_anterior,
+        fmant.despesas as despesa_mes_anterior
+      FROM saldo_bancos sb, a_receber ar, a_pagar ap, fluxo_mes_atual fma, fluxo_mes_anterior fmant
+    `);
+
+    const row = result.rows[0] as any;
+    const saldoTotal = parseFloat(row?.saldo_total || '0');
+    const aReceberTotal = parseFloat(row?.a_receber_total || '0');
+    const aPagarTotal = parseFloat(row?.a_pagar_total || '0');
+    const receitaMesAtual = parseFloat(row?.receita_mes_atual || '0');
+    const despesaMesAtual = parseFloat(row?.despesa_mes_atual || '0');
+    const receitaMesAnterior = parseFloat(row?.receita_mes_anterior || '0');
+    const despesaMesAnterior = parseFloat(row?.despesa_mes_anterior || '0');
+    
+    return {
+      saldoTotal,
+      aReceberTotal,
+      aReceberQtd: parseInt(row?.a_receber_qtd || '0'),
+      aReceberVencidoValor: parseFloat(row?.a_receber_vencido_valor || '0'),
+      aReceberVencidoQtd: parseInt(row?.a_receber_vencidos_qtd || '0'),
+      aPagarTotal,
+      aPagarQtd: parseInt(row?.a_pagar_qtd || '0'),
+      aPagarVencidoValor: parseFloat(row?.a_pagar_vencido_valor || '0'),
+      aPagarVencidoQtd: parseInt(row?.a_pagar_vencidos_qtd || '0'),
+      receitaMesAtual,
+      despesaMesAtual,
+      resultadoMesAtual: receitaMesAtual - despesaMesAtual,
+      margemMesAtual: receitaMesAtual > 0 ? ((receitaMesAtual - despesaMesAtual) / receitaMesAtual) * 100 : 0,
+      receitaMesAnterior,
+      despesaMesAnterior,
+      variacaoReceita: receitaMesAnterior > 0 ? ((receitaMesAtual - receitaMesAnterior) / receitaMesAnterior) * 100 : 0,
+      variacaoDespesa: despesaMesAnterior > 0 ? ((despesaMesAtual - despesaMesAnterior) / despesaMesAnterior) * 100 : 0,
+      saldoProjetado: saldoTotal + aReceberTotal - aPagarTotal,
+      taxaInadimplencia: aReceberTotal > 0 ? (parseFloat(row?.a_receber_vencido_valor || '0') / aReceberTotal) * 100 : 0,
+    };
+  }
+
+  async getFinanceiroFluxoProximosDias(dias: number = 30): Promise<any[]> {
+    const result = await db.execute(sql`
+      WITH receber AS (
+        SELECT 
+          data_vencimento::date as data,
+          'RECEITA' as tipo,
+          COALESCE(SUM(nao_pago::numeric), 0) as valor
+        FROM caz_receber
+        WHERE status != 'ACQUITTED' 
+          AND nao_pago::numeric > 0
+          AND data_vencimento >= CURRENT_DATE
+          AND data_vencimento <= CURRENT_DATE + ${dias}
+        GROUP BY data_vencimento::date
+      ),
+      pagar AS (
+        SELECT 
+          data_vencimento::date as data,
+          'DESPESA' as tipo,
+          COALESCE(SUM(nao_pago::numeric), 0) as valor
+        FROM caz_pagar
+        WHERE status != 'ACQUITTED' 
+          AND nao_pago::numeric > 0
+          AND data_vencimento >= CURRENT_DATE
+          AND data_vencimento <= CURRENT_DATE + ${dias}
+        GROUP BY data_vencimento::date
+      )
+      SELECT * FROM receber
+      UNION ALL
+      SELECT * FROM pagar
+      ORDER BY data, tipo
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      data: row.data,
+      tipo: row.tipo,
+      valor: parseFloat(row.valor || '0'),
+    }));
+  }
+
   async getRecrutamentoKPIs(): Promise<import("@shared/schema").RecrutamentoKPIs> {
     const result = await db.execute(sql`
       WITH candidaturas_stats AS (

@@ -11,7 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Loader2, TrendingUp, TrendingDown, DollarSign, X, ChevronRight, 
   ArrowUpCircle, ArrowDownCircle, Wallet, PieChart, Users, CreditCard,
-  Building2, Target, BarChart3, LineChart as LineChartIcon
+  Building2, Target, BarChart3, LineChart as LineChartIcon, AlertTriangle,
+  Clock, Banknote, Receipt, FileWarning
 } from "lucide-react";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
@@ -67,6 +68,30 @@ export default function DashboardFinanceiro() {
 
   const { data: contasData, isLoading: isLoadingContas } = useQuery<FinanceiroContaBancaria[]>({
     queryKey: ["/api/financeiro/contas-bancarias"],
+  });
+
+  const { data: kpisCompletos, isLoading: isLoadingKpisCompletos } = useQuery<{
+    saldoTotal: number;
+    aReceberTotal: number;
+    aReceberQtd: number;
+    aReceberVencidoValor: number;
+    aReceberVencidoQtd: number;
+    aPagarTotal: number;
+    aPagarQtd: number;
+    aPagarVencidoValor: number;
+    aPagarVencidoQtd: number;
+    receitaMesAtual: number;
+    despesaMesAtual: number;
+    resultadoMesAtual: number;
+    margemMesAtual: number;
+    receitaMesAnterior: number;
+    despesaMesAnterior: number;
+    variacaoReceita: number;
+    variacaoDespesa: number;
+    saldoProjetado: number;
+    taxaInadimplencia: number;
+  }>({
+    queryKey: ["/api/financeiro/kpis-completos"],
   });
 
   const { data: saldoData, isLoading: isLoadingSaldo } = useQuery<SaldoBancos>({
@@ -264,63 +289,109 @@ export default function DashboardFinanceiro() {
 
   const renderVisaoGeral = () => (
     <div className="space-y-6">
+      {/* KPIs Principais - Posição Financeira */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          title="Receita do Mês"
-          value={formatCurrency(resumoData?.receitaTotal || 0)}
-          icon={TrendingUp}
+          title="Saldo em Caixa"
+          value={formatCurrency(kpisCompletos?.saldoTotal || 0)}
+          icon={Wallet}
+          variant="default"
+          loading={isLoadingKpisCompletos}
+        />
+        <KPICard
+          title="A Receber"
+          value={formatCurrency(kpisCompletos?.aReceberTotal || 0)}
+          icon={ArrowUpCircle}
           variant="success"
-          trend={resumoData?.variacaoReceita && resumoData.variacaoReceita > 0 ? 'up' : resumoData?.variacaoReceita && resumoData.variacaoReceita < 0 ? 'down' : 'neutral'}
-          trendValue={resumoData?.variacaoReceita ? `${resumoData.variacaoReceita.toFixed(1)}%` : undefined}
-          subtitle="vs mês anterior"
-          loading={isLoadingResumo}
+          subtitle={`${kpisCompletos?.aReceberQtd || 0} títulos`}
+          loading={isLoadingKpisCompletos}
         />
         <KPICard
-          title="Despesa do Mês"
-          value={formatCurrency(resumoData?.despesaTotal || 0)}
-          icon={TrendingDown}
+          title="A Pagar"
+          value={formatCurrency(kpisCompletos?.aPagarTotal || 0)}
+          icon={ArrowDownCircle}
           variant="danger"
-          trend={resumoData?.variacaoDespesa && resumoData.variacaoDespesa > 0 ? 'up' : resumoData?.variacaoDespesa && resumoData.variacaoDespesa < 0 ? 'down' : 'neutral'}
-          trendValue={resumoData?.variacaoDespesa ? `${resumoData.variacaoDespesa.toFixed(1)}%` : undefined}
-          subtitle="vs mês anterior"
-          loading={isLoadingResumo}
+          subtitle={`${kpisCompletos?.aPagarQtd || 0} títulos`}
+          loading={isLoadingKpisCompletos}
         />
         <KPICard
-          title="Resultado Operacional"
-          value={formatCurrency(resumoData?.resultado || 0)}
+          title="Saldo Projetado"
+          value={formatCurrency(kpisCompletos?.saldoProjetado || 0)}
           icon={Target}
-          variant={(resumoData?.resultado || 0) >= 0 ? 'success' : 'danger'}
-          loading={isLoadingResumo}
-        />
-        <KPICard
-          title="Margem Operacional"
-          value={`${(resumoData?.margemOperacional || 0).toFixed(1)}%`}
-          icon={PieChart}
-          variant={(resumoData?.margemOperacional || 0) >= 20 ? 'success' : (resumoData?.margemOperacional || 0) >= 0 ? 'warning' : 'danger'}
-          subtitle="Receita - Despesa / Receita"
-          loading={isLoadingResumo}
+          variant={(kpisCompletos?.saldoProjetado || 0) >= 0 ? 'success' : 'danger'}
+          subtitle="Caixa + Receber - Pagar"
+          loading={isLoadingKpisCompletos}
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* KPIs do Mês */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          title="Saldo Bancário Total"
-          value={formatCurrency(saldoData?.saldoTotal || 0)}
-          icon={Wallet}
-          loading={isLoadingSaldo}
+          title="Receita do Mês"
+          value={formatCurrency(kpisCompletos?.receitaMesAtual || 0)}
+          icon={TrendingUp}
+          variant="success"
+          trend={kpisCompletos?.variacaoReceita && kpisCompletos.variacaoReceita > 0 ? 'up' : kpisCompletos?.variacaoReceita && kpisCompletos.variacaoReceita < 0 ? 'down' : 'neutral'}
+          trendValue={kpisCompletos?.variacaoReceita ? `${kpisCompletos.variacaoReceita.toFixed(1)}%` : undefined}
+          subtitle="vs mês anterior"
+          loading={isLoadingKpisCompletos}
         />
         <KPICard
-          title="Parcelas Pagas"
-          value={`${resumoData?.parcelasPagas || 0}`}
-          icon={ArrowUpCircle}
-          variant="success"
-          subtitle={`de ${resumoData?.totalParcelas || 0} parcelas`}
-          loading={isLoadingResumo}
+          title="Despesa do Mês"
+          value={formatCurrency(kpisCompletos?.despesaMesAtual || 0)}
+          icon={TrendingDown}
+          variant="danger"
+          trend={kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa > 0 ? 'up' : kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa < 0 ? 'down' : 'neutral'}
+          trendValue={kpisCompletos?.variacaoDespesa ? `${kpisCompletos.variacaoDespesa.toFixed(1)}%` : undefined}
+          subtitle="vs mês anterior"
+          loading={isLoadingKpisCompletos}
+        />
+        <KPICard
+          title="Resultado do Mês"
+          value={formatCurrency(kpisCompletos?.resultadoMesAtual || 0)}
+          icon={Banknote}
+          variant={(kpisCompletos?.resultadoMesAtual || 0) >= 0 ? 'success' : 'danger'}
+          loading={isLoadingKpisCompletos}
+        />
+        <KPICard
+          title="Margem"
+          value={`${(kpisCompletos?.margemMesAtual || 0).toFixed(1)}%`}
+          icon={PieChart}
+          variant={(kpisCompletos?.margemMesAtual || 0) >= 20 ? 'success' : (kpisCompletos?.margemMesAtual || 0) >= 0 ? 'warning' : 'danger'}
+          loading={isLoadingKpisCompletos}
+        />
+      </div>
+
+      {/* Alertas - Inadimplência e Vencidos */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard
+          title="Vencidos a Receber"
+          value={formatCurrency(kpisCompletos?.aReceberVencidoValor || 0)}
+          icon={AlertTriangle}
+          variant={(kpisCompletos?.aReceberVencidoQtd || 0) > 0 ? 'warning' : 'success'}
+          subtitle={`${kpisCompletos?.aReceberVencidoQtd || 0} títulos vencidos`}
+          loading={isLoadingKpisCompletos}
+        />
+        <KPICard
+          title="Taxa de Inadimplência"
+          value={`${(kpisCompletos?.taxaInadimplencia || 0).toFixed(1)}%`}
+          icon={FileWarning}
+          variant={(kpisCompletos?.taxaInadimplencia || 0) > 10 ? 'danger' : (kpisCompletos?.taxaInadimplencia || 0) > 5 ? 'warning' : 'success'}
+          subtitle="Vencido / Total a Receber"
+          loading={isLoadingKpisCompletos}
+        />
+        <KPICard
+          title="Vencidos a Pagar"
+          value={formatCurrency(kpisCompletos?.aPagarVencidoValor || 0)}
+          icon={Clock}
+          variant={(kpisCompletos?.aPagarVencidoQtd || 0) > 0 ? 'danger' : 'success'}
+          subtitle={`${kpisCompletos?.aPagarVencidoQtd || 0} títulos vencidos`}
+          loading={isLoadingKpisCompletos}
         />
         <KPICard
           title="Parcelas Pendentes"
           value={`${resumoData?.parcelasPendentes || 0}`}
-          icon={ArrowDownCircle}
+          icon={Receipt}
           variant="warning"
           loading={isLoadingResumo}
         />
