@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Loader2, TrendingUp, TrendingDown, DollarSign, Calendar, ChevronRight, ChevronDown,
@@ -431,171 +430,166 @@ export default function DashboardDFC() {
                   <p>Nenhum dado de DFC disponível para os filtros selecionados.</p>
                 </div>
               ) : (
-                <div className="overflow-auto relative rounded-lg border max-h-[70vh]">
-                  <div className="inline-block min-w-full">
-                    <Table>
-                      <TableHeader className="sticky top-0 z-20">
-                        <TableRow className="bg-muted">
-                          <TableHead className="sticky left-0 top-0 bg-muted z-30 min-w-[350px] font-bold border-b border-r border-border shadow-[2px_2px_4px_rgba(0,0,0,0.1)]">
-                            <div className="flex items-center gap-2">
-                              <Receipt className="w-4 h-4" />
-                              Categoria
-                            </div>
-                          </TableHead>
-                          {dfcData.meses.map(mes => {
-                            const [ano, mesNum] = mes.split('-');
-                            const data = new Date(parseInt(ano), parseInt(mesNum) - 1);
-                            const mesFormatado = data.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-                            return (
-                              <TableHead key={mes} className="sticky top-0 z-20 text-center min-w-[130px] font-bold bg-muted border-b border-border">
-                                <div className="flex flex-col items-center">
-                                  <span className="capitalize">{mesFormatado}</span>
-                                </div>
-                              </TableHead>
-                            );
-                          })}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {visibleItems.map((item, idx) => {
-                          if (item.type === 'node') {
-                            const node = item.node;
-                            const hasParcelas = node.isLeaf && node.parcelas && node.parcelas.length > 0;
-                            const isReceitaNode = isReceita(node.categoriaId);
-                            const isRootNode = node.categoriaId === 'RECEITAS' || node.categoriaId === 'DESPESAS';
-                            
-                            const rowBg = isRootNode 
-                              ? (isReceitaNode 
-                                  ? 'bg-gradient-to-r from-green-500/10 via-green-500/5 to-transparent' 
-                                  : 'bg-gradient-to-r from-red-500/10 via-red-500/5 to-transparent')
-                              : '';
-                            
-                            return (
-                              <TableRow 
-                                key={node.categoriaId}
-                                className={`transition-all duration-200 hover:bg-muted/50 ${rowBg}`}
-                                data-testid={`dfc-row-${node.categoriaId}`}
-                              >
-                                <TableCell 
-                                  className={`sticky left-0 z-10 border-r border-border shadow-[2px_0_4px_rgba(0,0,0,0.05)] ${isRootNode ? (isReceitaNode ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30') : 'bg-background'}`}
-                                  style={{ paddingLeft: `${node.nivel * 24 + 16}px` }}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    {!node.isLeaf || hasParcelas ? (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className={`h-7 w-7 rounded-lg transition-all duration-200 ${
-                                          expanded.has(node.categoriaId) 
-                                            ? 'bg-primary/10 text-primary rotate-0' 
-                                            : 'hover:bg-muted'
-                                        }`}
-                                        onClick={() => toggleExpand(node.categoriaId)}
-                                        data-testid={`button-toggle-${node.categoriaId}`}
-                                      >
-                                        {expanded.has(node.categoriaId) ? (
-                                          <ChevronDown className="h-4 w-4 transition-transform duration-200" />
-                                        ) : (
-                                          <ChevronRight className="h-4 w-4 transition-transform duration-200" />
-                                        )}
-                                      </Button>
+                <div className="relative rounded-lg border overflow-hidden">
+                  <div 
+                    className="overflow-auto max-h-[70vh]"
+                    style={{ 
+                      display: 'grid',
+                      gridTemplateColumns: `350px repeat(${dfcData.meses.length}, 130px)`,
+                    }}
+                  >
+                    {/* Header Row - Sticky Top */}
+                    <div className="sticky top-0 left-0 z-30 bg-muted font-bold p-3 border-b border-r border-border flex items-center gap-2 shadow-[2px_2px_4px_rgba(0,0,0,0.1)]">
+                      <Receipt className="w-4 h-4" />
+                      Categoria
+                    </div>
+                    {dfcData.meses.map(mes => {
+                      const [ano, mesNum] = mes.split('-');
+                      const data = new Date(parseInt(ano), parseInt(mesNum) - 1);
+                      const mesFormatado = data.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+                      return (
+                        <div 
+                          key={`header-${mes}`} 
+                          className="sticky top-0 z-20 bg-muted font-bold p-3 border-b border-border text-center capitalize"
+                        >
+                          {mesFormatado}
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Body Rows */}
+                    {visibleItems.map((item, idx) => {
+                      if (item.type === 'node') {
+                        const node = item.node;
+                        const hasParcelas = node.isLeaf && node.parcelas && node.parcelas.length > 0;
+                        const isReceitaNode = isReceita(node.categoriaId);
+                        const isRootNode = node.categoriaId === 'RECEITAS' || node.categoriaId === 'DESPESAS';
+                        
+                        const cellBg = isRootNode 
+                          ? (isReceitaNode ? 'bg-green-100 dark:bg-green-950' : 'bg-red-100 dark:bg-red-950')
+                          : 'bg-background';
+                        
+                        const valueCellBg = isRootNode 
+                          ? (isReceitaNode ? 'bg-green-50 dark:bg-green-950/50' : 'bg-red-50 dark:bg-red-950/50')
+                          : 'bg-background';
+                        
+                        return (
+                          <>
+                            {/* Category Cell - Sticky Left */}
+                            <div 
+                              key={`cat-${node.categoriaId}`}
+                              className={`sticky left-0 z-10 p-3 border-b border-r border-border ${cellBg} shadow-[2px_0_4px_rgba(0,0,0,0.05)] hover:brightness-95 transition-all`}
+                              style={{ paddingLeft: `${node.nivel * 24 + 12}px` }}
+                              data-testid={`dfc-row-${node.categoriaId}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                {!node.isLeaf || hasParcelas ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className={`h-7 w-7 rounded-lg transition-all duration-200 ${
+                                      expanded.has(node.categoriaId) 
+                                        ? 'bg-primary/10 text-primary' 
+                                        : 'hover:bg-muted'
+                                    }`}
+                                    onClick={() => toggleExpand(node.categoriaId)}
+                                    data-testid={`button-toggle-${node.categoriaId}`}
+                                  >
+                                    {expanded.has(node.categoriaId) ? (
+                                      <ChevronDown className="h-4 w-4" />
                                     ) : (
-                                      <div className="w-7 flex justify-center">
-                                        {isReceitaNode ? (
-                                          <Coins className="w-4 h-4 text-green-500" />
-                                        ) : (
-                                          <CreditCard className="w-4 h-4 text-red-500" />
-                                        )}
-                                      </div>
+                                      <ChevronRight className="h-4 w-4" />
                                     )}
-                                    <span className={`${!node.isLeaf ? 'font-bold' : 'font-medium'} ${
-                                      isRootNode 
-                                        ? (isReceitaNode ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400')
-                                        : ''
-                                    }`}>
-                                      {node.categoriaId === 'RECEITAS' && <ArrowUpCircle className="w-5 h-5 inline mr-2 text-green-500" />}
-                                      {node.categoriaId === 'DESPESAS' && <ArrowDownCircle className="w-5 h-5 inline mr-2 text-red-500" />}
-                                      {node.categoriaNome}
-                                    </span>
+                                  </Button>
+                                ) : (
+                                  <div className="w-7 flex justify-center">
+                                    {isReceitaNode ? (
+                                      <Coins className="w-4 h-4 text-green-500" />
+                                    ) : (
+                                      <CreditCard className="w-4 h-4 text-red-500" />
+                                    )}
                                   </div>
-                                </TableCell>
-                                {dfcData.meses.map(mes => {
-                                  const valor = node.valuesByMonth[mes] || 0;
-                                  return (
-                                    <TableCell 
-                                      key={mes} 
-                                      className="text-center"
-                                      data-testid={`dfc-cell-${node.categoriaId}-${mes}`}
-                                    >
-                                      {valor !== 0 ? (
-                                        <span className={`
-                                          ${!node.isLeaf ? 'font-bold' : 'font-medium'}
-                                          ${isRootNode ? 'text-base' : 'text-sm'}
-                                        `}>
-                                          {formatCurrency(Math.abs(valor))}
-                                        </span>
-                                      ) : (
-                                        <span className="text-muted-foreground/40">—</span>
-                                      )}
-                                    </TableCell>
-                                  );
-                                })}
-                              </TableRow>
-                            );
-                          } else {
-                            const parcela = item.parcela;
-                            const parentNode = item.parentNode;
-                            const isReceitaParcela = isReceita(parentNode.categoriaId);
-                            
-                            return (
-                              <TableRow 
-                                key={`${parentNode.categoriaId}-parcela-${parcela.id}-${idx}`}
-                                className={`transition-all duration-200 ${
-                                  isReceitaParcela 
-                                    ? 'bg-green-500/5 hover:bg-green-500/10' 
-                                    : 'bg-red-500/5 hover:bg-red-500/10'
-                                }`}
-                                data-testid={`dfc-row-parcela-${parcela.id}-${parentNode.categoriaId}`}
-                              >
-                                <TableCell 
-                                  className={`sticky left-0 z-10 border-r border-border shadow-[2px_0_4px_rgba(0,0,0,0.05)] ${
-                                    isReceitaParcela ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
-                                  }`}
-                                  style={{ paddingLeft: `${(parentNode.nivel + 1) * 24 + 16}px` }}
+                                )}
+                                <span className={`${!node.isLeaf ? 'font-bold' : 'font-medium'} ${
+                                  isRootNode 
+                                    ? (isReceitaNode ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400')
+                                    : ''
+                                }`}>
+                                  {node.categoriaId === 'RECEITAS' && <ArrowUpCircle className="w-5 h-5 inline mr-2 text-green-500" />}
+                                  {node.categoriaId === 'DESPESAS' && <ArrowDownCircle className="w-5 h-5 inline mr-2 text-red-500" />}
+                                  {node.categoriaNome}
+                                </span>
+                              </div>
+                            </div>
+                            {/* Value Cells */}
+                            {dfcData.meses.map(mes => {
+                              const valor = node.valuesByMonth[mes] || 0;
+                              return (
+                                <div 
+                                  key={`val-${node.categoriaId}-${mes}`}
+                                  className={`p-3 border-b border-border text-center ${valueCellBg} hover:brightness-95 transition-all`}
+                                  data-testid={`dfc-cell-${node.categoriaId}-${mes}`}
                                 >
-                                  <div className="flex items-center gap-2">
-                                    <div className={`w-2 h-2 rounded-full ${
-                                      isReceitaParcela ? 'bg-green-500' : 'bg-red-500'
-                                    }`} />
-                                    <span className="text-sm text-muted-foreground">
-                                      #{parcela.id} - {parcela.descricao || 'Sem descrição'}
+                                  {valor !== 0 ? (
+                                    <span className={`${!node.isLeaf ? 'font-bold' : 'font-medium'} ${isRootNode ? 'text-base' : 'text-sm'}`}>
+                                      {formatCurrency(Math.abs(valor))}
                                     </span>
-                                  </div>
-                                </TableCell>
-                                {dfcData.meses.map(mes => {
-                                  const valor = parcela.mes === mes ? parcela.valorBruto : 0;
-                                  return (
-                                    <TableCell 
-                                      key={mes} 
-                                      className="text-center"
-                                      data-testid={`dfc-cell-parcela-${parcela.id}-${mes}`}
-                                    >
-                                      {valor !== 0 ? (
-                                        <span className="text-sm font-medium">
-                                          {formatCurrency(Math.abs(valor))}
-                                        </span>
-                                      ) : (
-                                        <span className="text-muted-foreground/30">—</span>
-                                      )}
-                                    </TableCell>
-                                  );
-                                })}
-                              </TableRow>
-                            );
-                          }
-                        })}
-                      </TableBody>
-                    </Table>
+                                  ) : (
+                                    <span className="text-muted-foreground/40">—</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </>
+                        );
+                      } else {
+                        const parcela = item.parcela;
+                        const parentNode = item.parentNode;
+                        const isReceitaParcela = isReceita(parentNode.categoriaId);
+                        
+                        const parcelaBg = isReceitaParcela 
+                          ? 'bg-green-50 dark:bg-green-950/30' 
+                          : 'bg-red-50 dark:bg-red-950/30';
+                        
+                        return (
+                          <>
+                            {/* Parcela Category Cell - Sticky Left */}
+                            <div 
+                              key={`parcela-cat-${parcela.id}-${idx}`}
+                              className={`sticky left-0 z-10 p-3 border-b border-r border-border ${parcelaBg} shadow-[2px_0_4px_rgba(0,0,0,0.05)] hover:brightness-95 transition-all`}
+                              style={{ paddingLeft: `${(parentNode.nivel + 1) * 24 + 12}px` }}
+                              data-testid={`dfc-row-parcela-${parcela.id}-${parentNode.categoriaId}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${isReceitaParcela ? 'bg-green-500' : 'bg-red-500'}`} />
+                                <span className="text-sm text-muted-foreground">
+                                  #{parcela.id} - {parcela.descricao || 'Sem descrição'}
+                                </span>
+                              </div>
+                            </div>
+                            {/* Parcela Value Cells */}
+                            {dfcData.meses.map(mes => {
+                              const valor = parcela.mes === mes ? parcela.valorBruto : 0;
+                              return (
+                                <div 
+                                  key={`parcela-val-${parcela.id}-${mes}-${idx}`}
+                                  className={`p-3 border-b border-border text-center ${parcelaBg} hover:brightness-95 transition-all`}
+                                  data-testid={`dfc-cell-parcela-${parcela.id}-${mes}`}
+                                >
+                                  {valor !== 0 ? (
+                                    <span className="text-sm font-medium">
+                                      {formatCurrency(Math.abs(valor))}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground/30">—</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </>
+                        );
+                      }
+                    })}
                   </div>
                 </div>
               )}
