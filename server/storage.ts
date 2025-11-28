@@ -2432,19 +2432,20 @@ export class DbStorage implements IStorage {
     const resultados = await db.execute(sql`
       WITH contratos_filtrados AS (
         SELECT 
-          con.*,
-          cli.responsavel
+          con.id_task,
+          con.valorr,
+          cli.responsavel as nome_responsavel
         FROM cup_contratos con
         LEFT JOIN cup_clientes cli ON con.id_task = cli.task_id
         WHERE ${whereClause}
       ),
       churn_por_responsavel AS (
         SELECT 
-          COALESCE(responsavel, 'Sem responsável') as responsavel,
+          COALESCE(nome_responsavel, 'Sem responsável') as responsavel,
           COUNT(*) as quantidade_contratos,
           COALESCE(SUM(valorr::numeric), 0) as valor_total_churn
         FROM contratos_filtrados
-        GROUP BY responsavel
+        GROUP BY nome_responsavel
       ),
       total_ativos_por_responsavel AS (
         SELECT 
