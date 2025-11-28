@@ -1612,15 +1612,23 @@ export class DbStorage implements IStorage {
   }
 
   async getFluxoCaixa(): Promise<FluxoCaixaItem[]> {
+    // Buscar de caz_receber (receitas) e caz_pagar (despesas) combinados
     const result = await db.execute(sql`
       SELECT 
         data_vencimento,
-        tipo_evento,
-        COALESCE(SUM(valor_bruto::numeric), 0) as valor_bruto
-      FROM ${schema.cazParcelas}
-      WHERE tipo_evento IN ('RECEITA', 'DESPESA')
-        AND data_vencimento IS NOT NULL
-      GROUP BY data_vencimento, tipo_evento
+        'RECEITA' as tipo_evento,
+        COALESCE(SUM(total::numeric), 0) as valor_bruto
+      FROM caz_receber
+      WHERE data_vencimento IS NOT NULL
+      GROUP BY data_vencimento
+      UNION ALL
+      SELECT 
+        data_vencimento,
+        'DESPESA' as tipo_evento,
+        COALESCE(SUM(total::numeric), 0) as valor_bruto
+      FROM caz_pagar
+      WHERE data_vencimento IS NOT NULL
+      GROUP BY data_vencimento
       ORDER BY data_vencimento DESC
     `);
     
@@ -1634,16 +1642,20 @@ export class DbStorage implements IStorage {
   async getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]> {
     const saldoAtual = await this.getSaldoAtualBancos();
     
+    // Combinar receitas (caz_receber) e despesas (caz_pagar)
     const result = await db.execute(sql`
+      WITH fluxo_combinado AS (
+        SELECT data_vencimento, total::numeric as valor, 'RECEITA' as tipo FROM caz_receber WHERE data_vencimento IS NOT NULL
+        UNION ALL
+        SELECT data_vencimento, total::numeric as valor, 'DESPESA' as tipo FROM caz_pagar WHERE data_vencimento IS NOT NULL
+      )
       SELECT 
         TO_CHAR(data_vencimento, 'DD/MM/YYYY') as dia,
         data_vencimento,
-        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END), 0) as receitas,
-        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END), 0) as despesas
-      FROM ${schema.cazParcelas}
-      WHERE tipo_evento IN ('RECEITA', 'DESPESA')
-        AND data_vencimento IS NOT NULL
-        AND EXTRACT(YEAR FROM data_vencimento) = ${ano}
+        COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) as receitas,
+        COALESCE(SUM(CASE WHEN tipo = 'DESPESA' THEN valor ELSE 0 END), 0) as despesas
+      FROM fluxo_combinado
+      WHERE EXTRACT(YEAR FROM data_vencimento) = ${ano}
         AND EXTRACT(MONTH FROM data_vencimento) = ${mes}
       GROUP BY data_vencimento
       ORDER BY data_vencimento ASC
@@ -1653,13 +1665,16 @@ export class DbStorage implements IStorage {
     hoje.setHours(0, 0, 0, 0);
     
     const transacoesPassadas = await db.execute(sql`
+      WITH fluxo_combinado AS (
+        SELECT data_vencimento, total::numeric as valor, 'RECEITA' as tipo FROM caz_receber WHERE data_vencimento IS NOT NULL
+        UNION ALL
+        SELECT data_vencimento, total::numeric as valor, 'DESPESA' as tipo FROM caz_pagar WHERE data_vencimento IS NOT NULL
+      )
       SELECT 
-        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END), 0) -
-        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END), 0) as fluxo_passado
-      FROM ${schema.cazParcelas}
-      WHERE tipo_evento IN ('RECEITA', 'DESPESA')
-        AND data_vencimento IS NOT NULL
-        AND data_vencimento < ${hoje.toISOString()}
+        COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN tipo = 'DESPESA' THEN valor ELSE 0 END), 0) as fluxo_passado
+      FROM fluxo_combinado
+      WHERE data_vencimento < ${hoje.toISOString()}::date
     `);
     
     const fluxoPassado = parseFloat((transacoesPassadas.rows[0] as any)?.fluxo_passado || '0');
@@ -1682,17 +1697,18 @@ export class DbStorage implements IStorage {
   }
 
   async getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]> {
+    // Combinar receitas (caz_receber) e despesas (caz_pagar)
     const result = await db.execute(sql`
-      SELECT 
-        id,
-        descricao,
-        valor_bruto,
-        tipo_evento,
-        empresa,
-        data_vencimento
-      FROM ${schema.cazParcelas}
-      WHERE tipo_evento IN ('RECEITA', 'DESPESA')
-        AND data_vencimento IS NOT NULL
+      SELECT id, descricao, total as valor_bruto, 'RECEITA' as tipo_evento, empresa, data_vencimento
+      FROM caz_receber
+      WHERE data_vencimento IS NOT NULL
+        AND EXTRACT(YEAR FROM data_vencimento) = ${ano}
+        AND EXTRACT(MONTH FROM data_vencimento) = ${mes}
+        AND EXTRACT(DAY FROM data_vencimento) = ${dia}
+      UNION ALL
+      SELECT id::varchar, descricao, total as valor_bruto, 'DESPESA' as tipo_evento, empresa, data_vencimento
+      FROM caz_pagar
+      WHERE data_vencimento IS NOT NULL
         AND EXTRACT(YEAR FROM data_vencimento) = ${ano}
         AND EXTRACT(MONTH FROM data_vencimento) = ${mes}
         AND EXTRACT(DAY FROM data_vencimento) = ${dia}
