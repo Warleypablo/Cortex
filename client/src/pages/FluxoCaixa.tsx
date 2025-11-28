@@ -375,15 +375,15 @@ export default function FluxoCaixa() {
               <div className="flex gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded bg-green-500" />
-                  <span>Entradas: {formatCurrencyCompact(totais.entradas)}</span>
+                  <span data-testid="text-total-entradas">Entradas: {formatCurrencyCompact(totais.entradas)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded bg-red-500" />
-                  <span>Saídas: {formatCurrencyCompact(totais.saidas)}</span>
+                  <span data-testid="text-total-saidas">Saídas: {formatCurrencyCompact(totais.saidas)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded bg-blue-500" />
-                  <span className={totais.saldo >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  <span className={totais.saldo >= 0 ? 'text-green-600' : 'text-red-600'} data-testid="text-total-saldo">
                     Saldo: {formatCurrencyCompact(totais.saldo)}
                   </span>
                 </div>

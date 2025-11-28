@@ -26,6 +26,7 @@ import DashboardDFC from "@/pages/DashboardDFC";
 import DashboardInhire from "@/pages/DashboardInhire";
 import DashboardRecrutamento from "@/pages/DashboardRecrutamento";
 import DashboardTech from "@/pages/DashboardTech";
+import FluxoCaixa from "@/pages/FluxoCaixa";
 import MetaAds from "@/pages/MetaAds";
 import AuditoriaSistemas from "@/pages/AuditoriaSistemas";
 import AdminUsuarios from "@/pages/AdminUsuarios";
@@ -117,6 +118,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/geg">{() => <ProtectedRoute path="/dashboard/geg" component={DashboardGeG} />}</Route>
       <Route path="/dashboard/retencao">{() => <ProtectedRoute path="/dashboard/retencao" component={DashboardRetencao} />}</Route>
       <Route path="/dashboard/dfc">{() => <ProtectedRoute path="/dashboard/dfc" component={DashboardDFC} />}</Route>
+      <Route path="/dashboard/fluxo-caixa">{() => <ProtectedRoute path="/dashboard/fluxo-caixa" component={FluxoCaixa} />}</Route>
       <Route path="/dashboard/auditoria-sistemas">{() => <ProtectedRoute path="/dashboard/auditoria-sistemas" component={AuditoriaSistemas} />}</Route>
       <Route path="/dashboard/inhire">{() => <ProtectedRoute path="/dashboard/inhire" component={DashboardInhire} />}</Route>
       <Route path="/dashboard/recrutamento">{() => <ProtectedRoute path="/dashboard/recrutamento" component={DashboardRecrutamento} />}</Route>
