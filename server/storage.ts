@@ -3964,6 +3964,13 @@ export class DbStorage implements IStorage {
     const receitaMesAnterior = parseFloat(row?.receita_mes_anterior || '0');
     const despesaMesAnterior = parseFloat(row?.despesa_mes_anterior || '0');
     
+    const variacaoReceita = receitaMesAnterior > 0 
+      ? ((receitaMesAtual - receitaMesAnterior) / receitaMesAnterior) * 100 
+      : (receitaMesAtual > 0 ? 100 : 0);
+    const variacaoDespesa = despesaMesAnterior > 0 
+      ? ((despesaMesAtual - despesaMesAnterior) / despesaMesAnterior) * 100 
+      : (despesaMesAtual > 0 ? 100 : 0);
+    
     return {
       saldoTotal,
       aReceberTotal,
@@ -3980,8 +3987,8 @@ export class DbStorage implements IStorage {
       margemMesAtual: receitaMesAtual > 0 ? ((receitaMesAtual - despesaMesAtual) / receitaMesAtual) * 100 : 0,
       receitaMesAnterior,
       despesaMesAnterior,
-      variacaoReceita: receitaMesAnterior > 0 ? ((receitaMesAtual - receitaMesAnterior) / receitaMesAnterior) * 100 : 0,
-      variacaoDespesa: despesaMesAnterior > 0 ? ((despesaMesAtual - despesaMesAnterior) / despesaMesAnterior) * 100 : 0,
+      variacaoReceita,
+      variacaoDespesa,
       saldoProjetado: saldoTotal + aReceberTotal - aPagarTotal,
       taxaInadimplencia: aReceberTotal > 0 ? (parseFloat(row?.a_receber_vencido_valor || '0') / aReceberTotal) * 100 : 0,
     };
@@ -3998,7 +4005,7 @@ export class DbStorage implements IStorage {
         WHERE status != 'ACQUITTED' 
           AND nao_pago::numeric > 0
           AND data_vencimento >= CURRENT_DATE
-          AND data_vencimento <= CURRENT_DATE + ${dias}
+          AND data_vencimento <= CURRENT_DATE + (${dias}::integer || ' days')::interval
         GROUP BY data_vencimento::date
       ),
       pagar AS (
@@ -4010,7 +4017,7 @@ export class DbStorage implements IStorage {
         WHERE status != 'ACQUITTED' 
           AND nao_pago::numeric > 0
           AND data_vencimento >= CURRENT_DATE
-          AND data_vencimento <= CURRENT_DATE + ${dias}
+          AND data_vencimento <= CURRENT_DATE + (${dias}::integer || ' days')::interval
         GROUP BY data_vencimento::date
       )
       SELECT * FROM receber
