@@ -159,6 +159,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debug route to explore tech tables structure
+  app.get("/debug-tech-tables", async (req, res) => {
+    try {
+      // Get structure of cup_projetos_tech
+      const projetosAtivos = await db.execute(sql`
+        SELECT * FROM staging.cup_projetos_tech LIMIT 5
+      `);
+      
+      // Get structure of cup_projetos_tech_fechados
+      const projetosFechados = await db.execute(sql`
+        SELECT * FROM staging.cup_projetos_tech_fechados LIMIT 5
+      `);
+      
+      // Get structure of cup_tech_tasks
+      const tasks = await db.execute(sql`
+        SELECT * FROM staging.cup_tech_tasks LIMIT 5
+      `);
+      
+      // Get column info
+      const columnsAtivos = projetosAtivos.rows.length > 0 ? Object.keys(projetosAtivos.rows[0] as object) : [];
+      const columnsFechados = projetosFechados.rows.length > 0 ? Object.keys(projetosFechados.rows[0] as object) : [];
+      const columnsTasks = tasks.rows.length > 0 ? Object.keys(tasks.rows[0] as object) : [];
+      
+      // Get counts
+      const countAtivos = await db.execute(sql`SELECT COUNT(*) as count FROM staging.cup_projetos_tech`);
+      const countFechados = await db.execute(sql`SELECT COUNT(*) as count FROM staging.cup_projetos_tech_fechados`);
+      const countTasks = await db.execute(sql`SELECT COUNT(*) as count FROM staging.cup_tech_tasks`);
+      
+      res.json({
+        cup_projetos_tech: {
+          columns: columnsAtivos,
+          count: countAtivos.rows[0],
+          sample: projetosAtivos.rows
+        },
+        cup_projetos_tech_fechados: {
+          columns: columnsFechados,
+          count: countFechados.rows[0],
+          sample: projetosFechados.rows
+        },
+        cup_tech_tasks: {
+          columns: columnsTasks,
+          count: countTasks.rows[0],
+          sample: tasks.rows
+        }
+      });
+    } catch (error) {
+      console.error("[debug] Error exploring tech tables:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
   app.post("/debug-smart-backfill", async (req, res) => {
     try {
       const patrimoniosResult = await db.execute(sql`
