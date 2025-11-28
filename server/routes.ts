@@ -667,6 +667,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/financeiro/kpis-completos", async (req, res) => {
+    try {
+      const kpis = await storage.getFinanceiroKPIsCompletos();
+      res.json(kpis);
+    } catch (error) {
+      console.error("[api] Error fetching financeiro KPIs:", error);
+      res.status(500).json({ error: "Failed to fetch financeiro KPIs" });
+    }
+  });
+
+  app.get("/api/financeiro/fluxo-proximos-dias", async (req, res) => {
+    try {
+      const dias = parseInt(req.query.dias as string) || 30;
+      const fluxo = await storage.getFinanceiroFluxoProximosDias(dias);
+      res.json(fluxo);
+    } catch (error) {
+      console.error("[api] Error fetching fluxo:", error);
+      res.status(500).json({ error: "Failed to fetch fluxo" });
+    }
+  });
+
   app.get("/api/analytics/cohort-retention", async (req, res) => {
     try {
       const filters: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string } = {};
