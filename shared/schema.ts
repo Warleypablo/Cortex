@@ -919,3 +919,37 @@ export type RecrutamentoConversaoPorVaga = {
   oferta: number;
   taxaConversao: number;
 };
+
+export type RecrutamentoTempoMedioPorEtapa = {
+  etapa: string;
+  tempoMedioDias: number;
+  totalCandidatos: number;
+  ordem: number;
+};
+
+export type RecrutamentoEntrevistasRealizadas = {
+  totalEntrevistas: number;
+  entrevistaRS: number;
+  entrevistaTecnica: number;
+  entrevistaFinal: number;
+  mediaEntrevistasPorVaga: number;
+};
+
+export type RecrutamentoEntrevistasPorCargo = {
+  cargo: string;
+  area: string | null;
+  totalEntrevistas: number;
+  entrevistaRS: number;
+  entrevistaTecnica: number;
+  entrevistaFinal: number;
+  percentual: number;
+};
+
+export type RecrutamentoCandidaturasPorArea = {
+  area: string;
+  totalCandidaturas: number;
+  candidatosAtivos: number;
+  candidatosRejeitados: number;
+  percentual: number;
+  vagasAbertas: number;
+};
