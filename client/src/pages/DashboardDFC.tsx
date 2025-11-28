@@ -20,16 +20,16 @@ type VisibleItem =
   | { type: 'parcela'; parcela: DfcParcela; parentNode: DfcNode };
 
 export default function DashboardDFC() {
-  const [filterMesInicio, setFilterMesInicio] = useState<string>("");
-  const [filterMesFim, setFilterMesFim] = useState<string>("");
+  const [filterDataInicio, setFilterDataInicio] = useState<string>("");
+  const [filterDataFim, setFilterDataFim] = useState<string>("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['RECEITAS', 'DESPESAS']));
 
   const { data: dfcData, isLoading } = useQuery<DfcHierarchicalResponse>({
-    queryKey: ["/api/dfc", filterMesInicio, filterMesFim],
+    queryKey: ["/api/dfc", filterDataInicio, filterDataFim],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (filterMesInicio) params.append("mesInicio", filterMesInicio);
-      if (filterMesFim) params.append("mesFim", filterMesFim);
+      if (filterDataInicio) params.append("dataInicio", filterDataInicio);
+      if (filterDataFim) params.append("dataFim", filterDataFim);
       
       const res = await fetch(`/api/dfc?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch DFC data");
@@ -152,7 +152,7 @@ export default function DashboardDFC() {
   };
 
   const KPICard = ({ 
-    title, value, subtitle, icon: Icon, variant = 'default', loading = false, animate = false 
+    title, value, subtitle, icon: Icon, variant = 'default', loading = false 
   }: { 
     title: string; 
     value: string; 
@@ -160,33 +160,27 @@ export default function DashboardDFC() {
     icon: any; 
     variant?: 'default' | 'success' | 'danger' | 'warning' | 'info';
     loading?: boolean;
-    animate?: boolean;
   }) => {
     const variantStyles = {
       default: {
         bg: 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900',
         icon: 'bg-primary/10 text-primary',
-        text: 'text-foreground',
       },
       success: {
         bg: 'bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/20',
         icon: 'bg-green-500/20 text-green-600 dark:text-green-400',
-        text: 'text-green-700 dark:text-green-400',
       },
       danger: {
         bg: 'bg-gradient-to-br from-red-50 to-rose-100 dark:from-red-900/30 dark:to-rose-900/20',
         icon: 'bg-red-500/20 text-red-600 dark:text-red-400',
-        text: 'text-red-700 dark:text-red-400',
       },
       warning: {
         bg: 'bg-gradient-to-br from-amber-50 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/20',
         icon: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
-        text: 'text-amber-700 dark:text-amber-400',
       },
       info: {
         bg: 'bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-900/30 dark:to-sky-900/20',
         icon: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
-        text: 'text-blue-700 dark:text-blue-400',
       },
     };
 
@@ -194,15 +188,15 @@ export default function DashboardDFC() {
 
     if (loading) {
       return (
-        <Card className={`${styles.bg} border-0 shadow-lg`}>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-8 w-32" />
+        <Card className={`${styles.bg} border-0 shadow-lg overflow-hidden`}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-2 flex-1 min-w-0">
                 <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-3 w-16" />
               </div>
-              <Skeleton className="h-14 w-14 rounded-2xl" />
+              <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -210,20 +204,20 @@ export default function DashboardDFC() {
     }
 
     return (
-      <Card className={`${styles.bg} border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1`}>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">{title}</p>
-              <p className={`text-2xl font-bold ${styles.text} ${animate ? 'animate-pulse' : ''}`}>
+      <Card className={`${styles.bg} border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 overflow-hidden`}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-muted-foreground truncate">{title}</p>
+              <p className="text-lg font-bold text-foreground truncate">
                 {value}
               </p>
               {subtitle && (
-                <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>
               )}
             </div>
-            <div className={`p-4 rounded-2xl ${styles.icon} shadow-inner`}>
-              <Icon className="w-7 h-7" />
+            <div className={`p-2.5 rounded-xl ${styles.icon} shadow-inner flex-shrink-0`}>
+              <Icon className="w-5 h-5" />
             </div>
           </div>
         </CardContent>
@@ -287,7 +281,6 @@ export default function DashboardDFC() {
               variant={kpis.saldoLiquido >= 0 ? 'success' : 'danger'}
               subtitle="Entradas - Saídas"
               loading={isLoading}
-              animate={kpis.saldoLiquido < 0}
             />
             <KPICard
               title="Meses Analisados"
@@ -386,26 +379,40 @@ export default function DashboardDFC() {
                 </div>
                 <div className="flex flex-wrap gap-3">
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">De:</label>
+                    <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Vencimento de:</label>
                     <input
-                      type="month"
-                      value={filterMesInicio}
-                      onChange={(e) => setFilterMesInicio(e.target.value)}
+                      type="date"
+                      value={filterDataInicio}
+                      onChange={(e) => setFilterDataInicio(e.target.value)}
                       className="h-10 rounded-lg border border-input bg-background px-3 text-sm shadow-sm hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                      data-testid="input-mes-inicio"
+                      data-testid="input-data-inicio"
                     />
                   </div>
                   
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Até:</label>
                     <input
-                      type="month"
-                      value={filterMesFim}
-                      onChange={(e) => setFilterMesFim(e.target.value)}
+                      type="date"
+                      value={filterDataFim}
+                      onChange={(e) => setFilterDataFim(e.target.value)}
                       className="h-10 rounded-lg border border-input bg-background px-3 text-sm shadow-sm hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                      data-testid="input-mes-fim"
+                      data-testid="input-data-fim"
                     />
                   </div>
+                  
+                  {(filterDataInicio || filterDataFim) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFilterDataInicio("");
+                        setFilterDataFim("");
+                      }}
+                      className="h-10"
+                    >
+                      Limpar
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -514,7 +521,6 @@ export default function DashboardDFC() {
                                 </TableCell>
                                 {dfcData.meses.map(mes => {
                                   const valor = node.valuesByMonth[mes] || 0;
-                                  const isPositive = valor > 0;
                                   return (
                                     <TableCell 
                                       key={mes} 
@@ -524,11 +530,7 @@ export default function DashboardDFC() {
                                       {valor !== 0 ? (
                                         <span className={`
                                           ${!node.isLeaf ? 'font-bold' : 'font-medium'}
-                                          ${isReceitaNode || isPositive 
-                                            ? 'text-green-600 dark:text-green-400' 
-                                            : 'text-red-600 dark:text-red-400'
-                                          }
-                                          ${isRootNode ? 'text-lg' : ''}
+                                          ${isRootNode ? 'text-base' : 'text-sm'}
                                         `}>
                                           {formatCurrency(Math.abs(valor))}
                                         </span>
@@ -579,16 +581,9 @@ export default function DashboardDFC() {
                                       data-testid={`dfc-cell-parcela-${parcela.id}-${mes}`}
                                     >
                                       {valor !== 0 ? (
-                                        <Badge 
-                                          variant="outline" 
-                                          className={`font-medium ${
-                                            isReceitaParcela 
-                                              ? 'border-green-500/30 text-green-600 bg-green-500/10' 
-                                              : 'border-red-500/30 text-red-600 bg-red-500/10'
-                                          }`}
-                                        >
+                                        <span className="text-sm font-medium">
                                           {formatCurrency(Math.abs(valor))}
-                                        </Badge>
+                                        </span>
                                       ) : (
                                         <span className="text-muted-foreground/30">—</span>
                                       )}

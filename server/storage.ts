@@ -152,7 +152,7 @@ export interface IStorage {
   getMrrEvolucaoMensal(mesAnoFim: string): Promise<import("@shared/schema").MrrEvolucaoMensal[]>;
   getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]>;
   getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]>;
-  getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse>;
+  getDfc(dataInicio?: string, dataFim?: string): Promise<DfcHierarchicalResponse>;
   getGegMetricas(periodo: string, squad: string, setor: string): Promise<any>;
   getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string): Promise<any>;
   getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string): Promise<any>;
@@ -327,7 +327,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse> {
+  async getDfc(dataInicio?: string, dataFim?: string): Promise<DfcHierarchicalResponse> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -2099,7 +2099,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getDfc(mesInicio?: string, mesFim?: string): Promise<DfcHierarchicalResponse> {
+  async getDfc(dataInicio?: string, dataFim?: string): Promise<DfcHierarchicalResponse> {
     // Buscar nomes reais das categorias da tabela caz_categorias
     // IMPORTANTE: O campo 'nome' contém CÓDIGO + DESCRIÇÃO juntos, ex: "06.10 Despesas Administrativas"
     const categoriasReais = await db.execute(sql.raw(`
@@ -2129,16 +2129,13 @@ export class DbStorage implements IStorage {
     
     const whereClauses: string[] = ['categoria_id IS NOT NULL', "categoria_id != ''", "status = 'QUITADO'"];
     
-    if (mesInicio) {
-      const [ano, mes] = mesInicio.split('-').map(Number);
-      const dataInicio = new Date(ano, mes - 1, 1);
-      whereClauses.push(`data_quitacao >= '${dataInicio.toISOString()}'`);
+    // Filtrar por data de vencimento
+    if (dataInicio) {
+      whereClauses.push(`data_vencimento >= '${dataInicio}'`);
     }
     
-    if (mesFim) {
-      const [ano, mes] = mesFim.split('-').map(Number);
-      const dataFim = new Date(ano, mes, 0, 23, 59, 59);
-      whereClauses.push(`data_quitacao <= '${dataFim.toISOString()}'`);
+    if (dataFim) {
+      whereClauses.push(`data_vencimento <= '${dataFim}'`);
     }
     
     const whereClause = whereClauses.join(' AND ');
