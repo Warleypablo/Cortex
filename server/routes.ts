@@ -863,18 +863,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/dfc", async (req, res) => {
     try {
-      const mesInicio = req.query.mesInicio as string | undefined;
-      const mesFim = req.query.mesFim as string | undefined;
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
       
-      if (mesInicio && !/^\d{4}-\d{2}$/.test(mesInicio)) {
-        return res.status(400).json({ error: "Invalid mesInicio parameter. Expected format: YYYY-MM" });
+      if (dataInicio && !/^\d{4}-\d{2}-\d{2}$/.test(dataInicio)) {
+        return res.status(400).json({ error: "Invalid dataInicio parameter. Expected format: YYYY-MM-DD" });
       }
       
-      if (mesFim && !/^\d{4}-\d{2}$/.test(mesFim)) {
-        return res.status(400).json({ error: "Invalid mesFim parameter. Expected format: YYYY-MM" });
+      if (dataFim && !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+        return res.status(400).json({ error: "Invalid dataFim parameter. Expected format: YYYY-MM-DD" });
       }
 
-      const dfcData = await storage.getDfc(mesInicio, mesFim);
+      const dfcData = await storage.getDfc(dataInicio, dataFim);
       res.json(dfcData);
     } catch (error) {
       console.error("[api] Error fetching DFC data:", error);
