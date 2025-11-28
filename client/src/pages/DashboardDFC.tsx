@@ -371,7 +371,7 @@ export default function DashboardDFC() {
                     <Activity className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <CardTitle>Fluxo de Caixa Hierárquico</CardTitle>
+                    <CardTitle>DFC</CardTitle>
                     <CardDescription>
                       Navegue pela hierarquia expandindo e colapsando os níveis
                     </CardDescription>
