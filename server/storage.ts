@@ -196,6 +196,10 @@ export interface IStorage {
   getRecrutamentoAreas(): Promise<import("@shared/schema").RecrutamentoAreaDistribuicao[]>;
   getRecrutamentoFiltros(): Promise<import("@shared/schema").RecrutamentoFiltros>;
   getRecrutamentoConversaoPorVaga(limit?: number): Promise<import("@shared/schema").RecrutamentoConversaoPorVaga[]>;
+  getRecrutamentoTempoMedioPorEtapa(): Promise<import("@shared/schema").RecrutamentoTempoMedioPorEtapa[]>;
+  getRecrutamentoEntrevistasRealizadas(): Promise<import("@shared/schema").RecrutamentoEntrevistasRealizadas>;
+  getRecrutamentoEntrevistasPorCargo(): Promise<import("@shared/schema").RecrutamentoEntrevistasPorCargo[]>;
+  getRecrutamentoCandidaturasPorArea(): Promise<import("@shared/schema").RecrutamentoCandidaturasPorArea[]>;
   
   // Tech Dashboard
   getTechMetricas(): Promise<TechMetricas>;
@@ -604,6 +608,22 @@ export class MemStorage implements IStorage {
   }
 
   async getRecrutamentoConversaoPorVaga(limit?: number): Promise<import("@shared/schema").RecrutamentoConversaoPorVaga[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getRecrutamentoTempoMedioPorEtapa(): Promise<import("@shared/schema").RecrutamentoTempoMedioPorEtapa[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getRecrutamentoEntrevistasRealizadas(): Promise<import("@shared/schema").RecrutamentoEntrevistasRealizadas> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getRecrutamentoEntrevistasPorCargo(): Promise<import("@shared/schema").RecrutamentoEntrevistasPorCargo[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getRecrutamentoCandidaturasPorArea(): Promise<import("@shared/schema").RecrutamentoCandidaturasPorArea[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -4841,6 +4861,143 @@ export class DbStorage implements IStorage {
         taxaConversao: total > 0 ? (oferta / total) * 100 : 0,
       };
     });
+  }
+
+  async getRecrutamentoTempoMedioPorEtapa(): Promise<import("@shared/schema").RecrutamentoTempoMedioPorEtapa[]> {
+    const etapasOrdem: Record<string, number> = {
+      'Inscrição': 1,
+      'Triagem': 2,
+      'Entrevista R&S': 3,
+      'Teste tecnico': 4,
+      'Entrevista técnica': 5,
+      'Entrevista final': 6,
+      'Oferta': 7,
+    };
+
+    const result = await db.execute(sql`
+      SELECT 
+        stage_name as etapa,
+        AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 86400) as tempo_medio_dias,
+        COUNT(*) as total_candidatos
+      FROM rh_candidaturas
+      WHERE stage_name IS NOT NULL
+        AND created_at IS NOT NULL
+        AND updated_at IS NOT NULL
+        AND updated_at > created_at
+      GROUP BY stage_name
+      ORDER BY tempo_medio_dias DESC
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      etapa: row.etapa || 'Não informado',
+      tempoMedioDias: parseFloat(row.tempo_medio_dias || '0'),
+      totalCandidatos: parseInt(row.total_candidatos || '0'),
+      ordem: etapasOrdem[row.etapa] || 99,
+    })).sort((a, b) => a.ordem - b.ordem);
+  }
+
+  async getRecrutamentoEntrevistasRealizadas(): Promise<import("@shared/schema").RecrutamentoEntrevistasRealizadas> {
+    const result = await db.execute(sql`
+      WITH entrevistas AS (
+        SELECT 
+          COUNT(CASE WHEN stage_name = 'Entrevista R&S' THEN 1 END) as entrevista_rs,
+          COUNT(CASE WHEN stage_name = 'Entrevista técnica' THEN 1 END) as entrevista_tecnica,
+          COUNT(CASE WHEN stage_name = 'Entrevista final' THEN 1 END) as entrevista_final
+        FROM rh_candidaturas
+        WHERE stage_name IN ('Entrevista R&S', 'Entrevista técnica', 'Entrevista final')
+      ),
+      vagas_com_entrevistas AS (
+        SELECT COUNT(DISTINCT v.id) as total_vagas
+        FROM rh_vagas v
+        INNER JOIN rh_candidaturas c ON c.job_id_hash = v.id::text
+        WHERE c.stage_name IN ('Entrevista R&S', 'Entrevista técnica', 'Entrevista final')
+      )
+      SELECT 
+        e.entrevista_rs,
+        e.entrevista_tecnica,
+        e.entrevista_final,
+        (e.entrevista_rs + e.entrevista_tecnica + e.entrevista_final) as total_entrevistas,
+        vce.total_vagas
+      FROM entrevistas e, vagas_com_entrevistas vce
+    `);
+
+    const row = result.rows[0] as any;
+    const totalEntrevistas = parseInt(row.total_entrevistas || '0');
+    const totalVagas = parseInt(row.total_vagas || '1');
+
+    return {
+      totalEntrevistas,
+      entrevistaRS: parseInt(row.entrevista_rs || '0'),
+      entrevistaTecnica: parseInt(row.entrevista_tecnica || '0'),
+      entrevistaFinal: parseInt(row.entrevista_final || '0'),
+      mediaEntrevistasPorVaga: totalVagas > 0 ? totalEntrevistas / totalVagas : 0,
+    };
+  }
+
+  async getRecrutamentoEntrevistasPorCargo(): Promise<import("@shared/schema").RecrutamentoEntrevistasPorCargo[]> {
+    const result = await db.execute(sql`
+      WITH entrevistas_por_cargo AS (
+        SELECT 
+          v.nome as cargo,
+          v.area,
+          COUNT(CASE WHEN c.stage_name = 'Entrevista R&S' THEN 1 END) as entrevista_rs,
+          COUNT(CASE WHEN c.stage_name = 'Entrevista técnica' THEN 1 END) as entrevista_tecnica,
+          COUNT(CASE WHEN c.stage_name = 'Entrevista final' THEN 1 END) as entrevista_final
+        FROM rh_vagas v
+        INNER JOIN rh_candidaturas c ON c.job_id_hash = v.id::text
+        WHERE c.stage_name IN ('Entrevista R&S', 'Entrevista técnica', 'Entrevista final')
+        GROUP BY v.nome, v.area
+      )
+      SELECT 
+        cargo,
+        area,
+        entrevista_rs,
+        entrevista_tecnica,
+        entrevista_final,
+        (entrevista_rs + entrevista_tecnica + entrevista_final) as total_entrevistas
+      FROM entrevistas_por_cargo
+      ORDER BY total_entrevistas DESC
+    `);
+
+    const rows = result.rows as any[];
+    const totalGeral = rows.reduce((sum, r) => sum + parseInt(r.total_entrevistas || '0'), 0);
+
+    return rows.map(row => ({
+      cargo: row.cargo || 'Cargo não informado',
+      area: row.area,
+      totalEntrevistas: parseInt(row.total_entrevistas || '0'),
+      entrevistaRS: parseInt(row.entrevista_rs || '0'),
+      entrevistaTecnica: parseInt(row.entrevista_tecnica || '0'),
+      entrevistaFinal: parseInt(row.entrevista_final || '0'),
+      percentual: totalGeral > 0 ? (parseInt(row.total_entrevistas || '0') / totalGeral) * 100 : 0,
+    }));
+  }
+
+  async getRecrutamentoCandidaturasPorArea(): Promise<import("@shared/schema").RecrutamentoCandidaturasPorArea[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(v.area, 'Área não informada') as area,
+        COUNT(c.id) as total_candidaturas,
+        COUNT(CASE WHEN c.talent_status = 'active' THEN 1 END) as candidatos_ativos,
+        COUNT(CASE WHEN c.talent_status = 'rejected' THEN 1 END) as candidatos_rejeitados,
+        COUNT(DISTINCT CASE WHEN v.status = 'open' THEN v.id END) as vagas_abertas
+      FROM rh_vagas v
+      LEFT JOIN rh_candidaturas c ON c.job_id_hash = v.id::text
+      GROUP BY v.area
+      ORDER BY total_candidaturas DESC
+    `);
+
+    const rows = result.rows as any[];
+    const totalGeral = rows.reduce((sum, r) => sum + parseInt(r.total_candidaturas || '0'), 0);
+
+    return rows.map(row => ({
+      area: row.area || 'Área não informada',
+      totalCandidaturas: parseInt(row.total_candidaturas || '0'),
+      candidatosAtivos: parseInt(row.candidatos_ativos || '0'),
+      candidatosRejeitados: parseInt(row.candidatos_rejeitados || '0'),
+      percentual: totalGeral > 0 ? (parseInt(row.total_candidaturas || '0') / totalGeral) * 100 : 0,
+      vagasAbertas: parseInt(row.vagas_abertas || '0'),
+    }));
   }
 
   // Tech Dashboard - DatabaseStorage implementations

@@ -1492,6 +1492,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/recrutamento/tempo-medio-por-etapa", async (req, res) => {
+    try {
+      const tempoMedio = await storage.getRecrutamentoTempoMedioPorEtapa();
+      res.json(tempoMedio);
+    } catch (error) {
+      console.error("[api] Error fetching average time per stage:", error);
+      res.status(500).json({ error: "Failed to fetch average time per stage" });
+    }
+  });
+
+  app.get("/api/recrutamento/entrevistas-realizadas", async (req, res) => {
+    try {
+      const entrevistas = await storage.getRecrutamentoEntrevistasRealizadas();
+      res.json(entrevistas);
+    } catch (error) {
+      console.error("[api] Error fetching interviews conducted:", error);
+      res.status(500).json({ error: "Failed to fetch interviews conducted" });
+    }
+  });
+
+  app.get("/api/recrutamento/entrevistas-por-cargo", async (req, res) => {
+    try {
+      const entrevistas = await storage.getRecrutamentoEntrevistasPorCargo();
+      res.json(entrevistas);
+    } catch (error) {
+      console.error("[api] Error fetching interviews by position:", error);
+      res.status(500).json({ error: "Failed to fetch interviews by position" });
+    }
+  });
+
+  app.get("/api/recrutamento/candidaturas-por-area", async (req, res) => {
+    try {
+      const candidaturas = await storage.getRecrutamentoCandidaturasPorArea();
+      res.json(candidaturas);
+    } catch (error) {
+      console.error("[api] Error fetching applications by area:", error);
+      res.status(500).json({ error: "Failed to fetch applications by area" });
+    }
+  });
+
   // Tech Dashboard API routes
   app.get("/api/tech/metricas", async (req, res) => {
     try {
