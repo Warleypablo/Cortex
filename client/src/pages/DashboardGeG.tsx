@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, TrendingUp, UserPlus, UserMinus, Clock, Cake, Award, Calendar } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, ComposedChart } from "recharts";
+import { Users, TrendingUp, UserPlus, UserMinus, Clock, Cake, Award, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, ComposedChart, PieChart, Pie, Cell } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface GegMetricas {
   headcount: number;
@@ -85,6 +86,43 @@ interface TempoPermanencia {
   tempoMedioDesligados: number;
 }
 
+interface MasContratacaoColaborador {
+  id: number;
+  nome: string;
+  setor: string | null;
+  squad: string | null;
+  admissao: string;
+  demissao: string;
+  diasAteDesligamento: number;
+}
+
+interface MasContratacoes {
+  total: number;
+  colaboradores: MasContratacaoColaborador[];
+}
+
+interface PessoasPorSetor {
+  setor: string;
+  total: number;
+}
+
+interface DemissoesPorTipo {
+  tipo: string;
+  total: number;
+  percentual: number;
+}
+
+interface HeadcountPorTenure {
+  faixa: string;
+  total: number;
+  ordem: number;
+}
+
+const CHART_COLORS = [
+  '#0ea5e9', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', 
+  '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'
+];
+
 export default function DashboardGeG() {
   const [periodo, setPeriodo] = useState("trimestre");
   const [squad, setSquad] = useState("todos");
@@ -132,6 +170,22 @@ export default function DashboardGeG() {
 
   const { data: tempoPermanencia, isLoading: isLoadingTempoPermanencia } = useQuery<TempoPermanencia>({
     queryKey: ['/api/geg/tempo-permanencia', { squad, setor }],
+  });
+
+  const { data: masContratacoes, isLoading: isLoadingMasContratacoes } = useQuery<MasContratacoes>({
+    queryKey: ['/api/geg/mas-contratacoes', { squad, setor }],
+  });
+
+  const { data: pessoasPorSetor, isLoading: isLoadingPessoasPorSetor } = useQuery<PessoasPorSetor[]>({
+    queryKey: ['/api/geg/pessoas-por-setor', { squad, setor }],
+  });
+
+  const { data: demissoesPorTipo, isLoading: isLoadingDemissoesPorTipo } = useQuery<DemissoesPorTipo[]>({
+    queryKey: ['/api/geg/demissoes-por-tipo', { squad, setor }],
+  });
+
+  const { data: headcountPorTenure, isLoading: isLoadingHeadcountPorTenure } = useQuery<HeadcountPorTenure[]>({
+    queryKey: ['/api/geg/headcount-por-tenure', { squad, setor }],
   });
 
   const formatMesAno = (mesAno: string) => {
@@ -344,6 +398,214 @@ export default function DashboardGeG() {
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">Valor de Mercado</p>
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card data-testid="card-mas-contratacoes" className="border-amber-500/20 bg-amber-500/5">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Más Contratações</CardTitle>
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              {isLoadingMasContratacoes ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <>
+                  <UITooltip>
+                    <TooltipTrigger asChild>
+                      <div className="text-2xl font-bold text-amber-500 cursor-help" data-testid="text-mas-contratacoes">
+                        {masContratacoes?.total || 0}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      {masContratacoes?.colaboradores && masContratacoes.colaboradores.length > 0 ? (
+                        <div className="space-y-1">
+                          <p className="font-medium text-xs mb-2">Desligados em até 90 dias:</p>
+                          {masContratacoes.colaboradores.slice(0, 5).map((c) => (
+                            <p key={c.id} className="text-xs">
+                              {c.nome} ({c.diasAteDesligamento} dias)
+                            </p>
+                          ))}
+                          {masContratacoes.colaboradores.length > 5 && (
+                            <p className="text-xs text-muted-foreground">
+                              +{masContratacoes.colaboradores.length - 5} outros
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs">Nenhuma má contratação encontrada</p>
+                      )}
+                    </TooltipContent>
+                  </UITooltip>
+                  <p className="text-xs text-muted-foreground mt-1">Desligados em até 90 dias</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-pessoas-por-setor" className="col-span-1 md:col-span-1 lg:col-span-3">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pessoas por Setor</CardTitle>
+              <Building className="w-4 h-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {isLoadingPessoasPorSetor ? (
+                <Skeleton className="h-[150px] w-full" />
+              ) : pessoasPorSetor && pessoasPorSetor.length > 0 ? (
+                <ResponsiveContainer width="100%" height={150}>
+                  <BarChart data={pessoasPorSetor} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis type="category" dataKey="setor" width={100} tick={{ fontSize: 11 }} />
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload as PessoasPorSetor;
+                          return (
+                            <div className="bg-popover border rounded-md shadow-md p-2">
+                              <p className="font-medium text-sm">{data.setor}</p>
+                              <p className="text-xs text-muted-foreground">{data.total} colaboradores</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar dataKey="total" fill="#0ea5e9" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[150px]" data-testid="text-no-data-pessoas-setor">
+                  <p className="text-muted-foreground text-sm">Nenhum dado disponível</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card data-testid="card-demissoes-por-tipo">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <PieChartIcon className="w-5 h-5 text-red-500" />
+                <CardTitle>Demissões por Tipo</CardTitle>
+              </div>
+              <CardDescription>Distribuição por tipo de desligamento</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingDemissoesPorTipo ? (
+                <Skeleton className="h-[250px] w-full" />
+              ) : demissoesPorTipo && demissoesPorTipo.length > 0 ? (
+                <div className="flex items-center justify-center gap-4">
+                  <ResponsiveContainer width="60%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={demissoesPorTipo}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="total"
+                        nameKey="tipo"
+                        label={({ tipo, percentual }) => `${percentual}%`}
+                        labelLine={false}
+                      >
+                        {demissoesPorTipo.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload as DemissoesPorTipo;
+                            return (
+                              <div className="bg-popover border rounded-md shadow-md p-2">
+                                <p className="font-medium text-sm">{data.tipo}</p>
+                                <p className="text-xs text-muted-foreground">{data.total} ({data.percentual}%)</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-2">
+                    {demissoesPorTipo.map((item, index) => (
+                      <div key={item.tipo} className="flex items-center gap-2 text-sm" data-testid={`demissao-tipo-${index}`}>
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} 
+                        />
+                        <span className="text-muted-foreground">{item.tipo}</span>
+                        <span className="font-medium">({item.total})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-demissoes-tipo">
+                  <p className="text-muted-foreground">Nenhum dado disponível</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-headcount-tenure">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <BarChart2 className="w-5 h-5 text-purple-500" />
+                <CardTitle>Headcount por Tempo de Permanência</CardTitle>
+              </div>
+              <CardDescription>Distribuição de colaboradores ativos por faixa de tempo</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingHeadcountPorTenure ? (
+                <Skeleton className="h-[250px] w-full" />
+              ) : headcountPorTenure && headcountPorTenure.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={headcountPorTenure}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="faixa" 
+                      tick={{ fontSize: 10 }} 
+                      angle={-20}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis />
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload as HeadcountPorTenure;
+                          return (
+                            <div className="bg-popover border rounded-md shadow-md p-2">
+                              <p className="font-medium text-sm">{data.faixa}</p>
+                              <p className="text-xs text-muted-foreground">{data.total} colaboradores</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar 
+                      dataKey="total" 
+                      name="Colaboradores"
+                      radius={[4, 4, 0, 0]}
+                    >
+                      {headcountPorTenure.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-headcount-tenure">
+                  <p className="text-muted-foreground">Nenhum dado disponível</p>
                 </div>
               )}
             </CardContent>

@@ -168,7 +168,7 @@ export interface IStorage {
   getGegUltimasPromocoes(squad: string, setor: string, limit?: number): Promise<any[]>;
   getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
   getGegMasContratacoes(squad: string, setor: string): Promise<GegMasContratacoes>;
-  getGegPessoasPorSetor(squad: string): Promise<GegPessoasPorSetor[]>;
+  getGegPessoasPorSetor(squad: string, setor: string): Promise<GegPessoasPorSetor[]>;
   getGegDemissoesPorTipo(squad: string, setor: string): Promise<GegDemissoesPorTipo[]>;
   getGegHeadcountPorTenure(squad: string, setor: string): Promise<GegHeadcountPorTenure[]>;
   getTopResponsaveis(limit?: number, mesAno?: string): Promise<{ nome: string; mrr: number; posicao: number }[]>;
@@ -495,7 +495,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegPessoasPorSetor(squad: string): Promise<GegPessoasPorSetor[]> {
+  async getGegPessoasPorSetor(squad: string, setor: string): Promise<GegPessoasPorSetor[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -3088,7 +3088,7 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getGegPessoasPorSetor(squad: string): Promise<GegPessoasPorSetor[]> {
+  async getGegPessoasPorSetor(squad: string, setor: string): Promise<GegPessoasPorSetor[]> {
     const result = await db.execute(sql.raw(`
       SELECT 
         COALESCE(setor, 'Não informado') as setor,
@@ -3096,6 +3096,7 @@ export class DbStorage implements IStorage {
       FROM rh_pessoal
       WHERE status = 'Ativo'
         ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
+        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
       GROUP BY COALESCE(setor, 'Não informado')
       ORDER BY total DESC
     `));
