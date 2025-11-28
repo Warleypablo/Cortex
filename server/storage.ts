@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
@@ -147,6 +147,9 @@ export interface IStorage {
   getFluxoCaixa(): Promise<FluxoCaixaItem[]>;
   getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]>;
   getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]>;
+  getContasBancos(): Promise<ContaBanco[]>;
+  getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<FluxoCaixaDiarioCompleto[]>;
+  getFluxoCaixaInsights(): Promise<FluxoCaixaInsights>;
   getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
   getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas>;
   getMrrEvolucaoMensal(mesAnoFim: string): Promise<import("@shared/schema").MrrEvolucaoMensal[]>;
@@ -368,6 +371,18 @@ export class MemStorage implements IStorage {
   }
 
   async getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getContasBancos(): Promise<ContaBanco[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<FluxoCaixaDiarioCompleto[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getFluxoCaixaInsights(): Promise<FluxoCaixaInsights> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1619,6 +1634,202 @@ export class DbStorage implements IStorage {
       empresa: row.empresa,
       dataVencimento: new Date(row.data_vencimento),
     }));
+  }
+
+  async getContasBancos(): Promise<ContaBanco[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        id,
+        nome,
+        balance as saldo,
+        empresa
+      FROM caz_bancos
+      WHERE ativo = true
+      ORDER BY balance::numeric DESC
+    `);
+    
+    return (result.rows as any[]).map((row: any) => ({
+      id: row.id || '',
+      nome: row.nome || 'Conta Desconhecida',
+      saldo: parseFloat(row.saldo || '0'),
+      empresa: row.empresa || '',
+    }));
+  }
+
+  async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<FluxoCaixaDiarioCompleto[]> {
+    const saldoAtual = await this.getSaldoAtualBancos();
+    
+    const transacoesPassadas = await db.execute(sql`
+      SELECT COALESCE(
+        SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'ACQUITTED' THEN valor_bruto::numeric ELSE 0 END) -
+        SUM(CASE WHEN tipo_evento = 'DESPESA' AND status = 'ACQUITTED' THEN valor_bruto::numeric ELSE 0 END),
+        0
+      ) as fluxo_passado
+      FROM caz_parcelas
+      WHERE data_quitacao IS NOT NULL
+        AND data_quitacao < ${dataInicio}::date
+    `);
+    
+    const fluxoPassado = parseFloat((transacoesPassadas.rows[0] as any)?.fluxo_passado || '0');
+    const saldoBase = saldoAtual.saldoTotal - fluxoPassado;
+    
+    const result = await db.execute(sql`
+      WITH dates AS (
+        SELECT generate_series(
+          ${dataInicio}::date,
+          ${dataFim}::date,
+          '1 day'::interval
+        )::date as data
+      ),
+      daily_transactions AS (
+        SELECT 
+          COALESCE(data_quitacao::date, data_vencimento::date) as data,
+          SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'ACQUITTED' THEN valor_bruto::numeric ELSE 0 END) as entradas_pagas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' AND status = 'ACQUITTED' THEN valor_bruto::numeric ELSE 0 END) as saidas_pagas,
+          SUM(CASE WHEN tipo_evento = 'RECEITA' AND status != 'ACQUITTED' THEN valor_bruto::numeric ELSE 0 END) as entradas_previstas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' AND status != 'ACQUITTED' THEN valor_bruto::numeric ELSE 0 END) as saidas_previstas
+        FROM caz_parcelas
+        WHERE tipo_evento IN ('RECEITA', 'DESPESA')
+          AND (
+            (data_quitacao IS NOT NULL AND data_quitacao::date BETWEEN ${dataInicio}::date AND ${dataFim}::date) OR
+            (status != 'ACQUITTED' AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date)
+          )
+        GROUP BY COALESCE(data_quitacao::date, data_vencimento::date)
+      )
+      SELECT 
+        TO_CHAR(d.data, 'YYYY-MM-DD') as data,
+        COALESCE(dt.entradas_pagas, 0) as entradas_pagas,
+        COALESCE(dt.saidas_pagas, 0) as saidas_pagas,
+        COALESCE(dt.entradas_previstas, 0) as entradas_previstas,
+        COALESCE(dt.saidas_previstas, 0) as saidas_previstas
+      FROM dates d
+      LEFT JOIN daily_transactions dt ON d.data = dt.data
+      ORDER BY d.data
+    `);
+    
+    let saldoAcumulado = saldoBase;
+    
+    return (result.rows as any[]).map((row: any) => {
+      const entradasPagas = parseFloat(row.entradas_pagas || '0');
+      const saidasPagas = parseFloat(row.saidas_pagas || '0');
+      const entradasPrevistas = parseFloat(row.entradas_previstas || '0');
+      const saidasPrevistas = parseFloat(row.saidas_previstas || '0');
+      
+      const entradas = entradasPagas + entradasPrevistas;
+      const saidas = saidasPagas + saidasPrevistas;
+      const saldoDia = entradas - saidas;
+      saldoAcumulado += saldoDia;
+      
+      return {
+        data: row.data,
+        entradas,
+        saidas,
+        saldoDia,
+        saldoAcumulado,
+        entradasPagas,
+        saidasPagas,
+        entradasPrevistas,
+        saidasPrevistas,
+      };
+    });
+  }
+
+  async getFluxoCaixaInsights(): Promise<FluxoCaixaInsights> {
+    const hoje = new Date().toISOString().split('T')[0];
+    
+    const result = await db.execute(sql`
+      WITH saldo_bancos AS (
+        SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
+        FROM caz_bancos
+        WHERE ativo = true
+      ),
+      proximos_30_dias AS (
+        SELECT 
+          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_previstas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_previstas
+        FROM caz_parcelas
+        WHERE status != 'ACQUITTED'
+          AND data_vencimento >= CURRENT_DATE
+          AND data_vencimento <= CURRENT_DATE + INTERVAL '30 days'
+      ),
+      vencidos AS (
+        SELECT 
+          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_vencidas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_vencidas
+        FROM caz_parcelas
+        WHERE status != 'ACQUITTED'
+          AND data_vencimento < CURRENT_DATE
+      ),
+      maior_entrada AS (
+        SELECT 
+          valor_bruto::numeric as valor,
+          COALESCE(descricao, 'Sem descrição') as descricao,
+          TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data
+        FROM caz_parcelas
+        WHERE tipo_evento = 'RECEITA'
+          AND status != 'ACQUITTED'
+          AND data_vencimento >= CURRENT_DATE
+          AND data_vencimento <= CURRENT_DATE + INTERVAL '30 days'
+        ORDER BY valor_bruto::numeric DESC
+        LIMIT 1
+      ),
+      maior_saida AS (
+        SELECT 
+          valor_bruto::numeric as valor,
+          COALESCE(descricao, 'Sem descrição') as descricao,
+          TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data
+        FROM caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND status != 'ACQUITTED'
+          AND data_vencimento >= CURRENT_DATE
+          AND data_vencimento <= CURRENT_DATE + INTERVAL '30 days'
+        ORDER BY valor_bruto::numeric DESC
+        LIMIT 1
+      )
+      SELECT 
+        sb.saldo_total,
+        COALESCE(p30.entradas_previstas, 0) as entradas_previstas_30,
+        COALESCE(p30.saidas_previstas, 0) as saidas_previstas_30,
+        COALESCE(v.entradas_vencidas, 0) as entradas_vencidas,
+        COALESCE(v.saidas_vencidas, 0) as saidas_vencidas,
+        me.valor as maior_entrada_valor,
+        me.descricao as maior_entrada_descricao,
+        me.data as maior_entrada_data,
+        ms.valor as maior_saida_valor,
+        ms.descricao as maior_saida_descricao,
+        ms.data as maior_saida_data
+      FROM saldo_bancos sb
+      CROSS JOIN proximos_30_dias p30
+      CROSS JOIN vencidos v
+      LEFT JOIN maior_entrada me ON true
+      LEFT JOIN maior_saida ms ON true
+    `);
+    
+    const row = result.rows[0] as any;
+    const saldoHoje = parseFloat(row?.saldo_total || '0');
+    const entradasPrevistas30Dias = parseFloat(row?.entradas_previstas_30 || '0');
+    const saidasPrevistas30Dias = parseFloat(row?.saidas_previstas_30 || '0');
+    const saldoFuturo30Dias = saldoHoje + entradasPrevistas30Dias - saidasPrevistas30Dias;
+    
+    return {
+      saldoHoje,
+      saldoFuturo30Dias,
+      entradasPrevistas30Dias,
+      saidasPrevistas30Dias,
+      entradasVencidas: parseFloat(row?.entradas_vencidas || '0'),
+      saidasVencidas: parseFloat(row?.saidas_vencidas || '0'),
+      diasAteNegatvo: null,
+      maiorEntradaPrevista: row?.maior_entrada_valor ? {
+        valor: parseFloat(row.maior_entrada_valor),
+        descricao: row.maior_entrada_descricao || 'Sem descrição',
+        data: row.maior_entrada_data,
+      } : null,
+      maiorSaidaPrevista: row?.maior_saida_valor ? {
+        valor: parseFloat(row.maior_saida_valor),
+        descricao: row.maior_saida_descricao || 'Sem descrição',
+        data: row.maior_saida_data,
+      } : null,
+    };
   }
 
   async getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData> {
