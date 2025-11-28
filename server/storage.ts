@@ -167,6 +167,10 @@ export interface IStorage {
   getGegPatrimonioResumo(): Promise<{ totalAtivos: number; valorTotalPago: number; valorTotalMercado: number; porTipo: { tipo: string; quantidade: number }[] }>;
   getGegUltimasPromocoes(squad: string, setor: string, limit?: number): Promise<any[]>;
   getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
+  getGegMasContratacoes(squad: string, setor: string): Promise<GegMasContratacoes>;
+  getGegPessoasPorSetor(squad: string): Promise<GegPessoasPorSetor[]>;
+  getGegDemissoesPorTipo(squad: string, setor: string): Promise<GegDemissoesPorTipo[]>;
+  getGegHeadcountPorTenure(squad: string, setor: string): Promise<GegHeadcountPorTenure[]>;
   getTopResponsaveis(limit?: number, mesAno?: string): Promise<{ nome: string; mrr: number; posicao: number }[]>;
   getTopSquads(limit?: number, mesAno?: string): Promise<{ squad: string; mrr: number; posicao: number }[]>;
   getInhireMetrics(): Promise<InhireMetrics>;
@@ -202,6 +206,39 @@ export interface IStorage {
   getTechProjetosFechados(limit?: number): Promise<TechProjetoDetalhe[]>;
   getTechTasksPorStatus(): Promise<TechTaskStatus[]>;
   getTechVelocidade(): Promise<TechVelocidade>;
+}
+
+// GEG Dashboard Extended Types
+export interface GegMaContratacao {
+  id: number;
+  nome: string;
+  setor: string | null;
+  squad: string | null;
+  admissao: string;
+  demissao: string;
+  diasAteDesligamento: number;
+}
+
+export interface GegMasContratacoes {
+  total: number;
+  colaboradores: GegMaContratacao[];
+}
+
+export interface GegPessoasPorSetor {
+  setor: string;
+  total: number;
+}
+
+export interface GegDemissoesPorTipo {
+  tipo: string;
+  total: number;
+  percentual: number;
+}
+
+export interface GegHeadcountPorTenure {
+  faixa: string;
+  total: number;
+  ordem: number;
 }
 
 // Tech Dashboard Types
@@ -451,6 +488,22 @@ export class MemStorage implements IStorage {
   }
 
   async getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegMasContratacoes(squad: string, setor: string): Promise<GegMasContratacoes> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegPessoasPorSetor(squad: string): Promise<GegPessoasPorSetor[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegDemissoesPorTipo(squad: string, setor: string): Promise<GegDemissoesPorTipo[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegHeadcountPorTenure(squad: string, setor: string): Promise<GegHeadcountPorTenure[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -2997,6 +3050,141 @@ export class DbStorage implements IStorage {
       tempoMedioAtivos: parseFloat(row.tempo_medio_ativos || '0'),
       tempoMedioDesligados: parseFloat(row.tempo_medio_desligados || '0'),
     };
+  }
+
+  async getGegMasContratacoes(squad: string, setor: string): Promise<GegMasContratacoes> {
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        id,
+        nome,
+        setor,
+        squad,
+        TO_CHAR(admissao, 'YYYY-MM-DD') as admissao,
+        TO_CHAR(demissao, 'YYYY-MM-DD') as demissao,
+        (demissao::date - admissao::date) as dias_ate_desligamento
+      FROM rh_pessoal
+      WHERE admissao IS NOT NULL
+        AND demissao IS NOT NULL
+        AND (demissao::date - admissao::date) <= 90
+        AND (demissao::date - admissao::date) >= 0
+        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
+        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+      ORDER BY demissao DESC
+    `));
+
+    const colaboradores = result.rows.map(row => ({
+      id: row.id as number,
+      nome: row.nome as string,
+      setor: row.setor as string || null,
+      squad: row.squad as string || null,
+      admissao: row.admissao as string,
+      demissao: row.demissao as string,
+      diasAteDesligamento: parseInt(row.dias_ate_desligamento as string || '0'),
+    }));
+
+    return {
+      total: colaboradores.length,
+      colaboradores,
+    };
+  }
+
+  async getGegPessoasPorSetor(squad: string): Promise<GegPessoasPorSetor[]> {
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        COALESCE(setor, 'Não informado') as setor,
+        COUNT(*) as total
+      FROM rh_pessoal
+      WHERE status = 'Ativo'
+        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
+      GROUP BY COALESCE(setor, 'Não informado')
+      ORDER BY total DESC
+    `));
+
+    return result.rows.map(row => ({
+      setor: row.setor as string,
+      total: parseInt(row.total as string || '0'),
+    }));
+  }
+
+  async getGegDemissoesPorTipo(squad: string, setor: string): Promise<GegDemissoesPorTipo[]> {
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        COALESCE(tipo_demissao, 'Não informado') as tipo,
+        COUNT(*) as total
+      FROM rh_pessoal
+      WHERE LOWER(status) IN ('inativo', 'em desligamento', 'dispensado')
+        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
+        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+      GROUP BY COALESCE(tipo_demissao, 'Não informado')
+      ORDER BY total DESC
+    `));
+
+    const totalGeral = result.rows.reduce((acc, row) => acc + parseInt(row.total as string || '0'), 0);
+
+    return result.rows.map(row => {
+      const total = parseInt(row.total as string || '0');
+      return {
+        tipo: row.tipo as string,
+        total,
+        percentual: totalGeral > 0 ? Math.round((total / totalGeral) * 100) : 0,
+      };
+    });
+  }
+
+  async getGegHeadcountPorTenure(squad: string, setor: string): Promise<GegHeadcountPorTenure[]> {
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        CASE 
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 3 THEN 'Menos de 3 meses'
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 6 THEN '3 a 6 meses'
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 12 THEN '6 a 12 meses'
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) < 2 THEN '1 a 2 anos'
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) < 3 THEN '2 a 3 anos'
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) < 5 THEN '3 a 5 anos'
+          ELSE 'Mais de 5 anos'
+        END as faixa,
+        CASE 
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 3 THEN 1
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 6 THEN 2
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 12 THEN 3
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) < 2 THEN 4
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) < 3 THEN 5
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) < 5 THEN 6
+          ELSE 7
+        END as ordem,
+        COUNT(*) as total
+      FROM rh_pessoal
+      WHERE status = 'Ativo'
+        AND admissao IS NOT NULL
+        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
+        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+      GROUP BY 
+        CASE 
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 3 THEN 'Menos de 3 meses'
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 6 THEN '3 a 6 meses'
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 12 THEN '6 a 12 meses'
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) < 2 THEN '1 a 2 anos'
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) < 3 THEN '2 a 3 anos'
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) < 5 THEN '3 a 5 anos'
+          ELSE 'Mais de 5 anos'
+        END,
+        CASE 
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 3 THEN 1
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 6 THEN 2
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 12 THEN 3
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) < 2 THEN 4
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) < 3 THEN 5
+          WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) < 5 THEN 6
+          ELSE 7
+        END
+      ORDER BY ordem
+    `));
+
+    return result.rows.map(row => ({
+      faixa: row.faixa as string,
+      total: parseInt(row.total as string || '0'),
+      ordem: parseInt(row.ordem as string || '0'),
+    }));
   }
 
   async getTopResponsaveis(limit: number = 5, mesAno?: string): Promise<{ nome: string; mrr: number; posicao: number }[]> {
