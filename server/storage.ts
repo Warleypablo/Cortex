@@ -3880,12 +3880,12 @@ export class DbStorage implements IStorage {
   async getFinanceiroContasBancarias(): Promise<any[]> {
     const result = await db.execute(sql`
       SELECT 
-        id::text,
-        nome,
+        uuid::text as id,
+        nmbanco as nome,
         COALESCE(balance::numeric, 0) as saldo,
         empresa
       FROM caz_bancos
-      WHERE ativo = 'true' OR ativo = 'Ativo'
+      WHERE ativo = true
       ORDER BY balance::numeric DESC
     `);
 
