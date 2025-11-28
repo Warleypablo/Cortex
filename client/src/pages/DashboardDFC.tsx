@@ -20,7 +20,7 @@ type VisibleItem =
   | { type: 'parcela'; parcela: DfcParcela; parentNode: DfcNode };
 
 export default function DashboardDFC() {
-  const [filterDataInicio, setFilterDataInicio] = useState<string>("");
+  const [filterDataInicio, setFilterDataInicio] = useState<string>("2025-01-01");
   const [filterDataFim, setFilterDataFim] = useState<string>("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['RECEITAS', 'DESPESAS']));
 
