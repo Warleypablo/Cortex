@@ -648,6 +648,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/fluxo-caixa/contas-bancos", async (req, res) => {
+    try {
+      const contas = await storage.getContasBancos();
+      res.json(contas);
+    } catch (error) {
+      console.error("[api] Error fetching contas bancos:", error);
+      res.status(500).json({ error: "Failed to fetch contas bancos" });
+    }
+  });
+
+  app.get("/api/fluxo-caixa/diario-completo", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string;
+      const dataFim = req.query.dataFim as string;
+      
+      if (!dataInicio || !dataFim) {
+        return res.status(400).json({ error: "dataInicio and dataFim are required" });
+      }
+
+      const fluxo = await storage.getFluxoCaixaDiarioCompleto(dataInicio, dataFim);
+      res.json(fluxo);
+    } catch (error) {
+      console.error("[api] Error fetching fluxo caixa diario completo:", error);
+      res.status(500).json({ error: "Failed to fetch fluxo caixa diario completo" });
+    }
+  });
+
+  app.get("/api/fluxo-caixa/insights", async (req, res) => {
+    try {
+      const insights = await storage.getFluxoCaixaInsights();
+      res.json(insights);
+    } catch (error) {
+      console.error("[api] Error fetching fluxo caixa insights:", error);
+      res.status(500).json({ error: "Failed to fetch fluxo caixa insights" });
+    }
+  });
+
   app.get("/api/financeiro/resumo", async (req, res) => {
     try {
       const mesAno = req.query.mesAno as string | undefined;
