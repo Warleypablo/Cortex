@@ -2132,15 +2132,18 @@ export class DbStorage implements IStorage {
     // Sempre filtrar a partir de janeiro de 2025 (mínimo)
     const dataMinima = '2025-01-01';
     
-    // Filtrar por data de vencimento
+    // Filtrar por data de vencimento E data de quitação (ambas devem ser >= 2025)
     if (dataInicio && dataInicio >= dataMinima) {
       whereClauses.push(`data_vencimento >= '${dataInicio}'`);
+      whereClauses.push(`data_quitacao >= '${dataInicio}'`);
     } else {
       whereClauses.push(`data_vencimento >= '${dataMinima}'`);
+      whereClauses.push(`data_quitacao >= '${dataMinima}'`);
     }
     
     if (dataFim) {
       whereClauses.push(`data_vencimento <= '${dataFim}'`);
+      whereClauses.push(`data_quitacao <= '${dataFim}'`);
     }
     
     const whereClause = whereClauses.join(' AND ');
