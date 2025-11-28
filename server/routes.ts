@@ -1166,6 +1166,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/geg/mas-contratacoes", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const resultado = await storage.getGegMasContratacoes(squad, setor);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG mas contratacoes:", error);
+      res.status(500).json({ error: "Failed to fetch GEG mas contratacoes" });
+    }
+  });
+
+  app.get("/api/geg/pessoas-por-setor", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+
+      const resultado = await storage.getGegPessoasPorSetor(squad);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG pessoas por setor:", error);
+      res.status(500).json({ error: "Failed to fetch GEG pessoas por setor" });
+    }
+  });
+
+  app.get("/api/geg/demissoes-por-tipo", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const resultado = await storage.getGegDemissoesPorTipo(squad, setor);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG demissoes por tipo:", error);
+      res.status(500).json({ error: "Failed to fetch GEG demissoes por tipo" });
+    }
+  });
+
+  app.get("/api/geg/headcount-por-tenure", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const resultado = await storage.getGegHeadcountPorTenure(squad, setor);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG headcount por tenure:", error);
+      res.status(500).json({ error: "Failed to fetch GEG headcount por tenure" });
+    }
+  });
+
   app.get("/api/inhire/metrics", async (req, res) => {
     try {
       const metrics = await storage.getInhireMetrics();
