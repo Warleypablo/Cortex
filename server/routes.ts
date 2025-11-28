@@ -1182,8 +1182,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/geg/pessoas-por-setor", async (req, res) => {
     try {
       const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
 
-      const resultado = await storage.getGegPessoasPorSetor(squad);
+      const resultado = await storage.getGegPessoasPorSetor(squad, setor);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG pessoas por setor:", error);
