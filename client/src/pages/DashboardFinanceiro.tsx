@@ -287,44 +287,18 @@ export default function DashboardFinanceiro() {
     );
   };
 
+  const mesAtualLabel = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  
   const renderVisaoGeral = () => (
     <div className="space-y-6">
-      {/* KPIs Principais - Posição Financeira */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
-          title="Saldo em Caixa"
-          value={formatCurrency(kpisCompletos?.saldoTotal || 0)}
-          icon={Wallet}
-          variant="default"
-          loading={isLoadingKpisCompletos}
-        />
-        <KPICard
-          title="A Receber"
-          value={formatCurrency(kpisCompletos?.aReceberTotal || 0)}
-          icon={ArrowUpCircle}
-          variant="success"
-          subtitle={`${kpisCompletos?.aReceberQtd || 0} títulos`}
-          loading={isLoadingKpisCompletos}
-        />
-        <KPICard
-          title="A Pagar"
-          value={formatCurrency(kpisCompletos?.aPagarTotal || 0)}
-          icon={ArrowDownCircle}
-          variant="danger"
-          subtitle={`${kpisCompletos?.aPagarQtd || 0} títulos`}
-          loading={isLoadingKpisCompletos}
-        />
-        <KPICard
-          title="Saldo Projetado"
-          value={formatCurrency(kpisCompletos?.saldoProjetado || 0)}
-          icon={Target}
-          variant={(kpisCompletos?.saldoProjetado || 0) >= 0 ? 'success' : 'danger'}
-          subtitle="Caixa + Receber - Pagar"
-          loading={isLoadingKpisCompletos}
-        />
+      {/* Header com mês atual */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-muted-foreground capitalize">
+          Resultados de {mesAtualLabel}
+        </h2>
       </div>
 
-      {/* KPIs do Mês */}
+      {/* KPIs do Mês Atual */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           title="Receita do Mês"
@@ -354,46 +328,12 @@ export default function DashboardFinanceiro() {
           loading={isLoadingKpisCompletos}
         />
         <KPICard
-          title="Margem"
+          title="Margem do Mês"
           value={`${(kpisCompletos?.margemMesAtual || 0).toFixed(1)}%`}
           icon={PieChart}
           variant={(kpisCompletos?.margemMesAtual || 0) >= 20 ? 'success' : (kpisCompletos?.margemMesAtual || 0) >= 0 ? 'warning' : 'danger'}
+          subtitle="Receita - Despesa / Receita"
           loading={isLoadingKpisCompletos}
-        />
-      </div>
-
-      {/* Alertas - Inadimplência e Vencidos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
-          title="Vencidos a Receber"
-          value={formatCurrency(kpisCompletos?.aReceberVencidoValor || 0)}
-          icon={AlertTriangle}
-          variant={(kpisCompletos?.aReceberVencidoQtd || 0) > 0 ? 'warning' : 'success'}
-          subtitle={`${kpisCompletos?.aReceberVencidoQtd || 0} títulos vencidos`}
-          loading={isLoadingKpisCompletos}
-        />
-        <KPICard
-          title="Taxa de Inadimplência"
-          value={`${(kpisCompletos?.taxaInadimplencia || 0).toFixed(1)}%`}
-          icon={FileWarning}
-          variant={(kpisCompletos?.taxaInadimplencia || 0) > 10 ? 'danger' : (kpisCompletos?.taxaInadimplencia || 0) > 5 ? 'warning' : 'success'}
-          subtitle="Vencido / Total a Receber"
-          loading={isLoadingKpisCompletos}
-        />
-        <KPICard
-          title="Vencidos a Pagar"
-          value={formatCurrency(kpisCompletos?.aPagarVencidoValor || 0)}
-          icon={Clock}
-          variant={(kpisCompletos?.aPagarVencidoQtd || 0) > 0 ? 'danger' : 'success'}
-          subtitle={`${kpisCompletos?.aPagarVencidoQtd || 0} títulos vencidos`}
-          loading={isLoadingKpisCompletos}
-        />
-        <KPICard
-          title="Parcelas Pendentes"
-          value={`${resumoData?.parcelasPendentes || 0}`}
-          icon={Receipt}
-          variant="warning"
-          loading={isLoadingResumo}
         />
       </div>
 
