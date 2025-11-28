@@ -25,6 +25,7 @@ import DashboardRetencao from "@/pages/DashboardRetencao";
 import DashboardDFC from "@/pages/DashboardDFC";
 import DashboardInhire from "@/pages/DashboardInhire";
 import DashboardRecrutamento from "@/pages/DashboardRecrutamento";
+import DashboardTech from "@/pages/DashboardTech";
 import MetaAds from "@/pages/MetaAds";
 import AuditoriaSistemas from "@/pages/AuditoriaSistemas";
 import AdminUsuarios from "@/pages/AdminUsuarios";
@@ -119,6 +120,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/auditoria-sistemas">{() => <ProtectedRoute path="/dashboard/auditoria-sistemas" component={AuditoriaSistemas} />}</Route>
       <Route path="/dashboard/inhire">{() => <ProtectedRoute path="/dashboard/inhire" component={DashboardInhire} />}</Route>
       <Route path="/dashboard/recrutamento">{() => <ProtectedRoute path="/dashboard/recrutamento" component={DashboardRecrutamento} />}</Route>
+      <Route path="/dashboard/tech">{() => <ProtectedRoute path="/dashboard/tech" component={DashboardTech} />}</Route>
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>

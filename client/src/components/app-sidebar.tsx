@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -91,6 +91,14 @@ const dashboardCategories = [
       { title: "Visão Geral", url: "/visao-geral", icon: Eye },
       { title: "Análise de Retenção", url: "/dashboard/retencao", icon: UserCheck },
       { title: "Meta Ads", url: "/dashboard/meta-ads", icon: Target },
+    ],
+  },
+  {
+    title: "Tech",
+    icon: Monitor,
+    baseUrl: "/dashboard/tech",
+    subItems: [
+      { title: "Projetos", url: "/dashboard/tech", icon: Rocket },
     ],
   },
 ];
