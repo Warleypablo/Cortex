@@ -431,12 +431,12 @@ export default function DashboardDFC() {
                   <p>Nenhum dado de DFC disponível para os filtros selecionados.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto relative rounded-lg border">
+                <div className="overflow-auto relative rounded-lg border max-h-[70vh]">
                   <div className="inline-block min-w-full">
                     <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead className="sticky left-0 bg-muted/50 z-10 min-w-[350px] font-bold">
+                      <TableHeader className="sticky top-0 z-20">
+                        <TableRow className="bg-muted">
+                          <TableHead className="sticky left-0 top-0 bg-muted z-30 min-w-[350px] font-bold border-b border-r border-border shadow-[2px_2px_4px_rgba(0,0,0,0.1)]">
                             <div className="flex items-center gap-2">
                               <Receipt className="w-4 h-4" />
                               Categoria
@@ -447,7 +447,7 @@ export default function DashboardDFC() {
                             const data = new Date(parseInt(ano), parseInt(mesNum) - 1);
                             const mesFormatado = data.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
                             return (
-                              <TableHead key={mes} className="text-center min-w-[130px] font-bold">
+                              <TableHead key={mes} className="sticky top-0 z-20 text-center min-w-[130px] font-bold bg-muted border-b border-border">
                                 <div className="flex flex-col items-center">
                                   <span className="capitalize">{mesFormatado}</span>
                                 </div>
@@ -477,7 +477,7 @@ export default function DashboardDFC() {
                                 data-testid={`dfc-row-${node.categoriaId}`}
                               >
                                 <TableCell 
-                                  className={`sticky left-0 z-10 ${isRootNode ? (isReceitaNode ? 'bg-green-500/10' : 'bg-red-500/10') : 'bg-background'}`}
+                                  className={`sticky left-0 z-10 border-r border-border shadow-[2px_0_4px_rgba(0,0,0,0.05)] ${isRootNode ? (isReceitaNode ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30') : 'bg-background'}`}
                                   style={{ paddingLeft: `${node.nivel * 24 + 16}px` }}
                                 >
                                   <div className="flex items-center gap-2">
@@ -558,8 +558,8 @@ export default function DashboardDFC() {
                                 data-testid={`dfc-row-parcela-${parcela.id}-${parentNode.categoriaId}`}
                               >
                                 <TableCell 
-                                  className={`sticky left-0 z-10 ${
-                                    isReceitaParcela ? 'bg-green-500/5' : 'bg-red-500/5'
+                                  className={`sticky left-0 z-10 border-r border-border shadow-[2px_0_4px_rgba(0,0,0,0.05)] ${
+                                    isReceitaParcela ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
                                   }`}
                                   style={{ paddingLeft: `${(parentNode.nivel + 1) * 24 + 16}px` }}
                                 >
