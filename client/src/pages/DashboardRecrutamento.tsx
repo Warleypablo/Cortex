@@ -20,7 +20,8 @@ import {
 import type { 
   RecrutamentoKPIs, RecrutamentoFunilEtapa, RecrutamentoFonteDistribuicao,
   RecrutamentoEvolucaoMensal, RecrutamentoVagaDetalhe, RecrutamentoAreaDistribuicao,
-  RecrutamentoFiltros, RecrutamentoConversaoPorVaga
+  RecrutamentoFiltros, RecrutamentoConversaoPorVaga, RecrutamentoTempoMedioPorEtapa,
+  RecrutamentoEntrevistasRealizadas, RecrutamentoEntrevistasPorCargo, RecrutamentoCandidaturasPorArea
 } from "@shared/schema";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1'];
@@ -85,6 +86,22 @@ export default function DashboardRecrutamento() {
     queryKey: ["/api/recrutamento/conversao-por-vaga"],
   });
 
+  const { data: tempoMedioPorEtapa, isLoading: isLoadingTempoMedio } = useQuery<RecrutamentoTempoMedioPorEtapa[]>({
+    queryKey: ["/api/recrutamento/tempo-medio-por-etapa"],
+  });
+
+  const { data: entrevistasRealizadas, isLoading: isLoadingEntrevistas } = useQuery<RecrutamentoEntrevistasRealizadas>({
+    queryKey: ["/api/recrutamento/entrevistas-realizadas"],
+  });
+
+  const { data: entrevistasPorCargo, isLoading: isLoadingEntrevistasCargo } = useQuery<RecrutamentoEntrevistasPorCargo[]>({
+    queryKey: ["/api/recrutamento/entrevistas-por-cargo"],
+  });
+
+  const { data: candidaturasPorArea, isLoading: isLoadingCandidaturasArea } = useQuery<RecrutamentoCandidaturasPorArea[]>({
+    queryKey: ["/api/recrutamento/candidaturas-por-area"],
+  });
+
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat('pt-BR').format(value);
   };
@@ -115,6 +132,30 @@ export default function DashboardRecrutamento() {
       fill: COLORS[index % COLORS.length],
     }));
   }, [areas]);
+
+  const tempoMedioChartData = useMemo(() => {
+    if (!tempoMedioPorEtapa) return [];
+    return tempoMedioPorEtapa.map((item, index) => ({
+      ...item,
+      fill: FUNNEL_COLORS[index % FUNNEL_COLORS.length],
+    }));
+  }, [tempoMedioPorEtapa]);
+
+  const entrevistasCargoData = useMemo(() => {
+    if (!entrevistasPorCargo) return [];
+    return entrevistasPorCargo.slice(0, 10).map((item, index) => ({
+      ...item,
+      fill: COLORS[index % COLORS.length],
+    }));
+  }, [entrevistasPorCargo]);
+
+  const candidaturasAreaData = useMemo(() => {
+    if (!candidaturasPorArea) return [];
+    return candidaturasPorArea.map((item, index) => ({
+      ...item,
+      fill: COLORS[index % COLORS.length],
+    }));
+  }, [candidaturasPorArea]);
 
   const KPICard = ({ 
     title, value, subtitle, icon: Icon, loading, variant = 'default' 
@@ -275,10 +316,14 @@ export default function DashboardRecrutamento() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+          <TabsList className="grid grid-cols-5 w-full max-w-3xl">
             <TabsTrigger value="visao-geral" data-testid="tab-visao-geral">
               <BarChart3 className="w-4 h-4 mr-2" />
               Visão Geral
+            </TabsTrigger>
+            <TabsTrigger value="insights" data-testid="tab-insights">
+              <Clock className="w-4 h-4 mr-2" />
+              Insights
             </TabsTrigger>
             <TabsTrigger value="funil" data-testid="tab-funil">
               <Activity className="w-4 h-4 mr-2" />
@@ -393,6 +438,219 @@ export default function DashboardRecrutamento() {
                   </ResponsiveContainer>
                 ) : (
                   <div className="flex items-center justify-center h-[300px]">
+                    <p className="text-muted-foreground">Nenhum dado disponível</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="insights" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <KPICard
+                title="Total de Entrevistas"
+                value={formatNumber(entrevistasRealizadas?.totalEntrevistas || 0)}
+                subtitle="Todas as entrevistas realizadas"
+                icon={Users}
+                loading={isLoadingEntrevistas}
+                variant="info"
+              />
+              <KPICard
+                title="Entrevistas R&S"
+                value={formatNumber(entrevistasRealizadas?.entrevistaRS || 0)}
+                subtitle="Primeira etapa"
+                icon={UserPlus}
+                loading={isLoadingEntrevistas}
+              />
+              <KPICard
+                title="Entrevistas Técnicas"
+                value={formatNumber(entrevistasRealizadas?.entrevistaTecnica || 0)}
+                subtitle="Avaliação técnica"
+                icon={Target}
+                loading={isLoadingEntrevistas}
+                variant="warning"
+              />
+              <KPICard
+                title="Entrevistas Finais"
+                value={formatNumber(entrevistasRealizadas?.entrevistaFinal || 0)}
+                subtitle={`Média: ${(entrevistasRealizadas?.mediaEntrevistasPorVaga || 0).toFixed(1)}/vaga`}
+                icon={UserCheck}
+                loading={isLoadingEntrevistas}
+                variant="success"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card data-testid="card-tempo-medio-etapa">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    Tempo Médio por Etapa
+                  </CardTitle>
+                  <CardDescription>Dias médios de permanência em cada etapa</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingTempoMedio ? (
+                    <Skeleton className="h-[300px] w-full" />
+                  ) : tempoMedioChartData && tempoMedioChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={tempoMedioChartData} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" unit=" dias" />
+                        <YAxis type="category" dataKey="etapa" width={130} />
+                        <Tooltip 
+                          formatter={(value: any) => [`${parseFloat(value).toFixed(1)} dias`, 'Tempo Médio']}
+                          labelFormatter={(label) => `Etapa: ${label}`}
+                        />
+                        <Bar dataKey="tempoMedioDias" name="Tempo Médio" radius={[0, 4, 4, 0]}>
+                          {tempoMedioChartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px]">
+                      <p className="text-muted-foreground">Nenhum dado disponível</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-candidaturas-area">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <PieChartIcon className="w-5 h-5" />
+                    Candidaturas por Área
+                  </CardTitle>
+                  <CardDescription>Distribuição de candidaturas por área</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingCandidaturasArea ? (
+                    <Skeleton className="h-[300px] w-full" />
+                  ) : candidaturasAreaData && candidaturasAreaData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={candidaturasAreaData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ area, percentual }) => `${area}: ${percentual.toFixed(1)}%`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="totalCandidaturas"
+                        >
+                          {candidaturasAreaData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: any, name: any, props: any) => [
+                            `${formatNumber(value)} candidaturas`,
+                            `${props.payload.area}`
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px]">
+                      <p className="text-muted-foreground">Nenhum dado disponível</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card data-testid="card-entrevistas-cargo">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase className="w-5 h-5" />
+                  Entrevistas por Cargo
+                </CardTitle>
+                <CardDescription>Top 10 cargos com mais entrevistas realizadas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingEntrevistasCargo ? (
+                  <Skeleton className="h-[350px] w-full" />
+                ) : entrevistasCargoData && entrevistasCargoData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={350}>
+                    <BarChart data={entrevistasCargoData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis type="category" dataKey="cargo" width={180} tick={{ fontSize: 12 }} />
+                      <Tooltip 
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-background border rounded-lg shadow-lg p-3">
+                                <p className="font-semibold">{label}</p>
+                                {data.area && <p className="text-sm text-muted-foreground">Área: {data.area}</p>}
+                                <div className="mt-2 space-y-1 text-sm">
+                                  <p>R&S: {data.entrevistaRS}</p>
+                                  <p>Técnica: {data.entrevistaTecnica}</p>
+                                  <p>Final: {data.entrevistaFinal}</p>
+                                  <p className="font-semibold">Total: {data.totalEntrevistas}</p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend />
+                      <Bar dataKey="entrevistaRS" name="Entrevista R&S" stackId="a" fill="#8884d8" />
+                      <Bar dataKey="entrevistaTecnica" name="Entrevista Técnica" stackId="a" fill="#82ca9d" />
+                      <Bar dataKey="entrevistaFinal" name="Entrevista Final" stackId="a" fill="#ffc658" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-[350px]">
+                    <p className="text-muted-foreground">Nenhum dado disponível</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-detalhes-area">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5" />
+                  Detalhes por Área
+                </CardTitle>
+                <CardDescription>Candidaturas, status e vagas por área</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingCandidaturasArea ? (
+                  <Skeleton className="h-[200px] w-full" />
+                ) : candidaturasPorArea && candidaturasPorArea.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Área</TableHead>
+                        <TableHead className="text-right">Candidaturas</TableHead>
+                        <TableHead className="text-right">Ativos</TableHead>
+                        <TableHead className="text-right">Rejeitados</TableHead>
+                        <TableHead className="text-right">Vagas Abertas</TableHead>
+                        <TableHead className="text-right">%</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {candidaturasPorArea.map((item) => (
+                        <TableRow key={item.area} data-testid={`row-area-${item.area.replace(/\s+/g, '-').toLowerCase()}`}>
+                          <TableCell className="font-medium">{item.area}</TableCell>
+                          <TableCell className="text-right">{formatNumber(item.totalCandidaturas)}</TableCell>
+                          <TableCell className="text-right text-green-600">{formatNumber(item.candidatosAtivos)}</TableCell>
+                          <TableCell className="text-right text-red-600">{formatNumber(item.candidatosRejeitados)}</TableCell>
+                          <TableCell className="text-right">{formatNumber(item.vagasAbertas)}</TableCell>
+                          <TableCell className="text-right">{formatPercent(item.percentual)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="flex items-center justify-center h-[200px]">
                     <p className="text-muted-foreground">Nenhum dado disponível</p>
                   </div>
                 )}
