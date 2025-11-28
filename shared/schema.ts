@@ -265,6 +265,37 @@ export type SaldoBancos = {
   saldoTotal: number;
 };
 
+export type ContaBanco = {
+  id: string;
+  nome: string;
+  saldo: number;
+  empresa: string;
+};
+
+export type FluxoCaixaDiarioCompleto = {
+  data: string;
+  entradas: number;
+  saidas: number;
+  saldoDia: number;
+  saldoAcumulado: number;
+  entradasPagas: number;
+  saidasPagas: number;
+  entradasPrevistas: number;
+  saidasPrevistas: number;
+};
+
+export type FluxoCaixaInsights = {
+  saldoHoje: number;
+  saldoFuturo30Dias: number;
+  entradasPrevistas30Dias: number;
+  saidasPrevistas30Dias: number;
+  entradasVencidas: number;
+  saidasVencidas: number;
+  diasAteNegatvo: number | null;
+  maiorEntradaPrevista: { valor: number; descricao: string; data: string } | null;
+  maiorSaidaPrevista: { valor: number; descricao: string; data: string } | null;
+};
+
 export type ChurnPorServico = {
   servico: string;
   mes: string;
