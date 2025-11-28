@@ -3441,8 +3441,8 @@ export class DbStorage implements IStorage {
             'total', 1
           )
         ) as "candidatosPorStatus"
-      FROM ${schema.rhVagas} v
-      LEFT JOIN ${schema.rhCandidaturas} c ON c.job_id_hash = v.id
+      FROM rh_vagas v
+      LEFT JOIN rh_candidaturas c ON c.job_id_hash = v.id::TEXT
       GROUP BY v.id, v.nome, v.status
       ORDER BY "totalCandidaturas" DESC
       LIMIT ${limit}
