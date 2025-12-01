@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Loader2, TrendingUp, TrendingDown, DollarSign, Calendar, ChevronRight, ChevronDown,
   Wallet, ArrowUpCircle, ArrowDownCircle, PiggyBank, BarChart3, Banknote, Receipt,
-  CircleDollarSign, Coins, CreditCard, LineChart, Target, Activity
+  CircleDollarSign, Coins, CreditCard, LineChart, Target, Activity, Percent
 } from "lucide-react";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -123,6 +123,28 @@ export default function DashboardDFC() {
     });
     
     return resultado;
+  }, [dfcData]);
+
+  const margemByMonth = useMemo(() => {
+    if (!dfcData || !dfcData.nodes || dfcData.nodes.length === 0) return {};
+    
+    const receitasNode = dfcData.nodes.find(n => n.categoriaId === 'RECEITAS');
+    const despesasNode = dfcData.nodes.find(n => n.categoriaId === 'DESPESAS');
+    
+    const margem: Record<string, number> = {};
+    dfcData.meses.forEach(mes => {
+      const receita = receitasNode?.valuesByMonth[mes] || 0;
+      const despesa = Math.abs(despesasNode?.valuesByMonth[mes] || 0);
+      const resultado = receita - despesa;
+      
+      if (receita > 0) {
+        margem[mes] = (resultado / receita) * 100;
+      } else {
+        margem[mes] = 0;
+      }
+    });
+    
+    return margem;
   }, [dfcData]);
 
   const chartData = useMemo(() => {
@@ -636,6 +658,51 @@ export default function DashboardDFC() {
                             isPositivo ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                           }`}>
                             {isPositivo ? '+R$ ' : 'R$ '}{Math.abs(resultado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Linha de Margem */}
+                    <div 
+                      className="sticky left-0 z-10 p-3 border-b border-r border-border bg-gradient-to-r from-purple-100 to-violet-100 dark:from-purple-950 dark:to-violet-950 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                      data-testid="dfc-row-margem"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Percent className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                        <span className="font-bold text-purple-700 dark:text-purple-400">
+                          MARGEM
+                        </span>
+                      </div>
+                    </div>
+                    {dfcData.meses.map(mes => {
+                      const margem = margemByMonth[mes] || 0;
+                      const isNegativa = margem < 0;
+                      const isBaixa = margem >= 0 && margem < 25;
+                      const isAlta = margem >= 25;
+                      
+                      let bgColor = '';
+                      let textColor = '';
+                      
+                      if (isNegativa) {
+                        bgColor = 'bg-red-100 dark:bg-red-950/50';
+                        textColor = 'text-red-600 dark:text-red-400';
+                      } else if (isBaixa) {
+                        bgColor = 'bg-yellow-100 dark:bg-yellow-950/50';
+                        textColor = 'text-yellow-600 dark:text-yellow-400';
+                      } else {
+                        bgColor = 'bg-green-100 dark:bg-green-950/50';
+                        textColor = 'text-green-600 dark:text-green-400';
+                      }
+                      
+                      return (
+                        <div 
+                          key={`margem-${mes}`}
+                          className={`p-3 border-b border-border text-center whitespace-nowrap ${bgColor}`}
+                          data-testid={`dfc-cell-margem-${mes}`}
+                        >
+                          <span className={`font-bold text-sm ${textColor}`}>
+                            {margem.toFixed(1)}%
                           </span>
                         </div>
                       );
