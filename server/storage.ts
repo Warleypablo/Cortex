@@ -1720,7 +1720,7 @@ export class DbStorage implements IStorage {
         nome,
         balance as saldo,
         empresa
-      FROM ${schema.cazBancos}
+      FROM caz_bancos
       WHERE ativo = 'true' OR ativo = 't' OR ativo IS NULL
       ORDER BY balance::numeric DESC
     `);
