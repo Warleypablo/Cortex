@@ -1734,8 +1734,8 @@ export class DbStorage implements IStorage {
     
     const transacoesPassadas = await db.execute(sql`
       SELECT COALESCE(
-        SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'ACQUITTED' THEN valor_bruto::numeric ELSE 0 END) -
-        SUM(CASE WHEN tipo_evento = 'DESPESA' AND status = 'ACQUITTED' THEN valor_bruto::numeric ELSE 0 END),
+        SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_bruto::numeric ELSE 0 END) -
+        SUM(CASE WHEN tipo_evento = 'DESPESA' AND status = 'QUITADO' THEN valor_bruto::numeric ELSE 0 END),
         0
       ) as fluxo_passado
       FROM caz_parcelas
@@ -1757,15 +1757,15 @@ export class DbStorage implements IStorage {
       daily_transactions AS (
         SELECT 
           COALESCE(data_quitacao::date, data_vencimento::date) as data,
-          SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'ACQUITTED' THEN valor_bruto::numeric ELSE 0 END) as entradas_pagas,
-          SUM(CASE WHEN tipo_evento = 'DESPESA' AND status = 'ACQUITTED' THEN valor_bruto::numeric ELSE 0 END) as saidas_pagas,
-          SUM(CASE WHEN tipo_evento = 'RECEITA' AND status != 'ACQUITTED' THEN valor_bruto::numeric ELSE 0 END) as entradas_previstas,
-          SUM(CASE WHEN tipo_evento = 'DESPESA' AND status != 'ACQUITTED' THEN valor_bruto::numeric ELSE 0 END) as saidas_previstas
+          SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_bruto::numeric ELSE 0 END) as entradas_pagas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' AND status = 'QUITADO' THEN valor_bruto::numeric ELSE 0 END) as saidas_pagas,
+          SUM(CASE WHEN tipo_evento = 'RECEITA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END) as entradas_previstas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END) as saidas_previstas
         FROM caz_parcelas
         WHERE tipo_evento IN ('RECEITA', 'DESPESA')
           AND (
             (data_quitacao IS NOT NULL AND data_quitacao::date BETWEEN ${dataInicio}::date AND ${dataFim}::date) OR
-            (status != 'ACQUITTED' AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date)
+            (status NOT IN ('QUITADO', 'PERDIDO') AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date)
           )
         GROUP BY COALESCE(data_quitacao::date, data_vencimento::date)
       )
@@ -1821,7 +1821,7 @@ export class DbStorage implements IStorage {
           SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_previstas,
           SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_previstas
         FROM caz_parcelas
-        WHERE status != 'ACQUITTED'
+        WHERE status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento >= CURRENT_DATE
           AND data_vencimento <= CURRENT_DATE + INTERVAL '30 days'
       ),
@@ -1830,7 +1830,7 @@ export class DbStorage implements IStorage {
           SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_vencidas,
           SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_vencidas
         FROM caz_parcelas
-        WHERE status != 'ACQUITTED'
+        WHERE status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento < CURRENT_DATE
       ),
       maior_entrada AS (
@@ -1840,7 +1840,7 @@ export class DbStorage implements IStorage {
           TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data
         FROM caz_parcelas
         WHERE tipo_evento = 'RECEITA'
-          AND status != 'ACQUITTED'
+          AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento >= CURRENT_DATE
           AND data_vencimento <= CURRENT_DATE + INTERVAL '30 days'
         ORDER BY valor_bruto::numeric DESC
@@ -1853,7 +1853,7 @@ export class DbStorage implements IStorage {
           TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data
         FROM caz_parcelas
         WHERE tipo_evento = 'DESPESA'
-          AND status != 'ACQUITTED'
+          AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento >= CURRENT_DATE
           AND data_vencimento <= CURRENT_DATE + INTERVAL '30 days'
         ORDER BY valor_bruto::numeric DESC
