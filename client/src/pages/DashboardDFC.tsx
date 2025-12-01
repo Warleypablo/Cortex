@@ -543,11 +543,11 @@ export default function DashboardDFC() {
                               return (
                                 <div 
                                   key={`val-${node.categoriaId}-${mes}`}
-                                  className={`p-3 border-b border-border text-center ${valueCellBg} hover:brightness-95 transition-all`}
+                                  className={`p-3 border-b border-border text-center whitespace-nowrap ${valueCellBg} hover:brightness-95 transition-all`}
                                   data-testid={`dfc-cell-${node.categoriaId}-${mes}`}
                                 >
                                   {valor !== 0 ? (
-                                    <span className={`${!node.isLeaf ? 'font-bold' : 'font-medium'} ${isRootNode ? 'text-base' : 'text-sm'}`}>
+                                    <span className={`${!node.isLeaf ? 'font-bold' : 'font-medium'} ${isRootNode ? 'text-sm' : 'text-sm'}`}>
                                       {formatCurrency(Math.abs(valor))}
                                     </span>
                                   ) : (
@@ -589,7 +589,7 @@ export default function DashboardDFC() {
                               return (
                                 <div 
                                   key={`parcela-val-${parcela.id}-${mes}-${idx}`}
-                                  className={`p-3 border-b border-border text-center ${parcelaBg} hover:brightness-95 transition-all`}
+                                  className={`p-3 border-b border-border text-center whitespace-nowrap ${parcelaBg} hover:brightness-95 transition-all`}
                                   data-testid={`dfc-cell-parcela-${parcela.id}-${mes}`}
                                 >
                                   {valor !== 0 ? (
