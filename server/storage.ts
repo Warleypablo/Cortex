@@ -1736,20 +1736,6 @@ export class DbStorage implements IStorage {
   async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<FluxoCaixaDiarioCompleto[]> {
     const saldoAtual = await this.getSaldoAtualBancos();
     
-    const transacoesPassadas = await db.execute(sql`
-      SELECT COALESCE(
-        SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_bruto::numeric ELSE 0 END) -
-        SUM(CASE WHEN tipo_evento = 'DESPESA' AND status = 'QUITADO' THEN valor_bruto::numeric ELSE 0 END),
-        0
-      ) as fluxo_passado
-      FROM caz_parcelas
-      WHERE data_quitacao IS NOT NULL
-        AND data_quitacao < ${dataInicio}::date
-    `);
-    
-    const fluxoPassado = parseFloat((transacoesPassadas.rows[0] as any)?.fluxo_passado || '0');
-    const saldoBase = saldoAtual.saldoTotal - fluxoPassado;
-    
     const result = await db.execute(sql`
       WITH dates AS (
         SELECT generate_series(
@@ -1760,23 +1746,17 @@ export class DbStorage implements IStorage {
       ),
       daily_transactions AS (
         SELECT 
-          COALESCE(data_quitacao::date, data_vencimento::date) as data,
-          SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_bruto::numeric ELSE 0 END) as entradas_pagas,
-          SUM(CASE WHEN tipo_evento = 'DESPESA' AND status = 'QUITADO' THEN valor_bruto::numeric ELSE 0 END) as saidas_pagas,
-          SUM(CASE WHEN tipo_evento = 'RECEITA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END) as entradas_previstas,
-          SUM(CASE WHEN tipo_evento = 'DESPESA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END) as saidas_previstas
+          data_vencimento::date as data,
+          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_previstas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_previstas
         FROM caz_parcelas
         WHERE tipo_evento IN ('RECEITA', 'DESPESA')
-          AND (
-            (data_quitacao IS NOT NULL AND data_quitacao::date BETWEEN ${dataInicio}::date AND ${dataFim}::date) OR
-            (status NOT IN ('QUITADO', 'PERDIDO') AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date)
-          )
-        GROUP BY COALESCE(data_quitacao::date, data_vencimento::date)
+          AND status NOT IN ('QUITADO', 'PERDIDO')
+          AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+        GROUP BY data_vencimento::date
       )
       SELECT 
         TO_CHAR(d.data, 'YYYY-MM-DD') as data,
-        COALESCE(dt.entradas_pagas, 0) as entradas_pagas,
-        COALESCE(dt.saidas_pagas, 0) as saidas_pagas,
         COALESCE(dt.entradas_previstas, 0) as entradas_previstas,
         COALESCE(dt.saidas_previstas, 0) as saidas_previstas
       FROM dates d
@@ -1784,16 +1764,15 @@ export class DbStorage implements IStorage {
       ORDER BY d.data
     `);
     
-    let saldoAcumulado = saldoBase;
+    // Saldo inicial = saldo atual dos bancos (R$ 784k)
+    let saldoAcumulado = saldoAtual.saldoTotal;
     
     return (result.rows as any[]).map((row: any) => {
-      const entradasPagas = parseFloat(row.entradas_pagas || '0');
-      const saidasPagas = parseFloat(row.saidas_pagas || '0');
       const entradasPrevistas = parseFloat(row.entradas_previstas || '0');
       const saidasPrevistas = parseFloat(row.saidas_previstas || '0');
       
-      const entradas = entradasPagas + entradasPrevistas;
-      const saidas = saidasPagas + saidasPrevistas;
+      const entradas = entradasPrevistas;
+      const saidas = saidasPrevistas;
       const saldoDia = entradas - saidas;
       saldoAcumulado += saldoDia;
       
@@ -1803,8 +1782,8 @@ export class DbStorage implements IStorage {
         saidas,
         saldoDia,
         saldoAcumulado,
-        entradasPagas,
-        saidasPagas,
+        entradasPagas: 0,
+        saidasPagas: 0,
         entradasPrevistas,
         saidasPrevistas,
       };
