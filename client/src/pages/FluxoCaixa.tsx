@@ -6,14 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Wallet, TrendingUp, TrendingDown, Calendar, AlertCircle,
   ArrowUpCircle, ArrowDownCircle, Banknote, CreditCard, Building2,
   ChevronRight, CircleDollarSign
 } from "lucide-react";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine
+  ComposedChart, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine, Line
 } from "recharts";
 import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsights, ContaBanco } from "@shared/schema";
 
@@ -116,16 +115,6 @@ export default function FluxoCaixa() {
     setDataInicio(inicio.toISOString().split('T')[0]);
     setDataFim(fim.toISOString().split('T')[0]);
   };
-
-  const saldoMinimo = useMemo(() => {
-    if (!chartData.length) return 0;
-    return Math.min(...chartData.map(d => d.saldoAcumulado));
-  }, [chartData]);
-
-  const saldoMaximo = useMemo(() => {
-    if (!chartData.length) return 0;
-    return Math.max(...chartData.map(d => d.saldoAcumulado));
-  }, [chartData]);
 
   return (
     <div className="bg-background min-h-screen">
@@ -420,141 +409,103 @@ export default function FluxoCaixa() {
           </CardHeader>
           
           <CardContent>
-            <Tabs defaultValue="saldo" className="w-full">
-              <TabsList className="mb-4">
-                <TabsTrigger value="saldo" data-testid="tab-saldo">Evolução do Saldo</TabsTrigger>
-                <TabsTrigger value="fluxo" data-testid="tab-fluxo">Entradas x Saídas</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="saldo">
-                {isLoadingFluxo ? (
-                  <div className="flex items-center justify-center h-[350px]">
-                    <Skeleton className="h-full w-full" />
-                  </div>
-                ) : !chartData || chartData.length === 0 ? (
-                  <div className="flex items-center justify-center h-[350px]">
-                    <p className="text-muted-foreground">Nenhum dado para o período selecionado</p>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={350}>
-                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="saldoGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                      <XAxis 
-                        dataKey="dataFormatada" 
-                        tick={{ fill: 'currentColor', fontSize: 11 }}
-                        tickLine={false}
-                        axisLine={false}
-                        interval={Math.max(0, Math.floor(chartData.length / 8) - 1)}
-                      />
-                      <YAxis 
-                        tick={{ fill: 'currentColor', fontSize: 11 }}
-                        tickFormatter={(value) => formatCurrencyCompact(value)}
-                        tickLine={false}
-                        axisLine={false}
-                        domain={[
-                          Math.min(saldoMinimo * 0.95, 0),
-                          saldoMaximo * 1.05
-                        ]}
-                      />
-                      <Tooltip
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                        }}
-                        formatter={(value: number) => [formatCurrency(value), 'Saldo Acumulado']}
-                        labelFormatter={(label) => `Data: ${label}`}
-                      />
-                      <ReferenceLine y={insights?.saldoHoje || 0} stroke="#10b981" strokeDasharray="5 5" label={{ value: 'Saldo Atual', position: 'right', fontSize: 10, fill: '#10b981' }} />
-                      <Area
-                        type="monotone"
-                        dataKey="saldoAcumulado"
-                        stroke="#3b82f6"
-                        strokeWidth={2}
-                        fill="url(#saldoGradient)"
-                        dot={false}
-                        activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="fluxo">
-                {isLoadingFluxo ? (
-                  <div className="flex items-center justify-center h-[350px]">
-                    <Skeleton className="h-full w-full" />
-                  </div>
-                ) : !chartData || chartData.length === 0 ? (
-                  <div className="flex items-center justify-center h-[350px]">
-                    <p className="text-muted-foreground">Nenhum dado para o período selecionado</p>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={350}>
-                    <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                      <XAxis 
-                        dataKey="dataFormatada" 
-                        tick={{ fill: 'currentColor', fontSize: 11 }}
-                        tickLine={false}
-                        axisLine={false}
-                        interval={Math.max(0, Math.floor(chartData.length / 8) - 1)}
-                      />
-                      <YAxis 
-                        tick={{ fill: 'currentColor', fontSize: 11 }}
-                        tickFormatter={(value) => formatCurrencyCompact(value)}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <Tooltip
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                        }}
-                        formatter={(value: number, name: string) => {
-                          const labels: Record<string, string> = {
-                            entradas: 'Entradas',
-                            saidas: 'Saídas',
-                          };
-                          return [formatCurrency(value), labels[name] || name];
-                        }}
-                        labelFormatter={(label) => `Data: ${label}`}
-                      />
-                      <Legend 
-                        formatter={(value) => {
-                          const labels: Record<string, string> = {
-                            entradas: 'Entradas',
-                            saidas: 'Saídas',
-                          };
-                          return labels[value] || value;
-                        }}
-                      />
-                      <Bar 
-                        dataKey="entradas" 
-                        fill="#22c55e"
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={30}
-                      />
-                      <Bar 
-                        dataKey="saidas" 
-                        fill="#ef4444"
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={30}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </TabsContent>
-            </Tabs>
+            {isLoadingFluxo ? (
+              <div className="flex items-center justify-center h-[400px]">
+                <Skeleton className="h-full w-full" />
+              </div>
+            ) : !chartData || chartData.length === 0 ? (
+              <div className="flex items-center justify-center h-[400px]">
+                <p className="text-muted-foreground">Nenhum dado para o período selecionado</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={400}>
+                <ComposedChart data={chartData} margin={{ top: 20, right: 60, left: 10, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="saldoGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                  <XAxis 
+                    dataKey="dataFormatada" 
+                    tick={{ fill: 'currentColor', fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={Math.max(0, Math.floor(chartData.length / 8) - 1)}
+                  />
+                  <YAxis 
+                    yAxisId="bars"
+                    tick={{ fill: 'currentColor', fontSize: 11 }}
+                    tickFormatter={(value) => formatCurrencyCompact(value)}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    yAxisId="line"
+                    orientation="right"
+                    tick={{ fill: 'currentColor', fontSize: 11 }}
+                    tickFormatter={(value) => formatCurrencyCompact(value)}
+                    tickLine={false}
+                    axisLine={false}
+                    domain={[
+                      (dataMin: number) => Math.max(0, dataMin * 0.9),
+                      (dataMax: number) => dataMax * 1.05
+                    ]}
+                  />
+                  <Tooltip
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--background))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                    }}
+                    formatter={(value: number, name: string) => {
+                      const labels: Record<string, string> = {
+                        entradas: 'Entradas',
+                        saidas: 'Saídas',
+                        saldoAcumulado: 'Saldo Acumulado',
+                      };
+                      return [formatCurrency(value), labels[name] || name];
+                    }}
+                    labelFormatter={(label) => `Data: ${label}`}
+                  />
+                  <Legend 
+                    formatter={(value) => {
+                      const labels: Record<string, string> = {
+                        entradas: 'Entradas',
+                        saidas: 'Saídas',
+                        saldoAcumulado: 'Saldo Acumulado',
+                      };
+                      return labels[value] || value;
+                    }}
+                  />
+                  <Bar 
+                    yAxisId="bars"
+                    dataKey="entradas" 
+                    fill="#22c55e"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={25}
+                  />
+                  <Bar 
+                    yAxisId="bars"
+                    dataKey="saidas" 
+                    fill="#ef4444"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={25}
+                  />
+                  <Line
+                    yAxisId="line"
+                    type="monotone"
+                    dataKey="saldoAcumulado"
+                    stroke="#3b82f6"
+                    strokeWidth={3}
+                    dot={false}
+                    activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
