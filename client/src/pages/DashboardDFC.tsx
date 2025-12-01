@@ -613,9 +613,7 @@ export default function DashboardDFC() {
                       data-testid="dfc-row-resultado"
                     >
                       <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-blue-500/20">
-                          <Target className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        </div>
+                        <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                         <span className="font-bold text-blue-700 dark:text-blue-400">
                           RESULTADO
                         </span>
@@ -629,23 +627,16 @@ export default function DashboardDFC() {
                           key={`resultado-${mes}`}
                           className={`p-3 border-t-2 border-b border-border text-center ${
                             isPositivo 
-                              ? 'bg-gradient-to-b from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50' 
-                              : 'bg-gradient-to-b from-red-50 to-rose-50 dark:from-red-950/50 dark:to-rose-950/50'
+                              ? 'bg-green-50 dark:bg-green-950/50' 
+                              : 'bg-red-50 dark:bg-red-950/50'
                           }`}
                           data-testid={`dfc-cell-resultado-${mes}`}
                         >
-                          <div className="flex flex-col items-center gap-0.5">
-                            <span className={`font-bold text-base ${
-                              isPositivo ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                            }`}>
-                              {isPositivo ? '+' : ''}{formatCurrency(resultado)}
-                            </span>
-                            <span className={`text-xs font-medium ${
-                              isPositivo ? 'text-green-500' : 'text-red-500'
-                            }`}>
-                              {isPositivo ? 'Lucro' : 'Prejuízo'}
-                            </span>
-                          </div>
+                          <span className={`font-bold ${
+                            isPositivo ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                          }`}>
+                            {isPositivo ? '+' : ''}{formatCurrency(resultado)}
+                          </span>
                         </div>
                       );
                     })}
