@@ -1827,11 +1827,10 @@ export class DbStorage implements IStorage {
       ),
       vencidos AS (
         SELECT 
-          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_vencidas,
-          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_vencidas
+          SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'ATRASADO' THEN valor_bruto::numeric ELSE 0 END) as entradas_vencidas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END) as saidas_vencidas
         FROM caz_parcelas
-        WHERE status NOT IN ('QUITADO', 'PERDIDO')
-          AND data_vencimento < CURRENT_DATE
+        WHERE data_vencimento < CURRENT_DATE
       ),
       maior_entrada AS (
         SELECT 
