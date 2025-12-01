@@ -76,6 +76,27 @@ export default function FluxoCaixa() {
     }));
   }, [fluxoDiario]);
 
+  const chartDomains = useMemo(() => {
+    if (!chartData || chartData.length === 0) {
+      return { barsMax: 100000, lineMin: 0, lineMax: 100000 };
+    }
+    
+    const maxEntrada = Math.max(...chartData.map(d => d.entradas || 0));
+    const maxSaida = Math.max(...chartData.map(d => d.saidas || 0));
+    const barsMax = Math.max(maxEntrada, maxSaida) * 1.1 || 100000;
+    
+    const saldos = chartData.map(d => d.saldoAcumulado || 0);
+    const lineMin = Math.min(...saldos);
+    const lineMax = Math.max(...saldos);
+    const linePadding = (lineMax - lineMin) * 0.1 || 100000;
+    
+    return {
+      barsMax: Math.ceil(barsMax / 50000) * 50000,
+      lineMin: Math.floor((lineMin - linePadding) / 100000) * 100000,
+      lineMax: Math.ceil((lineMax + linePadding) / 100000) * 100000,
+    };
+  }, [chartData]);
+
   const totais = useMemo(() => {
     if (!fluxoDiario || fluxoDiario.length === 0) {
       return { entradas: 0, saidas: 0, saldo: 0, saldoFinal: insights?.saldoHoje || 0 };
@@ -420,7 +441,7 @@ export default function FluxoCaixa() {
             ) : (
               <div className="h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                  <ComposedChart data={chartData} margin={{ top: 20, right: 80, left: 20, bottom: 60 }}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
                     <XAxis 
                       dataKey="dataFormatada" 
@@ -433,11 +454,23 @@ export default function FluxoCaixa() {
                       interval={chartData.length > 15 ? Math.floor(chartData.length / 10) : 0}
                     />
                     <YAxis 
-                      tick={{ fill: 'currentColor', fontSize: 11 }}
+                      yAxisId="bars"
+                      tick={{ fill: '#22c55e', fontSize: 11 }}
                       tickFormatter={(value) => formatCurrencyCompact(value)}
                       tickLine={false}
                       axisLine={false}
                       width={70}
+                      domain={[0, chartDomains.barsMax]}
+                    />
+                    <YAxis 
+                      yAxisId="line"
+                      orientation="right"
+                      tick={{ fill: '#3b82f6', fontSize: 11 }}
+                      tickFormatter={(value) => formatCurrencyCompact(value)}
+                      tickLine={false}
+                      axisLine={false}
+                      width={70}
+                      domain={[chartDomains.lineMin, chartDomains.lineMax]}
                     />
                     <Tooltip
                       contentStyle={{ 
@@ -469,18 +502,21 @@ export default function FluxoCaixa() {
                       }}
                     />
                     <Bar 
+                      yAxisId="bars"
                       dataKey="entradas" 
                       fill="#22c55e"
                       radius={[4, 4, 0, 0]}
                       name="entradas"
                     />
                     <Bar 
+                      yAxisId="bars"
                       dataKey="saidas" 
                       fill="#ef4444"
                       radius={[4, 4, 0, 0]}
                       name="saidas"
                     />
                     <Line
+                      yAxisId="line"
                       type="monotone"
                       dataKey="saldoAcumulado"
                       stroke="#3b82f6"
