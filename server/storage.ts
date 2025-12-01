@@ -1720,13 +1720,13 @@ export class DbStorage implements IStorage {
         nome,
         balance as saldo,
         empresa
-      FROM caz_bancos
-      WHERE ativo = true
+      FROM ${schema.cazBancos}
+      WHERE ativo = 'true' OR ativo = 't' OR ativo IS NULL
       ORDER BY balance::numeric DESC
     `);
     
     return (result.rows as any[]).map((row: any) => ({
-      id: row.id || '',
+      id: String(row.id || ''),
       nome: row.nome || 'Conta Desconhecida',
       saldo: parseFloat(row.saldo || '0'),
       empresa: row.empresa || '',
