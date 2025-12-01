@@ -109,6 +109,22 @@ export default function DashboardDFC() {
     };
   }, [dfcData]);
 
+  const resultadoByMonth = useMemo(() => {
+    if (!dfcData || !dfcData.nodes || dfcData.nodes.length === 0) return {};
+    
+    const receitasNode = dfcData.nodes.find(n => n.categoriaId === 'RECEITAS');
+    const despesasNode = dfcData.nodes.find(n => n.categoriaId === 'DESPESAS');
+    
+    const resultado: Record<string, number> = {};
+    dfcData.meses.forEach(mes => {
+      const receita = receitasNode?.valuesByMonth[mes] || 0;
+      const despesa = Math.abs(despesasNode?.valuesByMonth[mes] || 0);
+      resultado[mes] = receita - despesa;
+    });
+    
+    return resultado;
+  }, [dfcData]);
+
   const chartData = useMemo(() => {
     if (!dfcData || !dfcData.nodes || dfcData.nodes.length === 0) return [];
     
@@ -589,6 +605,49 @@ export default function DashboardDFC() {
                           </>
                         );
                       }
+                    })}
+                    
+                    {/* Linha de Resultado */}
+                    <div 
+                      className="sticky left-0 z-10 p-3 border-t-2 border-b border-r border-border bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-950 dark:to-indigo-950 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                      data-testid="dfc-row-resultado"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-blue-500/20">
+                          <Target className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <span className="font-bold text-blue-700 dark:text-blue-400">
+                          RESULTADO
+                        </span>
+                      </div>
+                    </div>
+                    {dfcData.meses.map(mes => {
+                      const resultado = resultadoByMonth[mes] || 0;
+                      const isPositivo = resultado >= 0;
+                      return (
+                        <div 
+                          key={`resultado-${mes}`}
+                          className={`p-3 border-t-2 border-b border-border text-center ${
+                            isPositivo 
+                              ? 'bg-gradient-to-b from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50' 
+                              : 'bg-gradient-to-b from-red-50 to-rose-50 dark:from-red-950/50 dark:to-rose-950/50'
+                          }`}
+                          data-testid={`dfc-cell-resultado-${mes}`}
+                        >
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className={`font-bold text-base ${
+                              isPositivo ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                            }`}>
+                              {isPositivo ? '+' : ''}{formatCurrency(resultado)}
+                            </span>
+                            <span className={`text-xs font-medium ${
+                              isPositivo ? 'text-green-500' : 'text-red-500'
+                            }`}>
+                              {isPositivo ? 'Lucro' : 'Prejuízo'}
+                            </span>
+                          </div>
+                        </div>
+                      );
                     })}
                   </div>
                 </div>
