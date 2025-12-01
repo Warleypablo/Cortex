@@ -1634,12 +1634,16 @@ export class DbStorage implements IStorage {
   async getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]> {
     const saldoAtual = await this.getSaldoAtualBancos();
     
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const primeiroDiaMes = new Date(ano, mes - 1, 1);
+    
     const result = await db.execute(sql`
       SELECT 
         TO_CHAR(data_vencimento, 'DD/MM/YYYY') as dia,
         data_vencimento,
-        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END), 0) as receitas,
-        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END), 0) as despesas
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END), 0) as receitas,
+        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END), 0) as despesas
       FROM ${schema.cazParcelas}
       WHERE tipo_evento IN ('RECEITA', 'DESPESA')
         AND data_vencimento IS NOT NULL
@@ -1649,23 +1653,23 @@ export class DbStorage implements IStorage {
       ORDER BY data_vencimento ASC
     `);
     
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    
-    const transacoesPassadas = await db.execute(sql`
+    // Calcular provisões entre hoje e o primeiro dia do mês selecionado
+    const provisoesAntesMes = await db.execute(sql`
       SELECT 
         COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END), 0) -
-        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END), 0) as fluxo_passado
+        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END), 0) as fluxo_provisoes
       FROM ${schema.cazParcelas}
       WHERE tipo_evento IN ('RECEITA', 'DESPESA')
+        AND status NOT IN ('QUITADO', 'PERDIDO')
         AND data_vencimento IS NOT NULL
-        AND data_vencimento < ${hoje.toISOString()}
+        AND data_vencimento >= CURRENT_DATE
+        AND data_vencimento < ${primeiroDiaMes.toISOString()}::date
     `);
     
-    const fluxoPassado = parseFloat((transacoesPassadas.rows[0] as any)?.fluxo_passado || '0');
-    const saldoInicial = saldoAtual.saldoTotal - fluxoPassado;
+    const fluxoProvisoesAntesMes = parseFloat((provisoesAntesMes.rows[0] as any)?.fluxo_provisoes || '0');
     
-    let saldoAcumulado = saldoInicial;
+    // Saldo inicial: saldo atual + provisões até o início do mês
+    let saldoAcumulado = saldoAtual.saldoTotal + fluxoProvisoesAntesMes;
     
     return (result.rows as any[]).map((row: any) => {
       const receitas = parseFloat(row.receitas || '0');
