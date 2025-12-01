@@ -4429,8 +4429,8 @@ export class DbStorage implements IStorage {
         SELECT 
           COALESCE(SUM(nao_pago::numeric), 0) as total_aberto,
           COUNT(*) as qtd_titulos,
-          COUNT(CASE WHEN data_vencimento < CURRENT_DATE THEN 1 END) as qtd_vencidos,
-          COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE THEN nao_pago::numeric ELSE 0 END), 0) as valor_vencido
+          COUNT(CASE WHEN status = 'OVERDUE' THEN 1 END) as qtd_vencidos,
+          COALESCE(SUM(CASE WHEN status = 'OVERDUE' THEN nao_pago::numeric ELSE 0 END), 0) as valor_vencido
         FROM caz_receber
         WHERE status != 'ACQUITTED' AND nao_pago::numeric > 0
       ),
