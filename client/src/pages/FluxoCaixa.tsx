@@ -418,90 +418,79 @@ export default function FluxoCaixa() {
                 <p className="text-muted-foreground">Nenhum dado para o período selecionado</p>
               </div>
             ) : (
-              <div className="overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
-                <div style={{ width: Math.max(800, chartData.length * 50), height: 400 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={chartData} margin={{ top: 20, right: 60, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                      <XAxis 
-                        dataKey="dataFormatada" 
-                        tick={{ fill: 'currentColor', fontSize: 11 }}
-                        tickLine={false}
-                        axisLine={false}
-                        interval={0}
-                      />
-                      <YAxis 
-                        yAxisId="bars"
-                        tick={{ fill: 'currentColor', fontSize: 11 }}
-                        tickFormatter={(value) => formatCurrencyCompact(value)}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <YAxis 
-                        yAxisId="line"
-                        orientation="right"
-                        tick={{ fill: 'currentColor', fontSize: 11 }}
-                        tickFormatter={(value) => formatCurrencyCompact(value)}
-                        tickLine={false}
-                        axisLine={false}
-                        domain={[
-                          (dataMin: number) => Math.max(0, dataMin * 0.9),
-                          (dataMax: number) => dataMax * 1.05
-                        ]}
-                      />
-                      <Tooltip
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                        }}
-                        formatter={(value: number, name: string) => {
-                          const labels: Record<string, string> = {
-                            entradas: 'Entradas',
-                            saidas: 'Saídas',
-                            saldoAcumulado: 'Saldo Acumulado',
-                          };
-                          return [formatCurrency(value), labels[name] || name];
-                        }}
-                        labelFormatter={(label) => `Data: ${label}`}
-                      />
-                      <Legend 
-                        formatter={(value) => {
-                          const labels: Record<string, string> = {
-                            entradas: 'Entradas',
-                            saidas: 'Saídas',
-                            saldoAcumulado: 'Saldo Acumulado',
-                          };
-                          return labels[value] || value;
-                        }}
-                      />
-                      <Bar 
-                        yAxisId="bars"
-                        dataKey="entradas" 
-                        fill="#22c55e"
-                        radius={[4, 4, 0, 0]}
-                        barSize={18}
-                      />
-                      <Bar 
-                        yAxisId="bars"
-                        dataKey="saidas" 
-                        fill="#ef4444"
-                        radius={[4, 4, 0, 0]}
-                        barSize={18}
-                      />
-                      <Line
-                        yAxisId="line"
-                        type="monotone"
-                        dataKey="saldoAcumulado"
-                        stroke="#3b82f6"
-                        strokeWidth={3}
-                        dot={false}
-                        activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
+              <div className="h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                    <XAxis 
+                      dataKey="dataFormatada" 
+                      tick={{ fill: 'currentColor', fontSize: 10 }}
+                      tickLine={false}
+                      axisLine={false}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                      interval={chartData.length > 15 ? Math.floor(chartData.length / 10) : 0}
+                    />
+                    <YAxis 
+                      tick={{ fill: 'currentColor', fontSize: 11 }}
+                      tickFormatter={(value) => formatCurrencyCompact(value)}
+                      tickLine={false}
+                      axisLine={false}
+                      width={70}
+                    />
+                    <Tooltip
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--background))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                      }}
+                      formatter={(value: number, name: string) => {
+                        const labels: Record<string, string> = {
+                          entradas: 'Entradas',
+                          saidas: 'Saídas',
+                          saldoAcumulado: 'Saldo Acumulado',
+                        };
+                        return [formatCurrency(value), labels[name] || name];
+                      }}
+                      labelFormatter={(label) => `Data: ${label}`}
+                    />
+                    <Legend 
+                      verticalAlign="top"
+                      height={36}
+                      formatter={(value) => {
+                        const labels: Record<string, string> = {
+                          entradas: 'Entradas',
+                          saidas: 'Saídas',
+                          saldoAcumulado: 'Saldo Acumulado',
+                        };
+                        return labels[value] || value;
+                      }}
+                    />
+                    <Bar 
+                      dataKey="entradas" 
+                      fill="#22c55e"
+                      radius={[4, 4, 0, 0]}
+                      name="entradas"
+                    />
+                    <Bar 
+                      dataKey="saidas" 
+                      fill="#ef4444"
+                      radius={[4, 4, 0, 0]}
+                      name="saidas"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="saldoAcumulado"
+                      stroke="#3b82f6"
+                      strokeWidth={3}
+                      dot={false}
+                      activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                      name="saldoAcumulado"
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
               </div>
             )}
           </CardContent>
