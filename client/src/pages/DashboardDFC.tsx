@@ -625,17 +625,17 @@ export default function DashboardDFC() {
                       return (
                         <div 
                           key={`resultado-${mes}`}
-                          className={`p-3 border-t-2 border-b border-border text-center ${
+                          className={`p-3 border-t-2 border-b border-border text-center whitespace-nowrap ${
                             isPositivo 
                               ? 'bg-green-50 dark:bg-green-950/50' 
                               : 'bg-red-50 dark:bg-red-950/50'
                           }`}
                           data-testid={`dfc-cell-resultado-${mes}`}
                         >
-                          <span className={`font-bold ${
+                          <span className={`font-bold text-sm ${
                             isPositivo ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                           }`}>
-                            {isPositivo ? '+' : ''}{formatCurrency(resultado)}
+                            {isPositivo ? '+R$ ' : 'R$ '}{Math.abs(resultado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                         </div>
                       );
