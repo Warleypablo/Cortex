@@ -829,6 +829,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/inadimplencia/por-metodo-pagamento", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const metodos = await storage.getInadimplenciaPorMetodoPagamento(dataInicio, dataFim);
+      res.json(metodos);
+    } catch (error) {
+      console.error("[api] Error fetching inadimplencia por metodo pagamento:", error);
+      res.status(500).json({ error: "Failed to fetch inadimplencia por metodo pagamento" });
+    }
+  });
+
   app.get("/api/analytics/cohort-retention", async (req, res) => {
     try {
       const filters: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string } = {};

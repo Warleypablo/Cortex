@@ -62,6 +62,7 @@ import {
   Loader2,
   X,
   AlertCircle,
+  CreditCard,
 } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -99,6 +100,14 @@ interface ClienteInadimplente {
 
 interface EmpresaInadimplente {
   empresa: string;
+  valorTotal: number;
+  quantidadeClientes: number;
+  quantidadeParcelas: number;
+  percentual: number;
+}
+
+interface MetodoPagamentoInadimplente {
+  metodo: string;
   valorTotal: number;
   quantidadeClientes: number;
   quantidadeParcelas: number;
@@ -179,6 +188,10 @@ export default function DashboardInadimplencia() {
 
   const { data: empresasData, isLoading: isLoadingEmpresas, isError: isErrorEmpresas } = useQuery<{ empresas: EmpresaInadimplente[] }>({
     queryKey: ['/api/inadimplencia/por-empresa', empresasParams],
+  });
+
+  const { data: metodosData, isLoading: isLoadingMetodos, isError: isErrorMetodos } = useQuery<{ metodos: MetodoPagamentoInadimplente[] }>({
+    queryKey: ['/api/inadimplencia/por-metodo-pagamento', empresasParams],
   });
 
   const parcelasParams = {
@@ -646,6 +659,54 @@ export default function DashboardInadimplencia() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {empresa.percentual.toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-por-metodo-pagamento">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            Inadimplência por Método de Pagamento
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingMetodos ? (
+            <div className="space-y-3" data-testid="loading-metodos">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : isErrorMetodos ? (
+            <ErrorDisplay message="Erro ao carregar dados por método de pagamento." />
+          ) : !metodosData?.metodos?.length ? (
+            <div className="h-32 flex items-center justify-center text-muted-foreground" data-testid="empty-metodos">
+              Nenhum dado disponível
+            </div>
+          ) : (
+            <div className="space-y-3" data-testid="list-metodos">
+              {metodosData.metodos.map((metodo, index) => (
+                <div key={metodo.metodo} className="flex items-center gap-4" data-testid={`row-metodo-${index}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium truncate">{metodo.metodo}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {metodo.quantidadeParcelas} parcela{metodo.quantidadeParcelas !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <Progress value={metodo.percentual} className="h-2" />
+                  </div>
+                  <div className="text-right min-w-[100px]">
+                    <p className="font-bold text-red-600 dark:text-red-400">
+                      {formatCurrency(metodo.valorTotal)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {metodo.percentual.toFixed(1)}%
                     </p>
                   </div>
                 </div>
