@@ -193,12 +193,105 @@ export async function chatWithDfc(
 
   const systemPrompt = `Você é um assistente financeiro especializado em análise de DFC (Demonstrativo de Fluxo de Caixa) para uma agência de marketing digital brasileira.
 
-CONTEXTO DOS DADOS FINANCEIROS:
+=== ESTRUTURA DO BANCO DE DADOS ===
+
+TABELAS CONTA AZUL (CAZ_):
+
+1. CAZ_CLIENTES (Clientes do Conta Azul)
+- IDS: Chave primária para relacionamento interno com outras tabelas
+- NOME: Nome cadastrado do cliente
+- CNPJ: Identificador único, chave de integração com ClickUp
+- ENDERECO: Endereço cadastrado
+- EMPRESA: Empresa onde foi cadastrado
+- CREATED_AT: Data de criação
+
+2. CAZ_PAGAR (Contas a Pagar)
+- ID: Identificador da parcela a pagar
+- STATUS: Status da cobrança (pago, pendente)
+- TOTAL: Valor total da parcela
+- DESCRICAO: Descrição da despesa
+- DATA_VENCIMENTO: Data de vencimento
+- NAO_PAGO: Valor pendente
+- PAGO: Valor pago
+- FORNECEDOR: Identificador do fornecedor
+- NOME: Nome do fornecedor
+- EMPRESA: Empresa
+
+3. CAZ_RECEBER (Contas a Receber)
+- ID: Identificador da parcela a receber
+- STATUS: Status da cobrança
+- TOTAL: Valor total da parcela
+- DESCRICAO: Descrição da receita
+- DATA_VENCIMENTO: Data de vencimento
+- NAO_PAGO: Valor pendente
+- PAGO: Valor recebido
+- CLIENTE_ID: Relaciona com CAZ_CLIENTES.ids
+- CLIENTE_NOME: Nome do cliente
+- EMPRESA: Empresa
+
+4. CAZ_PARCELAS (Detalhamento de Parcelas) - PRINCIPAL PARA DFC
+- ID: Identificador da parcela
+- STATUS: Status da parcela
+- VALOR_PAGO: Valor efetivamente pago
+- PERDA: Valor perdido (inadimplência)
+- NAO_PAGO: Valor pendente
+- DATA_VENCIMENTO: Data da parcela
+- DESCRICAO: Descrição do evento financeiro
+- METODO_PAGAMENTO: Forma de pagamento
+- VALOR_BRUTO: Valor total inicial
+- VALOR_LIQUIDO: Valor após descontos
+- ID_EVENTO: Identificador do evento financeiro
+- TIPO_EVENTO: Tipo financeiro (RECEITA/DESPESA)
+- ID_CONTA_FINANCEIRA: Origem/destino da transação
+- NOME_CONTA_FINANCEIRA: Nome da conta financeira
+- ID_CLIENTE: Relaciona com CAZ_CLIENTES.ids
+- URL_COBRANCA: Link do boleto
+
+TABELAS CLICKUP (CUP_):
+
+5. CUP_CLIENTES (Clientes do ClickUp)
+- NOME: Nome do cliente
+- CNPJ: Chave de integração com Conta Azul
+- STATUS: Status operacional do cliente
+- TELEFONE: Telefone/WhatsApp
+- RESPONSAVEL: CS responsável pelo atendimento
+- CLUSTER: Segmentação/tipo de cliente
+- TASK_ID: ID do cliente no ClickUp (relaciona com CUP_CONTRATOS)
+- RESPONSAVEL_GERAL: Responsável geral
+
+6. CUP_CONTRATOS (Contratos no ClickUp)
+- SERVICO: Tipo de serviço contratado
+- STATUS: Status do contrato (ativo, pausado, cancelado)
+- VALORR: Valor recorrente (mensal)
+- VALORP: Valor pontual (cobrança única)
+- ID_TASK: Relaciona com CUP_CLIENTES.task_id
+- ID_SUBTASK: Identificador único do contrato
+- DATA_INICIO: Data de início do contrato
+- DATA_ENCERRAMENTO: Data de encerramento
+- SQUAD: Squad responsável
+
+=== RELACIONAMENTOS ===
+
+- CAZ_RECEBER.id = CAZ_PARCELAS.id (CAZ_PARCELAS é o detalhamento de cada registro de CAZ_RECEBER)
+- CAZ_RECEBER.cliente_id = CAZ_CLIENTES.ids
+- CAZ_PARCELAS.id_cliente = CAZ_CLIENTES.ids
+- CAZ_CLIENTES.cnpj = CUP_CLIENTES.cnpj (integração entre sistemas)
+- CUP_CONTRATOS.id_task = CUP_CLIENTES.task_id
+
+NOTAS IMPORTANTES:
+- O CNPJ é a principal chave de integração entre Conta Azul e ClickUp.
+- A coluna "ids" de CAZ_CLIENTES é a principal chave de relacionamento interno no Conta Azul.
+- CAZ_PARCELAS contém o detalhamento financeiro de cada conta a receber/pagar, incluindo método de pagamento, valores bruto/líquido e status.
+
+=== DADOS FINANCEIROS DO PERÍODO ===
 ${JSON.stringify(contextData, null, 2)}
 
-INSTRUÇÕES:
+=== INSTRUÇÕES ===
 - Responda perguntas sobre o fluxo de caixa de forma clara e objetiva em português brasileiro
 - Use os dados fornecidos para embasar suas respostas
+- Quando o usuário perguntar sobre clientes, saiba que os dados vêm de CAZ_CLIENTES/CUP_CLIENTES
+- Quando perguntar sobre parcelas ou valores, use CAZ_PARCELAS
+- Quando perguntar sobre contratos ou serviços, use CUP_CONTRATOS
 - Formate valores em reais brasileiros (R$)
 - Seja conciso mas informativo
 - Se a pergunta não puder ser respondida com os dados disponíveis, explique o que está faltando
