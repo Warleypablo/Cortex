@@ -128,6 +128,125 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface DfcChatResponse {
+  resposta: string;
+  dadosReferenciados?: {
+    categorias?: string[];
+    meses?: string[];
+    valores?: string[];
+  };
+}
+
+export async function chatWithDfc(
+  dfcData: DfcHierarchicalResponse,
+  pergunta: string,
+  historico: ChatMessage[] = []
+): Promise<DfcChatResponse> {
+  const monthlyData = calculateMonthlyData(dfcData);
+  const categoryMetrics = calculateCategoryMetrics(dfcData.nodes, dfcData.meses);
+  const topCategories = findTopCategories(categoryMetrics, 20);
+  
+  const totalReceitas = monthlyData.reduce((a, m) => a + m.receitas, 0);
+  const totalDespesas = monthlyData.reduce((a, m) => a + m.despesas, 0);
+  const margemMedia = monthlyData.length > 0 
+    ? monthlyData.reduce((a, m) => a + m.margem, 0) / monthlyData.length 
+    : 0;
+  
+  const bestMonth = monthlyData.reduce((best, m) => m.resultado > best.resultado ? m : best, monthlyData[0]);
+  const worstMonth = monthlyData.reduce((worst, m) => m.resultado < worst.resultado ? m : worst, monthlyData[0]);
+
+  const contextData = {
+    periodo: {
+      inicio: dfcData.meses[0],
+      fim: dfcData.meses[dfcData.meses.length - 1],
+      meses: dfcData.meses
+    },
+    resumoFinanceiro: {
+      totalReceitas: formatCurrency(totalReceitas),
+      totalDespesas: formatCurrency(totalDespesas),
+      resultadoLiquido: formatCurrency(totalReceitas - totalDespesas),
+      margemMedia: `${margemMedia.toFixed(1)}%`
+    },
+    evolucaoMensal: monthlyData.map(m => ({
+      mes: m.mes,
+      receitas: formatCurrency(m.receitas),
+      despesas: formatCurrency(m.despesas),
+      resultado: formatCurrency(m.resultado),
+      margem: `${m.margem.toFixed(1)}%`
+    })),
+    categorias: topCategories.map(c => ({
+      nome: c.categoriaNome,
+      total: formatCurrency(c.total),
+      media: formatCurrency(c.mediaByMonth),
+      tendencia: c.tendencia
+    })),
+    destaques: {
+      melhorMes: { mes: bestMonth?.mes, resultado: formatCurrency(bestMonth?.resultado || 0) },
+      piorMes: { mes: worstMonth?.mes, resultado: formatCurrency(worstMonth?.resultado || 0) }
+    }
+  };
+
+  const systemPrompt = `Você é um assistente financeiro especializado em análise de DFC (Demonstrativo de Fluxo de Caixa) para uma agência de marketing digital brasileira.
+
+CONTEXTO DOS DADOS FINANCEIROS:
+${JSON.stringify(contextData, null, 2)}
+
+INSTRUÇÕES:
+- Responda perguntas sobre o fluxo de caixa de forma clara e objetiva em português brasileiro
+- Use os dados fornecidos para embasar suas respostas
+- Formate valores em reais brasileiros (R$)
+- Seja conciso mas informativo
+- Se a pergunta não puder ser respondida com os dados disponíveis, explique o que está faltando
+- Quando mencionar categorias ou meses específicos, cite os valores exatos dos dados
+
+Responda APENAS com JSON válido:
+{
+  "resposta": "Sua resposta detalhada aqui",
+  "dadosReferenciados": {
+    "categorias": ["categoria1", "categoria2"],
+    "meses": ["2024-01", "2024-02"],
+    "valores": ["R$ 10.000,00", "R$ 20.000,00"]
+  }
+}`;
+
+  const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+    { role: "system", content: systemPrompt }
+  ];
+
+  historico.forEach(msg => {
+    messages.push({ role: msg.role, content: msg.content });
+  });
+
+  messages.push({ role: "user", content: pergunta });
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-5",
+      messages,
+      response_format: { type: "json_object" },
+      max_completion_tokens: 2048,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("Resposta vazia da API");
+    }
+
+    return JSON.parse(content) as DfcChatResponse;
+  } catch (error) {
+    console.error("[DFC Chat] Error:", error);
+    return {
+      resposta: "Desculpe, não consegui processar sua pergunta. Por favor, tente novamente ou reformule sua pergunta.",
+      dadosReferenciados: undefined
+    };
+  }
+}
+
 export async function analyzeDfc(dfcData: DfcHierarchicalResponse): Promise<DfcAnalysisResult> {
   const monthlyData = calculateMonthlyData(dfcData);
   const categoryMetrics = calculateCategoryMetrics(dfcData.nodes, dfcData.meses);

@@ -7,7 +7,7 @@ import { isAuthenticated } from "./auth/middleware";
 import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole } from "./auth/userDb";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
-import { analyzeDfc } from "./services/dfcAnalysis";
+import { analyzeDfc, chatWithDfc, type ChatMessage } from "./services/dfcAnalysis";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== 'admin') {
@@ -1059,6 +1059,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error analyzing DFC data:", error);
       res.status(500).json({ error: "Failed to analyze DFC data" });
+    }
+  });
+
+  app.post("/api/dfc/chat", async (req, res) => {
+    try {
+      const { pergunta, historico, dataInicio, dataFim } = req.body;
+      
+      if (!pergunta || typeof pergunta !== 'string' || pergunta.trim().length === 0) {
+        return res.status(400).json({ error: "Pergunta é obrigatória" });
+      }
+      
+      if (dataInicio && !/^\d{4}-\d{2}-\d{2}$/.test(dataInicio)) {
+        return res.status(400).json({ error: "Invalid dataInicio parameter. Expected format: YYYY-MM-DD" });
+      }
+      
+      if (dataFim && !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+        return res.status(400).json({ error: "Invalid dataFim parameter. Expected format: YYYY-MM-DD" });
+      }
+
+      const dfcData = await storage.getDfc(dataInicio, dataFim);
+      
+      if (!dfcData.nodes || dfcData.nodes.length === 0) {
+        return res.json({ 
+          resposta: "Não há dados disponíveis no período selecionado para responder sua pergunta. Tente selecionar um período diferente.",
+          dadosReferenciados: undefined 
+        });
+      }
+
+      const chatHistory: ChatMessage[] = Array.isArray(historico) ? historico : [];
+      const response = await chatWithDfc(dfcData, pergunta.trim(), chatHistory);
+      res.json(response);
+    } catch (error) {
+      console.error("[api] Error in DFC chat:", error);
+      res.status(500).json({ error: "Falha ao processar a pergunta" });
     }
   });
 

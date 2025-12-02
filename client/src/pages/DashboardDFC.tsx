@@ -17,34 +17,28 @@ import {
   Loader2, TrendingUp, TrendingDown, DollarSign, Calendar, ChevronRight, ChevronDown,
   Wallet, ArrowUpCircle, ArrowDownCircle, PiggyBank, BarChart3, Banknote, Receipt,
   CircleDollarSign, Coins, CreditCard, LineChart, Target, Activity, Percent,
-  Sparkles, AlertTriangle, Lightbulb, CheckCircle, X, BrainCircuit
+  Sparkles, AlertTriangle, Lightbulb, CheckCircle, X, BrainCircuit, Send, MessageCircle, Bot, User
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
 import type { DfcHierarchicalResponse, DfcNode, DfcParcela } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
-interface DfcInsight {
-  tipo: "anomalia" | "tendencia" | "oportunidade" | "alerta";
-  titulo: string;
-  descricao: string;
-  metricas: string[];
-  severidade: "baixa" | "media" | "alta";
-  categoria?: string;
-  mes?: string;
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
 }
 
-interface DfcAnalysisResult {
-  resumoExecutivo: string;
-  insights: DfcInsight[];
-  recomendacoes: string[];
-  metricas: {
-    margemMedia: number;
-    tendenciaReceitas: string;
-    tendenciaDespesas: string;
-    mesComMelhorResultado: string;
-    mesComPiorResultado: string;
+interface DfcChatResponse {
+  resposta: string;
+  dadosReferenciados?: {
+    categorias?: string[];
+    meses?: string[];
+    valores?: string[];
   };
 }
 
@@ -56,22 +50,66 @@ export default function DashboardDFC() {
   const [filterDataInicio, setFilterDataInicio] = useState<string>("2025-01-01");
   const [filterDataFim, setFilterDataFim] = useState<string>("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['RECEITAS', 'DESPESAS']));
-  const [analysisOpen, setAnalysisOpen] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<DfcAnalysisResult | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const { toast } = useToast();
 
-  const analysisMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/dfc/analyze", {
+  const chatMutation = useMutation({
+    mutationFn: async ({ pergunta, currentHistory }: { pergunta: string; currentHistory: ChatMessage[] }) => {
+      const historico = currentHistory.map(m => ({ role: m.role, content: m.content }));
+      const response = await apiRequest("POST", "/api/dfc/chat", {
+        pergunta,
+        historico,
         dataInicio: filterDataInicio || undefined,
         dataFim: filterDataFim || undefined,
       });
       return response.json();
     },
-    onSuccess: (data: DfcAnalysisResult) => {
-      setAnalysisResult(data);
-      setAnalysisOpen(true);
+    onSuccess: (data: DfcChatResponse) => {
+      setChatMessages(prev => [...prev, {
+        role: "assistant",
+        content: data.resposta,
+        timestamp: new Date()
+      }]);
+    },
+    onError: () => {
+      toast({
+        title: "Erro ao processar",
+        description: "Não foi possível processar sua pergunta. Por favor, tente novamente.",
+        variant: "destructive",
+      });
     },
   });
+
+  const handleSendMessage = () => {
+    if (!chatInput.trim() || chatMutation.isPending) return;
+    
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: chatInput.trim(),
+      timestamp: new Date()
+    };
+    
+    const updatedHistory = [...chatMessages, userMessage];
+    setChatMessages(updatedHistory);
+    chatMutation.mutate({ pergunta: chatInput.trim(), currentHistory: updatedHistory });
+    setChatInput("");
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const suggestedQuestions = [
+    "Qual foi o mês com melhor resultado?",
+    "Quais categorias tiveram maior crescimento?",
+    "Explique as principais despesas do período",
+    "Compare receitas e despesas dos últimos meses",
+  ];
 
   const { data: dfcData, isLoading } = useQuery<DfcHierarchicalResponse>({
     queryKey: ["/api/dfc", filterDataInicio, filterDataFim],
@@ -331,22 +369,13 @@ export default function DashboardDFC() {
           </div>
           <div className="flex items-center gap-3">
             <Button
-              onClick={() => analysisMutation.mutate()}
-              disabled={analysisMutation.isPending || isLoading || !dfcData?.nodes?.length}
+              onClick={() => setChatOpen(true)}
+              disabled={isLoading || !dfcData?.nodes?.length}
               className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg"
-              data-testid="button-analise-ia"
+              data-testid="button-chat-ia"
             >
-              {analysisMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Analisando...
-                </>
-              ) : (
-                <>
-                  <BrainCircuit className="w-4 h-4 mr-2" />
-                  Análise IA
-                </>
-              )}
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Chat IA
             </Button>
             <Badge variant="outline" className="px-3 py-1.5 text-sm font-medium bg-green-500/10 text-green-600 border-green-500/30">
               <ArrowUpCircle className="w-4 h-4 mr-1.5" />
@@ -360,137 +389,121 @@ export default function DashboardDFC() {
         </div>
       </div>
 
-      <Dialog open={analysisOpen} onOpenChange={setAnalysisOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+      <Dialog open={chatOpen} onOpenChange={setChatOpen}>
+        <DialogContent className="max-w-2xl h-[80vh] overflow-hidden flex flex-col p-0">
+          <DialogHeader className="px-6 py-4 border-b bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30">
             <DialogTitle className="flex items-center gap-2 text-xl">
               <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-500/20">
                 <BrainCircuit className="w-5 h-5 text-violet-600" />
               </div>
-              Análise Inteligente do DFC
+              Assistente DFC
             </DialogTitle>
             <DialogDescription>
-              Insights gerados por IA para o período de {filterDataInicio || "início"} até {filterDataFim || "hoje"}
+              Faça perguntas sobre o fluxo de caixa ({filterDataInicio || "início"} até {filterDataFim || "hoje"})
             </DialogDescription>
           </DialogHeader>
 
-          {analysisResult && (
-            <ScrollArea className="flex-1 pr-4">
-              <div className="space-y-6 pb-4">
-                <Card className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 border-violet-200 dark:border-violet-800">
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold text-violet-900 dark:text-violet-100 mb-2 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4" />
-                      Resumo Executivo
-                    </h3>
-                    <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed">
-                      {analysisResult.resumoExecutivo}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="p-3 rounded-lg bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Margem Média</p>
-                    <p className="text-lg font-bold">{analysisResult.metricas.margemMedia.toFixed(1)}%</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Tendência Receitas</p>
-                    <p className={`text-lg font-bold flex items-center justify-center gap-1 ${analysisResult.metricas.tendenciaReceitas === 'crescente' ? 'text-green-600' : 'text-red-600'}`}>
-                      {analysisResult.metricas.tendenciaReceitas === 'crescente' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                      {analysisResult.metricas.tendenciaReceitas}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Melhor Mês</p>
-                    <p className="text-lg font-bold text-green-600">{analysisResult.metricas.mesComMelhorResultado}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Pior Mês</p>
-                    <p className="text-lg font-bold text-red-600">{analysisResult.metricas.mesComPiorResultado}</p>
-                  </div>
+          <ScrollArea className="flex-1 px-6 py-4">
+            {chatMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-8">
+                <div className="p-4 rounded-full bg-violet-100 dark:bg-violet-900/30 mb-4">
+                  <Bot className="w-10 h-10 text-violet-600" />
                 </div>
-
-                {analysisResult.insights.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="font-semibold flex items-center gap-2">
-                      <Lightbulb className="w-4 h-4 text-amber-500" />
-                      Insights Identificados
-                    </h3>
-                    <div className="space-y-2">
-                      {analysisResult.insights.map((insight, idx) => (
-                        <Card key={idx} className={`border-l-4 ${
-                          insight.tipo === 'anomalia' ? 'border-l-red-500 bg-red-50/50 dark:bg-red-950/20' :
-                          insight.tipo === 'tendencia' ? 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20' :
-                          insight.tipo === 'oportunidade' ? 'border-l-green-500 bg-green-50/50 dark:bg-green-950/20' :
-                          'border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
-                        }`}>
-                          <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                              <div className={`p-1.5 rounded-lg mt-0.5 ${
-                                insight.tipo === 'anomalia' ? 'bg-red-500/20 text-red-600' :
-                                insight.tipo === 'tendencia' ? 'bg-blue-500/20 text-blue-600' :
-                                insight.tipo === 'oportunidade' ? 'bg-green-500/20 text-green-600' :
-                                'bg-amber-500/20 text-amber-600'
-                              }`}>
-                                {insight.tipo === 'anomalia' && <AlertTriangle className="w-4 h-4" />}
-                                {insight.tipo === 'tendencia' && <TrendingUp className="w-4 h-4" />}
-                                {insight.tipo === 'oportunidade' && <Lightbulb className="w-4 h-4" />}
-                                {insight.tipo === 'alerta' && <AlertTriangle className="w-4 h-4" />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-medium text-sm">{insight.titulo}</h4>
-                                  <Badge variant="outline" className={`text-xs ${
-                                    insight.severidade === 'alta' ? 'border-red-300 text-red-600' :
-                                    insight.severidade === 'media' ? 'border-amber-300 text-amber-600' :
-                                    'border-green-300 text-green-600'
-                                  }`}>
-                                    {insight.severidade}
-                                  </Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground">{insight.descricao}</p>
-                                {insight.metricas.length > 0 && (
-                                  <div className="flex flex-wrap gap-2 mt-2">
-                                    {insight.metricas.map((m, midx) => (
-                                      <Badge key={midx} variant="secondary" className="text-xs">{m}</Badge>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                <h3 className="text-lg font-medium mb-2">Como posso ajudar?</h3>
+                <p className="text-sm text-muted-foreground text-center mb-6 max-w-md">
+                  Pergunte sobre receitas, despesas, tendências ou qualquer aspecto do seu fluxo de caixa.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
+                  {suggestedQuestions.map((question, idx) => (
+                    <Button
+                      key={idx}
+                      variant="outline"
+                      size="sm"
+                      className="text-left justify-start h-auto py-2 px-3 text-xs"
+                      onClick={() => {
+                        setChatInput(question);
+                      }}
+                      data-testid={`button-suggestion-${idx}`}
+                    >
+                      <Sparkles className="w-3 h-3 mr-2 flex-shrink-0 text-violet-500" />
+                      <span className="line-clamp-2">{question}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {chatMessages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    {msg.role === "assistant" && (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                        <Bot className="w-4 h-4 text-violet-600" />
+                      </div>
+                    )}
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                        msg.role === "user"
+                          ? "bg-violet-600 text-white"
+                          : "bg-muted"
+                      }`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      <p className={`text-xs mt-1 ${msg.role === "user" ? "text-violet-200" : "text-muted-foreground"}`}>
+                        {msg.timestamp.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                    {msg.role === "user" && (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center">
+                        <User className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {chatMutation.isPending && (
+                  <div className="flex gap-3 justify-start">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                      <Bot className="w-4 h-4 text-violet-600" />
+                    </div>
+                    <div className="bg-muted rounded-2xl px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-violet-600" />
+                        <span className="text-sm text-muted-foreground">Analisando...</span>
+                      </div>
                     </div>
                   </div>
                 )}
-
-                {analysisResult.recomendacoes.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="font-semibold flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                      Recomendações
-                    </h3>
-                    <Card>
-                      <CardContent className="p-4">
-                        <ul className="space-y-2">
-                          {analysisResult.recomendacoes.map((rec, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-sm">
-                              <div className="w-5 h-5 rounded-full bg-green-500/20 text-green-600 flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold">
-                                {idx + 1}
-                              </div>
-                              <span>{rec}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
               </div>
-            </ScrollArea>
-          )}
+            )}
+          </ScrollArea>
+
+          <div className="px-6 py-4 border-t bg-background">
+            <div className="flex gap-2">
+              <Input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="Digite sua pergunta sobre o DFC..."
+                className="flex-1"
+                disabled={chatMutation.isPending}
+                data-testid="input-chat-message"
+              />
+              <Button
+                onClick={handleSendMessage}
+                disabled={!chatInput.trim() || chatMutation.isPending}
+                className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+                data-testid="button-send-message"
+              >
+                {chatMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
