@@ -5469,7 +5469,10 @@ export class DbStorage implements IStorage {
         (
           SELECT string_agg(DISTINCT servico, ', ')
           FROM cup_contratos
-          WHERE id_task = cc.task_id AND cc.task_id IS NOT NULL AND cc.task_id != ''
+          WHERE id_task::text = cc.task_id 
+            AND cc.task_id IS NOT NULL 
+            AND cc.task_id != ''
+            AND LENGTH(TRIM(cc.task_id)) > 10
         ) as servicos
       FROM inadimplencia i
       LEFT JOIN clientes_validos caz ON caz.ids = i.id_cliente
