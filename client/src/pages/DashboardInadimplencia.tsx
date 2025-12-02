@@ -90,6 +90,11 @@ interface ClienteInadimplente {
   parcelaMaisAntiga: string;
   diasAtrasoMax: number;
   empresa: string;
+  cnpj: string | null;
+  statusClickup: string | null;
+  responsavel: string | null;
+  cluster: string | null;
+  servicos: string | null;
 }
 
 interface EmpresaInadimplente {
@@ -241,6 +246,14 @@ export default function DashboardInadimplencia() {
     if (dias <= 60) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
     if (dias <= 90) return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
     return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+  };
+
+  const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+    const statusLower = status.toLowerCase();
+    if (statusLower.includes("ativo") || statusLower.includes("onboarding")) return "default";
+    if (statusLower.includes("churn") || statusLower.includes("cancelado") || statusLower.includes("encerrado")) return "destructive";
+    if (statusLower.includes("triagem") || statusLower.includes("prospect")) return "secondary";
+    return "outline";
   };
 
   const KPICard = ({
@@ -660,30 +673,71 @@ export default function DashboardInadimplencia() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Cliente</TableHead>
-                    <TableHead>Empresa</TableHead>
+                    <TableHead>Status ClickUp</TableHead>
+                    <TableHead>Responsável</TableHead>
+                    <TableHead>Serviços</TableHead>
                     <TableHead className="text-right">Valor Total</TableHead>
                     <TableHead className="text-center">Parcelas</TableHead>
                     <TableHead className="text-center">Dias Atraso</TableHead>
-                    <TableHead className="text-center">Vencimento Antigo</TableHead>
                     <TableHead className="text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {clientesFiltrados.map((cliente) => (
                     <TableRow key={cliente.idCliente} data-testid={`row-cliente-${cliente.idCliente}`}>
-                      <TableCell className="font-medium max-w-[200px] truncate">
+                      <TableCell className="font-medium max-w-[180px]">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="cursor-help">{cliente.nomeCliente}</span>
+                              <div className="truncate cursor-help">
+                                <span>{cliente.nomeCliente}</span>
+                                {cliente.empresa && (
+                                  <p className="text-xs text-muted-foreground truncate">{cliente.empresa}</p>
+                                )}
+                              </div>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>{cliente.nomeCliente}</p>
+                              <p className="font-medium">{cliente.nomeCliente}</p>
+                              {cliente.cnpj && <p className="text-xs">CNPJ: {cliente.cnpj}</p>}
+                              {cliente.empresa && <p className="text-xs">Empresa: {cliente.empresa}</p>}
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{cliente.empresa || "-"}</TableCell>
+                      <TableCell>
+                        {cliente.statusClickup ? (
+                          <Badge variant={getStatusVariant(cliente.statusClickup)} data-testid={`status-${cliente.idCliente}`}>
+                            {cliente.statusClickup}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[120px] truncate">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help">{cliente.responsavel || "-"}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{cliente.responsavel || "Sem responsável"}</p>
+                              {cliente.cluster && <p className="text-xs">Cluster: {cliente.cluster}</p>}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[150px] truncate">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help">{cliente.servicos || "-"}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">{cliente.servicos || "Sem serviços"}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
                       <TableCell className="text-right font-bold text-red-600 dark:text-red-400" data-testid={`value-cliente-${cliente.idCliente}`}>
                         {formatCurrency(cliente.valorTotal)}
                       </TableCell>
@@ -694,9 +748,6 @@ export default function DashboardInadimplencia() {
                         <Badge className={getDiasAtrasoColor(cliente.diasAtrasoMax)}>
                           {cliente.diasAtrasoMax} dias
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-center text-sm text-muted-foreground">
-                        {format(new Date(cliente.parcelaMaisAntiga), "dd/MM/yyyy", { locale: ptBR })}
                       </TableCell>
                       <TableCell className="text-center">
                         <Button
@@ -742,7 +793,7 @@ export default function DashboardInadimplencia() {
           ) : (
             <>
               <div className="mb-4 p-4 bg-muted/50 rounded-lg" data-testid="resumo-parcelas">
-                <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">Total em Aberto</p>
                     <p className="text-lg font-bold text-red-600 dark:text-red-400" data-testid="total-parcelas-aberto">
@@ -754,10 +805,36 @@ export default function DashboardInadimplencia() {
                     <p className="text-lg font-bold" data-testid="quantidade-parcelas">{parcelasData.parcelas.length}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Empresa</p>
-                    <p className="text-lg font-bold">{clienteSelecionado?.empresa || "-"}</p>
+                    <p className="text-muted-foreground">Status ClickUp</p>
+                    {clienteSelecionado?.statusClickup ? (
+                      <Badge variant={getStatusVariant(clienteSelecionado.statusClickup)} className="mt-1">
+                        {clienteSelecionado.statusClickup}
+                      </Badge>
+                    ) : (
+                      <p className="text-lg font-bold">-</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Responsável</p>
+                    <p className="text-lg font-bold truncate">{clienteSelecionado?.responsavel || "-"}</p>
                   </div>
                 </div>
+                {(clienteSelecionado?.servicos || clienteSelecionado?.cnpj) && (
+                  <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t text-sm">
+                    {clienteSelecionado?.servicos && (
+                      <div>
+                        <p className="text-muted-foreground">Serviços</p>
+                        <p className="font-medium">{clienteSelecionado.servicos}</p>
+                      </div>
+                    )}
+                    {clienteSelecionado?.cnpj && (
+                      <div>
+                        <p className="text-muted-foreground">CNPJ</p>
+                        <p className="font-medium">{clienteSelecionado.cnpj}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <Table>
                 <TableHeader>
