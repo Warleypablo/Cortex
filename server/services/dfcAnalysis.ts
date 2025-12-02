@@ -1,8 +1,41 @@
 import OpenAI from "openai";
 import type { DfcHierarchicalResponse, DfcNode } from "@shared/schema";
+import { db } from "../db";
+import { sql } from "drizzle-orm";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Função para executar queries SQL de forma segura (somente SELECT)
+async function executeSecureQuery(query: string): Promise<{ success: boolean; data?: any[]; error?: string; rowCount?: number }> {
+  // Validação de segurança: apenas queries SELECT são permitidas
+  const normalizedQuery = query.trim().toUpperCase();
+  
+  if (!normalizedQuery.startsWith('SELECT')) {
+    return { success: false, error: "Apenas queries SELECT são permitidas" };
+  }
+  
+  // Bloquear comandos perigosos
+  const dangerousKeywords = ['DROP', 'DELETE', 'UPDATE', 'INSERT', 'ALTER', 'TRUNCATE', 'CREATE', 'GRANT', 'REVOKE'];
+  for (const keyword of dangerousKeywords) {
+    if (normalizedQuery.includes(keyword)) {
+      return { success: false, error: `Comando ${keyword} não é permitido` };
+    }
+  }
+  
+  try {
+    console.log("[DFC Chat] Executing query:", query);
+    const result = await db.execute(sql.raw(query));
+    return { 
+      success: true, 
+      data: result.rows as any[],
+      rowCount: result.rowCount || 0
+    };
+  } catch (error: any) {
+    console.error("[DFC Chat] Query error:", error);
+    return { success: false, error: error.message || "Erro ao executar query" };
+  }
+}
 
 export interface DfcInsight {
   tipo: "anomalia" | "tendencia" | "oportunidade" | "alerta";
@@ -140,7 +173,106 @@ export interface DfcChatResponse {
     meses?: string[];
     valores?: string[];
   };
+  queryExecutada?: string;
 }
+
+// Constante com a estrutura do banco de dados
+const DATABASE_SCHEMA = `
+=== ESTRUTURA DO BANCO DE DADOS (schema: staging) ===
+
+TABELAS CONTA AZUL (staging.caz_*):
+
+1. staging.caz_clientes (Clientes do Conta Azul)
+- ids: Chave primária para relacionamento interno (TEXT)
+- nome: Nome cadastrado do cliente (TEXT)
+- cnpj: Identificador único, chave de integração com ClickUp (TEXT)
+- endereco: Endereço cadastrado (TEXT)
+- empresa: Empresa onde foi cadastrado (TEXT)
+- created_at: Data de criação (TEXT)
+
+2. staging.caz_pagar (Contas a Pagar)
+- id: Identificador da parcela a pagar (TEXT)
+- status: Status da cobrança - 'ACQUITTED' (pago), 'PENDING' (pendente) (TEXT)
+- total: Valor total da parcela (NUMERIC)
+- descricao: Descrição da despesa (TEXT)
+- data_vencimento: Data de vencimento formato 'YYYY-MM-DD' (TEXT)
+- nao_pago: Valor pendente (NUMERIC)
+- pago: Valor pago (NUMERIC)
+- fornecedor: Identificador do fornecedor (TEXT)
+- nome: Nome do fornecedor (TEXT)
+- empresa: Empresa (TEXT)
+
+3. staging.caz_receber (Contas a Receber)
+- id: Identificador da parcela a receber (TEXT)
+- status: Status da cobrança (TEXT)
+- total: Valor total da parcela (NUMERIC)
+- descricao: Descrição da receita (TEXT)
+- data_vencimento: Data de vencimento formato 'YYYY-MM-DD' (TEXT)
+- nao_pago: Valor pendente (NUMERIC)
+- pago: Valor recebido (NUMERIC)
+- cliente_id: Relaciona com caz_clientes.ids (TEXT)
+- cliente_nome: Nome do cliente (TEXT)
+- empresa: Empresa (TEXT)
+
+4. staging.caz_parcelas (Detalhamento de Parcelas) - PRINCIPAL PARA DFC
+- id: Identificador da parcela (TEXT)
+- status: Status da parcela - 'ACQUITTED' (pago), 'PENDING' (pendente) (TEXT)
+- valor_pago: Valor efetivamente pago (NUMERIC)
+- perda: Valor perdido - inadimplência (NUMERIC)
+- nao_pago: Valor pendente (NUMERIC)
+- data_vencimento: Data da parcela formato 'YYYY-MM-DD' (TEXT)
+- descricao: Descrição do evento financeiro (TEXT)
+- metodo_pagamento: Forma de pagamento (TEXT)
+- valor_bruto: Valor total inicial (NUMERIC)
+- valor_liquido: Valor após descontos (NUMERIC)
+- id_evento: Identificador do evento financeiro (TEXT)
+- tipo_evento: Tipo financeiro - 'INCOME' (receita), 'EXPENSE' (despesa) (TEXT)
+- id_conta_financeira: Origem/destino da transação (TEXT)
+- nome_conta_financeira: Nome da conta financeira (TEXT)
+- id_cliente: Relaciona com caz_clientes.ids (TEXT)
+- url_cobranca: Link do boleto (TEXT)
+
+TABELAS CLICKUP (staging.cup_*):
+
+5. staging.cup_clientes (Clientes do ClickUp)
+- nome: Nome do cliente (TEXT)
+- cnpj: Chave de integração com Conta Azul (TEXT)
+- status: Status operacional do cliente (TEXT)
+- telefone: Telefone/WhatsApp (TEXT)
+- responsavel: CS responsável pelo atendimento (TEXT)
+- cluster: Segmentação/tipo de cliente (TEXT)
+- task_id: ID do cliente no ClickUp (TEXT)
+- responsavel_geral: Responsável geral (TEXT)
+
+6. staging.cup_contratos (Contratos no ClickUp)
+- servico: Tipo de serviço contratado (TEXT)
+- status: Status do contrato (ativo, pausado, cancelado) (TEXT)
+- valorr: Valor recorrente mensal (NUMERIC)
+- valorp: Valor pontual - cobrança única (NUMERIC)
+- id_task: Relaciona com cup_clientes.task_id (TEXT)
+- id_subtask: Identificador único do contrato (TEXT)
+- data_inicio: Data de início do contrato (TEXT)
+- data_encerramento: Data de encerramento (TEXT)
+- squad: Squad responsável (TEXT)
+
+=== RELACIONAMENTOS ===
+
+- caz_receber.id = caz_parcelas.id (caz_parcelas é o detalhamento de cada registro de caz_receber)
+- caz_receber.cliente_id = caz_clientes.ids
+- caz_parcelas.id_cliente = caz_clientes.ids
+- caz_clientes.cnpj = cup_clientes.cnpj (integração entre sistemas)
+- cup_contratos.id_task = cup_clientes.task_id
+
+=== NOTAS IMPORTANTES PARA QUERIES ===
+
+1. Use sempre o schema 'staging.' antes do nome das tabelas: staging.caz_parcelas, staging.caz_pagar, etc.
+2. Para filtrar por mês, use: TO_CHAR(data_vencimento::date, 'YYYY-MM') = '2025-11'
+3. Para DESPESAS: tipo_evento = 'EXPENSE' (em caz_parcelas)
+4. Para RECEITAS: tipo_evento = 'INCOME' (em caz_parcelas)
+5. Use COALESCE para valores nulos: COALESCE(valor_pago, 0)
+6. Limite resultados com LIMIT para evitar retornos muito grandes
+7. Ordene por valor decrescente para encontrar maiores: ORDER BY valor_pago DESC
+`;
 
 export async function chatWithDfc(
   dfcData: DfcHierarchicalResponse,
@@ -191,150 +323,152 @@ export async function chatWithDfc(
     }
   };
 
-  const systemPrompt = `Você é um assistente financeiro especializado em análise de DFC (Demonstrativo de Fluxo de Caixa) para uma agência de marketing digital brasileira.
+  // ETAPA 1: Analisar se precisa de query SQL
+  const analysisPrompt = `Você é um assistente financeiro especializado em DFC para uma agência de marketing digital brasileira.
 
-=== ESTRUTURA DO BANCO DE DADOS ===
+${DATABASE_SCHEMA}
 
-TABELAS CONTA AZUL (CAZ_):
-
-1. CAZ_CLIENTES (Clientes do Conta Azul)
-- IDS: Chave primária para relacionamento interno com outras tabelas
-- NOME: Nome cadastrado do cliente
-- CNPJ: Identificador único, chave de integração com ClickUp
-- ENDERECO: Endereço cadastrado
-- EMPRESA: Empresa onde foi cadastrado
-- CREATED_AT: Data de criação
-
-2. CAZ_PAGAR (Contas a Pagar)
-- ID: Identificador da parcela a pagar
-- STATUS: Status da cobrança (pago, pendente)
-- TOTAL: Valor total da parcela
-- DESCRICAO: Descrição da despesa
-- DATA_VENCIMENTO: Data de vencimento
-- NAO_PAGO: Valor pendente
-- PAGO: Valor pago
-- FORNECEDOR: Identificador do fornecedor
-- NOME: Nome do fornecedor
-- EMPRESA: Empresa
-
-3. CAZ_RECEBER (Contas a Receber)
-- ID: Identificador da parcela a receber
-- STATUS: Status da cobrança
-- TOTAL: Valor total da parcela
-- DESCRICAO: Descrição da receita
-- DATA_VENCIMENTO: Data de vencimento
-- NAO_PAGO: Valor pendente
-- PAGO: Valor recebido
-- CLIENTE_ID: Relaciona com CAZ_CLIENTES.ids
-- CLIENTE_NOME: Nome do cliente
-- EMPRESA: Empresa
-
-4. CAZ_PARCELAS (Detalhamento de Parcelas) - PRINCIPAL PARA DFC
-- ID: Identificador da parcela
-- STATUS: Status da parcela
-- VALOR_PAGO: Valor efetivamente pago
-- PERDA: Valor perdido (inadimplência)
-- NAO_PAGO: Valor pendente
-- DATA_VENCIMENTO: Data da parcela
-- DESCRICAO: Descrição do evento financeiro
-- METODO_PAGAMENTO: Forma de pagamento
-- VALOR_BRUTO: Valor total inicial
-- VALOR_LIQUIDO: Valor após descontos
-- ID_EVENTO: Identificador do evento financeiro
-- TIPO_EVENTO: Tipo financeiro (RECEITA/DESPESA)
-- ID_CONTA_FINANCEIRA: Origem/destino da transação
-- NOME_CONTA_FINANCEIRA: Nome da conta financeira
-- ID_CLIENTE: Relaciona com CAZ_CLIENTES.ids
-- URL_COBRANCA: Link do boleto
-
-TABELAS CLICKUP (CUP_):
-
-5. CUP_CLIENTES (Clientes do ClickUp)
-- NOME: Nome do cliente
-- CNPJ: Chave de integração com Conta Azul
-- STATUS: Status operacional do cliente
-- TELEFONE: Telefone/WhatsApp
-- RESPONSAVEL: CS responsável pelo atendimento
-- CLUSTER: Segmentação/tipo de cliente
-- TASK_ID: ID do cliente no ClickUp (relaciona com CUP_CONTRATOS)
-- RESPONSAVEL_GERAL: Responsável geral
-
-6. CUP_CONTRATOS (Contratos no ClickUp)
-- SERVICO: Tipo de serviço contratado
-- STATUS: Status do contrato (ativo, pausado, cancelado)
-- VALORR: Valor recorrente (mensal)
-- VALORP: Valor pontual (cobrança única)
-- ID_TASK: Relaciona com CUP_CLIENTES.task_id
-- ID_SUBTASK: Identificador único do contrato
-- DATA_INICIO: Data de início do contrato
-- DATA_ENCERRAMENTO: Data de encerramento
-- SQUAD: Squad responsável
-
-=== RELACIONAMENTOS ===
-
-- CAZ_RECEBER.id = CAZ_PARCELAS.id (CAZ_PARCELAS é o detalhamento de cada registro de CAZ_RECEBER)
-- CAZ_RECEBER.cliente_id = CAZ_CLIENTES.ids
-- CAZ_PARCELAS.id_cliente = CAZ_CLIENTES.ids
-- CAZ_CLIENTES.cnpj = CUP_CLIENTES.cnpj (integração entre sistemas)
-- CUP_CONTRATOS.id_task = CUP_CLIENTES.task_id
-
-NOTAS IMPORTANTES:
-- O CNPJ é a principal chave de integração entre Conta Azul e ClickUp.
-- A coluna "ids" de CAZ_CLIENTES é a principal chave de relacionamento interno no Conta Azul.
-- CAZ_PARCELAS contém o detalhamento financeiro de cada conta a receber/pagar, incluindo método de pagamento, valores bruto/líquido e status.
-
-=== DADOS FINANCEIROS DO PERÍODO ===
+=== DADOS AGREGADOS DO PERÍODO (já calculados) ===
 ${JSON.stringify(contextData, null, 2)}
 
-=== INSTRUÇÕES ===
-- Responda perguntas sobre o fluxo de caixa de forma clara e objetiva em português brasileiro
-- Use os dados fornecidos para embasar suas respostas
-- Quando o usuário perguntar sobre clientes, saiba que os dados vêm de CAZ_CLIENTES/CUP_CLIENTES
-- Quando perguntar sobre parcelas ou valores, use CAZ_PARCELAS
-- Quando perguntar sobre contratos ou serviços, use CUP_CONTRATOS
-- Formate valores em reais brasileiros (R$)
-- Seja conciso mas informativo
-- Se a pergunta não puder ser respondida com os dados disponíveis, explique o que está faltando
-- Quando mencionar categorias ou meses específicos, cite os valores exatos dos dados
+=== SUA TAREFA ===
+Analise a pergunta do usuário e decida:
+1. Se pode responder usando apenas os DADOS AGREGADOS acima, responda diretamente
+2. Se precisa de dados mais específicos do banco (ex: qual foi a maior despesa individual, detalhes de um cliente específico, etc), gere uma query SQL
 
 Responda APENAS com JSON válido:
 {
-  "resposta": "Sua resposta detalhada aqui",
-  "dadosReferenciados": {
-    "categorias": ["categoria1", "categoria2"],
-    "meses": ["2024-01", "2024-02"],
-    "valores": ["R$ 10.000,00", "R$ 20.000,00"]
-  }
-}`;
+  "precisaQuery": true ou false,
+  "query": "SELECT ... (apenas se precisaQuery=true, senão null)",
+  "motivoQuery": "explicação de por que precisa da query (apenas se precisaQuery=true)",
+  "respostaFinal": "sua resposta completa (apenas se precisaQuery=false)"
+}
 
-  const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
-    { role: "system", content: systemPrompt }
+REGRAS PARA QUERIES:
+- Use sempre o schema staging. (ex: staging.caz_parcelas)
+- Para filtrar mês: TO_CHAR(data_vencimento::date, 'YYYY-MM') = 'YYYY-MM'
+- Para despesas: tipo_evento = 'EXPENSE'
+- Para receitas: tipo_evento = 'INCOME'
+- Limite resultados: LIMIT 10 ou LIMIT 20
+- Ordene adequadamente: ORDER BY valor_pago DESC para maiores valores
+- Use aliases para clareza: AS valor, AS descricao, etc.`;
+
+  const analysisMessages: { role: "system" | "user" | "assistant"; content: string }[] = [
+    { role: "system", content: analysisPrompt }
   ];
 
   historico.forEach(msg => {
-    messages.push({ role: msg.role, content: msg.content });
+    analysisMessages.push({ role: msg.role, content: msg.content });
   });
 
-  messages.push({ role: "user", content: pergunta });
+  analysisMessages.push({ role: "user", content: pergunta });
 
   try {
-    const response = await openai.chat.completions.create({
+    console.log("[DFC Chat] Analyzing question:", pergunta);
+    
+    const analysisResponse = await openai.chat.completions.create({
       model: "gpt-5",
-      messages,
+      messages: analysisMessages,
       response_format: { type: "json_object" },
       max_completion_tokens: 2048,
     });
 
-    const content = response.choices[0].message.content;
-    if (!content) {
-      throw new Error("Resposta vazia da API");
+    const analysisContent = analysisResponse.choices[0].message.content;
+    if (!analysisContent) {
+      throw new Error("Resposta vazia da análise");
     }
 
-    return JSON.parse(content) as DfcChatResponse;
+    const analysis = JSON.parse(analysisContent) as {
+      precisaQuery: boolean;
+      query?: string;
+      motivoQuery?: string;
+      respostaFinal?: string;
+    };
+
+    console.log("[DFC Chat] Analysis result:", { precisaQuery: analysis.precisaQuery, hasQuery: !!analysis.query });
+
+    // Se não precisa de query, retorna a resposta direta
+    if (!analysis.precisaQuery && analysis.respostaFinal) {
+      return {
+        resposta: analysis.respostaFinal,
+        dadosReferenciados: undefined
+      };
+    }
+
+    // ETAPA 2: Executar query se necessário
+    if (analysis.precisaQuery && analysis.query) {
+      console.log("[DFC Chat] Executing query:", analysis.query);
+      
+      const queryResult = await executeSecureQuery(analysis.query);
+      
+      if (!queryResult.success) {
+        console.error("[DFC Chat] Query failed:", queryResult.error);
+        // Tentar responder mesmo sem a query
+        return {
+          resposta: `Não consegui executar a consulta no banco de dados: ${queryResult.error}. Com base nos dados agregados disponíveis, posso informar que ${analysis.motivoQuery || 'os dados detalhados não estão acessíveis no momento'}.`,
+          dadosReferenciados: undefined
+        };
+      }
+
+      // ETAPA 3: Gerar resposta final com os dados da query
+      const finalPrompt = `Você é um assistente financeiro especializado em DFC para uma agência de marketing digital brasileira.
+
+O usuário perguntou: "${pergunta}"
+
+Executei a seguinte query no banco de dados:
+${analysis.query}
+
+Resultado da query (${queryResult.rowCount} registros):
+${JSON.stringify(queryResult.data?.slice(0, 20), null, 2)}
+
+${queryResult.rowCount && queryResult.rowCount > 20 ? `(Mostrando apenas os 20 primeiros de ${queryResult.rowCount} registros)` : ''}
+
+=== DADOS AGREGADOS DE CONTEXTO ===
+${JSON.stringify(contextData, null, 2)}
+
+=== INSTRUÇÕES ===
+- Responda de forma clara e objetiva em português brasileiro
+- Formate valores em reais: R$ 1.234,56
+- Cite os dados específicos encontrados
+- Se os resultados forem vazios, explique isso ao usuário
+
+Responda APENAS com JSON válido:
+{
+  "resposta": "Sua resposta detalhada aqui baseada nos resultados da query",
+  "dadosReferenciados": {
+    "categorias": ["categoria1"],
+    "meses": ["2025-11"],
+    "valores": ["R$ 10.000,00"]
+  }
+}`;
+
+      const finalResponse = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [{ role: "system", content: finalPrompt }],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 2048,
+      });
+
+      const finalContent = finalResponse.choices[0].message.content;
+      if (!finalContent) {
+        throw new Error("Resposta vazia da API final");
+      }
+
+      const result = JSON.parse(finalContent) as DfcChatResponse;
+      result.queryExecutada = analysis.query;
+      return result;
+    }
+
+    // Fallback
+    return {
+      resposta: analysis.respostaFinal || "Não consegui processar sua pergunta. Por favor, tente reformulá-la.",
+      dadosReferenciados: undefined
+    };
+
   } catch (error) {
     console.error("[DFC Chat] Error:", error);
     return {
-      resposta: "Desculpe, não consegui processar sua pergunta. Por favor, tente novamente ou reformule sua pergunta.",
+      resposta: "Desculpe, ocorreu um erro ao processar sua pergunta. Por favor, tente novamente.",
       dadosReferenciados: undefined
     };
   }
