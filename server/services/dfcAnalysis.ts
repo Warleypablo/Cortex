@@ -178,11 +178,11 @@ export interface DfcChatResponse {
 
 // Constante com a estrutura do banco de dados
 const DATABASE_SCHEMA = `
-=== ESTRUTURA DO BANCO DE DADOS (schema: staging) ===
+=== ESTRUTURA DO BANCO DE DADOS (schema: public) ===
 
-TABELAS CONTA AZUL (staging.caz_*):
+TABELAS CONTA AZUL (caz_*):
 
-1. staging.caz_clientes (Clientes do Conta Azul)
+1. caz_clientes (Clientes do Conta Azul)
 - ids: Chave primária para relacionamento interno (TEXT)
 - nome: Nome cadastrado do cliente (TEXT)
 - cnpj: Identificador único, chave de integração com ClickUp (TEXT)
@@ -190,7 +190,7 @@ TABELAS CONTA AZUL (staging.caz_*):
 - empresa: Empresa onde foi cadastrado (TEXT)
 - created_at: Data de criação (TEXT)
 
-2. staging.caz_pagar (Contas a Pagar)
+2. caz_pagar (Contas a Pagar)
 - id: Identificador da parcela a pagar (TEXT)
 - status: Status da cobrança - 'ACQUITTED' (pago), 'PENDING' (pendente) (TEXT)
 - total: Valor total da parcela (NUMERIC)
@@ -202,7 +202,7 @@ TABELAS CONTA AZUL (staging.caz_*):
 - nome: Nome do fornecedor (TEXT)
 - empresa: Empresa (TEXT)
 
-3. staging.caz_receber (Contas a Receber)
+3. caz_receber (Contas a Receber)
 - id: Identificador da parcela a receber (TEXT)
 - status: Status da cobrança (TEXT)
 - total: Valor total da parcela (NUMERIC)
@@ -214,7 +214,7 @@ TABELAS CONTA AZUL (staging.caz_*):
 - cliente_nome: Nome do cliente (TEXT)
 - empresa: Empresa (TEXT)
 
-4. staging.caz_parcelas (Detalhamento de Parcelas) - PRINCIPAL PARA DFC
+4. caz_parcelas (Detalhamento de Parcelas) - PRINCIPAL PARA DFC
 - id: Identificador da parcela (TEXT)
 - status: Status da parcela - 'ACQUITTED' (pago), 'PENDING' (pendente) (TEXT)
 - valor_pago: Valor efetivamente pago (NUMERIC)
@@ -232,9 +232,9 @@ TABELAS CONTA AZUL (staging.caz_*):
 - id_cliente: Relaciona com caz_clientes.ids (TEXT)
 - url_cobranca: Link do boleto (TEXT)
 
-TABELAS CLICKUP (staging.cup_*):
+TABELAS CLICKUP (cup_*):
 
-5. staging.cup_clientes (Clientes do ClickUp)
+5. cup_clientes (Clientes do ClickUp)
 - nome: Nome do cliente (TEXT)
 - cnpj: Chave de integração com Conta Azul (TEXT)
 - status: Status operacional do cliente (TEXT)
@@ -244,7 +244,7 @@ TABELAS CLICKUP (staging.cup_*):
 - task_id: ID do cliente no ClickUp (TEXT)
 - responsavel_geral: Responsável geral (TEXT)
 
-6. staging.cup_contratos (Contratos no ClickUp)
+6. cup_contratos (Contratos no ClickUp)
 - servico: Tipo de serviço contratado (TEXT)
 - status: Status do contrato (ativo, pausado, cancelado) (TEXT)
 - valorr: Valor recorrente mensal (NUMERIC)
@@ -265,7 +265,7 @@ TABELAS CLICKUP (staging.cup_*):
 
 === NOTAS IMPORTANTES PARA QUERIES ===
 
-1. Use sempre o schema 'staging.' antes do nome das tabelas: staging.caz_parcelas, staging.caz_pagar, etc.
+1. NÃO use schema - as tabelas estão no schema public (padrão). Use apenas o nome da tabela: caz_parcelas, caz_pagar, etc.
 2. Para filtrar por mês, use: TO_CHAR(data_vencimento::date, 'YYYY-MM') = '2025-11'
 3. Para DESPESAS: tipo_evento = 'EXPENSE' (em caz_parcelas)
 4. Para RECEITAS: tipo_evento = 'INCOME' (em caz_parcelas)
@@ -345,7 +345,7 @@ Responda APENAS com JSON válido:
 }
 
 REGRAS PARA QUERIES:
-- Use sempre o schema staging. (ex: staging.caz_parcelas)
+- NÃO use schema - as tabelas estão no public (padrão). Use apenas: caz_parcelas, caz_pagar, etc.
 - Para filtrar mês: TO_CHAR(data_vencimento::date, 'YYYY-MM') = 'YYYY-MM'
 - Para despesas: tipo_evento = 'EXPENSE'
 - Para receitas: tipo_evento = 'INCOME'
