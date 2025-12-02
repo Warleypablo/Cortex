@@ -216,7 +216,7 @@ TABELAS CONTA AZUL (caz_*):
 
 4. caz_parcelas (Detalhamento de Parcelas) - PRINCIPAL PARA DFC
 - id: Identificador da parcela (TEXT)
-- status: Status da parcela - 'ACQUITTED' (pago), 'PENDING' (pendente) (TEXT)
+- status: Status da parcela - 'QUITADO' (pago), 'PENDENTE' (pendente) (TEXT)
 - valor_pago: Valor efetivamente pago (NUMERIC)
 - perda: Valor perdido - inadimplência (NUMERIC)
 - nao_pago: Valor pendente (NUMERIC)
@@ -226,7 +226,7 @@ TABELAS CONTA AZUL (caz_*):
 - valor_bruto: Valor total inicial (NUMERIC)
 - valor_liquido: Valor após descontos (NUMERIC)
 - id_evento: Identificador do evento financeiro (TEXT)
-- tipo_evento: Tipo financeiro - 'INCOME' (receita), 'EXPENSE' (despesa) (TEXT)
+- tipo_evento: Tipo financeiro - 'RECEITA' (receita), 'DESPESA' (despesa) (TEXT)
 - id_conta_financeira: Origem/destino da transação (TEXT)
 - nome_conta_financeira: Nome da conta financeira (TEXT)
 - id_cliente: Relaciona com caz_clientes.ids (TEXT)
@@ -267,11 +267,12 @@ TABELAS CLICKUP (cup_*):
 
 1. NÃO use schema - as tabelas estão no schema public (padrão). Use apenas o nome da tabela: caz_parcelas, caz_pagar, etc.
 2. Para filtrar por mês, use: TO_CHAR(data_vencimento::date, 'YYYY-MM') = '2025-11'
-3. Para DESPESAS: tipo_evento = 'EXPENSE' (em caz_parcelas)
-4. Para RECEITAS: tipo_evento = 'INCOME' (em caz_parcelas)
-5. Use COALESCE para valores nulos: COALESCE(valor_pago, 0)
-6. Limite resultados com LIMIT para evitar retornos muito grandes
-7. Ordene por valor decrescente para encontrar maiores: ORDER BY valor_pago DESC
+3. Para DESPESAS: tipo_evento = 'DESPESA' (em caz_parcelas) - ATENÇÃO: está em português!
+4. Para RECEITAS: tipo_evento = 'RECEITA' (em caz_parcelas) - ATENÇÃO: está em português!
+5. Para status pago: status = 'QUITADO' - ATENÇÃO: está em português!
+6. Use COALESCE para valores nulos: COALESCE(valor_pago, 0)
+7. Limite resultados com LIMIT para evitar retornos muito grandes
+8. Ordene por valor decrescente para encontrar maiores: ORDER BY valor_pago DESC
 `;
 
 export async function chatWithDfc(
@@ -347,8 +348,11 @@ Responda APENAS com JSON válido:
 REGRAS PARA QUERIES:
 - NÃO use schema - as tabelas estão no public (padrão). Use apenas: caz_parcelas, caz_pagar, etc.
 - Para filtrar mês: TO_CHAR(data_vencimento::date, 'YYYY-MM') = 'YYYY-MM'
-- Para despesas: tipo_evento = 'EXPENSE'
-- Para receitas: tipo_evento = 'INCOME'
+- IMPORTANTE: Os valores estão em PORTUGUÊS:
+  - Para despesas: tipo_evento = 'DESPESA'
+  - Para receitas: tipo_evento = 'RECEITA'
+  - Para status pago: status = 'QUITADO'
+  - Para status pendente: status = 'PENDENTE'
 - Limite resultados: LIMIT 10 ou LIMIT 20
 - Ordene adequadamente: ORDER BY valor_pago DESC para maiores valores
 - Use aliases para clareza: AS valor, AS descricao, etc.`;
