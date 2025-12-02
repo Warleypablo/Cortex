@@ -5392,6 +5392,11 @@ export class DbStorage implements IStorage {
       parcelaMaisAntiga: Date;
       diasAtrasoMax: number;
       empresa: string;
+      cnpj: string | null;
+      statusClickup: string | null;
+      responsavel: string | null;
+      cluster: string | null;
+      servicos: string | null;
     }[];
   }> {
     const hoje = new Date();
@@ -5400,10 +5405,10 @@ export class DbStorage implements IStorage {
     let whereDataInicio = '';
     let whereDataFim = '';
     if (dataInicio) {
-      whereDataInicio = ` AND data_vencimento >= '${dataInicio}'`;
+      whereDataInicio = ` AND cp.data_vencimento >= '${dataInicio}'`;
     }
     if (dataFim) {
-      whereDataFim = ` AND data_vencimento <= '${dataFim}'`;
+      whereDataFim = ` AND cp.data_vencimento <= '${dataFim}'`;
     }
     
     let orderByClause = 'valor_total DESC';
@@ -5414,24 +5419,50 @@ export class DbStorage implements IStorage {
     }
     
     const result = await db.execute(sql.raw(`
+      WITH inadimplencia AS (
+        SELECT 
+          cp.id_cliente,
+          MAX(cp.descricao) as nome_cliente,
+          COALESCE(SUM(cp.nao_pago::numeric), 0) as valor_total,
+          COUNT(*) as quantidade_parcelas,
+          MIN(cp.data_vencimento) as parcela_mais_antiga,
+          MAX('${dataHoje}'::date - cp.data_vencimento::date) as dias_atraso_max,
+          MAX(cp.empresa) as empresa
+        FROM caz_parcelas cp
+        WHERE cp.tipo_evento = 'RECEITA'
+          AND cp.data_vencimento < '${dataHoje}'
+          AND cp.nao_pago::numeric > 0
+          AND cp.id_cliente IS NOT NULL
+          AND cp.id_cliente != ''
+          ${whereDataInicio}
+          ${whereDataFim}
+        GROUP BY cp.id_cliente
+        HAVING COALESCE(SUM(cp.nao_pago::numeric), 0) > 0
+      )
       SELECT 
-        id_cliente,
-        MAX(descricao) as nome_cliente,
-        COALESCE(SUM(nao_pago::numeric), 0) as valor_total,
-        COUNT(*) as quantidade_parcelas,
-        MIN(data_vencimento) as parcela_mais_antiga,
-        MAX('${dataHoje}'::date - data_vencimento::date) as dias_atraso_max,
-        MAX(empresa) as empresa
-      FROM caz_parcelas
-      WHERE tipo_evento = 'RECEITA'
-        AND data_vencimento < '${dataHoje}'
-        AND nao_pago::numeric > 0
-        AND id_cliente IS NOT NULL
-        AND id_cliente != ''
-        ${whereDataInicio}
-        ${whereDataFim}
-      GROUP BY id_cliente
-      HAVING COALESCE(SUM(nao_pago::numeric), 0) > 0
+        i.id_cliente,
+        COALESCE(cc.nome, i.nome_cliente) as nome_cliente,
+        i.valor_total,
+        i.quantidade_parcelas,
+        i.parcela_mais_antiga,
+        i.dias_atraso_max,
+        i.empresa,
+        caz.cnpj,
+        cc.status as status_clickup,
+        cc.responsavel,
+        cc.cluster,
+        (
+          SELECT string_agg(DISTINCT servico, ', ')
+          FROM cup_contratos
+          WHERE id_task = cc.task_id AND cc.task_id IS NOT NULL AND cc.task_id != ''
+        ) as servicos
+      FROM inadimplencia i
+      LEFT JOIN caz_clientes caz ON caz.ids::text = i.id_cliente::text 
+        AND COALESCE(caz.ids, '') != '' 
+        AND LENGTH(caz.ids) > 0
+      LEFT JOIN cup_clientes cc ON TRIM(cc.cnpj) = TRIM(caz.cnpj) 
+        AND COALESCE(caz.cnpj, '') != '' 
+        AND LENGTH(TRIM(caz.cnpj)) > 0
       ORDER BY ${orderByClause}
       LIMIT ${limite}
     `));
@@ -5444,6 +5475,11 @@ export class DbStorage implements IStorage {
       parcelaMaisAntiga: new Date(row.parcela_mais_antiga),
       diasAtrasoMax: parseInt(row.dias_atraso_max || '0'),
       empresa: row.empresa || '',
+      cnpj: row.cnpj || null,
+      statusClickup: row.status_clickup || null,
+      responsavel: row.responsavel || null,
+      cluster: row.cluster || null,
+      servicos: row.servicos || null,
     }));
     
     return { clientes };
