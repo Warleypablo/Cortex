@@ -776,6 +776,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============== INADIMPLÊNCIA ==============
+  
+  app.get("/api/inadimplencia/resumo", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const resumo = await storage.getInadimplenciaResumo(dataInicio, dataFim);
+      res.json(resumo);
+    } catch (error) {
+      console.error("[api] Error fetching inadimplencia resumo:", error);
+      res.status(500).json({ error: "Failed to fetch inadimplencia resumo" });
+    }
+  });
+
+  app.get("/api/inadimplencia/clientes", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const ordenarPor = (req.query.ordenarPor as 'valor' | 'diasAtraso' | 'nome') || 'valor';
+      const limite = parseInt(req.query.limite as string) || 100;
+      const clientes = await storage.getInadimplenciaClientes(dataInicio, dataFim, ordenarPor, limite);
+      res.json(clientes);
+    } catch (error) {
+      console.error("[api] Error fetching inadimplencia clientes:", error);
+      res.status(500).json({ error: "Failed to fetch inadimplencia clientes" });
+    }
+  });
+
+  app.get("/api/inadimplencia/cliente/:idCliente/parcelas", async (req, res) => {
+    try {
+      const idCliente = req.params.idCliente;
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const parcelas = await storage.getInadimplenciaDetalheParcelas(idCliente, dataInicio, dataFim);
+      res.json(parcelas);
+    } catch (error) {
+      console.error("[api] Error fetching inadimplencia parcelas:", error);
+      res.status(500).json({ error: "Failed to fetch inadimplencia parcelas" });
+    }
+  });
+
+  app.get("/api/inadimplencia/por-empresa", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const empresas = await storage.getInadimplenciaPorEmpresa(dataInicio, dataFim);
+      res.json(empresas);
+    } catch (error) {
+      console.error("[api] Error fetching inadimplencia por empresa:", error);
+      res.status(500).json({ error: "Failed to fetch inadimplencia por empresa" });
+    }
+  });
+
   app.get("/api/analytics/cohort-retention", async (req, res) => {
     try {
       const filters: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string } = {};

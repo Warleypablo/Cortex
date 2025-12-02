@@ -5226,6 +5226,336 @@ export class DbStorage implements IStorage {
       taxaCumprimentoPrazo,
     };
   }
+
+  // ============== INADIMPLÊNCIA ==============
+  
+  async getInadimplenciaResumo(dataInicio?: string, dataFim?: string): Promise<{
+    totalInadimplente: number;
+    quantidadeClientes: number;
+    quantidadeParcelas: number;
+    ticketMedio: number;
+    valorUltimos45Dias: number;
+    quantidadeUltimos45Dias: number;
+    faixas: {
+      ate30dias: { valor: number; quantidade: number; percentual: number };
+      de31a60dias: { valor: number; quantidade: number; percentual: number };
+      de61a90dias: { valor: number; quantidade: number; percentual: number };
+      acima90dias: { valor: number; quantidade: number; percentual: number };
+    };
+    evolucaoMensal: { mes: string; mesLabel: string; valor: number; quantidade: number }[];
+  }> {
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    const data45DiasAtras = new Date(hoje.getTime() - 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    // Filtros de data
+    let whereDataInicio = '';
+    let whereDataFim = '';
+    if (dataInicio) {
+      whereDataInicio = ` AND data_vencimento >= '${dataInicio}'`;
+    }
+    if (dataFim) {
+      whereDataFim = ` AND data_vencimento <= '${dataFim}'`;
+    }
+    
+    // Resumo geral
+    const resumoResult = await db.execute(sql.raw(`
+      SELECT 
+        COALESCE(SUM(nao_pago::numeric), 0) as total_inadimplente,
+        COUNT(DISTINCT id_cliente) as quantidade_clientes,
+        COUNT(*) as quantidade_parcelas
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_vencimento < '${dataHoje}'
+        AND nao_pago::numeric > 0
+        ${whereDataInicio}
+        ${whereDataFim}
+    `));
+    
+    const totalInadimplente = parseFloat((resumoResult.rows[0] as any)?.total_inadimplente || '0');
+    const quantidadeClientes = parseInt((resumoResult.rows[0] as any)?.quantidade_clientes || '0');
+    const quantidadeParcelas = parseInt((resumoResult.rows[0] as any)?.quantidade_parcelas || '0');
+    const ticketMedio = quantidadeClientes > 0 ? totalInadimplente / quantidadeClientes : 0;
+    
+    // Valor últimos 45 dias
+    const ultimos45Result = await db.execute(sql.raw(`
+      SELECT 
+        COALESCE(SUM(nao_pago::numeric), 0) as valor,
+        COUNT(*) as quantidade
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_vencimento < '${dataHoje}'
+        AND data_vencimento >= '${data45DiasAtras}'
+        AND nao_pago::numeric > 0
+        ${whereDataInicio}
+        ${whereDataFim}
+    `));
+    
+    const valorUltimos45Dias = parseFloat((ultimos45Result.rows[0] as any)?.valor || '0');
+    const quantidadeUltimos45Dias = parseInt((ultimos45Result.rows[0] as any)?.quantidade || '0');
+    
+    // Faixas de atraso
+    const faixasResult = await db.execute(sql.raw(`
+      SELECT 
+        CASE 
+          WHEN ('${dataHoje}'::date - data_vencimento::date) BETWEEN 1 AND 30 THEN 'ate30dias'
+          WHEN ('${dataHoje}'::date - data_vencimento::date) BETWEEN 31 AND 60 THEN 'de31a60dias'
+          WHEN ('${dataHoje}'::date - data_vencimento::date) BETWEEN 61 AND 90 THEN 'de61a90dias'
+          ELSE 'acima90dias'
+        END as faixa,
+        COALESCE(SUM(nao_pago::numeric), 0) as valor,
+        COUNT(*) as quantidade
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_vencimento < '${dataHoje}'
+        AND nao_pago::numeric > 0
+        ${whereDataInicio}
+        ${whereDataFim}
+      GROUP BY 
+        CASE 
+          WHEN ('${dataHoje}'::date - data_vencimento::date) BETWEEN 1 AND 30 THEN 'ate30dias'
+          WHEN ('${dataHoje}'::date - data_vencimento::date) BETWEEN 31 AND 60 THEN 'de31a60dias'
+          WHEN ('${dataHoje}'::date - data_vencimento::date) BETWEEN 61 AND 90 THEN 'de61a90dias'
+          ELSE 'acima90dias'
+        END
+    `));
+    
+    const faixasMap: Record<string, { valor: number; quantidade: number }> = {
+      ate30dias: { valor: 0, quantidade: 0 },
+      de31a60dias: { valor: 0, quantidade: 0 },
+      de61a90dias: { valor: 0, quantidade: 0 },
+      acima90dias: { valor: 0, quantidade: 0 },
+    };
+    
+    for (const row of faixasResult.rows as any[]) {
+      const faixa = row.faixa as string;
+      if (faixasMap[faixa]) {
+        faixasMap[faixa].valor = parseFloat(row.valor || '0');
+        faixasMap[faixa].quantidade = parseInt(row.quantidade || '0');
+      }
+    }
+    
+    const faixas = {
+      ate30dias: { ...faixasMap.ate30dias, percentual: totalInadimplente > 0 ? (faixasMap.ate30dias.valor / totalInadimplente) * 100 : 0 },
+      de31a60dias: { ...faixasMap.de31a60dias, percentual: totalInadimplente > 0 ? (faixasMap.de31a60dias.valor / totalInadimplente) * 100 : 0 },
+      de61a90dias: { ...faixasMap.de61a90dias, percentual: totalInadimplente > 0 ? (faixasMap.de61a90dias.valor / totalInadimplente) * 100 : 0 },
+      acima90dias: { ...faixasMap.acima90dias, percentual: totalInadimplente > 0 ? (faixasMap.acima90dias.valor / totalInadimplente) * 100 : 0 },
+    };
+    
+    // Evolução mensal (últimos 12 meses)
+    const evolucaoResult = await db.execute(sql.raw(`
+      SELECT 
+        TO_CHAR(data_vencimento, 'YYYY-MM') as mes,
+        COALESCE(SUM(nao_pago::numeric), 0) as valor,
+        COUNT(*) as quantidade
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_vencimento < '${dataHoje}'
+        AND data_vencimento >= '${dataHoje}'::date - INTERVAL '12 months'
+        AND nao_pago::numeric > 0
+        ${whereDataInicio}
+        ${whereDataFim}
+      GROUP BY TO_CHAR(data_vencimento, 'YYYY-MM')
+      ORDER BY mes
+    `));
+    
+    const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const evolucaoMensal = (evolucaoResult.rows as any[]).map(row => {
+      const [ano, mes] = (row.mes || '').split('-');
+      const mesIndex = parseInt(mes) - 1;
+      return {
+        mes: row.mes,
+        mesLabel: `${mesesNomes[mesIndex] || mes}/${ano?.slice(2)}`,
+        valor: parseFloat(row.valor || '0'),
+        quantidade: parseInt(row.quantidade || '0'),
+      };
+    });
+    
+    return {
+      totalInadimplente,
+      quantidadeClientes,
+      quantidadeParcelas,
+      ticketMedio,
+      valorUltimos45Dias,
+      quantidadeUltimos45Dias,
+      faixas,
+      evolucaoMensal,
+    };
+  }
+
+  async getInadimplenciaClientes(dataInicio?: string, dataFim?: string, ordenarPor: 'valor' | 'diasAtraso' | 'nome' = 'valor', limite: number = 100): Promise<{
+    clientes: {
+      idCliente: string;
+      nomeCliente: string;
+      valorTotal: number;
+      quantidadeParcelas: number;
+      parcelaMaisAntiga: Date;
+      diasAtrasoMax: number;
+      empresa: string;
+    }[];
+  }> {
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    let whereDataInicio = '';
+    let whereDataFim = '';
+    if (dataInicio) {
+      whereDataInicio = ` AND data_vencimento >= '${dataInicio}'`;
+    }
+    if (dataFim) {
+      whereDataFim = ` AND data_vencimento <= '${dataFim}'`;
+    }
+    
+    let orderByClause = 'valor_total DESC';
+    if (ordenarPor === 'diasAtraso') {
+      orderByClause = 'dias_atraso_max DESC';
+    } else if (ordenarPor === 'nome') {
+      orderByClause = 'nome_cliente ASC';
+    }
+    
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        id_cliente,
+        MAX(descricao) as nome_cliente,
+        COALESCE(SUM(nao_pago::numeric), 0) as valor_total,
+        COUNT(*) as quantidade_parcelas,
+        MIN(data_vencimento) as parcela_mais_antiga,
+        MAX('${dataHoje}'::date - data_vencimento::date) as dias_atraso_max,
+        MAX(empresa) as empresa
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_vencimento < '${dataHoje}'
+        AND nao_pago::numeric > 0
+        AND id_cliente IS NOT NULL
+        AND id_cliente != ''
+        ${whereDataInicio}
+        ${whereDataFim}
+      GROUP BY id_cliente
+      HAVING COALESCE(SUM(nao_pago::numeric), 0) > 0
+      ORDER BY ${orderByClause}
+      LIMIT ${limite}
+    `));
+    
+    const clientes = (result.rows as any[]).map(row => ({
+      idCliente: row.id_cliente || '',
+      nomeCliente: row.nome_cliente || 'Cliente Desconhecido',
+      valorTotal: parseFloat(row.valor_total || '0'),
+      quantidadeParcelas: parseInt(row.quantidade_parcelas || '0'),
+      parcelaMaisAntiga: new Date(row.parcela_mais_antiga),
+      diasAtrasoMax: parseInt(row.dias_atraso_max || '0'),
+      empresa: row.empresa || '',
+    }));
+    
+    return { clientes };
+  }
+
+  async getInadimplenciaDetalheParcelas(idCliente: string, dataInicio?: string, dataFim?: string): Promise<{
+    parcelas: {
+      id: number;
+      descricao: string;
+      valorBruto: number;
+      naoPago: number;
+      dataVencimento: Date;
+      diasAtraso: number;
+      empresa: string;
+      status: string;
+    }[];
+  }> {
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    let whereDataInicio = '';
+    let whereDataFim = '';
+    if (dataInicio) {
+      whereDataInicio = ` AND data_vencimento >= '${dataInicio}'`;
+    }
+    if (dataFim) {
+      whereDataFim = ` AND data_vencimento <= '${dataFim}'`;
+    }
+    
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        id,
+        descricao,
+        valor_bruto,
+        nao_pago,
+        data_vencimento,
+        ('${dataHoje}'::date - data_vencimento::date) as dias_atraso,
+        empresa,
+        status
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_vencimento < '${dataHoje}'
+        AND nao_pago::numeric > 0
+        AND id_cliente = '${idCliente}'
+        ${whereDataInicio}
+        ${whereDataFim}
+      ORDER BY data_vencimento ASC
+    `));
+    
+    const parcelas = (result.rows as any[]).map(row => ({
+      id: parseInt(row.id),
+      descricao: row.descricao || '',
+      valorBruto: parseFloat(row.valor_bruto || '0'),
+      naoPago: parseFloat(row.nao_pago || '0'),
+      dataVencimento: new Date(row.data_vencimento),
+      diasAtraso: parseInt(row.dias_atraso || '0'),
+      empresa: row.empresa || '',
+      status: row.status || '',
+    }));
+    
+    return { parcelas };
+  }
+
+  async getInadimplenciaPorEmpresa(dataInicio?: string, dataFim?: string): Promise<{
+    empresas: {
+      empresa: string;
+      valorTotal: number;
+      quantidadeClientes: number;
+      quantidadeParcelas: number;
+      percentual: number;
+    }[];
+  }> {
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    let whereDataInicio = '';
+    let whereDataFim = '';
+    if (dataInicio) {
+      whereDataInicio = ` AND data_vencimento >= '${dataInicio}'`;
+    }
+    if (dataFim) {
+      whereDataFim = ` AND data_vencimento <= '${dataFim}'`;
+    }
+    
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        COALESCE(empresa, 'Não Definida') as empresa,
+        COALESCE(SUM(nao_pago::numeric), 0) as valor_total,
+        COUNT(DISTINCT id_cliente) as quantidade_clientes,
+        COUNT(*) as quantidade_parcelas
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_vencimento < '${dataHoje}'
+        AND nao_pago::numeric > 0
+        ${whereDataInicio}
+        ${whereDataFim}
+      GROUP BY COALESCE(empresa, 'Não Definida')
+      ORDER BY valor_total DESC
+    `));
+    
+    const totalGeral = (result.rows as any[]).reduce((sum, row) => sum + parseFloat(row.valor_total || '0'), 0);
+    
+    const empresas = (result.rows as any[]).map(row => ({
+      empresa: row.empresa,
+      valorTotal: parseFloat(row.valor_total || '0'),
+      quantidadeClientes: parseInt(row.quantidade_clientes || '0'),
+      quantidadeParcelas: parseInt(row.quantidade_parcelas || '0'),
+      percentual: totalGeral > 0 ? (parseFloat(row.valor_total || '0') / totalGeral) * 100 : 0,
+    }));
+    
+    return { empresas };
+  }
 }
 
 export const storage = new DbStorage();
