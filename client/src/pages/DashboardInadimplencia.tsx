@@ -686,48 +686,47 @@ export default function DashboardInadimplencia() {
       </div>
 
       {/* Filtro de Status */}
-      <div className="flex flex-wrap items-center gap-2" data-testid="filtro-status">
-        <Label className="text-sm text-muted-foreground mr-1">
-          <Filter className="h-4 w-4 inline mr-1" />
+      <div className="flex items-center gap-2" data-testid="filtro-status">
+        <Label className="text-sm text-muted-foreground flex items-center gap-1">
+          <Filter className="h-4 w-4" />
           Status:
         </Label>
-        <Button
-          variant={statusFiltro === "todos" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setStatusFiltro("todos")}
-          data-testid="filter-status-todos"
-        >
-          Todos
-        </Button>
-        {statusUnicos.map((status) => (
-          <Button
-            key={status}
-            variant={statusFiltro === status ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFiltro(status)}
-            data-testid={`filter-status-${status.toLowerCase().replace(/\s+/g, '-')}`}
-          >
-            <Badge variant={getStatusVariant(status)} className="mr-1.5 pointer-events-none">
-              {status}
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              ({clientesData?.clientes?.filter(c => c.statusClickup === status).length || 0})
-            </span>
-          </Button>
-        ))}
-        {clientesData?.clientes?.some(c => !c.statusClickup) && (
-          <Button
-            variant={statusFiltro === "sem-status" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFiltro("sem-status")}
-            data-testid="filter-status-sem-status"
-          >
-            <span className="text-muted-foreground">Sem Status</span>
-            <span className="text-xs text-muted-foreground ml-1.5">
-              ({clientesData?.clientes?.filter(c => !c.statusClickup).length || 0})
-            </span>
-          </Button>
-        )}
+        <Select value={statusFiltro} onValueChange={setStatusFiltro}>
+          <SelectTrigger className="w-56" data-testid="select-filtro-status">
+            <SelectValue placeholder="Selecione um status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos" data-testid="option-status-todos">
+              <span className="flex items-center gap-2">
+                Todos ({clientesData?.clientes?.length || 0})
+              </span>
+            </SelectItem>
+            {statusUnicos.map((status) => {
+              const count = clientesData?.clientes?.filter(c => c.statusClickup === status).length || 0;
+              const statusLower = status.toLowerCase();
+              const isAtivo = statusLower.includes("ativo") && !statusLower.includes("inativo") && !statusLower.includes("cancelado");
+              const isCancelado = statusLower.includes("cancelado") || statusLower.includes("cancelamento") || statusLower.includes("inativo");
+              const dotColor = isAtivo ? "bg-green-500" : isCancelado ? "bg-red-500" : "bg-blue-500";
+              
+              return (
+                <SelectItem key={status} value={status} data-testid={`option-status-${status.toLowerCase().replace(/\s+/g, '-')}`}>
+                  <span className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+                    {status} ({count})
+                  </span>
+                </SelectItem>
+              );
+            })}
+            {clientesData?.clientes?.some(c => !c.statusClickup) && (
+              <SelectItem value="sem-status" data-testid="option-status-sem-status">
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-gray-400" />
+                  Sem Status ({clientesData?.clientes?.filter(c => !c.statusClickup).length || 0})
+                </span>
+              </SelectItem>
+            )}
+          </SelectContent>
+        </Select>
       </div>
 
       <Card data-testid="card-tabela-clientes">
