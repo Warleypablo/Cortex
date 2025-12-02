@@ -7,6 +7,7 @@ import { isAuthenticated } from "./auth/middleware";
 import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole } from "./auth/userDb";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import { analyzeDfc } from "./services/dfcAnalysis";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== 'admin') {
@@ -1032,6 +1033,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching DFC data:", error);
       res.status(500).json({ error: "Failed to fetch DFC data" });
+    }
+  });
+
+  app.post("/api/dfc/analyze", async (req, res) => {
+    try {
+      const { dataInicio, dataFim } = req.body;
+      
+      if (dataInicio && !/^\d{4}-\d{2}-\d{2}$/.test(dataInicio)) {
+        return res.status(400).json({ error: "Invalid dataInicio parameter. Expected format: YYYY-MM-DD" });
+      }
+      
+      if (dataFim && !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+        return res.status(400).json({ error: "Invalid dataFim parameter. Expected format: YYYY-MM-DD" });
+      }
+
+      const dfcData = await storage.getDfc(dataInicio, dataFim);
+      
+      if (!dfcData.nodes || dfcData.nodes.length === 0) {
+        return res.status(400).json({ error: "Não há dados suficientes para análise no período selecionado" });
+      }
+
+      const analysis = await analyzeDfc(dfcData);
+      res.json(analysis);
+    } catch (error) {
+      console.error("[api] Error analyzing DFC data:", error);
+      res.status(500).json({ error: "Failed to analyze DFC data" });
     }
   });
 

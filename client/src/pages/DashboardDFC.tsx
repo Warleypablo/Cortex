@@ -1,18 +1,52 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { 
   Loader2, TrendingUp, TrendingDown, DollarSign, Calendar, ChevronRight, ChevronDown,
   Wallet, ArrowUpCircle, ArrowDownCircle, PiggyBank, BarChart3, Banknote, Receipt,
-  CircleDollarSign, Coins, CreditCard, LineChart, Target, Activity, Percent
+  CircleDollarSign, Coins, CreditCard, LineChart, Target, Activity, Percent,
+  Sparkles, AlertTriangle, Lightbulb, CheckCircle, X, BrainCircuit
 } from "lucide-react";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
 import type { DfcHierarchicalResponse, DfcNode, DfcParcela } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
+
+interface DfcInsight {
+  tipo: "anomalia" | "tendencia" | "oportunidade" | "alerta";
+  titulo: string;
+  descricao: string;
+  metricas: string[];
+  severidade: "baixa" | "media" | "alta";
+  categoria?: string;
+  mes?: string;
+}
+
+interface DfcAnalysisResult {
+  resumoExecutivo: string;
+  insights: DfcInsight[];
+  recomendacoes: string[];
+  metricas: {
+    margemMedia: number;
+    tendenciaReceitas: string;
+    tendenciaDespesas: string;
+    mesComMelhorResultado: string;
+    mesComPiorResultado: string;
+  };
+}
 
 type VisibleItem = 
   | { type: 'node'; node: DfcNode }
@@ -22,6 +56,22 @@ export default function DashboardDFC() {
   const [filterDataInicio, setFilterDataInicio] = useState<string>("2025-01-01");
   const [filterDataFim, setFilterDataFim] = useState<string>("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['RECEITAS', 'DESPESAS']));
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<DfcAnalysisResult | null>(null);
+
+  const analysisMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/dfc/analyze", {
+        dataInicio: filterDataInicio || undefined,
+        dataFim: filterDataFim || undefined,
+      });
+      return response.json();
+    },
+    onSuccess: (data: DfcAnalysisResult) => {
+      setAnalysisResult(data);
+      setAnalysisOpen(true);
+    },
+  });
 
   const { data: dfcData, isLoading } = useQuery<DfcHierarchicalResponse>({
     queryKey: ["/api/dfc", filterDataInicio, filterDataFim],
@@ -280,6 +330,24 @@ export default function DashboardDFC() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              onClick={() => analysisMutation.mutate()}
+              disabled={analysisMutation.isPending || isLoading || !dfcData?.nodes?.length}
+              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg"
+              data-testid="button-analise-ia"
+            >
+              {analysisMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Analisando...
+                </>
+              ) : (
+                <>
+                  <BrainCircuit className="w-4 h-4 mr-2" />
+                  Análise IA
+                </>
+              )}
+            </Button>
             <Badge variant="outline" className="px-3 py-1.5 text-sm font-medium bg-green-500/10 text-green-600 border-green-500/30">
               <ArrowUpCircle className="w-4 h-4 mr-1.5" />
               Entradas
@@ -291,6 +359,140 @@ export default function DashboardDFC() {
           </div>
         </div>
       </div>
+
+      <Dialog open={analysisOpen} onOpenChange={setAnalysisOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-500/20">
+                <BrainCircuit className="w-5 h-5 text-violet-600" />
+              </div>
+              Análise Inteligente do DFC
+            </DialogTitle>
+            <DialogDescription>
+              Insights gerados por IA para o período de {filterDataInicio || "início"} até {filterDataFim || "hoje"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {analysisResult && (
+            <ScrollArea className="flex-1 pr-4">
+              <div className="space-y-6 pb-4">
+                <Card className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 border-violet-200 dark:border-violet-800">
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold text-violet-900 dark:text-violet-100 mb-2 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      Resumo Executivo
+                    </h3>
+                    <p className="text-sm text-violet-800 dark:text-violet-200 leading-relaxed">
+                      {analysisResult.resumoExecutivo}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-lg bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Margem Média</p>
+                    <p className="text-lg font-bold">{analysisResult.metricas.margemMedia.toFixed(1)}%</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Tendência Receitas</p>
+                    <p className={`text-lg font-bold flex items-center justify-center gap-1 ${analysisResult.metricas.tendenciaReceitas === 'crescente' ? 'text-green-600' : 'text-red-600'}`}>
+                      {analysisResult.metricas.tendenciaReceitas === 'crescente' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                      {analysisResult.metricas.tendenciaReceitas}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Melhor Mês</p>
+                    <p className="text-lg font-bold text-green-600">{analysisResult.metricas.mesComMelhorResultado}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Pior Mês</p>
+                    <p className="text-lg font-bold text-red-600">{analysisResult.metricas.mesComPiorResultado}</p>
+                  </div>
+                </div>
+
+                {analysisResult.insights.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-amber-500" />
+                      Insights Identificados
+                    </h3>
+                    <div className="space-y-2">
+                      {analysisResult.insights.map((insight, idx) => (
+                        <Card key={idx} className={`border-l-4 ${
+                          insight.tipo === 'anomalia' ? 'border-l-red-500 bg-red-50/50 dark:bg-red-950/20' :
+                          insight.tipo === 'tendencia' ? 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20' :
+                          insight.tipo === 'oportunidade' ? 'border-l-green-500 bg-green-50/50 dark:bg-green-950/20' :
+                          'border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
+                        }`}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <div className={`p-1.5 rounded-lg mt-0.5 ${
+                                insight.tipo === 'anomalia' ? 'bg-red-500/20 text-red-600' :
+                                insight.tipo === 'tendencia' ? 'bg-blue-500/20 text-blue-600' :
+                                insight.tipo === 'oportunidade' ? 'bg-green-500/20 text-green-600' :
+                                'bg-amber-500/20 text-amber-600'
+                              }`}>
+                                {insight.tipo === 'anomalia' && <AlertTriangle className="w-4 h-4" />}
+                                {insight.tipo === 'tendencia' && <TrendingUp className="w-4 h-4" />}
+                                {insight.tipo === 'oportunidade' && <Lightbulb className="w-4 h-4" />}
+                                {insight.tipo === 'alerta' && <AlertTriangle className="w-4 h-4" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-medium text-sm">{insight.titulo}</h4>
+                                  <Badge variant="outline" className={`text-xs ${
+                                    insight.severidade === 'alta' ? 'border-red-300 text-red-600' :
+                                    insight.severidade === 'media' ? 'border-amber-300 text-amber-600' :
+                                    'border-green-300 text-green-600'
+                                  }`}>
+                                    {insight.severidade}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">{insight.descricao}</p>
+                                {insight.metricas.length > 0 && (
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    {insight.metricas.map((m, midx) => (
+                                      <Badge key={midx} variant="secondary" className="text-xs">{m}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {analysisResult.recomendacoes.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      Recomendações
+                    </h3>
+                    <Card>
+                      <CardContent className="p-4">
+                        <ul className="space-y-2">
+                          {analysisResult.recomendacoes.map((rec, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-sm">
+                              <div className="w-5 h-5 rounded-full bg-green-500/20 text-green-600 flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold">
+                                {idx + 1}
+                              </div>
+                              <span>{rec}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className="flex-1 overflow-auto p-6 bg-gradient-to-b from-muted/20 to-background">
         <div className="max-w-[1800px] mx-auto space-y-6">
