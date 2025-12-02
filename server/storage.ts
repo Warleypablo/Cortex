@@ -5399,129 +5399,82 @@ export class DbStorage implements IStorage {
       servicos: string | null;
     }[];
   }> {
-    try {
-      const hoje = new Date();
-      const dataHoje = hoje.toISOString().split('T')[0];
-      
-      let whereDataInicio = '';
-      let whereDataFim = '';
-      if (dataInicio) {
-        whereDataInicio = ` AND cp.data_vencimento >= '${dataInicio}'`;
-      }
-      if (dataFim) {
-        whereDataFim = ` AND cp.data_vencimento <= '${dataFim}'`;
-      }
-      
-      let orderByClause = 'valor_total DESC';
-      if (ordenarPor === 'diasAtraso') {
-        orderByClause = 'dias_atraso_max DESC';
-      } else if (ordenarPor === 'nome') {
-        orderByClause = 'nome_cliente ASC';
-      }
-      
-      console.log('[DEBUG] getInadimplenciaClientes - Iniciando Query 1');
-      
-      const parcelasQuery = `
-        SELECT 
-          cp.id_cliente,
-          MAX(cp.descricao) as nome_cliente,
-          COALESCE(SUM(cp.nao_pago::numeric), 0) as valor_total,
-          COUNT(*) as quantidade_parcelas,
-          MIN(cp.data_vencimento) as parcela_mais_antiga,
-          MAX('${dataHoje}'::date - cp.data_vencimento::date) as dias_atraso_max,
-          MAX(cp.empresa) as empresa
-        FROM caz_parcelas cp
-        WHERE cp.tipo_evento = 'RECEITA'
-          AND cp.data_vencimento < '${dataHoje}'
-          AND cp.nao_pago::numeric > 0
-          AND cp.id_cliente IS NOT NULL
-          AND cp.id_cliente != ''
-          AND TRIM(cp.id_cliente) != ''
-          ${whereDataInicio}
-          ${whereDataFim}
-        GROUP BY cp.id_cliente
-        HAVING COALESCE(SUM(cp.nao_pago::numeric), 0) > 0
-        ORDER BY ${orderByClause}
-        LIMIT ${limite}
-      `;
-      
-      console.log('[DEBUG] Query SQL:', parcelasQuery.substring(0, 200) + '...');
-      
-      const result = await db.execute(sql.raw(parcelasQuery));
-      console.log('[DEBUG] getInadimplenciaClientes - Query 1 OK, ' + (result.rows as any[]).length + ' rows');
-      
-      const clienteIds = (result.rows as any[]).map(r => r.id_cliente).filter(Boolean);
-      
-      let cnpjMap: Record<string, string> = {};
-      let clickupMap: Record<string, { nome: string; status: string; responsavel: string; cluster: string; taskId: string }> = {};
-      
-      if (clienteIds.length > 0) {
-        console.log('[DEBUG] getInadimplenciaClientes - Query 2: Buscando CNPJs de ' + clienteIds.length + ' clientes');
-        const cnpjResult = await db.execute(sql.raw(`
-          SELECT ids, cnpj FROM caz_clientes 
-          WHERE ids IN (${clienteIds.map(id => `'${id}'`).join(',')})
-            AND cnpj IS NOT NULL AND cnpj != ''
-        `));
-        console.log('[DEBUG] getInadimplenciaClientes - Query 2 OK, ' + (cnpjResult.rows as any[]).length + ' rows');
-        
-        for (const row of cnpjResult.rows as any[]) {
-          if (row.ids && row.cnpj) {
-            cnpjMap[row.ids] = row.cnpj;
-          }
-        }
-        
-        const cnpjs = Object.values(cnpjMap).filter(Boolean);
-        if (cnpjs.length > 0) {
-          console.log('[DEBUG] getInadimplenciaClientes - Query 3: Buscando dados ClickUp de ' + cnpjs.length + ' CNPJs');
-          const clickupResult = await db.execute(sql.raw(`
-            SELECT cnpj, nome, status, responsavel, cluster, task_id 
-            FROM cup_clientes 
-            WHERE TRIM(cnpj) IN (${cnpjs.map(c => `'${c.trim()}'`).join(',')})
-          `));
-          console.log('[DEBUG] getInadimplenciaClientes - Query 3 OK, ' + (clickupResult.rows as any[]).length + ' rows');
-          
-          for (const row of clickupResult.rows as any[]) {
-            if (row.cnpj) {
-              clickupMap[row.cnpj.trim()] = {
-                nome: row.nome || '',
-                status: row.status || '',
-                responsavel: row.responsavel || '',
-                cluster: row.cluster || '',
-                taskId: row.task_id || ''
-              };
-            }
-          }
-        }
-      }
-      
-      const clientes = (result.rows as any[]).map(row => {
-        const idCliente = row.id_cliente || '';
-        const cnpj = cnpjMap[idCliente] || null;
-        const clickupData = cnpj ? clickupMap[cnpj.trim()] : null;
-        
-        return {
-          idCliente,
-          nomeCliente: clickupData?.nome || row.nome_cliente || 'Cliente Desconhecido',
-          valorTotal: parseFloat(row.valor_total || '0'),
-          quantidadeParcelas: parseInt(row.quantidade_parcelas || '0'),
-          parcelaMaisAntiga: new Date(row.parcela_mais_antiga),
-          diasAtrasoMax: parseInt(row.dias_atraso_max || '0'),
-          empresa: row.empresa || '',
-          cnpj,
-          statusClickup: clickupData?.status || null,
-          responsavel: clickupData?.responsavel || null,
-          cluster: clickupData?.cluster || null,
-          servicos: null,
-        };
-      });
-      
-      console.log('[DEBUG] getInadimplenciaClientes - Retornando ' + clientes.length + ' clientes');
-      return { clientes };
-    } catch (error: any) {
-      console.error('[DEBUG] getInadimplenciaClientes - ERRO:', error.message);
-      console.error('[DEBUG] Stack:', error.stack);
-      throw error;
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    let whereDataInicio = '';
+    let whereDataFim = '';
+    if (dataInicio) {
+      whereDataInicio = ` AND cp.data_vencimento >= '${dataInicio}'`;
     }
+    if (dataFim) {
+      whereDataFim = ` AND cp.data_vencimento <= '${dataFim}'`;
+    }
+    
+    let orderByClause = 'valor_total DESC';
+    if (ordenarPor === 'diasAtraso') {
+      orderByClause = 'dias_atraso_max DESC';
+    } else if (ordenarPor === 'nome') {
+      orderByClause = 'nome_cliente ASC';
+    }
+    
+    // Query única com LEFT JOINs para trazer todos os dados de uma vez
+    // Relacionamentos: caz_parcelas.id_cliente = caz_clientes.ids
+    //                  caz_clientes.cnpj = cup_clientes.cnpj
+    //                  cup_clientes.task_id = cup_contratos.id_task
+    // IMPORTANTE: Usar ::text antes de TRIM para evitar erro com colunas UUID no banco remoto
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        cp.id_cliente,
+        MAX(cp.descricao) as nome_cliente,
+        COALESCE(SUM(cp.nao_pago::numeric), 0) as valor_total,
+        COUNT(*) as quantidade_parcelas,
+        MIN(cp.data_vencimento) as parcela_mais_antiga,
+        MAX('${dataHoje}'::date - cp.data_vencimento::date) as dias_atraso_max,
+        MAX(cp.empresa) as empresa,
+        MAX(cc.cnpj) as cnpj,
+        MAX(cup.nome) as nome_clickup,
+        MAX(cup.status) as status_clickup,
+        MAX(cup.responsavel) as responsavel,
+        MAX(cup.cluster) as cluster,
+        MAX(cup.task_id::text) as task_id,
+        STRING_AGG(DISTINCT cont.servico, ', ') as servicos
+      FROM caz_parcelas cp
+      LEFT JOIN caz_clientes cc ON TRIM(cp.id_cliente::text) = TRIM(cc.ids::text)
+      LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
+        AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
+      LEFT JOIN cup_contratos cont ON TRIM(cup.task_id::text) = TRIM(cont.id_task::text)
+        AND cup.task_id IS NOT NULL AND cup.task_id::text != ''
+        AND cont.id_task IS NOT NULL AND cont.id_task::text != ''
+      WHERE cp.tipo_evento = 'RECEITA'
+        AND cp.data_vencimento < '${dataHoje}'
+        AND cp.nao_pago::numeric > 0
+        AND cp.id_cliente IS NOT NULL
+        AND cp.id_cliente::text != ''
+        ${whereDataInicio}
+        ${whereDataFim}
+      GROUP BY cp.id_cliente
+      HAVING COALESCE(SUM(cp.nao_pago::numeric), 0) > 0
+      ORDER BY ${orderByClause}
+      LIMIT ${limite}
+    `));
+    
+    const clientes = (result.rows as any[]).map(row => ({
+      idCliente: row.id_cliente || '',
+      nomeCliente: row.nome_clickup || row.nome_cliente || 'Cliente Desconhecido',
+      valorTotal: parseFloat(row.valor_total || '0'),
+      quantidadeParcelas: parseInt(row.quantidade_parcelas || '0'),
+      parcelaMaisAntiga: new Date(row.parcela_mais_antiga),
+      diasAtrasoMax: parseInt(row.dias_atraso_max || '0'),
+      empresa: row.empresa || '',
+      cnpj: row.cnpj || null,
+      statusClickup: row.status_clickup || null,
+      responsavel: row.responsavel || null,
+      cluster: row.cluster || null,
+      servicos: row.servicos || null,
+    }));
+    
+    return { clientes };
   }
 
   async getInadimplenciaDetalheParcelas(idCliente: string, dataInicio?: string, dataFim?: string): Promise<{
