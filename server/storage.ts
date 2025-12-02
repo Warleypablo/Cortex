@@ -5419,82 +5419,114 @@ export class DbStorage implements IStorage {
     }
     
     const result = await db.execute(sql.raw(`
-      WITH inadimplencia AS (
-        SELECT 
-          cp.id_cliente,
-          MAX(cp.descricao) as nome_cliente,
-          COALESCE(SUM(cp.nao_pago::numeric), 0) as valor_total,
-          COUNT(*) as quantidade_parcelas,
-          MIN(cp.data_vencimento) as parcela_mais_antiga,
-          MAX('${dataHoje}'::date - cp.data_vencimento::date) as dias_atraso_max,
-          MAX(cp.empresa) as empresa
-        FROM caz_parcelas cp
-        WHERE cp.tipo_evento = 'RECEITA'
-          AND cp.data_vencimento < '${dataHoje}'
-          AND cp.nao_pago::numeric > 0
-          AND cp.id_cliente IS NOT NULL
-          AND cp.id_cliente != ''
-          AND LENGTH(TRIM(cp.id_cliente)) > 0
-          ${whereDataInicio}
-          ${whereDataFim}
-        GROUP BY cp.id_cliente
-        HAVING COALESCE(SUM(cp.nao_pago::numeric), 0) > 0
-      ),
-      clientes_validos AS (
-        SELECT ids, cnpj 
-        FROM caz_clientes 
-        WHERE ids IS NOT NULL 
-          AND ids != '' 
-          AND LENGTH(TRIM(ids)) > 0
-      ),
-      cup_validos AS (
-        SELECT cnpj, nome, status, responsavel, cluster, task_id
-        FROM cup_clientes 
-        WHERE cnpj IS NOT NULL 
-          AND cnpj != '' 
-          AND LENGTH(TRIM(cnpj)) > 0
-      )
       SELECT 
-        i.id_cliente,
-        COALESCE(cc.nome, i.nome_cliente) as nome_cliente,
-        i.valor_total,
-        i.quantidade_parcelas,
-        i.parcela_mais_antiga,
-        i.dias_atraso_max,
-        i.empresa,
-        caz.cnpj,
-        cc.status as status_clickup,
-        cc.responsavel,
-        cc.cluster,
-        (
-          SELECT string_agg(DISTINCT servico, ', ')
-          FROM cup_contratos
-          WHERE id_task::text = cc.task_id 
-            AND cc.task_id IS NOT NULL 
-            AND cc.task_id != ''
-            AND LENGTH(TRIM(cc.task_id)) > 10
-        ) as servicos
-      FROM inadimplencia i
-      LEFT JOIN clientes_validos caz ON caz.ids = i.id_cliente
-      LEFT JOIN cup_validos cc ON TRIM(cc.cnpj) = TRIM(caz.cnpj)
+        cp.id_cliente,
+        MAX(cp.descricao) as nome_cliente,
+        COALESCE(SUM(cp.nao_pago::numeric), 0) as valor_total,
+        COUNT(*) as quantidade_parcelas,
+        MIN(cp.data_vencimento) as parcela_mais_antiga,
+        MAX('${dataHoje}'::date - cp.data_vencimento::date) as dias_atraso_max,
+        MAX(cp.empresa) as empresa
+      FROM caz_parcelas cp
+      WHERE cp.tipo_evento = 'RECEITA'
+        AND cp.data_vencimento < '${dataHoje}'
+        AND cp.nao_pago::numeric > 0
+        AND cp.id_cliente IS NOT NULL
+        AND cp.id_cliente != ''
+        AND TRIM(cp.id_cliente) != ''
+        ${whereDataInicio}
+        ${whereDataFim}
+      GROUP BY cp.id_cliente
+      HAVING COALESCE(SUM(cp.nao_pago::numeric), 0) > 0
       ORDER BY ${orderByClause}
       LIMIT ${limite}
     `));
     
-    const clientes = (result.rows as any[]).map(row => ({
-      idCliente: row.id_cliente || '',
-      nomeCliente: row.nome_cliente || 'Cliente Desconhecido',
-      valorTotal: parseFloat(row.valor_total || '0'),
-      quantidadeParcelas: parseInt(row.quantidade_parcelas || '0'),
-      parcelaMaisAntiga: new Date(row.parcela_mais_antiga),
-      diasAtrasoMax: parseInt(row.dias_atraso_max || '0'),
-      empresa: row.empresa || '',
-      cnpj: row.cnpj || null,
-      statusClickup: row.status_clickup || null,
-      responsavel: row.responsavel || null,
-      cluster: row.cluster || null,
-      servicos: row.servicos || null,
-    }));
+    const clienteIds = (result.rows as any[]).map(r => r.id_cliente).filter(Boolean);
+    
+    let cnpjMap: Record<string, string> = {};
+    let clickupMap: Record<string, { nome: string; status: string; responsavel: string; cluster: string; taskId: string }> = {};
+    let servicosMap: Record<string, string> = {};
+    
+    if (clienteIds.length > 0) {
+      const cnpjResult = await db.execute(sql.raw(`
+        SELECT ids, cnpj FROM caz_clientes 
+        WHERE ids IN (${clienteIds.map(id => `'${id}'`).join(',')})
+          AND cnpj IS NOT NULL AND cnpj != ''
+      `));
+      
+      for (const row of cnpjResult.rows as any[]) {
+        if (row.ids && row.cnpj) {
+          cnpjMap[row.ids] = row.cnpj;
+        }
+      }
+      
+      const cnpjs = Object.values(cnpjMap).filter(Boolean);
+      if (cnpjs.length > 0) {
+        const clickupResult = await db.execute(sql.raw(`
+          SELECT cnpj, nome, status, responsavel, cluster, task_id 
+          FROM cup_clientes 
+          WHERE TRIM(cnpj) IN (${cnpjs.map(c => `'${c.trim()}'`).join(',')})
+        `));
+        
+        for (const row of clickupResult.rows as any[]) {
+          if (row.cnpj) {
+            clickupMap[row.cnpj.trim()] = {
+              nome: row.nome || '',
+              status: row.status || '',
+              responsavel: row.responsavel || '',
+              cluster: row.cluster || '',
+              taskId: row.task_id || ''
+            };
+          }
+        }
+        
+        const taskIds = Object.values(clickupMap)
+          .map(c => c.taskId)
+          .filter(t => t && t.length > 10);
+        
+        if (taskIds.length > 0) {
+          try {
+            const servicosResult = await db.execute(sql.raw(`
+              SELECT id_task::text as task_id, string_agg(DISTINCT servico, ', ') as servicos
+              FROM cup_contratos 
+              WHERE id_task::text IN (${taskIds.map(t => `'${t}'`).join(',')})
+              GROUP BY id_task
+            `));
+            
+            for (const row of servicosResult.rows as any[]) {
+              if (row.task_id) {
+                servicosMap[row.task_id] = row.servicos || '';
+              }
+            }
+          } catch (e) {
+            console.log('[api] Skipping servicos query due to error');
+          }
+        }
+      }
+    }
+    
+    const clientes = (result.rows as any[]).map(row => {
+      const idCliente = row.id_cliente || '';
+      const cnpj = cnpjMap[idCliente] || null;
+      const clickupData = cnpj ? clickupMap[cnpj.trim()] : null;
+      const servicos = clickupData?.taskId ? servicosMap[clickupData.taskId] : null;
+      
+      return {
+        idCliente,
+        nomeCliente: clickupData?.nome || row.nome_cliente || 'Cliente Desconhecido',
+        valorTotal: parseFloat(row.valor_total || '0'),
+        quantidadeParcelas: parseInt(row.quantidade_parcelas || '0'),
+        parcelaMaisAntiga: new Date(row.parcela_mais_antiga),
+        diasAtrasoMax: parseInt(row.dias_atraso_max || '0'),
+        empresa: row.empresa || '',
+        cnpj,
+        statusClickup: clickupData?.status || null,
+        responsavel: clickupData?.responsavel || null,
+        cluster: clickupData?.cluster || null,
+        servicos: servicos || null,
+      };
+    });
     
     return { clientes };
   }
