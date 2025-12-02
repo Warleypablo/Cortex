@@ -325,7 +325,7 @@ export async function chatWithDfc(
   };
 
   // ETAPA 1: Analisar se precisa de query SQL
-  const analysisPrompt = `Você é um assistente financeiro especializado em DFC para uma agência de marketing digital brasileira.
+  const analysisPrompt = `Você é um assistente financeiro especializado em DFC (Demonstrativo de Fluxo de Caixa) para uma agência de marketing digital brasileira chamada Turbo Partners.
 
 ${DATABASE_SCHEMA}
 
@@ -334,18 +334,27 @@ ${JSON.stringify(contextData, null, 2)}
 
 === SUA TAREFA ===
 Analise a pergunta do usuário e decida:
-1. Se pode responder usando apenas os DADOS AGREGADOS acima, responda diretamente
-2. Se precisa de dados mais específicos do banco (ex: qual foi a maior despesa individual, detalhes de um cliente específico, etc), gere uma query SQL
+1. Se pode responder usando os DADOS AGREGADOS acima (análises de saúde financeira, comparativos, tendências, etc), responda diretamente com análise detalhada
+2. Se precisa de dados específicos do banco (ex: maior despesa individual, detalhes de um cliente, lista de transações, etc), gere uma query SQL
+
+IMPORTANTE: Para perguntas analíticas/consultivas sobre saúde financeira, tendências, comparativos entre períodos, recomendações - USE OS DADOS AGREGADOS e responda diretamente sem query SQL. Você tem dados mensais completos para fazer análises sofisticadas.
 
 Responda APENAS com JSON válido:
 {
   "precisaQuery": true ou false,
   "query": "SELECT ... (apenas se precisaQuery=true, senão null)",
   "motivoQuery": "explicação de por que precisa da query (apenas se precisaQuery=true)",
-  "respostaFinal": "sua resposta completa (apenas se precisaQuery=false)"
+  "respostaFinal": "sua resposta completa e detalhada em português (OBRIGATÓRIO se precisaQuery=false)"
 }
 
-REGRAS PARA QUERIES:
+REGRAS PARA RESPOSTAS DIRETAS (precisaQuery=false):
+- Forneça análises detalhadas baseadas nos dados agregados
+- Compare períodos, identifique tendências, calcule variações
+- Formate valores em reais: R$ 1.234,56
+- Seja específico com números e percentuais
+- Dê insights acionáveis para o negócio
+
+REGRAS PARA QUERIES (precisaQuery=true):
 - NÃO use schema - as tabelas estão no public (padrão). Use apenas: caz_parcelas, caz_pagar, etc.
 - Para filtrar mês: TO_CHAR(data_vencimento::date, 'YYYY-MM') = 'YYYY-MM'
 - IMPORTANTE: Os valores estão em PORTUGUÊS:
@@ -371,10 +380,10 @@ REGRAS PARA QUERIES:
     console.log("[DFC Chat] Analyzing question:", pergunta);
     
     const analysisResponse = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o",
       messages: analysisMessages,
       response_format: { type: "json_object" },
-      max_completion_tokens: 2048,
+      max_tokens: 2048,
     });
 
     const analysisContent = analysisResponse.choices[0].message.content;
@@ -447,10 +456,10 @@ Responda APENAS com JSON válido:
 }`;
 
       const finalResponse = await openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o",
         messages: [{ role: "system", content: finalPrompt }],
         response_format: { type: "json_object" },
-        max_completion_tokens: 2048,
+        max_tokens: 2048,
       });
 
       const finalContent = finalResponse.choices[0].message.content;
@@ -581,13 +590,13 @@ Gere entre 4 e 8 insights relevantes, priorizando os mais impactantes para o neg
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Analise os seguintes dados do DFC:\n\n${JSON.stringify(analysisPayload, null, 2)}` }
       ],
       response_format: { type: "json_object" },
-      max_completion_tokens: 4096,
+      max_tokens: 4096,
     });
 
     const content = response.choices[0].message.content;
