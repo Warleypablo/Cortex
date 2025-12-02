@@ -5481,28 +5481,6 @@ export class DbStorage implements IStorage {
           }
         }
         
-        const taskIds = Object.values(clickupMap)
-          .map(c => c.taskId)
-          .filter(t => t && t.length > 10);
-        
-        if (taskIds.length > 0) {
-          try {
-            const servicosResult = await db.execute(sql.raw(`
-              SELECT id_task::text as task_id, string_agg(DISTINCT servico, ', ') as servicos
-              FROM cup_contratos 
-              WHERE id_task::text IN (${taskIds.map(t => `'${t}'`).join(',')})
-              GROUP BY id_task
-            `));
-            
-            for (const row of servicosResult.rows as any[]) {
-              if (row.task_id) {
-                servicosMap[row.task_id] = row.servicos || '';
-              }
-            }
-          } catch (e) {
-            console.log('[api] Skipping servicos query due to error');
-          }
-        }
       }
     }
     
