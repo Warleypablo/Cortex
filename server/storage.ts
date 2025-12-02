@@ -5434,10 +5434,25 @@ export class DbStorage implements IStorage {
           AND cp.nao_pago::numeric > 0
           AND cp.id_cliente IS NOT NULL
           AND cp.id_cliente != ''
+          AND LENGTH(TRIM(cp.id_cliente)) > 0
           ${whereDataInicio}
           ${whereDataFim}
         GROUP BY cp.id_cliente
         HAVING COALESCE(SUM(cp.nao_pago::numeric), 0) > 0
+      ),
+      clientes_validos AS (
+        SELECT ids, cnpj 
+        FROM caz_clientes 
+        WHERE ids IS NOT NULL 
+          AND ids != '' 
+          AND LENGTH(TRIM(ids)) > 0
+      ),
+      cup_validos AS (
+        SELECT cnpj, nome, status, responsavel, cluster, task_id
+        FROM cup_clientes 
+        WHERE cnpj IS NOT NULL 
+          AND cnpj != '' 
+          AND LENGTH(TRIM(cnpj)) > 0
       )
       SELECT 
         i.id_cliente,
@@ -5457,12 +5472,8 @@ export class DbStorage implements IStorage {
           WHERE id_task = cc.task_id AND cc.task_id IS NOT NULL AND cc.task_id != ''
         ) as servicos
       FROM inadimplencia i
-      LEFT JOIN caz_clientes caz ON caz.ids::text = i.id_cliente::text 
-        AND COALESCE(caz.ids, '') != '' 
-        AND LENGTH(caz.ids) > 0
-      LEFT JOIN cup_clientes cc ON TRIM(cc.cnpj) = TRIM(caz.cnpj) 
-        AND COALESCE(caz.cnpj, '') != '' 
-        AND LENGTH(TRIM(caz.cnpj)) > 0
+      LEFT JOIN clientes_validos caz ON caz.ids = i.id_cliente
+      LEFT JOIN cup_validos cc ON TRIM(cc.cnpj) = TRIM(caz.cnpj)
       ORDER BY ${orderByClause}
       LIMIT ${limite}
     `));
