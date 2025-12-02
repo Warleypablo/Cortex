@@ -146,6 +146,7 @@ export default function DashboardInadimplencia() {
   const [ordenarPor, setOrdenarPor] = useState<"valor" | "diasAtraso" | "nome">("valor");
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteInadimplente | null>(null);
   const [busca, setBusca] = useState("");
+  const [statusFiltro, setStatusFiltro] = useState<string>("todos");
 
   useEffect(() => {
     setClienteSelecionado(null);
@@ -194,16 +195,44 @@ export default function DashboardInadimplencia() {
     enabled: !!clienteSelecionado?.idCliente,
   });
 
+  // Extrair status únicos dos clientes para o filtro
+  const statusUnicos = useMemo(() => {
+    if (!clientesData?.clientes) return [];
+    const statusSet = new Set<string>();
+    clientesData.clientes.forEach((c) => {
+      if (c.statusClickup) {
+        statusSet.add(c.statusClickup);
+      }
+    });
+    return Array.from(statusSet).sort();
+  }, [clientesData]);
+
   const clientesFiltrados = useMemo(() => {
     if (!clientesData?.clientes) return [];
-    if (!busca.trim()) return clientesData.clientes;
-    const termo = busca.toLowerCase();
-    return clientesData.clientes.filter(
-      (c) =>
-        c.nomeCliente.toLowerCase().includes(termo) ||
-        c.empresa.toLowerCase().includes(termo)
-    );
-  }, [clientesData, busca]);
+    
+    let filtrados = clientesData.clientes;
+    
+    // Filtrar por status
+    if (statusFiltro !== "todos") {
+      if (statusFiltro === "sem-status") {
+        filtrados = filtrados.filter((c) => !c.statusClickup);
+      } else {
+        filtrados = filtrados.filter((c) => c.statusClickup === statusFiltro);
+      }
+    }
+    
+    // Filtrar por busca
+    if (busca.trim()) {
+      const termo = busca.toLowerCase();
+      filtrados = filtrados.filter(
+        (c) =>
+          c.nomeCliente.toLowerCase().includes(termo) ||
+          c.empresa.toLowerCase().includes(termo)
+      );
+    }
+    
+    return filtrados;
+  }, [clientesData, busca, statusFiltro]);
 
   const faixasChartData = useMemo(() => {
     if (!resumoData) return [];
@@ -239,6 +268,7 @@ export default function DashboardInadimplencia() {
     setDataInicio("");
     setDataFim("");
     setBusca("");
+    setStatusFiltro("todos");
   };
 
   const getDiasAtrasoColor = (dias: number) => {
@@ -653,6 +683,51 @@ export default function DashboardInadimplencia() {
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      {/* Filtro de Status */}
+      <div className="flex flex-wrap items-center gap-2" data-testid="filtro-status">
+        <Label className="text-sm text-muted-foreground mr-1">
+          <Filter className="h-4 w-4 inline mr-1" />
+          Status:
+        </Label>
+        <Button
+          variant={statusFiltro === "todos" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setStatusFiltro("todos")}
+          data-testid="filter-status-todos"
+        >
+          Todos
+        </Button>
+        {statusUnicos.map((status) => (
+          <Button
+            key={status}
+            variant={statusFiltro === status ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFiltro(status)}
+            data-testid={`filter-status-${status.toLowerCase().replace(/\s+/g, '-')}`}
+          >
+            <Badge variant={getStatusVariant(status)} className="mr-1.5 pointer-events-none">
+              {status}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              ({clientesData?.clientes?.filter(c => c.statusClickup === status).length || 0})
+            </span>
+          </Button>
+        ))}
+        {clientesData?.clientes?.some(c => !c.statusClickup) && (
+          <Button
+            variant={statusFiltro === "sem-status" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFiltro("sem-status")}
+            data-testid="filter-status-sem-status"
+          >
+            <span className="text-muted-foreground">Sem Status</span>
+            <span className="text-xs text-muted-foreground ml-1.5">
+              ({clientesData?.clientes?.filter(c => !c.statusClickup).length || 0})
+            </span>
+          </Button>
+        )}
       </div>
 
       <Card data-testid="card-tabela-clientes">
