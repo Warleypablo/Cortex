@@ -5584,6 +5584,56 @@ export class DbStorage implements IStorage {
     
     return { empresas };
   }
+
+  async getInadimplenciaPorMetodoPagamento(dataInicio?: string, dataFim?: string): Promise<{
+    metodos: {
+      metodo: string;
+      valorTotal: number;
+      quantidadeClientes: number;
+      quantidadeParcelas: number;
+      percentual: number;
+    }[];
+  }> {
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    let whereDataInicio = '';
+    let whereDataFim = '';
+    if (dataInicio) {
+      whereDataInicio = ` AND data_vencimento >= '${dataInicio}'`;
+    }
+    if (dataFim) {
+      whereDataFim = ` AND data_vencimento <= '${dataFim}'`;
+    }
+    
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        COALESCE(metodo_pagamento, 'Não Informado') as metodo,
+        COALESCE(SUM(nao_pago::numeric), 0) as valor_total,
+        COUNT(DISTINCT id_cliente) as quantidade_clientes,
+        COUNT(*) as quantidade_parcelas
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_vencimento < '${dataHoje}'
+        AND nao_pago::numeric > 0
+        ${whereDataInicio}
+        ${whereDataFim}
+      GROUP BY COALESCE(metodo_pagamento, 'Não Informado')
+      ORDER BY valor_total DESC
+    `));
+    
+    const totalGeral = (result.rows as any[]).reduce((sum, row) => sum + parseFloat(row.valor_total || '0'), 0);
+    
+    const metodos = (result.rows as any[]).map(row => ({
+      metodo: row.metodo,
+      valorTotal: parseFloat(row.valor_total || '0'),
+      quantidadeClientes: parseInt(row.quantidade_clientes || '0'),
+      quantidadeParcelas: parseInt(row.quantidade_parcelas || '0'),
+      percentual: totalGeral > 0 ? (parseFloat(row.valor_total || '0') / totalGeral) * 100 : 0,
+    }));
+    
+    return { metodos };
+  }
 }
 
 export const storage = new DbStorage();
