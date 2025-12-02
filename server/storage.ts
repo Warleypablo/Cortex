@@ -5418,6 +5418,7 @@ export class DbStorage implements IStorage {
       orderByClause = 'nome_cliente ASC';
     }
     
+    console.log('[DEBUG] getInadimplenciaClientes - Query 1: Buscando parcelas inadimplentes');
     const result = await db.execute(sql.raw(`
       SELECT 
         cp.id_cliente,
@@ -5441,6 +5442,7 @@ export class DbStorage implements IStorage {
       ORDER BY ${orderByClause}
       LIMIT ${limite}
     `));
+    console.log('[DEBUG] getInadimplenciaClientes - Query 1 OK, ${result.rows.length} rows');
     
     const clienteIds = (result.rows as any[]).map(r => r.id_cliente).filter(Boolean);
     
@@ -5449,11 +5451,13 @@ export class DbStorage implements IStorage {
     let servicosMap: Record<string, string> = {};
     
     if (clienteIds.length > 0) {
+      console.log('[DEBUG] getInadimplenciaClientes - Query 2: Buscando CNPJs de ' + clienteIds.length + ' clientes');
       const cnpjResult = await db.execute(sql.raw(`
         SELECT ids, cnpj FROM caz_clientes 
         WHERE ids IN (${clienteIds.map(id => `'${id}'`).join(',')})
           AND cnpj IS NOT NULL AND cnpj != ''
       `));
+      console.log('[DEBUG] getInadimplenciaClientes - Query 2 OK, ' + cnpjResult.rows.length + ' rows');
       
       for (const row of cnpjResult.rows as any[]) {
         if (row.ids && row.cnpj) {
@@ -5463,11 +5467,13 @@ export class DbStorage implements IStorage {
       
       const cnpjs = Object.values(cnpjMap).filter(Boolean);
       if (cnpjs.length > 0) {
+        console.log('[DEBUG] getInadimplenciaClientes - Query 3: Buscando dados ClickUp de ' + cnpjs.length + ' CNPJs');
         const clickupResult = await db.execute(sql.raw(`
           SELECT cnpj, nome, status, responsavel, cluster, task_id 
           FROM cup_clientes 
           WHERE TRIM(cnpj) IN (${cnpjs.map(c => `'${c.trim()}'`).join(',')})
         `));
+        console.log('[DEBUG] getInadimplenciaClientes - Query 3 OK, ' + clickupResult.rows.length + ' rows');
         
         for (const row of clickupResult.rows as any[]) {
           if (row.cnpj) {
