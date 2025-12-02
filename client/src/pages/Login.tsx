@@ -7,6 +7,10 @@ export default function Login() {
     window.location.href = "/auth/google";
   };
 
+  const handleDevLogin = () => {
+    window.location.href = "/auth/dev-login";
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
       <Card className="w-full max-w-md">
@@ -40,6 +44,15 @@ export default function Login() {
           >
             <SiGoogle className="w-5 h-5" />
             Continuar com Google
+          </Button>
+          <Button
+            onClick={handleDevLogin}
+            size="lg"
+            variant="outline"
+            className="w-full h-12 text-base"
+            data-testid="button-dev-login"
+          >
+            Dev Admin Login
           </Button>
           <p className="text-xs text-center text-muted-foreground">
             Ao continuar, você concorda com nossos termos de uso e política de privacidade
