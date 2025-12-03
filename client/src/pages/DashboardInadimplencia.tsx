@@ -63,6 +63,9 @@ import {
   X,
   AlertCircle,
   CreditCard,
+  Calendar,
+  ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -152,6 +155,7 @@ export default function DashboardInadimplencia() {
   const [activeTab, setActiveTab] = useState("visao-geral");
   const [dataInicio, setDataInicio] = useState<string>("");
   const [dataFim, setDataFim] = useState<string>("");
+  const [activePreset, setActivePreset] = useState<string>("");
   const [ordenarPor, setOrdenarPor] = useState<"valor" | "diasAtraso" | "nome">("valor");
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteInadimplente | null>(null);
   const [busca, setBusca] = useState("");
@@ -280,6 +284,7 @@ export default function DashboardInadimplencia() {
   const limparFiltros = () => {
     setDataInicio("");
     setDataFim("");
+    setActivePreset("");
     setBusca("");
     setStatusFiltro("todos");
   };
@@ -378,82 +383,141 @@ export default function DashboardInadimplencia() {
     );
   };
 
+  const presetPeriodos = [
+    { label: "15 dias", dias: 15, id: "15d" },
+    { label: "30 dias", dias: 30, id: "30d" },
+    { label: "45 dias", dias: 45, id: "45d" },
+    { label: "60 dias", dias: 60, id: "60d" },
+    { label: "90 dias", dias: 90, id: "90d" },
+    { label: "180 dias", dias: 180, id: "180d" },
+    { label: "Tudo", dias: 0, id: "all" },
+  ];
+
+  const aplicarPreset = (preset: typeof presetPeriodos[0]) => {
+    if (preset.dias === 0) {
+      setDataInicio("");
+      setDataFim("");
+    } else {
+      const hoje = new Date();
+      const inicio = subDays(hoje, preset.dias);
+      setDataInicio(format(inicio, "yyyy-MM-dd"));
+      setDataFim(format(hoje, "yyyy-MM-dd"));
+    }
+    setActivePreset(preset.id);
+  };
+
   const renderFiltros = () => (
-    <Card className="mb-6" data-testid="card-filtros">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Filter className="h-4 w-4" />
-            Filtros
-          </CardTitle>
+    <Card className="mb-6 border-0 shadow-lg overflow-hidden" data-testid="card-filtros">
+      <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-red-50 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-red-950/30 p-5">
+        <div className="flex flex-col gap-5">
+          {/* Header */}
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/25">
+                <Filter className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Filtros de Período</h3>
+                <p className="text-xs text-muted-foreground">Selecione o período de análise da inadimplência</p>
+              </div>
+            </div>
+            {(dataInicio || dataFim) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={limparFiltros}
+                className="h-9 px-4 border-amber-300 dark:border-amber-800 hover:bg-amber-100 hover:border-amber-400 hover:text-amber-700 dark:hover:bg-amber-950/50 dark:hover:border-amber-700 dark:hover:text-amber-400 transition-all"
+                data-testid="button-limpar-filtros"
+              >
+                <RotateCcw className="h-4 w-4 mr-1.5" />
+                Limpar Filtros
+              </Button>
+            )}
+          </div>
+
+          {/* Filters Row */}
+          <div className="flex flex-col xl:flex-row xl:items-end gap-5">
+            {/* Preset Buttons */}
+            <div className="flex-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 block">
+                Período Rápido
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {presetPeriodos.map((preset) => {
+                  const isActive = activePreset === preset.id;
+                  return (
+                    <Button
+                      key={preset.id}
+                      variant={isActive ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => aplicarPreset(preset)}
+                      className={`h-9 text-sm font-medium transition-all ${
+                        isActive 
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg shadow-amber-500/30 border-0' 
+                          : 'bg-white/80 dark:bg-slate-900/80 hover:bg-amber-100 dark:hover:bg-amber-950/50 border-amber-200 dark:border-amber-800/50 hover:border-amber-400 dark:hover:border-amber-700'
+                      }`}
+                      data-testid={`btn-preset-${preset.id}`}
+                    >
+                      {preset.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+            
+            {/* Custom Date Range */}
+            <div className="flex items-end gap-3 xl:pl-5 xl:border-l border-amber-200 dark:border-amber-800/50">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar className="w-3 h-3" />
+                  Data Inicial
+                </label>
+                <Input
+                  type="date"
+                  value={dataInicio}
+                  onChange={(e) => {
+                    setDataInicio(e.target.value);
+                    setActivePreset("");
+                  }}
+                  className="h-10 w-44 bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-800/50 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer hover:border-amber-400"
+                  data-testid="input-data-inicio"
+                />
+              </div>
+              <div className="flex items-center h-10 px-1">
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar className="w-3 h-3" />
+                  Data Final
+                </label>
+                <Input
+                  type="date"
+                  value={dataFim}
+                  onChange={(e) => {
+                    setDataFim(e.target.value);
+                    setActivePreset("");
+                  }}
+                  className="h-10 w-44 bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-800/50 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer hover:border-amber-400"
+                  data-testid="input-data-fim"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Active Filter Badge */}
           {(dataInicio || dataFim) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={limparFiltros}
-              className="text-muted-foreground hover:text-foreground"
-              data-testid="button-limpar-filtros"
-            >
-              <X className="h-4 w-4 mr-1" />
-              Limpar
-            </Button>
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-xs text-muted-foreground">Período selecionado:</span>
+              <Badge variant="secondary" className="bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
+                {dataInicio ? format(new Date(dataInicio + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR }) : 'Início'} 
+                {' → '}
+                {dataFim ? format(new Date(dataFim + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR }) : 'Hoje'}
+              </Badge>
+            </div>
           )}
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-4 items-end">
-          <div className="space-y-1.5">
-            <Label htmlFor="dataInicio" className="text-sm">Data Vencimento Inicial</Label>
-            <Input
-              id="dataInicio"
-              type="date"
-              value={dataInicio}
-              onChange={(e) => setDataInicio(e.target.value)}
-              className="w-40"
-              data-testid="input-data-inicio"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="dataFim" className="text-sm">Data Vencimento Final</Label>
-            <Input
-              id="dataFim"
-              type="date"
-              value={dataFim}
-              onChange={(e) => setDataFim(e.target.value)}
-              className="w-40"
-              data-testid="input-data-fim"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const hoje = new Date();
-                const inicio = subDays(hoje, 45);
-                setDataInicio(format(inicio, "yyyy-MM-dd"));
-                setDataFim(format(hoje, "yyyy-MM-dd"));
-              }}
-              data-testid="button-ultimos-45-dias"
-            >
-              Últimos 45 dias
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const hoje = new Date();
-                const inicio = subDays(hoje, 90);
-                setDataInicio(format(inicio, "yyyy-MM-dd"));
-                setDataFim(format(hoje, "yyyy-MM-dd"));
-              }}
-              data-testid="button-ultimos-90-dias"
-            >
-              Últimos 90 dias
-            </Button>
-          </div>
-        </div>
-      </CardContent>
+      </div>
     </Card>
   );
 
