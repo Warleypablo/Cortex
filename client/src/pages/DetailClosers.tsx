@@ -241,7 +241,7 @@ export default function DetailClosers() {
               <SelectValue placeholder="Escolha um closer para analisar..." />
             </SelectTrigger>
             <SelectContent className="bg-slate-800 border-slate-700">
-              {closers?.filter(c => c.active).map(closer => (
+              {closers?.map(closer => (
                 <SelectItem key={closer.id} value={closer.id.toString()}>
                   {closer.name}
                 </SelectItem>
