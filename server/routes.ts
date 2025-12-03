@@ -1757,9 +1757,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/closers/sources", async (req, res) => {
     try {
       const result = await db.execute(sql`
-        SELECT DISTINCT source FROM crm_deal WHERE source IS NOT NULL ORDER BY source
+        SELECT DISTINCT source FROM crm_deal WHERE source IS NOT NULL AND source != '' ORDER BY source
       `);
-      res.json(result.rows.map((r: any) => r.source));
+      res.json(result.rows.map((r: any) => r.source).filter((s: string) => s && s.trim() !== ''));
     } catch (error) {
       console.error("[api] Error fetching sources:", error);
       res.status(500).json({ error: "Failed to fetch sources" });
@@ -1769,9 +1769,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/closers/pipelines", async (req, res) => {
     try {
       const result = await db.execute(sql`
-        SELECT DISTINCT category_name FROM crm_deal WHERE category_name IS NOT NULL ORDER BY category_name
+        SELECT DISTINCT category_name FROM crm_deal WHERE category_name IS NOT NULL AND category_name != '' ORDER BY category_name
       `);
-      res.json(result.rows.map((r: any) => r.category_name));
+      res.json(result.rows.map((r: any) => r.category_name).filter((c: string) => c && c.trim() !== ''));
     } catch (error) {
       console.error("[api] Error fetching pipelines:", error);
       res.status(500).json({ error: "Failed to fetch pipelines" });
