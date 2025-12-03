@@ -65,9 +65,9 @@ export default function DashboardClosers() {
   const [dataReuniaoFim, setDataReuniaoFim] = useState<string>("");
   const [dataFechamentoInicio, setDataFechamentoInicio] = useState<string>("");
   const [dataFechamentoFim, setDataFechamentoFim] = useState<string>("");
-  const [source, setSource] = useState<string>("");
-  const [pipeline, setPipeline] = useState<string>("");
-  const [closerId, setCloserId] = useState<string>("");
+  const [source, setSource] = useState<string>("all");
+  const [pipeline, setPipeline] = useState<string>("all");
+  const [closerId, setCloserId] = useState<string>("all");
 
   const buildQueryParams = () => {
     const params = new URLSearchParams();
@@ -75,9 +75,9 @@ export default function DashboardClosers() {
     if (dataReuniaoFim) params.append("dataReuniaoFim", dataReuniaoFim);
     if (dataFechamentoInicio) params.append("dataFechamentoInicio", dataFechamentoInicio);
     if (dataFechamentoFim) params.append("dataFechamentoFim", dataFechamentoFim);
-    if (source) params.append("source", source);
-    if (pipeline) params.append("pipeline", pipeline);
-    if (closerId) params.append("closerId", closerId);
+    if (source && source !== "all") params.append("source", source);
+    if (pipeline && pipeline !== "all") params.append("pipeline", pipeline);
+    if (closerId && closerId !== "all") params.append("closerId", closerId);
     return params.toString();
   };
 
@@ -124,9 +124,9 @@ export default function DashboardClosers() {
     setDataReuniaoFim("");
     setDataFechamentoInicio("");
     setDataFechamentoFim("");
-    setSource("");
-    setPipeline("");
-    setCloserId("");
+    setSource("all");
+    setPipeline("all");
+    setCloserId("all");
   };
 
   const formatCurrency = (value: number) => {
