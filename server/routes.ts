@@ -1811,7 +1811,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(sql`d.category_name = ${pipeline}`);
       }
       if (closerId) {
-        conditions.push(sql`d.closer = ${parseInt(closerId as string)}`);
+        conditions.push(sql`d.closer = ${closerId}`);
       }
 
       const whereClause = conditions.length > 0 
@@ -1827,7 +1827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes_realizadas,
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios_ganhos
         FROM crm_deal d
-        LEFT JOIN crm_closers c ON CAST(d.closer AS INTEGER) = c.id
+        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
       `);
       
@@ -1889,14 +1889,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db.execute(sql`
         SELECT 
-          c.name as closer_name,
+          c.nome as closer_name,
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes,
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios_ganhos
         FROM crm_deal d
-        INNER JOIN crm_closers c ON CAST(d.closer AS INTEGER) = c.id
+        INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
-        GROUP BY c.id, c.name
-        ORDER BY c.name
+        GROUP BY c.id, c.nome
+        ORDER BY c.nome
       `);
       
       const data = result.rows.map((row: any) => {
@@ -1957,14 +1957,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db.execute(sql`
         SELECT 
-          c.name as closer_name,
+          c.nome as closer_name,
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
           COALESCE(SUM(d.valor_pontual), 0) as pontual
         FROM crm_deal d
-        INNER JOIN crm_closers c ON CAST(d.closer AS INTEGER) = c.id
+        INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
-        GROUP BY c.id, c.name
-        ORDER BY c.name
+        GROUP BY c.id, c.nome
+        ORDER BY c.nome
       `);
       
       const data = result.rows.map((row: any) => ({
