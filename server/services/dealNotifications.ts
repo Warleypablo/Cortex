@@ -72,10 +72,6 @@ function startPolling() {
 }
 
 async function checkForNewDeals() {
-  if (clients.size === 0) {
-    return;
-  }
-
   try {
     const result = await db.execute(sql`
       SELECT 
@@ -108,8 +104,15 @@ async function checkForNewDeals() {
           contractType: row.category_name || "Recorrente"
         };
 
-        broadcastNewDeal(deal);
+        // Always update lastCheckedId to avoid missing deals
         lastCheckedId = Math.max(lastCheckedId || 0, row.id);
+
+        // Only broadcast if there are connected clients
+        if (clients.size > 0) {
+          broadcastNewDeal(deal);
+        } else {
+          console.log(`[DealNotifications] No clients connected, skipping broadcast for deal ${deal.id}`);
+        }
       }
     }
   } catch (error) {
