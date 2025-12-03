@@ -432,7 +432,7 @@ export default function DashboardSDRs() {
           )}
         </AnimatePresence>
 
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           {[
             { 
               label: "Reuniões Realizadas", 
@@ -442,21 +442,7 @@ export default function DashboardSDRs() {
               format: (v: number) => v.toString()
             },
             { 
-              label: "Reuniões Agendadas", 
-              value: metrics?.reunioesAgendadas || 0, 
-              icon: CalendarDays,
-              gradient: "from-blue-600 to-indigo-600",
-              format: (v: number) => v.toString()
-            },
-            { 
-              label: "Show Rate", 
-              value: metrics?.taxaShowRate || 0, 
-              icon: TrendingUp,
-              gradient: "from-emerald-600 to-green-600",
-              format: (v: number) => `${v.toFixed(1)}%`
-            },
-            { 
-              label: "Leads Qualificados", 
+              label: "Leads Trabalhados", 
               value: metrics?.leadsQualificados || 0, 
               icon: Users,
               gradient: "from-purple-600 to-violet-600",
