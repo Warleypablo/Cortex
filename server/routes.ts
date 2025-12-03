@@ -1745,7 +1745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/closers/list", async (req, res) => {
     try {
       const result = await db.execute(sql`
-        SELECT id, name, email, active FROM crm_closers ORDER BY name
+        SELECT id, nome as name, email, active FROM crm_closers ORDER BY nome
       `);
       res.json(result.rows);
     } catch (error) {
@@ -1885,14 +1885,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db.execute(sql`
         SELECT 
-          c.name as closer_name,
+          c.nome as closer_name,
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes,
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN 1 END) as negocios_ganhos
         FROM crm_deal d
         INNER JOIN crm_closers c ON d.closer = c.id
         ${whereClause}
-        GROUP BY c.id, c.name
-        ORDER BY c.name
+        GROUP BY c.id, c.nome
+        ORDER BY c.nome
       `);
       
       const data = result.rows.map((row: any) => {
@@ -1953,14 +1953,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db.execute(sql`
         SELECT 
-          c.name as closer_name,
+          c.nome as closer_name,
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
           COALESCE(SUM(d.valor_pontual), 0) as pontual
         FROM crm_deal d
         INNER JOIN crm_closers c ON d.closer = c.id
         ${whereClause}
-        GROUP BY c.id, c.name
-        ORDER BY c.name
+        GROUP BY c.id, c.nome
+        ORDER BY c.nome
       `);
       
       const data = result.rows.map((row: any) => ({
