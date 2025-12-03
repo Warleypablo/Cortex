@@ -1987,9 +1987,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/sdrs/list", async (req, res) => {
     try {
       const result = await db.execute(sql`
-        SELECT id, nome as name, email, ativo as active
+        SELECT id, nome as name, email, active
         FROM crm_closers
-        WHERE ativo = true
+        WHERE active = true
         ORDER BY nome
       `);
       res.json(result.rows);
@@ -2071,33 +2071,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ${whereClauseRealizadas}
       `);
 
-      const conditionsAgendadas: ReturnType<typeof sql>[] = [];
-      if (dataReuniaoInicio) {
-        conditionsAgendadas.push(sql`d.data_reuniao_marcada >= ${dataReuniaoInicio}`);
-      }
-      if (dataReuniaoFim) {
-        conditionsAgendadas.push(sql`d.data_reuniao_marcada <= ${dataReuniaoFim}`);
-      }
-      if (source) {
-        conditionsAgendadas.push(sql`d.source = ${source}`);
-      }
-      if (pipeline) {
-        conditionsAgendadas.push(sql`d.category_name = ${pipeline}`);
-      }
-      if (sdrId) {
-        conditionsAgendadas.push(sql`d.sdr = ${sdrId}`);
-      }
-
-      const whereClauseAgendadas = conditionsAgendadas.length > 0 
-        ? sql`WHERE d.data_reuniao_marcada IS NOT NULL AND ${sql.join(conditionsAgendadas, sql` AND `)}` 
-        : sql`WHERE d.data_reuniao_marcada IS NOT NULL`;
-
-      const resultAgendadas = await db.execute(sql`
-        SELECT COUNT(*) as reunioes_agendadas
-        FROM crm_deal d
-        ${whereClauseAgendadas}
-      `);
-
       const whereClauseLeads = conditions.length > 0 
         ? sql`WHERE ${sql.join(conditions, sql` AND `)}` 
         : sql``;
@@ -2109,18 +2082,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
 
       const row = resultRealizadas.rows[0] as any;
-      const rowAgendadas = resultAgendadas.rows[0] as any;
       const rowLeads = resultLeads.rows[0] as any;
       
       const reunioesRealizadas = parseInt(row.reunioes_realizadas) || 0;
-      const reunioesAgendadas = parseInt(rowAgendadas.reunioes_agendadas) || 0;
       const leadsQualificados = parseInt(rowLeads.leads_qualificados) || 0;
-      const taxaShowRate = reunioesAgendadas > 0 ? (reunioesRealizadas / reunioesAgendadas) * 100 : 0;
 
       res.json({
         reunioesRealizadas,
-        reunioesAgendadas,
-        taxaShowRate,
+        reunioesAgendadas: 0,
+        taxaShowRate: 0,
         leadsQualificados
       });
     } catch (error) {
@@ -2170,52 +2140,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         GROUP BY c.id, c.nome
       `);
 
-      const conditionsAgendadas: ReturnType<typeof sql>[] = [sql`d.data_reuniao_marcada IS NOT NULL`];
-
-      if (dataReuniaoInicio) {
-        conditionsAgendadas.push(sql`d.data_reuniao_marcada >= ${dataReuniaoInicio}`);
-      }
-      if (dataReuniaoFim) {
-        conditionsAgendadas.push(sql`d.data_reuniao_marcada <= ${dataReuniaoFim}`);
-      }
-      if (source) {
-        conditionsAgendadas.push(sql`d.source = ${source}`);
-      }
-      if (pipeline) {
-        conditionsAgendadas.push(sql`d.category_name = ${pipeline}`);
-      }
-      if (sdrId) {
-        conditionsAgendadas.push(sql`d.sdr = ${sdrId}`);
-      }
-
-      const whereClauseAgendadas = sql`WHERE ${sql.join(conditionsAgendadas, sql` AND `)}`;
-
-      const resultAgendadas = await db.execute(sql`
-        SELECT 
-          c.nome as sdr_name,
-          c.id as sdr_id,
-          COUNT(*) as reunioes_agendadas
-        FROM crm_deal d
-        INNER JOIN crm_closers c ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = c.id
-        ${whereClauseAgendadas}
-        GROUP BY c.id, c.nome
-      `);
-
-      const agendadasMap = new Map<number, number>();
-      resultAgendadas.rows.forEach((row: any) => {
-        agendadasMap.set(row.sdr_id, parseInt(row.reunioes_agendadas) || 0);
-      });
-
       const data = resultRealizadas.rows.map((row: any) => {
         const realizadas = parseInt(row.reunioes_realizadas) || 0;
-        const agendadas = agendadasMap.get(row.sdr_id) || 0;
-        const showRate = agendadas > 0 ? (realizadas / agendadas) * 100 : 0;
         
         return {
           sdr: row.sdr_name,
           reunioesRealizadas: realizadas,
-          reunioesAgendadas: agendadas,
-          showRate: parseFloat(showRate.toFixed(1))
+          reunioesAgendadas: 0,
+          showRate: 0
         };
       });
 
