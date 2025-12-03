@@ -284,7 +284,9 @@ export default function DashboardDFC() {
   };
 
   const isReceita = (categoriaId: string) => {
-    return categoriaId === 'RECEITAS' || categoriaId.startsWith('R');
+    if (categoriaId === 'RECEITAS') return true;
+    const twoDigitPrefix = categoriaId.substring(0, 2);
+    return twoDigitPrefix === '03' || twoDigitPrefix === '04';
   };
 
   const getMaxValue = () => {
