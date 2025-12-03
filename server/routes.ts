@@ -8,6 +8,7 @@ import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole } from 
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { analyzeDfc, chatWithDfc, type ChatMessage } from "./services/dfcAnalysis";
+import { setupDealNotifications, triggerTestNotification } from "./services/dealNotifications";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== 'admin') {
@@ -2214,7 +2215,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/deals/test-notification", async (req, res) => {
+    try {
+      const deal = triggerTestNotification();
+      res.json({ success: true, deal });
+    } catch (error) {
+      console.error("[api] Error triggering test notification:", error);
+      res.status(500).json({ error: "Failed to trigger test notification" });
+    }
+  });
+
   const httpServer = createServer(app);
+  
+  setupDealNotifications(httpServer);
 
   return httpServer;
 }
