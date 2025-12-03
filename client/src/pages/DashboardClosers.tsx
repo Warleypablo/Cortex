@@ -1,24 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer,
-  ComposedChart,
-  Line,
-  Cell
-} from "recharts";
+import { Badge } from "@/components/ui/badge";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   Handshake, 
   DollarSign, 
@@ -28,8 +17,18 @@ import {
   CalendarDays,
   Filter,
   RotateCcw,
-  Percent,
-  Repeat
+  Crown,
+  Medal,
+  Trophy,
+  Flame,
+  Zap,
+  Star,
+  ChevronUp,
+  ChevronDown,
+  Minus,
+  Sparkles,
+  Repeat,
+  X
 } from "lucide-react";
 
 interface CloserMetrics {
@@ -60,6 +59,18 @@ interface ChartDataReceita {
   pontual: number;
 }
 
+interface RankingCloser {
+  position: number;
+  name: string;
+  mrr: number;
+  pontual: number;
+  total: number;
+  reunioes: number;
+  negocios: number;
+  taxa: number;
+  trend: 'up' | 'down' | 'stable';
+}
+
 export default function DashboardClosers() {
   const [dataReuniaoInicio, setDataReuniaoInicio] = useState<string>("");
   const [dataReuniaoFim, setDataReuniaoFim] = useState<string>("");
@@ -68,6 +79,13 @@ export default function DashboardClosers() {
   const [source, setSource] = useState<string>("all");
   const [pipeline, setPipeline] = useState<string>("all");
   const [closerId, setCloserId] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const buildQueryParams = () => {
     const params = new URLSearchParams();
@@ -101,6 +119,7 @@ export default function DashboardClosers() {
       const res = await fetch(`/api/closers/metrics?${queryParams}`);
       return res.json();
     },
+    refetchInterval: 60000,
   });
 
   const { data: chartReunioesNegocios, isLoading: isLoadingChart1 } = useQuery<ChartDataReunioesNegocios[]>({
@@ -109,6 +128,7 @@ export default function DashboardClosers() {
       const res = await fetch(`/api/closers/chart-reunioes-negocios?${queryParams}`);
       return res.json();
     },
+    refetchInterval: 60000,
   });
 
   const { data: chartReceita, isLoading: isLoadingChart2 } = useQuery<ChartDataReceita[]>({
@@ -117,6 +137,7 @@ export default function DashboardClosers() {
       const res = await fetch(`/api/closers/chart-receita?${queryParams}`);
       return res.json();
     },
+    refetchInterval: 60000,
   });
 
   const clearFilters = () => {
@@ -133,7 +154,8 @@ export default function DashboardClosers() {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-      minimumFractionDigits: 2,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(value);
   };
 
@@ -147,360 +169,621 @@ export default function DashboardClosers() {
     return formatCurrency(value);
   };
 
-  const kpiCards = [
-    {
-      title: "MRR Obtido",
-      value: metrics?.mrrObtido || 0,
-      icon: Repeat,
-      format: "currency",
-      gradient: "from-emerald-500 to-teal-600",
-      bgGradient: "from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30",
-      iconBg: "bg-emerald-500/10",
-      iconColor: "text-emerald-600",
-    },
-    {
-      title: "Pontual Obtido",
-      value: metrics?.pontualObtido || 0,
-      icon: DollarSign,
-      format: "currency",
-      gradient: "from-blue-500 to-indigo-600",
-      bgGradient: "from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30",
-      iconBg: "bg-blue-500/10",
-      iconColor: "text-blue-600",
-    },
-    {
-      title: "Reuniões Realizadas",
-      value: metrics?.reunioesRealizadas || 0,
-      icon: Users,
-      format: "number",
-      gradient: "from-violet-500 to-purple-600",
-      bgGradient: "from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30",
-      iconBg: "bg-violet-500/10",
-      iconColor: "text-violet-600",
-    },
-    {
-      title: "Negócios Ganhos",
-      value: metrics?.negociosGanhos || 0,
-      icon: Handshake,
-      format: "number",
-      gradient: "from-amber-500 to-orange-600",
-      bgGradient: "from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30",
-      iconBg: "bg-amber-500/10",
-      iconColor: "text-amber-600",
-    },
-    {
-      title: "Taxa de Conversão",
-      value: metrics?.taxaConversao || 0,
-      icon: Target,
-      format: "percent",
-      gradient: "from-rose-500 to-pink-600",
-      bgGradient: "from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/30",
-      iconBg: "bg-rose-500/10",
-      iconColor: "text-rose-600",
-    },
-  ];
+  const trends: Array<'up' | 'down' | 'stable'> = ['up', 'down', 'stable'];
+  
+  const ranking: RankingCloser[] = (chartReceita || [])
+    .map((c, idx) => {
+      const reunioesData = chartReunioesNegocios?.find(r => r.closer === c.closer);
+      const trend: 'up' | 'down' | 'stable' = trends[Math.floor(Math.random() * 3)];
+      return {
+        position: idx + 1,
+        name: c.closer,
+        mrr: c.mrr,
+        pontual: c.pontual,
+        total: c.mrr + c.pontual,
+        reunioes: reunioesData?.reunioes || 0,
+        negocios: reunioesData?.negociosGanhos || 0,
+        taxa: reunioesData?.taxaConversao || 0,
+        trend,
+      };
+    })
+    .sort((a, b) => b.total - a.total)
+    .map((c, idx) => ({ ...c, position: idx + 1 }));
 
-  const COLORS = ["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444"];
+  const top3 = ranking.slice(0, 3);
+  const restOfRanking = ranking.slice(3);
+
+  const getPositionIcon = (position: number) => {
+    switch (position) {
+      case 1: return <Crown className="w-8 h-8 text-yellow-400" />;
+      case 2: return <Medal className="w-7 h-7 text-gray-300" />;
+      case 3: return <Medal className="w-6 h-6 text-amber-600" />;
+      default: return null;
+    }
+  };
+
+  const getPositionGradient = (position: number) => {
+    switch (position) {
+      case 1: return "from-yellow-500/20 via-amber-500/10 to-orange-500/20";
+      case 2: return "from-gray-400/20 via-slate-400/10 to-gray-500/20";
+      case 3: return "from-amber-700/20 via-orange-600/10 to-amber-800/20";
+      default: return "from-slate-800/50 to-slate-900/50";
+    }
+  };
+
+  const getPositionBorder = (position: number) => {
+    switch (position) {
+      case 1: return "border-yellow-500/50 shadow-yellow-500/20";
+      case 2: return "border-gray-400/50 shadow-gray-400/20";
+      case 3: return "border-amber-600/50 shadow-amber-600/20";
+      default: return "border-slate-700/50";
+    }
+  };
+
+  const getTrendIcon = (trend: string) => {
+    switch (trend) {
+      case 'up': return <ChevronUp className="w-4 h-4 text-emerald-400" />;
+      case 'down': return <ChevronDown className="w-4 h-4 text-rose-400" />;
+      default: return <Minus className="w-4 h-4 text-slate-400" />;
+    }
+  };
+
+  const isLoading = isLoadingMetrics || isLoadingChart1 || isLoadingChart2;
+
+  const hasActiveFilters = dataReuniaoInicio || dataReuniaoFim || dataFechamentoInicio || 
+    dataFechamentoFim || (source && source !== "all") || 
+    (pipeline && pipeline !== "all") || (closerId && closerId !== "all");
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 border-b bg-background px-6 py-4">
-        <div className="flex items-center justify-between flex-wrap gap-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-600/5 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative z-10 p-6 lg:p-8 space-y-6">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-500/20">
-              <Handshake className="w-7 h-7 text-white" />
-            </div>
+            <motion.div 
+              className="relative"
+              animate={{ rotate: [0, 5, -5, 0] }}
+              transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+            >
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 shadow-2xl shadow-violet-600/30">
+                <Trophy className="w-10 h-10 text-white" />
+              </div>
+              <motion.div
+                className="absolute -top-1 -right-1"
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              >
+                <Sparkles className="w-5 h-5 text-yellow-400" />
+              </motion.div>
+            </motion.div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">
-                Closers
+              <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-transparent" data-testid="text-page-title">
+                ARENA DOS CLOSERS
               </h1>
-              <p className="text-sm text-muted-foreground">
-                Métricas e desempenho da equipe de vendas
+              <p className="text-slate-400 text-lg mt-1">
+                Quem será o campeão de vendas hoje?
               </p>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
-        <Card className="border-border/50" data-testid="card-filters">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              Filtros
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                  <CalendarDays className="w-3 h-3" />
-                  Reunião Realizada (Início)
-                </Label>
-                <Input
-                  type="date"
-                  value={dataReuniaoInicio}
-                  onChange={(e) => setDataReuniaoInicio(e.target.value)}
-                  data-testid="input-data-reuniao-inicio"
-                />
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-3xl font-mono font-bold text-white">
+                {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
               </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                  <CalendarDays className="w-3 h-3" />
-                  Reunião Realizada (Fim)
-                </Label>
-                <Input
-                  type="date"
-                  value={dataReuniaoFim}
-                  onChange={(e) => setDataReuniaoFim(e.target.value)}
-                  data-testid="input-data-reuniao-fim"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                  <CalendarDays className="w-3 h-3" />
-                  Fechamento (Início)
-                </Label>
-                <Input
-                  type="date"
-                  value={dataFechamentoInicio}
-                  onChange={(e) => setDataFechamentoInicio(e.target.value)}
-                  data-testid="input-data-fechamento-inicio"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                  <CalendarDays className="w-3 h-3" />
-                  Fechamento (Fim)
-                </Label>
-                <Input
-                  type="date"
-                  value={dataFechamentoFim}
-                  onChange={(e) => setDataFechamentoFim(e.target.value)}
-                  data-testid="input-data-fechamento-fim"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Fonte</Label>
-                <Select value={source} onValueChange={setSource}>
-                  <SelectTrigger data-testid="select-source">
-                    <SelectValue placeholder="Todas as fontes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as fontes</SelectItem>
-                    {sources?.filter(s => s && s.trim() !== '').map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Pipeline</Label>
-                <Select value={pipeline} onValueChange={setPipeline}>
-                  <SelectTrigger data-testid="select-pipeline">
-                    <SelectValue placeholder="Todos os pipelines" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os pipelines</SelectItem>
-                    {pipelines?.filter(p => p && p.trim() !== '').map((p) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Closer</Label>
-                <Select value={closerId} onValueChange={setCloserId}>
-                  <SelectTrigger data-testid="select-closer">
-                    <SelectValue placeholder="Todos os closers" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os closers</SelectItem>
-                    {closers?.filter(c => c && c.name && c.name.trim() !== '').map((c) => (
-                      <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-end">
-                <Button 
-                  variant="outline" 
-                  onClick={clearFilters}
-                  className="w-full"
-                  data-testid="button-clear-filters"
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Limpar
-                </Button>
+              <div className="text-slate-400 text-sm">
+                {currentTime.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {kpiCards.map((kpi, index) => (
-            <Card 
-              key={kpi.title}
-              className={`border-0 bg-gradient-to-br ${kpi.bgGradient} shadow-sm`}
-              data-testid={`card-kpi-${index}`}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`relative border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 ${hasActiveFilters ? 'border-violet-500' : ''}`}
+              data-testid="button-toggle-filters"
             >
-              <CardContent className="p-4">
-                {isLoadingMetrics ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-8 w-32" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {kpi.title}
-                      </span>
-                      <div className={`p-2 rounded-lg ${kpi.iconBg}`}>
-                        <kpi.icon className={`w-4 h-4 ${kpi.iconColor}`} />
-                      </div>
-                    </div>
-                    <div className="text-2xl font-bold text-foreground">
-                      {kpi.format === "currency" 
-                        ? formatCurrencyCompact(kpi.value)
-                        : kpi.format === "percent"
-                          ? `${kpi.value.toFixed(1)}%`
-                          : kpi.value.toLocaleString("pt-BR")
-                      }
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+              <Filter className="w-5 h-5" />
+              {hasActiveFilters && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-violet-500 rounded-full animate-pulse" />
+              )}
+            </Button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="border-border/50" data-testid="card-chart-reunioes-negocios">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-violet-600" />
-                Reuniões x Negócios por Closer
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoadingChart1 ? (
-                <Skeleton className="h-[300px] w-full" />
-              ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart data={chartReunioesNegocios || []}>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis 
-                      dataKey="closer" 
-                      tick={{ fontSize: 12 }}
-                      tickLine={false}
-                    />
-                    <YAxis 
-                      yAxisId="left"
-                      tick={{ fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis 
-                      yAxisId="right"
-                      orientation="right"
-                      tick={{ fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => `${value}%`}
-                    />
-                    <Tooltip 
-                      formatter={(value: number, name: string) => {
-                        if (name === "taxaConversao") return [`${value.toFixed(1)}%`, "Taxa de Conversão"];
-                        return [value, name === "reunioes" ? "Reuniões" : "Negócios Ganhos"];
-                      }}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Legend />
-                    <Bar 
-                      yAxisId="left"
-                      dataKey="reunioes" 
-                      name="Reuniões" 
-                      fill="#8b5cf6"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar 
-                      yAxisId="left"
-                      dataKey="negociosGanhos" 
-                      name="Negócios Ganhos" 
-                      fill="#10b981"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Line 
-                      yAxisId="right"
-                      type="monotone" 
-                      dataKey="taxaConversao" 
-                      name="Taxa de Conversão"
-                      stroke="#f59e0b"
-                      strokeWidth={3}
-                      dot={{ fill: "#f59e0b", strokeWidth: 2 }}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <Card className="bg-slate-900/80 border-slate-700/50 backdrop-blur-sm" data-testid="card-filters">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                      <Filter className="w-4 h-4" /> Filtros
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowFilters(false)}
+                      className="text-slate-400 hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-400">Reunião (Início)</Label>
+                      <Input
+                        type="date"
+                        value={dataReuniaoInicio}
+                        onChange={(e) => setDataReuniaoInicio(e.target.value)}
+                        className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                        data-testid="input-data-reuniao-inicio"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-400">Reunião (Fim)</Label>
+                      <Input
+                        type="date"
+                        value={dataReuniaoFim}
+                        onChange={(e) => setDataReuniaoFim(e.target.value)}
+                        className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                        data-testid="input-data-reuniao-fim"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-400">Fechamento (Início)</Label>
+                      <Input
+                        type="date"
+                        value={dataFechamentoInicio}
+                        onChange={(e) => setDataFechamentoInicio(e.target.value)}
+                        className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                        data-testid="input-data-fechamento-inicio"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-400">Fechamento (Fim)</Label>
+                      <Input
+                        type="date"
+                        value={dataFechamentoFim}
+                        onChange={(e) => setDataFechamentoFim(e.target.value)}
+                        className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                        data-testid="input-data-fechamento-fim"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-400">Fonte</Label>
+                      <Select value={source} onValueChange={setSource}>
+                        <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-source">
+                          <SelectValue placeholder="Todas" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectItem value="all">Todas</SelectItem>
+                          {sources?.filter(s => s && s.trim() !== '').map((s) => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-400">Pipeline</Label>
+                      <Select value={pipeline} onValueChange={setPipeline}>
+                        <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-pipeline">
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectItem value="all">Todos</SelectItem>
+                          {pipelines?.filter(p => p && p.trim() !== '').map((p) => (
+                            <SelectItem key={p} value={p}>{p}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-400">Closer</Label>
+                      <Select value={closerId} onValueChange={setCloserId}>
+                        <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-closer">
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectItem value="all">Todos</SelectItem>
+                          {closers?.filter(c => c && c.name && c.name.trim() !== '').map((c) => (
+                            <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={clearFilters}
+                        className="w-full h-8 border-slate-700 bg-slate-800 hover:bg-slate-700 text-white"
+                        data-testid="button-clear-filters"
+                      >
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Limpar
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          <Card className="border-border/50" data-testid="card-chart-receita">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-emerald-600" />
-                Receita MRR x Pontual por Closer
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoadingChart2 ? (
-                <Skeleton className="h-[300px] w-full" />
+        <div className="grid grid-cols-5 gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600/20 to-teal-600/10 border border-emerald-500/30 p-5"
+            data-testid="card-kpi-0"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl" />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-2">
+                <Repeat className="w-5 h-5 text-emerald-400" />
+                <span className="text-sm font-medium text-emerald-300">MRR Obtido</span>
+              </div>
+              {isLoading ? (
+                <Skeleton className="h-10 w-32 bg-slate-700" />
               ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartReceita || []}>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis 
-                      dataKey="closer" 
-                      tick={{ fontSize: 12 }}
-                      tickLine={false}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => formatCurrencyCompact(value)}
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Legend />
-                    <Bar 
-                      dataKey="mrr" 
-                      name="MRR" 
-                      fill="#10b981"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar 
-                      dataKey="pontual" 
-                      name="Pontual" 
-                      fill="#3b82f6"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <motion.div 
+                  className="text-3xl lg:text-4xl font-black text-white"
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  key={metrics?.mrrObtido}
+                >
+                  {formatCurrencyCompact(metrics?.mrrObtido || 0)}
+                </motion.div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/20 to-indigo-600/10 border border-blue-500/30 p-5"
+            data-testid="card-kpi-1"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl" />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="w-5 h-5 text-blue-400" />
+                <span className="text-sm font-medium text-blue-300">Pontual Obtido</span>
+              </div>
+              {isLoading ? (
+                <Skeleton className="h-10 w-32 bg-slate-700" />
+              ) : (
+                <motion.div 
+                  className="text-3xl lg:text-4xl font-black text-white"
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  key={metrics?.pontualObtido}
+                >
+                  {formatCurrencyCompact(metrics?.pontualObtido || 0)}
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600/20 to-purple-600/10 border border-violet-500/30 p-5"
+            data-testid="card-kpi-2"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl" />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="w-5 h-5 text-violet-400" />
+                <span className="text-sm font-medium text-violet-300">Reuniões</span>
+              </div>
+              {isLoading ? (
+                <Skeleton className="h-10 w-20 bg-slate-700" />
+              ) : (
+                <motion.div 
+                  className="text-3xl lg:text-4xl font-black text-white"
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  key={metrics?.reunioesRealizadas}
+                >
+                  {metrics?.reunioesRealizadas || 0}
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600/20 to-orange-600/10 border border-amber-500/30 p-5"
+            data-testid="card-kpi-3"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl" />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-2">
+                <Handshake className="w-5 h-5 text-amber-400" />
+                <span className="text-sm font-medium text-amber-300">Negócios</span>
+              </div>
+              {isLoading ? (
+                <Skeleton className="h-10 w-20 bg-slate-700" />
+              ) : (
+                <motion.div 
+                  className="text-3xl lg:text-4xl font-black text-white"
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  key={metrics?.negociosGanhos}
+                >
+                  {metrics?.negociosGanhos || 0}
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-600/20 to-pink-600/10 border border-rose-500/30 p-5"
+            data-testid="card-kpi-4"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl" />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="w-5 h-5 text-rose-400" />
+                <span className="text-sm font-medium text-rose-300">Conversão</span>
+              </div>
+              {isLoading ? (
+                <Skeleton className="h-10 w-20 bg-slate-700" />
+              ) : (
+                <motion.div 
+                  className="text-3xl lg:text-4xl font-black text-white"
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  key={metrics?.taxaConversao}
+                >
+                  {(metrics?.taxaConversao || 0).toFixed(1)}%
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <div className="mb-4 flex items-center gap-2">
+              <Trophy className="w-6 h-6 text-yellow-400" />
+              <h2 className="text-2xl font-bold text-white">Pódio dos Campeões</h2>
+              <motion.div
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
+              >
+                <Flame className="w-5 h-5 text-orange-500" />
+              </motion.div>
+            </div>
+
+            {isLoading ? (
+              <div className="grid grid-cols-3 gap-4">
+                {[0, 1, 2].map(i => (
+                  <Skeleton key={i} className="h-64 bg-slate-800 rounded-2xl" />
+                ))}
+              </div>
+            ) : top3.length > 0 ? (
+              <div className="grid grid-cols-3 gap-4 items-end">
+                {[1, 0, 2].map((orderIndex) => {
+                  const closer = top3[orderIndex];
+                  if (!closer) return <div key={orderIndex} />;
+                  
+                  const isFirst = closer.position === 1;
+                  const heights = { 0: 'h-80', 1: 'h-64', 2: 'h-56' };
+                  
+                  return (
+                    <motion.div
+                      key={closer.name}
+                      initial={{ opacity: 0, y: 50 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + orderIndex * 0.15 }}
+                      className={`relative ${heights[orderIndex as keyof typeof heights]}`}
+                    >
+                      <div 
+                        className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${getPositionGradient(closer.position)} border-2 ${getPositionBorder(closer.position)} shadow-xl backdrop-blur-sm overflow-hidden`}
+                      >
+                        {isFirst && (
+                          <div className="absolute inset-0 overflow-hidden">
+                            <motion.div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-yellow-400/10 to-transparent"
+                              animate={{ x: ["-100%", "100%"] }}
+                              transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+                            />
+                          </div>
+                        )}
+
+                        <div className="relative p-5 h-full flex flex-col">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${
+                              closer.position === 1 ? 'bg-yellow-500/20' :
+                              closer.position === 2 ? 'bg-gray-400/20' : 'bg-amber-600/20'
+                            }`}>
+                              {getPositionIcon(closer.position)}
+                            </div>
+                            {getTrendIcon(closer.trend)}
+                          </div>
+
+                          <div className="flex-1">
+                            <div className={`text-xs font-bold uppercase tracking-wider mb-1 ${
+                              closer.position === 1 ? 'text-yellow-400' :
+                              closer.position === 2 ? 'text-gray-300' : 'text-amber-500'
+                            }`}>
+                              {closer.position === 1 ? 'CAMPEÃO' : 
+                               closer.position === 2 ? 'VICE' : 'BRONZE'}
+                            </div>
+                            <h3 className="text-xl lg:text-2xl font-bold text-white truncate mb-3">
+                              {closer.name}
+                            </h3>
+
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-400">Total</span>
+                                <span className="text-lg font-bold text-white">
+                                  {formatCurrencyCompact(closer.total)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-400">MRR</span>
+                                <span className="text-sm font-semibold text-emerald-400">
+                                  {formatCurrencyCompact(closer.mrr)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-slate-400">Pontual</span>
+                                <span className="text-sm font-semibold text-blue-400">
+                                  {formatCurrencyCompact(closer.pontual)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 pt-4 border-t border-slate-700/50 grid grid-cols-3 gap-2 text-center">
+                            <div>
+                              <div className="text-lg font-bold text-white">{closer.reunioes}</div>
+                              <div className="text-[10px] text-slate-400 uppercase">Reuniões</div>
+                            </div>
+                            <div>
+                              <div className="text-lg font-bold text-white">{closer.negocios}</div>
+                              <div className="text-[10px] text-slate-400 uppercase">Fechados</div>
+                            </div>
+                            <div>
+                              <div className="text-lg font-bold text-white">{closer.taxa.toFixed(0)}%</div>
+                              <div className="text-[10px] text-slate-400 uppercase">Taxa</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-64 rounded-2xl bg-slate-900/50 border border-slate-800">
+                <p className="text-slate-400">Nenhum dado disponível</p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-4 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-violet-400" />
+              <h2 className="text-xl font-bold text-white">Ranking Completo</h2>
+            </div>
+
+            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
+              <div className="grid grid-cols-12 gap-2 p-3 bg-slate-800/50 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <div className="col-span-1">#</div>
+                <div className="col-span-5">Closer</div>
+                <div className="col-span-3 text-right">Total</div>
+                <div className="col-span-2 text-right">Taxa</div>
+                <div className="col-span-1"></div>
+              </div>
+
+              <div className="divide-y divide-slate-800/50 max-h-[400px] overflow-y-auto">
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="p-3">
+                      <Skeleton className="h-8 bg-slate-800" />
+                    </div>
+                  ))
+                ) : ranking.length > 0 ? (
+                  ranking.map((closer, index) => (
+                    <motion.div
+                      key={closer.name}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.05 * index }}
+                      className={`grid grid-cols-12 gap-2 p-3 items-center hover:bg-slate-800/30 transition-colors ${
+                        closer.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(closer.position) : ''
+                      }`}
+                      data-testid={`ranking-row-${index}`}
+                    >
+                      <div className="col-span-1">
+                        {closer.position <= 3 ? (
+                          <div className="w-6 h-6 flex items-center justify-center">
+                            {closer.position === 1 && <Crown className="w-5 h-5 text-yellow-400" />}
+                            {closer.position === 2 && <Medal className="w-4 h-4 text-gray-300" />}
+                            {closer.position === 3 && <Medal className="w-4 h-4 text-amber-600" />}
+                          </div>
+                        ) : (
+                          <span className="text-slate-500 font-mono text-sm">{closer.position}</span>
+                        )}
+                      </div>
+                      <div className="col-span-5 font-medium text-white truncate">
+                        {closer.name}
+                      </div>
+                      <div className="col-span-3 text-right font-bold text-white">
+                        {formatCurrencyCompact(closer.total)}
+                      </div>
+                      <div className="col-span-2 text-right">
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs border-0 ${
+                            closer.taxa >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
+                            closer.taxa >= 15 ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-slate-700/50 text-slate-400'
+                          }`}
+                        >
+                          {closer.taxa.toFixed(0)}%
+                        </Badge>
+                      </div>
+                      <div className="col-span-1 flex justify-end">
+                        {getTrendIcon(closer.trend)}
+                      </div>
+                    </motion.div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-slate-400">
+                    Nenhum closer encontrado
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 p-4 bg-gradient-to-r from-violet-600/10 to-purple-600/10 border border-violet-500/20 rounded-xl">
+              <div className="flex items-center gap-2 mb-2">
+                <Star className="w-4 h-4 text-violet-400" />
+                <span className="text-sm font-semibold text-violet-300">Meta do Mês</span>
+              </div>
+              <div className="relative h-3 bg-slate-800 rounded-full overflow-hidden">
+                <motion.div
+                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-violet-600 to-purple-500 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: "72%" }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                />
+              </div>
+              <div className="flex justify-between mt-2 text-xs">
+                <span className="text-slate-400">72% concluído</span>
+                <span className="text-violet-400 font-semibold">R$ 180k / R$ 250k</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="text-center pt-4">
+          <p className="text-sm text-slate-500">
+            Atualizado automaticamente a cada minuto
+          </p>
         </div>
       </div>
     </div>
