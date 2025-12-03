@@ -25,10 +25,13 @@ import {
   Star,
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Minus,
   Sparkles,
   Repeat,
-  X
+  X,
+  Calendar
 } from "lucide-react";
 
 interface CloserMetrics {
@@ -72,20 +75,51 @@ interface RankingCloser {
 }
 
 export default function DashboardClosers() {
+  const hoje = new Date();
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
+
   const [dataReuniaoInicio, setDataReuniaoInicio] = useState<string>("");
   const [dataReuniaoFim, setDataReuniaoFim] = useState<string>("");
-  const [dataFechamentoInicio, setDataFechamentoInicio] = useState<string>("");
-  const [dataFechamentoFim, setDataFechamentoFim] = useState<string>("");
+  const [dataFechamentoInicio, setDataFechamentoInicio] = useState<string>(inicioMes);
+  const [dataFechamentoFim, setDataFechamentoFim] = useState<string>(fimMes);
   const [source, setSource] = useState<string>("all");
   const [pipeline, setPipeline] = useState<string>("all");
   const [closerId, setCloserId] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [mesAtual, setMesAtual] = useState<string>(
+    hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+  );
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const navegarMes = (direcao: 'anterior' | 'proximo') => {
+    const dataAtual = new Date(dataFechamentoInicio + 'T00:00:00');
+    const novoMes = direcao === 'anterior' 
+      ? new Date(dataAtual.getFullYear(), dataAtual.getMonth() - 1, 1)
+      : new Date(dataAtual.getFullYear(), dataAtual.getMonth() + 1, 1);
+    
+    const inicioNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth(), 1).toISOString().split('T')[0];
+    const fimNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth() + 1, 0).toISOString().split('T')[0];
+    
+    setDataFechamentoInicio(inicioNovoMes);
+    setDataFechamentoFim(fimNovoMes);
+    setMesAtual(novoMes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
+  };
+
+  const irParaMesAtual = () => {
+    const agora = new Date();
+    const inicioMesAtual = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0];
+    const fimMesAtual = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0];
+    
+    setDataFechamentoInicio(inicioMesAtual);
+    setDataFechamentoFim(fimMesAtual);
+    setMesAtual(agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
+  };
 
   const buildQueryParams = () => {
     const params = new URLSearchParams();
@@ -141,13 +175,18 @@ export default function DashboardClosers() {
   });
 
   const clearFilters = () => {
+    const agora = new Date();
+    const inicioMesAtual = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0];
+    const fimMesAtual = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0];
+    
     setDataReuniaoInicio("");
     setDataReuniaoFim("");
-    setDataFechamentoInicio("");
-    setDataFechamentoFim("");
+    setDataFechamentoInicio(inicioMesAtual);
+    setDataFechamentoFim(fimMesAtual);
     setSource("all");
     setPipeline("all");
     setCloserId("all");
+    setMesAtual(agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   };
 
   const formatCurrency = (value: number) => {
@@ -230,8 +269,8 @@ export default function DashboardClosers() {
 
   const isLoading = isLoadingMetrics || isLoadingChart1 || isLoadingChart2;
 
-  const hasActiveFilters = dataReuniaoInicio || dataReuniaoFim || dataFechamentoInicio || 
-    dataFechamentoFim || (source && source !== "all") || 
+  const hasActiveFilters = dataReuniaoInicio || dataReuniaoFim || 
+    (source && source !== "all") || 
     (pipeline && pipeline !== "all") || (closerId && closerId !== "all");
 
   return (
@@ -266,20 +305,60 @@ export default function DashboardClosers() {
                 ARENA DOS CLOSERS
               </h1>
               <p className="text-slate-400 text-lg mt-1">
-                Quem será o campeão de vendas hoje?
+                Quem será o campeão de vendas?
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-xl px-2 py-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navegarMes('anterior')}
+                className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700"
+                data-testid="button-mes-anterior"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+              
+              <div className="flex items-center gap-2 px-3 min-w-[180px] justify-center">
+                <Calendar className="w-4 h-4 text-violet-400" />
+                <span className="text-white font-semibold capitalize" data-testid="text-mes-atual">
+                  {mesAtual}
+                </span>
+              </div>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navegarMes('proximo')}
+                className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700"
+                data-testid="button-mes-proximo"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={irParaMesAtual}
+                className="text-xs text-violet-400 hover:text-violet-300 hover:bg-slate-700 ml-1"
+                data-testid="button-mes-atual"
+              >
+                Hoje
+              </Button>
+            </div>
+
             <div className="text-right">
-              <div className="text-3xl font-mono font-bold text-white">
+              <div className="text-2xl font-mono font-bold text-white">
                 {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
               </div>
-              <div className="text-slate-400 text-sm">
-                {currentTime.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
+              <div className="text-slate-400 text-xs">
+                {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric" })}
               </div>
             </div>
+            
             <Button
               variant="outline"
               size="icon"
