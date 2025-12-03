@@ -1790,49 +1790,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         closerId
       } = req.query;
 
-      const conditions: string[] = [];
-      const params: any[] = [];
-      let paramIndex = 1;
+      const conditions: ReturnType<typeof sql>[] = [];
 
       if (dataReuniaoInicio) {
-        conditions.push(`d.data_reuniao_realizada >= $${paramIndex}`);
-        params.push(dataReuniaoInicio);
-        paramIndex++;
+        conditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
       }
       if (dataReuniaoFim) {
-        conditions.push(`d.data_reuniao_realizada <= $${paramIndex}`);
-        params.push(dataReuniaoFim);
-        paramIndex++;
+        conditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
       }
       if (dataFechamentoInicio) {
-        conditions.push(`d.close_date >= $${paramIndex}`);
-        params.push(dataFechamentoInicio);
-        paramIndex++;
+        conditions.push(sql`d.close_date >= ${dataFechamentoInicio}`);
       }
       if (dataFechamentoFim) {
-        conditions.push(`d.close_date <= $${paramIndex}`);
-        params.push(dataFechamentoFim);
-        paramIndex++;
+        conditions.push(sql`d.close_date <= ${dataFechamentoFim}`);
       }
       if (source) {
-        conditions.push(`d.source = $${paramIndex}`);
-        params.push(source);
-        paramIndex++;
+        conditions.push(sql`d.source = ${source}`);
       }
       if (pipeline) {
-        conditions.push(`d.category_name = $${paramIndex}`);
-        params.push(pipeline);
-        paramIndex++;
+        conditions.push(sql`d.category_name = ${pipeline}`);
       }
       if (closerId) {
-        conditions.push(`d.closer = $${paramIndex}`);
-        params.push(parseInt(closerId as string));
-        paramIndex++;
+        conditions.push(sql`d.closer = ${parseInt(closerId as string)}`);
       }
 
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const whereClause = conditions.length > 0 
+        ? sql`WHERE ${sql.join(conditions, sql` AND `)}` 
+        : sql``;
 
-      const query = `
+      const result = await db.execute(sql`
         SELECT 
           COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN d.valor_recorrente ELSE 0 END), 0) as mrr_obtido,
           COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN d.valor_pontual ELSE 0 END), 0) as pontual_obtido,
@@ -1841,9 +1827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM crm_deal d
         LEFT JOIN crm_closers c ON d.closer = c.id
         ${whereClause}
-      `;
-
-      const result = await db.execute(sql.raw(query, params));
+      `);
       const row = result.rows[0] as any;
 
       const reunioes = parseInt(row.reunioes_realizadas) || 0;
@@ -1874,44 +1858,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pipeline
       } = req.query;
 
-      const conditions: string[] = [];
-      const params: any[] = [];
-      let paramIndex = 1;
+      const conditions: ReturnType<typeof sql>[] = [];
 
       if (dataReuniaoInicio) {
-        conditions.push(`d.data_reuniao_realizada >= $${paramIndex}`);
-        params.push(dataReuniaoInicio);
-        paramIndex++;
+        conditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
       }
       if (dataReuniaoFim) {
-        conditions.push(`d.data_reuniao_realizada <= $${paramIndex}`);
-        params.push(dataReuniaoFim);
-        paramIndex++;
+        conditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
       }
       if (dataFechamentoInicio) {
-        conditions.push(`d.close_date >= $${paramIndex}`);
-        params.push(dataFechamentoInicio);
-        paramIndex++;
+        conditions.push(sql`d.close_date >= ${dataFechamentoInicio}`);
       }
       if (dataFechamentoFim) {
-        conditions.push(`d.close_date <= $${paramIndex}`);
-        params.push(dataFechamentoFim);
-        paramIndex++;
+        conditions.push(sql`d.close_date <= ${dataFechamentoFim}`);
       }
       if (source) {
-        conditions.push(`d.source = $${paramIndex}`);
-        params.push(source);
-        paramIndex++;
+        conditions.push(sql`d.source = ${source}`);
       }
       if (pipeline) {
-        conditions.push(`d.category_name = $${paramIndex}`);
-        params.push(pipeline);
-        paramIndex++;
+        conditions.push(sql`d.category_name = ${pipeline}`);
       }
 
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const whereClause = conditions.length > 0 
+        ? sql`WHERE ${sql.join(conditions, sql` AND `)}` 
+        : sql``;
 
-      const query = `
+      const result = await db.execute(sql`
         SELECT 
           c.name as closer_name,
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes,
@@ -1921,9 +1893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ${whereClause}
         GROUP BY c.id, c.name
         ORDER BY c.name
-      `;
-
-      const result = await db.execute(sql.raw(query, params));
+      `);
       
       const data = result.rows.map((row: any) => {
         const reunioes = parseInt(row.reunioes) || 0;
@@ -1956,44 +1926,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pipeline
       } = req.query;
 
-      const conditions: string[] = ["d.stage_name = 'Negócio Ganho (WON)'"];
-      const params: any[] = [];
-      let paramIndex = 1;
+      const conditions: ReturnType<typeof sql>[] = [sql`d.stage_name = 'Negócio Ganho (WON)'`];
 
       if (dataReuniaoInicio) {
-        conditions.push(`d.data_reuniao_realizada >= $${paramIndex}`);
-        params.push(dataReuniaoInicio);
-        paramIndex++;
+        conditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
       }
       if (dataReuniaoFim) {
-        conditions.push(`d.data_reuniao_realizada <= $${paramIndex}`);
-        params.push(dataReuniaoFim);
-        paramIndex++;
+        conditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
       }
       if (dataFechamentoInicio) {
-        conditions.push(`d.close_date >= $${paramIndex}`);
-        params.push(dataFechamentoInicio);
-        paramIndex++;
+        conditions.push(sql`d.close_date >= ${dataFechamentoInicio}`);
       }
       if (dataFechamentoFim) {
-        conditions.push(`d.close_date <= $${paramIndex}`);
-        params.push(dataFechamentoFim);
-        paramIndex++;
+        conditions.push(sql`d.close_date <= ${dataFechamentoFim}`);
       }
       if (source) {
-        conditions.push(`d.source = $${paramIndex}`);
-        params.push(source);
-        paramIndex++;
+        conditions.push(sql`d.source = ${source}`);
       }
       if (pipeline) {
-        conditions.push(`d.category_name = $${paramIndex}`);
-        params.push(pipeline);
-        paramIndex++;
+        conditions.push(sql`d.category_name = ${pipeline}`);
       }
 
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const whereClause = conditions.length > 0 
+        ? sql`WHERE ${sql.join(conditions, sql` AND `)}` 
+        : sql``;
 
-      const query = `
+      const result = await db.execute(sql`
         SELECT 
           c.name as closer_name,
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
@@ -2003,9 +1961,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ${whereClause}
         GROUP BY c.id, c.name
         ORDER BY c.name
-      `;
-
-      const result = await db.execute(sql.raw(query, params));
+      `);
       
       const data = result.rows.map((row: any) => ({
         closer: row.closer_name,
