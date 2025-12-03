@@ -1811,7 +1811,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(sql`d.category_name = ${pipeline}`);
       }
       if (closerId) {
-        conditions.push(sql`d.closer = ${closerId}`);
+        conditions.push(sql`d.closer = ${parseInt(closerId as string)}`);
       }
 
       const whereClause = conditions.length > 0 
