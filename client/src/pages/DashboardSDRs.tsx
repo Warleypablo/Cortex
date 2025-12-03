@@ -35,10 +35,9 @@ import {
 } from "lucide-react";
 
 interface SDRMetrics {
+  leadsTotais: number;
   reunioesRealizadas: number;
-  reunioesAgendadas: number;
-  taxaShowRate: number;
-  leadsQualificados: number;
+  taxaConversao: number;
 }
 
 interface SDR {
@@ -50,17 +49,18 @@ interface SDR {
 
 interface ChartDataReunioes {
   sdr: string;
+  sdrId: number;
+  leads: number;
   reunioesRealizadas: number;
-  reunioesAgendadas: number;
-  showRate: number;
+  conversao: number;
 }
 
 interface RankingSDR {
   position: number;
   name: string;
+  leads: number;
   reunioesRealizadas: number;
-  reunioesAgendadas: number;
-  showRate: number;
+  conversao: number;
   trend: 'up' | 'down' | 'stable';
 }
 
@@ -174,9 +174,9 @@ export default function DashboardSDRs() {
       return {
         position: idx + 1,
         name: c.sdr,
+        leads: c.leads,
         reunioesRealizadas: c.reunioesRealizadas,
-        reunioesAgendadas: c.reunioesAgendadas,
-        showRate: c.showRate,
+        conversao: c.conversao,
         trend,
       };
     })
@@ -432,8 +432,15 @@ export default function DashboardSDRs() {
           )}
         </AnimatePresence>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           {[
+            { 
+              label: "Leads Criados", 
+              value: metrics?.leadsTotais || 0, 
+              icon: Users,
+              gradient: "from-blue-600 to-indigo-600",
+              format: (v: number) => v.toString()
+            },
             { 
               label: "Reuniões Realizadas", 
               value: metrics?.reunioesRealizadas || 0, 
@@ -442,11 +449,11 @@ export default function DashboardSDRs() {
               format: (v: number) => v.toString()
             },
             { 
-              label: "Leads Trabalhados", 
-              value: metrics?.leadsQualificados || 0, 
-              icon: Users,
-              gradient: "from-purple-600 to-violet-600",
-              format: (v: number) => v.toString()
+              label: "Taxa de Conversão", 
+              value: metrics?.taxaConversao || 0, 
+              icon: TrendingUp,
+              gradient: "from-emerald-600 to-green-600",
+              format: (v: number) => `${v.toFixed(1)}%`
             },
           ].map((kpi, index) => (
             <motion.div
@@ -545,21 +552,21 @@ export default function DashboardSDRs() {
                         
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
-                            <span className="text-slate-400 text-sm">Total</span>
+                            <span className="text-slate-400 text-sm">Reuniões</span>
                             <span className="text-2xl font-black text-cyan-400">
                               {sdr.reunioesRealizadas}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-slate-400 text-xs">Agendadas</span>
+                            <span className="text-slate-400 text-xs">Leads</span>
                             <span className="text-sm font-semibold text-blue-400">
-                              {sdr.reunioesAgendadas}
+                              {sdr.leads}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-slate-400 text-xs">Show Rate</span>
+                            <span className="text-slate-400 text-xs">Conversão</span>
                             <span className="text-sm font-semibold text-emerald-400">
-                              {sdr.showRate.toFixed(0)}%
+                              {sdr.conversao.toFixed(1)}%
                             </span>
                           </div>
                         </div>
@@ -584,9 +591,10 @@ export default function DashboardSDRs() {
             <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
               <div className="grid grid-cols-12 gap-2 p-3 bg-slate-800/50 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 <div className="col-span-1">#</div>
-                <div className="col-span-5">SDR</div>
-                <div className="col-span-3 text-right">Reuniões</div>
-                <div className="col-span-2 text-right">Show Rate</div>
+                <div className="col-span-4">SDR</div>
+                <div className="col-span-2 text-right">Leads</div>
+                <div className="col-span-2 text-right">Reuniões</div>
+                <div className="col-span-2 text-right">Conversão</div>
                 <div className="col-span-1"></div>
               </div>
 
@@ -620,22 +628,25 @@ export default function DashboardSDRs() {
                           <span className="text-slate-500 font-mono text-sm">{sdr.position}</span>
                         )}
                       </div>
-                      <div className="col-span-5 font-medium text-white truncate">
+                      <div className="col-span-4 font-medium text-white truncate">
                         {sdr.name}
                       </div>
-                      <div className="col-span-3 text-right font-bold text-cyan-400">
+                      <div className="col-span-2 text-right text-blue-400">
+                        {sdr.leads}
+                      </div>
+                      <div className="col-span-2 text-right font-bold text-cyan-400">
                         {sdr.reunioesRealizadas}
                       </div>
                       <div className="col-span-2 text-right">
                         <Badge 
                           variant="outline" 
                           className={`text-xs border-0 ${
-                            sdr.showRate >= 70 ? 'bg-emerald-500/20 text-emerald-400' :
-                            sdr.showRate >= 50 ? 'bg-amber-500/20 text-amber-400' :
+                            sdr.conversao >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
+                            sdr.conversao >= 15 ? 'bg-amber-500/20 text-amber-400' :
                             'bg-slate-700/50 text-slate-400'
                           }`}
                         >
-                          {sdr.showRate.toFixed(0)}%
+                          {sdr.conversao.toFixed(1)}%
                         </Badge>
                       </div>
                       <div className="col-span-1 flex justify-end">
