@@ -1980,6 +1980,252 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // SDRs DASHBOARD API ENDPOINTS
+  // ========================================
+
+  app.get("/api/sdrs/list", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, nome as name, email, ativo as active
+        FROM crm_closers
+        WHERE ativo = true
+        ORDER BY nome
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching SDRs list:", error);
+      res.status(500).json({ error: "Failed to fetch SDRs list" });
+    }
+  });
+
+  app.get("/api/sdrs/sources", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT source
+        FROM crm_deal
+        WHERE source IS NOT NULL AND source != ''
+        ORDER BY source
+      `);
+      res.json(result.rows.map((r: any) => r.source));
+    } catch (error) {
+      console.error("[api] Error fetching SDR sources:", error);
+      res.status(500).json({ error: "Failed to fetch sources" });
+    }
+  });
+
+  app.get("/api/sdrs/pipelines", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT category_name
+        FROM crm_deal
+        WHERE category_name IS NOT NULL AND category_name != ''
+        ORDER BY category_name
+      `);
+      res.json(result.rows.map((r: any) => r.category_name));
+    } catch (error) {
+      console.error("[api] Error fetching SDR pipelines:", error);
+      res.status(500).json({ error: "Failed to fetch pipelines" });
+    }
+  });
+
+  app.get("/api/sdrs/metrics", async (req, res) => {
+    try {
+      const { 
+        dataReuniaoInicio, 
+        dataReuniaoFim, 
+        source,
+        pipeline,
+        sdrId
+      } = req.query;
+
+      console.log("[sdrs/metrics] Query params:", { dataReuniaoInicio, dataReuniaoFim, source, pipeline, sdrId });
+
+      const conditions: ReturnType<typeof sql>[] = [];
+
+      if (dataReuniaoInicio) {
+        conditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
+      }
+      if (dataReuniaoFim) {
+        conditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
+      }
+      if (source) {
+        conditions.push(sql`d.source = ${source}`);
+      }
+      if (pipeline) {
+        conditions.push(sql`d.category_name = ${pipeline}`);
+      }
+      if (sdrId) {
+        conditions.push(sql`d.sdr = ${sdrId}`);
+      }
+
+      const whereClauseRealizadas = conditions.length > 0 
+        ? sql`WHERE d.data_reuniao_realizada IS NOT NULL AND ${sql.join(conditions, sql` AND `)}` 
+        : sql`WHERE d.data_reuniao_realizada IS NOT NULL`;
+
+      console.log("[sdrs/metrics] Executing metrics query...");
+      
+      const resultRealizadas = await db.execute(sql`
+        SELECT COUNT(*) as reunioes_realizadas
+        FROM crm_deal d
+        ${whereClauseRealizadas}
+      `);
+
+      const conditionsAgendadas: ReturnType<typeof sql>[] = [];
+      if (dataReuniaoInicio) {
+        conditionsAgendadas.push(sql`d.data_reuniao_marcada >= ${dataReuniaoInicio}`);
+      }
+      if (dataReuniaoFim) {
+        conditionsAgendadas.push(sql`d.data_reuniao_marcada <= ${dataReuniaoFim}`);
+      }
+      if (source) {
+        conditionsAgendadas.push(sql`d.source = ${source}`);
+      }
+      if (pipeline) {
+        conditionsAgendadas.push(sql`d.category_name = ${pipeline}`);
+      }
+      if (sdrId) {
+        conditionsAgendadas.push(sql`d.sdr = ${sdrId}`);
+      }
+
+      const whereClauseAgendadas = conditionsAgendadas.length > 0 
+        ? sql`WHERE d.data_reuniao_marcada IS NOT NULL AND ${sql.join(conditionsAgendadas, sql` AND `)}` 
+        : sql`WHERE d.data_reuniao_marcada IS NOT NULL`;
+
+      const resultAgendadas = await db.execute(sql`
+        SELECT COUNT(*) as reunioes_agendadas
+        FROM crm_deal d
+        ${whereClauseAgendadas}
+      `);
+
+      const whereClauseLeads = conditions.length > 0 
+        ? sql`WHERE ${sql.join(conditions, sql` AND `)}` 
+        : sql``;
+
+      const resultLeads = await db.execute(sql`
+        SELECT COUNT(DISTINCT d.id) as leads_qualificados
+        FROM crm_deal d
+        ${whereClauseLeads}
+      `);
+
+      const row = resultRealizadas.rows[0] as any;
+      const rowAgendadas = resultAgendadas.rows[0] as any;
+      const rowLeads = resultLeads.rows[0] as any;
+      
+      const reunioesRealizadas = parseInt(row.reunioes_realizadas) || 0;
+      const reunioesAgendadas = parseInt(rowAgendadas.reunioes_agendadas) || 0;
+      const leadsQualificados = parseInt(rowLeads.leads_qualificados) || 0;
+      const taxaShowRate = reunioesAgendadas > 0 ? (reunioesRealizadas / reunioesAgendadas) * 100 : 0;
+
+      res.json({
+        reunioesRealizadas,
+        reunioesAgendadas,
+        taxaShowRate,
+        leadsQualificados
+      });
+    } catch (error) {
+      console.error("[api] Error fetching SDR metrics:", error);
+      res.status(500).json({ error: "Failed to fetch SDR metrics" });
+    }
+  });
+
+  app.get("/api/sdrs/chart-reunioes", async (req, res) => {
+    try {
+      const { 
+        dataReuniaoInicio, 
+        dataReuniaoFim, 
+        source,
+        pipeline,
+        sdrId
+      } = req.query;
+
+      const conditionsRealizadas: ReturnType<typeof sql>[] = [sql`d.data_reuniao_realizada IS NOT NULL`];
+
+      if (dataReuniaoInicio) {
+        conditionsRealizadas.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
+      }
+      if (dataReuniaoFim) {
+        conditionsRealizadas.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
+      }
+      if (source) {
+        conditionsRealizadas.push(sql`d.source = ${source}`);
+      }
+      if (pipeline) {
+        conditionsRealizadas.push(sql`d.category_name = ${pipeline}`);
+      }
+      if (sdrId) {
+        conditionsRealizadas.push(sql`d.sdr = ${sdrId}`);
+      }
+
+      const whereClauseRealizadas = sql`WHERE ${sql.join(conditionsRealizadas, sql` AND `)}`;
+
+      const resultRealizadas = await db.execute(sql`
+        SELECT 
+          c.nome as sdr_name,
+          c.id as sdr_id,
+          COUNT(*) as reunioes_realizadas
+        FROM crm_deal d
+        INNER JOIN crm_closers c ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = c.id
+        ${whereClauseRealizadas}
+        GROUP BY c.id, c.nome
+      `);
+
+      const conditionsAgendadas: ReturnType<typeof sql>[] = [sql`d.data_reuniao_marcada IS NOT NULL`];
+
+      if (dataReuniaoInicio) {
+        conditionsAgendadas.push(sql`d.data_reuniao_marcada >= ${dataReuniaoInicio}`);
+      }
+      if (dataReuniaoFim) {
+        conditionsAgendadas.push(sql`d.data_reuniao_marcada <= ${dataReuniaoFim}`);
+      }
+      if (source) {
+        conditionsAgendadas.push(sql`d.source = ${source}`);
+      }
+      if (pipeline) {
+        conditionsAgendadas.push(sql`d.category_name = ${pipeline}`);
+      }
+      if (sdrId) {
+        conditionsAgendadas.push(sql`d.sdr = ${sdrId}`);
+      }
+
+      const whereClauseAgendadas = sql`WHERE ${sql.join(conditionsAgendadas, sql` AND `)}`;
+
+      const resultAgendadas = await db.execute(sql`
+        SELECT 
+          c.nome as sdr_name,
+          c.id as sdr_id,
+          COUNT(*) as reunioes_agendadas
+        FROM crm_deal d
+        INNER JOIN crm_closers c ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = c.id
+        ${whereClauseAgendadas}
+        GROUP BY c.id, c.nome
+      `);
+
+      const agendadasMap = new Map<number, number>();
+      resultAgendadas.rows.forEach((row: any) => {
+        agendadasMap.set(row.sdr_id, parseInt(row.reunioes_agendadas) || 0);
+      });
+
+      const data = resultRealizadas.rows.map((row: any) => {
+        const realizadas = parseInt(row.reunioes_realizadas) || 0;
+        const agendadas = agendadasMap.get(row.sdr_id) || 0;
+        const showRate = agendadas > 0 ? (realizadas / agendadas) * 100 : 0;
+        
+        return {
+          sdr: row.sdr_name,
+          reunioesRealizadas: realizadas,
+          reunioesAgendadas: agendadas,
+          showRate: parseFloat(showRate.toFixed(1))
+        };
+      });
+
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching SDR chart data:", error);
+      res.status(500).json({ error: "Failed to fetch SDR chart data" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
