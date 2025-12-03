@@ -97,7 +97,8 @@ router.post("/auth/dev-login", (req, res) => {
       '/dashboard/closers',
       '/dashboard/sdrs',
       '/dashboard/closers/detalhamento',
-      '/admin/usuarios'
+      '/admin/usuarios',
+      '/dashboard/comercial/analise-vendas'
     ]
   };
 
