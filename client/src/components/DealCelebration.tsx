@@ -27,16 +27,46 @@ export function DealCelebration({
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const playSound = useCallback(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.src = "data:audio/wav;base64,UklGRl4GAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToGAACAgICAgICAgJaWqqq+vszMzMy+vqqqlpaCgoKClpaqqr6+zMzMzL6+qqq+vszMzMy+vqqqlpaCgoKClpaqqr6+zMz5+f39/f35+fPz6enf39XV1dXf3+np8/P5+f39/f35+fPz6enf39XV1dXf3+np8/P5+f39/f35+fPz6enf39XV1dXf3+np8/P5+f39/f3//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAA//////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAAAAAAAAAAAAAAAAAAAAAP////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8=";
-    }
-    
     try {
-      const celebrationAudio = new Audio();
-      celebrationAudio.src = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAABhlpZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/7UGQAD/AAADSAAAAANIAAANIAAAAEAAANIAAAADAAADSAAAAACqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
-      celebrationAudio.volume = 0.6;
-      celebrationAudio.play().catch(console.error);
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      const playNote = (frequency: number, startTime: number, duration: number, volume: number = 0.3) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = frequency;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration);
+      };
+
+      const now = audioContext.currentTime;
+      
+      // Victory fanfare melody (like a celebration jingle)
+      // C major chord arpeggio going up
+      playNote(523.25, now, 0.15, 0.4);        // C5
+      playNote(659.25, now + 0.1, 0.15, 0.4);  // E5
+      playNote(783.99, now + 0.2, 0.15, 0.4);  // G5
+      playNote(1046.5, now + 0.3, 0.4, 0.5);   // C6 (longer, louder)
+      
+      // Second part - higher notes
+      playNote(1174.66, now + 0.5, 0.15, 0.35); // D6
+      playNote(1318.51, now + 0.6, 0.15, 0.35); // E6
+      playNote(1567.98, now + 0.7, 0.5, 0.5);   // G6 (triumphant ending)
+      
+      // Add some sparkle notes
+      playNote(2093.0, now + 0.4, 0.1, 0.2);   // C7 sparkle
+      playNote(2637.02, now + 0.75, 0.15, 0.2); // E7 sparkle
+      
+      console.log("[DealCelebration] Playing celebration sound!");
     } catch (error) {
       console.log("Could not play celebration sound:", error);
     }
