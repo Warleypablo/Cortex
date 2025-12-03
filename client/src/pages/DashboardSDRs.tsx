@@ -512,13 +512,13 @@ export default function DashboardSDRs() {
               </div>
             ) : top3.length > 0 ? (
               <div className="flex items-end justify-center gap-4 h-[380px]">
-                {[1, 0, 2].map((posIndex) => {
-                  const sdr = top3[posIndex];
+                {[1, 0, 2].map((dataIndex, visualIndex) => {
+                  const sdr = top3[dataIndex];
                   if (!sdr) return null;
                   
                   const heights = ['h-72', 'h-80', 'h-64'];
                   const sizes = ['text-3xl', 'text-4xl', 'text-2xl'];
-                  const badges = ['VICE', 'CAMPEAO', 'BRONZE'];
+                  const badges = ['VICE', 'CAMPEÃO', 'BRONZE'];
                   const badgeColors = ['bg-gray-500', 'bg-gradient-to-r from-yellow-500 to-amber-500', 'bg-amber-700'];
                   
                   return (
@@ -526,8 +526,8 @@ export default function DashboardSDRs() {
                       key={sdr.name}
                       initial={{ opacity: 0, y: 50 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 + posIndex * 0.1 }}
-                      className={`relative ${heights[posIndex]} w-56 flex flex-col`}
+                      transition={{ delay: 0.2 + visualIndex * 0.1 }}
+                      className={`relative ${heights[visualIndex]} w-56 flex flex-col`}
                     >
                       <div className={`flex-1 rounded-2xl bg-gradient-to-b ${getPositionGradient(sdr.position)} border-2 ${getPositionBorder(sdr.position)} shadow-xl p-4 flex flex-col justify-between backdrop-blur-sm`}>
                         <div>
@@ -541,11 +541,11 @@ export default function DashboardSDRs() {
                             </motion.div>
                           )}
                           
-                          <Badge className={`${badgeColors[posIndex]} text-white text-xs mb-2 font-bold`}>
-                            {badges[posIndex]}
+                          <Badge className={`${badgeColors[visualIndex]} text-white text-xs mb-2 font-bold`}>
+                            {badges[visualIndex]}
                           </Badge>
                           
-                          <h3 className={`${sizes[posIndex]} font-black text-white mb-1 leading-tight`}>
+                          <h3 className={`${sizes[visualIndex]} font-black text-white mb-1 leading-tight`}>
                             {sdr.name.split(' ').slice(0, 2).join(' ')}
                           </h3>
                         </div>
