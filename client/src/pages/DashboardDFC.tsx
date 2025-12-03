@@ -17,7 +17,8 @@ import {
   Loader2, TrendingUp, TrendingDown, DollarSign, Calendar, ChevronRight, ChevronDown,
   Wallet, ArrowUpCircle, ArrowDownCircle, BarChart3, Receipt,
   CircleDollarSign, LineChart, Target, Activity, Percent,
-  Sparkles, BrainCircuit, Send, MessageCircle, Bot, User, Minus, LayoutGrid, Table2
+  Sparkles, BrainCircuit, Send, MessageCircle, Bot, User, Minus, LayoutGrid, Table2,
+  RotateCcw
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -748,52 +749,113 @@ export default function DashboardDFC() {
           {/* Filters and DFC Table */}
           <Card className="shadow-sm border-0">
             <CardHeader className="pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Activity className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">Demonstrativo de Fluxo de Caixa</CardTitle>
-                    <CardDescription className="text-xs">
-                      Clique nas categorias para expandir detalhes
-                    </CardDescription>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <Activity className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Demonstrativo de Fluxo de Caixa</CardTitle>
+                      <CardDescription className="text-xs">
+                        Clique nas categorias para expandir detalhes
+                      </CardDescription>
+                    </div>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs font-medium text-muted-foreground">De:</label>
-                    <input
-                      type="date"
-                      value={filterDataInicio}
-                      onChange={(e) => setFilterDataInicio(e.target.value)}
-                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                      data-testid="input-data-inicio"
-                    />
+                
+                {/* Premium Date Selector */}
+                <div className="bg-gradient-to-r from-slate-50 to-slate-100/50 dark:from-slate-900/50 dark:to-slate-800/30 rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                    {/* Preset Buttons */}
+                    <div className="flex-1">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
+                        Período Rápido
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { label: "Ano Atual", inicio: `${new Date().getFullYear()}-01-01`, fim: "" },
+                          { label: "Último Trimestre", inicio: (() => { const d = new Date(); d.setMonth(d.getMonth() - 3); return d.toISOString().split('T')[0]; })(), fim: "" },
+                          { label: "Últimos 6 Meses", inicio: (() => { const d = new Date(); d.setMonth(d.getMonth() - 6); return d.toISOString().split('T')[0]; })(), fim: "" },
+                          { label: "Último Ano", inicio: (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().split('T')[0]; })(), fim: "" },
+                          { label: "Tudo", inicio: "", fim: "" },
+                        ].map((preset) => {
+                          const isActive = filterDataInicio === preset.inicio && filterDataFim === preset.fim;
+                          return (
+                            <Button
+                              key={preset.label}
+                              variant={isActive ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => {
+                                setFilterDataInicio(preset.inicio);
+                                setFilterDataFim(preset.fim);
+                              }}
+                              className={`h-8 text-xs font-medium transition-all ${
+                                isActive 
+                                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 border-0' 
+                                  : 'hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
+                              }`}
+                              data-testid={`btn-preset-${preset.label.toLowerCase().replace(/\s/g, '-')}`}
+                            >
+                              {preset.label}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    {/* Custom Date Range */}
+                    <div className="flex items-end gap-3 pl-0 lg:pl-4 lg:border-l border-slate-200 dark:border-slate-700">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3" />
+                          De
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="date"
+                            value={filterDataInicio}
+                            onChange={(e) => setFilterDataInicio(e.target.value)}
+                            className="h-10 w-40 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-sm font-medium shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all cursor-pointer hover:border-emerald-400"
+                            data-testid="input-data-inicio"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center h-10 px-2">
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3" />
+                          Até
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="date"
+                            value={filterDataFim}
+                            onChange={(e) => setFilterDataFim(e.target.value)}
+                            className="h-10 w-40 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-sm font-medium shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all cursor-pointer hover:border-emerald-400"
+                            data-testid="input-data-fim"
+                          />
+                        </div>
+                      </div>
+                      {(filterDataInicio || filterDataFim) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setFilterDataInicio("");
+                            setFilterDataFim("");
+                          }}
+                          className="h-10 px-4 border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 dark:hover:bg-rose-950/30 dark:hover:border-rose-800 dark:hover:text-rose-400 transition-all"
+                          data-testid="button-clear-dates"
+                        >
+                          <RotateCcw className="w-4 h-4 mr-1.5" />
+                          Limpar
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs font-medium text-muted-foreground">Até:</label>
-                    <input
-                      type="date"
-                      value={filterDataFim}
-                      onChange={(e) => setFilterDataFim(e.target.value)}
-                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-                      data-testid="input-data-fim"
-                    />
-                  </div>
-                  {(filterDataInicio || filterDataFim) && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setFilterDataInicio("");
-                        setFilterDataFim("");
-                      }}
-                      className="h-9"
-                    >
-                      Limpar
-                    </Button>
-                  )}
                 </div>
               </div>
             </CardHeader>
