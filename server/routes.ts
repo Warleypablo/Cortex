@@ -2041,57 +2041,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("[sdrs/metrics] Query params:", { dataReuniaoInicio, dataReuniaoFim, source, pipeline, sdrId });
 
-      const conditions: ReturnType<typeof sql>[] = [];
-
-      if (dataReuniaoInicio) {
-        conditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
-      }
-      if (dataReuniaoFim) {
-        conditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
-      }
+      const sharedConditions: ReturnType<typeof sql>[] = [];
       if (source) {
-        conditions.push(sql`d.source = ${source}`);
+        sharedConditions.push(sql`d.source = ${source}`);
       }
       if (pipeline) {
-        conditions.push(sql`d.category_name = ${pipeline}`);
+        sharedConditions.push(sql`d.category_name = ${pipeline}`);
       }
       if (sdrId) {
-        conditions.push(sql`d.sdr = ${sdrId}`);
+        sharedConditions.push(sql`d.sdr = ${sdrId}`);
       }
 
-      const whereClauseRealizadas = conditions.length > 0 
-        ? sql`WHERE d.data_reuniao_realizada IS NOT NULL AND ${sql.join(conditions, sql` AND `)}` 
-        : sql`WHERE d.data_reuniao_realizada IS NOT NULL`;
+      const leadsConditions = [...sharedConditions];
+      if (dataReuniaoInicio) {
+        leadsConditions.push(sql`d.date_create >= ${dataReuniaoInicio}`);
+      }
+      if (dataReuniaoFim) {
+        leadsConditions.push(sql`d.date_create <= ${dataReuniaoFim}`);
+      }
 
-      console.log("[sdrs/metrics] Executing metrics query...");
-      
-      const resultRealizadas = await db.execute(sql`
-        SELECT COUNT(*) as reunioes_realizadas
-        FROM crm_deal d
-        ${whereClauseRealizadas}
-      `);
-
-      const whereClauseLeads = conditions.length > 0 
-        ? sql`WHERE ${sql.join(conditions, sql` AND `)}` 
+      const whereClauseLeads = leadsConditions.length > 0 
+        ? sql`WHERE ${sql.join(leadsConditions, sql` AND `)}` 
         : sql``;
 
       const resultLeads = await db.execute(sql`
-        SELECT COUNT(DISTINCT d.id) as leads_qualificados
+        SELECT COUNT(DISTINCT d.id) as leads_totais
         FROM crm_deal d
         ${whereClauseLeads}
       `);
 
-      const row = resultRealizadas.rows[0] as any;
+      const reunioesConditions = [...sharedConditions];
+      reunioesConditions.push(sql`d.data_reuniao_realizada IS NOT NULL`);
+      if (dataReuniaoInicio) {
+        reunioesConditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
+      }
+      if (dataReuniaoFim) {
+        reunioesConditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
+      }
+
+      const whereClauseReunioes = sql`WHERE ${sql.join(reunioesConditions, sql` AND `)}`;
+
+      const resultReunioes = await db.execute(sql`
+        SELECT COUNT(*) as reunioes_realizadas
+        FROM crm_deal d
+        ${whereClauseReunioes}
+      `);
+
       const rowLeads = resultLeads.rows[0] as any;
+      const rowReunioes = resultReunioes.rows[0] as any;
       
-      const reunioesRealizadas = parseInt(row.reunioes_realizadas) || 0;
-      const leadsQualificados = parseInt(rowLeads.leads_qualificados) || 0;
+      const leadsTotais = parseInt(rowLeads.leads_totais) || 0;
+      const reunioesRealizadas = parseInt(rowReunioes.reunioes_realizadas) || 0;
+      const taxaConversao = leadsTotais > 0 ? (reunioesRealizadas / leadsTotais) * 100 : 0;
 
       res.json({
+        leadsTotais,
         reunioesRealizadas,
-        reunioesAgendadas: 0,
-        taxaShowRate: 0,
-        leadsQualificados
+        taxaConversao
       });
     } catch (error) {
       console.error("[api] Error fetching SDR metrics:", error);
@@ -2109,47 +2115,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sdrId
       } = req.query;
 
-      const conditionsRealizadas: ReturnType<typeof sql>[] = [sql`d.data_reuniao_realizada IS NOT NULL`];
-
-      if (dataReuniaoInicio) {
-        conditionsRealizadas.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
-      }
-      if (dataReuniaoFim) {
-        conditionsRealizadas.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
-      }
+      const sharedConditions: ReturnType<typeof sql>[] = [];
       if (source) {
-        conditionsRealizadas.push(sql`d.source = ${source}`);
+        sharedConditions.push(sql`d.source = ${source}`);
       }
       if (pipeline) {
-        conditionsRealizadas.push(sql`d.category_name = ${pipeline}`);
+        sharedConditions.push(sql`d.category_name = ${pipeline}`);
       }
       if (sdrId) {
-        conditionsRealizadas.push(sql`d.sdr = ${sdrId}`);
+        sharedConditions.push(sql`d.sdr = ${sdrId}`);
       }
 
-      const whereClauseRealizadas = sql`WHERE ${sql.join(conditionsRealizadas, sql` AND `)}`;
+      const leadsConditions = [...sharedConditions];
+      if (dataReuniaoInicio) {
+        leadsConditions.push(sql`d.date_create >= ${dataReuniaoInicio}`);
+      }
+      if (dataReuniaoFim) {
+        leadsConditions.push(sql`d.date_create <= ${dataReuniaoFim}`);
+      }
 
-      const resultRealizadas = await db.execute(sql`
+      const whereClauseLeads = leadsConditions.length > 0 
+        ? sql`WHERE ${sql.join(leadsConditions, sql` AND `)}` 
+        : sql``;
+
+      const resultLeads = await db.execute(sql`
         SELECT 
           c.nome as sdr_name,
           c.id as sdr_id,
-          COUNT(*) as reunioes_realizadas
+          COUNT(DISTINCT d.id) as leads
         FROM crm_deal d
         INNER JOIN crm_closers c ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = c.id
-        ${whereClauseRealizadas}
+        ${whereClauseLeads}
         GROUP BY c.id, c.nome
       `);
 
-      const data = resultRealizadas.rows.map((row: any) => {
-        const realizadas = parseInt(row.reunioes_realizadas) || 0;
+      const reunioesConditions = [...sharedConditions];
+      reunioesConditions.push(sql`d.data_reuniao_realizada IS NOT NULL`);
+      if (dataReuniaoInicio) {
+        reunioesConditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
+      }
+      if (dataReuniaoFim) {
+        reunioesConditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
+      }
+
+      const whereClauseReunioes = sql`WHERE ${sql.join(reunioesConditions, sql` AND `)}`;
+
+      const resultReunioes = await db.execute(sql`
+        SELECT 
+          c.nome as sdr_name,
+          c.id as sdr_id,
+          COUNT(*) as reunioes
+        FROM crm_deal d
+        INNER JOIN crm_closers c ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = c.id
+        ${whereClauseReunioes}
+        GROUP BY c.id, c.nome
+      `);
+
+      const leadsMap = new Map<number, { name: string; leads: number }>();
+      resultLeads.rows.forEach((row: any) => {
+        leadsMap.set(row.sdr_id, { 
+          name: row.sdr_name, 
+          leads: parseInt(row.leads) || 0 
+        });
+      });
+
+      const reunioesMap = new Map<number, number>();
+      resultReunioes.rows.forEach((row: any) => {
+        reunioesMap.set(row.sdr_id, parseInt(row.reunioes) || 0);
+      });
+
+      const allSdrIds = new Set([...Array.from(leadsMap.keys()), ...Array.from(reunioesMap.keys())]);
+      
+      const data = Array.from(allSdrIds).map((sdrId) => {
+        const leadsInfo = leadsMap.get(sdrId);
+        const leads = leadsInfo?.leads || 0;
+        const reunioes = reunioesMap.get(sdrId) || 0;
+        const conversao = leads > 0 ? (reunioes / leads) * 100 : 0;
+        
+        let sdrName = leadsInfo?.name || '';
+        if (!sdrName) {
+          const reuniaoRow = resultReunioes.rows.find((r: any) => r.sdr_id === sdrId) as any;
+          sdrName = reuniaoRow?.sdr_name || 'Desconhecido';
+        }
         
         return {
-          sdr: row.sdr_name,
-          reunioesRealizadas: realizadas,
-          reunioesAgendadas: 0,
-          showRate: 0
+          sdr: sdrName,
+          sdrId,
+          leads,
+          reunioesRealizadas: reunioes,
+          conversao: parseFloat(conversao.toFixed(1))
         };
-      });
+      }).sort((a, b) => b.reunioesRealizadas - a.reunioesRealizadas);
 
       res.json(data);
     } catch (error) {
