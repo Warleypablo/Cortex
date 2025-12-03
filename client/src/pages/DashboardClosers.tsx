@@ -288,7 +288,7 @@ export default function DashboardClosers() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas as fontes</SelectItem>
-                    {sources?.map((s) => (
+                    {sources?.filter(s => s && s.trim() !== '').map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
                   </SelectContent>
@@ -302,7 +302,7 @@ export default function DashboardClosers() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os pipelines</SelectItem>
-                    {pipelines?.map((p) => (
+                    {pipelines?.filter(p => p && p.trim() !== '').map((p) => (
                       <SelectItem key={p} value={p}>{p}</SelectItem>
                     ))}
                   </SelectContent>
@@ -316,7 +316,7 @@ export default function DashboardClosers() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os closers</SelectItem>
-                    {closers?.map((c) => (
+                    {closers?.filter(c => c && c.name && c.name.trim() !== '').map((c) => (
                       <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
                     ))}
                   </SelectContent>
