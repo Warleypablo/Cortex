@@ -77,13 +77,12 @@ async function checkForNewDeals() {
       SELECT 
         d.id,
         d.title,
-        d.opportunity,
+        d.valor_recorrente,
         d.stage_name,
-        d.date_won,
+        d.data_fechamento,
         d.category_name,
-        c.nome as closer_name
+        d.assigned_by_name as closer_name
       FROM crm_deal d
-      LEFT JOIN crm_closers c ON CASE WHEN d.assigned ~ '^[0-9]+$' THEN d.assigned::integer ELSE NULL END = c.id
       WHERE d.stage_name = 'Negócio Ganho'
         AND d.id > ${lastCheckedId}
         AND d.category_name = 'Recorrente'
@@ -98,9 +97,9 @@ async function checkForNewDeals() {
           id: row.id,
           title: row.title || "Novo Contrato",
           closerName: row.closer_name || "Closer",
-          opportunity: parseFloat(row.opportunity) || 0,
+          opportunity: parseFloat(row.valor_recorrente) || 0,
           stageName: row.stage_name,
-          dateWon: row.date_won,
+          dateWon: row.data_fechamento,
           contractType: row.category_name || "Recorrente"
         };
 
