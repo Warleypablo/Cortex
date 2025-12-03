@@ -1827,7 +1827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes_realizadas,
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios_ganhos
         FROM crm_deal d
-        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        LEFT JOIN crm_closers c ON d.closer = c.id
         ${whereClause}
       `);
       
@@ -1889,14 +1889,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db.execute(sql`
         SELECT 
-          c.nome as closer_name,
+          c.name as closer_name,
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes,
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios_ganhos
         FROM crm_deal d
-        INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        INNER JOIN crm_closers c ON d.closer = c.id
         ${whereClause}
-        GROUP BY c.id, c.nome
-        ORDER BY c.nome
+        GROUP BY c.id, c.name
+        ORDER BY c.name
       `);
       
       const data = result.rows.map((row: any) => {
@@ -1957,14 +1957,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db.execute(sql`
         SELECT 
-          c.nome as closer_name,
+          c.name as closer_name,
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
           COALESCE(SUM(d.valor_pontual), 0) as pontual
         FROM crm_deal d
-        INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        INNER JOIN crm_closers c ON d.closer = c.id
         ${whereClause}
-        GROUP BY c.id, c.nome
-        ORDER BY c.nome
+        GROUP BY c.id, c.name
+        ORDER BY c.name
       `);
       
       const data = result.rows.map((row: any) => ({
