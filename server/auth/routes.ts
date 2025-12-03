@@ -62,6 +62,55 @@ router.post("/auth/logout", (req, res) => {
   });
 });
 
+// Dev login - bypasses Google OAuth for testing
+router.post("/auth/dev-login", (req, res) => {
+  console.log("🔧 Dev login iniciado...");
+  
+  // Create dev user object
+  const devUser: User = {
+    id: "dev-admin-001",
+    googleId: "dev-google-id",
+    email: "dev@teste.com",
+    name: "Dev Admin",
+    picture: "",
+    createdAt: new Date().toISOString(),
+    role: "admin",
+    allowedRoutes: [
+      '/',
+      '/clientes',
+      '/contratos',
+      '/colaboradores',
+      '/colaboradores/analise',
+      '/patrimonio',
+      '/ferramentas',
+      '/turbozap',
+      '/visao-geral',
+      '/dashboard/financeiro',
+      '/dashboard/geg',
+      '/dashboard/inhire',
+      '/dashboard/recrutamento',
+      '/dashboard/meta-ads',
+      '/dashboard/retencao',
+      '/dashboard/dfc',
+      '/dashboard/inadimplencia',
+      '/dashboard/auditoria-sistemas',
+      '/dashboard/closers',
+      '/dashboard/sdrs',
+      '/dashboard/closers/detalhamento',
+      '/admin/usuarios'
+    ]
+  };
+
+  req.logIn(devUser, (err) => {
+    if (err) {
+      console.error("❌ Erro no dev login:", err);
+      return res.status(500).json({ message: "Dev login failed" });
+    }
+    console.log("✅ Dev login bem-sucedido!");
+    res.json({ success: true, user: devUser });
+  });
+});
+
 router.get("/api/auth/me", (req, res) => {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Not authenticated" });
