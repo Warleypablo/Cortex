@@ -2476,6 +2476,328 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== ANÁLISE DE VENDAS ====================
+
+  // Filtros disponíveis
+  app.get("/api/vendas/filtros", async (req, res) => {
+    try {
+      const [pipelines, sources, utmContents] = await Promise.all([
+        db.execute(sql`SELECT DISTINCT pipeline_name FROM crm_deal WHERE pipeline_name IS NOT NULL AND pipeline_name != '' ORDER BY pipeline_name`),
+        db.execute(sql`SELECT DISTINCT source FROM crm_deal WHERE source IS NOT NULL AND source != '' ORDER BY source`),
+        db.execute(sql`SELECT DISTINCT utm_content FROM crm_deal WHERE utm_content IS NOT NULL AND utm_content != '' ORDER BY utm_content`)
+      ]);
+      
+      res.json({
+        pipelines: pipelines.rows.map((r: any) => r.pipeline_name),
+        sources: sources.rows.map((r: any) => r.source),
+        utmContents: utmContents.rows.map((r: any) => r.utm_content)
+      });
+    } catch (error) {
+      console.error("[api] Error fetching vendas filters:", error);
+      res.status(500).json({ error: "Failed to fetch filters" });
+    }
+  });
+
+  // KPIs principais
+  app.get("/api/vendas/kpis", async (req, res) => {
+    try {
+      const { dataInicio, dataFim, pipeline, source, utmContent } = req.query;
+
+      const conditions: ReturnType<typeof sql>[] = [sql`stage_name = 'Negócio Ganho (WON)'`];
+
+      if (dataInicio) {
+        conditions.push(sql`close_date >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+      }
+      if (pipeline) {
+        conditions.push(sql`pipeline_name = ${pipeline}`);
+      }
+      if (source) {
+        conditions.push(sql`source = ${source}`);
+      }
+      if (utmContent) {
+        conditions.push(sql`utm_content = ${utmContent}`);
+      }
+
+      const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
+
+      const result = await db.execute(sql`
+        SELECT 
+          COALESCE(SUM(valor_recorrente), 0) as receita_recorrente,
+          COALESCE(SUM(valor_pontual), 0) as receita_pontual,
+          COALESCE(SUM(valor_recorrente) + SUM(valor_pontual), 0) as receita_total,
+          COUNT(*) as total_contratos,
+          COUNT(CASE WHEN valor_recorrente > 0 THEN 1 END) as contratos_recorrentes,
+          COUNT(CASE WHEN valor_pontual > 0 AND (valor_recorrente = 0 OR valor_recorrente IS NULL) THEN 1 END) as contratos_pontuais,
+          COALESCE(AVG(EXTRACT(EPOCH FROM (close_date - created_date)) / 86400), 0) as tempo_fechamento_dias,
+          COALESCE(AVG(CASE WHEN valor_recorrente > 0 THEN valor_recorrente END), 0) as ticket_medio_recorrente,
+          COALESCE(AVG(CASE WHEN valor_pontual > 0 THEN valor_pontual END), 0) as ticket_medio_pontual
+        FROM crm_deal
+        ${whereClause}
+      `);
+
+      const row = result.rows[0] as any;
+
+      res.json({
+        receitaRecorrente: parseFloat(row.receita_recorrente) || 0,
+        receitaPontual: parseFloat(row.receita_pontual) || 0,
+        receitaTotal: parseFloat(row.receita_total) || 0,
+        totalContratos: parseInt(row.total_contratos) || 0,
+        contratosRecorrentes: parseInt(row.contratos_recorrentes) || 0,
+        contratosPontuais: parseInt(row.contratos_pontuais) || 0,
+        tempoFechamentoDias: parseFloat(row.tempo_fechamento_dias) || 0,
+        ticketMedioRecorrente: parseFloat(row.ticket_medio_recorrente) || 0,
+        ticketMedioPontual: parseFloat(row.ticket_medio_pontual) || 0
+      });
+    } catch (error) {
+      console.error("[api] Error fetching vendas KPIs:", error);
+      res.status(500).json({ error: "Failed to fetch KPIs" });
+    }
+  });
+
+  // Contratos por dia
+  app.get("/api/vendas/contratos-por-dia", async (req, res) => {
+    try {
+      const { dataInicio, dataFim, pipeline, source, utmContent } = req.query;
+
+      const conditions: ReturnType<typeof sql>[] = [sql`stage_name = 'Negócio Ganho (WON)'`];
+
+      if (dataInicio) {
+        conditions.push(sql`close_date >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+      }
+      if (pipeline) {
+        conditions.push(sql`pipeline_name = ${pipeline}`);
+      }
+      if (source) {
+        conditions.push(sql`source = ${source}`);
+      }
+      if (utmContent) {
+        conditions.push(sql`utm_content = ${utmContent}`);
+      }
+
+      const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
+
+      const result = await db.execute(sql`
+        SELECT 
+          DATE(close_date) as dia,
+          COUNT(*) as contratos,
+          COALESCE(SUM(valor_recorrente), 0) as valor_recorrente,
+          COALESCE(SUM(valor_pontual), 0) as valor_pontual
+        FROM crm_deal
+        ${whereClause}
+        GROUP BY DATE(close_date)
+        ORDER BY dia
+      `);
+
+      res.json(result.rows.map((row: any) => ({
+        dia: row.dia,
+        contratos: parseInt(row.contratos) || 0,
+        valorRecorrente: parseFloat(row.valor_recorrente) || 0,
+        valorPontual: parseFloat(row.valor_pontual) || 0
+      })));
+    } catch (error) {
+      console.error("[api] Error fetching contratos por dia:", error);
+      res.status(500).json({ error: "Failed to fetch contratos por dia" });
+    }
+  });
+
+  // MRR por Closer
+  app.get("/api/vendas/mrr-por-closer", async (req, res) => {
+    try {
+      const { dataInicio, dataFim, pipeline, source, utmContent } = req.query;
+
+      const conditions: ReturnType<typeof sql>[] = [sql`d.stage_name = 'Negócio Ganho (WON)'`];
+
+      if (dataInicio) {
+        conditions.push(sql`d.close_date >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        conditions.push(sql`d.close_date <= ${dataFim}::date + interval '1 day'`);
+      }
+      if (pipeline) {
+        conditions.push(sql`d.pipeline_name = ${pipeline}`);
+      }
+      if (source) {
+        conditions.push(sql`d.source = ${source}`);
+      }
+      if (utmContent) {
+        conditions.push(sql`d.utm_content = ${utmContent}`);
+      }
+
+      const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
+
+      const result = await db.execute(sql`
+        SELECT 
+          COALESCE(c.name, 'Não Atribuído') as closer_name,
+          COALESCE(SUM(d.valor_recorrente), 0) as mrr,
+          COALESCE(SUM(d.valor_pontual), 0) as pontual,
+          COUNT(*) as contratos
+        FROM crm_deal d
+        LEFT JOIN crm_closers c ON d.closer = c.id
+        ${whereClause}
+        GROUP BY c.id, c.name
+        ORDER BY mrr DESC
+      `);
+
+      res.json(result.rows.map((row: any) => ({
+        closer: row.closer_name,
+        mrr: parseFloat(row.mrr) || 0,
+        pontual: parseFloat(row.pontual) || 0,
+        contratos: parseInt(row.contratos) || 0
+      })));
+    } catch (error) {
+      console.error("[api] Error fetching MRR por closer:", error);
+      res.status(500).json({ error: "Failed to fetch MRR por closer" });
+    }
+  });
+
+  // MRR por SDR (owner_name)
+  app.get("/api/vendas/mrr-por-sdr", async (req, res) => {
+    try {
+      const { dataInicio, dataFim, pipeline, source, utmContent } = req.query;
+
+      const conditions: ReturnType<typeof sql>[] = [sql`stage_name = 'Negócio Ganho (WON)'`];
+
+      if (dataInicio) {
+        conditions.push(sql`close_date >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+      }
+      if (pipeline) {
+        conditions.push(sql`pipeline_name = ${pipeline}`);
+      }
+      if (source) {
+        conditions.push(sql`source = ${source}`);
+      }
+      if (utmContent) {
+        conditions.push(sql`utm_content = ${utmContent}`);
+      }
+
+      const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
+
+      const result = await db.execute(sql`
+        SELECT 
+          COALESCE(owner_name, 'Não Atribuído') as sdr_name,
+          COALESCE(SUM(valor_recorrente), 0) as mrr,
+          COALESCE(SUM(valor_pontual), 0) as pontual,
+          COUNT(*) as contratos
+        FROM crm_deal
+        ${whereClause}
+        GROUP BY owner_name
+        ORDER BY mrr DESC
+      `);
+
+      res.json(result.rows.map((row: any) => ({
+        sdr: row.sdr_name,
+        mrr: parseFloat(row.mrr) || 0,
+        pontual: parseFloat(row.pontual) || 0,
+        contratos: parseInt(row.contratos) || 0
+      })));
+    } catch (error) {
+      console.error("[api] Error fetching MRR por SDR:", error);
+      res.status(500).json({ error: "Failed to fetch MRR por SDR" });
+    }
+  });
+
+  // Receita por Fonte
+  app.get("/api/vendas/receita-por-fonte", async (req, res) => {
+    try {
+      const { dataInicio, dataFim, pipeline, source, utmContent } = req.query;
+
+      const conditions: ReturnType<typeof sql>[] = [sql`stage_name = 'Negócio Ganho (WON)'`];
+
+      if (dataInicio) {
+        conditions.push(sql`close_date >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+      }
+      if (pipeline) {
+        conditions.push(sql`pipeline_name = ${pipeline}`);
+      }
+      if (source) {
+        conditions.push(sql`source = ${source}`);
+      }
+      if (utmContent) {
+        conditions.push(sql`utm_content = ${utmContent}`);
+      }
+
+      const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
+
+      const result = await db.execute(sql`
+        SELECT 
+          COALESCE(source, 'Não Identificado') as fonte,
+          COALESCE(SUM(valor_recorrente), 0) as mrr,
+          COALESCE(SUM(valor_pontual), 0) as pontual,
+          COUNT(*) as contratos
+        FROM crm_deal
+        ${whereClause}
+        GROUP BY source
+        ORDER BY (COALESCE(SUM(valor_recorrente), 0) + COALESCE(SUM(valor_pontual), 0)) DESC
+      `);
+
+      res.json(result.rows.map((row: any) => ({
+        fonte: row.fonte,
+        mrr: parseFloat(row.mrr) || 0,
+        pontual: parseFloat(row.pontual) || 0,
+        contratos: parseInt(row.contratos) || 0
+      })));
+    } catch (error) {
+      console.error("[api] Error fetching receita por fonte:", error);
+      res.status(500).json({ error: "Failed to fetch receita por fonte" });
+    }
+  });
+
+  // MRR Perdido (deals perdidos no período)
+  app.get("/api/vendas/mrr-perdido", async (req, res) => {
+    try {
+      const { dataInicio, dataFim, pipeline, source } = req.query;
+
+      const conditions: ReturnType<typeof sql>[] = [
+        sql`(stage_name ILIKE '%perdido%' OR stage_name ILIKE '%lost%' OR stage_name ILIKE '%cancelado%')`
+      ];
+
+      if (dataInicio) {
+        conditions.push(sql`close_date >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+      }
+      if (pipeline) {
+        conditions.push(sql`pipeline_name = ${pipeline}`);
+      }
+      if (source) {
+        conditions.push(sql`source = ${source}`);
+      }
+
+      const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
+
+      const result = await db.execute(sql`
+        SELECT 
+          COALESCE(SUM(valor_recorrente), 0) as mrr_perdido,
+          COUNT(*) as contratos_perdidos
+        FROM crm_deal
+        ${whereClause}
+      `);
+
+      const row = result.rows[0] as any;
+
+      res.json({
+        mrrPerdido: parseFloat(row.mrr_perdido) || 0,
+        contratosPerdidos: parseInt(row.contratos_perdidos) || 0
+      });
+    } catch (error) {
+      console.error("[api] Error fetching MRR perdido:", error);
+      res.status(500).json({ error: "Failed to fetch MRR perdido" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
