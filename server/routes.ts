@@ -2054,10 +2054,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const leadsConditions = [...sharedConditions];
       if (dataReuniaoInicio) {
-        leadsConditions.push(sql`d.date_create >= ${dataReuniaoInicio}`);
+        leadsConditions.push(sql`d.created_date >= ${dataReuniaoInicio}`);
       }
       if (dataReuniaoFim) {
-        leadsConditions.push(sql`d.date_create <= ${dataReuniaoFim}`);
+        leadsConditions.push(sql`d.created_date <= ${dataReuniaoFim}`);
       }
 
       const whereClauseLeads = leadsConditions.length > 0 
@@ -2065,7 +2065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : sql``;
 
       const resultLeads = await db.execute(sql`
-        SELECT COUNT(DISTINCT d.id) as leads_totais
+        SELECT COUNT(DISTINCT d.deal_id) as leads_totais
         FROM crm_deal d
         ${whereClauseLeads}
       `);
@@ -2128,10 +2128,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const leadsConditions = [...sharedConditions];
       if (dataReuniaoInicio) {
-        leadsConditions.push(sql`d.date_create >= ${dataReuniaoInicio}`);
+        leadsConditions.push(sql`d.created_date >= ${dataReuniaoInicio}`);
       }
       if (dataReuniaoFim) {
-        leadsConditions.push(sql`d.date_create <= ${dataReuniaoFim}`);
+        leadsConditions.push(sql`d.created_date <= ${dataReuniaoFim}`);
       }
 
       const whereClauseLeads = leadsConditions.length > 0 
@@ -2142,7 +2142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           c.nome as sdr_name,
           c.id as sdr_id,
-          COUNT(DISTINCT d.id) as leads
+          COUNT(DISTINCT d.deal_id) as leads
         FROM crm_deal d
         INNER JOIN crm_closers c ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = c.id
         ${whereClauseLeads}
