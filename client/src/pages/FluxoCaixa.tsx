@@ -12,7 +12,7 @@ import {
   ChevronRight, CircleDollarSign
 } from "lucide-react";
 import {
-  ComposedChart, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine, Line
+  ComposedChart, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine, Line, Cell
 } from "recharts";
 import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsights, ContaBanco } from "@shared/schema";
 
@@ -431,53 +431,96 @@ export default function FluxoCaixa() {
           
           <CardContent>
             {isLoadingFluxo ? (
-              <div className="flex items-center justify-center h-[400px]">
+              <div className="flex items-center justify-center h-[450px]">
                 <Skeleton className="h-full w-full" />
               </div>
             ) : !chartData || chartData.length === 0 ? (
-              <div className="flex items-center justify-center h-[400px]">
+              <div className="flex items-center justify-center h-[450px]">
                 <p className="text-muted-foreground">Nenhum dado para o período selecionado</p>
               </div>
             ) : (
-              <div className="h-[400px]">
+              <div className="h-[450px] relative">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 20, right: 80, left: 20, bottom: 60 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                  <ComposedChart 
+                    data={chartData} 
+                    margin={{ top: 30, right: 90, left: 20, bottom: 50 }}
+                    barGap={2}
+                    barCategoryGap="15%"
+                  >
+                    <defs>
+                      <linearGradient id="gradientEntradas" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#22c55e" stopOpacity={1} />
+                        <stop offset="100%" stopColor="#16a34a" stopOpacity={0.8} />
+                      </linearGradient>
+                      <linearGradient id="gradientSaidas" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#ef4444" stopOpacity={1} />
+                        <stop offset="100%" stopColor="#dc2626" stopOpacity={0.8} />
+                      </linearGradient>
+                      <linearGradient id="gradientSaldo" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.05} />
+                      </linearGradient>
+                      <filter id="glow">
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                        <feMerge>
+                          <feMergeNode in="coloredBlur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
+                    </defs>
+                    
+                    <CartesianGrid 
+                      strokeDasharray="3 3" 
+                      stroke="hsl(var(--border))" 
+                      vertical={false} 
+                      opacity={0.5}
+                    />
+                    
                     <XAxis 
                       dataKey="dataFormatada" 
-                      tick={{ fill: 'currentColor', fontSize: 10 }}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
                       tickLine={false}
-                      axisLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
                       angle={-45}
                       textAnchor="end"
-                      height={60}
-                      interval={chartData.length > 15 ? Math.floor(chartData.length / 10) : 0}
+                      height={50}
+                      interval={chartData.length > 20 ? Math.floor(chartData.length / 12) : chartData.length > 10 ? 1 : 0}
+                      dy={10}
                     />
+                    
                     <YAxis 
                       yAxisId="bars"
-                      tick={{ fill: '#22c55e', fontSize: 11 }}
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
                       tickFormatter={(value) => formatCurrencyCompact(value)}
                       tickLine={false}
                       axisLine={false}
-                      width={70}
+                      width={75}
                       domain={[0, chartDomains.barsMax]}
                     />
+                    
                     <YAxis 
                       yAxisId="line"
                       orientation="right"
-                      tick={{ fill: '#3b82f6', fontSize: 11 }}
+                      tick={{ fill: '#06b6d4', fontSize: 11, fontWeight: 600 }}
                       tickFormatter={(value) => formatCurrencyCompact(value)}
                       tickLine={false}
                       axisLine={false}
-                      width={70}
+                      width={80}
                       domain={[chartDomains.lineMin, chartDomains.lineMax]}
                     />
+                    
                     <Tooltip
+                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3, radius: 4 }}
                       contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))',
+                        backgroundColor: 'hsl(var(--card))',
                         border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.3)',
+                        padding: '12px 16px',
+                      }}
+                      itemStyle={{
+                        padding: '4px 0',
+                        fontSize: '13px',
                       }}
                       formatter={(value: number, name: string) => {
                         const labels: Record<string, string> = {
@@ -485,44 +528,119 @@ export default function FluxoCaixa() {
                           saidas: 'Saídas',
                           saldoAcumulado: 'Saldo Acumulado',
                         };
-                        return [formatCurrency(value), labels[name] || name];
+                        const colors: Record<string, string> = {
+                          entradas: '#22c55e',
+                          saidas: '#ef4444',
+                          saldoAcumulado: '#06b6d4',
+                        };
+                        return [
+                          <span style={{ color: colors[name], fontWeight: 600 }}>{formatCurrency(value)}</span>,
+                          <span style={{ color: 'hsl(var(--muted-foreground))' }}>{labels[name] || name}</span>
+                        ];
                       }}
-                      labelFormatter={(label) => `Data: ${label}`}
+                      labelFormatter={(label) => (
+                        <span style={{ fontWeight: 600, fontSize: '14px', color: 'hsl(var(--foreground))' }}>
+                          {label}
+                        </span>
+                      )}
                     />
+                    
                     <Legend 
                       verticalAlign="top"
-                      height={36}
+                      height={45}
+                      wrapperStyle={{ paddingBottom: '10px' }}
+                      iconType="rect"
+                      iconSize={12}
                       formatter={(value) => {
                         const labels: Record<string, string> = {
                           entradas: 'Entradas',
                           saidas: 'Saídas',
                           saldoAcumulado: 'Saldo Acumulado',
                         };
-                        return labels[value] || value;
+                        return (
+                          <span style={{ 
+                            color: 'hsl(var(--foreground))', 
+                            fontSize: '13px', 
+                            fontWeight: 500,
+                            marginLeft: '4px'
+                          }}>
+                            {labels[value] || value}
+                          </span>
+                        );
                       }}
                     />
+                    
+                    <ReferenceLine 
+                      yAxisId="line" 
+                      y={0} 
+                      stroke="hsl(var(--border))" 
+                      strokeDasharray="5 5"
+                      strokeWidth={1}
+                    />
+                    
+                    <Area
+                      yAxisId="line"
+                      type="monotone"
+                      dataKey="saldoAcumulado"
+                      fill="url(#gradientSaldo)"
+                      stroke="none"
+                      name="areaFill"
+                      legendType="none"
+                    />
+                    
                     <Bar 
                       yAxisId="bars"
                       dataKey="entradas" 
-                      fill="#22c55e"
-                      radius={[4, 4, 0, 0]}
+                      fill="url(#gradientEntradas)"
+                      radius={[6, 6, 0, 0]}
                       name="entradas"
+                      maxBarSize={40}
                     />
+                    
                     <Bar 
                       yAxisId="bars"
                       dataKey="saidas" 
-                      fill="#ef4444"
-                      radius={[4, 4, 0, 0]}
+                      fill="url(#gradientSaidas)"
+                      radius={[6, 6, 0, 0]}
                       name="saidas"
+                      maxBarSize={40}
                     />
+                    
                     <Line
                       yAxisId="line"
                       type="monotone"
                       dataKey="saldoAcumulado"
-                      stroke="#3b82f6"
+                      stroke="#06b6d4"
                       strokeWidth={3}
-                      dot={false}
-                      activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                      dot={({ cx, cy, payload, index }) => {
+                        const isFirst = index === 0;
+                        const isLast = index === chartData.length - 1;
+                        const isMinMax = payload.saldoAcumulado === Math.min(...chartData.map(d => d.saldoAcumulado)) ||
+                                        payload.saldoAcumulado === Math.max(...chartData.map(d => d.saldoAcumulado));
+                        
+                        if (isFirst || isLast || isMinMax) {
+                          return (
+                            <circle
+                              key={`dot-${index}`}
+                              cx={cx}
+                              cy={cy}
+                              r={5}
+                              fill="#06b6d4"
+                              stroke="#fff"
+                              strokeWidth={2}
+                              filter="url(#glow)"
+                            />
+                          );
+                        }
+                        return <circle key={`dot-${index}`} cx={cx} cy={cy} r={0} />;
+                      }}
+                      activeDot={{ 
+                        r: 8, 
+                        fill: '#06b6d4', 
+                        stroke: '#fff', 
+                        strokeWidth: 3,
+                        filter: 'url(#glow)'
+                      }}
                       name="saldoAcumulado"
                     />
                   </ComposedChart>
