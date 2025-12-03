@@ -838,32 +838,201 @@ export default function DashboardClosers() {
               </div>
             </div>
 
-            <div className="mt-4 p-4 bg-gradient-to-r from-violet-600/10 to-purple-600/10 border border-violet-500/20 rounded-xl">
-              <div className="flex items-center gap-2 mb-2">
-                <Star className="w-4 h-4 text-violet-400" />
-                <span className="text-sm font-semibold text-violet-300">Meta do Mês</span>
-              </div>
-              <div className="relative h-3 bg-slate-800 rounded-full overflow-hidden">
-                <motion.div
-                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-violet-600 to-purple-500 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: "72%" }}
-                  transition={{ duration: 1.5, ease: "easeOut" }}
-                />
-              </div>
-              <div className="flex justify-between mt-2 text-xs">
-                <span className="text-slate-400">72% concluído</span>
-                <span className="text-violet-400 font-semibold">R$ 180k / R$ 250k</span>
-              </div>
-            </div>
           </div>
         </div>
 
-        <div className="text-center pt-4">
-          <p className="text-sm text-slate-500">
-            Atualizado automaticamente a cada minuto
-          </p>
-        </div>
+        {/* BARRA DE META ÉPICA */}
+        <motion.div 
+          className="mt-8 relative"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.6 }}
+        >
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/50 p-8">
+            {/* Background effects */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <div className="absolute -top-20 -left-20 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl" />
+              <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl" />
+              {(() => {
+                const META_MRR = 180000;
+                const mrrAtual = metrics?.mrrObtido || 0;
+                const percentual = Math.min((mrrAtual / META_MRR) * 100, 100);
+                
+                if (percentual >= 100) {
+                  return (
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-yellow-500/10 to-emerald-500/5"
+                      animate={{ opacity: [0.3, 0.6, 0.3] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    />
+                  );
+                }
+                return null;
+              })()}
+            </div>
+
+            <div className="relative z-10">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <motion.div 
+                    className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30"
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    <Target className="w-8 h-8 text-white" />
+                  </motion.div>
+                  <div>
+                    <h2 className="text-3xl font-black text-white">META DO MÊS</h2>
+                    <p className="text-slate-400 text-lg">Receita Recorrente (MRR)</p>
+                  </div>
+                </div>
+                
+                <div className="text-right">
+                  <div className="text-sm text-slate-400 uppercase tracking-wider mb-1">Meta</div>
+                  <div className="text-4xl font-black text-white">R$ 180k</div>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              {(() => {
+                const META_MRR = 180000;
+                const mrrAtual = metrics?.mrrObtido || 0;
+                const percentual = Math.min((mrrAtual / META_MRR) * 100, 100);
+                const faltam = Math.max(META_MRR - mrrAtual, 0);
+                const atingida = percentual >= 100;
+                
+                return (
+                  <>
+                    <div className="relative h-16 bg-slate-800/80 rounded-2xl overflow-hidden border border-slate-700/50">
+                      {/* Progress fill */}
+                      <motion.div
+                        className={`absolute inset-y-0 left-0 rounded-2xl ${
+                          atingida 
+                            ? 'bg-gradient-to-r from-emerald-500 via-yellow-400 to-emerald-500'
+                            : percentual >= 80 
+                              ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-400'
+                              : percentual >= 50
+                                ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-400'
+                                : 'bg-gradient-to-r from-rose-600 via-rose-500 to-orange-400'
+                        }`}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percentual}%` }}
+                        transition={{ duration: 2, ease: "easeOut", delay: 0.3 }}
+                      >
+                        {/* Shimmer effect */}
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                          animate={{ x: ["-100%", "100%"] }}
+                          transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                        />
+                      </motion.div>
+                      
+                      {/* Percentage display in bar */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <motion.span 
+                          className="text-3xl font-black text-white drop-shadow-lg"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ delay: 1.5, type: "spring", stiffness: 200 }}
+                        >
+                          {percentual.toFixed(1)}%
+                        </motion.span>
+                      </div>
+
+                      {/* Milestone markers */}
+                      {[25, 50, 75, 100].map((milestone) => (
+                        <div
+                          key={milestone}
+                          className="absolute top-0 bottom-0 w-px bg-slate-600/50"
+                          style={{ left: `${milestone}%` }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Stats below bar */}
+                    <div className="flex items-center justify-between mt-6">
+                      <div className="flex items-center gap-8">
+                        <div>
+                          <div className="text-sm text-slate-400 uppercase tracking-wider mb-1">Conquistado</div>
+                          <motion.div 
+                            className="text-4xl font-black text-emerald-400"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.8 }}
+                          >
+                            {formatCurrencyCompact(mrrAtual)}
+                          </motion.div>
+                        </div>
+                        
+                        {!atingida && (
+                          <div>
+                            <div className="text-sm text-slate-400 uppercase tracking-wider mb-1">Faltam</div>
+                            <motion.div 
+                              className="text-4xl font-black text-amber-400"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ delay: 1 }}
+                            >
+                              {formatCurrencyCompact(faltam)}
+                            </motion.div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Status badge */}
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 1.2, type: "spring" }}
+                      >
+                        {atingida ? (
+                          <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30">
+                            <motion.div
+                              animate={{ rotate: [0, 10, -10, 0] }}
+                              transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
+                            >
+                              <Trophy className="w-8 h-8 text-yellow-400" />
+                            </motion.div>
+                            <span className="text-2xl font-black text-emerald-400">META BATIDA!</span>
+                            <motion.div
+                              animate={{ scale: [1, 1.3, 1] }}
+                              transition={{ duration: 1, repeat: Infinity }}
+                            >
+                              <Sparkles className="w-6 h-6 text-yellow-400" />
+                            </motion.div>
+                          </div>
+                        ) : percentual >= 80 ? (
+                          <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30">
+                            <Flame className="w-6 h-6 text-orange-400" />
+                            <span className="text-xl font-bold text-emerald-400">Quase lá!</span>
+                          </div>
+                        ) : percentual >= 50 ? (
+                          <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-amber-500/20 border border-amber-500/30">
+                            <TrendingUp className="w-6 h-6 text-amber-400" />
+                            <span className="text-xl font-bold text-amber-400">Bom progresso!</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-rose-500/20 border border-rose-500/30">
+                            <Zap className="w-6 h-6 text-rose-400" />
+                            <span className="text-xl font-bold text-rose-400">Hora de acelerar!</span>
+                          </div>
+                        )}
+                      </motion.div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="text-center mt-4">
+            <p className="text-sm text-slate-500">
+              Atualizado automaticamente a cada minuto
+            </p>
+          </div>
+        </motion.div>
       </div>
     </div>
   );
