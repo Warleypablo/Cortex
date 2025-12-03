@@ -1811,23 +1811,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(sql`d.category_name = ${pipeline}`);
       }
       if (closerId) {
-        conditions.push(sql`d.closer = ${parseInt(closerId as string)}`);
+        conditions.push(sql`d.closer = ${closerId}`);
       }
 
       const whereClause = conditions.length > 0 
         ? sql`WHERE ${sql.join(conditions, sql` AND `)}` 
         : sql``;
 
+      console.log("[closers/metrics] Executing metrics query...");
+      
       const result = await db.execute(sql`
         SELECT 
-          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN d.valor_recorrente ELSE 0 END), 0) as mrr_obtido,
-          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN d.valor_pontual ELSE 0 END), 0) as pontual_obtido,
+          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_recorrente ELSE 0 END), 0) as mrr_obtido,
+          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_pontual ELSE 0 END), 0) as pontual_obtido,
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes_realizadas,
-          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN 1 END) as negocios_ganhos
+          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios_ganhos
         FROM crm_deal d
         LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
       `);
+      
+      console.log("[closers/metrics] Query result:", JSON.stringify(result.rows));
       const row = result.rows[0] as any;
 
       const reunioes = parseInt(row.reunioes_realizadas) || 0;
@@ -1887,7 +1891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           c.nome as closer_name,
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes,
-          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN 1 END) as negocios_ganhos
+          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios_ganhos
         FROM crm_deal d
         INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
@@ -1926,7 +1930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pipeline
       } = req.query;
 
-      const conditions: ReturnType<typeof sql>[] = [sql`d.stage_name = 'Negócio Ganho (WON)'`];
+      const conditions: ReturnType<typeof sql>[] = [sql`d.stage_name = 'Negócio Ganho'`];
 
       if (dataReuniaoInicio) {
         conditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
