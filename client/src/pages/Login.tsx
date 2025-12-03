@@ -1,10 +1,34 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SiGoogle } from "react-icons/si";
+import { Code2, Loader2 } from "lucide-react";
 
 export default function Login() {
+  const [isDevLoading, setIsDevLoading] = useState(false);
+
   const handleGoogleLogin = () => {
     window.location.href = "/auth/google";
+  };
+
+  const handleDevLogin = async () => {
+    setIsDevLoading(true);
+    try {
+      const response = await fetch("/auth/dev-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      
+      if (response.ok) {
+        window.location.href = "/";
+      } else {
+        console.error("Dev login failed");
+        setIsDevLoading(false);
+      }
+    } catch (error) {
+      console.error("Dev login error:", error);
+      setIsDevLoading(false);
+    }
   };
 
   return (
@@ -41,6 +65,32 @@ export default function Login() {
             <SiGoogle className="w-5 h-5" />
             Continuar com Google
           </Button>
+          
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">ou</span>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleDevLogin}
+            variant="outline"
+            size="lg"
+            disabled={isDevLoading}
+            className="w-full gap-3 h-12 text-base border-dashed border-2 border-amber-500/50 hover:border-amber-500 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            data-testid="button-dev-login"
+          >
+            {isDevLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Code2 className="w-5 h-5" />
+            )}
+            {isDevLoading ? "Entrando..." : "Entrar como Dev (Teste)"}
+          </Button>
+
           <p className="text-xs text-center text-muted-foreground">
             Ao continuar, você concorda com nossos termos de uso e política de privacidade
           </p>
