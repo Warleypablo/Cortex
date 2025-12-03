@@ -31,8 +31,10 @@ import {
   Sparkles,
   X,
   Calendar,
-  Headphones
+  Headphones,
+  Bell
 } from "lucide-react";
+import { DealCelebration, useDealCelebrationTrigger } from "@/components/DealCelebration";
 
 interface SDRMetrics {
   leadsTotais: number;
@@ -79,6 +81,8 @@ export default function DashboardSDRs() {
   const [mesAtual, setMesAtual] = useState<string>(
     hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
   );
+
+  const { triggerTest } = useDealCelebrationTrigger();
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -849,13 +853,25 @@ export default function DashboardSDRs() {
           </div>
 
           {/* Footer */}
-          <div className="text-center mt-4">
+          <div className="flex items-center justify-center gap-4 mt-4">
             <p className="text-sm text-slate-500">
               Atualizado automaticamente a cada minuto
             </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => triggerTest()}
+              className="text-slate-500 hover:text-cyan-400 gap-1"
+              data-testid="button-test-celebration"
+            >
+              <Bell className="w-4 h-4" />
+              Testar Celebração
+            </Button>
           </div>
         </motion.div>
       </div>
+
+      <DealCelebration autoClose={15000} />
     </div>
   );
 }
