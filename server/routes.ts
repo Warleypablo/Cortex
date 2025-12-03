@@ -1825,7 +1825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes_realizadas,
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN 1 END) as negocios_ganhos
         FROM crm_deal d
-        LEFT JOIN crm_closers c ON d.closer = c.id
+        LEFT JOIN crm_closers c ON d.closer::integer = c.id
         ${whereClause}
       `);
       const row = result.rows[0] as any;
@@ -1889,7 +1889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes,
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN 1 END) as negocios_ganhos
         FROM crm_deal d
-        INNER JOIN crm_closers c ON d.closer = c.id
+        INNER JOIN crm_closers c ON d.closer::integer = c.id
         ${whereClause}
         GROUP BY c.id, c.nome
         ORDER BY c.nome
@@ -1957,7 +1957,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
           COALESCE(SUM(d.valor_pontual), 0) as pontual
         FROM crm_deal d
-        INNER JOIN crm_closers c ON d.closer = c.id
+        INNER JOIN crm_closers c ON d.closer::integer = c.id
         ${whereClause}
         GROUP BY c.id, c.nome
         ORDER BY c.nome
