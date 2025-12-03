@@ -1982,6 +1982,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
+  // CLOSER DETAIL API ENDPOINTS
+  // ========================================
+
+  app.get("/api/closers/detail", async (req, res) => {
+    try {
+      const { closerId, dataInicio, dataFim } = req.query;
+
+      if (!closerId) {
+        return res.status(400).json({ error: "closerId is required" });
+      }
+
+      const closerResult = await db.execute(sql`
+        SELECT id, nome FROM crm_closers WHERE id = ${closerId}
+      `);
+      
+      if (closerResult.rows.length === 0) {
+        return res.status(404).json({ error: "Closer not found" });
+      }
+
+      const closerInfo = closerResult.rows[0] as any;
+
+      const dateConditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) {
+        dateConditions.push(sql`d.date_create >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        dateConditions.push(sql`d.date_create <= ${dataFim}`);
+      }
+
+      const dateWhereClause = dateConditions.length > 0 
+        ? sql`AND ${sql.join(dateConditions, sql` AND `)}` 
+        : sql``;
+
+      const metricsResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) as total_negocios,
+          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios_ganhos,
+          COUNT(CASE WHEN d.stage_name IN ('Negócio perdido', 'Negócio Perdido', 'Perdido', 'Descartado', 'Descartado/sem fit') THEN 1 END) as negocios_perdidos,
+          COUNT(CASE WHEN d.stage_name NOT IN ('Negócio Ganho', 'Negócio perdido', 'Negócio Perdido', 'Perdido', 'Descartado', 'Descartado/sem fit') THEN 1 END) as negocios_em_andamento,
+          COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes_realizadas,
+          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_recorrente END), 0) as valor_recorrente,
+          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_pontual END), 0) as valor_pontual,
+          MIN(d.date_create) as primeiro_negocio,
+          MAX(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.data_fechamento END) as ultimo_negocio
+        FROM crm_deal d
+        WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
+        ${dateWhereClause}
+      `);
+
+      const row = metricsResult.rows[0] as any;
+      
+      const totalNegocios = parseInt(row.total_negocios) || 0;
+      const negociosGanhos = parseInt(row.negocios_ganhos) || 0;
+      const negociosPerdidos = parseInt(row.negocios_perdidos) || 0;
+      const negociosEmAndamento = parseInt(row.negocios_em_andamento) || 0;
+      const reunioesRealizadas = parseInt(row.reunioes_realizadas) || 0;
+      const valorRecorrente = parseFloat(row.valor_recorrente) || 0;
+      const valorPontual = parseFloat(row.valor_pontual) || 0;
+      const valorTotal = valorRecorrente + valorPontual;
+      const taxaConversao = reunioesRealizadas > 0 ? (negociosGanhos / reunioesRealizadas) * 100 : 0;
+      const ticketMedio = negociosGanhos > 0 ? valorTotal / negociosGanhos : 0;
+      const ticketMedioRecorrente = negociosGanhos > 0 ? valorRecorrente / negociosGanhos : 0;
+      const ticketMedioPontual = negociosGanhos > 0 ? valorPontual / negociosGanhos : 0;
+
+      const primeiroNegocio = row.primeiro_negocio;
+      const ultimoNegocio = row.ultimo_negocio;
+
+      let lt = 0;
+      let diasAtivo = 0;
+      if (primeiroNegocio) {
+        const inicio = new Date(primeiroNegocio);
+        const fim = ultimoNegocio ? new Date(ultimoNegocio) : new Date();
+        diasAtivo = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+        lt = Math.max(1, Math.ceil(diasAtivo / 30));
+      }
+
+      const mediaContratosPorMes = lt > 0 ? negociosGanhos / lt : 0;
+
+      res.json({
+        closerId: parseInt(closerId as string),
+        closerName: closerInfo.nome,
+        negociosGanhos,
+        negociosPerdidos,
+        negociosEmAndamento,
+        totalNegocios,
+        reunioesRealizadas,
+        taxaConversao,
+        valorRecorrente,
+        valorPontual,
+        valorTotal,
+        ticketMedio,
+        ticketMedioRecorrente,
+        ticketMedioPontual,
+        lt,
+        primeiroNegocio: primeiroNegocio ? new Date(primeiroNegocio).toISOString() : null,
+        ultimoNegocio: ultimoNegocio ? new Date(ultimoNegocio).toISOString() : null,
+        diasAtivo,
+        mediaContratosPorMes
+      });
+    } catch (error) {
+      console.error("[api] Error fetching closer detail:", error);
+      res.status(500).json({ error: "Failed to fetch closer detail" });
+    }
+  });
+
+  app.get("/api/closers/detail/monthly", async (req, res) => {
+    try {
+      const { closerId, dataInicio, dataFim } = req.query;
+
+      if (!closerId) {
+        return res.status(400).json({ error: "closerId is required" });
+      }
+
+      const dateConditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) {
+        dateConditions.push(sql`d.data_fechamento >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        dateConditions.push(sql`d.data_fechamento <= ${dataFim}`);
+      }
+
+      const dateWhereClause = dateConditions.length > 0 
+        ? sql`AND ${sql.join(dateConditions, sql` AND `)}` 
+        : sql``;
+
+      const result = await db.execute(sql`
+        SELECT 
+          TO_CHAR(d.data_fechamento, 'YYYY-MM') as mes,
+          TO_CHAR(d.data_fechamento, 'Mon/YY') as mes_label,
+          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_recorrente END), 0) as valor_recorrente,
+          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_pontual END), 0) as valor_pontual,
+          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios,
+          COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes
+        FROM crm_deal d
+        WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
+          AND d.data_fechamento IS NOT NULL
+          ${dateWhereClause}
+        GROUP BY TO_CHAR(d.data_fechamento, 'YYYY-MM'), TO_CHAR(d.data_fechamento, 'Mon/YY')
+        ORDER BY mes ASC
+      `);
+
+      const data = result.rows.map((row: any) => ({
+        mes: row.mes,
+        mesLabel: row.mes_label,
+        valorRecorrente: parseFloat(row.valor_recorrente) || 0,
+        valorPontual: parseFloat(row.valor_pontual) || 0,
+        negocios: parseInt(row.negocios) || 0,
+        reunioes: parseInt(row.reunioes) || 0
+      }));
+
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching monthly data:", error);
+      res.status(500).json({ error: "Failed to fetch monthly data" });
+    }
+  });
+
+  app.get("/api/closers/detail/stages", async (req, res) => {
+    try {
+      const { closerId, dataInicio, dataFim } = req.query;
+
+      if (!closerId) {
+        return res.status(400).json({ error: "closerId is required" });
+      }
+
+      const dateConditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) {
+        dateConditions.push(sql`d.date_create >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        dateConditions.push(sql`d.date_create <= ${dataFim}`);
+      }
+
+      const dateWhereClause = dateConditions.length > 0 
+        ? sql`AND ${sql.join(dateConditions, sql` AND `)}` 
+        : sql``;
+
+      const result = await db.execute(sql`
+        SELECT 
+          d.stage_name as stage,
+          COUNT(*) as count
+        FROM crm_deal d
+        WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
+          ${dateWhereClause}
+        GROUP BY d.stage_name
+        ORDER BY count DESC
+      `);
+
+      const totalCount = result.rows.reduce((acc: number, row: any) => acc + parseInt(row.count), 0);
+      
+      const data = result.rows.map((row: any) => ({
+        stage: row.stage || 'Não informado',
+        count: parseInt(row.count) || 0,
+        percentage: totalCount > 0 ? (parseInt(row.count) / totalCount) * 100 : 0
+      }));
+
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching stage data:", error);
+      res.status(500).json({ error: "Failed to fetch stage data" });
+    }
+  });
+
+  app.get("/api/closers/detail/sources", async (req, res) => {
+    try {
+      const { closerId, dataInicio, dataFim } = req.query;
+
+      if (!closerId) {
+        return res.status(400).json({ error: "closerId is required" });
+      }
+
+      const dateConditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) {
+        dateConditions.push(sql`d.date_create >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        dateConditions.push(sql`d.date_create <= ${dataFim}`);
+      }
+
+      const dateWhereClause = dateConditions.length > 0 
+        ? sql`AND ${sql.join(dateConditions, sql` AND `)}` 
+        : sql``;
+
+      const result = await db.execute(sql`
+        SELECT 
+          COALESCE(d.source, 'Não informado') as source,
+          COUNT(*) as count
+        FROM crm_deal d
+        WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
+          ${dateWhereClause}
+        GROUP BY d.source
+        ORDER BY count DESC
+        LIMIT 15
+      `);
+
+      const totalCount = result.rows.reduce((acc: number, row: any) => acc + parseInt(row.count), 0);
+      
+      const data = result.rows.map((row: any) => ({
+        source: row.source || 'Não informado',
+        count: parseInt(row.count) || 0,
+        percentage: totalCount > 0 ? (parseInt(row.count) / totalCount) * 100 : 0
+      }));
+
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching source data:", error);
+      res.status(500).json({ error: "Failed to fetch source data" });
+    }
+  });
+
+  // ========================================
   // SDRs DASHBOARD API ENDPOINTS
   // ========================================
 

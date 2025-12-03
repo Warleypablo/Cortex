@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -110,6 +110,7 @@ const dashboardCategories = [
     subItems: [
       { title: "Closers", url: "/dashboard/comercial/closers", icon: UserRound },
       { title: "SDRs", url: "/dashboard/comercial/sdrs", icon: Headphones },
+      { title: "Detalhamento Closers", url: "/dashboard/comercial/detalhamento-closers", icon: UserSearch },
     ],
   },
 ];
