@@ -1076,7 +1076,7 @@ export default function DashboardDFC() {
                     
                     {/* Result Row */}
                     <div 
-                      className="sticky left-0 z-10 p-3 border-t-2 border-b border-r bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50"
+                      className="sticky left-0 z-10 p-3 border-t-2 border-b border-r bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950"
                       data-testid="dfc-row-resultado"
                     >
                       <div className="flex items-center gap-2">
@@ -1110,7 +1110,7 @@ export default function DashboardDFC() {
                     
                     {/* Margin Row */}
                     <div 
-                      className="sticky left-0 z-10 p-3 border-b border-r bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/50 dark:to-purple-950/50"
+                      className="sticky left-0 z-10 p-3 border-b border-r bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950 dark:to-purple-950"
                       data-testid="dfc-row-margem"
                     >
                       <div className="flex items-center gap-2">
