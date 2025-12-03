@@ -5,23 +5,24 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { 
   Loader2, TrendingUp, TrendingDown, DollarSign, Calendar, ChevronRight, ChevronDown,
-  Wallet, ArrowUpCircle, ArrowDownCircle, PiggyBank, BarChart3, Banknote, Receipt,
-  CircleDollarSign, Coins, CreditCard, LineChart, Target, Activity, Percent,
-  Sparkles, AlertTriangle, Lightbulb, CheckCircle, X, BrainCircuit, Send, MessageCircle, Bot, User
+  Wallet, ArrowUpCircle, ArrowDownCircle, BarChart3, Receipt,
+  CircleDollarSign, LineChart, Target, Activity, Percent,
+  Sparkles, BrainCircuit, Send, MessageCircle, Bot, User, Minus, LayoutGrid, Table2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, ComposedChart, Line, Cell, ReferenceLine
 } from "recharts";
 import type { DfcHierarchicalResponse, DfcNode, DfcParcela } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -53,6 +54,7 @@ export default function DashboardDFC() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const { toast } = useToast();
 
   const chatMutation = useMutation({
@@ -171,6 +173,7 @@ export default function DashboardDFC() {
         totalReceitas: 0,
         totalDespesas: 0,
         saldoLiquido: 0,
+        margemMedia: 0,
       };
     }
 
@@ -188,12 +191,16 @@ export default function DashboardDFC() {
       totalDespesas += Math.abs(despesasNode?.valuesByMonth[mes] || 0);
     });
 
+    const saldoLiquido = totalReceitas - totalDespesas;
+    const margemMedia = totalReceitas > 0 ? (saldoLiquido / totalReceitas) * 100 : 0;
+
     return { 
       totalCategorias, 
       totalMeses, 
       totalReceitas,
       totalDespesas,
-      saldoLiquido: totalReceitas - totalDespesas,
+      saldoLiquido,
+      margemMedia,
     };
   }, [dfcData]);
 
@@ -248,12 +255,16 @@ export default function DashboardDFC() {
       
       const receitas = receitasNode?.valuesByMonth[mes] || 0;
       const despesas = Math.abs(despesasNode?.valuesByMonth[mes] || 0);
+      const saldo = receitas - despesas;
+      const margem = receitas > 0 ? ((saldo / receitas) * 100) : 0;
       
       return {
         mes: mesLabel,
+        mesKey: mes,
         receitas,
         despesas,
-        saldo: receitas - despesas,
+        saldo,
+        margem,
       };
     });
   }, [dfcData]);
@@ -276,119 +287,77 @@ export default function DashboardDFC() {
     return categoriaId === 'RECEITAS' || categoriaId.startsWith('R');
   };
 
-  const KPICard = ({ 
-    title, value, subtitle, icon: Icon, variant = 'default', loading = false 
-  }: { 
-    title: string; 
-    value: string; 
-    subtitle?: string; 
-    icon: any; 
-    variant?: 'default' | 'success' | 'danger' | 'warning' | 'info';
-    loading?: boolean;
-  }) => {
-    const variantStyles = {
-      default: {
-        bg: 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900',
-        icon: 'bg-primary/10 text-primary',
-      },
-      success: {
-        bg: 'bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/20',
-        icon: 'bg-green-500/20 text-green-600 dark:text-green-400',
-      },
-      danger: {
-        bg: 'bg-gradient-to-br from-red-50 to-rose-100 dark:from-red-900/30 dark:to-rose-900/20',
-        icon: 'bg-red-500/20 text-red-600 dark:text-red-400',
-      },
-      warning: {
-        bg: 'bg-gradient-to-br from-amber-50 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/20',
-        icon: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
-      },
-      info: {
-        bg: 'bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-900/30 dark:to-sky-900/20',
-        icon: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
-      },
-    };
-
-    const styles = variantStyles[variant];
-
-    if (loading) {
-      return (
-        <Card className={`${styles.bg} border-0 shadow-lg overflow-hidden`}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="space-y-2 flex-1 min-w-0">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-6 w-24" />
-                <Skeleton className="h-3 w-16" />
-              </div>
-              <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
-            </div>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    return (
-      <Card className={`${styles.bg} border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 overflow-hidden`}>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-muted-foreground truncate">{title}</p>
-              <p className="text-lg font-bold text-foreground truncate">
-                {value}
-              </p>
-              {subtitle && (
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>
-              )}
-            </div>
-            <div className={`p-2.5 rounded-xl ${styles.icon} shadow-inner flex-shrink-0`}>
-              <Icon className="w-5 h-5" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
+  const getMaxValue = () => {
+    if (!dfcData?.nodes) return 0;
+    let max = 0;
+    dfcData.nodes.forEach(node => {
+      if (node.isLeaf) {
+        dfcData.meses.forEach(mes => {
+          const val = Math.abs(node.valuesByMonth[mes] || 0);
+          if (val > max) max = val;
+        });
+      }
+    });
+    return max;
   };
+
+  const maxValue = useMemo(() => getMaxValue(), [dfcData]);
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 border-b bg-gradient-to-r from-background via-background to-muted/30 px-6 py-5">
-        <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex-shrink-0 border-b bg-background px-6 py-4">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 shadow-lg">
-              <BarChart3 className="w-8 h-8 text-primary" />
+            <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20">
+              <BarChart3 className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text" data-testid="text-page-title">
-                DFC - Demonstração de Fluxo de Caixa
+              <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">
+                Fluxo de Caixa
               </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Análise hierárquica completa do fluxo financeiro
+              <p className="text-sm text-muted-foreground">
+                Demonstração detalhada de entradas e saídas
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1" data-testid="toggle-view-mode">
+              <Button
+                variant={viewMode === "table" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("table")}
+                className="h-8"
+                data-testid="button-view-table"
+              >
+                <Table2 className="w-4 h-4 mr-1" />
+                Tabela
+              </Button>
+              <Button
+                variant={viewMode === "cards" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("cards")}
+                className="h-8"
+                data-testid="button-view-cards"
+              >
+                <LayoutGrid className="w-4 h-4 mr-1" />
+                Cards
+              </Button>
+            </div>
             <Button
               onClick={() => setChatOpen(true)}
               disabled={isLoading || !dfcData?.nodes?.length}
-              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg"
+              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg shadow-violet-500/25"
               data-testid="button-chat-ia"
             >
               <MessageCircle className="w-4 h-4 mr-2" />
-              Chat IA
+              Assistente IA
             </Button>
-            <Badge variant="outline" className="px-3 py-1.5 text-sm font-medium bg-green-500/10 text-green-600 border-green-500/30">
-              <ArrowUpCircle className="w-4 h-4 mr-1.5" />
-              Entradas
-            </Badge>
-            <Badge variant="outline" className="px-3 py-1.5 text-sm font-medium bg-red-500/10 text-red-600 border-red-500/30">
-              <ArrowDownCircle className="w-4 h-4 mr-1.5" />
-              Saídas
-            </Badge>
           </div>
         </div>
       </div>
 
+      {/* Chat Dialog */}
       <Dialog open={chatOpen} onOpenChange={setChatOpen}>
         <DialogContent className="max-w-2xl h-[80vh] overflow-hidden flex flex-col p-0">
           <DialogHeader className="px-6 py-4 border-b bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30">
@@ -507,151 +476,309 @@ export default function DashboardDFC() {
         </DialogContent>
       </Dialog>
 
-      <div className="flex-1 overflow-auto p-6 bg-gradient-to-b from-muted/20 to-background">
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto p-6 bg-muted/30">
         <div className="max-w-[1800px] mx-auto space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <KPICard
-              title="Total de Entradas"
-              value={formatCurrency(kpis.totalReceitas)}
-              icon={ArrowUpCircle}
-              variant="success"
-              subtitle="Receitas no período"
-              loading={isLoading}
-            />
-            <KPICard
-              title="Total de Saídas"
-              value={formatCurrency(kpis.totalDespesas)}
-              icon={ArrowDownCircle}
-              variant="danger"
-              subtitle="Despesas no período"
-              loading={isLoading}
-            />
-            <KPICard
-              title="Saldo Líquido"
-              value={formatCurrency(kpis.saldoLiquido)}
-              icon={Wallet}
-              variant={kpis.saldoLiquido >= 0 ? 'success' : 'danger'}
-              subtitle="Entradas - Saídas"
-              loading={isLoading}
-            />
-            <KPICard
-              title="Meses Analisados"
-              value={kpis.totalMeses.toString()}
-              icon={Calendar}
-              variant="info"
-              subtitle="Período de análise"
-              loading={isLoading}
-            />
-            <KPICard
-              title="Categorias"
-              value={kpis.totalCategorias.toString()}
-              icon={Receipt}
-              variant="warning"
-              subtitle="Categorias ativas"
-              loading={isLoading}
-            />
-          </div>
-
-          {chartData.length > 0 && (
-            <Card className="shadow-lg border-0 bg-gradient-to-br from-background to-muted/20">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <LineChart className="w-5 h-5 text-primary" />
+          
+          {/* KPI Cards - Modern Design */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {/* Entradas */}
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/40 dark:to-emerald-900/20 overflow-hidden">
+              <CardContent className="p-4">
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-8 w-28" />
                   </div>
-                  <div>
-                    <CardTitle>Evolução do Fluxo de Caixa</CardTitle>
-                    <CardDescription>Comparativo mensal de entradas e saídas</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={chartData}>
-                    <defs>
-                      <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="mes" tick={{ fill: 'currentColor', fontSize: 11 }} />
-                    <YAxis tick={{ fill: 'currentColor' }} tickFormatter={formatCurrencyCompact} />
-                    <Tooltip 
-                      formatter={(value: number, name: string) => [formatCurrency(value), name === 'receitas' ? 'Entradas' : 'Saídas']}
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))', 
-                        border: '1px solid hsl(var(--border))', 
-                        borderRadius: '12px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                      }}
-                    />
-                    <Legend 
-                      formatter={(value: string) => value === 'receitas' ? 'Entradas' : 'Saídas'}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="receitas" 
-                      stroke="#22c55e" 
-                      strokeWidth={3}
-                      fillOpacity={1} 
-                      fill="url(#colorReceitas)" 
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="despesas" 
-                      stroke="#ef4444" 
-                      strokeWidth={3}
-                      fillOpacity={1} 
-                      fill="url(#colorDespesas)" 
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Entradas</span>
+                      <ArrowUpCircle className="w-4 h-4 text-emerald-500" />
+                    </div>
+                    <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+                      {formatCurrencyCompact(kpis.totalReceitas)}
+                    </p>
+                    <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">
+                      Total no período
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
+
+            {/* Saídas */}
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/40 dark:to-rose-900/20 overflow-hidden">
+              <CardContent className="p-4">
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-8 w-28" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-rose-600 dark:text-rose-400">Saídas</span>
+                      <ArrowDownCircle className="w-4 h-4 text-rose-500" />
+                    </div>
+                    <p className="text-xl font-bold text-rose-700 dark:text-rose-300">
+                      {formatCurrencyCompact(kpis.totalDespesas)}
+                    </p>
+                    <p className="text-xs text-rose-600/70 dark:text-rose-400/70 mt-1">
+                      Total no período
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Saldo */}
+            <Card className={`border-0 shadow-sm overflow-hidden ${
+              kpis.saldoLiquido >= 0 
+                ? 'bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20'
+                : 'bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/40 dark:to-orange-900/20'
+            }`}>
+              <CardContent className="p-4">
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-8 w-28" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-xs font-medium ${kpis.saldoLiquido >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                        Saldo
+                      </span>
+                      <Wallet className={`w-4 h-4 ${kpis.saldoLiquido >= 0 ? 'text-blue-500' : 'text-orange-500'}`} />
+                    </div>
+                    <p className={`text-xl font-bold ${kpis.saldoLiquido >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-orange-700 dark:text-orange-300'}`}>
+                      {kpis.saldoLiquido >= 0 ? '+' : ''}{formatCurrencyCompact(kpis.saldoLiquido)}
+                    </p>
+                    <p className={`text-xs mt-1 ${kpis.saldoLiquido >= 0 ? 'text-blue-600/70 dark:text-blue-400/70' : 'text-orange-600/70 dark:text-orange-400/70'}`}>
+                      Entradas - Saídas
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Margem */}
+            <Card className={`border-0 shadow-sm overflow-hidden ${
+              kpis.margemMedia >= 20 
+                ? 'bg-gradient-to-br from-violet-50 to-violet-100/50 dark:from-violet-950/40 dark:to-violet-900/20'
+                : kpis.margemMedia >= 0
+                ? 'bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/40 dark:to-amber-900/20'
+                : 'bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/40 dark:to-red-900/20'
+            }`}>
+              <CardContent className="p-4">
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-8 w-28" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-xs font-medium ${
+                        kpis.margemMedia >= 20 ? 'text-violet-600 dark:text-violet-400' : 
+                        kpis.margemMedia >= 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
+                      }`}>Margem Média</span>
+                      <Percent className={`w-4 h-4 ${
+                        kpis.margemMedia >= 20 ? 'text-violet-500' : 
+                        kpis.margemMedia >= 0 ? 'text-amber-500' : 'text-red-500'
+                      }`} />
+                    </div>
+                    <p className={`text-xl font-bold ${
+                      kpis.margemMedia >= 20 ? 'text-violet-700 dark:text-violet-300' : 
+                      kpis.margemMedia >= 0 ? 'text-amber-700 dark:text-amber-300' : 'text-red-700 dark:text-red-300'
+                    }`}>
+                      {kpis.margemMedia.toFixed(1)}%
+                    </p>
+                    <p className={`text-xs mt-1 ${
+                      kpis.margemMedia >= 20 ? 'text-violet-600/70 dark:text-violet-400/70' : 
+                      kpis.margemMedia >= 0 ? 'text-amber-600/70 dark:text-amber-400/70' : 'text-red-600/70 dark:text-red-400/70'
+                    }`}>
+                      Resultado/Receita
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Meses */}
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/40 dark:to-slate-700/20 overflow-hidden">
+              <CardContent className="p-4">
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-8 w-28" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Período</span>
+                      <Calendar className="w-4 h-4 text-slate-500" />
+                    </div>
+                    <p className="text-xl font-bold text-slate-700 dark:text-slate-300">
+                      {kpis.totalMeses} meses
+                    </p>
+                    <p className="text-xs text-slate-600/70 dark:text-slate-400/70 mt-1">
+                      Analisados
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Categorias */}
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-cyan-50 to-cyan-100/50 dark:from-cyan-950/40 dark:to-cyan-900/20 overflow-hidden">
+              <CardContent className="p-4">
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-8 w-28" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-cyan-600 dark:text-cyan-400">Categorias</span>
+                      <Receipt className="w-4 h-4 text-cyan-500" />
+                    </div>
+                    <p className="text-xl font-bold text-cyan-700 dark:text-cyan-300">
+                      {kpis.totalCategorias}
+                    </p>
+                    <p className="text-xs text-cyan-600/70 dark:text-cyan-400/70 mt-1">
+                      Ativas no período
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Charts Section */}
+          {chartData.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Evolução do Fluxo */}
+              <Card className="shadow-sm border-0">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <LineChart className="w-5 h-5 text-primary" />
+                    <CardTitle className="text-base">Evolução Mensal</CardTitle>
+                  </div>
+                  <CardDescription className="text-xs">Comparativo de entradas e saídas</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={chartData}>
+                      <defs>
+                        <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted/50" />
+                      <XAxis dataKey="mes" tick={{ fill: 'currentColor', fontSize: 10 }} />
+                      <YAxis tick={{ fill: 'currentColor', fontSize: 10 }} tickFormatter={formatCurrencyCompact} width={60} />
+                      <Tooltip 
+                        formatter={(value: number, name: string) => [formatCurrency(value), name === 'receitas' ? 'Entradas' : 'Saídas']}
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--background))', 
+                          border: '1px solid hsl(var(--border))', 
+                          borderRadius: '8px',
+                          fontSize: '12px'
+                        }}
+                      />
+                      <Area type="monotone" dataKey="receitas" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorReceitas)" />
+                      <Area type="monotone" dataKey="despesas" stroke="#f43f5e" strokeWidth={2} fillOpacity={1} fill="url(#colorDespesas)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Resultado Mensal */}
+              <Card className="shadow-sm border-0">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-primary" />
+                    <CardTitle className="text-base">Resultado Mensal</CardTitle>
+                  </div>
+                  <CardDescription className="text-xs">Saldo e margem por mês</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <ComposedChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted/50" />
+                      <XAxis dataKey="mes" tick={{ fill: 'currentColor', fontSize: 10 }} />
+                      <YAxis yAxisId="left" tick={{ fill: 'currentColor', fontSize: 10 }} tickFormatter={formatCurrencyCompact} width={60} />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fill: 'currentColor', fontSize: 10 }} tickFormatter={(v) => `${v}%`} width={40} />
+                      <Tooltip 
+                        formatter={(value: number, name: string) => {
+                          if (name === 'saldo') return [formatCurrency(value), 'Resultado'];
+                          return [`${value.toFixed(1)}%`, 'Margem'];
+                        }}
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--background))', 
+                          border: '1px solid hsl(var(--border))', 
+                          borderRadius: '8px',
+                          fontSize: '12px'
+                        }}
+                      />
+                      <ReferenceLine yAxisId="left" y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                      <Bar yAxisId="left" dataKey="saldo" radius={[4, 4, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.saldo >= 0 ? '#10b981' : '#f43f5e'} />
+                        ))}
+                      </Bar>
+                      <Line yAxisId="right" type="monotone" dataKey="margem" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
           )}
 
-          <Card className="shadow-lg border-0 bg-gradient-to-br from-background to-muted/10">
-            <CardHeader>
+          {/* Filters and DFC Table */}
+          <Card className="shadow-sm border-0">
+            <CardHeader className="pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-primary/10">
                     <Activity className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <CardTitle>DFC</CardTitle>
-                    <CardDescription>
-                      Navegue pela hierarquia expandindo e colapsando os níveis
+                    <CardTitle className="text-lg">Demonstrativo de Fluxo de Caixa</CardTitle>
+                    <CardDescription className="text-xs">
+                      Clique nas categorias para expandir detalhes
                     </CardDescription>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Vencimento de:</label>
+                    <label className="text-xs font-medium text-muted-foreground">De:</label>
                     <input
                       type="date"
                       value={filterDataInicio}
                       onChange={(e) => setFilterDataInicio(e.target.value)}
-                      className="h-10 rounded-lg border border-input bg-background px-3 text-sm shadow-sm hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                       data-testid="input-data-inicio"
                     />
                   </div>
-                  
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Até:</label>
+                    <label className="text-xs font-medium text-muted-foreground">Até:</label>
                     <input
                       type="date"
                       value={filterDataFim}
                       onChange={(e) => setFilterDataFim(e.target.value)}
-                      className="h-10 rounded-lg border border-input bg-background px-3 text-sm shadow-sm hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                       data-testid="input-data-fim"
                     />
                   </div>
-                  
                   {(filterDataInicio || filterDataFim) && (
                     <Button
                       variant="outline"
@@ -660,7 +787,7 @@ export default function DashboardDFC() {
                         setFilterDataInicio("");
                         setFilterDataFim("");
                       }}
-                      className="h-10"
+                      className="h-9"
                     >
                       Limpar
                     </Button>
@@ -668,32 +795,106 @@ export default function DashboardDFC() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-4" data-testid="loading-dfc">
                   <div className="relative">
-                    <div className="w-16 h-16 border-4 border-primary/20 rounded-full"></div>
-                    <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+                    <div className="w-12 h-12 border-4 border-primary/20 rounded-full"></div>
+                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
                   </div>
-                  <p className="text-muted-foreground animate-pulse">Carregando dados financeiros...</p>
+                  <p className="text-sm text-muted-foreground">Carregando dados...</p>
                 </div>
               ) : !dfcData || visibleItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-4 text-muted-foreground">
-                  <DollarSign className="w-16 h-16 opacity-20" />
-                  <p>Nenhum dado de DFC disponível para os filtros selecionados.</p>
+                  <DollarSign className="w-12 h-12 opacity-20" />
+                  <p className="text-sm">Nenhum dado disponível para o período selecionado.</p>
+                </div>
+              ) : viewMode === "cards" ? (
+                /* Cards View */
+                <div className="space-y-4">
+                  {dfcData.nodes.filter(n => n.categoriaId === 'RECEITAS' || n.categoriaId === 'DESPESAS').map(rootNode => (
+                    <div key={rootNode.categoriaId} className="space-y-3">
+                      <div className={`p-4 rounded-xl ${
+                        rootNode.categoriaId === 'RECEITAS' 
+                          ? 'bg-gradient-to-r from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 border border-emerald-200/50 dark:border-emerald-800/30'
+                          : 'bg-gradient-to-r from-rose-50 to-rose-100/50 dark:from-rose-950/30 dark:to-rose-900/20 border border-rose-200/50 dark:border-rose-800/30'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {rootNode.categoriaId === 'RECEITAS' ? (
+                              <ArrowUpCircle className="w-6 h-6 text-emerald-600" />
+                            ) : (
+                              <ArrowDownCircle className="w-6 h-6 text-rose-600" />
+                            )}
+                            <span className={`text-lg font-bold ${
+                              rootNode.categoriaId === 'RECEITAS' ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'
+                            }`}>
+                              {rootNode.categoriaNome}
+                            </span>
+                          </div>
+                          <span className={`text-lg font-bold ${
+                            rootNode.categoriaId === 'RECEITAS' ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'
+                          }`}>
+                            {formatCurrency(Math.abs(Object.values(rootNode.valuesByMonth).reduce((a, b) => a + b, 0)))}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pl-4">
+                        {dfcData.nodes
+                          .filter(n => n.isLeaf && (
+                            rootNode.categoriaId === 'RECEITAS' ? isReceita(n.categoriaId) : !isReceita(n.categoriaId)
+                          ))
+                          .sort((a, b) => {
+                            const totalA = Math.abs(Object.values(a.valuesByMonth).reduce((s, v) => s + v, 0));
+                            const totalB = Math.abs(Object.values(b.valuesByMonth).reduce((s, v) => s + v, 0));
+                            return totalB - totalA;
+                          })
+                          .slice(0, 9)
+                          .map(node => {
+                            const total = Math.abs(Object.values(node.valuesByMonth).reduce((a, b) => a + b, 0));
+                            const isReceitaNode = isReceita(node.categoriaId);
+                            return (
+                              <div
+                                key={node.categoriaId}
+                                className="p-3 rounded-lg bg-background border hover:shadow-md transition-all cursor-pointer"
+                                onClick={() => toggleExpand(node.categoriaId)}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium truncate">{node.categoriaNome}</p>
+                                    <p className={`text-lg font-bold ${isReceitaNode ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                      {formatCurrency(total)}
+                                    </p>
+                                  </div>
+                                  <div className={`w-2 h-2 rounded-full mt-2 ${isReceitaNode ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                </div>
+                                {/* Mini bar showing relative size */}
+                                <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full rounded-full ${isReceitaNode ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                    style={{ width: `${Math.min((total / maxValue) * 100, 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <div className="relative rounded-lg border overflow-hidden">
+                /* Table View */
+                <div className="relative rounded-xl border overflow-hidden bg-background">
                   <div 
-                    className="overflow-auto max-h-[70vh]"
+                    className="overflow-auto max-h-[60vh]"
                     style={{ 
                       display: 'grid',
-                      gridTemplateColumns: `350px repeat(${dfcData.meses.length}, 130px)`,
+                      gridTemplateColumns: `minmax(280px, 320px) repeat(${dfcData.meses.length}, minmax(100px, 120px))`,
                     }}
                   >
-                    {/* Header Row - Sticky Top */}
-                    <div className="sticky top-0 left-0 z-30 bg-muted font-bold p-3 border-b border-r border-border flex items-center gap-2 shadow-[2px_2px_4px_rgba(0,0,0,0.1)]">
-                      <Receipt className="w-4 h-4" />
+                    {/* Header Row */}
+                    <div className="sticky top-0 left-0 z-30 bg-muted/80 backdrop-blur-sm font-semibold p-3 border-b border-r text-sm flex items-center gap-2">
+                      <Receipt className="w-4 h-4 text-muted-foreground" />
                       Categoria
                     </div>
                     {dfcData.meses.map(mes => {
@@ -703,7 +904,7 @@ export default function DashboardDFC() {
                       return (
                         <div 
                           key={`header-${mes}`} 
-                          className="sticky top-0 z-20 bg-muted font-bold p-3 border-b border-border text-center capitalize"
+                          className="sticky top-0 z-20 bg-muted/80 backdrop-blur-sm font-semibold p-3 border-b text-center text-sm capitalize"
                         >
                           {mesFormatado}
                         </div>
@@ -718,34 +919,30 @@ export default function DashboardDFC() {
                         const isReceitaNode = isReceita(node.categoriaId);
                         const isRootNode = node.categoriaId === 'RECEITAS' || node.categoriaId === 'DESPESAS';
                         
-                        const cellBg = isRootNode 
-                          ? (isReceitaNode ? 'bg-green-100 dark:bg-green-950' : 'bg-red-100 dark:bg-red-950')
-                          : 'bg-background';
-                        
-                        const valueCellBg = isRootNode 
-                          ? (isReceitaNode ? 'bg-green-50 dark:bg-green-950/50' : 'bg-red-50 dark:bg-red-950/50')
-                          : 'bg-background';
-                        
                         return (
                           <>
-                            {/* Category Cell - Sticky Left */}
+                            {/* Category Cell */}
                             <div 
                               key={`cat-${node.categoriaId}`}
-                              className={`sticky left-0 z-10 p-3 border-b border-r border-border ${cellBg} shadow-[2px_0_4px_rgba(0,0,0,0.05)] hover:brightness-95 transition-all`}
-                              style={{ paddingLeft: `${node.nivel * 24 + 12}px` }}
+                              className={`sticky left-0 z-10 p-3 border-b border-r transition-colors ${
+                                isRootNode 
+                                  ? (isReceitaNode 
+                                    ? 'bg-emerald-50/80 dark:bg-emerald-950/40' 
+                                    : 'bg-rose-50/80 dark:bg-rose-950/40')
+                                  : 'bg-background hover:bg-muted/50'
+                              }`}
+                              style={{ paddingLeft: `${node.nivel * 20 + 12}px` }}
                               data-testid={`dfc-row-${node.categoriaId}`}
                             >
                               <div className="flex items-center gap-2">
                                 {!node.isLeaf || hasParcelas ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className={`h-7 w-7 rounded-lg transition-all duration-200 ${
+                                  <button
+                                    onClick={() => toggleExpand(node.categoriaId)}
+                                    className={`p-1 rounded-md transition-colors ${
                                       expanded.has(node.categoriaId) 
                                         ? 'bg-primary/10 text-primary' 
-                                        : 'hover:bg-muted'
+                                        : 'hover:bg-muted text-muted-foreground'
                                     }`}
-                                    onClick={() => toggleExpand(node.categoriaId)}
                                     data-testid={`button-toggle-${node.categoriaId}`}
                                   >
                                     {expanded.has(node.categoriaId) ? (
@@ -753,23 +950,27 @@ export default function DashboardDFC() {
                                     ) : (
                                       <ChevronRight className="h-4 w-4" />
                                     )}
-                                  </Button>
+                                  </button>
                                 ) : (
-                                  <div className="w-7 flex justify-center">
-                                    {isReceitaNode ? (
-                                      <Coins className="w-4 h-4 text-green-500" />
-                                    ) : (
-                                      <CreditCard className="w-4 h-4 text-red-500" />
-                                    )}
+                                  <div className="w-6 flex justify-center">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${isReceitaNode ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                                   </div>
                                 )}
-                                <span className={`${!node.isLeaf ? 'font-bold' : 'font-medium'} ${
+                                <span className={`text-sm ${
                                   isRootNode 
-                                    ? (isReceitaNode ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400')
+                                    ? 'font-bold' 
+                                    : !node.isLeaf 
+                                    ? 'font-semibold' 
+                                    : 'font-medium'
+                                } ${
+                                  isRootNode 
+                                    ? (isReceitaNode ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400')
                                     : ''
                                 }`}>
-                                  {node.categoriaId === 'RECEITAS' && <ArrowUpCircle className="w-5 h-5 inline mr-2 text-green-500" />}
-                                  {node.categoriaId === 'DESPESAS' && <ArrowDownCircle className="w-5 h-5 inline mr-2 text-red-500" />}
+                                  {isRootNode && (isReceitaNode 
+                                    ? <ArrowUpCircle className="w-4 h-4 inline mr-1.5 text-emerald-500" />
+                                    : <ArrowDownCircle className="w-4 h-4 inline mr-1.5 text-rose-500" />
+                                  )}
                                   {node.categoriaNome}
                                 </span>
                               </div>
@@ -777,18 +978,39 @@ export default function DashboardDFC() {
                             {/* Value Cells */}
                             {dfcData.meses.map(mes => {
                               const valor = node.valuesByMonth[mes] || 0;
+                              const absValor = Math.abs(valor);
                               return (
                                 <div 
                                   key={`val-${node.categoriaId}-${mes}`}
-                                  className={`p-3 border-b border-border text-center whitespace-nowrap ${valueCellBg} hover:brightness-95 transition-all`}
+                                  className={`p-3 border-b text-right transition-colors ${
+                                    isRootNode 
+                                      ? (isReceitaNode 
+                                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20' 
+                                        : 'bg-rose-50/50 dark:bg-rose-950/20')
+                                      : 'bg-background'
+                                  }`}
                                   data-testid={`dfc-cell-${node.categoriaId}-${mes}`}
                                 >
-                                  {valor !== 0 ? (
-                                    <span className={`${!node.isLeaf ? 'font-bold' : 'font-medium'} ${isRootNode ? 'text-sm' : 'text-sm'}`}>
-                                      {formatCurrency(Math.abs(valor))}
-                                    </span>
+                                  {absValor > 0 ? (
+                                    <div className="flex flex-col items-end gap-1">
+                                      <span className={`text-sm tabular-nums ${
+                                        isRootNode ? 'font-bold' : !node.isLeaf ? 'font-semibold' : 'font-medium'
+                                      } ${isRootNode ? (isReceitaNode ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400') : ''}`}>
+                                        {formatCurrency(absValor)}
+                                      </span>
+                                      {node.isLeaf && maxValue > 0 && (
+                                        <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                                          <div 
+                                            className={`h-full rounded-full transition-all ${isReceitaNode ? 'bg-emerald-400' : 'bg-rose-400'}`}
+                                            style={{ width: `${(absValor / maxValue) * 100}%` }}
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
                                   ) : (
-                                    <span className="text-muted-foreground/40">—</span>
+                                    <span className="text-muted-foreground/30">
+                                      <Minus className="w-3 h-3 inline" />
+                                    </span>
                                   )}
                                 </div>
                               );
@@ -800,23 +1022,23 @@ export default function DashboardDFC() {
                         const parentNode = item.parentNode;
                         const isReceitaParcela = isReceita(parentNode.categoriaId);
                         
-                        const parcelaBg = isReceitaParcela 
-                          ? 'bg-green-50 dark:bg-green-950/30' 
-                          : 'bg-red-50 dark:bg-red-950/30';
-                        
                         return (
                           <>
-                            {/* Parcela Category Cell - Sticky Left */}
+                            {/* Parcela Cell */}
                             <div 
                               key={`parcela-cat-${parcela.id}-${idx}`}
-                              className={`sticky left-0 z-10 p-3 border-b border-r border-border ${parcelaBg} shadow-[2px_0_4px_rgba(0,0,0,0.05)] hover:brightness-95 transition-all`}
-                              style={{ paddingLeft: `${(parentNode.nivel + 1) * 24 + 12}px` }}
+                              className={`sticky left-0 z-10 p-2 border-b border-r text-xs ${
+                                isReceitaParcela 
+                                  ? 'bg-emerald-50/30 dark:bg-emerald-950/10' 
+                                  : 'bg-rose-50/30 dark:bg-rose-950/10'
+                              }`}
+                              style={{ paddingLeft: `${(parentNode.nivel + 1) * 20 + 16}px` }}
                               data-testid={`dfc-row-parcela-${parcela.id}-${parentNode.categoriaId}`}
                             >
                               <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${isReceitaParcela ? 'bg-green-500' : 'bg-red-500'}`} />
-                                <span className="text-sm text-muted-foreground">
-                                  #{parcela.id} - {parcela.descricao || 'Sem descrição'}
+                                <div className={`w-1 h-1 rounded-full ${isReceitaParcela ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                                <span className="text-muted-foreground truncate max-w-[200px]">
+                                  {parcela.descricao || `#${parcela.id}`}
                                 </span>
                               </div>
                             </div>
@@ -826,15 +1048,21 @@ export default function DashboardDFC() {
                               return (
                                 <div 
                                   key={`parcela-val-${parcela.id}-${mes}-${idx}`}
-                                  className={`p-3 border-b border-border text-center whitespace-nowrap ${parcelaBg} hover:brightness-95 transition-all`}
+                                  className={`p-2 border-b text-right text-xs ${
+                                    isReceitaParcela 
+                                      ? 'bg-emerald-50/20 dark:bg-emerald-950/5' 
+                                      : 'bg-rose-50/20 dark:bg-rose-950/5'
+                                  }`}
                                   data-testid={`dfc-cell-parcela-${parcela.id}-${mes}`}
                                 >
                                   {valor !== 0 ? (
-                                    <span className="text-sm font-medium">
+                                    <span className="text-muted-foreground tabular-nums">
                                       {formatCurrency(Math.abs(valor))}
                                     </span>
                                   ) : (
-                                    <span className="text-muted-foreground/30">—</span>
+                                    <span className="text-muted-foreground/20">
+                                      <Minus className="w-2 h-2 inline" />
+                                    </span>
                                   )}
                                 </div>
                               );
@@ -844,14 +1072,14 @@ export default function DashboardDFC() {
                       }
                     })}
                     
-                    {/* Linha de Resultado */}
+                    {/* Result Row */}
                     <div 
-                      className="sticky left-0 z-10 p-3 border-t-2 border-b border-r border-border bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-950 dark:to-indigo-950 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                      className="sticky left-0 z-10 p-3 border-t-2 border-b border-r bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50"
                       data-testid="dfc-row-resultado"
                     >
                       <div className="flex items-center gap-2">
-                        <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                        <span className="font-bold text-blue-700 dark:text-blue-400">
+                        <Target className="w-4 h-4 text-blue-600" />
+                        <span className="font-bold text-sm text-blue-700 dark:text-blue-400">
                           RESULTADO
                         </span>
                       </div>
@@ -862,61 +1090,57 @@ export default function DashboardDFC() {
                       return (
                         <div 
                           key={`resultado-${mes}`}
-                          className={`p-3 border-t-2 border-b border-border text-center whitespace-nowrap ${
+                          className={`p-3 border-t-2 border-b text-right ${
                             isPositivo 
-                              ? 'bg-green-50 dark:bg-green-950/50' 
-                              : 'bg-red-50 dark:bg-red-950/50'
+                              ? 'bg-emerald-50/50 dark:bg-emerald-950/30' 
+                              : 'bg-rose-50/50 dark:bg-rose-950/30'
                           }`}
                           data-testid={`dfc-cell-resultado-${mes}`}
                         >
-                          <span className={`font-bold text-sm ${
-                            isPositivo ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                          <span className={`font-bold text-sm tabular-nums ${
+                            isPositivo ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                           }`}>
-                            {isPositivo ? '+R$ ' : 'R$ '}{Math.abs(resultado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {isPositivo ? '+' : ''}{formatCurrency(resultado)}
                           </span>
                         </div>
                       );
                     })}
                     
-                    {/* Linha de Margem */}
+                    {/* Margin Row */}
                     <div 
-                      className="sticky left-0 z-10 p-3 border-b border-r border-border bg-gradient-to-r from-purple-100 to-violet-100 dark:from-purple-950 dark:to-violet-950 shadow-[2px_0_4px_rgba(0,0,0,0.05)]"
+                      className="sticky left-0 z-10 p-3 border-b border-r bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/50 dark:to-purple-950/50"
                       data-testid="dfc-row-margem"
                     >
                       <div className="flex items-center gap-2">
-                        <Percent className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                        <span className="font-bold text-purple-700 dark:text-purple-400">
+                        <Percent className="w-4 h-4 text-violet-600" />
+                        <span className="font-bold text-sm text-violet-700 dark:text-violet-400">
                           MARGEM
                         </span>
                       </div>
                     </div>
                     {dfcData.meses.map(mes => {
                       const margem = margemByMonth[mes] || 0;
-                      const isNegativa = margem < 0;
-                      const isBaixa = margem >= 0 && margem < 25;
-                      const isAlta = margem >= 25;
+                      let colorClass = '';
+                      let bgClass = '';
                       
-                      let bgColor = '';
-                      let textColor = '';
-                      
-                      if (isNegativa) {
-                        bgColor = 'bg-red-100 dark:bg-red-950/50';
-                        textColor = 'text-red-600 dark:text-red-400';
-                      } else if (isBaixa) {
-                        bgColor = 'bg-yellow-100 dark:bg-yellow-950/50';
-                        textColor = 'text-yellow-600 dark:text-yellow-400';
+                      if (margem < 0) {
+                        colorClass = 'text-rose-600 dark:text-rose-400';
+                        bgClass = 'bg-rose-50/50 dark:bg-rose-950/30';
+                      } else if (margem < 20) {
+                        colorClass = 'text-amber-600 dark:text-amber-400';
+                        bgClass = 'bg-amber-50/50 dark:bg-amber-950/30';
                       } else {
-                        bgColor = 'bg-green-100 dark:bg-green-950/50';
-                        textColor = 'text-green-600 dark:text-green-400';
+                        colorClass = 'text-emerald-600 dark:text-emerald-400';
+                        bgClass = 'bg-emerald-50/50 dark:bg-emerald-950/30';
                       }
                       
                       return (
                         <div 
                           key={`margem-${mes}`}
-                          className={`p-3 border-b border-border text-center whitespace-nowrap ${bgColor}`}
+                          className={`p-3 border-b text-right ${bgClass}`}
                           data-testid={`dfc-cell-margem-${mes}`}
                         >
-                          <span className={`font-bold text-sm ${textColor}`}>
+                          <span className={`font-bold text-sm tabular-nums ${colorClass}`}>
                             {margem.toFixed(1)}%
                           </span>
                         </div>
