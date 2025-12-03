@@ -895,7 +895,7 @@ export default function DashboardDFC() {
                     }}
                   >
                     {/* Header Row */}
-                    <div className="sticky top-0 left-0 z-30 bg-muted/80 backdrop-blur-sm font-semibold p-3 border-b border-r text-sm flex items-center gap-2">
+                    <div className="sticky top-0 left-0 z-30 bg-muted font-semibold p-3 border-b border-r text-sm flex items-center gap-2">
                       <Receipt className="w-4 h-4 text-muted-foreground" />
                       Categoria
                     </div>
@@ -929,9 +929,9 @@ export default function DashboardDFC() {
                               className={`sticky left-0 z-10 p-3 border-b border-r transition-colors ${
                                 isRootNode 
                                   ? (isReceitaNode 
-                                    ? 'bg-emerald-50/80 dark:bg-emerald-950/40' 
-                                    : 'bg-rose-50/80 dark:bg-rose-950/40')
-                                  : 'bg-background hover:bg-muted/50'
+                                    ? 'bg-emerald-50 dark:bg-emerald-950' 
+                                    : 'bg-rose-50 dark:bg-rose-950')
+                                  : 'bg-background hover:bg-muted'
                               }`}
                               style={{ paddingLeft: `${node.nivel * 20 + 12}px` }}
                               data-testid={`dfc-row-${node.categoriaId}`}
@@ -1031,8 +1031,8 @@ export default function DashboardDFC() {
                               key={`parcela-cat-${parcela.id}-${idx}`}
                               className={`sticky left-0 z-10 p-2 border-b border-r text-xs ${
                                 isReceitaParcela 
-                                  ? 'bg-emerald-50/30 dark:bg-emerald-950/10' 
-                                  : 'bg-rose-50/30 dark:bg-rose-950/10'
+                                  ? 'bg-emerald-50 dark:bg-emerald-950' 
+                                  : 'bg-rose-50 dark:bg-rose-950'
                               }`}
                               style={{ paddingLeft: `${(parentNode.nivel + 1) * 20 + 16}px` }}
                               data-testid={`dfc-row-parcela-${parcela.id}-${parentNode.categoriaId}`}
