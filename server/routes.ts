@@ -2482,13 +2482,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vendas/filtros", async (req, res) => {
     try {
       const [pipelines, sources, utmContents] = await Promise.all([
-        db.execute(sql`SELECT DISTINCT pipeline_name FROM crm_deal WHERE pipeline_name IS NOT NULL AND pipeline_name != '' ORDER BY pipeline_name`),
+        db.execute(sql`SELECT DISTINCT category_name FROM crm_deal WHERE category_name IS NOT NULL AND category_name != '' ORDER BY category_name`),
         db.execute(sql`SELECT DISTINCT source FROM crm_deal WHERE source IS NOT NULL AND source != '' ORDER BY source`),
         db.execute(sql`SELECT DISTINCT utm_content FROM crm_deal WHERE utm_content IS NOT NULL AND utm_content != '' ORDER BY utm_content`)
       ]);
       
       res.json({
-        pipelines: pipelines.rows.map((r: any) => r.pipeline_name),
+        pipelines: pipelines.rows.map((r: any) => r.category_name),
         sources: sources.rows.map((r: any) => r.source),
         utmContents: utmContents.rows.map((r: any) => r.utm_content)
       });
@@ -2503,16 +2503,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { dataInicio, dataFim, pipeline, source, utmContent } = req.query;
 
-      const conditions: ReturnType<typeof sql>[] = [sql`stage_name = 'Negócio Ganho (WON)'`];
+      const conditions: ReturnType<typeof sql>[] = [sql`stage_name = 'Negócio Ganho'`];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}`);
+        conditions.push(sql`data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
       if (pipeline) {
-        conditions.push(sql`pipeline_name = ${pipeline}`);
+        conditions.push(sql`category_name = ${pipeline}`);
       }
       if (source) {
         conditions.push(sql`source = ${source}`);
@@ -2531,7 +2531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(*) as total_contratos,
           COUNT(CASE WHEN valor_recorrente > 0 THEN 1 END) as contratos_recorrentes,
           COUNT(CASE WHEN valor_pontual > 0 AND (valor_recorrente = 0 OR valor_recorrente IS NULL) THEN 1 END) as contratos_pontuais,
-          COALESCE(AVG(EXTRACT(EPOCH FROM (close_date - created_date)) / 86400), 0) as tempo_fechamento_dias,
+          COALESCE(AVG(EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400), 0) as tempo_fechamento_dias,
           COALESCE(AVG(CASE WHEN valor_recorrente > 0 THEN valor_recorrente END), 0) as ticket_medio_recorrente,
           COALESCE(AVG(CASE WHEN valor_pontual > 0 THEN valor_pontual END), 0) as ticket_medio_pontual
         FROM crm_deal
@@ -2562,16 +2562,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { dataInicio, dataFim, pipeline, source, utmContent } = req.query;
 
-      const conditions: ReturnType<typeof sql>[] = [sql`stage_name = 'Negócio Ganho (WON)'`];
+      const conditions: ReturnType<typeof sql>[] = [sql`stage_name = 'Negócio Ganho'`];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}`);
+        conditions.push(sql`data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
       if (pipeline) {
-        conditions.push(sql`pipeline_name = ${pipeline}`);
+        conditions.push(sql`category_name = ${pipeline}`);
       }
       if (source) {
         conditions.push(sql`source = ${source}`);
@@ -2584,13 +2584,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db.execute(sql`
         SELECT 
-          DATE(close_date) as dia,
+          DATE(data_fechamento) as dia,
           COUNT(*) as contratos,
           COALESCE(SUM(valor_recorrente), 0) as valor_recorrente,
           COALESCE(SUM(valor_pontual), 0) as valor_pontual
         FROM crm_deal
         ${whereClause}
-        GROUP BY DATE(close_date)
+        GROUP BY DATE(data_fechamento)
         ORDER BY dia
       `);
 
@@ -2611,16 +2611,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { dataInicio, dataFim, pipeline, source, utmContent } = req.query;
 
-      const conditions: ReturnType<typeof sql>[] = [sql`d.stage_name = 'Negócio Ganho (WON)'`];
+      const conditions: ReturnType<typeof sql>[] = [sql`d.stage_name = 'Negócio Ganho'`];
 
       if (dataInicio) {
-        conditions.push(sql`d.close_date >= ${dataInicio}`);
+        conditions.push(sql`d.data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        conditions.push(sql`d.close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`d.data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
       if (pipeline) {
-        conditions.push(sql`d.pipeline_name = ${pipeline}`);
+        conditions.push(sql`d.category_name = ${pipeline}`);
       }
       if (source) {
         conditions.push(sql`d.source = ${source}`);
@@ -2633,14 +2633,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db.execute(sql`
         SELECT 
-          COALESCE(c.name, 'Não Atribuído') as closer_name,
+          COALESCE(c.nome, 'Não Atribuído') as closer_name,
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
           COALESCE(SUM(d.valor_pontual), 0) as pontual,
           COUNT(*) as contratos
         FROM crm_deal d
-        LEFT JOIN crm_closers c ON d.closer = c.id
+        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
-        GROUP BY c.id, c.name
+        GROUP BY c.id, c.nome
         ORDER BY mrr DESC
       `);
 
@@ -2656,40 +2656,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // MRR por SDR (owner_name)
+  // MRR por SDR (sdr column joined with crm_closers)
   app.get("/api/vendas/mrr-por-sdr", async (req, res) => {
     try {
       const { dataInicio, dataFim, pipeline, source, utmContent } = req.query;
 
-      const conditions: ReturnType<typeof sql>[] = [sql`stage_name = 'Negócio Ganho (WON)'`];
+      const conditions: ReturnType<typeof sql>[] = [sql`d.stage_name = 'Negócio Ganho'`];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}`);
+        conditions.push(sql`d.data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`d.data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
       if (pipeline) {
-        conditions.push(sql`pipeline_name = ${pipeline}`);
+        conditions.push(sql`d.category_name = ${pipeline}`);
       }
       if (source) {
-        conditions.push(sql`source = ${source}`);
+        conditions.push(sql`d.source = ${source}`);
       }
       if (utmContent) {
-        conditions.push(sql`utm_content = ${utmContent}`);
+        conditions.push(sql`d.utm_content = ${utmContent}`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 
       const result = await db.execute(sql`
         SELECT 
-          COALESCE(owner_name, 'Não Atribuído') as sdr_name,
-          COALESCE(SUM(valor_recorrente), 0) as mrr,
-          COALESCE(SUM(valor_pontual), 0) as pontual,
+          COALESCE(c.nome, 'Não Atribuído') as sdr_name,
+          COALESCE(SUM(d.valor_recorrente), 0) as mrr,
+          COALESCE(SUM(d.valor_pontual), 0) as pontual,
           COUNT(*) as contratos
-        FROM crm_deal
+        FROM crm_deal d
+        LEFT JOIN crm_closers c ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = c.id
         ${whereClause}
-        GROUP BY owner_name
+        GROUP BY c.id, c.nome
         ORDER BY mrr DESC
       `);
 
@@ -2710,16 +2711,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { dataInicio, dataFim, pipeline, source, utmContent } = req.query;
 
-      const conditions: ReturnType<typeof sql>[] = [sql`stage_name = 'Negócio Ganho (WON)'`];
+      const conditions: ReturnType<typeof sql>[] = [sql`stage_name = 'Negócio Ganho'`];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}`);
+        conditions.push(sql`data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
       if (pipeline) {
-        conditions.push(sql`pipeline_name = ${pipeline}`);
+        conditions.push(sql`category_name = ${pipeline}`);
       }
       if (source) {
         conditions.push(sql`source = ${source}`);
@@ -2764,13 +2765,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}`);
+        conditions.push(sql`data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
       if (pipeline) {
-        conditions.push(sql`pipeline_name = ${pipeline}`);
+        conditions.push(sql`category_name = ${pipeline}`);
       }
       if (source) {
         conditions.push(sql`source = ${source}`);
