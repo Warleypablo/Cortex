@@ -1740,6 +1740,286 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== COMERCIAL - CLOSERS ====================
+  
+  app.get("/api/closers/list", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, name, email, active FROM crm_closers ORDER BY name
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching closers list:", error);
+      res.status(500).json({ error: "Failed to fetch closers list" });
+    }
+  });
+
+  app.get("/api/closers/sources", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT source FROM crm_deal WHERE source IS NOT NULL ORDER BY source
+      `);
+      res.json(result.rows.map((r: any) => r.source));
+    } catch (error) {
+      console.error("[api] Error fetching sources:", error);
+      res.status(500).json({ error: "Failed to fetch sources" });
+    }
+  });
+
+  app.get("/api/closers/pipelines", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT category_name FROM crm_deal WHERE category_name IS NOT NULL ORDER BY category_name
+      `);
+      res.json(result.rows.map((r: any) => r.category_name));
+    } catch (error) {
+      console.error("[api] Error fetching pipelines:", error);
+      res.status(500).json({ error: "Failed to fetch pipelines" });
+    }
+  });
+
+  app.get("/api/closers/metrics", async (req, res) => {
+    try {
+      const { 
+        dataReuniaoInicio, 
+        dataReuniaoFim, 
+        dataFechamentoInicio, 
+        dataFechamentoFim,
+        source,
+        pipeline,
+        closerId
+      } = req.query;
+
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let paramIndex = 1;
+
+      if (dataReuniaoInicio) {
+        conditions.push(`d.data_reuniao_realizada >= $${paramIndex}`);
+        params.push(dataReuniaoInicio);
+        paramIndex++;
+      }
+      if (dataReuniaoFim) {
+        conditions.push(`d.data_reuniao_realizada <= $${paramIndex}`);
+        params.push(dataReuniaoFim);
+        paramIndex++;
+      }
+      if (dataFechamentoInicio) {
+        conditions.push(`d.close_date >= $${paramIndex}`);
+        params.push(dataFechamentoInicio);
+        paramIndex++;
+      }
+      if (dataFechamentoFim) {
+        conditions.push(`d.close_date <= $${paramIndex}`);
+        params.push(dataFechamentoFim);
+        paramIndex++;
+      }
+      if (source) {
+        conditions.push(`d.source = $${paramIndex}`);
+        params.push(source);
+        paramIndex++;
+      }
+      if (pipeline) {
+        conditions.push(`d.category_name = $${paramIndex}`);
+        params.push(pipeline);
+        paramIndex++;
+      }
+      if (closerId) {
+        conditions.push(`d.closer = $${paramIndex}`);
+        params.push(parseInt(closerId as string));
+        paramIndex++;
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+      const query = `
+        SELECT 
+          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN d.valor_recorrente ELSE 0 END), 0) as mrr_obtido,
+          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN d.valor_pontual ELSE 0 END), 0) as pontual_obtido,
+          COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes_realizadas,
+          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN 1 END) as negocios_ganhos
+        FROM crm_deal d
+        LEFT JOIN crm_closers c ON d.closer = c.id
+        ${whereClause}
+      `;
+
+      const result = await db.execute(sql.raw(query, params));
+      const row = result.rows[0] as any;
+
+      const reunioes = parseInt(row.reunioes_realizadas) || 0;
+      const negocios = parseInt(row.negocios_ganhos) || 0;
+      const conversao = reunioes > 0 ? (negocios / reunioes) * 100 : 0;
+
+      res.json({
+        mrrObtido: parseFloat(row.mrr_obtido) || 0,
+        pontualObtido: parseFloat(row.pontual_obtido) || 0,
+        reunioesRealizadas: reunioes,
+        negociosGanhos: negocios,
+        taxaConversao: conversao
+      });
+    } catch (error) {
+      console.error("[api] Error fetching closers metrics:", error);
+      res.status(500).json({ error: "Failed to fetch closers metrics" });
+    }
+  });
+
+  app.get("/api/closers/chart-reunioes-negocios", async (req, res) => {
+    try {
+      const { 
+        dataReuniaoInicio, 
+        dataReuniaoFim, 
+        dataFechamentoInicio, 
+        dataFechamentoFim,
+        source,
+        pipeline
+      } = req.query;
+
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let paramIndex = 1;
+
+      if (dataReuniaoInicio) {
+        conditions.push(`d.data_reuniao_realizada >= $${paramIndex}`);
+        params.push(dataReuniaoInicio);
+        paramIndex++;
+      }
+      if (dataReuniaoFim) {
+        conditions.push(`d.data_reuniao_realizada <= $${paramIndex}`);
+        params.push(dataReuniaoFim);
+        paramIndex++;
+      }
+      if (dataFechamentoInicio) {
+        conditions.push(`d.close_date >= $${paramIndex}`);
+        params.push(dataFechamentoInicio);
+        paramIndex++;
+      }
+      if (dataFechamentoFim) {
+        conditions.push(`d.close_date <= $${paramIndex}`);
+        params.push(dataFechamentoFim);
+        paramIndex++;
+      }
+      if (source) {
+        conditions.push(`d.source = $${paramIndex}`);
+        params.push(source);
+        paramIndex++;
+      }
+      if (pipeline) {
+        conditions.push(`d.category_name = $${paramIndex}`);
+        params.push(pipeline);
+        paramIndex++;
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+      const query = `
+        SELECT 
+          c.name as closer_name,
+          COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes,
+          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho (WON)' THEN 1 END) as negocios_ganhos
+        FROM crm_deal d
+        INNER JOIN crm_closers c ON d.closer = c.id
+        ${whereClause}
+        GROUP BY c.id, c.name
+        ORDER BY c.name
+      `;
+
+      const result = await db.execute(sql.raw(query, params));
+      
+      const data = result.rows.map((row: any) => {
+        const reunioes = parseInt(row.reunioes) || 0;
+        const negocios = parseInt(row.negocios_ganhos) || 0;
+        const conversao = reunioes > 0 ? (negocios / reunioes) * 100 : 0;
+        
+        return {
+          closer: row.closer_name,
+          reunioes,
+          negociosGanhos: negocios,
+          taxaConversao: parseFloat(conversao.toFixed(1))
+        };
+      });
+
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching chart data:", error);
+      res.status(500).json({ error: "Failed to fetch chart data" });
+    }
+  });
+
+  app.get("/api/closers/chart-receita", async (req, res) => {
+    try {
+      const { 
+        dataReuniaoInicio, 
+        dataReuniaoFim, 
+        dataFechamentoInicio, 
+        dataFechamentoFim,
+        source,
+        pipeline
+      } = req.query;
+
+      const conditions: string[] = ["d.stage_name = 'Negócio Ganho (WON)'"];
+      const params: any[] = [];
+      let paramIndex = 1;
+
+      if (dataReuniaoInicio) {
+        conditions.push(`d.data_reuniao_realizada >= $${paramIndex}`);
+        params.push(dataReuniaoInicio);
+        paramIndex++;
+      }
+      if (dataReuniaoFim) {
+        conditions.push(`d.data_reuniao_realizada <= $${paramIndex}`);
+        params.push(dataReuniaoFim);
+        paramIndex++;
+      }
+      if (dataFechamentoInicio) {
+        conditions.push(`d.close_date >= $${paramIndex}`);
+        params.push(dataFechamentoInicio);
+        paramIndex++;
+      }
+      if (dataFechamentoFim) {
+        conditions.push(`d.close_date <= $${paramIndex}`);
+        params.push(dataFechamentoFim);
+        paramIndex++;
+      }
+      if (source) {
+        conditions.push(`d.source = $${paramIndex}`);
+        params.push(source);
+        paramIndex++;
+      }
+      if (pipeline) {
+        conditions.push(`d.category_name = $${paramIndex}`);
+        params.push(pipeline);
+        paramIndex++;
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+      const query = `
+        SELECT 
+          c.name as closer_name,
+          COALESCE(SUM(d.valor_recorrente), 0) as mrr,
+          COALESCE(SUM(d.valor_pontual), 0) as pontual
+        FROM crm_deal d
+        INNER JOIN crm_closers c ON d.closer = c.id
+        ${whereClause}
+        GROUP BY c.id, c.name
+        ORDER BY c.name
+      `;
+
+      const result = await db.execute(sql.raw(query, params));
+      
+      const data = result.rows.map((row: any) => ({
+        closer: row.closer_name,
+        mrr: parseFloat(row.mrr) || 0,
+        pontual: parseFloat(row.pontual) || 0
+      }));
+
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching revenue chart data:", error);
+      res.status(500).json({ error: "Failed to fetch revenue chart data" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
