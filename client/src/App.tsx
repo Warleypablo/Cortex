@@ -36,6 +36,7 @@ import Login from "@/pages/Login";
 import DashboardClosers from "@/pages/DashboardClosers";
 import DashboardSDRs from "@/pages/DashboardSDRs";
 import DetailClosers from "@/pages/DetailClosers";
+import AnaliseVendas from "@/pages/AnaliseVendas";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -132,6 +133,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/comercial/closers">{() => <ProtectedRoute path="/dashboard/comercial/closers" component={DashboardClosers} />}</Route>
       <Route path="/dashboard/comercial/sdrs">{() => <ProtectedRoute path="/dashboard/comercial/sdrs" component={DashboardSDRs} />}</Route>
       <Route path="/dashboard/comercial/detalhamento-closers">{() => <ProtectedRoute path="/dashboard/comercial/detalhamento-closers" component={DetailClosers} />}</Route>
+      <Route path="/dashboard/comercial/analise-vendas">{() => <ProtectedRoute path="/dashboard/comercial/analise-vendas" component={AnaliseVendas} />}</Route>
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>
       <Route>
