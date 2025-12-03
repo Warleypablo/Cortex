@@ -1799,10 +1799,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
       }
       if (dataFechamentoInicio) {
-        conditions.push(sql`d.close_date >= ${dataFechamentoInicio}`);
+        conditions.push(sql`d.data_fechamento >= ${dataFechamentoInicio}`);
       }
       if (dataFechamentoFim) {
-        conditions.push(sql`d.close_date <= ${dataFechamentoFim}`);
+        conditions.push(sql`d.data_fechamento <= ${dataFechamentoFim}`);
       }
       if (source) {
         conditions.push(sql`d.source = ${source}`);
@@ -1871,10 +1871,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
       }
       if (dataFechamentoInicio) {
-        conditions.push(sql`d.close_date >= ${dataFechamentoInicio}`);
+        conditions.push(sql`d.data_fechamento >= ${dataFechamentoInicio}`);
       }
       if (dataFechamentoFim) {
-        conditions.push(sql`d.close_date <= ${dataFechamentoFim}`);
+        conditions.push(sql`d.data_fechamento <= ${dataFechamentoFim}`);
       }
       if (source) {
         conditions.push(sql`d.source = ${source}`);
@@ -1939,10 +1939,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
       }
       if (dataFechamentoInicio) {
-        conditions.push(sql`d.close_date >= ${dataFechamentoInicio}`);
+        conditions.push(sql`d.data_fechamento >= ${dataFechamentoInicio}`);
       }
       if (dataFechamentoFim) {
-        conditions.push(sql`d.close_date <= ${dataFechamentoFim}`);
+        conditions.push(sql`d.data_fechamento <= ${dataFechamentoFim}`);
       }
       if (source) {
         conditions.push(sql`d.source = ${source}`);
