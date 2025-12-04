@@ -296,6 +296,20 @@ export type FluxoCaixaInsights = {
   maiorSaidaPrevista: { valor: number; descricao: string; data: string } | null;
 };
 
+export type FluxoCaixaInsightsPeriodo = {
+  saldoAtual: number;
+  saldoFinalPeriodo: number;
+  entradasPeriodo: number;
+  saidasPeriodo: number;
+  entradasVencidas: number;
+  saidasVencidas: number;
+  maiorEntrada: { valor: number; descricao: string; data: string; empresa: string } | null;
+  maiorSaida: { valor: number; descricao: string; data: string; empresa: string } | null;
+  topEntradas: { valor: number; descricao: string; data: string; empresa: string }[];
+  topSaidas: { valor: number; descricao: string; data: string; empresa: string }[];
+  transacoesPorCategoria: { categoria: string; tipo: 'RECEITA' | 'DESPESA'; valor: number }[];
+};
+
 export type ChurnPorServico = {
   servico: string;
   mes: string;
