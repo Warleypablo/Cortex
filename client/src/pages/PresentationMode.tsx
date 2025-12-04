@@ -79,12 +79,20 @@ interface RankingCloser {
   trend: 'up' | 'down' | 'stable';
 }
 
+interface MRRData {
+  sdr: string;
+  mrr: number;
+  pontual: number;
+  contratos: number;
+}
+
 interface RankingSDR {
   position: number;
   name: string;
   leads: number;
   reunioesRealizadas: number;
   conversao: number;
+  mrr: number;
   trend: 'up' | 'down' | 'stable';
 }
 
@@ -168,6 +176,20 @@ export default function PresentationMode() {
     refetchInterval: 30000,
   });
 
+  const mrrQueryParams = new URLSearchParams({
+    dataInicio: inicioMes,
+    dataFim: fimMes,
+  }).toString();
+
+  const { data: sdrMrrData, isLoading: isLoadingSDRMrr } = useQuery<MRRData[]>({
+    queryKey: ["/api/vendas/mrr-por-sdr", mrrQueryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/vendas/mrr-por-sdr?${mrrQueryParams}`);
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
@@ -208,6 +230,11 @@ export default function PresentationMode() {
     .sort((a, b) => b.total - a.total)
     .map((c, idx) => ({ ...c, position: idx + 1 }));
 
+  const sdrMrrMap = new Map<string, number>();
+  (sdrMrrData || []).forEach(m => {
+    sdrMrrMap.set(m.sdr, m.mrr);
+  });
+
   const sdrRanking: RankingSDR[] = (chartReunioes || [])
     .map((c, idx) => {
       const trend: 'up' | 'down' | 'stable' = trends[Math.floor(Math.random() * 3)];
@@ -217,10 +244,11 @@ export default function PresentationMode() {
         leads: c.leads,
         reunioesRealizadas: c.reunioesRealizadas,
         conversao: c.conversao,
+        mrr: sdrMrrMap.get(c.sdr) || 0,
         trend,
       };
     })
-    .sort((a, b) => b.reunioesRealizadas - a.reunioesRealizadas)
+    .sort((a, b) => b.mrr - a.mrr)
     .map((c, idx) => ({ ...c, position: idx + 1 }));
 
   const closerTop3 = closerRanking.slice(0, 3);
@@ -262,7 +290,7 @@ export default function PresentationMode() {
   };
 
   const isLoadingClosers = isLoadingCloserMetrics || isLoadingChart1 || isLoadingChart2;
-  const isLoadingSDRs = isLoadingSDRMetrics || isLoadingChartSDR;
+  const isLoadingSDRs = isLoadingSDRMetrics || isLoadingChartSDR || isLoadingSDRMrr;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -1171,16 +1199,16 @@ export default function PresentationMode() {
                               
                               <div className="space-y-3 mt-auto">
                                 <div className="flex justify-between items-center">
-                                  <span className="text-xs text-slate-400">Leads</span>
-                                  <span className="text-lg font-bold text-blue-400">{sdr.leads}</span>
+                                  <span className="text-sm text-slate-400">MRR</span>
+                                  <span className="text-2xl font-black text-emerald-400">{formatCurrency(sdr.mrr)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                   <span className="text-xs text-slate-400">Reuniões</span>
-                                  <span className="text-lg font-bold text-cyan-400">{sdr.reunioesRealizadas}</span>
+                                  <span className="text-sm font-semibold text-cyan-400">{sdr.reunioesRealizadas}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                  <span className="text-xs text-slate-400">Conversão</span>
-                                  <span className="text-sm font-semibold text-emerald-400">{sdr.conversao.toFixed(1)}%</span>
+                                  <span className="text-xs text-slate-400">Leads</span>
+                                  <span className="text-sm font-semibold text-blue-400">{sdr.leads}</span>
                                 </div>
                               </div>
                             </div>
@@ -1204,10 +1232,11 @@ export default function PresentationMode() {
                   <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
                     <div className="grid grid-cols-12 gap-2 p-3 bg-slate-800/50 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                       <div className="col-span-1">#</div>
-                      <div className="col-span-4">SDR</div>
+                      <div className="col-span-3">SDR</div>
+                      <div className="col-span-3 text-right">MRR</div>
+                      <div className="col-span-2 text-right">Reuniões</div>
                       <div className="col-span-2 text-right">Leads</div>
-                      <div className="col-span-3 text-right">Reuniões</div>
-                      <div className="col-span-2 text-right">Conv.</div>
+                      <div className="col-span-1"></div>
                     </div>
 
                     <div className="divide-y divide-slate-800/50">
@@ -1239,26 +1268,20 @@ export default function PresentationMode() {
                                 <span className="text-slate-500 font-mono text-sm">{sdr.position}</span>
                               )}
                             </div>
-                            <div className="col-span-4 font-medium text-white truncate">
+                            <div className="col-span-3 font-medium text-white truncate">
                               {sdr.name}
                             </div>
-                            <div className="col-span-2 text-right font-semibold text-blue-400">
-                              {sdr.leads}
+                            <div className="col-span-3 text-right font-bold text-emerald-400">
+                              {formatCurrency(sdr.mrr)}
                             </div>
-                            <div className="col-span-3 text-right font-bold text-cyan-400">
+                            <div className="col-span-2 text-right text-cyan-400">
                               {sdr.reunioesRealizadas}
                             </div>
-                            <div className="col-span-2 text-right">
-                              <Badge 
-                                variant="outline" 
-                                className={`text-xs border-0 ${
-                                  sdr.conversao >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
-                                  sdr.conversao >= 15 ? 'bg-amber-500/20 text-amber-400' :
-                                  'bg-slate-700/50 text-slate-400'
-                                }`}
-                              >
-                                {sdr.conversao.toFixed(0)}%
-                              </Badge>
+                            <div className="col-span-2 text-right text-blue-400">
+                              {sdr.leads}
+                            </div>
+                            <div className="col-span-1 flex justify-end">
+                              {getTrendIcon(sdr.trend)}
                             </div>
                           </motion.div>
                         ))
