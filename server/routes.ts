@@ -2995,7 +2995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db.execute(sql`
         SELECT 
-          d.deal_id,
+          d.id,
           d.deal_name,
           d.company_name,
           d.contact_name,
@@ -3020,10 +3020,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
         ORDER BY ${sql.raw(orderColumn)} ${sql.raw(orderDirection)}
+        LIMIT 500
       `);
 
       res.json(result.rows.map((row: any) => ({
-        dealId: row.deal_id,
+        dealId: row.id,
         dealName: row.deal_name,
         companyName: row.company_name,
         contactName: row.contact_name,
