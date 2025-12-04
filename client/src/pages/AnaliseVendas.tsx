@@ -7,25 +7,19 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   DollarSign, 
   TrendingUp, 
-  TrendingDown,
   Target, 
   CalendarDays,
   Filter,
   RotateCcw,
   Trophy,
-  Flame,
-  Zap,
   Star,
   Calendar,
   Clock,
-  Repeat,
   Banknote,
-  PiggyBank,
   BarChart3,
   Award,
   Users,
@@ -35,28 +29,23 @@ import {
   Activity,
   FileText,
   Briefcase,
-  Layers,
-  ArrowUpRight,
-  ArrowDownRight,
-  Minus
+  Layers
 } from "lucide-react";
 import {
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   Legend,
   PieChart,
   Pie,
   Cell,
   Area,
-  AreaChart,
-  ComposedChart
+  ComposedChart,
+  Line,
+  BarChart,
+  Bar
 } from "recharts";
 
 interface VendasKPIs {
@@ -134,43 +123,32 @@ function AnimatedCounter({ value, duration = 2000, prefix = "", suffix = "" }: {
   return <>{prefix}{count.toLocaleString('pt-BR')}{suffix}</>;
 }
 
-function GlowingBorder({ color = "blue" }: { color?: string }) {
-  const gradients: Record<string, string> = {
-    blue: "from-blue-500 via-indigo-500 to-violet-500",
-    cyan: "from-cyan-500 via-teal-500 to-emerald-500",
-    green: "from-green-500 via-emerald-500 to-teal-500",
-    amber: "from-amber-500 via-orange-500 to-red-500",
-    pink: "from-pink-500 via-rose-500 to-red-500",
-    violet: "from-violet-500 via-purple-500 to-fuchsia-500",
-  };
-  
-  return (
-    <div className="absolute inset-0 rounded-2xl overflow-hidden">
-      <div className={`absolute inset-0 bg-gradient-to-r ${gradients[color]} opacity-20`} />
-      <div className={`absolute -inset-1 bg-gradient-to-r ${gradients[color]} opacity-30 blur-xl animate-pulse`} />
-    </div>
-  );
-}
-
 function FloatingParticles() {
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none">
-      {Array.from({ length: 20 }).map((_, i) => (
+      {Array.from({ length: 30 }).map((_, i) => (
         <motion.div
           key={i}
-          className="absolute w-1 h-1 bg-blue-500/30 rounded-full"
+          className="absolute rounded-full"
+          style={{
+            width: Math.random() * 4 + 1,
+            height: Math.random() * 4 + 1,
+            background: `rgba(${Math.random() > 0.5 ? '139, 92, 246' : '59, 130, 246'}, ${Math.random() * 0.3 + 0.1})`,
+          }}
           initial={{
             x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1920),
             y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1080),
           }}
           animate={{
-            y: [null, -100],
-            opacity: [0, 1, 0],
+            y: [null, -150],
+            x: [null, Math.random() * 100 - 50],
+            opacity: [0, 0.8, 0],
           }}
           transition={{
-            duration: 3 + Math.random() * 2,
+            duration: 4 + Math.random() * 3,
             repeat: Infinity,
-            delay: Math.random() * 2,
+            delay: Math.random() * 3,
+            ease: "easeOut"
           }}
         />
       ))}
@@ -178,16 +156,16 @@ function FloatingParticles() {
   );
 }
 
-const CHART_COLORS = [
-  "#3b82f6", // blue-500
-  "#8b5cf6", // violet-500
-  "#06b6d4", // cyan-500
-  "#10b981", // emerald-500
-  "#f59e0b", // amber-500
-  "#ef4444", // red-500
-  "#ec4899", // pink-500
-  "#6366f1", // indigo-500
-];
+const CHART_COLORS = {
+  violet: ["#8b5cf6", "#a78bfa", "#c4b5fd"],
+  blue: ["#3b82f6", "#60a5fa", "#93c5fd"],
+  cyan: ["#06b6d4", "#22d3ee", "#67e8f9"],
+  emerald: ["#10b981", "#34d399", "#6ee7b7"],
+  amber: ["#f59e0b", "#fbbf24", "#fcd34d"],
+  rose: ["#f43f5e", "#fb7185", "#fda4af"],
+};
+
+const PIE_COLORS = ["#8b5cf6", "#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#f43f5e", "#a855f7", "#6366f1"];
 
 export default function AnaliseVendas() {
   const hoje = new Date();
@@ -210,8 +188,8 @@ export default function AnaliseVendas() {
     const params = new URLSearchParams();
     if (dataInicio) params.append("dataInicio", dataInicio);
     if (dataFim) params.append("dataFim", dataFim);
-    if (pipeline) params.append("pipeline", pipeline);
-    if (source) params.append("source", source);
+    if (pipeline && pipeline !== "all") params.append("pipeline", pipeline);
+    if (source && source !== "all") params.append("source", source);
     return params.toString();
   };
 
@@ -288,93 +266,146 @@ export default function AnaliseVendas() {
     total: item.valorRecorrente + item.valorPontual
   })) || [];
 
-  const getMedalIcon = (position: number) => {
+  const getMedalStyle = (position: number) => {
     switch (position) {
       case 0:
-        return <Crown className="w-5 h-5 text-yellow-400" />;
+        return {
+          bg: "from-amber-500/30 via-yellow-500/20 to-orange-500/30",
+          border: "border-amber-400/50",
+          glow: "shadow-amber-500/30",
+          icon: <Crown className="w-6 h-6 text-amber-400" />,
+          badge: "bg-gradient-to-r from-amber-500 to-yellow-500"
+        };
       case 1:
-        return <Trophy className="w-5 h-5 text-gray-300" />;
+        return {
+          bg: "from-slate-300/20 via-gray-400/15 to-slate-400/20",
+          border: "border-slate-400/50",
+          glow: "shadow-slate-400/20",
+          icon: <Trophy className="w-5 h-5 text-slate-300" />,
+          badge: "bg-gradient-to-r from-slate-400 to-gray-400"
+        };
       case 2:
-        return <Award className="w-5 h-5 text-amber-600" />;
+        return {
+          bg: "from-orange-600/25 via-amber-700/20 to-orange-700/25",
+          border: "border-orange-500/50",
+          glow: "shadow-orange-500/20",
+          icon: <Award className="w-5 h-5 text-orange-400" />,
+          badge: "bg-gradient-to-r from-orange-600 to-amber-600"
+        };
       default:
-        return <Star className="w-4 h-4 text-blue-400" />;
-    }
-  };
-
-  const getMedalBg = (position: number) => {
-    switch (position) {
-      case 0:
-        return "bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/30";
-      case 1:
-        return "bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-gray-400/30";
-      case 2:
-        return "bg-gradient-to-r from-amber-600/20 to-orange-600/20 border-amber-600/30";
-      default:
-        return "bg-slate-800/50 border-slate-700/30";
+        return {
+          bg: "from-slate-800/60 via-slate-700/40 to-slate-800/60",
+          border: "border-slate-600/30",
+          glow: "",
+          icon: <Star className="w-4 h-4 text-slate-400" />,
+          badge: "bg-slate-600"
+        };
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 relative overflow-hidden">
-      <FloatingParticles />
-      
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-violet-500/5 rounded-full blur-3xl" />
+    <div className="min-h-screen bg-[#0A0A0F] relative overflow-hidden">
+      {/* Premium Aurora Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.1, 1],
+            opacity: [0.15, 0.25, 0.15]
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[-20%] left-[-10%] w-[700px] h-[700px] bg-violet-600/20 rounded-full blur-[180px]" 
+        />
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.15, 1],
+            opacity: [0.12, 0.22, 0.12]
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+          className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-blue-600/20 rounded-full blur-[180px]" 
+        />
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.2, 1],
+            opacity: [0.08, 0.15, 0.08]
+          }}
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+          className="absolute top-[40%] left-[50%] w-[500px] h-[500px] bg-indigo-500/15 rounded-full blur-[150px] transform -translate-x-1/2 -translate-y-1/2" 
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
       </div>
       
-      <div className="relative z-10 p-6 space-y-6">
-        {/* Header */}
+      <FloatingParticles />
+
+      <div className="relative z-10 p-6 lg:p-8 space-y-6">
+        {/* Premium Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-wrap items-center justify-between gap-4"
+          className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4"
         >
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-violet-500 rounded-2xl blur-xl opacity-50" />
-              <div className="relative p-4 bg-gradient-to-br from-blue-600 to-violet-600 rounded-2xl shadow-2xl">
+          <div className="flex items-center gap-5">
+            <motion.div 
+              whileHover={{ scale: 1.05, rotate: 5 }}
+              className="relative"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-blue-600 rounded-2xl blur-xl opacity-60 animate-pulse" />
+              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 via-blue-500 to-indigo-600 flex items-center justify-center shadow-2xl shadow-violet-500/30">
                 <BarChart3 className="w-8 h-8 text-white" />
               </div>
-            </div>
+            </motion.div>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400 bg-clip-text text-transparent">
+              <h1 className="text-3xl lg:text-4xl font-black bg-gradient-to-r from-white via-violet-200 to-blue-200 bg-clip-text text-transparent">
                 Análise de Vendas
               </h1>
-              <p className="text-slate-400 mt-1 flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                {currentTime.toLocaleTimeString('pt-BR')} • {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              <p className="text-slate-400 text-sm mt-1 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-violet-400" />
+                Métricas de performance comercial em tempo real
               </p>
             </div>
           </div>
-
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className="bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50 text-slate-300"
-              data-testid="button-toggle-filters"
+          
+          <div className="flex items-center gap-4">
+            <motion.div 
+              whileHover={{ scale: 1.02 }}
+              className="relative group"
             >
-              <Filter className="w-4 h-4 mr-2" />
-              Filtros
-              {(pipeline || source) && (
-                <Badge className="ml-2 bg-blue-500/20 text-blue-400 border-blue-500/30">
-                  {[pipeline, source].filter(Boolean).length}
-                </Badge>
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={resetFilters}
-              className="text-slate-400 hover:text-slate-200"
-              data-testid="button-reset-filters"
-            >
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Limpar
-            </Button>
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 to-blue-600/20 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative bg-slate-900/80 backdrop-blur-xl rounded-xl border border-violet-500/20 px-4 py-2">
+                <p className="text-xs text-slate-500">Atualizado em</p>
+                <p className="text-xl font-mono font-bold bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">
+                  {currentTime.toLocaleTimeString('pt-BR')}
+                </p>
+              </div>
+            </motion.div>
+            
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="bg-violet-500/10 border-violet-500/30 text-violet-300 hover:bg-violet-500/20 hover:border-violet-400/50 backdrop-blur-xl"
+                data-testid="button-toggle-filters"
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                Filtros
+                {(pipeline || source) && (
+                  <Badge className="ml-2 bg-violet-500 text-white border-0">
+                    {[pipeline, source].filter(Boolean).length}
+                  </Badge>
+                )}
+              </Button>
+            </motion.div>
+            
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                variant="ghost"
+                onClick={resetFilters}
+                className="text-slate-400 hover:text-white hover:bg-slate-800/50"
+                data-testid="button-reset-filters"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Limpar
+              </Button>
+            </motion.div>
           </div>
         </motion.div>
 
@@ -382,56 +413,54 @@ export default function AnaliseVendas() {
         <AnimatePresence>
           {showFilters && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
+              initial={{ opacity: 0, height: 0, y: -20 }}
+              animate={{ opacity: 1, height: "auto", y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
               className="overflow-hidden"
             >
-              <Card className="bg-gradient-to-br from-slate-900/90 via-slate-800/80 to-blue-900/30 border-slate-700/50 backdrop-blur-xl shadow-2xl">
-                <CardContent className="p-6">
+              <div className="relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-violet-600/20 to-blue-600/20 rounded-2xl blur-lg" />
+                <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-violet-500/20 p-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="space-y-2">
-                      <Label className="text-slate-300 flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-blue-400" />
+                      <Label className="text-violet-300 flex items-center gap-2 text-sm font-medium">
+                        <Calendar className="w-4 h-4" />
                         Data Início
                       </Label>
-                      <div className="relative">
-                        <Input
-                          type="date"
-                          value={dataInicio}
-                          onChange={(e) => setDataInicio(e.target.value)}
-                          className="bg-slate-800/50 border-slate-600/50 text-slate-200 focus:ring-blue-500/50 focus:border-blue-500/50"
-                          data-testid="input-data-inicio"
-                        />
-                      </div>
+                      <Input
+                        type="date"
+                        value={dataInicio}
+                        onChange={(e) => setDataInicio(e.target.value)}
+                        className="bg-slate-800/50 border-slate-700/50 text-white focus:ring-violet-500/50 focus:border-violet-500/50 rounded-xl"
+                        data-testid="input-data-inicio"
+                      />
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-slate-300 flex items-center gap-2">
-                        <CalendarDays className="w-4 h-4 text-blue-400" />
+                      <Label className="text-violet-300 flex items-center gap-2 text-sm font-medium">
+                        <CalendarDays className="w-4 h-4" />
                         Data Fim
                       </Label>
-                      <div className="relative">
-                        <Input
-                          type="date"
-                          value={dataFim}
-                          onChange={(e) => setDataFim(e.target.value)}
-                          className="bg-slate-800/50 border-slate-600/50 text-slate-200 focus:ring-blue-500/50 focus:border-blue-500/50"
-                          data-testid="input-data-fim"
-                        />
-                      </div>
+                      <Input
+                        type="date"
+                        value={dataFim}
+                        onChange={(e) => setDataFim(e.target.value)}
+                        className="bg-slate-800/50 border-slate-700/50 text-white focus:ring-violet-500/50 focus:border-violet-500/50 rounded-xl"
+                        data-testid="input-data-fim"
+                      />
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-slate-300 flex items-center gap-2">
-                        <Layers className="w-4 h-4 text-indigo-400" />
+                      <Label className="text-blue-300 flex items-center gap-2 text-sm font-medium">
+                        <Layers className="w-4 h-4" />
                         Pipeline
                       </Label>
                       <Select value={pipeline} onValueChange={setPipeline}>
-                        <SelectTrigger className="bg-slate-800/50 border-slate-600/50 text-slate-200" data-testid="select-pipeline">
+                        <SelectTrigger className="bg-slate-800/50 border-slate-700/50 text-white rounded-xl" data-testid="select-pipeline">
                           <SelectValue placeholder="Todos os pipelines" />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-700">
+                        <SelectContent className="bg-slate-900 border-slate-700 rounded-xl">
                           <SelectItem value="all">Todos os pipelines</SelectItem>
                           {filtros?.pipelines.map((p) => (
                             <SelectItem key={p} value={p}>{p}</SelectItem>
@@ -441,15 +470,15 @@ export default function AnaliseVendas() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-slate-300 flex items-center gap-2">
-                        <Target className="w-4 h-4 text-violet-400" />
+                      <Label className="text-indigo-300 flex items-center gap-2 text-sm font-medium">
+                        <Target className="w-4 h-4" />
                         Fonte
                       </Label>
                       <Select value={source} onValueChange={setSource}>
-                        <SelectTrigger className="bg-slate-800/50 border-slate-600/50 text-slate-200" data-testid="select-source">
+                        <SelectTrigger className="bg-slate-800/50 border-slate-700/50 text-white rounded-xl" data-testid="select-source">
                           <SelectValue placeholder="Todas as fontes" />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-700">
+                        <SelectContent className="bg-slate-900 border-slate-700 rounded-xl">
                           <SelectItem value="all">Todas as fontes</SelectItem>
                           {filtros?.sources.map((s) => (
                             <SelectItem key={s} value={s}>{s}</SelectItem>
@@ -458,8 +487,8 @@ export default function AnaliseVendas() {
                       </Select>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -469,223 +498,220 @@ export default function AnaliseVendas() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5"
         >
           {/* Receita Total */}
-          <Card className="relative bg-gradient-to-br from-slate-900/90 via-blue-900/30 to-slate-900/90 border-blue-500/30 overflow-hidden">
-            <GlowingBorder color="blue" />
-            <CardContent className="relative z-10 p-6">
-              <div className="flex items-center justify-between">
-                <div className="p-3 bg-blue-500/20 rounded-xl">
-                  <DollarSign className="w-6 h-6 text-blue-400" />
+          <motion.div whileHover={{ scale: 1.02, y: -4 }} className="relative group">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-600 to-blue-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity" />
+            <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-violet-500/20 p-6 h-full">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-violet-500/20 to-blue-500/20 rounded-xl border border-violet-500/20">
+                  <DollarSign className="w-6 h-6 text-violet-400" />
                 </div>
-                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                <Badge className="bg-gradient-to-r from-violet-500/20 to-blue-500/20 text-violet-300 border-violet-500/30">
                   <TrendingUp className="w-3 h-3 mr-1" />
                   Total
                 </Badge>
               </div>
-              <div className="mt-4">
-                <p className="text-sm text-slate-400">Receita Total</p>
-                {isLoadingKpis ? (
-                  <Skeleton className="h-8 w-32 mt-1 bg-slate-700" />
-                ) : (
-                  <p className="text-2xl font-bold text-white">
-                    <AnimatedCounter value={kpis?.receitaTotal || 0} prefix="R$ " />
-                  </p>
-                )}
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                <div className="bg-slate-800/50 rounded-lg p-2">
-                  <span className="text-slate-400">Recorrente</span>
-                  <p className="text-blue-400 font-semibold">{formatCurrency(kpis?.receitaRecorrente || 0)}</p>
+              <p className="text-sm text-slate-400 mb-1">Receita Total</p>
+              {isLoadingKpis ? (
+                <Skeleton className="h-9 w-40 bg-slate-800" />
+              ) : (
+                <p className="text-3xl font-black bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">
+                  <AnimatedCounter value={kpis?.receitaTotal || 0} prefix="R$ " />
+                </p>
+              )}
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/30">
+                  <span className="text-xs text-slate-500">Recorrente</span>
+                  <p className="text-violet-400 font-bold">{formatCurrency(kpis?.receitaRecorrente || 0)}</p>
                 </div>
-                <div className="bg-slate-800/50 rounded-lg p-2">
-                  <span className="text-slate-400">Pontual</span>
-                  <p className="text-violet-400 font-semibold">{formatCurrency(kpis?.receitaPontual || 0)}</p>
+                <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/30">
+                  <span className="text-xs text-slate-500">Pontual</span>
+                  <p className="text-blue-400 font-bold">{formatCurrency(kpis?.receitaPontual || 0)}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </motion.div>
 
           {/* Total Contratos */}
-          <Card className="relative bg-gradient-to-br from-slate-900/90 via-violet-900/30 to-slate-900/90 border-violet-500/30 overflow-hidden">
-            <GlowingBorder color="violet" />
-            <CardContent className="relative z-10 p-6">
-              <div className="flex items-center justify-between">
-                <div className="p-3 bg-violet-500/20 rounded-xl">
-                  <FileText className="w-6 h-6 text-violet-400" />
+          <motion.div whileHover={{ scale: 1.02, y: -4 }} className="relative group">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity" />
+            <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-indigo-500/20 p-6 h-full">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-xl border border-indigo-500/20">
+                  <FileText className="w-6 h-6 text-indigo-400" />
                 </div>
-                <Badge className="bg-violet-500/20 text-violet-400 border-violet-500/30">
+                <Badge className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border-indigo-500/30">
                   <Sparkles className="w-3 h-3 mr-1" />
                   Ganhos
                 </Badge>
               </div>
-              <div className="mt-4">
-                <p className="text-sm text-slate-400">Total de Contratos</p>
-                {isLoadingKpis ? (
-                  <Skeleton className="h-8 w-24 mt-1 bg-slate-700" />
-                ) : (
-                  <p className="text-2xl font-bold text-white">
-                    <AnimatedCounter value={kpis?.totalContratos || 0} />
-                  </p>
-                )}
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                <div className="bg-slate-800/50 rounded-lg p-2">
-                  <span className="text-slate-400">Recorrentes</span>
-                  <p className="text-violet-400 font-semibold">{kpis?.contratosRecorrentes || 0}</p>
+              <p className="text-sm text-slate-400 mb-1">Total de Contratos</p>
+              {isLoadingKpis ? (
+                <Skeleton className="h-9 w-24 bg-slate-800" />
+              ) : (
+                <p className="text-3xl font-black bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                  <AnimatedCounter value={kpis?.totalContratos || 0} />
+                </p>
+              )}
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/30">
+                  <span className="text-xs text-slate-500">Recorrentes</span>
+                  <p className="text-indigo-400 font-bold">{kpis?.contratosRecorrentes || 0}</p>
                 </div>
-                <div className="bg-slate-800/50 rounded-lg p-2">
-                  <span className="text-slate-400">Pontuais</span>
-                  <p className="text-indigo-400 font-semibold">{kpis?.contratosPontuais || 0}</p>
+                <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/30">
+                  <span className="text-xs text-slate-500">Pontuais</span>
+                  <p className="text-purple-400 font-bold">{kpis?.contratosPontuais || 0}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </motion.div>
 
           {/* Ticket Médio */}
-          <Card className="relative bg-gradient-to-br from-slate-900/90 via-cyan-900/30 to-slate-900/90 border-cyan-500/30 overflow-hidden">
-            <GlowingBorder color="cyan" />
-            <CardContent className="relative z-10 p-6">
-              <div className="flex items-center justify-between">
-                <div className="p-3 bg-cyan-500/20 rounded-xl">
+          <motion.div whileHover={{ scale: 1.02, y: -4 }} className="relative group">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-600 to-teal-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity" />
+            <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-cyan-500/20 p-6 h-full">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-cyan-500/20 to-teal-500/20 rounded-xl border border-cyan-500/20">
                   <Banknote className="w-6 h-6 text-cyan-400" />
                 </div>
-                <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
+                <Badge className="bg-gradient-to-r from-cyan-500/20 to-teal-500/20 text-cyan-300 border-cyan-500/30">
                   <Target className="w-3 h-3 mr-1" />
                   Médio
                 </Badge>
               </div>
-              <div className="mt-4">
-                <p className="text-sm text-slate-400">Ticket Médio Recorrente</p>
-                {isLoadingKpis ? (
-                  <Skeleton className="h-8 w-32 mt-1 bg-slate-700" />
-                ) : (
-                  <p className="text-2xl font-bold text-white">
-                    <AnimatedCounter value={kpis?.ticketMedioRecorrente || 0} prefix="R$ " />
-                  </p>
-                )}
+              <p className="text-sm text-slate-400 mb-1">Ticket Médio Recorrente</p>
+              {isLoadingKpis ? (
+                <Skeleton className="h-9 w-32 bg-slate-800" />
+              ) : (
+                <p className="text-3xl font-black bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent">
+                  <AnimatedCounter value={kpis?.ticketMedioRecorrente || 0} prefix="R$ " />
+                </p>
+              )}
+              <div className="mt-4 bg-slate-800/50 rounded-xl p-3 border border-slate-700/30">
+                <span className="text-xs text-slate-500">Ticket Médio Pontual</span>
+                <p className="text-cyan-400 font-bold">{formatCurrency(kpis?.ticketMedioPontual || 0)}</p>
               </div>
-              <div className="mt-4 bg-slate-800/50 rounded-lg p-2">
-                <span className="text-slate-400 text-sm">Ticket Médio Pontual</span>
-                <p className="text-cyan-400 font-semibold">{formatCurrency(kpis?.ticketMedioPontual || 0)}</p>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </motion.div>
 
           {/* Tempo Médio Fechamento */}
-          <Card className="relative bg-gradient-to-br from-slate-900/90 via-green-900/30 to-slate-900/90 border-green-500/30 overflow-hidden">
-            <GlowingBorder color="green" />
-            <CardContent className="relative z-10 p-6">
-              <div className="flex items-center justify-between">
-                <div className="p-3 bg-green-500/20 rounded-xl">
-                  <Clock className="w-6 h-6 text-green-400" />
+          <motion.div whileHover={{ scale: 1.02, y: -4 }} className="relative group">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-600 to-green-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition-opacity" />
+            <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-emerald-500/20 p-6 h-full">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-gradient-to-br from-emerald-500/20 to-green-500/20 rounded-xl border border-emerald-500/20">
+                  <Clock className="w-6 h-6 text-emerald-400" />
                 </div>
-                <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                <Badge className="bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-300 border-emerald-500/30">
                   <Rocket className="w-3 h-3 mr-1" />
                   Ciclo
                 </Badge>
               </div>
-              <div className="mt-4">
-                <p className="text-sm text-slate-400">Tempo Médio de Fechamento</p>
-                {isLoadingKpis ? (
-                  <Skeleton className="h-8 w-24 mt-1 bg-slate-700" />
-                ) : (
-                  <p className="text-2xl font-bold text-white">
-                    <AnimatedCounter value={Math.round(kpis?.tempoFechamentoDias || 0)} suffix=" dias" />
-                  </p>
-                )}
-              </div>
-              <div className="mt-4 bg-slate-800/50 rounded-lg p-2 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-green-400" />
+              <p className="text-sm text-slate-400 mb-1">Tempo Médio de Fechamento</p>
+              {isLoadingKpis ? (
+                <Skeleton className="h-9 w-24 bg-slate-800" />
+              ) : (
+                <p className="text-3xl font-black bg-gradient-to-r from-emerald-400 to-green-400 bg-clip-text text-transparent">
+                  <AnimatedCounter value={Math.round(kpis?.tempoFechamentoDias || 0)} suffix=" dias" />
+                </p>
+              )}
+              <div className="mt-4 bg-slate-800/50 rounded-xl p-3 border border-slate-700/30 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-emerald-400" />
                 <span className="text-slate-300 text-sm">Ciclo de vendas médio</span>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </motion.div>
         </motion.div>
 
         {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Contratos por Dia */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Evolução de Vendas */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <Card className="bg-gradient-to-br from-slate-900/90 via-slate-800/80 to-slate-900/90 border-slate-700/50 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-white">
-                  <div className="p-2 bg-blue-500/20 rounded-lg">
-                    <TrendingUp className="w-5 h-5 text-blue-400" />
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-600/20 to-blue-600/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-700/30 overflow-hidden">
+                <div className="p-6 border-b border-slate-700/30">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-violet-500/20 to-blue-500/20 rounded-xl border border-violet-500/20">
+                      <TrendingUp className="w-5 h-5 text-violet-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white">Evolução de Vendas</h3>
                   </div>
-                  Evolução de Vendas
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingContratos ? (
-                  <Skeleton className="h-80 w-full bg-slate-800/50" />
-                ) : (
-                  <ResponsiveContainer width="100%" height={320}>
-                    <ComposedChart data={chartContratosData}>
-                      <defs>
-                        <linearGradient id="colorRecorrente" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorPontual" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="diaLabel" stroke="#94a3b8" fontSize={12} />
-                      <YAxis yAxisId="left" stroke="#94a3b8" fontSize={12} tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} />
-                      <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" fontSize={12} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#1e293b',
-                          border: '1px solid #475569',
-                          borderRadius: '12px',
-                          color: '#f1f5f9'
-                        }}
-                        formatter={(value: number, name: string) => [
-                          name === 'contratos' ? value : formatCurrency(value),
-                          name === 'valorRecorrente' ? 'Recorrente' : name === 'valorPontual' ? 'Pontual' : 'Contratos'
-                        ]}
-                      />
-                      <Legend />
-                      <Area
-                        yAxisId="left"
-                        type="monotone"
-                        dataKey="valorRecorrente"
-                        stroke="#3b82f6"
-                        strokeWidth={2}
-                        fill="url(#colorRecorrente)"
-                        name="Recorrente"
-                      />
-                      <Area
-                        yAxisId="left"
-                        type="monotone"
-                        dataKey="valorPontual"
-                        stroke="#8b5cf6"
-                        strokeWidth={2}
-                        fill="url(#colorPontual)"
-                        name="Pontual"
-                      />
-                      <Line
-                        yAxisId="right"
-                        type="monotone"
-                        dataKey="contratos"
-                        stroke="#10b981"
-                        strokeWidth={3}
-                        dot={{ fill: '#10b981', strokeWidth: 2 }}
-                        name="Contratos"
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+                <div className="p-6">
+                  {isLoadingContratos ? (
+                    <Skeleton className="h-80 w-full bg-slate-800/50" />
+                  ) : (
+                    <ResponsiveContainer width="100%" height={320}>
+                      <ComposedChart data={chartContratosData}>
+                        <defs>
+                          <linearGradient id="colorRecorrente" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="colorPontual" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                        <XAxis dataKey="diaLabel" stroke="#64748b" fontSize={11} />
+                        <YAxis yAxisId="left" stroke="#64748b" fontSize={11} tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} />
+                        <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={11} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                            borderRadius: '12px',
+                            color: '#f1f5f9',
+                            backdropFilter: 'blur(12px)'
+                          }}
+                          formatter={(value: number, name: string) => [
+                            name === 'contratos' ? value : formatCurrency(value),
+                            name === 'valorRecorrente' ? 'Recorrente' : name === 'valorPontual' ? 'Pontual' : 'Contratos'
+                          ]}
+                        />
+                        <Legend />
+                        <Area
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="valorRecorrente"
+                          stroke="#8b5cf6"
+                          strokeWidth={2}
+                          fill="url(#colorRecorrente)"
+                          name="Recorrente"
+                        />
+                        <Area
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="valorPontual"
+                          stroke="#3b82f6"
+                          strokeWidth={2}
+                          fill="url(#colorPontual)"
+                          name="Pontual"
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="contratos"
+                          stroke="#10b981"
+                          strokeWidth={3}
+                          dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2 }}
+                          name="Contratos"
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+            </div>
           </motion.div>
 
           {/* Receita por Fonte */}
@@ -694,132 +720,157 @@ export default function AnaliseVendas() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <Card className="bg-gradient-to-br from-slate-900/90 via-slate-800/80 to-slate-900/90 border-slate-700/50 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-white">
-                  <div className="p-2 bg-violet-500/20 rounded-lg">
-                    <Target className="w-5 h-5 text-violet-400" />
-                  </div>
-                  Receita por Fonte
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingFonte ? (
-                  <Skeleton className="h-80 w-full bg-slate-800/50" />
-                ) : (
-                  <div className="flex items-center gap-4">
-                    <ResponsiveContainer width="50%" height={280}>
-                      <PieChart>
-                        <Pie
-                          data={receitaPorFonte}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={100}
-                          paddingAngle={5}
-                          dataKey="mrr"
-                          nameKey="fonte"
-                        >
-                          {receitaPorFonte?.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: '#1e293b',
-                            border: '1px solid #475569',
-                            borderRadius: '12px',
-                            color: '#f1f5f9'
-                          }}
-                          formatter={(value: number) => formatCurrency(value)}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="flex-1 space-y-2">
-                      {receitaPorFonte?.map((item, index) => (
-                        <div
-                          key={item.fonte}
-                          className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/30"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
-                            />
-                            <span className="text-slate-300">{item.fonte}</span>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-white font-semibold">{formatCurrency(item.mrr + item.pontual)}</p>
-                            <p className="text-xs text-slate-400">{item.contratos} contratos</p>
-                          </div>
-                        </div>
-                      ))}
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-700/30 overflow-hidden">
+                <div className="p-6 border-b border-slate-700/30">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-xl border border-indigo-500/20">
+                      <Target className="w-5 h-5 text-indigo-400" />
                     </div>
+                    <h3 className="text-lg font-bold text-white">Receita por Fonte</h3>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+                <div className="p-6">
+                  {isLoadingFonte ? (
+                    <Skeleton className="h-80 w-full bg-slate-800/50" />
+                  ) : (
+                    <div className="flex flex-col lg:flex-row items-center gap-6">
+                      <ResponsiveContainer width="100%" height={280} className="lg:w-1/2">
+                        <PieChart>
+                          <Pie
+                            data={receitaPorFonte?.slice(0, 6)}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={70}
+                            outerRadius={110}
+                            paddingAngle={4}
+                            dataKey="mrr"
+                            nameKey="fonte"
+                          >
+                            {receitaPorFonte?.slice(0, 6).map((_, index) => (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={PIE_COLORS[index % PIE_COLORS.length]}
+                                stroke="rgba(0,0,0,0.3)"
+                                strokeWidth={2}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                              border: '1px solid rgba(139, 92, 246, 0.3)',
+                              borderRadius: '12px',
+                              color: '#f1f5f9',
+                              backdropFilter: 'blur(12px)'
+                            }}
+                            formatter={(value: number) => formatCurrency(value)}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="flex-1 space-y-2 w-full lg:w-1/2 max-h-[280px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-800">
+                        {receitaPorFonte?.slice(0, 8).map((item, index) => (
+                          <motion.div
+                            key={item.fonte}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/30 hover:bg-slate-800/70 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-3 h-3 rounded-full shadow-lg"
+                                style={{ 
+                                  backgroundColor: PIE_COLORS[index % PIE_COLORS.length],
+                                  boxShadow: `0 0 8px ${PIE_COLORS[index % PIE_COLORS.length]}40`
+                                }}
+                              />
+                              <span className="text-slate-300 text-sm truncate max-w-[120px]">{item.fonte || 'N/A'}</span>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-white font-semibold">{formatCurrency(item.mrr + item.pontual)}</p>
+                              <p className="text-xs text-slate-500">{item.contratos} contratos</p>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </motion.div>
         </div>
 
         {/* Rankings Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Ranking Closers */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <Card className="bg-gradient-to-br from-slate-900/90 via-violet-900/20 to-slate-900/90 border-violet-500/30 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-white">
-                  <div className="p-2 bg-violet-500/20 rounded-lg">
-                    <Users className="w-5 h-5 text-violet-400" />
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-600/20 to-purple-600/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-violet-500/20 overflow-hidden">
+                <div className="p-6 border-b border-violet-500/10 bg-gradient-to-r from-violet-500/5 to-purple-500/5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-xl border border-violet-500/20">
+                        <Users className="w-5 h-5 text-violet-400" />
+                      </div>
+                      <h3 className="text-lg font-bold text-white">Ranking Closers</h3>
+                    </div>
+                    <Badge className="bg-gradient-to-r from-violet-500 to-purple-500 text-white border-0 shadow-lg shadow-violet-500/20">
+                      <Crown className="w-3 h-3 mr-1" />
+                      MRR
+                    </Badge>
                   </div>
-                  Ranking Closers
-                  <Badge className="ml-auto bg-violet-500/20 text-violet-400 border-violet-500/30">
-                    MRR
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingCloser ? (
-                  <div className="space-y-3">
-                    {[...Array(5)].map((_, i) => (
-                      <Skeleton key={i} className="h-16 w-full bg-slate-800/50" />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {mrrPorCloser?.slice(0, 5).map((closer, index) => (
-                      <motion.div
-                        key={closer.closer}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`p-4 rounded-xl border ${getMedalBg(index)}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-800/50 border border-slate-700/50">
-                              {getMedalIcon(index)}
+                </div>
+                <div className="p-6">
+                  {isLoadingCloser ? (
+                    <div className="space-y-3">
+                      {[...Array(5)].map((_, i) => (
+                        <Skeleton key={i} className="h-20 w-full bg-slate-800/50" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {mrrPorCloser?.slice(0, 5).map((closer, index) => {
+                        const style = getMedalStyle(index);
+                        return (
+                          <motion.div
+                            key={closer.closer}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.08 }}
+                            whileHover={{ scale: 1.01, x: 4 }}
+                            className={`relative p-4 rounded-xl border bg-gradient-to-r ${style.bg} ${style.border} shadow-lg ${style.glow}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${index < 3 ? style.badge : 'bg-slate-700/50'} shadow-lg`}>
+                                  {style.icon}
+                                </div>
+                                <div>
+                                  <p className="text-white font-bold">{closer.closer}</p>
+                                  <p className="text-sm text-slate-400">{closer.contratos} contratos fechados</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-violet-400 font-black text-xl">{formatCurrency(closer.mrr)}</p>
+                                <p className="text-xs text-slate-500">+ {formatCurrency(closer.pontual)} pontual</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-white font-semibold">{closer.closer}</p>
-                              <p className="text-sm text-slate-400">{closer.contratos} contratos</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-violet-400 font-bold text-lg">{formatCurrency(closer.mrr)}</p>
-                            <p className="text-xs text-slate-500">+ {formatCurrency(closer.pontual)} pontual</p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </motion.div>
 
           {/* Ranking SDRs */}
@@ -828,101 +879,126 @@ export default function AnaliseVendas() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
           >
-            <Card className="bg-gradient-to-br from-slate-900/90 via-cyan-900/20 to-slate-900/90 border-cyan-500/30 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-white">
-                  <div className="p-2 bg-cyan-500/20 rounded-lg">
-                    <Briefcase className="w-5 h-5 text-cyan-400" />
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-600/20 to-teal-600/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-cyan-500/20 overflow-hidden">
+                <div className="p-6 border-b border-cyan-500/10 bg-gradient-to-r from-cyan-500/5 to-teal-500/5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-gradient-to-br from-cyan-500/20 to-teal-500/20 rounded-xl border border-cyan-500/20">
+                        <Briefcase className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <h3 className="text-lg font-bold text-white">Ranking SDRs</h3>
+                    </div>
+                    <Badge className="bg-gradient-to-r from-cyan-500 to-teal-500 text-white border-0 shadow-lg shadow-cyan-500/20">
+                      <Crown className="w-3 h-3 mr-1" />
+                      MRR
+                    </Badge>
                   </div>
-                  Ranking SDRs
-                  <Badge className="ml-auto bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
-                    MRR
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingSdr ? (
-                  <div className="space-y-3">
-                    {[...Array(5)].map((_, i) => (
-                      <Skeleton key={i} className="h-16 w-full bg-slate-800/50" />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {mrrPorSdr?.slice(0, 5).map((sdr, index) => (
-                      <motion.div
-                        key={sdr.sdr}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`p-4 rounded-xl border ${getMedalBg(index)}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-800/50 border border-slate-700/50">
-                              {getMedalIcon(index)}
+                </div>
+                <div className="p-6">
+                  {isLoadingSdr ? (
+                    <div className="space-y-3">
+                      {[...Array(5)].map((_, i) => (
+                        <Skeleton key={i} className="h-20 w-full bg-slate-800/50" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {mrrPorSdr?.slice(0, 5).map((sdr, index) => {
+                        const style = getMedalStyle(index);
+                        return (
+                          <motion.div
+                            key={sdr.sdr}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.08 }}
+                            whileHover={{ scale: 1.01, x: 4 }}
+                            className={`relative p-4 rounded-xl border bg-gradient-to-r ${style.bg} ${style.border} shadow-lg ${style.glow}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${index < 3 ? style.badge : 'bg-slate-700/50'} shadow-lg`}>
+                                  {style.icon}
+                                </div>
+                                <div>
+                                  <p className="text-white font-bold">{sdr.sdr}</p>
+                                  <p className="text-sm text-slate-400">{sdr.contratos} contratos gerados</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-cyan-400 font-black text-xl">{formatCurrency(sdr.mrr)}</p>
+                                <p className="text-xs text-slate-500">+ {formatCurrency(sdr.pontual)} pontual</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-white font-semibold">{sdr.sdr}</p>
-                              <p className="text-sm text-slate-400">{sdr.contratos} contratos</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-cyan-400 font-bold text-lg">{formatCurrency(sdr.mrr)}</p>
-                            <p className="text-xs text-slate-500">+ {formatCurrency(sdr.pontual)} pontual</p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </motion.div>
         </div>
 
         {/* Bar Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* MRR por Closer - Bar Chart */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
           >
-            <Card className="bg-gradient-to-br from-slate-900/90 via-slate-800/80 to-slate-900/90 border-slate-700/50 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-white">
-                  <div className="p-2 bg-violet-500/20 rounded-lg">
-                    <BarChart3 className="w-5 h-5 text-violet-400" />
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-600/20 to-indigo-600/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-700/30 overflow-hidden">
+                <div className="p-6 border-b border-slate-700/30">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-violet-500/20 to-indigo-500/20 rounded-xl border border-violet-500/20">
+                      <BarChart3 className="w-5 h-5 text-violet-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white">MRR por Closer</h3>
                   </div>
-                  MRR por Closer
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingCloser ? (
-                  <Skeleton className="h-64 w-full bg-slate-800/50" />
-                ) : (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={mrrPorCloser} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis type="number" stroke="#94a3b8" fontSize={12} tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} />
-                      <YAxis type="category" dataKey="closer" stroke="#94a3b8" fontSize={12} width={100} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#1e293b',
-                          border: '1px solid #475569',
-                          borderRadius: '12px',
-                          color: '#f1f5f9'
-                        }}
-                        formatter={(value: number) => formatCurrency(value)}
-                      />
-                      <Bar dataKey="mrr" fill="#8b5cf6" radius={[0, 6, 6, 0]} name="MRR" />
-                      <Bar dataKey="pontual" fill="#3b82f6" radius={[0, 6, 6, 0]} name="Pontual" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+                <div className="p-6">
+                  {isLoadingCloser ? (
+                    <Skeleton className="h-64 w-full bg-slate-800/50" />
+                  ) : (
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={mrrPorCloser?.slice(0, 8)} layout="vertical">
+                        <defs>
+                          <linearGradient id="barGradientMrr" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#8b5cf6" />
+                            <stop offset="100%" stopColor="#a855f7" />
+                          </linearGradient>
+                          <linearGradient id="barGradientPontual" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#3b82f6" />
+                            <stop offset="100%" stopColor="#60a5fa" />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                        <XAxis type="number" stroke="#64748b" fontSize={11} tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} />
+                        <YAxis type="category" dataKey="closer" stroke="#64748b" fontSize={10} width={90} tick={{ fill: '#94a3b8' }} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                            borderRadius: '12px',
+                            color: '#f1f5f9',
+                            backdropFilter: 'blur(12px)'
+                          }}
+                          formatter={(value: number) => formatCurrency(value)}
+                        />
+                        <Legend />
+                        <Bar dataKey="mrr" fill="url(#barGradientMrr)" radius={[0, 8, 8, 0]} name="MRR" />
+                        <Bar dataKey="pontual" fill="url(#barGradientPontual)" radius={[0, 8, 8, 0]} name="Pontual" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+            </div>
           </motion.div>
 
           {/* MRR por SDR - Bar Chart */}
@@ -931,40 +1007,55 @@ export default function AnaliseVendas() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7 }}
           >
-            <Card className="bg-gradient-to-br from-slate-900/90 via-slate-800/80 to-slate-900/90 border-slate-700/50 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-white">
-                  <div className="p-2 bg-cyan-500/20 rounded-lg">
-                    <BarChart3 className="w-5 h-5 text-cyan-400" />
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-600/20 to-teal-600/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-700/30 overflow-hidden">
+                <div className="p-6 border-b border-slate-700/30">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-cyan-500/20 to-teal-500/20 rounded-xl border border-cyan-500/20">
+                      <BarChart3 className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <h3 className="text-lg font-bold text-white">MRR por SDR</h3>
                   </div>
-                  MRR por SDR
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingSdr ? (
-                  <Skeleton className="h-64 w-full bg-slate-800/50" />
-                ) : (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={mrrPorSdr} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis type="number" stroke="#94a3b8" fontSize={12} tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} />
-                      <YAxis type="category" dataKey="sdr" stroke="#94a3b8" fontSize={12} width={100} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#1e293b',
-                          border: '1px solid #475569',
-                          borderRadius: '12px',
-                          color: '#f1f5f9'
-                        }}
-                        formatter={(value: number) => formatCurrency(value)}
-                      />
-                      <Bar dataKey="mrr" fill="#06b6d4" radius={[0, 6, 6, 0]} name="MRR" />
-                      <Bar dataKey="pontual" fill="#10b981" radius={[0, 6, 6, 0]} name="Pontual" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+                <div className="p-6">
+                  {isLoadingSdr ? (
+                    <Skeleton className="h-64 w-full bg-slate-800/50" />
+                  ) : (
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={mrrPorSdr?.slice(0, 8)} layout="vertical">
+                        <defs>
+                          <linearGradient id="barGradientSdrMrr" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#06b6d4" />
+                            <stop offset="100%" stopColor="#22d3ee" />
+                          </linearGradient>
+                          <linearGradient id="barGradientSdrPontual" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#10b981" />
+                            <stop offset="100%" stopColor="#34d399" />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                        <XAxis type="number" stroke="#64748b" fontSize={11} tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} />
+                        <YAxis type="category" dataKey="sdr" stroke="#64748b" fontSize={10} width={90} tick={{ fill: '#94a3b8' }} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            border: '1px solid rgba(6, 182, 212, 0.3)',
+                            borderRadius: '12px',
+                            color: '#f1f5f9',
+                            backdropFilter: 'blur(12px)'
+                          }}
+                          formatter={(value: number) => formatCurrency(value)}
+                        />
+                        <Legend />
+                        <Bar dataKey="mrr" fill="url(#barGradientSdrMrr)" radius={[0, 8, 8, 0]} name="MRR" />
+                        <Bar dataKey="pontual" fill="url(#barGradientSdrPontual)" radius={[0, 8, 8, 0]} name="Pontual" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+            </div>
           </motion.div>
         </div>
       </div>
