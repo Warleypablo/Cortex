@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Phone, 
@@ -32,7 +34,8 @@ import {
   X,
   Calendar,
   Headphones,
-  Bell
+  Bell,
+  Monitor
 } from "lucide-react";
 import { DealCelebration, useDealCelebrationTrigger } from "@/components/DealCelebration";
 
@@ -67,6 +70,7 @@ interface RankingSDR {
 }
 
 export default function DashboardSDRs() {
+  const [, navigate] = useLocation();
   const hoje = new Date();
   const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
   const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -321,6 +325,23 @@ export default function DashboardSDRs() {
                 {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric" })}
               </div>
             </div>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => navigate('/dashboard/comercial/apresentacao')}
+                  className="border-cyan-500/50 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300"
+                  data-testid="button-presentation-mode"
+                >
+                  <Monitor className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Modo Apresentação (TV)</p>
+              </TooltipContent>
+            </Tooltip>
             
             <Button
               variant="outline"
