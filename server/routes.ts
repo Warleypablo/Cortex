@@ -2919,7 +2919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(d.valor_pontual), 0) as total_pontual,
           COALESCE(SUM(d.valor_recorrente) + SUM(d.valor_pontual), 0) as receita_total,
           COALESCE(AVG(COALESCE(d.valor_recorrente, 0) + COALESCE(d.valor_pontual, 0)), 0) as ticket_medio,
-          COALESCE(AVG(EXTRACT(EPOCH FROM (d.data_fechamento - d.created_date)) / 86400), 0) as ciclo_medio_dias,
+          COALESCE(AVG(EXTRACT(EPOCH FROM (d.data_fechamento - d.date_create)) / 86400), 0) as ciclo_medio_dias,
           COUNT(DISTINCT d.company_name) as empresas_unicas,
           COUNT(DISTINCT c.nome) as closers_ativos,
           COUNT(CASE WHEN d.valor_recorrente > 0 THEN 1 END) as negocios_recorrentes,
@@ -3008,9 +3008,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           d.source,
           d.pipeline_name,
           c.nome as closer_name,
-          d.created_date,
+          d.date_create,
           d.data_fechamento,
-          EXTRACT(EPOCH FROM (d.data_fechamento - d.created_date)) / 86400 as ciclo_dias,
+          EXTRACT(EPOCH FROM (d.data_fechamento - d.date_create)) / 86400 as ciclo_dias,
           d.utm_source,
           d.utm_medium,
           d.utm_campaign,
@@ -3036,7 +3036,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         source: row.source,
         pipelineName: row.pipeline_name,
         ownerName: row.closer_name,
-        createdDate: row.created_date,
+        createdDate: row.date_create,
         closeDate: row.data_fechamento,
         cicloDias: parseFloat(row.ciclo_dias) || 0,
         utmSource: row.utm_source,
@@ -3124,7 +3124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(d.valor_pontual), 0) as pontual,
           COALESCE(SUM(d.valor_recorrente) + SUM(d.valor_pontual), 0) as total,
           COALESCE(AVG(COALESCE(d.valor_recorrente, 0) + COALESCE(d.valor_pontual, 0)), 0) as ticket_medio,
-          COALESCE(AVG(EXTRACT(EPOCH FROM (d.data_fechamento - d.created_date)) / 86400), 0) as ciclo_medio
+          COALESCE(AVG(EXTRACT(EPOCH FROM (d.data_fechamento - d.date_create)) / 86400), 0) as ciclo_medio
         FROM crm_deal d
         LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
@@ -3282,7 +3282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conditions: ReturnType<typeof sql>[] = [
         sql`stage_name = 'Negócio Ganho'`,
         sql`data_fechamento IS NOT NULL`,
-        sql`created_date IS NOT NULL`
+        sql`date_create IS NOT NULL`
       ];
 
       if (dataInicio) {
@@ -3297,10 +3297,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.execute(sql`
         SELECT 
           CASE 
-            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 7 THEN '0-7 dias'
-            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 14 THEN '8-14 dias'
-            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 30 THEN '15-30 dias'
-            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 60 THEN '31-60 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 7 THEN '0-7 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 14 THEN '8-14 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 30 THEN '15-30 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 60 THEN '31-60 dias'
             ELSE '60+ dias'
           END as faixa,
           COUNT(*) as quantidade,
@@ -3310,40 +3310,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ${whereClause}
         GROUP BY 
           CASE 
-            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 7 THEN '0-7 dias'
-            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 14 THEN '8-14 dias'
-            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 30 THEN '15-30 dias'
-            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 60 THEN '31-60 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 7 THEN '0-7 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 14 THEN '8-14 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 30 THEN '15-30 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 60 THEN '31-60 dias'
             ELSE '60+ dias'
           END
         ORDER BY 
           CASE 
             WHEN CASE 
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 7 THEN '0-7 dias'
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 14 THEN '8-14 dias'
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 30 THEN '15-30 dias'
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 60 THEN '31-60 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 7 THEN '0-7 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 14 THEN '8-14 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 30 THEN '15-30 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 60 THEN '31-60 dias'
               ELSE '60+ dias'
             END = '0-7 dias' THEN 1
             WHEN CASE 
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 7 THEN '0-7 dias'
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 14 THEN '8-14 dias'
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 30 THEN '15-30 dias'
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 60 THEN '31-60 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 7 THEN '0-7 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 14 THEN '8-14 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 30 THEN '15-30 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 60 THEN '31-60 dias'
               ELSE '60+ dias'
             END = '8-14 dias' THEN 2
             WHEN CASE 
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 7 THEN '0-7 dias'
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 14 THEN '8-14 dias'
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 30 THEN '15-30 dias'
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 60 THEN '31-60 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 7 THEN '0-7 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 14 THEN '8-14 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 30 THEN '15-30 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 60 THEN '31-60 dias'
               ELSE '60+ dias'
             END = '15-30 dias' THEN 3
             WHEN CASE 
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 7 THEN '0-7 dias'
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 14 THEN '8-14 dias'
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 30 THEN '15-30 dias'
-              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 60 THEN '31-60 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 7 THEN '0-7 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 14 THEN '8-14 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 30 THEN '15-30 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400 <= 60 THEN '31-60 dias'
               ELSE '60+ dias'
             END = '31-60 dias' THEN 4
             ELSE 5
