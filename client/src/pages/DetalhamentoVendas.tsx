@@ -150,12 +150,8 @@ const formatDate = (dateString: string | null) => {
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 export default function DetalhamentoVendas() {
-  const hoje = new Date();
-  const inicioAno = new Date(hoje.getFullYear(), 0, 1).toISOString().split('T')[0];
-  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
-
-  const [dataInicio, setDataInicio] = useState<string>(inicioAno);
-  const [dataFim, setDataFim] = useState<string>(fimMes);
+  const [dataInicio, setDataInicio] = useState<string>("");
+  const [dataFim, setDataFim] = useState<string>("");
   const [source, setSource] = useState<string>("all");
   const [category, setCategory] = useState<string>("all");
   const [closer, setCloser] = useState<string>("all");
@@ -209,15 +205,16 @@ export default function DetalhamentoVendas() {
   });
 
   const resetFilters = () => {
-    setDataInicio(inicioAno);
-    setDataFim(fimMes);
+    setDataInicio("");
+    setDataFim("");
     setSource("all");
     setCategory("all");
     setCloser("all");
   };
 
   const navegarMes = (direcao: 'anterior' | 'proximo') => {
-    const dataAtual = new Date(dataInicio + 'T00:00:00');
+    const hoje = new Date();
+    const dataAtual = dataInicio ? new Date(dataInicio + 'T00:00:00') : hoje;
     const novoMes = direcao === 'anterior' 
       ? new Date(dataAtual.getFullYear(), dataAtual.getMonth() - 1, 1)
       : new Date(dataAtual.getFullYear(), dataAtual.getMonth() + 1, 1);
