@@ -363,7 +363,7 @@ export default function PresentationMode() {
   return (
     <div 
       ref={containerRef}
-      className="min-h-screen w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden relative"
+      className="h-screen w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden relative flex flex-col"
       data-testid="presentation-mode-container"
     >
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -451,7 +451,7 @@ export default function PresentationMode() {
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 p-6 lg:p-8 space-y-6">
+      <div className="relative z-10 flex-1 flex flex-col justify-center p-6 lg:p-8">
         <AnimatePresence mode="wait">
           {currentView === 'closers' ? (
             <motion.div
@@ -460,7 +460,7 @@ export default function PresentationMode() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.4 }}
-              className="space-y-6"
+              className="space-y-4"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -831,7 +831,7 @@ export default function PresentationMode() {
 
               {/* BARRA DE META */}
               <motion.div 
-                className="mt-6 relative"
+                className="mt-4 relative"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5, duration: 0.6 }}
@@ -1013,7 +1013,7 @@ export default function PresentationMode() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.4 }}
-              className="space-y-6"
+              className="space-y-4"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -1274,7 +1274,7 @@ export default function PresentationMode() {
 
               {/* BARRA DE META REUNIÕES SDR */}
               <motion.div 
-                className="mt-6 relative"
+                className="mt-4 relative"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5, duration: 0.6 }}
