@@ -211,12 +211,9 @@ export default function PresentationMode() {
     return formatCurrency(value);
   };
 
-  const trends: Array<'up' | 'down' | 'stable'> = ['up', 'down', 'stable'];
-
   const closerRanking: RankingCloser[] = (chartReceita || [])
     .map((c, idx) => {
       const reunioesData = chartReunioesNegocios?.find(r => r.closer === c.closer);
-      const trend: 'up' | 'down' | 'stable' = trends[Math.floor(Math.random() * 3)];
       return {
         position: idx + 1,
         name: c.closer,
@@ -226,7 +223,7 @@ export default function PresentationMode() {
         reunioes: reunioesData?.reunioes || 0,
         negocios: reunioesData?.negociosGanhos || 0,
         taxa: reunioesData?.taxaConversao || 0,
-        trend,
+        trend: 'stable' as const,
       };
     })
     .sort((a, b) => b.total - a.total)
