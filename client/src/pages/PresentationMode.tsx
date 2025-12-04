@@ -110,11 +110,17 @@ export default function PresentationMode() {
   const closerQueryParams = new URLSearchParams({
     dataFechamentoInicio: inicioMes,
     dataFechamentoFim: fimMes,
+    dataReuniaoInicio: inicioMes,
+    dataReuniaoFim: fimMes,
+    dataLeadInicio: inicioMes,
+    dataLeadFim: fimMes,
   }).toString();
 
   const sdrQueryParams = new URLSearchParams({
     dataReuniaoInicio: inicioMes,
     dataReuniaoFim: fimMes,
+    dataLeadInicio: inicioMes,
+    dataLeadFim: fimMes,
   }).toString();
 
   const { data: closerMetrics, isLoading: isLoadingCloserMetrics } = useQuery<CloserMetrics>({
