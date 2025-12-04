@@ -1086,7 +1086,7 @@ export default function PresentationMode() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.4 }}
-              className="space-y-4"
+              className="space-y-3"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -1126,7 +1126,7 @@ export default function PresentationMode() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-3">
                 {[
                   { 
                     label: "Leads Criados", 
@@ -1156,7 +1156,7 @@ export default function PresentationMode() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 * index }}
                   >
-                    <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 backdrop-blur-sm border border-slate-800 p-5">
+                    <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 backdrop-blur-sm border border-slate-800 p-4">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-10 rounded-full -translate-y-1/2 translate-x-1/2" />
                       
                       <div className="flex items-center gap-3 mb-3">
@@ -1183,7 +1183,7 @@ export default function PresentationMode() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
                   <div className="mb-4 flex items-center gap-2">
                     <Trophy className="w-5 h-5 text-yellow-500" />
@@ -1203,13 +1203,13 @@ export default function PresentationMode() {
                       ))}
                     </div>
                   ) : sdrTop3.length > 0 ? (
-                    <div className="flex items-end justify-center gap-4 h-[420px]">
+                    <div className="flex items-end justify-center gap-4 h-[320px]">
                       {[1, 0, 2].map((dataIndex, visualIndex) => {
                         const sdr = sdrTop3[dataIndex];
                         if (!sdr) return null;
                         
-                        const heights = ['h-80', 'h-96', 'h-72'];
-                        const sizes = ['text-3xl', 'text-4xl', 'text-2xl'];
+                        const heights = ['h-64', 'h-72', 'h-56'];
+                        const sizes = ['text-2xl', 'text-3xl', 'text-xl'];
                         const badges = ['VICE', 'CAMPEÃO', 'BRONZE'];
                         const badgeColors = ['bg-gray-500', 'bg-gradient-to-r from-yellow-500 to-amber-500', 'bg-amber-700'];
                         
@@ -1286,7 +1286,7 @@ export default function PresentationMode() {
                       <div className="col-span-1 text-right">Leads</div>
                     </div>
 
-                    <div className="divide-y divide-slate-800/50 max-h-[350px] overflow-y-auto">
+                    <div className="divide-y divide-slate-800/50 max-h-[290px] overflow-y-auto">
                       {isLoadingSDRs ? (
                         Array.from({ length: 5 }).map((_, i) => (
                           <div key={i} className="p-2">
@@ -1359,7 +1359,7 @@ export default function PresentationMode() {
 
               {/* BARRA DE META REUNIÕES SDR */}
               <motion.div 
-                className="mt-2 relative"
+                className="mt-1 relative"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5, duration: 0.6 }}
