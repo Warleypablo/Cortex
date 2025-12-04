@@ -2996,7 +2996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.execute(sql`
         SELECT 
           d.id,
-          d.deal_name,
+          d.title,
           d.company_name,
           d.contact_name,
           d.contact_email,
@@ -3025,7 +3025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(result.rows.map((row: any) => ({
         dealId: row.id,
-        dealName: row.deal_name,
+        dealName: row.title,
         companyName: row.company_name,
         contactName: row.contact_name,
         contactEmail: row.contact_email,
