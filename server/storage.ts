@@ -150,6 +150,7 @@ export interface IStorage {
   getContasBancos(): Promise<ContaBanco[]>;
   getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<FluxoCaixaDiarioCompleto[]>;
   getFluxoCaixaInsights(): Promise<FluxoCaixaInsights>;
+  getFluxoCaixaInsightsPeriodo(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaInsightsPeriodo>;
   getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
   getVisaoGeralMetricas(mesAno: string): Promise<VisaoGeralMetricas>;
   getMrrEvolucaoMensal(mesAnoFim: string): Promise<import("@shared/schema").MrrEvolucaoMensal[]>;
@@ -424,6 +425,10 @@ export class MemStorage implements IStorage {
   }
 
   async getFluxoCaixaInsights(): Promise<FluxoCaixaInsights> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getFluxoCaixaInsightsPeriodo(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaInsightsPeriodo> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1884,6 +1889,201 @@ export class DbStorage implements IStorage {
         descricao: row.maior_saida_descricao || 'Sem descrição',
         data: row.maior_saida_data,
       } : null,
+    };
+  }
+
+  async getFluxoCaixaInsightsPeriodo(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaInsightsPeriodo> {
+    const result = await db.execute(sql`
+      WITH saldo_bancos AS (
+        SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
+        FROM caz_bancos
+        WHERE ativo = true
+      ),
+      periodo AS (
+        SELECT 
+          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_periodo,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_periodo
+        FROM caz_parcelas
+        WHERE status NOT IN ('QUITADO', 'PERDIDO')
+          AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+      ),
+      vencidos AS (
+        SELECT 
+          SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'ATRASADO' THEN valor_bruto::numeric ELSE 0 END) as entradas_vencidas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END) as saidas_vencidas
+        FROM caz_parcelas
+        WHERE data_vencimento < CURRENT_DATE
+      ),
+      maior_entrada AS (
+        SELECT 
+          valor_bruto::numeric as valor,
+          COALESCE(descricao, 'Sem descrição') as descricao,
+          TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data,
+          COALESCE(empresa, 'N/A') as empresa
+        FROM caz_parcelas
+        WHERE tipo_evento = 'RECEITA'
+          AND status NOT IN ('QUITADO', 'PERDIDO')
+          AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+        ORDER BY valor_bruto::numeric DESC
+        LIMIT 1
+      ),
+      maior_saida AS (
+        SELECT 
+          valor_bruto::numeric as valor,
+          COALESCE(descricao, 'Sem descrição') as descricao,
+          TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data,
+          COALESCE(empresa, 'N/A') as empresa
+        FROM caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND status NOT IN ('QUITADO', 'PERDIDO')
+          AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+        ORDER BY valor_bruto::numeric DESC
+        LIMIT 1
+      ),
+      top_entradas AS (
+        SELECT 
+          valor_bruto::numeric as valor,
+          COALESCE(descricao, 'Sem descrição') as descricao,
+          TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data,
+          COALESCE(empresa, 'N/A') as empresa
+        FROM caz_parcelas
+        WHERE tipo_evento = 'RECEITA'
+          AND status NOT IN ('QUITADO', 'PERDIDO')
+          AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+        ORDER BY valor_bruto::numeric DESC
+        LIMIT 5
+      ),
+      top_saidas AS (
+        SELECT 
+          valor_bruto::numeric as valor,
+          COALESCE(descricao, 'Sem descrição') as descricao,
+          TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data,
+          COALESCE(empresa, 'N/A') as empresa
+        FROM caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND status NOT IN ('QUITADO', 'PERDIDO')
+          AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+        ORDER BY valor_bruto::numeric DESC
+        LIMIT 5
+      ),
+      categorias AS (
+        SELECT 
+          COALESCE(dfc_categoria, 'Sem categoria') as categoria,
+          tipo_evento,
+          SUM(valor_bruto::numeric) as valor
+        FROM caz_parcelas
+        WHERE status NOT IN ('QUITADO', 'PERDIDO')
+          AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+          AND tipo_evento IN ('RECEITA', 'DESPESA')
+        GROUP BY dfc_categoria, tipo_evento
+        ORDER BY valor DESC
+        LIMIT 10
+      )
+      SELECT 
+        sb.saldo_total,
+        COALESCE(p.entradas_periodo, 0) as entradas_periodo,
+        COALESCE(p.saidas_periodo, 0) as saidas_periodo,
+        COALESCE(v.entradas_vencidas, 0) as entradas_vencidas,
+        COALESCE(v.saidas_vencidas, 0) as saidas_vencidas,
+        me.valor as maior_entrada_valor,
+        me.descricao as maior_entrada_descricao,
+        me.data as maior_entrada_data,
+        me.empresa as maior_entrada_empresa,
+        ms.valor as maior_saida_valor,
+        ms.descricao as maior_saida_descricao,
+        ms.data as maior_saida_data,
+        ms.empresa as maior_saida_empresa
+      FROM saldo_bancos sb
+      CROSS JOIN periodo p
+      CROSS JOIN vencidos v
+      LEFT JOIN maior_entrada me ON true
+      LEFT JOIN maior_saida ms ON true
+    `);
+    
+    const row = result.rows[0] as any;
+    const saldoAtual = parseFloat(row?.saldo_total || '0');
+    const entradasPeriodo = parseFloat(row?.entradas_periodo || '0');
+    const saidasPeriodo = parseFloat(row?.saidas_periodo || '0');
+    const saldoFinalPeriodo = saldoAtual + entradasPeriodo - saidasPeriodo;
+
+    const topEntradasResult = await db.execute(sql`
+      SELECT 
+        valor_bruto::numeric as valor,
+        COALESCE(descricao, 'Sem descrição') as descricao,
+        TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data,
+        COALESCE(empresa, 'N/A') as empresa
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND status NOT IN ('QUITADO', 'PERDIDO')
+        AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+      ORDER BY valor_bruto::numeric DESC
+      LIMIT 5
+    `);
+
+    const topSaidasResult = await db.execute(sql`
+      SELECT 
+        valor_bruto::numeric as valor,
+        COALESCE(descricao, 'Sem descrição') as descricao,
+        TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data,
+        COALESCE(empresa, 'N/A') as empresa
+      FROM caz_parcelas
+      WHERE tipo_evento = 'DESPESA'
+        AND status NOT IN ('QUITADO', 'PERDIDO')
+        AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+      ORDER BY valor_bruto::numeric DESC
+      LIMIT 5
+    `);
+
+    const categoriasResult = await db.execute(sql`
+      SELECT 
+        COALESCE(dfc_categoria, 'Sem categoria') as categoria,
+        tipo_evento,
+        SUM(valor_bruto::numeric) as valor
+      FROM caz_parcelas
+      WHERE status NOT IN ('QUITADO', 'PERDIDO')
+        AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+        AND tipo_evento IN ('RECEITA', 'DESPESA')
+      GROUP BY dfc_categoria, tipo_evento
+      ORDER BY valor DESC
+      LIMIT 10
+    `);
+    
+    return {
+      saldoAtual,
+      saldoFinalPeriodo,
+      entradasPeriodo,
+      saidasPeriodo,
+      entradasVencidas: parseFloat(row?.entradas_vencidas || '0'),
+      saidasVencidas: parseFloat(row?.saidas_vencidas || '0'),
+      maiorEntrada: row?.maior_entrada_valor ? {
+        valor: parseFloat(row.maior_entrada_valor),
+        descricao: row.maior_entrada_descricao || 'Sem descrição',
+        data: row.maior_entrada_data,
+        empresa: row.maior_entrada_empresa || 'N/A',
+      } : null,
+      maiorSaida: row?.maior_saida_valor ? {
+        valor: parseFloat(row.maior_saida_valor),
+        descricao: row.maior_saida_descricao || 'Sem descrição',
+        data: row.maior_saida_data,
+        empresa: row.maior_saida_empresa || 'N/A',
+      } : null,
+      topEntradas: (topEntradasResult.rows as any[]).map((r: any) => ({
+        valor: parseFloat(r.valor),
+        descricao: r.descricao,
+        data: r.data,
+        empresa: r.empresa,
+      })),
+      topSaidas: (topSaidasResult.rows as any[]).map((r: any) => ({
+        valor: parseFloat(r.valor),
+        descricao: r.descricao,
+        data: r.data,
+        empresa: r.empresa,
+      })),
+      transacoesPorCategoria: (categoriasResult.rows as any[]).map((r: any) => ({
+        categoria: r.categoria,
+        tipo: r.tipo_evento as 'RECEITA' | 'DESPESA',
+        valor: parseFloat(r.valor),
+      })),
     };
   }
 

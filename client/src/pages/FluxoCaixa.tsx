@@ -4,17 +4,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Wallet, TrendingUp, TrendingDown, Calendar, AlertCircle,
   ArrowUpCircle, ArrowDownCircle, Banknote, CreditCard, Building2,
-  ChevronRight, CircleDollarSign
+  ChevronRight, CircleDollarSign, CalendarDays, ArrowRight, Receipt
 } from "lucide-react";
 import {
-  ComposedChart, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine, Line, Cell
+  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, Cell
 } from "recharts";
-import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsights, ContaBanco } from "@shared/schema";
+import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsightsPeriodo, ContaBanco } from "@shared/schema";
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -40,17 +39,55 @@ const formatDate = (dateStr: string) => {
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 };
 
+const formatDateFull = (dateStr: string) => {
+  const date = new Date(dateStr + 'T00:00:00');
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const getMesNome = (mes: number, ano: number) => {
+  const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  return `${meses[mes]} ${ano}`;
+};
+
 export default function FluxoCaixa() {
   const hoje = new Date();
-  const defaultDataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
-  const defaultDataFim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
+  const [mesAno, setMesAno] = useState(`${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`);
+  
+  const dataInicio = useMemo(() => {
+    const [ano, mes] = mesAno.split('-').map(Number);
+    return new Date(ano, mes - 1, 1).toISOString().split('T')[0];
+  }, [mesAno]);
+  
+  const dataFim = useMemo(() => {
+    const [ano, mes] = mesAno.split('-').map(Number);
+    return new Date(ano, mes, 0).toISOString().split('T')[0];
+  }, [mesAno]);
 
-  const [dataInicio, setDataInicio] = useState(defaultDataInicio);
-  const [dataFim, setDataFim] = useState(defaultDataFim);
-  const [activePreset, setActivePreset] = useState('mes-atual');
+  const periodoLabel = useMemo(() => {
+    const [ano, mes] = mesAno.split('-').map(Number);
+    return getMesNome(mes - 1, ano);
+  }, [mesAno]);
 
-  const { data: insights, isLoading: isLoadingInsights } = useQuery<FluxoCaixaInsights>({
-    queryKey: ['/api/fluxo-caixa/insights'],
+  const mesesDisponiveis = useMemo(() => {
+    const meses = [];
+    for (let i = -6; i <= 6; i++) {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
+      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = getMesNome(d.getMonth(), d.getFullYear());
+      meses.push({ value, label });
+    }
+    return meses;
+  }, []);
+
+  const { data: insightsPeriodo, isLoading: isLoadingInsights } = useQuery<FluxoCaixaInsightsPeriodo>({
+    queryKey: ['/api/fluxo-caixa/insights-periodo', { dataInicio, dataFim }],
+    queryFn: async () => {
+      const params = new URLSearchParams({ dataInicio, dataFim });
+      const res = await fetch(`/api/fluxo-caixa/insights-periodo?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch insights");
+      return res.json();
+    },
+    enabled: !!dataInicio && !!dataFim,
   });
 
   const { data: contasBancos, isLoading: isLoadingContas } = useQuery<ContaBanco[]>({
@@ -58,7 +95,7 @@ export default function FluxoCaixa() {
   });
 
   const { data: fluxoDiario, isLoading: isLoadingFluxo } = useQuery<FluxoCaixaDiarioCompleto[]>({
-    queryKey: ['/api/fluxo-caixa/diario-completo', dataInicio, dataFim],
+    queryKey: ['/api/fluxo-caixa/diario-completo', { dataInicio, dataFim }],
     queryFn: async () => {
       const params = new URLSearchParams({ dataInicio, dataFim });
       const res = await fetch(`/api/fluxo-caixa/diario-completo?${params.toString()}`);
@@ -99,57 +136,52 @@ export default function FluxoCaixa() {
 
   const totais = useMemo(() => {
     if (!fluxoDiario || fluxoDiario.length === 0) {
-      return { entradas: 0, saidas: 0, saldo: 0, saldoFinal: insights?.saldoHoje || 0 };
+      return { entradas: 0, saidas: 0, saldo: 0, saldoFinal: insightsPeriodo?.saldoAtual || 0 };
     }
     const entradas = fluxoDiario.reduce((acc, item) => acc + item.entradas, 0);
     const saidas = fluxoDiario.reduce((acc, item) => acc + item.saidas, 0);
-    const saldoFinal = fluxoDiario[fluxoDiario.length - 1]?.saldoAcumulado || insights?.saldoHoje || 0;
+    const saldoFinal = fluxoDiario[fluxoDiario.length - 1]?.saldoAcumulado || insightsPeriodo?.saldoAtual || 0;
     return { entradas, saidas, saldo: entradas - saidas, saldoFinal };
-  }, [fluxoDiario, insights]);
-
-  const setRangePreset = (preset: 'mes-atual' | 'proximo-mes' | '30-dias' | '60-dias') => {
-    const now = new Date();
-    let inicio: Date, fim: Date;
-
-    switch (preset) {
-      case 'mes-atual':
-        inicio = new Date(now.getFullYear(), now.getMonth(), 1);
-        fim = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        break;
-      case 'proximo-mes':
-        inicio = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        fim = new Date(now.getFullYear(), now.getMonth() + 2, 0);
-        break;
-      case '30-dias':
-        inicio = new Date(now);
-        fim = new Date(now);
-        fim.setDate(fim.getDate() + 30);
-        break;
-      case '60-dias':
-        inicio = new Date(now);
-        fim = new Date(now);
-        fim.setDate(fim.getDate() + 60);
-        break;
-    }
-
-    setActivePreset(preset);
-    setDataInicio(inicio.toISOString().split('T')[0]);
-    setDataFim(fim.toISOString().split('T')[0]);
-  };
+  }, [fluxoDiario, insightsPeriodo]);
 
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
+        {/* Header com Seletor de Mês */}
+        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10">
               <CircleDollarSign className="w-6 h-6 text-primary" />
             </div>
             <div>
               <h1 className="text-2xl font-semibold" data-testid="text-title">Fluxo de Caixa</h1>
-              <p className="text-sm text-muted-foreground">Análise e projeção de entradas e saídas</p>
+              <p className="text-sm text-muted-foreground">Análise de entradas e saídas do período</p>
             </div>
           </div>
+          
+          <div className="flex items-center gap-3">
+            <CalendarDays className="w-5 h-5 text-muted-foreground" />
+            <Select value={mesAno} onValueChange={setMesAno}>
+              <SelectTrigger className="w-[200px]" data-testid="select-mes">
+                <SelectValue placeholder="Selecione o mês" />
+              </SelectTrigger>
+              <SelectContent>
+                {mesesDisponiveis.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Período Selecionado Badge */}
+        <div className="mb-6">
+          <Badge variant="secondary" className="text-sm px-4 py-2">
+            <Calendar className="w-4 h-4 mr-2" />
+            Período: {periodoLabel}
+          </Badge>
         </div>
 
         {/* KPIs Principais */}
@@ -157,62 +189,62 @@ export default function FluxoCaixa() {
           <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20" data-testid="card-saldo-atual">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Saldo Atual</span>
+                <span className="text-sm font-medium text-muted-foreground">Saldo Atual (Hoje)</span>
                 <Wallet className="w-5 h-5 text-emerald-500" />
               </div>
               {isLoadingInsights ? (
                 <Skeleton className="h-8 w-32" />
               ) : (
                 <div className="text-2xl font-bold text-emerald-600" data-testid="text-saldo-atual">
-                  {formatCurrency(insights?.saldoHoje || 0)}
+                  {formatCurrency(insightsPeriodo?.saldoAtual || 0)}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-saldo-futuro">
+          <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-saldo-final">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Saldo em 30 dias</span>
+                <span className="text-sm font-medium text-muted-foreground">Saldo Projetado (Fim do Mês)</span>
                 <TrendingUp className="w-5 h-5 text-blue-500" />
               </div>
               {isLoadingInsights ? (
                 <Skeleton className="h-8 w-32" />
               ) : (
-                <div className={`text-2xl font-bold ${(insights?.saldoFuturo30Dias || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`} data-testid="text-saldo-futuro">
-                  {formatCurrency(insights?.saldoFuturo30Dias || 0)}
+                <div className={`text-2xl font-bold ${(insightsPeriodo?.saldoFinalPeriodo || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`} data-testid="text-saldo-final">
+                  {formatCurrency(insightsPeriodo?.saldoFinalPeriodo || 0)}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card data-testid="card-entradas-previstas">
+          <Card data-testid="card-entradas-periodo">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Entradas (30d)</span>
+                <span className="text-sm font-medium text-muted-foreground">Entradas do Mês</span>
                 <ArrowUpCircle className="w-5 h-5 text-green-500" />
               </div>
               {isLoadingInsights ? (
                 <Skeleton className="h-8 w-32" />
               ) : (
-                <div className="text-2xl font-bold text-green-600" data-testid="text-entradas-previstas">
-                  {formatCurrency(insights?.entradasPrevistas30Dias || 0)}
+                <div className="text-2xl font-bold text-green-600" data-testid="text-entradas-periodo">
+                  {formatCurrency(insightsPeriodo?.entradasPeriodo || 0)}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card data-testid="card-saidas-previstas">
+          <Card data-testid="card-saidas-periodo">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Saídas (30d)</span>
+                <span className="text-sm font-medium text-muted-foreground">Saídas do Mês</span>
                 <ArrowDownCircle className="w-5 h-5 text-red-500" />
               </div>
               {isLoadingInsights ? (
                 <Skeleton className="h-8 w-32" />
               ) : (
-                <div className="text-2xl font-bold text-red-600" data-testid="text-saidas-previstas">
-                  {formatCurrency(insights?.saidasPrevistas30Dias || 0)}
+                <div className="text-2xl font-bold text-red-600" data-testid="text-saidas-periodo">
+                  {formatCurrency(insightsPeriodo?.saidasPeriodo || 0)}
                 </div>
               )}
             </CardContent>
@@ -220,9 +252,9 @@ export default function FluxoCaixa() {
         </div>
 
         {/* Alertas de Vencidos */}
-        {((insights?.entradasVencidas || 0) > 0 || (insights?.saidasVencidas || 0) > 0) && (
+        {((insightsPeriodo?.entradasVencidas || 0) > 0 || (insightsPeriodo?.saidasVencidas || 0) > 0) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {(insights?.entradasVencidas || 0) > 0 && (
+            {(insightsPeriodo?.entradasVencidas || 0) > 0 && (
               <Card className="border-amber-500/50 bg-amber-500/5" data-testid="card-entradas-vencidas">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
@@ -231,13 +263,13 @@ export default function FluxoCaixa() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Entradas Vencidas</p>
-                      <p className="text-xl font-bold text-amber-600">{formatCurrency(insights?.entradasVencidas || 0)}</p>
+                      <p className="text-xl font-bold text-amber-600">{formatCurrency(insightsPeriodo?.entradasVencidas || 0)}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             )}
-            {(insights?.saidasVencidas || 0) > 0 && (
+            {(insightsPeriodo?.saidasVencidas || 0) > 0 && (
               <Card className="border-red-500/50 bg-red-500/5" data-testid="card-saidas-vencidas">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
@@ -246,7 +278,7 @@ export default function FluxoCaixa() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Saídas Vencidas</p>
-                      <p className="text-xl font-bold text-red-600">{formatCurrency(insights?.saidasVencidas || 0)}</p>
+                      <p className="text-xl font-bold text-red-600">{formatCurrency(insightsPeriodo?.saidasVencidas || 0)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -255,67 +287,77 @@ export default function FluxoCaixa() {
           </div>
         )}
 
-        {/* Destaques */}
+        {/* Top Entradas e Saídas do Período */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-          <Card data-testid="card-maior-entrada">
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-green-500/10">
-                    <Banknote className="w-5 h-5 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Maior Entrada (30d)</p>
-                    {isLoadingInsights ? (
-                      <Skeleton className="h-6 w-32 mt-1" />
-                    ) : insights?.maiorEntradaPrevista ? (
-                      <>
-                        <p className="text-lg font-bold text-green-600">{formatCurrency(insights.maiorEntradaPrevista.valor)}</p>
-                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">{insights.maiorEntradaPrevista.descricao}</p>
-                      </>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Sem entradas previstas</p>
-                    )}
-                  </div>
+          <Card data-testid="card-top-entradas">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-green-500/10">
+                  <Banknote className="w-4 h-4 text-green-600" />
                 </div>
-                {insights?.maiorEntradaPrevista && (
-                  <Badge variant="secondary" className="text-xs">
-                    <Calendar className="w-3 h-3 mr-1" />
-                    {new Date(insights.maiorEntradaPrevista.data + 'T00:00:00').toLocaleDateString('pt-BR')}
-                  </Badge>
-                )}
+                <CardTitle className="text-base">Maiores Entradas - {periodoLabel}</CardTitle>
               </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingInsights ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-12" />)}
+                </div>
+              ) : !insightsPeriodo?.topEntradas || insightsPeriodo.topEntradas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma entrada no período</p>
+              ) : (
+                <div className="space-y-3">
+                  {insightsPeriodo.topEntradas.slice(0, 5).map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-green-500/5 border border-green-500/10">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{item.descricao}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                          <span>{formatDateFull(item.data)}</span>
+                          <span>•</span>
+                          <span className="truncate">{item.empresa}</span>
+                        </div>
+                      </div>
+                      <p className="text-green-600 font-bold ml-4">{formatCurrency(item.valor)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          <Card data-testid="card-maior-saida">
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-red-500/10">
-                    <CreditCard className="w-5 h-5 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Maior Saída (30d)</p>
-                    {isLoadingInsights ? (
-                      <Skeleton className="h-6 w-32 mt-1" />
-                    ) : insights?.maiorSaidaPrevista ? (
-                      <>
-                        <p className="text-lg font-bold text-red-600">{formatCurrency(insights.maiorSaidaPrevista.valor)}</p>
-                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">{insights.maiorSaidaPrevista.descricao}</p>
-                      </>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Sem saídas previstas</p>
-                    )}
-                  </div>
+          <Card data-testid="card-top-saidas">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-red-500/10">
+                  <CreditCard className="w-4 h-4 text-red-600" />
                 </div>
-                {insights?.maiorSaidaPrevista && (
-                  <Badge variant="secondary" className="text-xs">
-                    <Calendar className="w-3 h-3 mr-1" />
-                    {new Date(insights.maiorSaidaPrevista.data + 'T00:00:00').toLocaleDateString('pt-BR')}
-                  </Badge>
-                )}
+                <CardTitle className="text-base">Maiores Saídas - {periodoLabel}</CardTitle>
               </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingInsights ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-12" />)}
+                </div>
+              ) : !insightsPeriodo?.topSaidas || insightsPeriodo.topSaidas.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma saída no período</p>
+              ) : (
+                <div className="space-y-3">
+                  {insightsPeriodo.topSaidas.slice(0, 5).map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-red-500/5 border border-red-500/10">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{item.descricao}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                          <span>{formatDateFull(item.data)}</span>
+                          <span>•</span>
+                          <span className="truncate">{item.empresa}</span>
+                        </div>
+                      </div>
+                      <p className="text-red-600 font-bold ml-4">{formatCurrency(item.valor)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -359,54 +401,11 @@ export default function FluxoCaixa() {
           <CardHeader className="pb-4">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <CardTitle className="text-lg">Fluxo de Caixa</CardTitle>
+                <CardTitle className="text-lg">Fluxo Diário - {periodoLabel}</CardTitle>
                 <CardDescription>Evolução do saldo no período selecionado</CardDescription>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {(['mes-atual', 'proximo-mes', '30-dias', '60-dias'] as const).map((preset) => (
-                  <Button 
-                    key={preset}
-                    size="sm" 
-                    variant={activePreset === preset ? "default" : "outline"}
-                    onClick={() => setRangePreset(preset)} 
-                    data-testid={`btn-${preset}`}
-                  >
-                    {preset === 'mes-atual' ? 'Mês Atual' : 
-                     preset === 'proximo-mes' ? 'Próx. Mês' : 
-                     preset === '30-dias' ? '30 Dias' : '60 Dias'}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap items-end gap-4 mt-4 pt-4 border-t">
-              <div className="flex items-center gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="dataInicio" className="text-xs">Início</Label>
-                  <Input
-                    id="dataInicio"
-                    type="date"
-                    value={dataInicio}
-                    onChange={(e) => { setDataInicio(e.target.value); setActivePreset(''); }}
-                    className="w-36 h-9"
-                    data-testid="input-data-inicio"
-                  />
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground mt-6" />
-                <div className="space-y-1">
-                  <Label htmlFor="dataFim" className="text-xs">Fim</Label>
-                  <Input
-                    id="dataFim"
-                    type="date"
-                    value={dataFim}
-                    onChange={(e) => { setDataFim(e.target.value); setActivePreset(''); }}
-                    className="w-36 h-9"
-                    data-testid="input-data-fim"
-                  />
-                </div>
-              </div>
               
-              <div className="flex gap-4 ml-auto">
+              <div className="flex gap-4">
                 <div className="text-center px-4 py-2 rounded-lg bg-green-500/10">
                   <p className="text-xs text-muted-foreground">Entradas</p>
                   <p className="text-sm font-semibold text-green-600" data-testid="text-total-entradas">
@@ -431,19 +430,19 @@ export default function FluxoCaixa() {
           
           <CardContent>
             {isLoadingFluxo ? (
-              <div className="flex items-center justify-center h-[450px]">
+              <div className="flex items-center justify-center h-[400px]">
                 <Skeleton className="h-full w-full" />
               </div>
             ) : !chartData || chartData.length === 0 ? (
-              <div className="flex items-center justify-center h-[450px]">
+              <div className="flex items-center justify-center h-[400px]">
                 <p className="text-muted-foreground">Nenhum dado para o período selecionado</p>
               </div>
             ) : (
-              <div className="h-[450px] relative">
+              <div className="h-[400px] relative">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart 
                     data={chartData} 
-                    margin={{ top: 30, right: 90, left: 20, bottom: 50 }}
+                    margin={{ top: 20, right: 80, left: 20, bottom: 50 }}
                     barGap={2}
                     barCategoryGap="15%"
                   >
@@ -456,17 +455,6 @@ export default function FluxoCaixa() {
                         <stop offset="0%" stopColor="#ef4444" stopOpacity={1} />
                         <stop offset="100%" stopColor="#dc2626" stopOpacity={0.8} />
                       </linearGradient>
-                      <linearGradient id="gradientSaldo" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.05} />
-                      </linearGradient>
-                      <filter id="glow">
-                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-                        <feMerge>
-                          <feMergeNode in="coloredBlur"/>
-                          <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                      </filter>
                     </defs>
                     
                     <CartesianGrid 
@@ -518,130 +506,44 @@ export default function FluxoCaixa() {
                         boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.3)',
                         padding: '12px 16px',
                       }}
-                      itemStyle={{
-                        padding: '4px 0',
-                        fontSize: '13px',
-                      }}
                       formatter={(value: number, name: string) => {
                         const labels: Record<string, string> = {
                           entradas: 'Entradas',
                           saidas: 'Saídas',
-                          saldoAcumulado: 'Saldo Acumulado',
+                          saldoAcumulado: 'Saldo'
                         };
-                        const colors: Record<string, string> = {
-                          entradas: '#22c55e',
-                          saidas: '#ef4444',
-                          saldoAcumulado: '#06b6d4',
-                        };
-                        return [
-                          <span style={{ color: colors[name], fontWeight: 600 }}>{formatCurrency(value)}</span>,
-                          <span style={{ color: 'hsl(var(--muted-foreground))' }}>{labels[name] || name}</span>
-                        ];
+                        return [formatCurrency(value), labels[name] || name];
                       }}
-                      labelFormatter={(label) => (
-                        <span style={{ fontWeight: 600, fontSize: '14px', color: 'hsl(var(--foreground))' }}>
-                          {label}
-                        </span>
-                      )}
-                    />
-                    
-                    <Legend 
-                      verticalAlign="top"
-                      height={45}
-                      wrapperStyle={{ paddingBottom: '10px' }}
-                      iconType="rect"
-                      iconSize={12}
-                      formatter={(value) => {
-                        const labels: Record<string, string> = {
-                          entradas: 'Entradas',
-                          saidas: 'Saídas',
-                          saldoAcumulado: 'Saldo Acumulado',
-                        };
-                        return (
-                          <span style={{ 
-                            color: 'hsl(var(--foreground))', 
-                            fontSize: '13px', 
-                            fontWeight: 500,
-                            marginLeft: '4px'
-                          }}>
-                            {labels[value] || value}
-                          </span>
-                        );
-                      }}
-                    />
-                    
-                    <ReferenceLine 
-                      yAxisId="line" 
-                      y={0} 
-                      stroke="hsl(var(--border))" 
-                      strokeDasharray="5 5"
-                      strokeWidth={1}
-                    />
-                    
-                    <Area
-                      yAxisId="line"
-                      type="monotone"
-                      dataKey="saldoAcumulado"
-                      fill="url(#gradientSaldo)"
-                      stroke="none"
-                      name="areaFill"
-                      legendType="none"
+                      labelFormatter={(label) => `Data: ${label}`}
                     />
                     
                     <Bar 
                       yAxisId="bars"
                       dataKey="entradas" 
-                      fill="url(#gradientEntradas)"
-                      radius={[6, 6, 0, 0]}
                       name="entradas"
-                      maxBarSize={40}
+                      fill="url(#gradientEntradas)"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={20}
                     />
                     
                     <Bar 
                       yAxisId="bars"
                       dataKey="saidas" 
-                      fill="url(#gradientSaidas)"
-                      radius={[6, 6, 0, 0]}
                       name="saidas"
-                      maxBarSize={40}
+                      fill="url(#gradientSaidas)"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={20}
                     />
                     
-                    <Line
+                    <Line 
                       yAxisId="line"
-                      type="monotone"
-                      dataKey="saldoAcumulado"
-                      stroke="#06b6d4"
-                      strokeWidth={3}
-                      dot={({ cx, cy, payload, index }) => {
-                        const isFirst = index === 0;
-                        const isLast = index === chartData.length - 1;
-                        const isMinMax = payload.saldoAcumulado === Math.min(...chartData.map(d => d.saldoAcumulado)) ||
-                                        payload.saldoAcumulado === Math.max(...chartData.map(d => d.saldoAcumulado));
-                        
-                        if (isFirst || isLast || isMinMax) {
-                          return (
-                            <circle
-                              key={`dot-${index}`}
-                              cx={cx}
-                              cy={cy}
-                              r={5}
-                              fill="#06b6d4"
-                              stroke="#fff"
-                              strokeWidth={2}
-                              filter="url(#glow)"
-                            />
-                          );
-                        }
-                        return <circle key={`dot-${index}`} cx={cx} cy={cy} r={0} />;
-                      }}
-                      activeDot={{ 
-                        r: 8, 
-                        fill: '#06b6d4', 
-                        stroke: '#fff', 
-                        strokeWidth: 3,
-                        filter: 'url(#glow)'
-                      }}
+                      type="monotone" 
+                      dataKey="saldoAcumulado" 
                       name="saldoAcumulado"
+                      stroke="#06b6d4" 
+                      strokeWidth={3}
+                      dot={false}
+                      activeDot={{ r: 6, fill: '#06b6d4', stroke: '#fff', strokeWidth: 2 }}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>

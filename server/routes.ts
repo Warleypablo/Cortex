@@ -687,6 +687,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/fluxo-caixa/insights-periodo", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string;
+      const dataFim = req.query.dataFim as string;
+      
+      if (!dataInicio || !dataFim) {
+        return res.status(400).json({ error: "dataInicio and dataFim are required" });
+      }
+
+      const insights = await storage.getFluxoCaixaInsightsPeriodo(dataInicio, dataFim);
+      res.json(insights);
+    } catch (error) {
+      console.error("[api] Error fetching fluxo caixa insights periodo:", error);
+      res.status(500).json({ error: "Failed to fetch fluxo caixa insights periodo" });
+    }
+  });
+
   app.get("/api/financeiro/resumo", async (req, res) => {
     try {
       const mesAno = req.query.mesAno as string | undefined;
