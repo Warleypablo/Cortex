@@ -233,7 +233,7 @@ export default function DashboardSDRs() {
         trend,
       };
     })
-    .sort((a, b) => b.mrr - a.mrr)
+    .sort((a, b) => b.reunioesRealizadas - a.reunioesRealizadas || b.mrr - a.mrr)
     .map((c, idx) => ({ ...c, position: idx + 1 }));
 
   const top3 = ranking.slice(0, 3);
@@ -667,15 +667,15 @@ export default function DashboardSDRs() {
                         
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
-                            <span className="text-slate-400 text-sm">MRR</span>
-                            <span className="text-2xl font-black text-emerald-400">
-                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(sdr.mrr)}
+                            <span className="text-slate-400 text-sm">Reuniões</span>
+                            <span className="text-2xl font-black text-cyan-400">
+                              {sdr.reunioesRealizadas}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-slate-400 text-xs">Reuniões</span>
-                            <span className="text-sm font-semibold text-cyan-400">
-                              {sdr.reunioesRealizadas}
+                            <span className="text-slate-400 text-xs">MRR</span>
+                            <span className="text-sm font-semibold text-emerald-400">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(sdr.mrr)}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
@@ -707,11 +707,11 @@ export default function DashboardSDRs() {
               <div className="grid grid-cols-12 gap-1 p-3 bg-slate-800/50 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
                 <div className="col-span-1">#</div>
                 <div className="col-span-2">SDR</div>
+                <div className="col-span-2 text-right text-cyan-400">Reuniões</div>
                 <div className="col-span-2 text-right">MRR Gerado</div>
                 <div className="col-span-2 text-right">Pontual</div>
                 <div className="col-span-1 text-right">Contr.</div>
-                <div className="col-span-1 text-right">Reun.</div>
-                <div className="col-span-2 text-right">Conversão</div>
+                <div className="col-span-1 text-right">Conversão</div>
                 <div className="col-span-1 text-right">Leads</div>
               </div>
 
@@ -748,7 +748,10 @@ export default function DashboardSDRs() {
                       <div className="col-span-2 font-medium text-white truncate text-xs">
                         {sdr.name}
                       </div>
-                      <div className="col-span-2 text-right font-bold text-emerald-400 text-xs">
+                      <div className="col-span-2 text-right font-black text-cyan-400 text-sm">
+                        {sdr.reunioesRealizadas}
+                      </div>
+                      <div className="col-span-2 text-right font-semibold text-emerald-400 text-xs">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(sdr.mrr)}
                       </div>
                       <div className="col-span-2 text-right font-semibold text-blue-400 text-xs">
@@ -757,10 +760,7 @@ export default function DashboardSDRs() {
                       <div className="col-span-1 text-right text-violet-400 text-xs font-semibold">
                         {sdr.contratos}
                       </div>
-                      <div className="col-span-1 text-right text-cyan-400 text-xs">
-                        {sdr.reunioesRealizadas}
-                      </div>
-                      <div className="col-span-2 text-right">
+                      <div className="col-span-1 text-right">
                         <Badge 
                           variant="outline" 
                           className={`text-[10px] border-0 px-1 ${
