@@ -111,6 +111,7 @@ const dashboardCategories = [
       { title: "Closers", url: "/dashboard/comercial/closers", icon: UserRound },
       { title: "SDRs", url: "/dashboard/comercial/sdrs", icon: Headphones },
       { title: "Detalhamento Closers", url: "/dashboard/comercial/detalhamento-closers", icon: UserSearch },
+      { title: "Detalhamento Vendas", url: "/dashboard/comercial/detalhamento-vendas", icon: BarChart3 },
       { title: "Análise de Vendas", url: "/dashboard/comercial/analise-vendas", icon: LineChart },
       { title: "Modo Apresentação", url: "/dashboard/comercial/apresentacao", icon: Tv },
     ],
