@@ -160,48 +160,48 @@ export default function DetalhamentoVendas() {
   const [orderDir, setOrderDir] = useState<string>("desc");
   const [utmType, setUtmType] = useState<string>("source");
 
-  const queryParams = new URLSearchParams({
+  const queryParamsObj = {
     dataInicio,
     dataFim,
     source,
     category,
     closer
-  }).toString();
+  };
 
   const { data: filtros } = useQuery<Filtros>({
     queryKey: ['/api/vendas/detalhamento/filtros']
   });
 
   const { data: metricas, isLoading: isLoadingMetricas } = useQuery<Metricas>({
-    queryKey: ['/api/vendas/detalhamento/metricas', queryParams]
+    queryKey: ['/api/vendas/detalhamento/metricas', queryParamsObj]
   });
 
   const { data: negocios, isLoading: isLoadingNegocios } = useQuery<Negocio[]>({
-    queryKey: ['/api/vendas/detalhamento/negocios', queryParams, orderBy, orderDir]
+    queryKey: ['/api/vendas/detalhamento/negocios', { ...queryParamsObj, orderBy, orderDir }]
   });
 
   const { data: porFonte } = useQuery<DistribuicaoItem[]>({
-    queryKey: ['/api/vendas/detalhamento/por-fonte', dataInicio, dataFim]
+    queryKey: ['/api/vendas/detalhamento/por-fonte', { dataInicio, dataFim }]
   });
 
   const { data: porCloser } = useQuery<DistribuicaoItem[]>({
-    queryKey: ['/api/vendas/detalhamento/por-closer', dataInicio, dataFim]
+    queryKey: ['/api/vendas/detalhamento/por-closer', { dataInicio, dataFim }]
   });
 
   const { data: evolucaoMensal } = useQuery<EvolucaoMensal[]>({
-    queryKey: ['/api/vendas/detalhamento/evolucao-mensal', dataInicio, dataFim]
+    queryKey: ['/api/vendas/detalhamento/evolucao-mensal', { dataInicio, dataFim }]
   });
 
   const { data: cicloVendas } = useQuery<CicloVendas[]>({
-    queryKey: ['/api/vendas/detalhamento/ciclo-vendas', dataInicio, dataFim]
+    queryKey: ['/api/vendas/detalhamento/ciclo-vendas', { dataInicio, dataFim }]
   });
 
   const { data: tipoContrato } = useQuery<TipoContrato[]>({
-    queryKey: ['/api/vendas/detalhamento/tipo-contrato', dataInicio, dataFim]
+    queryKey: ['/api/vendas/detalhamento/tipo-contrato', { dataInicio, dataFim }]
   });
 
   const { data: porUtm } = useQuery<{ utmValue: string; quantidade: number; mrr: number; pontual: number; total: number }[]>({
-    queryKey: ['/api/vendas/detalhamento/por-utm', dataInicio, dataFim, utmType]
+    queryKey: ['/api/vendas/detalhamento/por-utm', { dataInicio, dataFim, utmType }]
   });
 
   const resetFilters = () => {
