@@ -499,7 +499,7 @@ export default function PresentationMode() {
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 flex-1 flex flex-col justify-center p-6 lg:p-8">
+      <div className="relative z-10 flex-1 flex flex-col p-4 lg:p-6 overflow-y-auto">
         <AnimatePresence mode="wait">
           {currentView === 'closers' ? (
             <motion.div
@@ -508,210 +508,195 @@ export default function PresentationMode() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.4 }}
-              className="space-y-4"
+              className="space-y-3"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <motion.div 
                     className="relative"
                     animate={{ rotate: [0, 5, -5, 0] }}
                     transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
                   >
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 shadow-2xl shadow-violet-600/30">
-                      <Trophy className="w-10 h-10 text-white" />
+                    <div className="p-3 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 shadow-xl shadow-violet-600/30">
+                      <Trophy className="w-8 h-8 text-white" />
                     </div>
                     <motion.div
                       className="absolute -top-1 -right-1"
                       animate={{ scale: [1, 1.2, 1] }}
                       transition={{ duration: 1.5, repeat: Infinity }}
                     >
-                      <Sparkles className="w-5 h-5 text-yellow-400" />
+                      <Sparkles className="w-4 h-4 text-yellow-400" />
                     </motion.div>
                   </motion.div>
                   <div>
-                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-transparent">
+                    <h1 className="text-3xl lg:text-4xl font-black bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-transparent">
                       Dashboard Closers
                     </h1>
-                    <p className="text-slate-400 text-lg mt-1 capitalize">
+                    <p className="text-slate-400 text-sm capitalize">
                       {mesAtual}
                     </p>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <div className="text-2xl font-mono font-bold text-white">
+                  <div className="text-xl font-mono font-bold text-white">
                     {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                   </div>
-                  <div className="text-slate-400 text-xs">
+                  <div className="text-slate-400 text-[10px]">
                     {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-5 gap-4">
+              <div className="grid grid-cols-5 gap-3">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600/20 to-teal-600/10 border border-emerald-500/30 p-5"
+                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-600/20 to-teal-600/10 border border-emerald-500/30 p-3"
                 >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl" />
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Repeat className="w-5 h-5 text-emerald-400" />
-                      <span className="text-sm font-medium text-emerald-300">MRR Obtido</span>
-                    </div>
-                    {isLoadingClosers ? (
-                      <Skeleton className="h-10 w-32 bg-slate-700" />
-                    ) : (
-                      <motion.div 
-                        className="text-3xl lg:text-4xl font-black text-white"
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        key={closerMetrics?.mrrObtido}
-                      >
-                        {formatCurrencyCompact(closerMetrics?.mrrObtido || 0)}
-                      </motion.div>
-                    )}
+                  <div className="flex items-center gap-2 mb-1">
+                    <Repeat className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-medium text-emerald-300">MRR Obtido</span>
                   </div>
+                  {isLoadingClosers ? (
+                    <Skeleton className="h-8 w-24 bg-slate-700" />
+                  ) : (
+                    <motion.div 
+                      className="text-2xl lg:text-3xl font-black text-white"
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      key={closerMetrics?.mrrObtido}
+                    >
+                      {formatCurrencyCompact(closerMetrics?.mrrObtido || 0)}
+                    </motion.div>
+                  )}
                 </motion.div>
 
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/20 to-indigo-600/10 border border-blue-500/30 p-5"
+                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600/20 to-indigo-600/10 border border-blue-500/30 p-3"
                 >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl" />
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="w-5 h-5 text-blue-400" />
-                      <span className="text-sm font-medium text-blue-300">Pontual</span>
-                    </div>
-                    {isLoadingClosers ? (
-                      <Skeleton className="h-10 w-32 bg-slate-700" />
-                    ) : (
-                      <motion.div 
-                        className="text-3xl lg:text-4xl font-black text-white"
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        key={closerMetrics?.pontualObtido}
-                      >
-                        {formatCurrencyCompact(closerMetrics?.pontualObtido || 0)}
-                      </motion.div>
-                    )}
+                  <div className="flex items-center gap-2 mb-1">
+                    <DollarSign className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs font-medium text-blue-300">Pontual</span>
                   </div>
+                  {isLoadingClosers ? (
+                    <Skeleton className="h-8 w-24 bg-slate-700" />
+                  ) : (
+                    <motion.div 
+                      className="text-2xl lg:text-3xl font-black text-white"
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      key={closerMetrics?.pontualObtido}
+                    >
+                      {formatCurrencyCompact(closerMetrics?.pontualObtido || 0)}
+                    </motion.div>
+                  )}
                 </motion.div>
 
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600/20 to-purple-600/10 border border-violet-500/30 p-5"
+                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-violet-600/20 to-purple-600/10 border border-violet-500/30 p-3"
                 >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl" />
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Users className="w-5 h-5 text-violet-400" />
-                      <span className="text-sm font-medium text-violet-300">Reuniões</span>
-                    </div>
-                    {isLoadingClosers ? (
-                      <Skeleton className="h-10 w-20 bg-slate-700" />
-                    ) : (
-                      <motion.div 
-                        className="text-3xl lg:text-4xl font-black text-white"
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        key={closerMetrics?.reunioesRealizadas}
-                      >
-                        {closerMetrics?.reunioesRealizadas || 0}
-                      </motion.div>
-                    )}
+                  <div className="flex items-center gap-2 mb-1">
+                    <Users className="w-4 h-4 text-violet-400" />
+                    <span className="text-xs font-medium text-violet-300">Reuniões</span>
                   </div>
+                  {isLoadingClosers ? (
+                    <Skeleton className="h-8 w-16 bg-slate-700" />
+                  ) : (
+                    <motion.div 
+                      className="text-2xl lg:text-3xl font-black text-white"
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      key={closerMetrics?.reunioesRealizadas}
+                    >
+                      {closerMetrics?.reunioesRealizadas || 0}
+                    </motion.div>
+                  )}
                 </motion.div>
 
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600/20 to-orange-600/10 border border-amber-500/30 p-5"
+                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-600/20 to-orange-600/10 border border-amber-500/30 p-3"
                 >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl" />
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Handshake className="w-5 h-5 text-amber-400" />
-                      <span className="text-sm font-medium text-amber-300">Negócios</span>
-                    </div>
-                    {isLoadingClosers ? (
-                      <Skeleton className="h-10 w-20 bg-slate-700" />
-                    ) : (
-                      <motion.div 
-                        className="text-3xl lg:text-4xl font-black text-white"
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        key={closerMetrics?.negociosGanhos}
-                      >
-                        {closerMetrics?.negociosGanhos || 0}
-                      </motion.div>
-                    )}
+                  <div className="flex items-center gap-2 mb-1">
+                    <Handshake className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-medium text-amber-300">Negócios</span>
                   </div>
+                  {isLoadingClosers ? (
+                    <Skeleton className="h-8 w-16 bg-slate-700" />
+                  ) : (
+                    <motion.div 
+                      className="text-2xl lg:text-3xl font-black text-white"
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      key={closerMetrics?.negociosGanhos}
+                    >
+                      {closerMetrics?.negociosGanhos || 0}
+                    </motion.div>
+                  )}
                 </motion.div>
 
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5 }}
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-600/20 to-pink-600/10 border border-rose-500/30 p-5"
+                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-rose-600/20 to-pink-600/10 border border-rose-500/30 p-3"
                 >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl" />
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Target className="w-5 h-5 text-rose-400" />
-                      <span className="text-sm font-medium text-rose-300">Conversão</span>
-                    </div>
-                    {isLoadingClosers ? (
-                      <Skeleton className="h-10 w-20 bg-slate-700" />
-                    ) : (
-                      <motion.div 
-                        className="text-3xl lg:text-4xl font-black text-white"
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        key={closerMetrics?.taxaConversao}
-                      >
-                        {(closerMetrics?.taxaConversao || 0).toFixed(1)}%
-                      </motion.div>
-                    )}
+                  <div className="flex items-center gap-2 mb-1">
+                    <Target className="w-4 h-4 text-rose-400" />
+                    <span className="text-xs font-medium text-rose-300">Conversão</span>
                   </div>
+                  {isLoadingClosers ? (
+                    <Skeleton className="h-8 w-16 bg-slate-700" />
+                  ) : (
+                    <motion.div 
+                      className="text-2xl lg:text-3xl font-black text-white"
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      key={closerMetrics?.taxaConversao}
+                    >
+                      {(closerMetrics?.taxaConversao || 0).toFixed(1)}%
+                    </motion.div>
+                  )}
                 </motion.div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="lg:col-span-2">
-                  <div className="mb-4 flex items-center gap-2">
-                    <Trophy className="w-6 h-6 text-yellow-400" />
-                    <h2 className="text-2xl font-bold text-white">Pódio</h2>
+                  <div className="mb-2 flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-yellow-400" />
+                    <h2 className="text-xl font-bold text-white">Pódio</h2>
                     <motion.div
                       animate={{ rotate: [0, 10, -10, 0] }}
                       transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
                     >
-                      <Flame className="w-5 h-5 text-orange-500" />
+                      <Flame className="w-4 h-4 text-orange-500" />
                     </motion.div>
                   </div>
 
                   {isLoadingClosers ? (
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-3 gap-3">
                       {[0, 1, 2].map(i => (
-                        <Skeleton key={i} className="h-64 bg-slate-800 rounded-2xl" />
+                        <Skeleton key={i} className="h-48 bg-slate-800 rounded-xl" />
                       ))}
                     </div>
                   ) : closerTop3.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-4 items-end">
+                    <div className="grid grid-cols-3 gap-3 items-end">
                       {[1, 0, 2].map((orderIndex) => {
                         const closer = closerTop3[orderIndex];
                         if (!closer) return <div key={orderIndex} />;
                         
                         const isFirst = closer.position === 1;
-                        const heights = { 0: 'h-96', 1: 'h-80', 2: 'h-72' };
+                        const heights = { 0: 'h-64', 1: 'h-56', 2: 'h-48' };
                         
                         return (
                           <motion.div
@@ -734,57 +719,56 @@ export default function PresentationMode() {
                                 </div>
                               )}
 
-                              <div className="relative p-5 h-full flex flex-col">
-                                <div className="flex items-center justify-between mb-4">
-                                  <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${
+                              <div className="relative p-3 h-full flex flex-col">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className={`flex items-center justify-center w-8 h-8 rounded-lg ${
                                     closer.position === 1 ? 'bg-yellow-500/20' :
                                     closer.position === 2 ? 'bg-gray-400/20' : 'bg-amber-600/20'
                                   }`}>
-                                    {getPositionIcon(closer.position)}
+                                    {closer.position === 1 && <Crown className="w-5 h-5 text-yellow-400" />}
+                                    {closer.position === 2 && <Medal className="w-4 h-4 text-gray-300" />}
+                                    {closer.position === 3 && <Medal className="w-4 h-4 text-amber-600" />}
                                   </div>
-                                  {getTrendIcon(closer.trend)}
-                                </div>
-
-                                <div className="flex-1">
-                                  <div className={`text-xs font-bold uppercase tracking-wider mb-1 ${
+                                  <div className={`text-[10px] font-bold uppercase ${
                                     closer.position === 1 ? 'text-yellow-400' :
                                     closer.position === 2 ? 'text-gray-300' : 'text-amber-500'
                                   }`}>
                                     {closer.position === 1 ? 'CAMPEÃO' : 
                                      closer.position === 2 ? 'VICE' : 'BRONZE'}
                                   </div>
-                                  <h3 className="text-xl lg:text-2xl font-bold text-white truncate mb-3">
-                                    {closer.name}
-                                  </h3>
+                                </div>
 
-                                  <div className="space-y-2">
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-400">MRR</span>
-                                      <span className="text-sm font-semibold text-emerald-400">
-                                        {formatCurrencyCompact(closer.mrr)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-xs text-slate-400">Pontual</span>
-                                      <span className="text-sm font-semibold text-blue-400">
-                                        {formatCurrencyCompact(closer.pontual)}
-                                      </span>
-                                    </div>
+                                <h3 className="text-sm lg:text-base font-bold text-white truncate mb-2">
+                                  {closer.name}
+                                </h3>
+
+                                <div className="space-y-1 flex-1">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] text-slate-400">MRR</span>
+                                    <span className="text-xs font-semibold text-emerald-400">
+                                      {formatCurrencyCompact(closer.mrr)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] text-slate-400">Pontual</span>
+                                    <span className="text-xs font-semibold text-blue-400">
+                                      {formatCurrencyCompact(closer.pontual)}
+                                    </span>
                                   </div>
                                 </div>
 
-                                <div className="mt-4 pt-4 border-t border-slate-700/50 grid grid-cols-3 gap-2 text-center">
+                                <div className="mt-2 pt-2 border-t border-slate-700/50 grid grid-cols-3 gap-1 text-center">
                                   <div>
-                                    <div className="text-lg font-bold text-white">{closer.reunioes}</div>
-                                    <div className="text-[10px] text-slate-400 uppercase">Reuniões</div>
+                                    <div className="text-sm font-bold text-white">{closer.reunioes}</div>
+                                    <div className="text-[8px] text-slate-400 uppercase">Reun.</div>
                                   </div>
                                   <div>
-                                    <div className="text-lg font-bold text-white">{closer.negocios}</div>
-                                    <div className="text-[10px] text-slate-400 uppercase">Fechados</div>
+                                    <div className="text-sm font-bold text-white">{closer.negocios}</div>
+                                    <div className="text-[8px] text-slate-400 uppercase">Fech.</div>
                                   </div>
                                   <div>
-                                    <div className="text-lg font-bold text-white">{closer.taxa.toFixed(0)}%</div>
-                                    <div className="text-[10px] text-slate-400 uppercase">Conversão</div>
+                                    <div className="text-sm font-bold text-white">{closer.taxa.toFixed(0)}%</div>
+                                    <div className="text-[8px] text-slate-400 uppercase">Conv.</div>
                                   </div>
                                 </div>
                               </div>
@@ -801,22 +785,22 @@ export default function PresentationMode() {
                 </div>
 
                 <div>
-                  <div className="mb-4 flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-violet-400" />
-                    <h2 className="text-xl font-bold text-white">Ranking Completo</h2>
+                  <div className="mb-2 flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-violet-400" />
+                    <h2 className="text-lg font-bold text-white">Ranking Completo</h2>
                   </div>
 
-                  <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
-                    <div className="grid grid-cols-12 gap-1 p-2 bg-slate-800/50 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl overflow-hidden">
+                    <div className="grid grid-cols-12 gap-1 p-1.5 bg-slate-800/50 text-[8px] font-semibold text-slate-400 uppercase tracking-wider">
                       <div className="col-span-1">#</div>
                       <div className="col-span-3">Closer</div>
                       <div className="col-span-2 text-right">MRR</div>
-                      <div className="col-span-2 text-right">Pontual</div>
+                      <div className="col-span-2 text-right">Pont.</div>
                       <div className="col-span-2 text-right">Total</div>
                       <div className="col-span-2 text-right">Reun.</div>
                     </div>
 
-                    <div className="divide-y divide-slate-800/50 max-h-[320px] overflow-y-auto">
+                    <div className="divide-y divide-slate-800/50 max-h-[180px] overflow-y-auto">
                       {isLoadingClosers ? (
                         Array.from({ length: 5 }).map((_, i) => (
                           <div key={i} className="p-2">
@@ -932,52 +916,31 @@ export default function PresentationMode() {
 
               {/* BARRA DE META */}
               <motion.div 
-                className="mt-4 relative"
+                className="mt-2 relative"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5, duration: 0.6 }}
               >
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/50 p-6">
-                  <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute -top-20 -left-20 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl" />
-                    <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl" />
-                    {(() => {
-                      const META_MRR = 180000;
-                      const mrrAtual = closerMetrics?.mrrObtido || 0;
-                      const percentual = Math.min((mrrAtual / META_MRR) * 100, 100);
-                      
-                      if (percentual >= 100) {
-                        return (
-                          <motion.div
-                            className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-yellow-500/10 to-emerald-500/5"
-                            animate={{ opacity: [0.3, 0.6, 0.3] }}
-                            transition={{ duration: 2, repeat: Infinity }}
-                          />
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-
+                <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/50 p-3">
                   <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
                         <motion.div 
-                          className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30"
+                          className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30"
                           animate={{ scale: [1, 1.05, 1] }}
                           transition={{ duration: 2, repeat: Infinity }}
                         >
-                          <Target className="w-6 h-6 text-white" />
+                          <Target className="w-4 h-4 text-white" />
                         </motion.div>
                         <div>
-                          <h2 className="text-2xl font-black text-white">META DO MÊS</h2>
-                          <p className="text-slate-400 text-sm">Receita Recorrente (MRR)</p>
+                          <h2 className="text-lg font-black text-white">META DO MÊS</h2>
+                          <p className="text-slate-400 text-[10px]">Receita Recorrente (MRR)</p>
                         </div>
                       </div>
                       
                       <div className="text-right">
-                        <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Meta</div>
-                        <div className="text-3xl font-black text-white">R$ 180k</div>
+                        <div className="text-[10px] text-slate-400 uppercase tracking-wider">Meta</div>
+                        <div className="text-xl font-black text-white">R$ 180k</div>
                       </div>
                     </div>
 
@@ -990,9 +953,9 @@ export default function PresentationMode() {
                       
                       return (
                         <>
-                          <div className="relative h-12 bg-slate-800/80 rounded-xl overflow-hidden border border-slate-700/50">
+                          <div className="relative h-8 bg-slate-800/80 rounded-lg overflow-hidden border border-slate-700/50">
                             <motion.div
-                              className={`absolute inset-y-0 left-0 rounded-xl ${
+                              className={`absolute inset-y-0 left-0 rounded-lg ${
                                 atingida 
                                   ? 'bg-gradient-to-r from-emerald-500 via-yellow-400 to-emerald-500'
                                   : percentual >= 80 
@@ -1014,7 +977,7 @@ export default function PresentationMode() {
                             
                             <div className="absolute inset-0 flex items-center justify-center">
                               <motion.span 
-                                className="text-2xl font-black text-white drop-shadow-lg"
+                                className="text-lg font-black text-white drop-shadow-lg"
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
                                 transition={{ delay: 1.5, type: "spring", stiffness: 200 }}
@@ -1022,22 +985,14 @@ export default function PresentationMode() {
                                 {percentual.toFixed(1)}%
                               </motion.span>
                             </div>
-
-                            {[25, 50, 75, 100].map((milestone) => (
-                              <div
-                                key={milestone}
-                                className="absolute top-0 bottom-0 w-px bg-slate-600/50"
-                                style={{ left: `${milestone}%` }}
-                              />
-                            ))}
                           </div>
 
-                          <div className="flex items-center justify-between mt-4">
-                            <div className="flex items-center gap-6">
+                          <div className="flex items-center justify-between mt-2">
+                            <div className="flex items-center gap-4">
                               <div>
-                                <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Conquistado</div>
+                                <div className="text-[10px] text-slate-400 uppercase">Conquistado</div>
                                 <motion.div 
-                                  className="text-3xl font-black text-emerald-400"
+                                  className="text-xl font-black text-emerald-400"
                                   initial={{ opacity: 0 }}
                                   animate={{ opacity: 1 }}
                                   transition={{ delay: 0.8 }}
@@ -1048,9 +1003,9 @@ export default function PresentationMode() {
                               
                               {!atingida && (
                                 <div>
-                                  <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Faltam</div>
+                                  <div className="text-[10px] text-slate-400 uppercase">Faltam</div>
                                   <motion.div 
-                                    className="text-3xl font-black text-amber-400"
+                                    className="text-xl font-black text-amber-400"
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     transition={{ delay: 1 }}
@@ -1067,35 +1022,25 @@ export default function PresentationMode() {
                               transition={{ delay: 1.2, type: "spring" }}
                             >
                               {atingida ? (
-                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30">
-                                  <motion.div
-                                    animate={{ rotate: [0, 10, -10, 0] }}
-                                    transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
-                                  >
-                                    <Trophy className="w-6 h-6 text-yellow-400" />
-                                  </motion.div>
-                                  <span className="text-xl font-black text-emerald-400">META BATIDA!</span>
-                                  <motion.div
-                                    animate={{ scale: [1, 1.3, 1] }}
-                                    transition={{ duration: 1, repeat: Infinity }}
-                                  >
-                                    <Sparkles className="w-5 h-5 text-yellow-400" />
-                                  </motion.div>
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30">
+                                  <Trophy className="w-4 h-4 text-yellow-400" />
+                                  <span className="text-sm font-black text-emerald-400">META BATIDA!</span>
+                                  <Sparkles className="w-4 h-4 text-yellow-400" />
                                 </div>
                               ) : percentual >= 80 ? (
-                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30">
-                                  <Flame className="w-5 h-5 text-orange-400" />
-                                  <span className="text-lg font-bold text-emerald-400">Quase lá!</span>
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30">
+                                  <Flame className="w-4 h-4 text-orange-400" />
+                                  <span className="text-sm font-bold text-emerald-400">Quase lá!</span>
                                 </div>
                               ) : percentual >= 50 ? (
-                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/30">
-                                  <TrendingUp className="w-5 h-5 text-amber-400" />
-                                  <span className="text-lg font-bold text-amber-400">Bom progresso!</span>
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30">
+                                  <TrendingUp className="w-4 h-4 text-amber-400" />
+                                  <span className="text-sm font-bold text-amber-400">Bom progresso!</span>
                                 </div>
                               ) : (
-                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-500/20 border border-rose-500/30">
-                                  <Zap className="w-5 h-5 text-rose-400" />
-                                  <span className="text-lg font-bold text-rose-400">Hora de acelerar!</span>
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/20 border border-rose-500/30">
+                                  <Zap className="w-4 h-4 text-rose-400" />
+                                  <span className="text-sm font-bold text-rose-400">Hora de acelerar!</span>
                                 </div>
                               )}
                             </motion.div>
