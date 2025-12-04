@@ -33,18 +33,30 @@ interface DebugData {
 }
 
 const AVAILABLE_ROUTES = [
-  { path: '/', label: 'Clientes' },
-  { path: '/contratos', label: 'Contratos' },
-  { path: '/colaboradores', label: 'Colaboradores' },
-  { path: '/colaboradores/analise', label: 'Análise de Colaboradores' },
-  { path: '/patrimonio', label: 'Patrimônio' },
-  { path: '/ferramentas', label: 'Ferramentas' },
-  { path: '/visao-geral', label: 'Visão Geral' },
-  { path: '/dashboard/financeiro', label: 'Dashboard Financeiro' },
-  { path: '/dashboard/geg', label: 'Dashboard G&G' },
-  { path: '/dashboard/retencao', label: 'Análise de Retenção' },
-  { path: '/dashboard/dfc', label: 'DFC' },
-  { path: '/admin/usuarios', label: 'Gerenciar Usuários' },
+  { path: '/', label: 'Clientes', category: 'Menu Principal' },
+  { path: '/contratos', label: 'Contratos', category: 'Menu Principal' },
+  { path: '/colaboradores', label: 'Colaboradores', category: 'Menu Principal' },
+  { path: '/patrimonio', label: 'Patrimônio', category: 'Menu Principal' },
+  { path: '/ferramentas', label: 'Ferramentas', category: 'Menu Principal' },
+  { path: '/turbozap', label: 'TurboZap', category: 'Menu Principal' },
+  { path: '/dashboard/financeiro', label: 'Visão Geral', category: 'Financeiro' },
+  { path: '/dashboard/dfc', label: 'DFC', category: 'Financeiro' },
+  { path: '/dashboard/fluxo-caixa', label: 'Fluxo de Caixa', category: 'Financeiro' },
+  { path: '/dashboard/inadimplencia', label: 'Inadimplência', category: 'Financeiro' },
+  { path: '/dashboard/auditoria-sistemas', label: 'Auditoria de Sistemas', category: 'Financeiro' },
+  { path: '/dashboard/geg', label: 'Visão Geral', category: 'G&G' },
+  { path: '/dashboard/inhire', label: 'Inhire', category: 'G&G' },
+  { path: '/dashboard/recrutamento', label: 'Recrutamento', category: 'G&G' },
+  { path: '/visao-geral', label: 'Visão Geral', category: 'Operação' },
+  { path: '/dashboard/retencao', label: 'Análise de Retenção', category: 'Operação' },
+  { path: '/dashboard/meta-ads', label: 'Meta Ads', category: 'Operação' },
+  { path: '/dashboard/tech', label: 'Projetos', category: 'Tech' },
+  { path: '/dashboard/comercial/closers', label: 'Closers', category: 'Comercial' },
+  { path: '/dashboard/comercial/sdrs', label: 'SDRs', category: 'Comercial' },
+  { path: '/dashboard/comercial/detalhamento-closers', label: 'Detalhamento Closers', category: 'Comercial' },
+  { path: '/dashboard/comercial/analise-vendas', label: 'Análise de Vendas', category: 'Comercial' },
+  { path: '/dashboard/comercial/apresentacao', label: 'Modo Apresentação', category: 'Comercial' },
+  { path: '/admin/usuarios', label: 'Gerenciar Usuários', category: 'Administração' },
 ];
 
 function EditPermissionsDialog({ user, open, onOpenChange }: {
@@ -129,21 +141,34 @@ function EditPermissionsDialog({ user, open, onOpenChange }: {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {AVAILABLE_ROUTES.map((route) => (
-              <div key={route.path} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`route-${route.path}`}
-                  checked={selectedRoutes.includes(route.path)}
-                  onCheckedChange={() => handleToggleRoute(route.path)}
-                  data-testid={`checkbox-${route.path}`}
-                />
-                <Label
-                  htmlFor={`route-${route.path}`}
-                  className="text-sm font-normal cursor-pointer"
-                >
-                  {route.label}
-                </Label>
+          <div className="space-y-6">
+            {Object.entries(
+              AVAILABLE_ROUTES.reduce((acc, route) => {
+                if (!acc[route.category]) acc[route.category] = [];
+                acc[route.category].push(route);
+                return acc;
+              }, {} as Record<string, typeof AVAILABLE_ROUTES>)
+            ).map(([category, routes]) => (
+              <div key={category}>
+                <h4 className="text-sm font-semibold text-muted-foreground mb-3">{category}</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {routes.map((route) => (
+                    <div key={route.path} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`route-${route.path}`}
+                        checked={selectedRoutes.includes(route.path)}
+                        onCheckedChange={() => handleToggleRoute(route.path)}
+                        data-testid={`checkbox-${route.path}`}
+                      />
+                      <Label
+                        htmlFor={`route-${route.path}`}
+                        className="text-sm font-normal cursor-pointer"
+                      >
+                        {route.label}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
