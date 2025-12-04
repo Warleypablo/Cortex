@@ -39,6 +39,7 @@ interface CloserMetrics {
   pontualObtido: number;
   reunioesRealizadas: number;
   negociosGanhos: number;
+  leadsCriados: number;
   taxaConversao: number;
 }
 
@@ -83,6 +84,8 @@ export default function DashboardClosers() {
   const [dataReuniaoFim, setDataReuniaoFim] = useState<string>("");
   const [dataFechamentoInicio, setDataFechamentoInicio] = useState<string>(inicioMes);
   const [dataFechamentoFim, setDataFechamentoFim] = useState<string>(fimMes);
+  const [dataLeadInicio, setDataLeadInicio] = useState<string>("");
+  const [dataLeadFim, setDataLeadFim] = useState<string>("");
   const [source, setSource] = useState<string>("all");
   const [pipeline, setPipeline] = useState<string>("all");
   const [closerId, setCloserId] = useState<string>("all");
@@ -127,6 +130,8 @@ export default function DashboardClosers() {
     if (dataReuniaoFim) params.append("dataReuniaoFim", dataReuniaoFim);
     if (dataFechamentoInicio) params.append("dataFechamentoInicio", dataFechamentoInicio);
     if (dataFechamentoFim) params.append("dataFechamentoFim", dataFechamentoFim);
+    if (dataLeadInicio) params.append("dataLeadInicio", dataLeadInicio);
+    if (dataLeadFim) params.append("dataLeadFim", dataLeadFim);
     if (source && source !== "all") params.append("source", source);
     if (pipeline && pipeline !== "all") params.append("pipeline", pipeline);
     if (closerId && closerId !== "all") params.append("closerId", closerId);
@@ -183,6 +188,8 @@ export default function DashboardClosers() {
     setDataReuniaoFim("");
     setDataFechamentoInicio(inicioMesAtual);
     setDataFechamentoFim(fimMesAtual);
+    setDataLeadInicio("");
+    setDataLeadFim("");
     setSource("all");
     setPipeline("all");
     setCloserId("all");
@@ -270,6 +277,7 @@ export default function DashboardClosers() {
   const isLoading = isLoadingMetrics || isLoadingChart1 || isLoadingChart2;
 
   const hasActiveFilters = dataReuniaoInicio || dataReuniaoFim || 
+    dataLeadInicio || dataLeadFim ||
     (source && source !== "all") || 
     (pipeline && pipeline !== "all") || (closerId && closerId !== "all");
 
@@ -386,7 +394,7 @@ export default function DashboardClosers() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                      <Filter className="w-4 h-4" /> Filtros
+                      <Filter className="w-4 h-4" /> Filtros Independentes
                     </span>
                     <Button
                       variant="ghost"
@@ -397,100 +405,154 @@ export default function DashboardClosers() {
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-400">Reunião (Início)</Label>
-                      <Input
-                        type="date"
-                        value={dataReuniaoInicio}
-                        onChange={(e) => setDataReuniaoInicio(e.target.value)}
-                        className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                        data-testid="input-data-reuniao-inicio"
-                      />
+                  
+                  <div className="space-y-4">
+                    {/* Date filters organized by metric type */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Reuniões filter */}
+                      <div className="p-3 rounded-lg bg-violet-500/10 border border-violet-500/30">
+                        <div className="text-xs font-medium text-violet-300 mb-2 flex items-center gap-1">
+                          <Handshake className="w-3 h-3" /> Reuniões Realizadas
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-400">Início</Label>
+                            <Input
+                              type="date"
+                              value={dataReuniaoInicio}
+                              onChange={(e) => setDataReuniaoInicio(e.target.value)}
+                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                              data-testid="input-data-reuniao-inicio"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-400">Fim</Label>
+                            <Input
+                              type="date"
+                              value={dataReuniaoFim}
+                              onChange={(e) => setDataReuniaoFim(e.target.value)}
+                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                              data-testid="input-data-reuniao-fim"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Negócios Fechados filter */}
+                      <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                        <div className="text-xs font-medium text-emerald-300 mb-2 flex items-center gap-1">
+                          <Target className="w-3 h-3" /> Negócios Fechados / MRR / Pontual
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-400">Início</Label>
+                            <Input
+                              type="date"
+                              value={dataFechamentoInicio}
+                              onChange={(e) => setDataFechamentoInicio(e.target.value)}
+                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                              data-testid="input-data-fechamento-inicio"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-400">Fim</Label>
+                            <Input
+                              type="date"
+                              value={dataFechamentoFim}
+                              onChange={(e) => setDataFechamentoFim(e.target.value)}
+                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                              data-testid="input-data-fechamento-fim"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Leads Criados filter */}
+                      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                        <div className="text-xs font-medium text-blue-300 mb-2 flex items-center gap-1">
+                          <Users className="w-3 h-3" /> Leads Criados
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-400">Início</Label>
+                            <Input
+                              type="date"
+                              value={dataLeadInicio}
+                              onChange={(e) => setDataLeadInicio(e.target.value)}
+                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                              data-testid="input-data-lead-inicio"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-400">Fim</Label>
+                            <Input
+                              type="date"
+                              value={dataLeadFim}
+                              onChange={(e) => setDataLeadFim(e.target.value)}
+                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                              data-testid="input-data-lead-fim"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-400">Reunião (Fim)</Label>
-                      <Input
-                        type="date"
-                        value={dataReuniaoFim}
-                        onChange={(e) => setDataReuniaoFim(e.target.value)}
-                        className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                        data-testid="input-data-reuniao-fim"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-400">Fechamento (Início)</Label>
-                      <Input
-                        type="date"
-                        value={dataFechamentoInicio}
-                        onChange={(e) => setDataFechamentoInicio(e.target.value)}
-                        className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                        data-testid="input-data-fechamento-inicio"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-400">Fechamento (Fim)</Label>
-                      <Input
-                        type="date"
-                        value={dataFechamentoFim}
-                        onChange={(e) => setDataFechamentoFim(e.target.value)}
-                        className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                        data-testid="input-data-fechamento-fim"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-400">Fonte</Label>
-                      <Select value={source} onValueChange={setSource}>
-                        <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-source">
-                          <SelectValue placeholder="Todas" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-700">
-                          <SelectItem value="all">Todas</SelectItem>
-                          {sources?.filter(s => s && s.trim() !== '').map((s) => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-400">Pipeline</Label>
-                      <Select value={pipeline} onValueChange={setPipeline}>
-                        <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-pipeline">
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-700">
-                          <SelectItem value="all">Todos</SelectItem>
-                          {pipelines?.filter(p => p && p.trim() !== '').map((p) => (
-                            <SelectItem key={p} value={p}>{p}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-400">Closer</Label>
-                      <Select value={closerId} onValueChange={setCloserId}>
-                        <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-closer">
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-700">
-                          <SelectItem value="all">Todos</SelectItem>
-                          {closers?.filter(c => c && c.name && c.name.trim() !== '').map((c) => (
-                            <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-end">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={clearFilters}
-                        className="w-full h-8 border-slate-700 bg-slate-800 hover:bg-slate-700 text-white"
-                        data-testid="button-clear-filters"
-                      >
-                        <RotateCcw className="w-3 h-3 mr-1" />
-                        Limpar
-                      </Button>
+
+                    {/* Other filters */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-400">Fonte</Label>
+                        <Select value={source} onValueChange={setSource}>
+                          <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-source">
+                            <SelectValue placeholder="Todas" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-800 border-slate-700">
+                            <SelectItem value="all">Todas</SelectItem>
+                            {sources?.filter(s => s && s.trim() !== '').map((s) => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-400">Pipeline</Label>
+                        <Select value={pipeline} onValueChange={setPipeline}>
+                          <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-pipeline">
+                            <SelectValue placeholder="Todos" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-800 border-slate-700">
+                            <SelectItem value="all">Todos</SelectItem>
+                            {pipelines?.filter(p => p && p.trim() !== '').map((p) => (
+                              <SelectItem key={p} value={p}>{p}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-400">Closer</Label>
+                        <Select value={closerId} onValueChange={setCloserId}>
+                          <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-closer">
+                            <SelectValue placeholder="Todos" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-800 border-slate-700">
+                            <SelectItem value="all">Todos</SelectItem>
+                            {closers?.filter(c => c && c.name && c.name.trim() !== '').map((c) => (
+                              <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-end">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={clearFilters}
+                          className="w-full h-8 border-slate-700 bg-slate-800 hover:bg-slate-700 text-white"
+                          data-testid="button-clear-filters"
+                        >
+                          <RotateCcw className="w-3 h-3 mr-1" />
+                          Limpar
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

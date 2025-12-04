@@ -73,6 +73,8 @@ export default function DashboardSDRs() {
 
   const [dataReuniaoInicio, setDataReuniaoInicio] = useState<string>(inicioMes);
   const [dataReuniaoFim, setDataReuniaoFim] = useState<string>(fimMes);
+  const [dataLeadInicio, setDataLeadInicio] = useState<string>("");
+  const [dataLeadFim, setDataLeadFim] = useState<string>("");
   const [source, setSource] = useState<string>("all");
   const [pipeline, setPipeline] = useState<string>("all");
   const [sdrId, setSdrId] = useState<string>("all");
@@ -117,6 +119,8 @@ export default function DashboardSDRs() {
     const params = new URLSearchParams();
     if (dataReuniaoInicio) params.append("dataReuniaoInicio", dataReuniaoInicio);
     if (dataReuniaoFim) params.append("dataReuniaoFim", dataReuniaoFim);
+    if (dataLeadInicio) params.append("dataLeadInicio", dataLeadInicio);
+    if (dataLeadFim) params.append("dataLeadFim", dataLeadFim);
     if (source && source !== "all") params.append("source", source);
     if (pipeline && pipeline !== "all") params.append("pipeline", pipeline);
     if (sdrId && sdrId !== "all") params.append("sdrId", sdrId);
@@ -162,6 +166,8 @@ export default function DashboardSDRs() {
     
     setDataReuniaoInicio(inicioMesAtual);
     setDataReuniaoFim(fimMesAtual);
+    setDataLeadInicio("");
+    setDataLeadFim("");
     setSource("all");
     setPipeline("all");
     setSdrId("all");
@@ -343,7 +349,7 @@ export default function DashboardSDRs() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                      <Filter className="w-4 h-4" /> Filtros
+                      <Filter className="w-4 h-4" /> Filtros Independentes
                     </span>
                     <Button
                       variant="ghost"
@@ -354,80 +360,125 @@ export default function DashboardSDRs() {
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-400">Reunião (Início)</Label>
-                      <Input
-                        type="date"
-                        value={dataReuniaoInicio}
-                        onChange={(e) => setDataReuniaoInicio(e.target.value)}
-                        className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                        data-testid="input-data-reuniao-inicio"
-                      />
+                  
+                  <div className="space-y-4">
+                    {/* Date filters organized by metric type */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Reuniões filter */}
+                      <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+                        <div className="text-xs font-medium text-cyan-300 mb-2 flex items-center gap-1">
+                          <CalendarCheck className="w-3 h-3" /> Reuniões Realizadas
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-400">Início</Label>
+                            <Input
+                              type="date"
+                              value={dataReuniaoInicio}
+                              onChange={(e) => setDataReuniaoInicio(e.target.value)}
+                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                              data-testid="input-data-reuniao-inicio"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-400">Fim</Label>
+                            <Input
+                              type="date"
+                              value={dataReuniaoFim}
+                              onChange={(e) => setDataReuniaoFim(e.target.value)}
+                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                              data-testid="input-data-reuniao-fim"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Leads Criados filter */}
+                      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                        <div className="text-xs font-medium text-blue-300 mb-2 flex items-center gap-1">
+                          <Users className="w-3 h-3" /> Leads Criados
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-400">Início</Label>
+                            <Input
+                              type="date"
+                              value={dataLeadInicio}
+                              onChange={(e) => setDataLeadInicio(e.target.value)}
+                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                              data-testid="input-data-lead-inicio"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-400">Fim</Label>
+                            <Input
+                              type="date"
+                              value={dataLeadFim}
+                              onChange={(e) => setDataLeadFim(e.target.value)}
+                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
+                              data-testid="input-data-lead-fim"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-400">Reunião (Fim)</Label>
-                      <Input
-                        type="date"
-                        value={dataReuniaoFim}
-                        onChange={(e) => setDataReuniaoFim(e.target.value)}
-                        className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                        data-testid="input-data-reuniao-fim"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-400">Origem</Label>
-                      <Select value={source} onValueChange={setSource}>
-                        <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-source">
-                          <SelectValue placeholder="Todas" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-700">
-                          <SelectItem value="all">Todas</SelectItem>
-                          {sources?.map((s) => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-400">Pipeline</Label>
-                      <Select value={pipeline} onValueChange={setPipeline}>
-                        <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-pipeline">
-                          <SelectValue placeholder="Todas" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-700">
-                          <SelectItem value="all">Todas</SelectItem>
-                          {pipelines?.map((p) => (
-                            <SelectItem key={p} value={p}>{p}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-400">SDR</Label>
-                      <Select value={sdrId} onValueChange={setSdrId}>
-                        <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-sdr">
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-slate-800 border-slate-700">
-                          <SelectItem value="all">Todos</SelectItem>
-                          {sdrs?.filter(s => s.active).map((s) => (
-                            <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={clearFilters}
-                        className="h-8 border-slate-700 text-slate-300 hover:bg-slate-700 w-full"
-                        data-testid="button-clear-filters"
-                      >
-                        <RotateCcw className="w-3 h-3 mr-1" />
-                        Limpar
-                      </Button>
+
+                    {/* Other filters */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-400">Origem</Label>
+                        <Select value={source} onValueChange={setSource}>
+                          <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-source">
+                            <SelectValue placeholder="Todas" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-800 border-slate-700">
+                            <SelectItem value="all">Todas</SelectItem>
+                            {sources?.map((s) => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-400">Pipeline</Label>
+                        <Select value={pipeline} onValueChange={setPipeline}>
+                          <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-pipeline">
+                            <SelectValue placeholder="Todas" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-800 border-slate-700">
+                            <SelectItem value="all">Todas</SelectItem>
+                            {pipelines?.map((p) => (
+                              <SelectItem key={p} value={p}>{p}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-400">SDR</Label>
+                        <Select value={sdrId} onValueChange={setSdrId}>
+                          <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-sdr">
+                            <SelectValue placeholder="Todos" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-800 border-slate-700">
+                            <SelectItem value="all">Todos</SelectItem>
+                            {sdrs?.filter(s => s.active).map((s) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={clearFilters}
+                          className="h-8 border-slate-700 text-slate-300 hover:bg-slate-700 w-full"
+                          data-testid="button-clear-filters"
+                        >
+                          <RotateCcw className="w-3 h-3 mr-1" />
+                          Limpar
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

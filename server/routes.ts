@@ -1786,64 +1786,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dataReuniaoFim, 
         dataFechamentoInicio, 
         dataFechamentoFim,
+        dataLeadInicio,
+        dataLeadFim,
         source,
         pipeline,
         closerId
       } = req.query;
 
-      const conditions: ReturnType<typeof sql>[] = [];
-
-      if (dataReuniaoInicio) {
-        conditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
-      }
-      if (dataReuniaoFim) {
-        conditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
-      }
-      if (dataFechamentoInicio) {
-        conditions.push(sql`d.data_fechamento >= ${dataFechamentoInicio}`);
-      }
-      if (dataFechamentoFim) {
-        conditions.push(sql`d.data_fechamento <= ${dataFechamentoFim}`);
-      }
+      // Shared conditions (source, pipeline, closerId) - applied to all queries
+      const sharedConditions: ReturnType<typeof sql>[] = [];
       if (source) {
-        conditions.push(sql`d.source = ${source}`);
+        sharedConditions.push(sql`d.source = ${source}`);
       }
       if (pipeline) {
-        conditions.push(sql`d.category_name = ${pipeline}`);
+        sharedConditions.push(sql`d.category_name = ${pipeline}`);
       }
       if (closerId) {
-        conditions.push(sql`d.closer = ${closerId}`);
+        sharedConditions.push(sql`d.closer = ${closerId}`);
       }
 
-      const whereClause = conditions.length > 0 
-        ? sql`WHERE ${sql.join(conditions, sql` AND `)}` 
-        : sql``;
-
-      console.log("[closers/metrics] Executing metrics query...");
+      console.log("[closers/metrics] Executing independent metrics queries...");
       
-      const result = await db.execute(sql`
-        SELECT 
-          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_recorrente ELSE 0 END), 0) as mrr_obtido,
-          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_pontual ELSE 0 END), 0) as pontual_obtido,
-          COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes_realizadas,
-          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios_ganhos
+      // Query 1: Reuniões realizadas - filtered ONLY by reunion dates
+      const reunioesConditions = [...sharedConditions];
+      reunioesConditions.push(sql`d.data_reuniao_realizada IS NOT NULL`);
+      if (dataReuniaoInicio) {
+        reunioesConditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
+      }
+      if (dataReuniaoFim) {
+        reunioesConditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
+      }
+      const whereClauseReunioes = sql`WHERE ${sql.join(reunioesConditions, sql` AND `)}`;
+      
+      const resultReunioes = await db.execute(sql`
+        SELECT COUNT(*) as reunioes_realizadas
         FROM crm_deal d
         LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
-        ${whereClause}
+        ${whereClauseReunioes}
+      `);
+
+      // Query 2: Negócios ganhos, MRR e Pontual - filtered ONLY by closing dates
+      const negociosConditions = [...sharedConditions];
+      negociosConditions.push(sql`d.stage_name = 'Negócio Ganho'`);
+      if (dataFechamentoInicio) {
+        negociosConditions.push(sql`d.data_fechamento >= ${dataFechamentoInicio}`);
+      }
+      if (dataFechamentoFim) {
+        negociosConditions.push(sql`d.data_fechamento <= ${dataFechamentoFim}`);
+      }
+      const whereClauseNegocios = sql`WHERE ${sql.join(negociosConditions, sql` AND `)}`;
+
+      const resultNegocios = await db.execute(sql`
+        SELECT 
+          COALESCE(SUM(d.valor_recorrente), 0) as mrr_obtido,
+          COALESCE(SUM(d.valor_pontual), 0) as pontual_obtido,
+          COUNT(*) as negocios_ganhos
+        FROM crm_deal d
+        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        ${whereClauseNegocios}
+      `);
+
+      // Query 3: Leads criados - filtered ONLY by lead creation dates
+      const leadsConditions = [...sharedConditions];
+      if (dataLeadInicio) {
+        leadsConditions.push(sql`d.date_create >= ${dataLeadInicio}`);
+      }
+      if (dataLeadFim) {
+        leadsConditions.push(sql`d.date_create <= ${dataLeadFim}`);
+      }
+      const whereClauseLeads = leadsConditions.length > 0 
+        ? sql`WHERE ${sql.join(leadsConditions, sql` AND `)}` 
+        : sql``;
+
+      const resultLeads = await db.execute(sql`
+        SELECT COUNT(DISTINCT d.id) as leads_criados
+        FROM crm_deal d
+        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        ${whereClauseLeads}
       `);
       
-      console.log("[closers/metrics] Query result:", JSON.stringify(result.rows));
-      const row = result.rows[0] as any;
+      const rowReunioes = resultReunioes.rows[0] as any;
+      const rowNegocios = resultNegocios.rows[0] as any;
+      const rowLeads = resultLeads.rows[0] as any;
 
-      const reunioes = parseInt(row.reunioes_realizadas) || 0;
-      const negocios = parseInt(row.negocios_ganhos) || 0;
+      const reunioes = parseInt(rowReunioes.reunioes_realizadas) || 0;
+      const negocios = parseInt(rowNegocios.negocios_ganhos) || 0;
+      const leads = parseInt(rowLeads.leads_criados) || 0;
       const conversao = reunioes > 0 ? (negocios / reunioes) * 100 : 0;
 
+      console.log("[closers/metrics] Independent results - Reuniões:", reunioes, "Negócios:", negocios, "Leads:", leads);
+
       res.json({
-        mrrObtido: parseFloat(row.mrr_obtido) || 0,
-        pontualObtido: parseFloat(row.pontual_obtido) || 0,
+        mrrObtido: parseFloat(rowNegocios.mrr_obtido) || 0,
+        pontualObtido: parseFloat(rowNegocios.pontual_obtido) || 0,
         reunioesRealizadas: reunioes,
         negociosGanhos: negocios,
+        leadsCriados: leads,
         taxaConversao: conversao
       });
     } catch (error) {
@@ -1863,55 +1901,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pipeline
       } = req.query;
 
-      const conditions: ReturnType<typeof sql>[] = [];
-
-      if (dataReuniaoInicio) {
-        conditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
-      }
-      if (dataReuniaoFim) {
-        conditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
-      }
-      if (dataFechamentoInicio) {
-        conditions.push(sql`d.data_fechamento >= ${dataFechamentoInicio}`);
-      }
-      if (dataFechamentoFim) {
-        conditions.push(sql`d.data_fechamento <= ${dataFechamentoFim}`);
-      }
+      // Shared conditions (source, pipeline)
+      const sharedConditions: ReturnType<typeof sql>[] = [];
       if (source) {
-        conditions.push(sql`d.source = ${source}`);
+        sharedConditions.push(sql`d.source = ${source}`);
       }
       if (pipeline) {
-        conditions.push(sql`d.category_name = ${pipeline}`);
+        sharedConditions.push(sql`d.category_name = ${pipeline}`);
       }
 
-      const whereClause = conditions.length > 0 
-        ? sql`WHERE ${sql.join(conditions, sql` AND `)}` 
-        : sql``;
+      // Query 1: Reuniões por closer - filtered ONLY by reunion dates
+      const reunioesConditions = [...sharedConditions];
+      reunioesConditions.push(sql`d.data_reuniao_realizada IS NOT NULL`);
+      if (dataReuniaoInicio) {
+        reunioesConditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
+      }
+      if (dataReuniaoFim) {
+        reunioesConditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
+      }
+      const whereClauseReunioes = sql`WHERE ${sql.join(reunioesConditions, sql` AND `)}`;
 
-      const result = await db.execute(sql`
+      const resultReunioes = await db.execute(sql`
         SELECT 
+          c.id as closer_id,
           c.nome as closer_name,
-          COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes,
-          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios_ganhos
+          COUNT(*) as reunioes
         FROM crm_deal d
         INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
-        ${whereClause}
+        ${whereClauseReunioes}
         GROUP BY c.id, c.nome
         ORDER BY c.nome
       `);
+
+      // Query 2: Negócios ganhos por closer - filtered ONLY by closing dates
+      const negociosConditions = [...sharedConditions];
+      negociosConditions.push(sql`d.stage_name = 'Negócio Ganho'`);
+      if (dataFechamentoInicio) {
+        negociosConditions.push(sql`d.data_fechamento >= ${dataFechamentoInicio}`);
+      }
+      if (dataFechamentoFim) {
+        negociosConditions.push(sql`d.data_fechamento <= ${dataFechamentoFim}`);
+      }
+      const whereClauseNegocios = sql`WHERE ${sql.join(negociosConditions, sql` AND `)}`;
+
+      const resultNegocios = await db.execute(sql`
+        SELECT 
+          c.id as closer_id,
+          c.nome as closer_name,
+          COUNT(*) as negocios_ganhos
+        FROM crm_deal d
+        INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        ${whereClauseNegocios}
+        GROUP BY c.id, c.nome
+        ORDER BY c.nome
+      `);
+
+      // Merge results by closer
+      const reunioesMap = new Map(resultReunioes.rows.map((r: any) => [r.closer_id, { name: r.closer_name, reunioes: parseInt(r.reunioes) || 0 }]));
+      const negociosMap = new Map(resultNegocios.rows.map((r: any) => [r.closer_id, parseInt(r.negocios_ganhos) || 0]));
+
+      const allCloserIds = new Set([...Array.from(reunioesMap.keys()), ...Array.from(negociosMap.keys())]);
       
-      const data = result.rows.map((row: any) => {
-        const reunioes = parseInt(row.reunioes) || 0;
-        const negocios = parseInt(row.negocios_ganhos) || 0;
+      const data = Array.from(allCloserIds).map(closerId => {
+        const reunioesData = reunioesMap.get(closerId) || { name: '', reunioes: 0 };
+        const negociosData = negociosMap.get(closerId) || 0;
+        
+        // Get closer name from either map
+        const closerName = reunioesData.name || (resultNegocios.rows.find((r: any) => r.closer_id === closerId) as any)?.closer_name || '';
+        
+        const reunioes = reunioesData.reunioes;
+        const negocios = negociosData;
         const conversao = reunioes > 0 ? (negocios / reunioes) * 100 : 0;
         
         return {
-          closer: row.closer_name,
+          closer: closerName,
           reunioes,
           negociosGanhos: negocios,
           taxaConversao: parseFloat(conversao.toFixed(1))
         };
-      });
+      }).filter(d => d.closer).sort((a, b) => a.closer.localeCompare(b.closer));
 
       res.json(data);
     } catch (error) {
@@ -1923,22 +1991,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/closers/chart-receita", async (req, res) => {
     try {
       const { 
-        dataReuniaoInicio, 
-        dataReuniaoFim, 
         dataFechamentoInicio, 
         dataFechamentoFim,
         source,
         pipeline
       } = req.query;
 
+      // Receita (MRR/Pontual) is filtered ONLY by closing dates
       const conditions: ReturnType<typeof sql>[] = [sql`d.stage_name = 'Negócio Ganho'`];
 
-      if (dataReuniaoInicio) {
-        conditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
-      }
-      if (dataReuniaoFim) {
-        conditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
-      }
       if (dataFechamentoInicio) {
         conditions.push(sql`d.data_fechamento >= ${dataFechamentoInicio}`);
       }
@@ -1952,9 +2013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(sql`d.category_name = ${pipeline}`);
       }
 
-      const whereClause = conditions.length > 0 
-        ? sql`WHERE ${sql.join(conditions, sql` AND `)}` 
-        : sql``;
+      const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 
       const result = await db.execute(sql`
         SELECT 
@@ -2285,14 +2344,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { 
         dataReuniaoInicio, 
-        dataReuniaoFim, 
+        dataReuniaoFim,
+        dataLeadInicio,
+        dataLeadFim,
         source,
         pipeline,
         sdrId
       } = req.query;
 
-      console.log("[sdrs/metrics] Query params:", { dataReuniaoInicio, dataReuniaoFim, source, pipeline, sdrId });
+      console.log("[sdrs/metrics] Query params:", { dataReuniaoInicio, dataReuniaoFim, dataLeadInicio, dataLeadFim, source, pipeline, sdrId });
 
+      // Shared conditions (source, pipeline, sdrId) - applied to all queries
       const sharedConditions: ReturnType<typeof sql>[] = [];
       if (source) {
         sharedConditions.push(sql`d.source = ${source}`);
@@ -2304,12 +2366,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sharedConditions.push(sql`d.sdr = ${sdrId}`);
       }
 
+      // Query 1: Leads - filtered ONLY by lead creation dates
       const leadsConditions = [...sharedConditions];
-      if (dataReuniaoInicio) {
-        leadsConditions.push(sql`d.date_create >= ${dataReuniaoInicio}`);
+      if (dataLeadInicio) {
+        leadsConditions.push(sql`d.date_create >= ${dataLeadInicio}`);
       }
-      if (dataReuniaoFim) {
-        leadsConditions.push(sql`d.date_create <= ${dataReuniaoFim}`);
+      if (dataLeadFim) {
+        leadsConditions.push(sql`d.date_create <= ${dataLeadFim}`);
       }
 
       const whereClauseLeads = leadsConditions.length > 0 
@@ -2322,6 +2385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ${whereClauseLeads}
       `);
 
+      // Query 2: Reuniões - filtered ONLY by reunion dates
       const reunioesConditions = [...sharedConditions];
       reunioesConditions.push(sql`d.data_reuniao_realizada IS NOT NULL`);
       if (dataReuniaoInicio) {
@@ -2346,6 +2410,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const reunioesRealizadas = parseInt(rowReunioes.reunioes_realizadas) || 0;
       const taxaConversao = leadsTotais > 0 ? (reunioesRealizadas / leadsTotais) * 100 : 0;
 
+      console.log("[sdrs/metrics] Independent results - Leads:", leadsTotais, "Reuniões:", reunioesRealizadas);
+
       res.json({
         leadsTotais,
         reunioesRealizadas,
@@ -2361,12 +2427,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { 
         dataReuniaoInicio, 
-        dataReuniaoFim, 
+        dataReuniaoFim,
+        dataLeadInicio,
+        dataLeadFim,
         source,
         pipeline,
         sdrId
       } = req.query;
 
+      // Shared conditions (source, pipeline, sdrId) - applied to all queries
       const sharedConditions: ReturnType<typeof sql>[] = [];
       if (source) {
         sharedConditions.push(sql`d.source = ${source}`);
@@ -2378,12 +2447,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sharedConditions.push(sql`d.sdr = ${sdrId}`);
       }
 
+      // Query 1: Leads por SDR - filtered ONLY by lead creation dates
       const leadsConditions = [...sharedConditions];
-      if (dataReuniaoInicio) {
-        leadsConditions.push(sql`d.date_create >= ${dataReuniaoInicio}`);
+      if (dataLeadInicio) {
+        leadsConditions.push(sql`d.date_create >= ${dataLeadInicio}`);
       }
-      if (dataReuniaoFim) {
-        leadsConditions.push(sql`d.date_create <= ${dataReuniaoFim}`);
+      if (dataLeadFim) {
+        leadsConditions.push(sql`d.date_create <= ${dataLeadFim}`);
       }
 
       const whereClauseLeads = leadsConditions.length > 0 
@@ -2401,6 +2471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         GROUP BY c.id, c.nome
       `);
 
+      // Query 2: Reuniões por SDR - filtered ONLY by reunion dates
       const reunioesConditions = [...sharedConditions];
       reunioesConditions.push(sql`d.data_reuniao_realizada IS NOT NULL`);
       if (dataReuniaoInicio) {
