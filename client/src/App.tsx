@@ -37,6 +37,7 @@ import DashboardClosers from "@/pages/DashboardClosers";
 import DashboardSDRs from "@/pages/DashboardSDRs";
 import DetailClosers from "@/pages/DetailClosers";
 import AnaliseVendas from "@/pages/AnaliseVendas";
+import PresentationMode from "@/pages/PresentationMode";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -134,6 +135,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/comercial/sdrs">{() => <ProtectedRoute path="/dashboard/comercial/sdrs" component={DashboardSDRs} />}</Route>
       <Route path="/dashboard/comercial/detalhamento-closers">{() => <ProtectedRoute path="/dashboard/comercial/detalhamento-closers" component={DetailClosers} />}</Route>
       <Route path="/dashboard/comercial/analise-vendas">{() => <ProtectedRoute path="/dashboard/comercial/analise-vendas" component={AnaliseVendas} />}</Route>
+      <Route path="/dashboard/comercial/apresentacao">{() => <ProtectedRoute path="/dashboard/comercial/apresentacao" component={PresentationMode} />}</Route>
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>
       <Route>
@@ -159,6 +161,7 @@ function Router() {
 function AppLayout() {
   const [location] = useLocation();
   const isLoginPage = location === "/login";
+  const isPresentationMode = location === "/dashboard/comercial/apresentacao";
 
   const style = {
     "--sidebar-width": "16rem",
@@ -166,6 +169,10 @@ function AppLayout() {
   };
 
   if (isLoginPage) {
+    return <Router />;
+  }
+
+  if (isPresentationMode) {
     return <Router />;
   }
 
