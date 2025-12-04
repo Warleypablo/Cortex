@@ -758,7 +758,7 @@ export default function DashboardClosers() {
                   if (!closer) return <div key={orderIndex} />;
                   
                   const isFirst = closer.position === 1;
-                  const heights = { 0: 'h-80', 1: 'h-64', 2: 'h-56' };
+                  const heights = { 0: 'h-96', 1: 'h-80', 2: 'h-72' };
                   
                   return (
                     <motion.div
