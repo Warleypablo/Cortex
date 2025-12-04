@@ -793,13 +793,15 @@ export default function PresentationMode() {
                     </div>
 
                     <div className="flex-1 bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl overflow-hidden flex flex-col">
-                      <div className="grid grid-cols-12 gap-1 p-1.5 bg-slate-800/50 text-[8px] font-semibold text-slate-400 uppercase tracking-wider">
-                        <div className="col-span-1">#</div>
-                        <div className="col-span-3">Closer</div>
-                        <div className="col-span-2 text-right">MRR</div>
-                        <div className="col-span-2 text-right">Pont.</div>
-                        <div className="col-span-2 text-right">Total</div>
-                        <div className="col-span-2 text-right">Reun.</div>
+                      <div className="flex items-center gap-1 p-1.5 bg-slate-800/50 text-[7px] font-semibold text-slate-400 uppercase tracking-wider">
+                        <div className="w-5 shrink-0">#</div>
+                        <div className="flex-1 min-w-0">Closer</div>
+                        <div className="w-12 text-right shrink-0">MRR</div>
+                        <div className="w-12 text-right shrink-0">Pont.</div>
+                        <div className="w-12 text-right shrink-0">Total</div>
+                        <div className="w-8 text-center shrink-0">Neg.</div>
+                        <div className="w-8 text-center shrink-0">Reun.</div>
+                        <div className="w-10 text-center shrink-0">Conv.</div>
                       </div>
 
                       <div className="divide-y divide-slate-800/50 flex-1 overflow-y-auto">
@@ -816,11 +818,11 @@ export default function PresentationMode() {
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.03 * index }}
-                            className={`grid grid-cols-12 gap-1 p-2 items-center hover:bg-slate-800/30 transition-colors ${
+                            className={`flex items-center gap-1 py-1.5 px-1.5 hover:bg-slate-800/30 transition-colors ${
                               closer.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(closer.position) : ''
                             }`}
                           >
-                            <div className="col-span-1">
+                            <div className="w-5 shrink-0">
                               {closer.position <= 3 ? (
                                 <div className="w-5 h-5 flex items-center justify-center">
                                   {closer.position === 1 && <Crown className="w-4 h-4 text-yellow-400" />}
@@ -828,23 +830,40 @@ export default function PresentationMode() {
                                   {closer.position === 3 && <Medal className="w-3 h-3 text-amber-600" />}
                                 </div>
                               ) : (
-                                <span className="text-slate-500 font-mono text-xs">{closer.position}</span>
+                                <span className="text-slate-500 font-mono text-[10px]">{closer.position}</span>
                               )}
                             </div>
-                            <div className="col-span-3 font-medium text-white truncate text-xs">
+                            <div className="flex-1 min-w-0 font-medium text-white truncate text-[10px]">
                               {closer.name}
                             </div>
-                            <div className="col-span-2 text-right font-bold text-emerald-400 text-xs">
+                            <div className="w-12 text-right font-bold text-emerald-400 text-[10px] shrink-0">
                               {formatCurrencyCompact(closer.mrr)}
                             </div>
-                            <div className="col-span-2 text-right font-semibold text-blue-400 text-xs">
+                            <div className="w-12 text-right font-semibold text-blue-400 text-[10px] shrink-0">
                               {formatCurrencyCompact(closer.pontual)}
                             </div>
-                            <div className="col-span-2 text-right font-bold text-white text-xs">
+                            <div className="w-12 text-right font-bold text-white text-[10px] shrink-0">
                               {formatCurrencyCompact(closer.total)}
                             </div>
-                            <div className="col-span-2 text-right text-cyan-400 text-xs">
-                              {closer.reunioes}
+                            <div className="w-8 text-center shrink-0">
+                              <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-amber-500/20 text-amber-400 text-[9px] font-bold">
+                                {closer.negocios}
+                              </span>
+                            </div>
+                            <div className="w-8 text-center shrink-0">
+                              <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-violet-500/20 text-violet-400 text-[9px] font-bold">
+                                {closer.reunioes}
+                              </span>
+                            </div>
+                            <div className="w-10 text-center shrink-0">
+                              <span className={`inline-flex items-center justify-center px-1 py-0.5 rounded text-[9px] font-bold ${
+                                closer.taxa >= 40 ? 'bg-emerald-500/20 text-emerald-400' :
+                                closer.taxa >= 25 ? 'bg-cyan-500/20 text-cyan-400' :
+                                closer.taxa >= 15 ? 'bg-amber-500/20 text-amber-400' :
+                                'bg-slate-700/50 text-slate-400'
+                              }`}>
+                                {closer.taxa.toFixed(0)}%
+                              </span>
                             </div>
                           </motion.div>
                         ))
