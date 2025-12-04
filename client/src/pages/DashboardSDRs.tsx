@@ -587,12 +587,12 @@ export default function DashboardSDRs() {
                 ))}
               </div>
             ) : top3.length > 0 ? (
-              <div className="flex items-end justify-center gap-4 h-[380px]">
+              <div className="flex items-end justify-center gap-4 h-[420px]">
                 {[1, 0, 2].map((dataIndex, visualIndex) => {
                   const sdr = top3[dataIndex];
                   if (!sdr) return null;
                   
-                  const heights = ['h-72', 'h-80', 'h-64'];
+                  const heights = ['h-80', 'h-96', 'h-72'];
                   const sizes = ['text-3xl', 'text-4xl', 'text-2xl'];
                   const badges = ['VICE', 'CAMPEÃO', 'BRONZE'];
                   const badgeColors = ['bg-gray-500', 'bg-gradient-to-r from-yellow-500 to-amber-500', 'bg-amber-700'];
