@@ -93,6 +93,8 @@ interface RankingSDR {
   reunioesRealizadas: number;
   conversao: number;
   mrr: number;
+  pontual: number;
+  contratos: number;
   trend: 'up' | 'down' | 'stable';
 }
 
@@ -230,22 +232,24 @@ export default function PresentationMode() {
     .sort((a, b) => b.total - a.total)
     .map((c, idx) => ({ ...c, position: idx + 1 }));
 
-  const sdrMrrMap = new Map<string, number>();
+  const sdrMrrMap = new Map<string, { mrr: number; pontual: number; contratos: number }>();
   (sdrMrrData || []).forEach(m => {
-    sdrMrrMap.set(m.sdr, m.mrr);
+    sdrMrrMap.set(m.sdr, { mrr: m.mrr, pontual: m.pontual, contratos: m.contratos });
   });
 
   const sdrRanking: RankingSDR[] = (chartReunioes || [])
     .map((c, idx) => {
-      const trend: 'up' | 'down' | 'stable' = trends[Math.floor(Math.random() * 3)];
+      const mrrData = sdrMrrMap.get(c.sdr) || { mrr: 0, pontual: 0, contratos: 0 };
       return {
         position: idx + 1,
         name: c.sdr,
         leads: c.leads,
         reunioesRealizadas: c.reunioesRealizadas,
         conversao: c.conversao,
-        mrr: sdrMrrMap.get(c.sdr) || 0,
-        trend,
+        mrr: mrrData.mrr,
+        pontual: mrrData.pontual,
+        contratos: mrrData.contratos,
+        trend: 'stable' as const,
       };
     })
     .sort((a, b) => b.mrr - a.mrr)
@@ -253,6 +257,25 @@ export default function PresentationMode() {
 
   const closerTop3 = closerRanking.slice(0, 3);
   const sdrTop3 = sdrRanking.slice(0, 3);
+
+  const closerTop3Pontual: RankingCloser[] = (chartReceita || [])
+    .filter(c => c.pontual > 0)
+    .sort((a, b) => b.pontual - a.pontual)
+    .slice(0, 3)
+    .map((c, idx) => {
+      const reunioesData = chartReunioesNegocios?.find(r => r.closer === c.closer);
+      return {
+        position: idx + 1,
+        name: c.closer,
+        mrr: c.mrr,
+        pontual: c.pontual,
+        total: c.mrr + c.pontual,
+        reunioes: reunioesData?.reunioes || 0,
+        negocios: reunioesData?.negociosGanhos || 0,
+        taxa: reunioesData?.taxaConversao || 0,
+        trend: 'stable' as const,
+      };
+    });
 
   const getPositionIcon = (position: number) => {
     switch (position) {
@@ -787,19 +810,20 @@ export default function PresentationMode() {
                   </div>
 
                   <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
-                    <div className="grid grid-cols-12 gap-2 p-3 bg-slate-800/50 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    <div className="grid grid-cols-12 gap-1 p-2 bg-slate-800/50 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
                       <div className="col-span-1">#</div>
-                      <div className="col-span-5">Closer</div>
-                      <div className="col-span-3 text-right">Total</div>
-                      <div className="col-span-2 text-right">Taxa</div>
-                      <div className="col-span-1"></div>
+                      <div className="col-span-3">Closer</div>
+                      <div className="col-span-2 text-right">MRR</div>
+                      <div className="col-span-2 text-right">Pontual</div>
+                      <div className="col-span-2 text-right">Total</div>
+                      <div className="col-span-2 text-right">Reun.</div>
                     </div>
 
-                    <div className="divide-y divide-slate-800/50">
+                    <div className="divide-y divide-slate-800/50 max-h-[320px] overflow-y-auto">
                       {isLoadingClosers ? (
                         Array.from({ length: 5 }).map((_, i) => (
-                          <div key={i} className="p-3">
-                            <Skeleton className="h-8 bg-slate-800" />
+                          <div key={i} className="p-2">
+                            <Skeleton className="h-6 bg-slate-800" />
                           </div>
                         ))
                       ) : closerRanking.length > 0 ? (
@@ -808,47 +832,41 @@ export default function PresentationMode() {
                             key={closer.name}
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.05 * index }}
-                            className={`grid grid-cols-12 gap-2 p-3 items-center hover:bg-slate-800/30 transition-colors ${
+                            transition={{ delay: 0.03 * index }}
+                            className={`grid grid-cols-12 gap-1 p-2 items-center hover:bg-slate-800/30 transition-colors ${
                               closer.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(closer.position) : ''
                             }`}
                           >
                             <div className="col-span-1">
                               {closer.position <= 3 ? (
-                                <div className="w-6 h-6 flex items-center justify-center">
-                                  {closer.position === 1 && <Crown className="w-5 h-5 text-yellow-400" />}
-                                  {closer.position === 2 && <Medal className="w-4 h-4 text-gray-300" />}
-                                  {closer.position === 3 && <Medal className="w-4 h-4 text-amber-600" />}
+                                <div className="w-5 h-5 flex items-center justify-center">
+                                  {closer.position === 1 && <Crown className="w-4 h-4 text-yellow-400" />}
+                                  {closer.position === 2 && <Medal className="w-3 h-3 text-gray-300" />}
+                                  {closer.position === 3 && <Medal className="w-3 h-3 text-amber-600" />}
                                 </div>
                               ) : (
-                                <span className="text-slate-500 font-mono text-sm">{closer.position}</span>
+                                <span className="text-slate-500 font-mono text-xs">{closer.position}</span>
                               )}
                             </div>
-                            <div className="col-span-5 font-medium text-white truncate">
+                            <div className="col-span-3 font-medium text-white truncate text-xs">
                               {closer.name}
                             </div>
-                            <div className="col-span-3 text-right font-bold text-white">
+                            <div className="col-span-2 text-right font-bold text-emerald-400 text-xs">
+                              {formatCurrencyCompact(closer.mrr)}
+                            </div>
+                            <div className="col-span-2 text-right font-semibold text-blue-400 text-xs">
+                              {formatCurrencyCompact(closer.pontual)}
+                            </div>
+                            <div className="col-span-2 text-right font-bold text-white text-xs">
                               {formatCurrencyCompact(closer.total)}
                             </div>
-                            <div className="col-span-2 text-right">
-                              <Badge 
-                                variant="outline" 
-                                className={`text-xs border-0 ${
-                                  closer.taxa >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
-                                  closer.taxa >= 15 ? 'bg-amber-500/20 text-amber-400' :
-                                  'bg-slate-700/50 text-slate-400'
-                                }`}
-                              >
-                                {closer.taxa.toFixed(0)}%
-                              </Badge>
-                            </div>
-                            <div className="col-span-1 flex justify-end">
-                              {getTrendIcon(closer.trend)}
+                            <div className="col-span-2 text-right text-cyan-400 text-xs">
+                              {closer.reunioes}
                             </div>
                           </motion.div>
                         ))
                       ) : (
-                        <div className="p-8 text-center text-slate-400">
+                        <div className="p-6 text-center text-slate-400">
                           Nenhum closer encontrado
                         </div>
                       )}
@@ -856,6 +874,63 @@ export default function PresentationMode() {
                   </div>
                 </div>
               </div>
+
+              {/* DESTAQUE PONTUAL - Compact horizontal */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-blue-400" />
+                  <h2 className="text-lg font-bold text-white">Destaque Pontual</h2>
+                  <Badge className="bg-blue-500/20 text-blue-400 text-[10px]">Top Vendas Pontuais</Badge>
+                </div>
+
+                <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl overflow-hidden">
+                  {isLoadingClosers ? (
+                    <div className="p-3 flex gap-3">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-12 flex-1 bg-slate-800 rounded-lg" />
+                      ))}
+                    </div>
+                  ) : closerTop3Pontual.length > 0 ? (
+                    <div className="flex divide-x divide-slate-800/50">
+                      {closerTop3Pontual.map((closer, index) => (
+                        <motion.div
+                          key={closer.name}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.1 * index }}
+                          className={`flex-1 p-3 flex items-center gap-2 ${
+                            index === 0 ? 'bg-gradient-to-r from-blue-500/20 to-transparent' : ''
+                          }`}
+                        >
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            index === 0 ? 'bg-blue-500/30' :
+                            index === 1 ? 'bg-slate-600/30' :
+                            'bg-amber-600/30'
+                          }`}>
+                            {index === 0 && <Crown className="w-4 h-4 text-blue-400" />}
+                            {index === 1 && <Medal className="w-3 h-3 text-gray-300" />}
+                            {index === 2 && <Medal className="w-3 h-3 text-amber-600" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-white truncate text-xs">{closer.name}</div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-sm font-bold text-blue-400">{formatCurrencyCompact(closer.pontual)}</div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-slate-400 text-sm">
+                      Nenhuma venda pontual
+                    </div>
+                  )}
+                </div>
+              </motion.div>
 
               {/* BARRA DE META */}
               <motion.div 
@@ -1230,20 +1305,22 @@ export default function PresentationMode() {
                   </div>
 
                   <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
-                    <div className="grid grid-cols-12 gap-2 p-3 bg-slate-800/50 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    <div className="grid grid-cols-12 gap-1 p-2 bg-slate-800/50 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
                       <div className="col-span-1">#</div>
-                      <div className="col-span-3">SDR</div>
-                      <div className="col-span-3 text-right">MRR</div>
-                      <div className="col-span-2 text-right">Reuniões</div>
-                      <div className="col-span-2 text-right">Leads</div>
-                      <div className="col-span-1"></div>
+                      <div className="col-span-2">SDR</div>
+                      <div className="col-span-2 text-right">MRR</div>
+                      <div className="col-span-2 text-right">Pontual</div>
+                      <div className="col-span-1 text-right">Contr.</div>
+                      <div className="col-span-1 text-right">Reun.</div>
+                      <div className="col-span-2 text-right">Conv.</div>
+                      <div className="col-span-1 text-right">Leads</div>
                     </div>
 
-                    <div className="divide-y divide-slate-800/50">
+                    <div className="divide-y divide-slate-800/50 max-h-[350px] overflow-y-auto">
                       {isLoadingSDRs ? (
                         Array.from({ length: 5 }).map((_, i) => (
-                          <div key={i} className="p-3">
-                            <Skeleton className="h-8 bg-slate-800" />
+                          <div key={i} className="p-2">
+                            <Skeleton className="h-6 bg-slate-800" />
                           </div>
                         ))
                       ) : sdrRanking.length > 0 ? (
@@ -1252,41 +1329,56 @@ export default function PresentationMode() {
                             key={sdr.name}
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.05 * index }}
-                            className={`grid grid-cols-12 gap-2 p-3 items-center hover:bg-slate-800/30 transition-colors ${
+                            transition={{ delay: 0.03 * index }}
+                            className={`grid grid-cols-12 gap-1 p-2 items-center hover:bg-slate-800/30 transition-colors ${
                               sdr.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(sdr.position) : ''
                             }`}
                           >
                             <div className="col-span-1">
                               {sdr.position <= 3 ? (
-                                <div className="w-6 h-6 flex items-center justify-center">
-                                  {sdr.position === 1 && <Crown className="w-5 h-5 text-yellow-400" />}
-                                  {sdr.position === 2 && <Medal className="w-4 h-4 text-gray-300" />}
-                                  {sdr.position === 3 && <Medal className="w-4 h-4 text-amber-600" />}
+                                <div className="w-5 h-5 flex items-center justify-center">
+                                  {sdr.position === 1 && <Crown className="w-4 h-4 text-yellow-400" />}
+                                  {sdr.position === 2 && <Medal className="w-3 h-3 text-gray-300" />}
+                                  {sdr.position === 3 && <Medal className="w-3 h-3 text-amber-600" />}
                                 </div>
                               ) : (
-                                <span className="text-slate-500 font-mono text-sm">{sdr.position}</span>
+                                <span className="text-slate-500 font-mono text-xs">{sdr.position}</span>
                               )}
                             </div>
-                            <div className="col-span-3 font-medium text-white truncate">
+                            <div className="col-span-2 font-medium text-white truncate text-xs">
                               {sdr.name}
                             </div>
-                            <div className="col-span-3 text-right font-bold text-emerald-400">
-                              {formatCurrency(sdr.mrr)}
+                            <div className="col-span-2 text-right font-bold text-emerald-400 text-xs">
+                              {formatCurrencyCompact(sdr.mrr)}
                             </div>
-                            <div className="col-span-2 text-right text-cyan-400">
+                            <div className="col-span-2 text-right font-semibold text-blue-400 text-xs">
+                              {formatCurrencyCompact(sdr.pontual)}
+                            </div>
+                            <div className="col-span-1 text-right text-violet-400 text-xs font-semibold">
+                              {sdr.contratos}
+                            </div>
+                            <div className="col-span-1 text-right text-cyan-400 text-xs">
                               {sdr.reunioesRealizadas}
                             </div>
-                            <div className="col-span-2 text-right text-blue-400">
-                              {sdr.leads}
+                            <div className="col-span-2 text-right">
+                              <Badge 
+                                variant="outline" 
+                                className={`text-[10px] border-0 px-1 ${
+                                  sdr.conversao >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
+                                  sdr.conversao >= 15 ? 'bg-amber-500/20 text-amber-400' :
+                                  'bg-slate-700/50 text-slate-400'
+                                }`}
+                              >
+                                {sdr.conversao.toFixed(0)}%
+                              </Badge>
                             </div>
-                            <div className="col-span-1 flex justify-end">
-                              {getTrendIcon(sdr.trend)}
+                            <div className="col-span-1 text-right text-slate-300 text-xs">
+                              {sdr.leads}
                             </div>
                           </motion.div>
                         ))
                       ) : (
-                        <div className="p-8 text-center text-slate-400">
+                        <div className="p-6 text-center text-slate-400">
                           Nenhum SDR encontrado
                         </div>
                       )}
