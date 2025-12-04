@@ -1802,7 +1802,7 @@ export class DbStorage implements IStorage {
       WITH saldo_bancos AS (
         SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
         FROM caz_bancos
-        WHERE ativo = true
+        WHERE ativo = 'true' OR ativo = 't' OR ativo = '1'
       ),
       proximos_30_dias AS (
         SELECT 
@@ -1897,7 +1897,7 @@ export class DbStorage implements IStorage {
       WITH saldo_bancos AS (
         SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
         FROM caz_bancos
-        WHERE ativo = true
+        WHERE ativo = 'true' OR ativo = 't' OR ativo = '1'
       ),
       periodo AS (
         SELECT 
@@ -1968,14 +1968,14 @@ export class DbStorage implements IStorage {
       ),
       categorias AS (
         SELECT 
-          COALESCE(dfc_categoria, 'Sem categoria') as categoria,
+          COALESCE(categoria_nome, 'Sem categoria') as categoria,
           tipo_evento,
           SUM(valor_bruto::numeric) as valor
         FROM caz_parcelas
         WHERE status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
           AND tipo_evento IN ('RECEITA', 'DESPESA')
-        GROUP BY dfc_categoria, tipo_evento
+        GROUP BY categoria_nome, tipo_evento
         ORDER BY valor DESC
         LIMIT 10
       )
@@ -2036,14 +2036,14 @@ export class DbStorage implements IStorage {
 
     const categoriasResult = await db.execute(sql`
       SELECT 
-        COALESCE(dfc_categoria, 'Sem categoria') as categoria,
+        COALESCE(categoria_nome, 'Sem categoria') as categoria,
         tipo_evento,
         SUM(valor_bruto::numeric) as valor
       FROM caz_parcelas
       WHERE status NOT IN ('QUITADO', 'PERDIDO')
         AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
         AND tipo_evento IN ('RECEITA', 'DESPESA')
-      GROUP BY dfc_categoria, tipo_evento
+      GROUP BY categoria_nome, tipo_evento
       ORDER BY valor DESC
       LIMIT 10
     `);
