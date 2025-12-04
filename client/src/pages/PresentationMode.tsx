@@ -869,65 +869,66 @@ export default function PresentationMode() {
                       )}
                     </div>
                   </div>
+
+                  {/* DESTAQUE PONTUAL - Below Ranking */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className="mt-4"
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-blue-400" />
+                      <h2 className="text-sm font-bold text-white">Destaque Pontual</h2>
+                      <Badge className="bg-blue-500/20 text-blue-400 text-[9px]">Top Pontuais</Badge>
+                    </div>
+
+                    <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl overflow-hidden">
+                      {isLoadingClosers ? (
+                        <div className="p-2 space-y-2">
+                          {[1, 2, 3].map((i) => (
+                            <Skeleton key={i} className="h-8 bg-slate-800 rounded-lg" />
+                          ))}
+                        </div>
+                      ) : closerTop3Pontual.length > 0 ? (
+                        <div className="divide-y divide-slate-800/50">
+                          {closerTop3Pontual.map((closer, index) => (
+                            <motion.div
+                              key={closer.name}
+                              initial={{ opacity: 0, x: 10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.1 * index }}
+                              className={`p-2 flex items-center gap-2 ${
+                                index === 0 ? 'bg-gradient-to-r from-blue-500/20 to-transparent' : ''
+                              }`}
+                            >
+                              <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                index === 0 ? 'bg-blue-500/30' :
+                                index === 1 ? 'bg-slate-600/30' :
+                                'bg-amber-600/30'
+                              }`}>
+                                {index === 0 && <Crown className="w-3 h-3 text-blue-400" />}
+                                {index === 1 && <Medal className="w-2.5 h-2.5 text-gray-300" />}
+                                {index === 2 && <Medal className="w-2.5 h-2.5 text-amber-600" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-white truncate text-xs">{closer.name}</div>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <div className="text-xs font-bold text-blue-400">{formatCurrencyCompact(closer.pontual)}</div>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-3 text-center text-slate-400 text-xs">
+                          Nenhuma venda pontual
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
                 </div>
               </div>
-
-              {/* DESTAQUE PONTUAL - Compact horizontal */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <div className="mb-2 flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-blue-400" />
-                  <h2 className="text-lg font-bold text-white">Destaque Pontual</h2>
-                  <Badge className="bg-blue-500/20 text-blue-400 text-[10px]">Top Vendas Pontuais</Badge>
-                </div>
-
-                <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl overflow-hidden">
-                  {isLoadingClosers ? (
-                    <div className="p-3 flex gap-3">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-12 flex-1 bg-slate-800 rounded-lg" />
-                      ))}
-                    </div>
-                  ) : closerTop3Pontual.length > 0 ? (
-                    <div className="flex divide-x divide-slate-800/50">
-                      {closerTop3Pontual.map((closer, index) => (
-                        <motion.div
-                          key={closer.name}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.1 * index }}
-                          className={`flex-1 p-3 flex items-center gap-2 ${
-                            index === 0 ? 'bg-gradient-to-r from-blue-500/20 to-transparent' : ''
-                          }`}
-                        >
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                            index === 0 ? 'bg-blue-500/30' :
-                            index === 1 ? 'bg-slate-600/30' :
-                            'bg-amber-600/30'
-                          }`}>
-                            {index === 0 && <Crown className="w-4 h-4 text-blue-400" />}
-                            {index === 1 && <Medal className="w-3 h-3 text-gray-300" />}
-                            {index === 2 && <Medal className="w-3 h-3 text-amber-600" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-white truncate text-xs">{closer.name}</div>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="text-sm font-bold text-blue-400">{formatCurrencyCompact(closer.pontual)}</div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-slate-400 text-sm">
-                      Nenhuma venda pontual
-                    </div>
-                  )}
-                </div>
-              </motion.div>
 
               {/* BARRA DE META */}
               <motion.div 
