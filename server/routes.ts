@@ -2891,23 +2891,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { dataInicio, dataFim, source, category, closer } = req.query;
 
       const conditions: ReturnType<typeof sql>[] = [
-        sql`stage_name = 'Negócio Ganho (WON)'`
+        sql`d.stage_name = 'Negócio Ganho'`
       ];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}::date`);
+        conditions.push(sql`d.data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`d.data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
       if (source && source !== 'all') {
-        conditions.push(sql`source = ${source}`);
+        conditions.push(sql`d.source = ${source}`);
       }
       if (category && category !== 'all') {
-        conditions.push(sql`category_name = ${category}`);
+        conditions.push(sql`d.category_name = ${category}`);
       }
       if (closer && closer !== 'all') {
-        conditions.push(sql`owner_name = ${closer}`);
+        conditions.push(sql`c.nome = ${closer}`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
@@ -2915,21 +2915,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.execute(sql`
         SELECT 
           COUNT(*) as total_negocios,
-          COALESCE(SUM(valor_recorrente), 0) as total_mrr,
-          COALESCE(SUM(valor_pontual), 0) as total_pontual,
-          COALESCE(SUM(valor_recorrente) + SUM(valor_pontual), 0) as receita_total,
-          COALESCE(AVG(valor_recorrente + valor_pontual), 0) as ticket_medio,
-          COALESCE(AVG(EXTRACT(EPOCH FROM (close_date - created_date)) / 86400), 0) as ciclo_medio_dias,
-          COUNT(DISTINCT company_name) as empresas_unicas,
-          COUNT(DISTINCT owner_name) as closers_ativos,
-          COUNT(CASE WHEN valor_recorrente > 0 THEN 1 END) as negocios_recorrentes,
-          COUNT(CASE WHEN valor_pontual > 0 AND (valor_recorrente IS NULL OR valor_recorrente = 0) THEN 1 END) as negocios_pontuais,
-          COUNT(CASE WHEN valor_recorrente > 0 AND valor_pontual > 0 THEN 1 END) as negocios_mistos,
-          COALESCE(AVG(valor_recorrente), 0) as mrr_medio,
-          COALESCE(AVG(valor_pontual), 0) as pontual_medio,
-          MIN(close_date) as primeira_venda,
-          MAX(close_date) as ultima_venda
-        FROM crm_deal
+          COALESCE(SUM(d.valor_recorrente), 0) as total_mrr,
+          COALESCE(SUM(d.valor_pontual), 0) as total_pontual,
+          COALESCE(SUM(d.valor_recorrente) + SUM(d.valor_pontual), 0) as receita_total,
+          COALESCE(AVG(COALESCE(d.valor_recorrente, 0) + COALESCE(d.valor_pontual, 0)), 0) as ticket_medio,
+          COALESCE(AVG(EXTRACT(EPOCH FROM (d.data_fechamento - d.created_date)) / 86400), 0) as ciclo_medio_dias,
+          COUNT(DISTINCT d.company_name) as empresas_unicas,
+          COUNT(DISTINCT c.nome) as closers_ativos,
+          COUNT(CASE WHEN d.valor_recorrente > 0 THEN 1 END) as negocios_recorrentes,
+          COUNT(CASE WHEN d.valor_pontual > 0 AND (d.valor_recorrente IS NULL OR d.valor_recorrente = 0) THEN 1 END) as negocios_pontuais,
+          COUNT(CASE WHEN d.valor_recorrente > 0 AND d.valor_pontual > 0 THEN 1 END) as negocios_mistos,
+          COALESCE(AVG(d.valor_recorrente), 0) as mrr_medio,
+          COALESCE(AVG(d.valor_pontual), 0) as pontual_medio,
+          MIN(d.data_fechamento) as primeira_venda,
+          MAX(d.data_fechamento) as ultima_venda
+        FROM crm_deal d
+        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
       `);
 
@@ -2964,58 +2965,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { dataInicio, dataFim, source, category, closer, orderBy, orderDir } = req.query;
 
       const conditions: ReturnType<typeof sql>[] = [
-        sql`stage_name = 'Negócio Ganho (WON)'`
+        sql`d.stage_name = 'Negócio Ganho'`
       ];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}::date`);
+        conditions.push(sql`d.data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`d.data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
       if (source && source !== 'all') {
-        conditions.push(sql`source = ${source}`);
+        conditions.push(sql`d.source = ${source}`);
       }
       if (category && category !== 'all') {
-        conditions.push(sql`category_name = ${category}`);
+        conditions.push(sql`d.category_name = ${category}`);
       }
       if (closer && closer !== 'all') {
-        conditions.push(sql`owner_name = ${closer}`);
+        conditions.push(sql`c.nome = ${closer}`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 
       const orderColumn = orderBy === 'valor' ? 'valor_total' : 
-                          orderBy === 'mrr' ? 'valor_recorrente' :
-                          orderBy === 'pontual' ? 'valor_pontual' :
+                          orderBy === 'mrr' ? 'd.valor_recorrente' :
+                          orderBy === 'pontual' ? 'd.valor_pontual' :
                           orderBy === 'ciclo' ? 'ciclo_dias' :
-                          'close_date';
+                          'd.data_fechamento';
       const orderDirection = orderDir === 'asc' ? 'ASC' : 'DESC';
 
       const result = await db.execute(sql`
         SELECT 
-          deal_id,
-          deal_name,
-          company_name,
-          contact_name,
-          contact_email,
-          contact_phone,
-          COALESCE(valor_recorrente, 0) as valor_recorrente,
-          COALESCE(valor_pontual, 0) as valor_pontual,
-          (COALESCE(valor_recorrente, 0) + COALESCE(valor_pontual, 0)) as valor_total,
-          category_name,
-          source,
-          pipeline_name,
-          owner_name,
-          created_date,
-          close_date,
-          EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 as ciclo_dias,
-          utm_source,
-          utm_medium,
-          utm_campaign,
-          utm_term,
-          utm_content
-        FROM crm_deal
+          d.deal_id,
+          d.deal_name,
+          d.company_name,
+          d.contact_name,
+          d.contact_email,
+          d.contact_phone,
+          COALESCE(d.valor_recorrente, 0) as valor_recorrente,
+          COALESCE(d.valor_pontual, 0) as valor_pontual,
+          (COALESCE(d.valor_recorrente, 0) + COALESCE(d.valor_pontual, 0)) as valor_total,
+          d.category_name,
+          d.source,
+          d.pipeline_name,
+          c.nome as closer_name,
+          d.created_date,
+          d.data_fechamento,
+          EXTRACT(EPOCH FROM (d.data_fechamento - d.created_date)) / 86400 as ciclo_dias,
+          d.utm_source,
+          d.utm_medium,
+          d.utm_campaign,
+          d.utm_term,
+          d.utm_content
+        FROM crm_deal d
+        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
         ORDER BY ${sql.raw(orderColumn)} ${sql.raw(orderDirection)}
       `);
@@ -3033,9 +3035,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         categoryName: row.category_name,
         source: row.source,
         pipelineName: row.pipeline_name,
-        ownerName: row.owner_name,
+        ownerName: row.closer_name,
         createdDate: row.created_date,
-        closeDate: row.close_date,
+        closeDate: row.data_fechamento,
         cicloDias: parseFloat(row.ciclo_dias) || 0,
         utmSource: row.utm_source,
         utmMedium: row.utm_medium,
@@ -3055,15 +3057,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { dataInicio, dataFim } = req.query;
 
       const conditions: ReturnType<typeof sql>[] = [
-        sql`stage_name = 'Negócio Ganho (WON)'`,
+        sql`stage_name = 'Negócio Ganho'`,
         sql`source IS NOT NULL`
       ];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}::date`);
+        conditions.push(sql`data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
@@ -3075,7 +3077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(valor_recorrente), 0) as mrr,
           COALESCE(SUM(valor_pontual), 0) as pontual,
           COALESCE(SUM(valor_recorrente) + SUM(valor_pontual), 0) as total,
-          COALESCE(AVG(valor_recorrente + valor_pontual), 0) as ticket_medio
+          COALESCE(AVG(COALESCE(valor_recorrente, 0) + COALESCE(valor_pontual, 0)), 0) as ticket_medio
         FROM crm_deal
         ${whereClause}
         GROUP BY source
@@ -3102,36 +3104,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { dataInicio, dataFim } = req.query;
 
       const conditions: ReturnType<typeof sql>[] = [
-        sql`stage_name = 'Negócio Ganho (WON)'`,
-        sql`owner_name IS NOT NULL`
+        sql`d.stage_name = 'Negócio Ganho'`
       ];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}::date`);
+        conditions.push(sql`d.data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`d.data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 
       const result = await db.execute(sql`
         SELECT 
-          owner_name as closer,
+          c.nome as closer,
           COUNT(*) as quantidade,
-          COALESCE(SUM(valor_recorrente), 0) as mrr,
-          COALESCE(SUM(valor_pontual), 0) as pontual,
-          COALESCE(SUM(valor_recorrente) + SUM(valor_pontual), 0) as total,
-          COALESCE(AVG(valor_recorrente + valor_pontual), 0) as ticket_medio,
-          COALESCE(AVG(EXTRACT(EPOCH FROM (close_date - created_date)) / 86400), 0) as ciclo_medio
-        FROM crm_deal
+          COALESCE(SUM(d.valor_recorrente), 0) as mrr,
+          COALESCE(SUM(d.valor_pontual), 0) as pontual,
+          COALESCE(SUM(d.valor_recorrente) + SUM(d.valor_pontual), 0) as total,
+          COALESCE(AVG(COALESCE(d.valor_recorrente, 0) + COALESCE(d.valor_pontual, 0)), 0) as ticket_medio,
+          COALESCE(AVG(EXTRACT(EPOCH FROM (d.data_fechamento - d.created_date)) / 86400), 0) as ciclo_medio
+        FROM crm_deal d
+        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
-        GROUP BY owner_name
+        GROUP BY c.nome
         ORDER BY total DESC
       `);
 
       res.json(result.rows.map((row: any) => ({
-        closer: row.closer,
+        closer: row.closer || 'Sem closer',
         quantidade: parseInt(row.quantidade) || 0,
         mrr: parseFloat(row.mrr) || 0,
         pontual: parseFloat(row.pontual) || 0,
@@ -3151,31 +3153,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { dataInicio, dataFim } = req.query;
 
       const conditions: ReturnType<typeof sql>[] = [
-        sql`stage_name = 'Negócio Ganho (WON)'`,
-        sql`close_date IS NOT NULL`
+        sql`stage_name = 'Negócio Ganho'`,
+        sql`data_fechamento IS NOT NULL`
       ];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}::date`);
+        conditions.push(sql`data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 
       const result = await db.execute(sql`
         SELECT 
-          TO_CHAR(close_date, 'YYYY-MM') as mes,
-          TO_CHAR(close_date, 'Mon/YY') as mes_label,
+          TO_CHAR(data_fechamento, 'YYYY-MM') as mes,
+          TO_CHAR(data_fechamento, 'Mon/YY') as mes_label,
           COUNT(*) as quantidade,
           COALESCE(SUM(valor_recorrente), 0) as mrr,
           COALESCE(SUM(valor_pontual), 0) as pontual,
           COALESCE(SUM(valor_recorrente) + SUM(valor_pontual), 0) as total,
-          COALESCE(AVG(valor_recorrente + valor_pontual), 0) as ticket_medio
+          COALESCE(AVG(COALESCE(valor_recorrente, 0) + COALESCE(valor_pontual, 0)), 0) as ticket_medio
         FROM crm_deal
         ${whereClause}
-        GROUP BY TO_CHAR(close_date, 'YYYY-MM'), TO_CHAR(close_date, 'Mon/YY')
+        GROUP BY TO_CHAR(data_fechamento, 'YYYY-MM'), TO_CHAR(data_fechamento, 'Mon/YY')
         ORDER BY mes ASC
       `);
 
@@ -3200,14 +3202,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { dataInicio, dataFim, utmType } = req.query;
 
       const conditions: ReturnType<typeof sql>[] = [
-        sql`stage_name = 'Negócio Ganho (WON)'`
+        sql`stage_name = 'Negócio Ganho'`
       ];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}::date`);
+        conditions.push(sql`data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
 
       const utmColumn = utmType === 'medium' ? 'utm_medium' :
@@ -3249,16 +3251,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Filtros disponíveis
   app.get("/api/vendas/detalhamento/filtros", async (req, res) => {
     try {
-      const [sources, categories, closers] = await Promise.all([
-        db.execute(sql`SELECT DISTINCT source FROM crm_deal WHERE stage_name = 'Negócio Ganho (WON)' AND source IS NOT NULL ORDER BY source`),
-        db.execute(sql`SELECT DISTINCT category_name FROM crm_deal WHERE stage_name = 'Negócio Ganho (WON)' AND category_name IS NOT NULL ORDER BY category_name`),
-        db.execute(sql`SELECT DISTINCT owner_name FROM crm_deal WHERE stage_name = 'Negócio Ganho (WON)' AND owner_name IS NOT NULL ORDER BY owner_name`)
+      const [sources, categories, closersResult] = await Promise.all([
+        db.execute(sql`SELECT DISTINCT source FROM crm_deal WHERE stage_name = 'Negócio Ganho' AND source IS NOT NULL ORDER BY source`),
+        db.execute(sql`SELECT DISTINCT category_name FROM crm_deal WHERE stage_name = 'Negócio Ganho' AND category_name IS NOT NULL ORDER BY category_name`),
+        db.execute(sql`
+          SELECT DISTINCT c.nome as closer_name 
+          FROM crm_deal d 
+          INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id 
+          WHERE d.stage_name = 'Negócio Ganho' 
+          ORDER BY c.nome
+        `)
       ]);
 
       res.json({
         sources: sources.rows.map((r: any) => r.source),
         categories: categories.rows.map((r: any) => r.category_name),
-        closers: closers.rows.map((r: any) => r.owner_name)
+        closers: closersResult.rows.map((r: any) => r.closer_name)
       });
     } catch (error) {
       console.error("[api] Error fetching filtros:", error);
@@ -3272,16 +3280,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { dataInicio, dataFim } = req.query;
 
       const conditions: ReturnType<typeof sql>[] = [
-        sql`stage_name = 'Negócio Ganho (WON)'`,
-        sql`close_date IS NOT NULL`,
+        sql`stage_name = 'Negócio Ganho'`,
+        sql`data_fechamento IS NOT NULL`,
         sql`created_date IS NOT NULL`
       ];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}::date`);
+        conditions.push(sql`data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
@@ -3289,53 +3297,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.execute(sql`
         SELECT 
           CASE 
-            WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 7 THEN '0-7 dias'
-            WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 14 THEN '8-14 dias'
-            WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 30 THEN '15-30 dias'
-            WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 60 THEN '31-60 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 7 THEN '0-7 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 14 THEN '8-14 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 30 THEN '15-30 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 60 THEN '31-60 dias'
             ELSE '60+ dias'
           END as faixa,
           COUNT(*) as quantidade,
           COALESCE(SUM(valor_recorrente) + SUM(valor_pontual), 0) as valor_total,
-          COALESCE(AVG(valor_recorrente + valor_pontual), 0) as ticket_medio
+          COALESCE(AVG(COALESCE(valor_recorrente, 0) + COALESCE(valor_pontual, 0)), 0) as ticket_medio
         FROM crm_deal
         ${whereClause}
         GROUP BY 
           CASE 
-            WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 7 THEN '0-7 dias'
-            WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 14 THEN '8-14 dias'
-            WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 30 THEN '15-30 dias'
-            WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 60 THEN '31-60 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 7 THEN '0-7 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 14 THEN '8-14 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 30 THEN '15-30 dias'
+            WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 60 THEN '31-60 dias'
             ELSE '60+ dias'
           END
         ORDER BY 
           CASE 
             WHEN CASE 
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 7 THEN '0-7 dias'
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 14 THEN '8-14 dias'
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 30 THEN '15-30 dias'
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 60 THEN '31-60 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 7 THEN '0-7 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 14 THEN '8-14 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 30 THEN '15-30 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 60 THEN '31-60 dias'
               ELSE '60+ dias'
             END = '0-7 dias' THEN 1
             WHEN CASE 
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 7 THEN '0-7 dias'
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 14 THEN '8-14 dias'
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 30 THEN '15-30 dias'
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 60 THEN '31-60 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 7 THEN '0-7 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 14 THEN '8-14 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 30 THEN '15-30 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 60 THEN '31-60 dias'
               ELSE '60+ dias'
             END = '8-14 dias' THEN 2
             WHEN CASE 
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 7 THEN '0-7 dias'
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 14 THEN '8-14 dias'
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 30 THEN '15-30 dias'
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 60 THEN '31-60 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 7 THEN '0-7 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 14 THEN '8-14 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 30 THEN '15-30 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 60 THEN '31-60 dias'
               ELSE '60+ dias'
             END = '15-30 dias' THEN 3
             WHEN CASE 
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 7 THEN '0-7 dias'
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 14 THEN '8-14 dias'
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 30 THEN '15-30 dias'
-              WHEN EXTRACT(EPOCH FROM (close_date - created_date)) / 86400 <= 60 THEN '31-60 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 7 THEN '0-7 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 14 THEN '8-14 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 30 THEN '15-30 dias'
+              WHEN EXTRACT(EPOCH FROM (data_fechamento - created_date)) / 86400 <= 60 THEN '31-60 dias'
               ELSE '60+ dias'
             END = '31-60 dias' THEN 4
             ELSE 5
@@ -3360,14 +3368,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { dataInicio, dataFim } = req.query;
 
       const conditions: ReturnType<typeof sql>[] = [
-        sql`stage_name = 'Negócio Ganho (WON)'`
+        sql`stage_name = 'Negócio Ganho'`
       ];
 
       if (dataInicio) {
-        conditions.push(sql`close_date >= ${dataInicio}::date`);
+        conditions.push(sql`data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`close_date <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
