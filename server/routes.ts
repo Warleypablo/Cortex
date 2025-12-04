@@ -1805,6 +1805,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sharedConditions.push(sql`d.closer = ${closerId}`);
       }
 
+      console.log("[closers/metrics] Query params:", {
+        dataReuniaoInicio,
+        dataReuniaoFim,
+        dataFechamentoInicio,
+        dataFechamentoFim,
+        dataLeadInicio,
+        dataLeadFim,
+        source,
+        pipeline,
+        closerId
+      });
       console.log("[closers/metrics] Executing independent metrics queries...");
       
       // Query 1: Reuniões realizadas - filtered ONLY by reunion dates
