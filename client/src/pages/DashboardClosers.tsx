@@ -84,12 +84,12 @@ export default function DashboardClosers() {
   const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
   const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
 
-  const [dataReuniaoInicio, setDataReuniaoInicio] = useState<string>("");
-  const [dataReuniaoFim, setDataReuniaoFim] = useState<string>("");
+  const [dataReuniaoInicio, setDataReuniaoInicio] = useState<string>(inicioMes);
+  const [dataReuniaoFim, setDataReuniaoFim] = useState<string>(fimMes);
   const [dataFechamentoInicio, setDataFechamentoInicio] = useState<string>(inicioMes);
   const [dataFechamentoFim, setDataFechamentoFim] = useState<string>(fimMes);
-  const [dataLeadInicio, setDataLeadInicio] = useState<string>("");
-  const [dataLeadFim, setDataLeadFim] = useState<string>("");
+  const [dataLeadInicio, setDataLeadInicio] = useState<string>(inicioMes);
+  const [dataLeadFim, setDataLeadFim] = useState<string>(fimMes);
   const [source, setSource] = useState<string>("all");
   const [pipeline, setPipeline] = useState<string>("all");
   const [closerId, setCloserId] = useState<string>("all");
@@ -113,8 +113,12 @@ export default function DashboardClosers() {
     const inicioNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth(), 1).toISOString().split('T')[0];
     const fimNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth() + 1, 0).toISOString().split('T')[0];
     
+    setDataReuniaoInicio(inicioNovoMes);
+    setDataReuniaoFim(fimNovoMes);
     setDataFechamentoInicio(inicioNovoMes);
     setDataFechamentoFim(fimNovoMes);
+    setDataLeadInicio(inicioNovoMes);
+    setDataLeadFim(fimNovoMes);
     setMesAtual(novoMes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   };
 
@@ -123,8 +127,12 @@ export default function DashboardClosers() {
     const inicioMesAtual = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0];
     const fimMesAtual = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0];
     
+    setDataReuniaoInicio(inicioMesAtual);
+    setDataReuniaoFim(fimMesAtual);
     setDataFechamentoInicio(inicioMesAtual);
     setDataFechamentoFim(fimMesAtual);
+    setDataLeadInicio(inicioMesAtual);
+    setDataLeadFim(fimMesAtual);
     setMesAtual(agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   };
 
