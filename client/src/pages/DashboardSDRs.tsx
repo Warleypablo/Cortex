@@ -60,12 +60,20 @@ interface ChartDataReunioes {
   conversao: number;
 }
 
+interface MRRData {
+  sdr: string;
+  mrr: number;
+  pontual: number;
+  contratos: number;
+}
+
 interface RankingSDR {
   position: number;
   name: string;
   leads: number;
   reunioesRealizadas: number;
   conversao: number;
+  mrr: number;
   trend: 'up' | 'down' | 'stable';
 }
 
@@ -163,6 +171,21 @@ export default function DashboardSDRs() {
     refetchInterval: 60000,
   });
 
+  const mrrQueryParams = new URLSearchParams();
+  if (dataReuniaoInicio) mrrQueryParams.append("dataInicio", dataReuniaoInicio);
+  if (dataReuniaoFim) mrrQueryParams.append("dataFim", dataReuniaoFim);
+  if (source && source !== "all") mrrQueryParams.append("source", source);
+  if (pipeline && pipeline !== "all") mrrQueryParams.append("pipeline", pipeline);
+
+  const { data: mrrData, isLoading: isLoadingMRR } = useQuery<MRRData[]>({
+    queryKey: ["/api/vendas/mrr-por-sdr", mrrQueryParams.toString()],
+    queryFn: async () => {
+      const res = await fetch(`/api/vendas/mrr-por-sdr?${mrrQueryParams.toString()}`);
+      return res.json();
+    },
+    refetchInterval: 60000,
+  });
+
   const clearFilters = () => {
     const agora = new Date();
     const inicioMesAtual = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0];
@@ -182,6 +205,11 @@ export default function DashboardSDRs() {
 
   const trends: Array<'up' | 'down' | 'stable'> = ['up', 'down', 'stable'];
   
+  const mrrMap = new Map<string, number>();
+  (mrrData || []).forEach(m => {
+    mrrMap.set(m.sdr, m.mrr);
+  });
+
   const ranking: RankingSDR[] = (chartReunioes || [])
     .map((c, idx) => {
       const trend: 'up' | 'down' | 'stable' = trends[Math.floor(Math.random() * 3)];
@@ -191,10 +219,11 @@ export default function DashboardSDRs() {
         leads: c.leads,
         reunioesRealizadas: c.reunioesRealizadas,
         conversao: c.conversao,
+        mrr: mrrMap.get(c.sdr) || 0,
         trend,
       };
     })
-    .sort((a, b) => b.reunioesRealizadas - a.reunioesRealizadas)
+    .sort((a, b) => b.mrr - a.mrr)
     .map((c, idx) => ({ ...c, position: idx + 1 }));
 
   const top3 = ranking.slice(0, 3);
@@ -235,7 +264,7 @@ export default function DashboardSDRs() {
     }
   };
 
-  const isLoading = isLoadingMetrics || isLoadingChart;
+  const isLoading = isLoadingMetrics || isLoadingChart || isLoadingMRR;
 
   const hasActiveFilters = (source && source !== "all") || 
     (pipeline && pipeline !== "all") || (sdrId && sdrId !== "all");
@@ -628,8 +657,14 @@ export default function DashboardSDRs() {
                         
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
-                            <span className="text-slate-400 text-sm">Reuniões</span>
-                            <span className="text-2xl font-black text-cyan-400">
+                            <span className="text-slate-400 text-sm">MRR</span>
+                            <span className="text-2xl font-black text-emerald-400">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(sdr.mrr)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 text-xs">Reuniões</span>
+                            <span className="text-sm font-semibold text-cyan-400">
                               {sdr.reunioesRealizadas}
                             </span>
                           </div>
@@ -637,12 +672,6 @@ export default function DashboardSDRs() {
                             <span className="text-slate-400 text-xs">Leads</span>
                             <span className="text-sm font-semibold text-blue-400">
                               {sdr.leads}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-slate-400 text-xs">Conversão</span>
-                            <span className="text-sm font-semibold text-emerald-400">
-                              {sdr.conversao.toFixed(1)}%
                             </span>
                           </div>
                         </div>
@@ -667,10 +696,10 @@ export default function DashboardSDRs() {
             <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
               <div className="grid grid-cols-12 gap-2 p-3 bg-slate-800/50 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 <div className="col-span-1">#</div>
-                <div className="col-span-4">SDR</div>
-                <div className="col-span-2 text-right">Leads</div>
+                <div className="col-span-3">SDR</div>
+                <div className="col-span-3 text-right">MRR</div>
                 <div className="col-span-2 text-right">Reuniões</div>
-                <div className="col-span-2 text-right">Conversão</div>
+                <div className="col-span-2 text-right">Leads</div>
                 <div className="col-span-1"></div>
               </div>
 
@@ -704,26 +733,17 @@ export default function DashboardSDRs() {
                           <span className="text-slate-500 font-mono text-sm">{sdr.position}</span>
                         )}
                       </div>
-                      <div className="col-span-4 font-medium text-white truncate">
+                      <div className="col-span-3 font-medium text-white truncate">
                         {sdr.name}
+                      </div>
+                      <div className="col-span-3 text-right font-bold text-emerald-400">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(sdr.mrr)}
+                      </div>
+                      <div className="col-span-2 text-right text-cyan-400">
+                        {sdr.reunioesRealizadas}
                       </div>
                       <div className="col-span-2 text-right text-blue-400">
                         {sdr.leads}
-                      </div>
-                      <div className="col-span-2 text-right font-bold text-cyan-400">
-                        {sdr.reunioesRealizadas}
-                      </div>
-                      <div className="col-span-2 text-right">
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs border-0 ${
-                            sdr.conversao >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
-                            sdr.conversao >= 15 ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-slate-700/50 text-slate-400'
-                          }`}
-                        >
-                          {sdr.conversao.toFixed(1)}%
-                        </Badge>
                       </div>
                       <div className="col-span-1 flex justify-end">
                         {getTrendIcon(sdr.trend)}
