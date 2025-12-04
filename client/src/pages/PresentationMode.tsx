@@ -767,7 +767,7 @@ export default function PresentationMode() {
                       <div className="col-span-1"></div>
                     </div>
 
-                    <div className="divide-y divide-slate-800/50 max-h-[400px] overflow-y-auto">
+                    <div className="divide-y divide-slate-800/50">
                       {isLoadingClosers ? (
                         Array.from({ length: 5 }).map((_, i) => (
                           <div key={i} className="p-3">
@@ -1210,7 +1210,7 @@ export default function PresentationMode() {
                       <div className="col-span-2 text-right">Conv.</div>
                     </div>
 
-                    <div className="divide-y divide-slate-800/50 max-h-[400px] overflow-y-auto">
+                    <div className="divide-y divide-slate-800/50">
                       {isLoadingSDRs ? (
                         Array.from({ length: 5 }).map((_, i) => (
                           <div key={i} className="p-3">
@@ -1271,6 +1271,183 @@ export default function PresentationMode() {
                   </div>
                 </div>
               </div>
+
+              {/* BARRA DE META REUNIÕES SDR */}
+              <motion.div 
+                className="mt-6 relative"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.6 }}
+              >
+                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/50 p-6">
+                  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    <div className="absolute -top-20 -left-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl" />
+                    <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl" />
+                    {(() => {
+                      const META_REUNIOES = 500;
+                      const reunioesAtual = sdrMetrics?.reunioesRealizadas || 0;
+                      const percentual = Math.min((reunioesAtual / META_REUNIOES) * 100, 100);
+                      
+                      if (percentual >= 100) {
+                        return (
+                          <motion.div
+                            className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 via-teal-500/10 to-cyan-500/5"
+                            animate={{ opacity: [0.3, 0.6, 0.3] }}
+                            transition={{ duration: 2, repeat: Infinity }}
+                          />
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <motion.div 
+                          className="p-3 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 shadow-lg shadow-cyan-500/30"
+                          animate={{ scale: [1, 1.05, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        >
+                          <CalendarCheck className="w-6 h-6 text-white" />
+                        </motion.div>
+                        <div>
+                          <h2 className="text-2xl font-black text-white">META DE REUNIÕES</h2>
+                          <p className="text-slate-400 text-sm">Reuniões Agendadas</p>
+                        </div>
+                      </div>
+                      
+                      <div className="text-right">
+                        <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Meta</div>
+                        <div className="text-3xl font-black text-white">500</div>
+                      </div>
+                    </div>
+
+                    {(() => {
+                      const META_REUNIOES = 500;
+                      const reunioesAtual = sdrMetrics?.reunioesRealizadas || 0;
+                      const percentual = Math.min((reunioesAtual / META_REUNIOES) * 100, 100);
+                      const faltam = Math.max(META_REUNIOES - reunioesAtual, 0);
+                      const atingida = percentual >= 100;
+                      
+                      return (
+                        <>
+                          <div className="relative h-12 bg-slate-800/80 rounded-xl overflow-hidden border border-slate-700/50">
+                            <motion.div
+                              className={`absolute inset-y-0 left-0 rounded-xl ${
+                                atingida 
+                                  ? 'bg-gradient-to-r from-cyan-500 via-teal-400 to-cyan-500'
+                                  : percentual >= 80 
+                                    ? 'bg-gradient-to-r from-cyan-600 via-cyan-500 to-teal-400'
+                                    : percentual >= 50
+                                      ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-400'
+                                      : 'bg-gradient-to-r from-rose-600 via-rose-500 to-orange-400'
+                              }`}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${percentual}%` }}
+                              transition={{ duration: 2, ease: "easeOut", delay: 0.3 }}
+                            >
+                              <motion.div
+                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                                animate={{ x: ["-100%", "100%"] }}
+                                transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                              />
+                            </motion.div>
+                            
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <motion.span 
+                                className="text-2xl font-black text-white drop-shadow-lg"
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ delay: 1.5, type: "spring", stiffness: 200 }}
+                              >
+                                {percentual.toFixed(1)}%
+                              </motion.span>
+                            </div>
+
+                            {[25, 50, 75, 100].map((milestone) => (
+                              <div
+                                key={milestone}
+                                className="absolute top-0 bottom-0 w-px bg-slate-600/50"
+                                style={{ left: `${milestone}%` }}
+                              />
+                            ))}
+                          </div>
+
+                          <div className="flex items-center justify-between mt-4">
+                            <div className="flex items-center gap-6">
+                              <div>
+                                <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Realizadas</div>
+                                <motion.div 
+                                  className="text-3xl font-black text-cyan-400"
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  transition={{ delay: 0.8 }}
+                                >
+                                  {reunioesAtual}
+                                </motion.div>
+                              </div>
+                              
+                              {!atingida && (
+                                <div>
+                                  <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Faltam</div>
+                                  <motion.div 
+                                    className="text-3xl font-black text-amber-400"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 1 }}
+                                  >
+                                    {faltam}
+                                  </motion.div>
+                                </div>
+                              )}
+                            </div>
+
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ delay: 1.2, type: "spring" }}
+                            >
+                              {atingida ? (
+                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500/20 to-teal-500/20 border border-cyan-500/30">
+                                  <motion.div
+                                    animate={{ rotate: [0, 10, -10, 0] }}
+                                    transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
+                                  >
+                                    <Trophy className="w-6 h-6 text-yellow-400" />
+                                  </motion.div>
+                                  <span className="text-xl font-black text-cyan-400">META BATIDA!</span>
+                                  <motion.div
+                                    animate={{ scale: [1, 1.3, 1] }}
+                                    transition={{ duration: 1, repeat: Infinity }}
+                                  >
+                                    <Sparkles className="w-5 h-5 text-yellow-400" />
+                                  </motion.div>
+                                </div>
+                              ) : percentual >= 80 ? (
+                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500/20 to-teal-500/20 border border-cyan-500/30">
+                                  <Flame className="w-5 h-5 text-orange-400" />
+                                  <span className="text-lg font-bold text-cyan-400">Quase lá!</span>
+                                </div>
+                              ) : percentual >= 50 ? (
+                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-500/30">
+                                  <TrendingUp className="w-5 h-5 text-amber-400" />
+                                  <span className="text-lg font-bold text-amber-400">Bom progresso!</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-500/20 border border-rose-500/30">
+                                  <Zap className="w-5 h-5 text-rose-400" />
+                                  <span className="text-lg font-bold text-rose-400">Hora de acelerar!</span>
+                                </div>
+                              )}
+                            </motion.div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
