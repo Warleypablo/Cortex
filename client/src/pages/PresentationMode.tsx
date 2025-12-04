@@ -499,7 +499,7 @@ export default function PresentationMode() {
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 flex-1 flex flex-col p-4 lg:p-6 overflow-y-auto">
+      <div className="relative z-10 flex-1 flex flex-col p-4 lg:p-5 overflow-hidden">
         <AnimatePresence mode="wait">
           {currentView === 'closers' ? (
             <motion.div
@@ -508,7 +508,7 @@ export default function PresentationMode() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.4 }}
-              className="space-y-3"
+              className="h-full flex flex-col gap-3"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -670,8 +670,8 @@ export default function PresentationMode() {
                 </motion.div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2">
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
+                <div className="lg:col-span-2 flex flex-col">
                   <div className="mb-2 flex items-center gap-2">
                     <Trophy className="w-5 h-5 text-yellow-400" />
                     <h2 className="text-xl font-bold text-white">Pódio</h2>
@@ -684,19 +684,19 @@ export default function PresentationMode() {
                   </div>
 
                   {isLoadingClosers ? (
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="flex-1 grid grid-cols-3 gap-3">
                       {[0, 1, 2].map(i => (
-                        <Skeleton key={i} className="h-48 bg-slate-800 rounded-xl" />
+                        <Skeleton key={i} className="bg-slate-800 rounded-xl" />
                       ))}
                     </div>
                   ) : closerTop3.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-3 items-end">
+                    <div className="flex-1 grid grid-cols-3 gap-3 items-end">
                       {[1, 0, 2].map((orderIndex) => {
                         const closer = closerTop3[orderIndex];
                         if (!closer) return <div key={orderIndex} />;
                         
                         const isFirst = closer.position === 1;
-                        const heights = { 0: 'h-64', 1: 'h-56', 2: 'h-48' };
+                        const heightPercents = { 0: '100%', 1: '85%', 2: '70%' };
                         
                         return (
                           <motion.div
@@ -704,7 +704,8 @@ export default function PresentationMode() {
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.3 + orderIndex * 0.15 }}
-                            className={`relative ${heights[orderIndex as keyof typeof heights]}`}
+                            className="relative"
+                            style={{ height: heightPercents[orderIndex as keyof typeof heightPercents] }}
                           >
                             <div 
                               className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${getPositionGradient(closer.position)} border-2 ${getPositionBorder(closer.position)} shadow-xl backdrop-blur-sm overflow-hidden`}
@@ -778,29 +779,30 @@ export default function PresentationMode() {
                       })}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center h-64 rounded-2xl bg-slate-900/50 border border-slate-800">
+                    <div className="flex-1 flex items-center justify-center rounded-2xl bg-slate-900/50 border border-slate-800">
                       <p className="text-slate-400">Nenhum dado disponível</p>
                     </div>
                   )}
                 </div>
 
-                <div>
-                  <div className="mb-2 flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-violet-400" />
-                    <h2 className="text-lg font-bold text-white">Ranking Completo</h2>
-                  </div>
-
-                  <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl overflow-hidden">
-                    <div className="grid grid-cols-12 gap-1 p-1.5 bg-slate-800/50 text-[8px] font-semibold text-slate-400 uppercase tracking-wider">
-                      <div className="col-span-1">#</div>
-                      <div className="col-span-3">Closer</div>
-                      <div className="col-span-2 text-right">MRR</div>
-                      <div className="col-span-2 text-right">Pont.</div>
-                      <div className="col-span-2 text-right">Total</div>
-                      <div className="col-span-2 text-right">Reun.</div>
+                <div className="flex flex-col gap-3 overflow-hidden">
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-violet-400" />
+                      <h2 className="text-lg font-bold text-white">Ranking Completo</h2>
                     </div>
 
-                    <div className="divide-y divide-slate-800/50 max-h-[180px] overflow-y-auto">
+                    <div className="flex-1 bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl overflow-hidden flex flex-col">
+                      <div className="grid grid-cols-12 gap-1 p-1.5 bg-slate-800/50 text-[8px] font-semibold text-slate-400 uppercase tracking-wider">
+                        <div className="col-span-1">#</div>
+                        <div className="col-span-3">Closer</div>
+                        <div className="col-span-2 text-right">MRR</div>
+                        <div className="col-span-2 text-right">Pont.</div>
+                        <div className="col-span-2 text-right">Total</div>
+                        <div className="col-span-2 text-right">Reun.</div>
+                      </div>
+
+                      <div className="divide-y divide-slate-800/50 flex-1 overflow-y-auto">
                       {isLoadingClosers ? (
                         Array.from({ length: 5 }).map((_, i) => (
                           <div key={i} className="p-2">
@@ -851,6 +853,7 @@ export default function PresentationMode() {
                           Nenhum closer encontrado
                         </div>
                       )}
+                      </div>
                     </div>
                   </div>
 
@@ -859,7 +862,6 @@ export default function PresentationMode() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 }}
-                    className="mt-4"
                   >
                     <div className="mb-2 flex items-center gap-2">
                       <Zap className="w-4 h-4 text-blue-400" />
