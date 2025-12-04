@@ -720,17 +720,17 @@ export default function PresentationMode() {
                                 </div>
                               )}
 
-                              <div className="relative p-3 h-full flex flex-col">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className={`flex items-center justify-center w-8 h-8 rounded-lg ${
+                              <div className="relative p-4 h-full flex flex-col">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${
                                     closer.position === 1 ? 'bg-yellow-500/20' :
                                     closer.position === 2 ? 'bg-gray-400/20' : 'bg-amber-600/20'
                                   }`}>
-                                    {closer.position === 1 && <Crown className="w-5 h-5 text-yellow-400" />}
-                                    {closer.position === 2 && <Medal className="w-4 h-4 text-gray-300" />}
-                                    {closer.position === 3 && <Medal className="w-4 h-4 text-amber-600" />}
+                                    {closer.position === 1 && <Crown className="w-6 h-6 text-yellow-400" />}
+                                    {closer.position === 2 && <Medal className="w-5 h-5 text-gray-300" />}
+                                    {closer.position === 3 && <Medal className="w-5 h-5 text-amber-600" />}
                                   </div>
-                                  <div className={`text-[10px] font-bold uppercase ${
+                                  <div className={`text-xs font-bold uppercase tracking-wide ${
                                     closer.position === 1 ? 'text-yellow-400' :
                                     closer.position === 2 ? 'text-gray-300' : 'text-amber-500'
                                   }`}>
@@ -739,37 +739,43 @@ export default function PresentationMode() {
                                   </div>
                                 </div>
 
-                                <h3 className="text-sm lg:text-base font-bold text-white truncate mb-2">
+                                <h3 className="text-base lg:text-lg font-bold text-white truncate mb-3">
                                   {closer.name}
                                 </h3>
 
-                                <div className="space-y-1 flex-1">
+                                <div className="flex-1 space-y-2">
                                   <div className="flex justify-between items-center">
-                                    <span className="text-[10px] text-slate-400">MRR</span>
-                                    <span className="text-xs font-semibold text-emerald-400">
+                                    <span className="text-xs text-slate-400">Total</span>
+                                    <span className="text-lg font-bold text-white">
+                                      {formatCurrencyCompact(closer.total)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-slate-400">MRR</span>
+                                    <span className="text-sm font-semibold text-emerald-400">
                                       {formatCurrencyCompact(closer.mrr)}
                                     </span>
                                   </div>
                                   <div className="flex justify-between items-center">
-                                    <span className="text-[10px] text-slate-400">Pontual</span>
-                                    <span className="text-xs font-semibold text-blue-400">
+                                    <span className="text-xs text-slate-400">Pontual</span>
+                                    <span className="text-sm font-semibold text-blue-400">
                                       {formatCurrencyCompact(closer.pontual)}
                                     </span>
                                   </div>
                                 </div>
 
-                                <div className="mt-2 pt-2 border-t border-slate-700/50 grid grid-cols-3 gap-1 text-center">
+                                <div className="mt-3 pt-3 border-t border-slate-700/50 grid grid-cols-3 gap-2 text-center">
                                   <div>
-                                    <div className="text-sm font-bold text-white">{closer.reunioes}</div>
-                                    <div className="text-[8px] text-slate-400 uppercase">Reun.</div>
+                                    <div className="text-base font-bold text-white">{closer.reunioes}</div>
+                                    <div className="text-[9px] text-slate-400 uppercase">Reuniões</div>
                                   </div>
                                   <div>
-                                    <div className="text-sm font-bold text-white">{closer.negocios}</div>
-                                    <div className="text-[8px] text-slate-400 uppercase">Fech.</div>
+                                    <div className="text-base font-bold text-white">{closer.negocios}</div>
+                                    <div className="text-[9px] text-slate-400 uppercase">Fechados</div>
                                   </div>
                                   <div>
-                                    <div className="text-sm font-bold text-white">{closer.taxa.toFixed(0)}%</div>
-                                    <div className="text-[8px] text-slate-400 uppercase">Conv.</div>
+                                    <div className="text-base font-bold text-white">{closer.taxa.toFixed(0)}%</div>
+                                    <div className="text-[9px] text-slate-400 uppercase">Taxa</div>
                                   </div>
                                 </div>
                               </div>
