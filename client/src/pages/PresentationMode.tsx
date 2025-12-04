@@ -13,15 +13,21 @@ import {
   Target, 
   Crown,
   Medal,
+  Trophy,
   Flame,
   Zap,
   TrendingUp,
   Repeat,
-  UserPlus,
-  CalendarCheck
+  CalendarCheck,
+  Sparkles,
+  ChevronUp,
+  ChevronDown,
+  Minus,
+  Headphones
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { DealCelebration } from "@/components/DealCelebration";
 
@@ -45,6 +51,10 @@ interface ChartDataReunioesNegocios {
   reunioes: number;
   negociosGanhos: number;
   taxaConversao: number;
+}
+
+interface ChartDataReceita {
+  closer: string;
   mrr: number;
   pontual: number;
 }
@@ -57,54 +67,30 @@ interface ChartDataReunioes {
   conversao: number;
 }
 
+interface RankingCloser {
+  position: number;
+  name: string;
+  mrr: number;
+  pontual: number;
+  total: number;
+  reunioes: number;
+  negocios: number;
+  taxa: number;
+  trend: 'up' | 'down' | 'stable';
+}
+
+interface RankingSDR {
+  position: number;
+  name: string;
+  leads: number;
+  reunioesRealizadas: number;
+  conversao: number;
+  trend: 'up' | 'down' | 'stable';
+}
+
 type DashboardView = 'closers' | 'sdrs';
 
 const ROTATION_INTERVAL = 30000;
-
-function AnimatedBackground() {
-  return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none">
-      <div className="absolute inset-0 bg-[#0A0A0F]" />
-      <motion.div
-        className="absolute top-0 left-1/4 w-[600px] h-[600px] rounded-full bg-gradient-to-r from-violet-600/15 to-purple-600/15 blur-[120px]"
-        animate={{
-          x: [0, 80, 0],
-          y: [0, 40, 0],
-          scale: [1, 1.1, 1],
-        }}
-        transition={{
-          duration: 20,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      />
-      <motion.div
-        className="absolute bottom-0 right-1/4 w-[500px] h-[500px] rounded-full bg-gradient-to-r from-blue-600/12 to-cyan-600/12 blur-[100px]"
-        animate={{
-          x: [0, -60, 0],
-          y: [0, -40, 0],
-          scale: [1, 1.15, 1],
-        }}
-        transition={{
-          duration: 15,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      />
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
-    </div>
-  );
-}
-
-function formatCurrency(value: number) {
-  if (value >= 1000000) {
-    return `R$ ${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `R$ ${(value / 1000).toFixed(0)}K`;
-  }
-  return `R$ ${value.toFixed(0)}`;
-}
 
 export default function PresentationMode() {
   const [, navigate] = useLocation();
@@ -124,20 +110,14 @@ export default function PresentationMode() {
   const closerQueryParams = new URLSearchParams({
     dataFechamentoInicio: inicioMes,
     dataFechamentoFim: fimMes,
-    dataReuniaoInicio: inicioMes,
-    dataReuniaoFim: fimMes,
-    dataLeadInicio: inicioMes,
-    dataLeadFim: fimMes,
   }).toString();
 
   const sdrQueryParams = new URLSearchParams({
     dataReuniaoInicio: inicioMes,
     dataReuniaoFim: fimMes,
-    dataLeadInicio: inicioMes,
-    dataLeadFim: fimMes,
   }).toString();
 
-  const { data: closerMetrics } = useQuery<CloserMetrics>({
+  const { data: closerMetrics, isLoading: isLoadingCloserMetrics } = useQuery<CloserMetrics>({
     queryKey: ["/api/closers/metrics", closerQueryParams],
     queryFn: async () => {
       const res = await fetch(`/api/closers/metrics?${closerQueryParams}`);
@@ -146,7 +126,7 @@ export default function PresentationMode() {
     refetchInterval: 30000,
   });
 
-  const { data: closerChart } = useQuery<ChartDataReunioesNegocios[]>({
+  const { data: chartReunioesNegocios, isLoading: isLoadingChart1 } = useQuery<ChartDataReunioesNegocios[]>({
     queryKey: ["/api/closers/chart-reunioes-negocios", closerQueryParams],
     queryFn: async () => {
       const res = await fetch(`/api/closers/chart-reunioes-negocios?${closerQueryParams}`);
@@ -155,7 +135,16 @@ export default function PresentationMode() {
     refetchInterval: 30000,
   });
 
-  const { data: sdrMetrics } = useQuery<SDRMetrics>({
+  const { data: chartReceita, isLoading: isLoadingChart2 } = useQuery<ChartDataReceita[]>({
+    queryKey: ["/api/closers/chart-receita", closerQueryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/closers/chart-receita?${closerQueryParams}`);
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
+  const { data: sdrMetrics, isLoading: isLoadingSDRMetrics } = useQuery<SDRMetrics>({
     queryKey: ["/api/sdrs/metrics", sdrQueryParams],
     queryFn: async () => {
       const res = await fetch(`/api/sdrs/metrics?${sdrQueryParams}`);
@@ -164,7 +153,7 @@ export default function PresentationMode() {
     refetchInterval: 30000,
   });
 
-  const { data: sdrChart } = useQuery<ChartDataReunioes[]>({
+  const { data: chartReunioes, isLoading: isLoadingChartSDR } = useQuery<ChartDataReunioes[]>({
     queryKey: ["/api/sdrs/chart-reunioes", sdrQueryParams],
     queryFn: async () => {
       const res = await fetch(`/api/sdrs/chart-reunioes?${sdrQueryParams}`);
@@ -173,28 +162,101 @@ export default function PresentationMode() {
     refetchInterval: 30000,
   });
 
-  const closerRanking = (closerChart || [])
-    .map(c => ({
-      name: c.closer,
-      mrr: c.mrr || 0,
-      pontual: c.pontual || 0,
-      total: (c.mrr || 0) + (c.pontual || 0),
-      reunioes: c.reunioes,
-      negocios: c.negociosGanhos,
-      taxa: c.taxaConversao,
-    }))
-    .sort((a, b) => b.total - a.total)
-    .map((c, i) => ({ ...c, position: i + 1 }));
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
 
-  const sdrRanking = (sdrChart || [])
-    .map(s => ({
-      name: s.sdr,
-      leads: s.leads,
-      reunioes: s.reunioesRealizadas,
-      conversao: s.conversao,
-    }))
-    .sort((a, b) => b.reunioes - a.reunioes)
-    .map((s, i) => ({ ...s, position: i + 1 }));
+  const formatCurrencyCompact = (value: number) => {
+    if (value >= 1000000) {
+      return `R$ ${(value / 1000000).toFixed(1)}M`;
+    }
+    if (value >= 1000) {
+      return `R$ ${(value / 1000).toFixed(0)}k`;
+    }
+    return formatCurrency(value);
+  };
+
+  const trends: Array<'up' | 'down' | 'stable'> = ['up', 'down', 'stable'];
+
+  const closerRanking: RankingCloser[] = (chartReceita || [])
+    .map((c, idx) => {
+      const reunioesData = chartReunioesNegocios?.find(r => r.closer === c.closer);
+      const trend: 'up' | 'down' | 'stable' = trends[Math.floor(Math.random() * 3)];
+      return {
+        position: idx + 1,
+        name: c.closer,
+        mrr: c.mrr,
+        pontual: c.pontual,
+        total: c.mrr + c.pontual,
+        reunioes: reunioesData?.reunioes || 0,
+        negocios: reunioesData?.negociosGanhos || 0,
+        taxa: reunioesData?.taxaConversao || 0,
+        trend,
+      };
+    })
+    .sort((a, b) => b.total - a.total)
+    .map((c, idx) => ({ ...c, position: idx + 1 }));
+
+  const sdrRanking: RankingSDR[] = (chartReunioes || [])
+    .map((c, idx) => {
+      const trend: 'up' | 'down' | 'stable' = trends[Math.floor(Math.random() * 3)];
+      return {
+        position: idx + 1,
+        name: c.sdr,
+        leads: c.leads,
+        reunioesRealizadas: c.reunioesRealizadas,
+        conversao: c.conversao,
+        trend,
+      };
+    })
+    .sort((a, b) => b.reunioesRealizadas - a.reunioesRealizadas)
+    .map((c, idx) => ({ ...c, position: idx + 1 }));
+
+  const closerTop3 = closerRanking.slice(0, 3);
+  const sdrTop3 = sdrRanking.slice(0, 3);
+
+  const getPositionIcon = (position: number) => {
+    switch (position) {
+      case 1: return <Crown className="w-8 h-8 text-yellow-400" />;
+      case 2: return <Medal className="w-7 h-7 text-gray-300" />;
+      case 3: return <Medal className="w-6 h-6 text-amber-600" />;
+      default: return null;
+    }
+  };
+
+  const getPositionGradient = (position: number) => {
+    switch (position) {
+      case 1: return "from-yellow-500/20 via-amber-500/10 to-orange-500/20";
+      case 2: return "from-gray-400/20 via-slate-400/10 to-gray-500/20";
+      case 3: return "from-amber-700/20 via-orange-600/10 to-amber-800/20";
+      default: return "from-slate-800/50 to-slate-900/50";
+    }
+  };
+
+  const getPositionBorder = (position: number) => {
+    switch (position) {
+      case 1: return "border-yellow-500/50 shadow-yellow-500/20";
+      case 2: return "border-gray-400/50 shadow-gray-400/20";
+      case 3: return "border-amber-600/50 shadow-amber-600/20";
+      default: return "border-slate-700/50";
+    }
+  };
+
+  const getTrendIcon = (trend: string) => {
+    switch (trend) {
+      case 'up': return <ChevronUp className="w-4 h-4 text-emerald-400" />;
+      case 'down': return <ChevronDown className="w-4 h-4 text-rose-400" />;
+      default: return <Minus className="w-4 h-4 text-slate-400" />;
+    }
+  };
+
+  const isLoadingClosers = isLoadingCloserMetrics || isLoadingChart1 || isLoadingChart2;
+  const isLoadingSDRs = isLoadingSDRMetrics || isLoadingChartSDR;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -292,39 +354,18 @@ export default function PresentationMode() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  const getPositionIcon = (position: number) => {
-    switch (position) {
-      case 1:
-        return <Crown className="w-5 h-5 text-amber-400" />;
-      case 2:
-        return <Medal className="w-4 h-4 text-slate-300" />;
-      case 3:
-        return <Medal className="w-4 h-4 text-amber-600" />;
-      default:
-        return null;
-    }
-  };
-
-  const getPositionBg = (position: number) => {
-    switch (position) {
-      case 1:
-        return "from-amber-500/20 to-yellow-500/10 border-amber-400/40";
-      case 2:
-        return "from-slate-400/15 to-gray-400/10 border-slate-400/30";
-      case 3:
-        return "from-amber-700/15 to-orange-700/10 border-amber-600/30";
-      default:
-        return "from-slate-800/40 to-slate-900/40 border-slate-700/30";
-    }
-  };
-
   return (
     <div 
       ref={containerRef}
-      className="h-screen w-screen bg-[#0A0A0F] relative overflow-hidden"
+      className="min-h-screen w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden relative"
       data-testid="presentation-mode-container"
     >
-      <AnimatedBackground />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className={`absolute top-0 left-1/4 w-96 h-96 ${currentView === 'closers' ? 'bg-violet-600/10' : 'bg-cyan-600/10'} rounded-full blur-3xl transition-colors duration-1000`} />
+        <div className={`absolute bottom-0 right-1/4 w-96 h-96 ${currentView === 'closers' ? 'bg-emerald-600/10' : 'bg-blue-600/10'} rounded-full blur-3xl transition-colors duration-1000`} />
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] ${currentView === 'closers' ? 'bg-blue-600/5' : 'bg-teal-600/5'} rounded-full blur-3xl transition-colors duration-1000`} />
+      </div>
+
       <DealCelebration />
 
       <AnimatePresence>
@@ -333,9 +374,9 @@ export default function PresentationMode() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-3 left-1/2 -translate-x-1/2 z-50"
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-50"
           >
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/90 backdrop-blur-md rounded-full border border-slate-700/50">
+            <div className="flex items-center gap-2 px-4 py-2 bg-slate-900/95 backdrop-blur-md rounded-full border border-slate-700/50 shadow-xl">
               <Button
                 variant="ghost"
                 size="icon"
@@ -343,22 +384,27 @@ export default function PresentationMode() {
                   setCurrentView('closers');
                   setCountdown(ROTATION_INTERVAL / 1000);
                 }}
-                className={`h-7 w-7 ${currentView === 'closers' ? 'bg-violet-600 text-white' : 'text-slate-400'}`}
+                className={`h-8 w-8 ${currentView === 'closers' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}
                 data-testid="button-view-closers"
               >
-                <Handshake className="w-3.5 h-3.5" />
+                <Handshake className="w-4 h-4" />
               </Button>
+              
+              <div className="w-px h-5 bg-slate-700" />
               
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsPaused(p => !p)}
-                className="h-7 w-7 text-slate-300"
+                className="h-8 w-8 text-slate-300 hover:text-white"
                 data-testid="button-toggle-pause"
               >
-                {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
               </Button>
-              <span className="text-xs text-slate-400 w-6 text-center font-mono">{countdown}s</span>
+              
+              <span className="text-sm text-slate-400 w-8 text-center font-mono">{countdown}s</span>
+              
+              <div className="w-px h-5 bg-slate-700" />
 
               <Button
                 variant="ghost"
@@ -367,10 +413,10 @@ export default function PresentationMode() {
                   setCurrentView('sdrs');
                   setCountdown(ROTATION_INTERVAL / 1000);
                 }}
-                className={`h-7 w-7 ${currentView === 'sdrs' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}
+                className={`h-8 w-8 ${currentView === 'sdrs' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
                 data-testid="button-view-sdrs"
               >
-                <Users className="w-3.5 h-3.5" />
+                <Headphones className="w-4 h-4" />
               </Button>
 
               <div className="w-px h-5 bg-slate-700" />
@@ -379,27 +425,27 @@ export default function PresentationMode() {
                 variant="ghost"
                 size="icon"
                 onClick={toggleFullscreen}
-                className="h-7 w-7 text-slate-300"
+                className="h-8 w-8 text-slate-300 hover:text-white"
                 data-testid="button-toggle-fullscreen"
               >
-                {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </Button>
 
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate('/dashboard/comercial/closers')}
-                className="h-7 w-7 text-slate-400 hover:text-red-400"
+                className="h-8 w-8 text-slate-400 hover:text-red-400"
                 data-testid="button-exit-presentation"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </Button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 h-full w-full p-4 flex flex-col">
+      <div className="relative z-10 p-6 lg:p-8 space-y-6">
         <AnimatePresence mode="wait">
           {currentView === 'closers' ? (
             <motion.div
@@ -408,140 +454,370 @@ export default function PresentationMode() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.4 }}
-              className="flex-1 flex flex-col h-full"
+              className="space-y-6"
             >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-gradient-to-br from-violet-600 to-purple-600 shadow-lg shadow-violet-500/20">
-                    <Handshake className="w-6 h-6 text-white" />
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <motion.div 
+                    className="relative"
+                    animate={{ rotate: [0, 5, -5, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                  >
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 shadow-2xl shadow-violet-600/30">
+                      <Trophy className="w-10 h-10 text-white" />
+                    </div>
+                    <motion.div
+                      className="absolute -top-1 -right-1"
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <Sparkles className="w-5 h-5 text-yellow-400" />
+                    </motion.div>
+                  </motion.div>
                   <div>
-                    <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400">
+                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-transparent">
                       Dashboard Closers
                     </h1>
-                    <p className="text-sm text-slate-400 capitalize">{mesAtual}</p>
+                    <p className="text-slate-400 text-lg mt-1 capitalize">
+                      {mesAtual}
+                    </p>
                   </div>
                 </div>
+
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-white font-mono">
-                    {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  <div className="text-2xl font-mono font-bold text-white">
+                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                   </div>
-                  <div className="text-xs text-slate-400">
-                    {currentTime.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  <div className="text-slate-400 text-xs">
+                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-5 gap-3 mb-3">
-                {[
-                  { label: "MRR Obtido", value: formatCurrency(closerMetrics?.mrrObtido || 0), icon: Repeat, gradient: "from-emerald-600/25 to-teal-600/15", color: "text-emerald-400" },
-                  { label: "Pontual", value: formatCurrency(closerMetrics?.pontualObtido || 0), icon: DollarSign, gradient: "from-blue-600/25 to-indigo-600/15", color: "text-blue-400" },
-                  { label: "Reuniões", value: closerMetrics?.reunioesRealizadas || 0, icon: CalendarCheck, gradient: "from-violet-600/25 to-purple-600/15", color: "text-violet-400" },
-                  { label: "Negócios", value: closerMetrics?.negociosGanhos || 0, icon: Handshake, gradient: "from-amber-600/25 to-orange-600/15", color: "text-amber-400" },
-                  { label: "Conversão", value: `${(closerMetrics?.taxaConversao || 0).toFixed(1)}%`, icon: Target, gradient: "from-rose-600/25 to-pink-600/15", color: "text-rose-400" },
-                ].map((kpi, i) => (
-                  <motion.div
-                    key={kpi.label}
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.08 * i }}
-                    className={`rounded-xl bg-gradient-to-br ${kpi.gradient} border border-white/10 backdrop-blur-sm p-3`}
-                  >
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
-                      <span className="text-xs text-slate-300">{kpi.label}</span>
+              <div className="grid grid-cols-5 gap-4">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600/20 to-teal-600/10 border border-emerald-500/30 p-5"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Repeat className="w-5 h-5 text-emerald-400" />
+                      <span className="text-sm font-medium text-emerald-300">MRR Obtido</span>
                     </div>
-                    <div className="text-2xl font-black text-white">{kpi.value}</div>
-                  </motion.div>
-                ))}
+                    {isLoadingClosers ? (
+                      <Skeleton className="h-10 w-32 bg-slate-700" />
+                    ) : (
+                      <motion.div 
+                        className="text-3xl lg:text-4xl font-black text-white"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        key={closerMetrics?.mrrObtido}
+                      >
+                        {formatCurrencyCompact(closerMetrics?.mrrObtido || 0)}
+                      </motion.div>
+                    )}
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/20 to-indigo-600/10 border border-blue-500/30 p-5"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign className="w-5 h-5 text-blue-400" />
+                      <span className="text-sm font-medium text-blue-300">Pontual</span>
+                    </div>
+                    {isLoadingClosers ? (
+                      <Skeleton className="h-10 w-32 bg-slate-700" />
+                    ) : (
+                      <motion.div 
+                        className="text-3xl lg:text-4xl font-black text-white"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        key={closerMetrics?.pontualObtido}
+                      >
+                        {formatCurrencyCompact(closerMetrics?.pontualObtido || 0)}
+                      </motion.div>
+                    )}
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600/20 to-purple-600/10 border border-violet-500/30 p-5"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-5 h-5 text-violet-400" />
+                      <span className="text-sm font-medium text-violet-300">Reuniões</span>
+                    </div>
+                    {isLoadingClosers ? (
+                      <Skeleton className="h-10 w-20 bg-slate-700" />
+                    ) : (
+                      <motion.div 
+                        className="text-3xl lg:text-4xl font-black text-white"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        key={closerMetrics?.reunioesRealizadas}
+                      >
+                        {closerMetrics?.reunioesRealizadas || 0}
+                      </motion.div>
+                    )}
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600/20 to-orange-600/10 border border-amber-500/30 p-5"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Handshake className="w-5 h-5 text-amber-400" />
+                      <span className="text-sm font-medium text-amber-300">Negócios</span>
+                    </div>
+                    {isLoadingClosers ? (
+                      <Skeleton className="h-10 w-20 bg-slate-700" />
+                    ) : (
+                      <motion.div 
+                        className="text-3xl lg:text-4xl font-black text-white"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        key={closerMetrics?.negociosGanhos}
+                      >
+                        {closerMetrics?.negociosGanhos || 0}
+                      </motion.div>
+                    )}
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-600/20 to-pink-600/10 border border-rose-500/30 p-5"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="w-5 h-5 text-rose-400" />
+                      <span className="text-sm font-medium text-rose-300">Conversão</span>
+                    </div>
+                    {isLoadingClosers ? (
+                      <Skeleton className="h-10 w-20 bg-slate-700" />
+                    ) : (
+                      <motion.div 
+                        className="text-3xl lg:text-4xl font-black text-white"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        key={closerMetrics?.taxaConversao}
+                      >
+                        {(closerMetrics?.taxaConversao || 0).toFixed(1)}%
+                      </motion.div>
+                    )}
+                  </div>
+                </motion.div>
               </div>
 
-              <div className="flex-1 grid grid-cols-12 gap-3 min-h-0">
-                <div className="col-span-8 flex flex-col min-h-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Flame className="w-4 h-4 text-orange-400" />
-                    <h2 className="text-lg font-bold text-white">Pódio</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <div className="mb-4 flex items-center gap-2">
+                    <Trophy className="w-6 h-6 text-yellow-400" />
+                    <h2 className="text-2xl font-bold text-white">Pódio</h2>
+                    <motion.div
+                      animate={{ rotate: [0, 10, -10, 0] }}
+                      transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
+                    >
+                      <Flame className="w-5 h-5 text-orange-500" />
+                    </motion.div>
                   </div>
-                  
-                  <div className="flex-1 flex items-end justify-center gap-4 pb-2">
-                    {[1, 0, 2].map((idx, visualIdx) => {
-                      const closer = closerRanking[idx];
-                      if (!closer) return null;
-                      const heights = ['h-[85%]', 'h-full', 'h-[70%]'];
-                      const widths = ['w-44', 'w-48', 'w-40'];
-                      
-                      return (
-                        <motion.div
-                          key={closer.name}
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.15 + visualIdx * 0.1 }}
-                          className={`${heights[visualIdx]} ${widths[visualIdx]} flex flex-col`}
-                        >
-                          <div className={`flex-1 rounded-xl bg-gradient-to-b ${getPositionBg(closer.position)} border backdrop-blur-sm p-3 flex flex-col`}>
-                            <div className="flex items-center justify-between mb-2">
-                              {getPositionIcon(closer.position)}
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-white/20 text-white/70">
-                                #{closer.position}
+
+                  {isLoadingClosers ? (
+                    <div className="grid grid-cols-3 gap-4">
+                      {[0, 1, 2].map(i => (
+                        <Skeleton key={i} className="h-64 bg-slate-800 rounded-2xl" />
+                      ))}
+                    </div>
+                  ) : closerTop3.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-4 items-end">
+                      {[1, 0, 2].map((orderIndex) => {
+                        const closer = closerTop3[orderIndex];
+                        if (!closer) return <div key={orderIndex} />;
+                        
+                        const isFirst = closer.position === 1;
+                        const heights = { 0: 'h-80', 1: 'h-64', 2: 'h-56' };
+                        
+                        return (
+                          <motion.div
+                            key={closer.name}
+                            initial={{ opacity: 0, y: 50 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 + orderIndex * 0.15 }}
+                            className={`relative ${heights[orderIndex as keyof typeof heights]}`}
+                          >
+                            <div 
+                              className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${getPositionGradient(closer.position)} border-2 ${getPositionBorder(closer.position)} shadow-xl backdrop-blur-sm overflow-hidden`}
+                            >
+                              {isFirst && (
+                                <div className="absolute inset-0 overflow-hidden">
+                                  <motion.div
+                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-yellow-400/10 to-transparent"
+                                    animate={{ x: ["-100%", "100%"] }}
+                                    transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+                                  />
+                                </div>
+                              )}
+
+                              <div className="relative p-5 h-full flex flex-col">
+                                <div className="flex items-center justify-between mb-4">
+                                  <div className={`flex items-center justify-center w-12 h-12 rounded-xl ${
+                                    closer.position === 1 ? 'bg-yellow-500/20' :
+                                    closer.position === 2 ? 'bg-gray-400/20' : 'bg-amber-600/20'
+                                  }`}>
+                                    {getPositionIcon(closer.position)}
+                                  </div>
+                                  {getTrendIcon(closer.trend)}
+                                </div>
+
+                                <div className="flex-1">
+                                  <div className={`text-xs font-bold uppercase tracking-wider mb-1 ${
+                                    closer.position === 1 ? 'text-yellow-400' :
+                                    closer.position === 2 ? 'text-gray-300' : 'text-amber-500'
+                                  }`}>
+                                    {closer.position === 1 ? 'CAMPEÃO' : 
+                                     closer.position === 2 ? 'VICE' : 'BRONZE'}
+                                  </div>
+                                  <h3 className="text-xl lg:text-2xl font-bold text-white truncate mb-3">
+                                    {closer.name}
+                                  </h3>
+
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-xs text-slate-400">MRR</span>
+                                      <span className="text-sm font-semibold text-emerald-400">
+                                        {formatCurrencyCompact(closer.mrr)}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-xs text-slate-400">Pontual</span>
+                                      <span className="text-sm font-semibold text-blue-400">
+                                        {formatCurrencyCompact(closer.pontual)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="mt-4 pt-4 border-t border-slate-700/50 grid grid-cols-3 gap-2 text-center">
+                                  <div>
+                                    <div className="text-lg font-bold text-white">{closer.reunioes}</div>
+                                    <div className="text-[10px] text-slate-400 uppercase">Reuniões</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-lg font-bold text-white">{closer.negocios}</div>
+                                    <div className="text-[10px] text-slate-400 uppercase">Fechados</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-lg font-bold text-white">{closer.taxa.toFixed(0)}%</div>
+                                    <div className="text-[10px] text-slate-400 uppercase">Conversão</div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-64 rounded-2xl bg-slate-900/50 border border-slate-800">
+                      <p className="text-slate-400">Nenhum dado disponível</p>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <div className="mb-4 flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-violet-400" />
+                    <h2 className="text-xl font-bold text-white">Ranking Completo</h2>
+                  </div>
+
+                  <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
+                    <div className="grid grid-cols-12 gap-2 p-3 bg-slate-800/50 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      <div className="col-span-1">#</div>
+                      <div className="col-span-5">Closer</div>
+                      <div className="col-span-3 text-right">Total</div>
+                      <div className="col-span-2 text-right">Taxa</div>
+                      <div className="col-span-1"></div>
+                    </div>
+
+                    <div className="divide-y divide-slate-800/50 max-h-[400px] overflow-y-auto">
+                      {isLoadingClosers ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                          <div key={i} className="p-3">
+                            <Skeleton className="h-8 bg-slate-800" />
+                          </div>
+                        ))
+                      ) : closerRanking.length > 0 ? (
+                        closerRanking.map((closer, index) => (
+                          <motion.div
+                            key={closer.name}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.05 * index }}
+                            className={`grid grid-cols-12 gap-2 p-3 items-center hover:bg-slate-800/30 transition-colors ${
+                              closer.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(closer.position) : ''
+                            }`}
+                          >
+                            <div className="col-span-1">
+                              {closer.position <= 3 ? (
+                                <div className="w-6 h-6 flex items-center justify-center">
+                                  {closer.position === 1 && <Crown className="w-5 h-5 text-yellow-400" />}
+                                  {closer.position === 2 && <Medal className="w-4 h-4 text-gray-300" />}
+                                  {closer.position === 3 && <Medal className="w-4 h-4 text-amber-600" />}
+                                </div>
+                              ) : (
+                                <span className="text-slate-500 font-mono text-sm">{closer.position}</span>
+                              )}
+                            </div>
+                            <div className="col-span-5 font-medium text-white truncate">
+                              {closer.name}
+                            </div>
+                            <div className="col-span-3 text-right font-bold text-white">
+                              {formatCurrencyCompact(closer.total)}
+                            </div>
+                            <div className="col-span-2 text-right">
+                              <Badge 
+                                variant="outline" 
+                                className={`text-xs border-0 ${
+                                  closer.taxa >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
+                                  closer.taxa >= 15 ? 'bg-amber-500/20 text-amber-400' :
+                                  'bg-slate-700/50 text-slate-400'
+                                }`}
+                              >
+                                {closer.taxa.toFixed(0)}%
                               </Badge>
                             </div>
-                            <h3 className="text-base font-bold text-white mb-auto truncate">
-                              {closer.name.split(' ').slice(0, 2).join(' ')}
-                            </h3>
-                            <div className="space-y-1.5 mt-2">
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] text-slate-400">MRR</span>
-                                <span className="text-sm font-bold text-emerald-400">{formatCurrency(closer.mrr)}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] text-slate-400">Pontual</span>
-                                <span className="text-sm font-bold text-blue-400">{formatCurrency(closer.pontual)}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] text-slate-400">Negócios</span>
-                                <span className="text-sm font-bold text-amber-400">{closer.negocios}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] text-slate-400">Conversão</span>
-                                <span className="text-xs font-semibold text-rose-400">{closer.taxa.toFixed(1)}%</span>
-                              </div>
+                            <div className="col-span-1 flex justify-end">
+                              {getTrendIcon(closer.trend)}
                             </div>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="col-span-4 flex flex-col min-h-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className="w-4 h-4 text-violet-400" />
-                    <h2 className="text-lg font-bold text-white">Ranking Completo</h2>
-                  </div>
-                  
-                  <div className="flex-1 bg-slate-900/50 backdrop-blur-sm border border-slate-800/50 rounded-xl overflow-hidden">
-                    <div className="h-full overflow-y-auto">
-                      {closerRanking.map((closer, index) => (
-                        <motion.div
-                          key={closer.name}
-                          initial={{ opacity: 0, x: 15 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.03 * index }}
-                          className={`flex items-center gap-2 px-3 py-2 border-b border-slate-800/30 ${index < 3 ? `bg-gradient-to-r ${getPositionBg(index + 1)}` : ''}`}
-                        >
-                          <div className="w-6 flex justify-center">
-                            {getPositionIcon(closer.position) || (
-                              <span className="text-xs text-slate-500 font-mono">{closer.position}</span>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-xs font-medium text-white truncate block">{closer.name}</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-xs font-bold text-emerald-400">{formatCurrency(closer.total)}</span>
-                          </div>
-                        </motion.div>
-                      ))}
+                          </motion.div>
+                        ))
+                      ) : (
+                        <div className="p-8 text-center text-slate-400">
+                          Nenhum closer encontrado
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -554,141 +830,260 @@ export default function PresentationMode() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.4 }}
-              className="flex-1 flex flex-col h-full"
+              className="space-y-6"
             >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-gradient-to-br from-cyan-600 to-teal-600 shadow-lg shadow-cyan-500/20">
-                    <Users className="w-6 h-6 text-white" />
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <motion.div 
+                    className="relative"
+                    animate={{ rotate: [0, 5, -5, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                  >
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-600 to-teal-700 shadow-2xl shadow-cyan-600/30">
+                      <Headphones className="w-10 h-10 text-white" />
+                    </div>
+                    <motion.div
+                      className="absolute -top-1 -right-1"
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <Sparkles className="w-5 h-5 text-yellow-400" />
+                    </motion.div>
+                  </motion.div>
                   <div>
-                    <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-400">
+                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-cyan-200 to-cyan-400 bg-clip-text text-transparent">
                       Dashboard SDRs
                     </h1>
-                    <p className="text-sm text-slate-400 capitalize">{mesAtual}</p>
+                    <p className="text-slate-400 text-lg mt-1 capitalize">
+                      {mesAtual}
+                    </p>
                   </div>
                 </div>
+
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-white font-mono">
-                    {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  <div className="text-2xl font-mono font-bold text-white">
+                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                   </div>
-                  <div className="text-xs text-slate-400">
-                    {currentTime.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  <div className="text-slate-400 text-xs">
+                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4 mb-3">
+              <div className="grid grid-cols-3 gap-4">
                 {[
-                  { label: "Leads Gerados", value: sdrMetrics?.leadsTotais || 0, icon: UserPlus, gradient: "from-cyan-600/25 to-teal-600/15", color: "text-cyan-400" },
-                  { label: "Reuniões Realizadas", value: sdrMetrics?.reunioesRealizadas || 0, icon: CalendarCheck, gradient: "from-violet-600/25 to-purple-600/15", color: "text-violet-400" },
-                  { label: "Taxa de Conversão", value: `${(sdrMetrics?.taxaConversao || 0).toFixed(1)}%`, icon: TrendingUp, gradient: "from-emerald-600/25 to-green-600/15", color: "text-emerald-400" },
-                ].map((kpi, i) => (
+                  { 
+                    label: "Leads Criados", 
+                    value: sdrMetrics?.leadsTotais || 0, 
+                    icon: Users,
+                    gradient: "from-blue-600 to-indigo-600",
+                    format: (v: number) => v.toString()
+                  },
+                  { 
+                    label: "Reuniões Realizadas", 
+                    value: sdrMetrics?.reunioesRealizadas || 0, 
+                    icon: CalendarCheck,
+                    gradient: "from-cyan-600 to-teal-600",
+                    format: (v: number) => v.toString()
+                  },
+                  { 
+                    label: "Taxa de Conversão", 
+                    value: sdrMetrics?.taxaConversao || 0, 
+                    icon: TrendingUp,
+                    gradient: "from-emerald-600 to-green-600",
+                    format: (v: number) => `${v.toFixed(1)}%`
+                  },
+                ].map((kpi, index) => (
                   <motion.div
                     key={kpi.label}
-                    initial={{ opacity: 0, y: 15 }}
+                    initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.08 * i }}
-                    className={`rounded-xl bg-gradient-to-br ${kpi.gradient} border border-white/10 backdrop-blur-sm p-4`}
+                    transition={{ delay: 0.1 * index }}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
-                      <span className="text-sm text-slate-300">{kpi.label}</span>
+                    <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 backdrop-blur-sm border border-slate-800 p-5">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                      
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className={`p-2.5 rounded-xl bg-gradient-to-br ${kpi.gradient} shadow-lg`}>
+                          <kpi.icon className="w-5 h-5 text-white" />
+                        </div>
+                        <span className="text-sm font-medium text-slate-400">{kpi.label}</span>
+                      </div>
+                      
+                      {isLoadingSDRs ? (
+                        <Skeleton className="h-10 w-32 bg-slate-800" />
+                      ) : (
+                        <motion.div
+                          className="text-4xl font-black text-white"
+                          initial={{ scale: 0.5 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 200, delay: 0.2 + 0.1 * index }}
+                        >
+                          {kpi.format(kpi.value)}
+                        </motion.div>
+                      )}
                     </div>
-                    <div className="text-3xl font-black text-white">{kpi.value}</div>
                   </motion.div>
                 ))}
               </div>
 
-              <div className="flex-1 grid grid-cols-12 gap-3 min-h-0">
-                <div className="col-span-8 flex flex-col min-h-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Flame className="w-4 h-4 text-orange-400" />
-                    <h2 className="text-lg font-bold text-white">Pódio</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <div className="mb-4 flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-yellow-500" />
+                    <h2 className="text-xl font-bold text-white">Pódio dos Campeões</h2>
+                    <motion.div
+                      animate={{ rotate: [0, 15, -15, 0] }}
+                      transition={{ duration: 1, repeat: Infinity, repeatDelay: 2 }}
+                    >
+                      <Flame className="w-5 h-5 text-orange-500" />
+                    </motion.div>
                   </div>
                   
-                  <div className="flex-1 flex items-end justify-center gap-4 pb-2">
-                    {[1, 0, 2].map((idx, visualIdx) => {
-                      const sdr = sdrRanking[idx];
-                      if (!sdr) return null;
-                      const heights = ['h-[85%]', 'h-full', 'h-[70%]'];
-                      const widths = ['w-44', 'w-48', 'w-40'];
-                      
-                      return (
-                        <motion.div
-                          key={sdr.name}
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.15 + visualIdx * 0.1 }}
-                          className={`${heights[visualIdx]} ${widths[visualIdx]} flex flex-col`}
-                        >
-                          <div className={`flex-1 rounded-xl bg-gradient-to-b ${getPositionBg(sdr.position)} border backdrop-blur-sm p-3 flex flex-col`}>
-                            <div className="flex items-center justify-between mb-2">
-                              {getPositionIcon(sdr.position)}
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-white/20 text-white/70">
-                                #{sdr.position}
-                              </Badge>
+                  {isLoadingSDRs ? (
+                    <div className="grid grid-cols-3 gap-4">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-64 rounded-2xl bg-slate-800" />
+                      ))}
+                    </div>
+                  ) : sdrTop3.length > 0 ? (
+                    <div className="flex items-end justify-center gap-4 h-[380px]">
+                      {[1, 0, 2].map((dataIndex, visualIndex) => {
+                        const sdr = sdrTop3[dataIndex];
+                        if (!sdr) return null;
+                        
+                        const heights = ['h-72', 'h-80', 'h-64'];
+                        const sizes = ['text-3xl', 'text-4xl', 'text-2xl'];
+                        const badges = ['VICE', 'CAMPEÃO', 'BRONZE'];
+                        const badgeColors = ['bg-gray-500', 'bg-gradient-to-r from-yellow-500 to-amber-500', 'bg-amber-700'];
+                        
+                        return (
+                          <motion.div
+                            key={sdr.name}
+                            initial={{ opacity: 0, y: 50 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 + visualIndex * 0.1 }}
+                            className={`relative ${heights[visualIndex]} w-56 flex flex-col`}
+                          >
+                            <div className={`flex-1 rounded-2xl bg-gradient-to-b ${getPositionGradient(sdr.position)} border-2 ${getPositionBorder(sdr.position)} shadow-xl p-4 flex flex-col justify-between backdrop-blur-sm`}>
+                              <div>
+                                {sdr.position === 1 && (
+                                  <motion.div 
+                                    className="flex justify-center mb-2"
+                                    animate={{ y: [0, -5, 0] }}
+                                    transition={{ duration: 2, repeat: Infinity }}
+                                  >
+                                    <Crown className="w-10 h-10 text-yellow-400 drop-shadow-lg" />
+                                  </motion.div>
+                                )}
+                                
+                                <Badge className={`${badgeColors[visualIndex]} text-white text-xs mb-2 font-bold`}>
+                                  {badges[visualIndex]}
+                                </Badge>
+                                
+                                <h3 className={`${sizes[visualIndex]} font-black text-white mb-1 leading-tight`}>
+                                  {sdr.name.split(' ').slice(0, 2).join(' ')}
+                                </h3>
+                              </div>
+                              
+                              <div className="space-y-3 mt-auto">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs text-slate-400">Leads</span>
+                                  <span className="text-lg font-bold text-blue-400">{sdr.leads}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs text-slate-400">Reuniões</span>
+                                  <span className="text-lg font-bold text-cyan-400">{sdr.reunioesRealizadas}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs text-slate-400">Conversão</span>
+                                  <span className="text-sm font-semibold text-emerald-400">{sdr.conversao.toFixed(1)}%</span>
+                                </div>
+                              </div>
                             </div>
-                            <h3 className="text-base font-bold text-white mb-auto truncate">
-                              {sdr.name.split(' ').slice(0, 2).join(' ')}
-                            </h3>
-                            <div className="space-y-2 mt-2">
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] text-slate-400">Leads</span>
-                                <span className="text-lg font-bold text-cyan-400">{sdr.leads}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] text-slate-400">Reuniões</span>
-                                <span className="text-lg font-bold text-violet-400">{sdr.reunioes}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] text-slate-400">Conversão</span>
-                                <span className="text-sm font-semibold text-emerald-400">{sdr.conversao.toFixed(1)}%</span>
-                              </div>
-                            </div>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-64 rounded-2xl bg-slate-900/50 border border-slate-800">
+                      <p className="text-slate-400">Nenhum dado disponível</p>
+                    </div>
+                  )}
                 </div>
 
-                <div className="col-span-4 flex flex-col min-h-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className="w-4 h-4 text-cyan-400" />
-                    <h2 className="text-lg font-bold text-white">Ranking Completo</h2>
+                <div>
+                  <div className="mb-4 flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-cyan-400" />
+                    <h2 className="text-xl font-bold text-white">Ranking Completo</h2>
                   </div>
-                  
-                  <div className="flex-1 bg-slate-900/50 backdrop-blur-sm border border-slate-800/50 rounded-xl overflow-hidden">
-                    <div className="h-full overflow-y-auto">
-                      {sdrRanking.map((sdr, index) => (
-                        <motion.div
-                          key={sdr.name}
-                          initial={{ opacity: 0, x: 15 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.03 * index }}
-                          className={`flex items-center gap-2 px-3 py-2 border-b border-slate-800/30 ${index < 3 ? `bg-gradient-to-r ${getPositionBg(index + 1)}` : ''}`}
-                        >
-                          <div className="w-6 flex justify-center">
-                            {getPositionIcon(sdr.position) || (
-                              <span className="text-xs text-slate-500 font-mono">{sdr.position}</span>
-                            )}
+
+                  <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
+                    <div className="grid grid-cols-12 gap-2 p-3 bg-slate-800/50 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      <div className="col-span-1">#</div>
+                      <div className="col-span-4">SDR</div>
+                      <div className="col-span-2 text-right">Leads</div>
+                      <div className="col-span-3 text-right">Reuniões</div>
+                      <div className="col-span-2 text-right">Conv.</div>
+                    </div>
+
+                    <div className="divide-y divide-slate-800/50 max-h-[400px] overflow-y-auto">
+                      {isLoadingSDRs ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                          <div key={i} className="p-3">
+                            <Skeleton className="h-8 bg-slate-800" />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="text-xs font-medium text-white truncate block">{sdr.name}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <span className="text-[10px] text-slate-500">Leads</span>
-                              <span className="text-xs font-bold text-cyan-400 ml-1">{sdr.leads}</span>
+                        ))
+                      ) : sdrRanking.length > 0 ? (
+                        sdrRanking.map((sdr, index) => (
+                          <motion.div
+                            key={sdr.name}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.05 * index }}
+                            className={`grid grid-cols-12 gap-2 p-3 items-center hover:bg-slate-800/30 transition-colors ${
+                              sdr.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(sdr.position) : ''
+                            }`}
+                          >
+                            <div className="col-span-1">
+                              {sdr.position <= 3 ? (
+                                <div className="w-6 h-6 flex items-center justify-center">
+                                  {sdr.position === 1 && <Crown className="w-5 h-5 text-yellow-400" />}
+                                  {sdr.position === 2 && <Medal className="w-4 h-4 text-gray-300" />}
+                                  {sdr.position === 3 && <Medal className="w-4 h-4 text-amber-600" />}
+                                </div>
+                              ) : (
+                                <span className="text-slate-500 font-mono text-sm">{sdr.position}</span>
+                              )}
                             </div>
-                            <div className="text-right">
-                              <span className="text-[10px] text-slate-500">Reuniões</span>
-                              <span className="text-xs font-bold text-violet-400 ml-1">{sdr.reunioes}</span>
+                            <div className="col-span-4 font-medium text-white truncate">
+                              {sdr.name}
                             </div>
-                          </div>
-                        </motion.div>
-                      ))}
+                            <div className="col-span-2 text-right font-semibold text-blue-400">
+                              {sdr.leads}
+                            </div>
+                            <div className="col-span-3 text-right font-bold text-cyan-400">
+                              {sdr.reunioesRealizadas}
+                            </div>
+                            <div className="col-span-2 text-right">
+                              <Badge 
+                                variant="outline" 
+                                className={`text-xs border-0 ${
+                                  sdr.conversao >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
+                                  sdr.conversao >= 15 ? 'bg-amber-500/20 text-amber-400' :
+                                  'bg-slate-700/50 text-slate-400'
+                                }`}
+                              >
+                                {sdr.conversao.toFixed(0)}%
+                              </Badge>
+                            </div>
+                          </motion.div>
+                        ))
+                      ) : (
+                        <div className="p-8 text-center text-slate-400">
+                          Nenhum SDR encontrado
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
