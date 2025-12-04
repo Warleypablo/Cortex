@@ -38,12 +38,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  PieChart,
-  Pie,
-  Cell,
-  Area,
-  ComposedChart,
-  Line,
   BarChart,
   Bar
 } from "recharts";
@@ -156,16 +150,6 @@ function FloatingParticles() {
   );
 }
 
-const CHART_COLORS = {
-  violet: ["#8b5cf6", "#a78bfa", "#c4b5fd"],
-  blue: ["#3b82f6", "#60a5fa", "#93c5fd"],
-  cyan: ["#06b6d4", "#22d3ee", "#67e8f9"],
-  emerald: ["#10b981", "#34d399", "#6ee7b7"],
-  amber: ["#f59e0b", "#fbbf24", "#fcd34d"],
-  rose: ["#f43f5e", "#fb7185", "#fda4af"],
-};
-
-const PIE_COLORS = ["#8b5cf6", "#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#f43f5e", "#a855f7", "#6366f1"];
 
 export default function AnaliseVendas() {
   const hoje = new Date();
@@ -260,11 +244,37 @@ export default function AnaliseVendas() {
     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
   };
 
-  const chartContratosData = contratosPorDia?.map(item => ({
-    ...item,
-    diaLabel: formatDate(item.dia),
-    total: item.valorRecorrente + item.valorPontual
-  })) || [];
+  const aggregateByWeek = (data: ContratosPorDia[]) => {
+    if (!data || data.length === 0) return [];
+    
+    const weeklyData: Record<string, { semana: string; contratos: number; valorRecorrente: number; valorPontual: number }> = {};
+    
+    data.forEach(item => {
+      const date = new Date(item.dia + 'T00:00:00');
+      const startOfYear = new Date(date.getFullYear(), 0, 1);
+      const weekNumber = Math.ceil((((date.getTime() - startOfYear.getTime()) / 86400000) + startOfYear.getDay() + 1) / 7);
+      const weekKey = `${date.getFullYear()}-S${weekNumber.toString().padStart(2, '0')}`;
+      const monthName = date.toLocaleDateString('pt-BR', { month: 'short' });
+      const weekLabel = `S${weekNumber} ${monthName}`;
+      
+      if (!weeklyData[weekKey]) {
+        weeklyData[weekKey] = {
+          semana: weekLabel,
+          contratos: 0,
+          valorRecorrente: 0,
+          valorPontual: 0
+        };
+      }
+      
+      weeklyData[weekKey].contratos += item.contratos;
+      weeklyData[weekKey].valorRecorrente += item.valorRecorrente;
+      weeklyData[weekKey].valorPontual += item.valorPontual;
+    });
+    
+    return Object.values(weeklyData).sort((a, b) => a.semana.localeCompare(b.semana));
+  };
+
+  const chartContratosData = aggregateByWeek(contratosPorDia || []);
 
   const getMedalStyle = (position: number) => {
     switch (position) {
@@ -649,21 +659,34 @@ export default function AnaliseVendas() {
                     <Skeleton className="h-80 w-full bg-slate-800/50" />
                   ) : (
                     <ResponsiveContainer width="100%" height={320}>
-                      <ComposedChart data={chartContratosData}>
+                      <BarChart data={chartContratosData} barCategoryGap="15%">
                         <defs>
-                          <linearGradient id="colorRecorrente" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                          <linearGradient id="barRecorrente" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#8b5cf6" stopOpacity={1}/>
+                            <stop offset="100%" stopColor="#6d28d9" stopOpacity={0.8}/>
                           </linearGradient>
-                          <linearGradient id="colorPontual" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                          <linearGradient id="barPontual" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#3b82f6" stopOpacity={1}/>
+                            <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0.8}/>
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                        <XAxis dataKey="diaLabel" stroke="#64748b" fontSize={11} />
-                        <YAxis yAxisId="left" stroke="#64748b" fontSize={11} tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} />
-                        <YAxis yAxisId="right" orientation="right" stroke="#64748b" fontSize={11} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                        <XAxis 
+                          dataKey="semana" 
+                          stroke="#64748b" 
+                          fontSize={10}
+                          angle={-45}
+                          textAnchor="end"
+                          height={60}
+                          interval={0}
+                          tick={{ fill: '#94a3b8' }}
+                        />
+                        <YAxis 
+                          stroke="#64748b" 
+                          fontSize={11} 
+                          tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`}
+                          tick={{ fill: '#94a3b8' }}
+                        />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: 'rgba(15, 23, 42, 0.95)',
@@ -673,40 +696,30 @@ export default function AnaliseVendas() {
                             backdropFilter: 'blur(12px)'
                           }}
                           formatter={(value: number, name: string) => [
-                            name === 'contratos' ? value : formatCurrency(value),
-                            name === 'valorRecorrente' ? 'Recorrente' : name === 'valorPontual' ? 'Pontual' : 'Contratos'
+                            formatCurrency(value),
+                            name === 'valorRecorrente' ? 'MRR' : 'Pontual'
                           ]}
+                          labelFormatter={(label) => `Semana: ${label}`}
                         />
-                        <Legend />
-                        <Area
-                          yAxisId="left"
-                          type="monotone"
-                          dataKey="valorRecorrente"
-                          stroke="#8b5cf6"
-                          strokeWidth={2}
-                          fill="url(#colorRecorrente)"
-                          name="Recorrente"
+                        <Legend 
+                          wrapperStyle={{ paddingTop: '10px' }}
+                          formatter={(value) => value === 'valorRecorrente' ? 'MRR' : 'Pontual'}
                         />
-                        <Area
-                          yAxisId="left"
-                          type="monotone"
-                          dataKey="valorPontual"
-                          stroke="#3b82f6"
-                          strokeWidth={2}
-                          fill="url(#colorPontual)"
-                          name="Pontual"
+                        <Bar 
+                          dataKey="valorRecorrente" 
+                          fill="url(#barRecorrente)" 
+                          radius={[4, 4, 0, 0]} 
+                          name="valorRecorrente"
+                          stackId="stack"
                         />
-                        <Line
-                          yAxisId="right"
-                          type="monotone"
-                          dataKey="contratos"
-                          stroke="#10b981"
-                          strokeWidth={3}
-                          dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                          activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2 }}
-                          name="Contratos"
+                        <Bar 
+                          dataKey="valorPontual" 
+                          fill="url(#barPontual)" 
+                          radius={[4, 4, 0, 0]} 
+                          name="valorPontual"
+                          stackId="stack"
                         />
-                      </ComposedChart>
+                      </BarChart>
                     </ResponsiveContainer>
                   )}
                 </div>
@@ -735,67 +748,76 @@ export default function AnaliseVendas() {
                   {isLoadingFonte ? (
                     <Skeleton className="h-80 w-full bg-slate-800/50" />
                   ) : (
-                    <div className="flex flex-col lg:flex-row items-center gap-6">
-                      <ResponsiveContainer width="100%" height={280} className="lg:w-1/2">
-                        <PieChart>
-                          <Pie
-                            data={receitaPorFonte?.slice(0, 6)}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={70}
-                            outerRadius={110}
-                            paddingAngle={4}
-                            dataKey="mrr"
-                            nameKey="fonte"
-                          >
-                            {receitaPorFonte?.slice(0, 6).map((_, index) => (
-                              <Cell 
-                                key={`cell-${index}`} 
-                                fill={PIE_COLORS[index % PIE_COLORS.length]}
-                                stroke="rgba(0,0,0,0.3)"
-                                strokeWidth={2}
-                              />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                              border: '1px solid rgba(139, 92, 246, 0.3)',
-                              borderRadius: '12px',
-                              color: '#f1f5f9',
-                              backdropFilter: 'blur(12px)'
-                            }}
-                            formatter={(value: number) => formatCurrency(value)}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="flex-1 space-y-2 w-full lg:w-1/2 max-h-[280px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-800">
-                        {receitaPorFonte?.slice(0, 8).map((item, index) => (
-                          <motion.div
-                            key={item.fonte}
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                            className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl border border-slate-700/30 hover:bg-slate-800/70 transition-colors"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className="w-3 h-3 rounded-full shadow-lg"
-                                style={{ 
-                                  backgroundColor: PIE_COLORS[index % PIE_COLORS.length],
-                                  boxShadow: `0 0 8px ${PIE_COLORS[index % PIE_COLORS.length]}40`
-                                }}
-                              />
-                              <span className="text-slate-300 text-sm truncate max-w-[120px]">{item.fonte || 'N/A'}</span>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-white font-semibold">{formatCurrency(item.mrr + item.pontual)}</p>
-                              <p className="text-xs text-slate-500">{item.contratos} contratos</p>
-                            </div>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </div>
+                    <ResponsiveContainer width="100%" height={320}>
+                      <BarChart 
+                        data={receitaPorFonte?.slice(0, 8).map(item => ({
+                          ...item,
+                          total: item.mrr + item.pontual,
+                          fonteLabel: (item.fonte || 'N/A').substring(0, 20)
+                        }))} 
+                        layout="vertical"
+                        margin={{ left: 10, right: 20 }}
+                      >
+                        <defs>
+                          <linearGradient id="barFonteMrr" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#8b5cf6" />
+                            <stop offset="100%" stopColor="#a855f7" />
+                          </linearGradient>
+                          <linearGradient id="barFontePontual" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor="#6366f1" />
+                            <stop offset="100%" stopColor="#818cf8" />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={true} vertical={false} />
+                        <XAxis 
+                          type="number" 
+                          stroke="#64748b" 
+                          fontSize={11}
+                          tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`}
+                          tick={{ fill: '#94a3b8' }}
+                        />
+                        <YAxis 
+                          type="category" 
+                          dataKey="fonteLabel" 
+                          stroke="#64748b" 
+                          fontSize={10}
+                          width={100}
+                          tick={{ fill: '#94a3b8' }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                            borderRadius: '12px',
+                            color: '#f1f5f9',
+                            backdropFilter: 'blur(12px)'
+                          }}
+                          formatter={(value: number, name: string) => [
+                            formatCurrency(value),
+                            name === 'mrr' ? 'MRR' : 'Pontual'
+                          ]}
+                          labelFormatter={(label) => `Fonte: ${label}`}
+                        />
+                        <Legend 
+                          wrapperStyle={{ paddingTop: '10px' }}
+                          formatter={(value) => value === 'mrr' ? 'MRR' : 'Pontual'}
+                        />
+                        <Bar 
+                          dataKey="mrr" 
+                          fill="url(#barFonteMrr)" 
+                          radius={[0, 4, 4, 0]} 
+                          name="mrr"
+                          stackId="fonte"
+                        />
+                        <Bar 
+                          dataKey="pontual" 
+                          fill="url(#barFontePontual)" 
+                          radius={[0, 4, 4, 0]} 
+                          name="pontual"
+                          stackId="fonte"
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
                   )}
                 </div>
               </div>
