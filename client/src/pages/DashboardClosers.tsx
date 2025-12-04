@@ -946,147 +946,63 @@ export default function DashboardClosers() {
           </div>
         </div>
 
-        {/* DESTAQUE PONTUAL E REUNIÕES POR CLOSER */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Destaque Pontual */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-          >
-            <div className="mb-4 flex items-center gap-2">
-              <Star className="w-5 h-5 text-blue-400" />
-              <h2 className="text-xl font-bold text-white">Destaque Pontual</h2>
-              <Badge className="bg-blue-500/20 text-blue-400 text-xs">Top Vendas Pontuais</Badge>
-            </div>
+        {/* DESTAQUE PONTUAL - Compact horizontal display */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <div className="mb-3 flex items-center gap-2">
+            <Star className="w-5 h-5 text-blue-400" />
+            <h2 className="text-xl font-bold text-white">Destaque Pontual</h2>
+            <Badge className="bg-blue-500/20 text-blue-400 text-xs">Top Vendas Pontuais</Badge>
+          </div>
 
-            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
-              {isLoading ? (
-                <div className="p-4 space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-16 bg-slate-800 rounded-xl" />
-                  ))}
-                </div>
-              ) : top3Pontual.length > 0 ? (
-                <div className="divide-y divide-slate-800/50">
-                  {top3Pontual.map((closer, index) => (
-                    <motion.div
-                      key={closer.name}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 * index }}
-                      className={`p-4 flex items-center justify-between ${
-                        index === 0 ? 'bg-gradient-to-r from-blue-500/20 to-transparent' : ''
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                          index === 0 ? 'bg-blue-500/30' :
-                          index === 1 ? 'bg-slate-600/30' :
-                          'bg-amber-600/30'
-                        }`}>
-                          {index === 0 && <Crown className="w-5 h-5 text-blue-400" />}
-                          {index === 1 && <Medal className="w-4 h-4 text-gray-300" />}
-                          {index === 2 && <Medal className="w-4 h-4 text-amber-600" />}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-white">{closer.name}</div>
-                          <div className="text-xs text-slate-400">{closer.negocios} negócios pontuais</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xl font-bold text-blue-400">{formatCurrencyCompact(closer.pontual)}</div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-8 text-center text-slate-400">
-                  Nenhuma venda pontual no período
-                </div>
-              )}
-            </div>
-          </motion.div>
-
-          {/* Reuniões Por CLOSER */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-          >
-            <div className="mb-4 flex items-center gap-2">
-              <Users className="w-5 h-5 text-cyan-400" />
-              <h2 className="text-xl font-bold text-white">Reuniões Por Closer</h2>
-            </div>
-
-            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
-              <div className="grid grid-cols-12 gap-2 p-3 bg-slate-800/50 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                <div className="col-span-1">#</div>
-                <div className="col-span-5">Closer</div>
-                <div className="col-span-3 text-right">Reuniões</div>
-                <div className="col-span-3 text-right">Conversão</div>
+          <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
+            {isLoading ? (
+              <div className="p-4 flex gap-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 flex-1 bg-slate-800 rounded-xl" />
+                ))}
               </div>
-
-              <div className="divide-y divide-slate-800/50 max-h-[250px] overflow-y-auto">
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="p-3">
-                      <Skeleton className="h-8 bg-slate-800" />
+            ) : top3Pontual.length > 0 ? (
+              <div className="flex divide-x divide-slate-800/50">
+                {top3Pontual.map((closer, index) => (
+                  <motion.div
+                    key={closer.name}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 * index }}
+                    className={`flex-1 p-4 flex items-center gap-3 ${
+                      index === 0 ? 'bg-gradient-to-r from-blue-500/20 to-transparent' : ''
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      index === 0 ? 'bg-blue-500/30' :
+                      index === 1 ? 'bg-slate-600/30' :
+                      'bg-amber-600/30'
+                    }`}>
+                      {index === 0 && <Crown className="w-5 h-5 text-blue-400" />}
+                      {index === 1 && <Medal className="w-4 h-4 text-gray-300" />}
+                      {index === 2 && <Medal className="w-4 h-4 text-amber-600" />}
                     </div>
-                  ))
-                ) : (chartReunioesNegocios || []).length > 0 ? (
-                  [...(chartReunioesNegocios || [])]
-                    .sort((a, b) => b.reunioes - a.reunioes)
-                    .map((closer, index) => (
-                    <motion.div
-                      key={closer.closer}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.05 * index }}
-                      className={`grid grid-cols-12 gap-2 p-3 items-center hover:bg-slate-800/30 transition-colors ${
-                        index < 3 ? 'bg-gradient-to-r from-cyan-500/10 to-transparent' : ''
-                      }`}
-                    >
-                      <div className="col-span-1">
-                        {index < 3 ? (
-                          <div className="w-5 h-5 flex items-center justify-center">
-                            {index === 0 && <Crown className="w-4 h-4 text-cyan-400" />}
-                            {index === 1 && <Medal className="w-3 h-3 text-gray-300" />}
-                            {index === 2 && <Medal className="w-3 h-3 text-amber-600" />}
-                          </div>
-                        ) : (
-                          <span className="text-slate-500 font-mono text-xs">{index + 1}</span>
-                        )}
-                      </div>
-                      <div className="col-span-5 font-medium text-white truncate text-sm">
-                        {closer.closer}
-                      </div>
-                      <div className="col-span-3 text-right font-bold text-cyan-400 text-lg">
-                        {closer.reunioes}
-                      </div>
-                      <div className="col-span-3 text-right">
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs border-0 ${
-                            closer.taxaConversao >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
-                            closer.taxaConversao >= 15 ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-slate-700/50 text-slate-400'
-                          }`}
-                        >
-                          {closer.taxaConversao.toFixed(0)}%
-                        </Badge>
-                      </div>
-                    </motion.div>
-                  ))
-                ) : (
-                  <div className="p-8 text-center text-slate-400">
-                    Nenhuma reunião encontrada
-                  </div>
-                )}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-white truncate text-sm">{closer.name}</div>
+                      <div className="text-xs text-slate-400">{closer.negocios} neg. pontuais</div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-lg font-bold text-blue-400">{formatCurrencyCompact(closer.pontual)}</div>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
-            </div>
-          </motion.div>
-        </div>
+            ) : (
+              <div className="p-6 text-center text-slate-400">
+                Nenhuma venda pontual no período
+              </div>
+            )}
+          </div>
+        </motion.div>
 
         {/* BARRA DE META ÉPICA */}
         <motion.div 
