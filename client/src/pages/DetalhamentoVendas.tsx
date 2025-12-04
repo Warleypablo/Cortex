@@ -61,9 +61,6 @@ interface Negocio {
   dealId: string;
   dealName: string;
   companyName: string;
-  contactName: string;
-  contactEmail: string;
-  contactPhone: string;
   valorRecorrente: number;
   valorPontual: number;
   valorTotal: number;
@@ -594,7 +591,6 @@ export default function DetalhamentoVendas() {
                     <thead className="bg-slate-800/50">
                       <tr className="text-slate-400 uppercase tracking-wider">
                         <th className="text-left p-2 font-medium">Empresa</th>
-                        <th className="text-left p-2 font-medium">Contato</th>
                         <th className="text-right p-2 font-medium">MRR</th>
                         <th className="text-right p-2 font-medium">Pontual</th>
                         <th className="text-right p-2 font-medium">Total</th>
@@ -608,7 +604,7 @@ export default function DetalhamentoVendas() {
                       {isLoadingNegocios ? (
                         Array.from({ length: 5 }).map((_, i) => (
                           <tr key={i}>
-                            <td colSpan={9} className="p-2">
+                            <td colSpan={8} className="p-2">
                               <Skeleton className="h-6 bg-slate-800" />
                             </td>
                           </tr>
@@ -617,12 +613,8 @@ export default function DetalhamentoVendas() {
                         negocios.map((n) => (
                           <tr key={n.dealId} className="hover:bg-slate-800/30" data-testid={`row-negocio-${n.dealId}`}>
                             <td className="p-2">
-                              <div className="font-medium text-white truncate max-w-[150px]">{n.companyName || '-'}</div>
-                              <div className="text-slate-500 text-[10px] truncate max-w-[150px]">{n.dealName}</div>
-                            </td>
-                            <td className="p-2">
-                              <div className="text-slate-300 truncate max-w-[120px]">{n.contactName || '-'}</div>
-                              <div className="text-slate-500 text-[10px]">{n.contactEmail || ''}</div>
+                              <div className="font-medium text-white truncate max-w-[180px]">{n.companyName || '-'}</div>
+                              <div className="text-slate-500 text-[10px] truncate max-w-[180px]">{n.dealName}</div>
                             </td>
                             <td className="p-2 text-right">
                               {n.valorRecorrente > 0 ? (
@@ -668,7 +660,7 @@ export default function DetalhamentoVendas() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={9} className="p-8 text-center text-slate-500">
+                          <td colSpan={8} className="p-8 text-center text-slate-500">
                             Nenhum negócio encontrado para o período selecionado
                           </td>
                         </tr>
