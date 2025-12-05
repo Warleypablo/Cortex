@@ -5611,50 +5611,81 @@ export class DbStorage implements IStorage {
       whereDataFim = ` AND cp.data_vencimento <= '${dataFim}'`;
     }
     
-    let orderByClause = 'valor_total DESC';
+    let orderByClause = 'parcelas.valor_total DESC';
     if (ordenarPor === 'diasAtraso') {
-      orderByClause = 'dias_atraso_max DESC';
+      orderByClause = 'parcelas.dias_atraso_max DESC';
     } else if (ordenarPor === 'nome') {
-      orderByClause = 'nome_cliente ASC';
+      orderByClause = 'COALESCE(cliente_info.nome_clickup, parcelas.nome_cliente) ASC';
     }
     
-    // Query única com LEFT JOINs para trazer todos os dados de uma vez
-    // Relacionamentos: caz_parcelas.id_cliente = caz_clientes.ids
-    //                  caz_clientes.cnpj = cup_clientes.cnpj
-    //                  cup_clientes.task_id = cup_contratos.id_task
-    // IMPORTANTE: Usar ::text antes de TRIM para evitar erro com colunas UUID no banco remoto
+    // Query refatorada com CTEs separadas para evitar duplicação de valores
+    // O problema anterior: JOIN com cup_contratos multiplicava as linhas antes do GROUP BY
+    // Solução: Agregar parcelas ANTES dos JOINs, depois fazer JOINs com dados pré-agregados
     const result = await db.execute(sql.raw(`
+      WITH parcelas_agregadas AS (
+        -- CTE 1: Agregar dados de parcelas por cliente (SEM JOINS - evita duplicação)
+        SELECT 
+          cp.id_cliente,
+          MAX(cp.descricao) as nome_cliente,
+          COALESCE(SUM(cp.nao_pago::numeric), 0) as valor_total,
+          COUNT(*) as quantidade_parcelas,
+          MIN(cp.data_vencimento) as parcela_mais_antiga,
+          MAX('${dataHoje}'::date - cp.data_vencimento::date) as dias_atraso_max,
+          MAX(cp.empresa) as empresa
+        FROM caz_parcelas cp
+        WHERE cp.tipo_evento = 'RECEITA'
+          AND cp.data_vencimento < '${dataHoje}'
+          AND cp.nao_pago::numeric > 0
+          AND cp.id_cliente IS NOT NULL
+          AND cp.id_cliente::text != ''
+          ${whereDataInicio}
+          ${whereDataFim}
+        GROUP BY cp.id_cliente
+        HAVING COALESCE(SUM(cp.nao_pago::numeric), 0) > 0
+      ),
+      cliente_metadata AS (
+        -- CTE 2: Dados do cliente (caz_clientes + cup_clientes) - uma linha por cliente
+        SELECT DISTINCT ON (TRIM(cc.ids::text))
+          TRIM(cc.ids::text) as id_cliente,
+          cc.cnpj,
+          cup.nome as nome_clickup,
+          cup.status as status_clickup,
+          cup.responsavel,
+          cup.cluster,
+          cup.task_id
+        FROM caz_clientes cc
+        LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
+          AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
+        WHERE cc.ids IS NOT NULL
+        ORDER BY TRIM(cc.ids::text), cup.status DESC NULLS LAST
+      ),
+      contratos_agregados AS (
+        -- CTE 3: Serviços agregados por task_id (evita multiplicação de linhas)
+        SELECT 
+          TRIM(cont.id_task::text) as task_id,
+          STRING_AGG(DISTINCT cont.servico, ', ') as servicos
+        FROM cup_contratos cont
+        WHERE cont.id_task IS NOT NULL AND cont.id_task::text != ''
+          AND cont.servico IS NOT NULL
+        GROUP BY TRIM(cont.id_task::text)
+      )
       SELECT 
-        cp.id_cliente,
-        MAX(cp.descricao) as nome_cliente,
-        COALESCE(SUM(cp.nao_pago::numeric), 0) as valor_total,
-        COUNT(*) as quantidade_parcelas,
-        MIN(cp.data_vencimento) as parcela_mais_antiga,
-        MAX('${dataHoje}'::date - cp.data_vencimento::date) as dias_atraso_max,
-        MAX(cp.empresa) as empresa,
-        MAX(cc.cnpj) as cnpj,
-        MAX(cup.nome) as nome_clickup,
-        MAX(cup.status) as status_clickup,
-        MAX(cup.responsavel) as responsavel,
-        MAX(cup.cluster) as cluster,
-        MAX(cup.task_id::text) as task_id,
-        STRING_AGG(DISTINCT cont.servico, ', ') as servicos
-      FROM caz_parcelas cp
-      LEFT JOIN caz_clientes cc ON TRIM(cp.id_cliente::text) = TRIM(cc.ids::text)
-      LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
-        AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
-      LEFT JOIN cup_contratos cont ON TRIM(cup.task_id::text) = TRIM(cont.id_task::text)
-        AND cup.task_id IS NOT NULL AND cup.task_id::text != ''
-        AND cont.id_task IS NOT NULL AND cont.id_task::text != ''
-      WHERE cp.tipo_evento = 'RECEITA'
-        AND cp.data_vencimento < '${dataHoje}'
-        AND cp.nao_pago::numeric > 0
-        AND cp.id_cliente IS NOT NULL
-        AND cp.id_cliente::text != ''
-        ${whereDataInicio}
-        ${whereDataFim}
-      GROUP BY cp.id_cliente
-      HAVING COALESCE(SUM(cp.nao_pago::numeric), 0) > 0
+        parcelas.id_cliente,
+        parcelas.nome_cliente,
+        parcelas.valor_total,
+        parcelas.quantidade_parcelas,
+        parcelas.parcela_mais_antiga,
+        parcelas.dias_atraso_max,
+        parcelas.empresa,
+        cliente_info.cnpj,
+        cliente_info.nome_clickup,
+        cliente_info.status_clickup,
+        cliente_info.responsavel,
+        cliente_info.cluster,
+        contratos.servicos
+      FROM parcelas_agregadas parcelas
+      LEFT JOIN cliente_metadata cliente_info ON TRIM(parcelas.id_cliente::text) = cliente_info.id_cliente
+      LEFT JOIN contratos_agregados contratos ON TRIM(cliente_info.task_id::text) = contratos.task_id
       ORDER BY ${orderByClause}
       LIMIT ${limite}
     `));
