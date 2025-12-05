@@ -5687,6 +5687,7 @@ export class DbStorage implements IStorage {
       diasAtraso: number;
       empresa: string;
       status: string;
+      urlCobranca: string | null;
     }[];
   }> {
     const hoje = new Date();
@@ -5710,7 +5711,8 @@ export class DbStorage implements IStorage {
         data_vencimento,
         ('${dataHoje}'::date - data_vencimento::date) as dias_atraso,
         empresa,
-        status
+        status,
+        url_cobranca
       FROM caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento < '${dataHoje}'
@@ -5730,6 +5732,7 @@ export class DbStorage implements IStorage {
       diasAtraso: parseInt(row.dias_atraso || '0'),
       empresa: row.empresa || '',
       status: row.status || '',
+      urlCobranca: row.url_cobranca || null,
     }));
     
     return { parcelas };

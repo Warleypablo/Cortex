@@ -66,6 +66,7 @@ import {
   Calendar,
   ChevronRight,
   RotateCcw,
+  ExternalLink,
 } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -126,6 +127,7 @@ interface ParcelaDetalhe {
   diasAtraso: number;
   empresa: string;
   status: string;
+  urlCobranca: string | null;
 }
 
 const COLORS = {
@@ -1043,6 +1045,7 @@ export default function DashboardInadimplencia() {
                     <TableHead className="text-right">Não Pago</TableHead>
                     <TableHead className="text-center">Vencimento</TableHead>
                     <TableHead className="text-center">Dias Atraso</TableHead>
+                    <TableHead className="text-center">Link</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1073,6 +1076,30 @@ export default function DashboardInadimplencia() {
                         <Badge className={getDiasAtrasoColor(parcela.diasAtraso)}>
                           {parcela.diasAtraso} dias
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {parcela.urlCobranca ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <a
+                                  href={parcela.urlCobranca}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 transition-colors"
+                                  data-testid={`link-cobranca-${parcela.id}`}
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Abrir link de cobrança</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
