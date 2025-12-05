@@ -627,7 +627,7 @@ export default function FluxoCaixa() {
 
       {/* Dialog de Detalhamento do Dia */}
       <Dialog open={!!diaSelecionado} onOpenChange={(open) => !open && setDiaSelecionado(null)}>
-        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col" data-testid="dialog-dia-detalhe">
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" data-testid="dialog-dia-detalhe">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10">
@@ -674,7 +674,7 @@ export default function FluxoCaixa() {
                 </div>
               </div>
 
-              <ScrollArea className="flex-1 max-h-[400px]">
+              <ScrollArea className="flex-1 min-h-0" style={{ maxHeight: 'calc(90vh - 220px)' }}>
                 <div className="space-y-6">
                   {/* Entradas */}
                   {diaDetalhe.entradas.length > 0 && (
