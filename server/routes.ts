@@ -9,6 +9,7 @@ import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { analyzeDfc, chatWithDfc, type ChatMessage } from "./services/dfcAnalysis";
 import { setupDealNotifications, triggerTestNotification } from "./services/dealNotifications";
+import PDFDocument from "pdfkit";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== 'admin') {
@@ -857,6 +858,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching inadimplencia por metodo pagamento:", error);
       res.status(500).json({ error: "Failed to fetch inadimplencia por metodo pagamento" });
+    }
+  });
+
+  app.get("/api/inadimplencia/relatorio-pdf", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const apenasAtivos = req.query.apenasAtivos === 'true';
+      
+      const clientesData = await storage.getInadimplenciaClientes(dataInicio, dataFim, 'valor', 500);
+      
+      let clientes = clientesData.clientes;
+      if (apenasAtivos) {
+        clientes = clientes.filter(c => {
+          if (!c.statusClickup) return false;
+          const statusLower = c.statusClickup.toLowerCase();
+          return statusLower.includes('ativo') && 
+                 !statusLower.includes('inativo') && 
+                 !statusLower.includes('cancelado') &&
+                 !statusLower.includes('cancelamento') &&
+                 !statusLower.includes('churn') &&
+                 !statusLower.includes('encerrado');
+        });
+      }
+      
+      const doc = new PDFDocument({ 
+        margin: 40,
+        size: 'A4',
+        layout: 'landscape'
+      });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=relatorio-inadimplencia-${new Date().toISOString().split('T')[0]}.pdf`);
+      
+      doc.pipe(res);
+      
+      const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      
+      doc.fontSize(18).fillColor('#1e293b').text('Relatório de Inadimplência', { align: 'center' });
+      doc.moveDown(0.3);
+      
+      const dataHoje = new Date().toLocaleDateString('pt-BR');
+      doc.fontSize(10).fillColor('#64748b').text(`Gerado em: ${dataHoje}`, { align: 'center' });
+      if (apenasAtivos) {
+        doc.text('Filtro: Apenas clientes ATIVOS no ClickUp', { align: 'center' });
+      }
+      doc.moveDown();
+      
+      const totalValor = clientes.reduce((acc, c) => acc + c.valorTotal, 0);
+      const totalParcelas = clientes.reduce((acc, c) => acc + c.quantidadeParcelas, 0);
+      
+      doc.fontSize(11).fillColor('#1e293b');
+      doc.text(`Total de Clientes: ${clientes.length}`, 40);
+      doc.text(`Total de Parcelas em Atraso: ${totalParcelas}`, 40);
+      doc.text(`Valor Total Inadimplente: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValor)}`, 40);
+      doc.moveDown();
+      
+      doc.moveTo(40, doc.y).lineTo(pageWidth + 40, doc.y).stroke('#e2e8f0');
+      doc.moveDown(0.5);
+      
+      const colWidths = {
+        cliente: 180,
+        valor: 90,
+        parcelas: 60,
+        diasAtraso: 70,
+        status: 100,
+        responsavel: 120,
+        empresa: 100
+      };
+      
+      const headerY = doc.y;
+      doc.fontSize(9).fillColor('#475569').font('Helvetica-Bold');
+      let xPos = 40;
+      doc.text('Cliente', xPos, headerY, { width: colWidths.cliente });
+      xPos += colWidths.cliente;
+      doc.text('Valor', xPos, headerY, { width: colWidths.valor, align: 'right' });
+      xPos += colWidths.valor;
+      doc.text('Parcelas', xPos, headerY, { width: colWidths.parcelas, align: 'center' });
+      xPos += colWidths.parcelas;
+      doc.text('Dias Atraso', xPos, headerY, { width: colWidths.diasAtraso, align: 'center' });
+      xPos += colWidths.diasAtraso;
+      doc.text('Status', xPos, headerY, { width: colWidths.status });
+      xPos += colWidths.status;
+      doc.text('Responsável', xPos, headerY, { width: colWidths.responsavel });
+      xPos += colWidths.responsavel;
+      doc.text('Empresa', xPos, headerY, { width: colWidths.empresa });
+      
+      doc.moveDown(0.5);
+      doc.moveTo(40, doc.y).lineTo(pageWidth + 40, doc.y).stroke('#e2e8f0');
+      doc.moveDown(0.3);
+      
+      doc.font('Helvetica').fontSize(8).fillColor('#334155');
+      
+      for (const cliente of clientes) {
+        if (doc.y > doc.page.height - 60) {
+          doc.addPage();
+          doc.fontSize(8).fillColor('#334155');
+        }
+        
+        const rowY = doc.y;
+        xPos = 40;
+        
+        const nomeCliente = cliente.nomeCliente.length > 35 
+          ? cliente.nomeCliente.substring(0, 35) + '...' 
+          : cliente.nomeCliente;
+        doc.text(nomeCliente, xPos, rowY, { width: colWidths.cliente });
+        xPos += colWidths.cliente;
+        
+        const valorFormatado = new Intl.NumberFormat('pt-BR', { 
+          style: 'currency', 
+          currency: 'BRL',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0
+        }).format(cliente.valorTotal);
+        doc.fillColor('#dc2626').text(valorFormatado, xPos, rowY, { width: colWidths.valor, align: 'right' });
+        xPos += colWidths.valor;
+        
+        doc.fillColor('#334155').text(String(cliente.quantidadeParcelas), xPos, rowY, { width: colWidths.parcelas, align: 'center' });
+        xPos += colWidths.parcelas;
+        
+        doc.text(`${cliente.diasAtrasoMax}d`, xPos, rowY, { width: colWidths.diasAtraso, align: 'center' });
+        xPos += colWidths.diasAtraso;
+        
+        const status = cliente.statusClickup || '-';
+        const statusTruncado = status.length > 18 ? status.substring(0, 18) + '...' : status;
+        doc.text(statusTruncado, xPos, rowY, { width: colWidths.status });
+        xPos += colWidths.status;
+        
+        const responsavel = cliente.responsavel || '-';
+        const responsavelTruncado = responsavel.length > 20 ? responsavel.substring(0, 20) + '...' : responsavel;
+        doc.text(responsavelTruncado, xPos, rowY, { width: colWidths.responsavel });
+        xPos += colWidths.responsavel;
+        
+        const empresa = cliente.empresa || '-';
+        const empresaTruncada = empresa.length > 15 ? empresa.substring(0, 15) + '...' : empresa;
+        doc.text(empresaTruncada, xPos, rowY, { width: colWidths.empresa });
+        
+        doc.moveDown(0.6);
+      }
+      
+      doc.end();
+      
+    } catch (error) {
+      console.error("[api] Error generating inadimplencia PDF report:", error);
+      res.status(500).json({ error: "Failed to generate PDF report" });
     }
   });
 
