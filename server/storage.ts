@@ -1809,9 +1809,9 @@ export class DbStorage implements IStorage {
         tipo_evento,
         status,
         COALESCE(categoria_nome, 'Sem categoria') as categoria,
-        COALESCE(meio_pagamento, 'Não informado') as meio_pagamento,
+        COALESCE(metodo_pagamento, 'Não informado') as metodo_pagamento,
         TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data_vencimento,
-        COALESCE(conta_recebimento, 'Não informado') as conta
+        COALESCE(nome_conta_financeira, 'Não informado') as conta
       FROM caz_parcelas
       WHERE data_vencimento::date = '${data}'::date
         AND status NOT IN ('PERDIDO')
@@ -1829,7 +1829,7 @@ export class DbStorage implements IStorage {
         valor: parseFloat(r.valor || '0'),
         status: r.status,
         categoria: r.categoria,
-        meioPagamento: r.meio_pagamento,
+        meioPagamento: r.metodo_pagamento,
         conta: r.conta,
       }));
     
@@ -1841,7 +1841,7 @@ export class DbStorage implements IStorage {
         valor: parseFloat(r.valor || '0'),
         status: r.status,
         categoria: r.categoria,
-        meioPagamento: r.meio_pagamento,
+        meioPagamento: r.metodo_pagamento,
         conta: r.conta,
       }));
     
