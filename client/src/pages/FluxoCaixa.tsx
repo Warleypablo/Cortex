@@ -6,14 +6,54 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
   Wallet, TrendingUp, TrendingDown, Calendar, AlertCircle,
   ArrowUpCircle, ArrowDownCircle, Banknote, CreditCard, Building2,
-  ChevronRight, CircleDollarSign, CalendarDays, ArrowRight, Receipt
+  ChevronRight, CircleDollarSign, CalendarDays, ArrowRight, Receipt,
+  Loader2, X
 } from "lucide-react";
 import {
   ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, Cell
 } from "recharts";
 import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsightsPeriodo, ContaBanco } from "@shared/schema";
+
+interface FluxoDiaDetalhe {
+  entradas: {
+    id: number;
+    descricao: string;
+    valor: number;
+    status: string;
+    categoria: string;
+    meioPagamento: string;
+    conta: string;
+  }[];
+  saidas: {
+    id: number;
+    descricao: string;
+    valor: number;
+    status: string;
+    categoria: string;
+    meioPagamento: string;
+    conta: string;
+  }[];
+  totalEntradas: number;
+  totalSaidas: number;
+  saldo: number;
+}
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -52,6 +92,7 @@ const getMesNome = (mes: number, ano: number) => {
 export default function FluxoCaixa() {
   const hoje = new Date();
   const [mesAno, setMesAno] = useState(`${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`);
+  const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
   
   const dataInicio = useMemo(() => {
     const [ano, mes] = mesAno.split('-').map(Number);
@@ -103,6 +144,16 @@ export default function FluxoCaixa() {
       return res.json();
     },
     enabled: !!dataInicio && !!dataFim,
+  });
+
+  const { data: diaDetalhe, isLoading: isLoadingDiaDetalhe } = useQuery<FluxoDiaDetalhe>({
+    queryKey: ['/api/fluxo-caixa/dia-detalhe', diaSelecionado],
+    queryFn: async () => {
+      const res = await fetch(`/api/fluxo-caixa/dia-detalhe?data=${diaSelecionado}`);
+      if (!res.ok) throw new Error("Failed to fetch dia detalhe");
+      return res.json();
+    },
+    enabled: !!diaSelecionado,
   });
 
   const chartData = useMemo(() => {
@@ -445,6 +496,27 @@ export default function FluxoCaixa() {
                     margin={{ top: 20, right: 80, left: 20, bottom: 50 }}
                     barGap={2}
                     barCategoryGap="15%"
+                    onClick={(chartEvent) => {
+                      if (chartEvent) {
+                        let targetData: string | null = null;
+                        
+                        if (chartEvent.activePayload && chartEvent.activePayload.length > 0) {
+                          const payload = chartEvent.activePayload[0].payload as typeof chartData[0];
+                          if (payload?.data) {
+                            targetData = payload.data;
+                          }
+                        }
+                        
+                        if (!targetData && typeof chartEvent.activeTooltipIndex === 'number' && chartData[chartEvent.activeTooltipIndex]) {
+                          targetData = chartData[chartEvent.activeTooltipIndex].data;
+                        }
+                        
+                        if (targetData) {
+                          setDiaSelecionado(targetData);
+                        }
+                      }
+                    }}
+                    style={{ cursor: 'pointer' }}
                   >
                     <defs>
                       <linearGradient id="gradientEntradas" x1="0" y1="0" x2="0" y2="1">
@@ -552,6 +624,163 @@ export default function FluxoCaixa() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog de Detalhamento do Dia */}
+      <Dialog open={!!diaSelecionado} onOpenChange={(open) => !open && setDiaSelecionado(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col" data-testid="dialog-dia-detalhe">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <CalendarDays className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <span className="text-lg">Movimentações do Dia</span>
+                {diaSelecionado && (
+                  <span className="block text-sm font-normal text-muted-foreground">
+                    {formatDateFull(diaSelecionado)}
+                  </span>
+                )}
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          
+          {isLoadingDiaDetalhe ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : diaDetalhe ? (
+            <div className="flex flex-col gap-4 overflow-hidden">
+              {/* Resumo do Dia */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 rounded-lg bg-green-500/10">
+                  <p className="text-xs text-muted-foreground">Total Entradas</p>
+                  <p className="text-xl font-bold text-green-600" data-testid="text-dia-entradas">
+                    {formatCurrency(diaDetalhe.totalEntradas)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{diaDetalhe.entradas.length} transações</p>
+                </div>
+                <div className="p-4 rounded-lg bg-red-500/10">
+                  <p className="text-xs text-muted-foreground">Total Saídas</p>
+                  <p className="text-xl font-bold text-red-600" data-testid="text-dia-saidas">
+                    {formatCurrency(diaDetalhe.totalSaidas)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{diaDetalhe.saidas.length} transações</p>
+                </div>
+                <div className="p-4 rounded-lg bg-blue-500/10">
+                  <p className="text-xs text-muted-foreground">Saldo do Dia</p>
+                  <p className={`text-xl font-bold ${diaDetalhe.saldo >= 0 ? 'text-blue-600' : 'text-red-600'}`} data-testid="text-dia-saldo">
+                    {formatCurrency(diaDetalhe.saldo)}
+                  </p>
+                </div>
+              </div>
+
+              <ScrollArea className="flex-1 max-h-[400px]">
+                <div className="space-y-6">
+                  {/* Entradas */}
+                  {diaDetalhe.entradas.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-green-600 mb-2 flex items-center gap-2">
+                        <ArrowUpCircle className="w-4 h-4" />
+                        Entradas ({diaDetalhe.entradas.length})
+                      </h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Descrição</TableHead>
+                            <TableHead>Categoria</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Valor</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {diaDetalhe.entradas.map((entrada, idx) => (
+                            <TableRow key={entrada.id || idx} data-testid={`row-entrada-${idx}`}>
+                              <TableCell className="font-medium max-w-[200px] truncate" title={entrada.descricao}>
+                                {entrada.descricao}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="text-xs">
+                                  {entrada.categoria}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={entrada.status === 'QUITADO' ? 'default' : 'outline'}
+                                  className={entrada.status === 'QUITADO' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : ''}
+                                >
+                                  {entrada.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-semibold text-green-600">
+                                {formatCurrency(entrada.valor)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {/* Saídas */}
+                  {diaDetalhe.saidas.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-red-600 mb-2 flex items-center gap-2">
+                        <ArrowDownCircle className="w-4 h-4" />
+                        Saídas ({diaDetalhe.saidas.length})
+                      </h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Descrição</TableHead>
+                            <TableHead>Categoria</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Valor</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {diaDetalhe.saidas.map((saida, idx) => (
+                            <TableRow key={saida.id || idx} data-testid={`row-saida-${idx}`}>
+                              <TableCell className="font-medium max-w-[200px] truncate" title={saida.descricao}>
+                                {saida.descricao}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="text-xs">
+                                  {saida.categoria}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={saida.status === 'QUITADO' ? 'default' : 'outline'}
+                                  className={saida.status === 'QUITADO' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : ''}
+                                >
+                                  {saida.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-semibold text-red-600">
+                                {formatCurrency(saida.valor)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {diaDetalhe.entradas.length === 0 && diaDetalhe.saidas.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Nenhuma movimentação registrada para este dia
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Erro ao carregar detalhes do dia
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

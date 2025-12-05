@@ -149,6 +149,7 @@ export interface IStorage {
   getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]>;
   getContasBancos(): Promise<ContaBanco[]>;
   getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<FluxoCaixaDiarioCompleto[]>;
+  getFluxoDiaDetalhe(data: string): Promise<{ entradas: any[]; saidas: any[]; totalEntradas: number; totalSaidas: number; saldo: number }>;
   getFluxoCaixaInsights(): Promise<FluxoCaixaInsights>;
   getFluxoCaixaInsightsPeriodo(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaInsightsPeriodo>;
   getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
@@ -421,6 +422,10 @@ export class MemStorage implements IStorage {
   }
 
   async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<FluxoCaixaDiarioCompleto[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getFluxoDiaDetalhe(data: string): Promise<{ entradas: any[]; saidas: any[]; totalEntradas: number; totalSaidas: number; saldo: number }> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1793,6 +1798,63 @@ export class DbStorage implements IStorage {
         saidasPrevistas,
       };
     });
+  }
+
+  async getFluxoDiaDetalhe(data: string): Promise<{ entradas: any[]; saidas: any[]; totalEntradas: number; totalSaidas: number; saldo: number }> {
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        id,
+        COALESCE(descricao, 'Sem descrição') as descricao,
+        valor_bruto::numeric as valor,
+        tipo_evento,
+        status,
+        COALESCE(categoria_nome, 'Sem categoria') as categoria,
+        COALESCE(meio_pagamento, 'Não informado') as meio_pagamento,
+        TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data_vencimento,
+        COALESCE(conta_recebimento, 'Não informado') as conta
+      FROM caz_parcelas
+      WHERE data_vencimento::date = '${data}'::date
+        AND status NOT IN ('PERDIDO')
+        AND valor_bruto::numeric > 0
+      ORDER BY tipo_evento DESC, valor_bruto::numeric DESC
+    `));
+    
+    const rows = result.rows as any[];
+    
+    const entradas = rows
+      .filter(r => r.tipo_evento === 'RECEITA')
+      .map(r => ({
+        id: r.id,
+        descricao: r.descricao,
+        valor: parseFloat(r.valor || '0'),
+        status: r.status,
+        categoria: r.categoria,
+        meioPagamento: r.meio_pagamento,
+        conta: r.conta,
+      }));
+    
+    const saidas = rows
+      .filter(r => r.tipo_evento === 'DESPESA')
+      .map(r => ({
+        id: r.id,
+        descricao: r.descricao,
+        valor: parseFloat(r.valor || '0'),
+        status: r.status,
+        categoria: r.categoria,
+        meioPagamento: r.meio_pagamento,
+        conta: r.conta,
+      }));
+    
+    const totalEntradas = entradas.reduce((acc, e) => acc + e.valor, 0);
+    const totalSaidas = saidas.reduce((acc, s) => acc + s.valor, 0);
+    
+    return {
+      entradas,
+      saidas,
+      totalEntradas,
+      totalSaidas,
+      saldo: totalEntradas - totalSaidas,
+    };
   }
 
   async getFluxoCaixaInsights(): Promise<FluxoCaixaInsights> {
