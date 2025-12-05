@@ -67,9 +67,12 @@ import {
   ChevronRight,
   RotateCcw,
   ExternalLink,
+  FileText,
+  Download,
 } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
 
 interface InadimplenciaResumo {
   totalInadimplente: number;
@@ -154,6 +157,7 @@ function ErrorDisplay({ message }: { message: string }) {
 }
 
 export default function DashboardInadimplencia() {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("visao-geral");
   const [dataInicio, setDataInicio] = useState<string>("");
   const [dataFim, setDataFim] = useState<string>("");
@@ -291,6 +295,45 @@ export default function DashboardInadimplencia() {
     setStatusFiltro("todos");
   };
 
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  
+  const handleDownloadPdf = async (apenasAtivos: boolean = false) => {
+    try {
+      setIsDownloadingPdf(true);
+      const params = new URLSearchParams();
+      if (dataInicio) params.append('dataInicio', dataInicio);
+      if (dataFim) params.append('dataFim', dataFim);
+      if (apenasAtivos) params.append('apenasAtivos', 'true');
+      
+      const response = await fetch(`/api/inadimplencia/relatorio-pdf?${params.toString()}`);
+      if (!response.ok) throw new Error('Erro ao gerar relatório');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-inadimplencia-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "PDF gerado com sucesso",
+        description: apenasAtivos ? "Relatório de clientes ativos baixado." : "Relatório completo baixado.",
+      });
+    } catch (error) {
+      console.error('Erro ao baixar PDF:', error);
+      toast({
+        title: "Erro ao gerar PDF",
+        description: "Não foi possível gerar o relatório. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
   const getDiasAtrasoColor = (dias: number) => {
     if (dias <= 30) return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
     if (dias <= 60) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
@@ -423,18 +466,50 @@ export default function DashboardInadimplencia() {
                 <p className="text-xs text-muted-foreground">Selecione o período de análise da inadimplência</p>
               </div>
             </div>
-            {(dataInicio || dataFim) && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {(dataInicio || dataFim) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={limparFiltros}
+                  className="h-9 px-4 border-amber-300 dark:border-amber-800 hover:bg-amber-100 hover:border-amber-400 hover:text-amber-700 dark:hover:bg-amber-950/50 dark:hover:border-amber-700 dark:hover:text-amber-400 transition-all"
+                  data-testid="button-limpar-filtros"
+                >
+                  <RotateCcw className="h-4 w-4 mr-1.5" />
+                  Limpar Filtros
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={limparFiltros}
+                onClick={() => handleDownloadPdf(false)}
+                disabled={isDownloadingPdf}
                 className="h-9 px-4 border-amber-300 dark:border-amber-800 hover:bg-amber-100 hover:border-amber-400 hover:text-amber-700 dark:hover:bg-amber-950/50 dark:hover:border-amber-700 dark:hover:text-amber-400 transition-all"
-                data-testid="button-limpar-filtros"
+                data-testid="button-download-pdf-todos"
               >
-                <RotateCcw className="h-4 w-4 mr-1.5" />
-                Limpar Filtros
+                {isDownloadingPdf ? (
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4 mr-1.5" />
+                )}
+                PDF (Todos)
               </Button>
-            )}
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => handleDownloadPdf(true)}
+                disabled={isDownloadingPdf}
+                className="h-9 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg shadow-amber-500/30 border-0 transition-all"
+                data-testid="button-download-pdf-ativos"
+              >
+                {isDownloadingPdf ? (
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-1.5" />
+                )}
+                PDF (Ativos ClickUp)
+              </Button>
+            </div>
           </div>
 
           {/* Filters Row */}
