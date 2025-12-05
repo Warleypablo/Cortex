@@ -649,9 +649,9 @@ export default function FluxoCaixa() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : diaDetalhe ? (
-            <div className="flex flex-col gap-4 overflow-hidden">
+            <div className="flex flex-col gap-4 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 120px)' }}>
               {/* Resumo do Dia */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-4 flex-shrink-0">
                 <div className="p-4 rounded-lg bg-green-500/10">
                   <p className="text-xs text-muted-foreground">Total Entradas</p>
                   <p className="text-xl font-bold text-green-600" data-testid="text-dia-entradas">
@@ -674,8 +674,7 @@ export default function FluxoCaixa() {
                 </div>
               </div>
 
-              <ScrollArea className="flex-1 min-h-0" style={{ maxHeight: 'calc(90vh - 220px)' }}>
-                <div className="space-y-6">
+              <div className="space-y-6">
                   {/* Entradas */}
                   {diaDetalhe.entradas.length > 0 && (
                     <div>
@@ -771,8 +770,7 @@ export default function FluxoCaixa() {
                       Nenhuma movimentação registrada para este dia
                     </div>
                   )}
-                </div>
-              </ScrollArea>
+              </div>
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
