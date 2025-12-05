@@ -705,6 +705,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/fluxo-caixa/dia-detalhe", async (req, res) => {
+    try {
+      const data = req.query.data as string;
+      
+      if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+        return res.status(400).json({ error: "data is required in format YYYY-MM-DD" });
+      }
+
+      const detalhe = await storage.getFluxoDiaDetalhe(data);
+      res.json(detalhe);
+    } catch (error) {
+      console.error("[api] Error fetching fluxo dia detalhe:", error);
+      res.status(500).json({ error: "Failed to fetch fluxo dia detalhe" });
+    }
+  });
+
   app.get("/api/financeiro/resumo", async (req, res) => {
     try {
       const mesAno = req.query.mesAno as string | undefined;
