@@ -29,14 +29,11 @@ export function configurePassport() {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
   if (!clientID || !clientSecret) {
-    console.warn("⚠️  Google OAuth credentials not found!");
-    console.warn("⚠️  Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Secrets");
+    console.warn("Google OAuth credentials not found");
     return;
   }
 
-  console.log("✅ Google OAuth configured successfully");
-  console.log("📍 Client ID starts with:", clientID.substring(0, 20) + "...");
-  console.log("📍 Callback URL:", getCallbackURL());
+  console.log("Google OAuth configured");
 
   passport.use(
     new GoogleStrategy(
@@ -47,12 +44,10 @@ export function configurePassport() {
       },
       async (_accessToken, _refreshToken, profile, done) => {
         try {
-          console.log("👤 Perfil do Google recebido:", profile.id, profile.displayName);
           const user = await createOrUpdateUser(profile);
-          console.log("✅ Usuário criado/atualizado:", user.id);
           return done(null, user);
         } catch (error) {
-          console.error("❌ Erro ao criar/atualizar usuário:", error);
+          console.error("OAuth error:", error);
           return done(error as Error);
         }
       }
@@ -107,21 +102,5 @@ export function configurePassport() {
 }
 
 export function logOAuthSetupInstructions() {
-  const callbackURL = getCallbackURL();
-  
-  console.log("\n" + "=".repeat(80));
-  console.log("🔐 GOOGLE OAUTH SETUP INSTRUCTIONS");
-  console.log("=".repeat(80));
-  console.log("\n1. Go to Google Cloud Console: https://console.cloud.google.com/");
-  console.log("2. Create or select a project");
-  console.log("3. Enable Google+ API");
-  console.log("4. Go to 'Credentials' → 'Create Credentials' → 'OAuth 2.0 Client ID'");
-  console.log("5. Application type: Web application");
-  console.log("\n6. Add this Authorized Redirect URI:");
-  console.log(`   ✨ ${callbackURL}`);
-  console.log("\n7. Copy your Client ID and Client Secret");
-  console.log("8. Add them to Replit Secrets:");
-  console.log("   - GOOGLE_CLIENT_ID");
-  console.log("   - GOOGLE_CLIENT_SECRET");
-  console.log("\n" + "=".repeat(80) + "\n");
+  console.log("OAuth callback URL:", getCallbackURL());
 }
