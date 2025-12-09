@@ -121,6 +121,7 @@ const dashboardCategories = [
     icon: Sparkles,
     baseUrl: "/growth",
     subItems: [
+      { title: "Visão Geral", url: "/growth/visao-geral", icon: Eye },
       { title: "Criativos", url: "/growth/criativos", icon: Image },
     ],
   },
