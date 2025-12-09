@@ -157,7 +157,18 @@ const ALL_ROUTES = [
   '/dashboard/meta-ads',
   '/dashboard/retencao',
   '/dashboard/dfc',
+  '/dashboard/fluxo-caixa',
+  '/dashboard/inadimplencia',
   '/dashboard/auditoria-sistemas',
+  '/dashboard/tech',
+  '/dashboard/comercial/closers',
+  '/dashboard/comercial/sdrs',
+  '/dashboard/comercial/detalhamento-closers',
+  '/dashboard/comercial/detalhamento-vendas',
+  '/dashboard/comercial/analise-vendas',
+  '/dashboard/comercial/apresentacao',
+  '/growth/visao-geral',
+  '/growth/criativos',
   '/admin/usuarios'
 ];
 const DEFAULT_USER_ROUTES = ['/ferramentas'];
