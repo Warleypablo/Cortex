@@ -9,6 +9,20 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
+export const authUsers = pgTable("auth_users", {
+  id: varchar("id", { length: 100 }).primaryKey(),
+  googleId: varchar("google_id", { length: 100 }).notNull().unique(),
+  email: varchar("email", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  picture: text("picture"),
+  createdAt: timestamp("created_at").defaultNow(),
+  role: varchar("role", { length: 20 }).notNull().default("user"),
+  allowedRoutes: text("allowed_routes").array(),
+});
+
+export type AuthUser = typeof authUsers.$inferSelect;
+export type InsertAuthUser = typeof authUsers.$inferInsert;
+
 export const cazClientes = pgTable("caz_clientes", {
   id: integer("id").primaryKey(),
   nome: text("nome"),
