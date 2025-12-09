@@ -7,39 +7,121 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Search, X, ArrowUpDown, TrendingUp, Rocket } from "lucide-react";
+import { CalendarIcon, Search, X, ArrowUpDown, TrendingUp, Rocket, ExternalLink } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-const mockData = [
-  { id: 1, anuncio: "1386 - [ASS] - [VENDA ATIVA] - [VID] - Conversão", status: "Ativo", plataforma: "Facebook", produto: "Assessoria", estrategia: "Conversão", investimento: 465895, impressoes: 10511987, frequencia: 1.25, cpm: 44, ctr: 0.96, cliques: 100827, cliquesLeads: 0.74, leads: 74, leadMql: 59, mql: 44, cpmql: 10580, mqlRm: 2, rm: 1, mqlRr: 5, rr: 2 },
-  { id: 2, anuncio: "1129 - [ASS] - [FLÁVIO AUGUSTO] - [VID] - Awareness", status: "Ativo", plataforma: "Facebook", produto: "Assessoria", estrategia: "Awareness", investimento: 184043, impressoes: 4039876, frequencia: 1.19, cpm: 46, ctr: 0.66, cliques: 26822, cliquesLeads: 0.49, leads: 131, leadMql: 59, mql: 77, cpmql: 2357, mqlRm: 0, rm: 0, mqlRr: 16, rr: 12 },
-  { id: 3, anuncio: "483 - VIDEO - BRENDA - FRASE - AGÊNCIA", status: "Ativo", plataforma: "Instagram", produto: "Consultoria", estrategia: "Conversão", investimento: 135967, impressoes: 3132904, frequencia: 1.19, cpm: 43, ctr: 0.60, cliques: 18730, cliquesLeads: 0.20, leads: 37, leadMql: 65, mql: 24, cpmql: 4981, mqlRm: 4, rm: 1, mqlRr: 25, rr: 6 },
-  { id: 4, anuncio: "1114 - [ASS] - [FLÁVIO AUGUSTO] - [VID] - Lead Gen", status: "Pausado", plataforma: "Facebook", produto: "Assessoria", estrategia: "Lead Gen", investimento: 16281, impressoes: 409180, frequencia: 1.13, cpm: 40, ctr: 0.60, cliques: 2462, cliquesLeads: 0.04, leads: 1, leadMql: 100, mql: 1, cpmql: 15947, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 5, anuncio: "634 - VIDEO - FERNANDO MIRANDA - Depoimento", status: "Ativo", plataforma: "Instagram", produto: "Consultoria", estrategia: "Awareness", investimento: 15283, impressoes: 325070, frequencia: 1.07, cpm: 47, ctr: 0.61, cliques: 1974, cliquesLeads: 0.61, leads: 12, leadMql: 100, mql: 12, cpmql: 1274, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 6, anuncio: "1387 - [ASS] - [COMO UMA EMPRESA...] - Conversão", status: "Ativo", plataforma: "Facebook", produto: "Assessoria", estrategia: "Conversão", investimento: 13267, impressoes: 382041, frequencia: 1.10, cpm: 35, ctr: 0.74, cliques: 2830, cliquesLeads: 0.39, leads: 11, leadMql: 64, mql: 7, cpmql: 1483, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 7, anuncio: "1403 - [ASS] - [AUTORIDADE V4] - [VID] - Branding", status: "Ativo", plataforma: "Facebook", produto: "Assessoria", estrategia: "Branding", investimento: 10378, impressoes: 281307, frequencia: 1.07, cpm: 37, ctr: 0.72, cliques: 2019, cliquesLeads: 0.55, leads: 11, leadMql: 64, mql: 7, cpmql: 1483, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 8, anuncio: "1404 - [ASS] - [AUTORIDADE V4] - [VID] - Retargeting", status: "Pausado", plataforma: "Facebook", produto: "Assessoria", estrategia: "Retargeting", investimento: 10172, impressoes: 213050, frequencia: 1.27, cpm: 48, ctr: 1.20, cliques: 2552, cliquesLeads: 0.24, leads: 6, leadMql: 83, mql: 5, cpmql: 611, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 9, anuncio: "1638 - [ASS] - [ESTRATÉGIA DE MARK...] - Conversão", status: "Ativo", plataforma: "Instagram", produto: "Curso", estrategia: "Conversão", investimento: 7608, impressoes: 93683, frequencia: 1.48, cpm: 81, ctr: 1.51, cliques: 1413, cliquesLeads: 0.50, leads: 7, leadMql: 100, mql: 7, cpmql: 0, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 10, anuncio: "1707 - [ASS] - [EMPRESÁRIO SEM TE...] - Lead Gen", status: "Ativo", plataforma: "Facebook", produto: "Assessoria", estrategia: "Lead Gen", investimento: 7558, impressoes: 110530, frequencia: 1.37, cpm: 68, ctr: 1.48, cliques: 1637, cliquesLeads: 0.55, leads: 9, leadMql: 89, mql: 8, cpmql: 0, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 11, anuncio: "1708 - [ASS] - [EMPRESÁRIO SEM TE...] - Awareness", status: "Ativo", plataforma: "Instagram", produto: "Assessoria", estrategia: "Awareness", investimento: 7527, impressoes: 72253, frequencia: 1.46, cpm: 104, ctr: 3.42, cliques: 2474, cliquesLeads: 0.61, leads: 15, leadMql: 87, mql: 13, cpmql: 0, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 12, anuncio: "1634 - [ASS] - [EMPRESÁRIO NÃO SA...] - Conversão", status: "Arquivado", plataforma: "Facebook", produto: "Assessoria", estrategia: "Conversão", investimento: 6762, impressoes: 143215, frequencia: 1.20, cpm: 47, ctr: 1.10, cliques: 1582, cliquesLeads: 0.51, leads: 8, leadMql: 88, mql: 7, cpmql: 0, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 13, anuncio: "1635 - [ASS] - [CLIENTE NÃO SABE O...] - Lead Gen", status: "Ativo", plataforma: "Google Ads", produto: "Consultoria", estrategia: "Lead Gen", investimento: 6749, impressoes: 180805, frequencia: 1.17, cpm: 37, ctr: 1.34, cliques: 2423, cliquesLeads: 0.41, leads: 10, leadMql: 70, mql: 7, cpmql: 0, mqlRm: 0, rm: 0, mqlRr: 14, rr: 1 },
-  { id: 14, anuncio: "1636 - [ASS] - [EMPRESÁRIO NÃO SA...] - Retargeting", status: "Pausado", plataforma: "Facebook", produto: "Assessoria", estrategia: "Retargeting", investimento: 6706, impressoes: 177810, frequencia: 1.16, cpm: 38, ctr: 1.65, cliques: 2930, cliquesLeads: 0.27, leads: 8, leadMql: 80, mql: 8, cpmql: 0, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 15, anuncio: "1402 - [ASS] - [MARKETING E VENDA...] - Branding", status: "Ativo", plataforma: "Instagram", produto: "Curso", estrategia: "Branding", investimento: 6287, impressoes: 122877, frequencia: 1.37, cpm: 51, ctr: 1.86, cliques: 2287, cliquesLeads: 0.13, leads: 3, leadMql: 67, mql: 2, cpmql: 0, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 16, anuncio: "1506 - [ASS] - [THIAGO NIGRO] - [VID] - Conversão", status: "Ativo", plataforma: "Facebook", produto: "Assessoria", estrategia: "Conversão", investimento: 6269, impressoes: 107889, frequencia: 1.30, cpm: 58, ctr: 1.98, cliques: 2131, cliquesLeads: 0.23, leads: 5, leadMql: 100, mql: 5, cpmql: 0, mqlRm: 0, rm: 0, mqlRr: 20, rr: 1 },
-  { id: 17, anuncio: "1388 - [ASS] - [] - [VID] - [Mentores] - Awareness", status: "Arquivado", plataforma: "Instagram", produto: "Consultoria", estrategia: "Awareness", investimento: 5027, impressoes: 114292, frequencia: 1.16, cpm: 44, ctr: 0.78, cliques: 893, cliquesLeads: 0.22, leads: 2, leadMql: 100, mql: 2, cpmql: 2454, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 18, anuncio: "1401 - [ASS] - [ENTREGÁVEIS] - [VID] - Lead Gen", status: "Ativo", plataforma: "Google Ads", produto: "Curso", estrategia: "Lead Gen", investimento: 3476, impressoes: 54886, frequencia: 1.33, cpm: 63, ctr: 2.58, cliques: 1415, cliquesLeads: 0.57, leads: 8, leadMql: 50, mql: 4, cpmql: 0, mqlRm: 25, rm: 1, mqlRr: 25, rr: 1 },
-  { id: 19, anuncio: "1399 - [ASS] - [ENTREGÁVEIS] - [VID] - Conversão", status: "Pausado", plataforma: "Facebook", produto: "Assessoria", estrategia: "Conversão", investimento: 3386, impressoes: 89282, frequencia: 1.49, cpm: 38, ctr: 2.13, cliques: 1898, cliquesLeads: 0.16, leads: 3, leadMql: 67, mql: 2, cpmql: 0, mqlRm: 0, rm: 0, mqlRr: 0, rr: 0 },
-  { id: 20, anuncio: "1400 - [ASS] - [MULTIPLICAR CAPTAÇ...] - Branding", status: "Ativo", plataforma: "Instagram", produto: "Assessoria", estrategia: "Branding", investimento: 2233, impressoes: 67467, frequencia: 1.41, cpm: 33, ctr: 0.96, cliques: 647, cliquesLeads: 0.15, leads: 1, leadMql: 100, mql: 1, cpmql: 0, mqlRm: 100, rm: 1, mqlRr: 100, rr: 1 },
+interface CriativoData {
+  id: string;
+  adName: string;
+  link: string;
+  dataCriacao: string;
+  status: string;
+  investimento: number;
+  ctr: number | null;
+  cpm: number | null;
+  leads: number;
+  cpl: number | null;
+  mql: number;
+  percMql: number | null;
+  cpmql: number | null;
+  ra: number;
+  percRa: number | null;
+  cpra: number | null;
+  percRaMql: number | null;
+  rr: number;
+  percRr: number | null;
+  cprr: number | null;
+  ganhosAceleracao: number | null;
+  ganhosPontuais: number | null;
+  cacAceleracao: number | null;
+  leadTimeClienteUnico: number | null;
+  clientesUnicos: number;
+  percRrCliente: number | null;
+  cacUnico: number | null;
+}
+
+function parseNumber(value: string): number | null {
+  if (!value || value === '-' || value === '') return null;
+  const cleaned = value.replace('R$', '').replace(/\./g, '').replace(',', '.').replace('%', '').trim();
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? null : num;
+}
+
+const rawData: CriativoData[] = [
+  { id: "120227781212760450", adName: "TP546 - vv-crators-Roberto-natural-tech-simples3-sabe-uma-coisa - adc81 - 18.06", link: "https://fb.me/209oHee6ZIx1qGJ", dataCriacao: "19/06/2025", status: "Ativo", investimento: 23976, ctr: 0.87, cpm: 85, leads: 200, cpl: 120, mql: 49, percMql: 25, cpmql: 489.31, ra: 29, percRa: 15, cpra: 827, percRaMql: 51.72, rr: 22, percRr: 75.86, cprr: 1089.82, ganhosAceleracao: 4, ganhosPontuais: 2, cacAceleracao: 5994.01, leadTimeClienteUnico: 28, clientesUnicos: 4, percRrCliente: 18, cacUnico: 5994 },
+  { id: "120234676163910450", adName: "TP724 - vv - REELS 2 - HOOK1 - - 03.09 — Cópia", link: "https://fb.me/31GoHtoi1MwpSJ5", dataCriacao: "02/10/2025", status: "Ativo", investimento: 10347, ctr: 1.35, cpm: 107, leads: 120, cpl: 86, mql: 23, percMql: 19, cpmql: 449.86, ra: 14, percRa: 12, cpra: 739, percRaMql: 64.29, rr: 8, percRr: 57.14, cprr: 1293.34, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120232961198100450", adName: "TP731 - vv-creators-criativo_invisível- hook 4 - - 03.09", link: "https://fb.me/1YaJ6mq0SjpgvZj", dataCriacao: "03/09/2025", status: "Ativo", investimento: 5836, ctr: 1.21, cpm: 70, leads: 172, cpl: 34, mql: 22, percMql: 13, cpmql: 265.26, ra: 10, percRa: 6, cpra: 584, percRaMql: 40, rr: 6, percRr: 60, cprr: 972.61, ganhosAceleracao: null, ganhosPontuais: 1, cacAceleracao: null, leadTimeClienteUnico: 6, clientesUnicos: 1, percRrCliente: 17, cacUnico: 5836 },
+  { id: "120232960242590450", adName: "TP724 - vv - REELS 2 - HOOK1 - - 03.09", link: "https://fb.me/22Erryo7fsWQN4Z", dataCriacao: "03/09/2025", status: "Pausado", investimento: 5792, ctr: 1.66, cpm: 102, leads: 79, cpl: 73, mql: 12, percMql: 15, cpmql: 482.70, ra: 5, percRa: 6, cpra: 1158, percRaMql: 60, rr: 6, percRr: 120, cprr: 965.40, ganhosAceleracao: 1, ganhosPontuais: null, cacAceleracao: 5792.39, leadTimeClienteUnico: 37, clientesUnicos: 1, percRrCliente: 17, cacUnico: 5792 },
+  { id: "120231071762480450", adName: "TP672 - vv-creators-esther-caixinhas-1x-h3-faz-sentido - - 04.08", link: "https://fb.me/1OB36NLOiTBFbbi", dataCriacao: "04/08/2025", status: "Pausado", investimento: 5179, ctr: 1.11, cpm: 54, leads: 105, cpl: 49, mql: 8, percMql: 8, cpmql: 647.34, ra: 6, percRa: 6, cpra: 863, percRaMql: 33.33, rr: 6, percRr: 100, cprr: 863.12, ganhosAceleracao: null, ganhosPontuais: 1, cacAceleracao: null, leadTimeClienteUnico: 16, clientesUnicos: 1, percRrCliente: 17, cacUnico: 5179 },
+  { id: "120234885862190450", adName: "TP796 - vertical hook 3 body 1 cta 2 - - 06.10", link: "https://fb.me/24ORmoUjJLbaeXQ", dataCriacao: "06/10/2025", status: "Ativo", investimento: 4118, ctr: 1.01, cpm: 105, leads: 64, cpl: 64, mql: 17, percMql: 27, cpmql: 242.21, ra: 15, percRa: 23, cpra: 275, percRaMql: 53.33, rr: 12, percRr: 80, cprr: 343.13, ganhosAceleracao: null, ganhosPontuais: 1, cacAceleracao: null, leadTimeClienteUnico: 25, clientesUnicos: 1, percRrCliente: 8, cacUnico: 4118 },
+  { id: "120234887730200450", adName: "TP791 - vertical hook 8 body 1 cta 2 - - 06.10", link: "https://fb.me/1QzUnFbj84acfzz", dataCriacao: "06/10/2025", status: "Ativo", investimento: 3481, ctr: 1.07, cpm: 119, leads: 59, cpl: 59, mql: 13, percMql: 22, cpmql: 267.78, ra: 10, percRa: 17, cpra: 348, percRaMql: 90, rr: 5, percRr: 50, cprr: 696.23, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120236070725110450", adName: "TP859 - HOOK1BODY2CTA1V_generico - - 21.10", link: "https://fb.me/28Y7WKUG0s3nVgC", dataCriacao: "21/10/2025", status: "Pausado", investimento: 2225, ctr: 0.91, cpm: 61, leads: 40, cpl: 56, mql: 4, percMql: 10, cpmql: 556.27, ra: 4, percRa: 10, cpra: 556, percRaMql: 0, rr: 3, percRr: 75, cprr: 741.69, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "773237162108_1", adName: "AD 1 (YouTube - HcGTTPCpoTw)", link: "https://www.youtube.com/watch?v=HcGTTPCpoTw", dataCriacao: "08/09/2025", status: "Ativo", investimento: 1855, ctr: null, cpm: null, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "773237162108_2", adName: "AD 1 (YouTube - Ip1SqCfhrOo)", link: "https://www.youtube.com/watch?v=Ip1SqCfhrOo", dataCriacao: "08/09/2025", status: "Ativo", investimento: 1855, ctr: null, cpm: null, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "773237162108_3", adName: "AD 1 (YouTube - UF2aDwrIWzw)", link: "https://www.youtube.com/watch?v=UF2aDwrIWzw", dataCriacao: "08/09/2025", status: "Ativo", investimento: 1855, ctr: null, cpm: null, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "773237162108_4", adName: "AD 1 (YouTube - hNz4BvtFve8)", link: "https://www.youtube.com/watch?v=hNz4BvtFve8", dataCriacao: "08/09/2025", status: "Ativo", investimento: 1855, ctr: null, cpm: null, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235997280980450", adName: "TP827 - hook 4 body 2 cta 2 - - 20.10", link: "https://fb.me/1YcNSHtZzzdiKlI", dataCriacao: "20/10/2025", status: "Ativo", investimento: 1705, ctr: 0.89, cpm: 97, leads: 25, cpl: 68, mql: 3, percMql: 12, cpmql: 568.18, ra: 3, percRa: 12, cpra: 568, percRaMql: 33.33, rr: 1, percRr: 33.33, cprr: 1704.55, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120237696111590450", adName: "TP906 - HOOK1BODY1minimal - - 13.11", link: "https://fb.me/264MGxwZHGmW18Q", dataCriacao: "13/11/2025", status: "Ativo", investimento: 1671, ctr: 0.64, cpm: 56, leads: 25, cpl: 67, mql: 5, percMql: 20, cpmql: 334.22, ra: 1, percRa: 4, cpra: 1671, percRaMql: 100, rr: 0, percRr: 0, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120237700711180450", adName: "TP910 - HOOK1BODY2minimal - - 13.11", link: "https://fb.me/1QBxh0RZ2vX46gd", dataCriacao: "13/11/2025", status: "Ativo", investimento: 1614, ctr: 0.44, cpm: 37, leads: 30, cpl: 54, mql: 7, percMql: 23, cpmql: 230.52, ra: 4, percRa: 13, cpra: 403, percRaMql: 75, rr: 3, percRr: 75, cprr: 537.88, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120237695786240450", adName: "TP891 - HOOK2BODY1CTA1V - - 13.10", link: "https://fb.me/1ZeTU347fwLKJyv", dataCriacao: "13/11/2025", status: "Ativo", investimento: 1386, ctr: 0.93, cpm: 95, leads: 17, cpl: 82, mql: 4, percMql: 24, cpmql: 346.51, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120233664596540450", adName: "TP546 - vv-crators-Roberto-natural-tech-simples3-sabe-uma-coisa - adc81 - 18.06", link: "https://fb.me/1O89dZbvbfSSxIt", dataCriacao: "15/09/2025", status: "Ativo", investimento: 1349, ctr: 0.71, cpm: 106, leads: 5, cpl: 270, mql: 1, percMql: 20, cpmql: 1349.34, ra: 1, percRa: 20, cpra: 1349, percRaMql: 100, rr: 1, percRr: 100, cprr: 1349.34, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120234676163860450", adName: "TP724 - vv - REELS 2 - HOOK1 - - 03.09 — Cópia", link: "https://fb.me/2m01FhM84Cnu4a7", dataCriacao: "02/10/2025", status: "Pausado", investimento: 1248, ctr: 1.64, cpm: 91, leads: 23, cpl: 54, mql: 0, percMql: 0, cpmql: null, ra: 4, percRa: 17, cpra: 312, percRaMql: 0, rr: 4, percRr: 100, cprr: 311.94, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120236071168450450", adName: "TP863 - hOOK1BODY2CTA2V_generico - - 21.10", link: "https://fb.me/1Qtd7Bw7d0kXgFI", dataCriacao: "21/10/2025", status: "Ativo", investimento: 1174, ctr: 0.64, cpm: 71, leads: 14, cpl: 84, mql: 5, percMql: 36, cpmql: 234.75, ra: 1, percRa: 7, cpra: 1174, percRaMql: 0, rr: 0, percRr: 0, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120236071168460450", adName: "TP864 - HOOK2BODY2CTA2V._generico - - 21.10", link: "https://fb.me/1RfOWfKqOezBZ6a", dataCriacao: "21/10/2025", status: "Pausado", investimento: 894, ctr: 1.22, cpm: 110, leads: 15, cpl: 60, mql: 1, percMql: 7, cpmql: 894.12, ra: 2, percRa: 13, cpra: 447, percRaMql: 0, rr: 1, percRr: 50, cprr: 894.12, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120236070725080450", adName: "TP861 - HOOK3BODY2CTA1Vmp4_generico - - 21.10", link: "https://fb.me/1RfO3jrPSOTAW9u", dataCriacao: "21/10/2025", status: "Pausado", investimento: 749, ctr: 0.96, cpm: 109, leads: 3, cpl: 250, mql: 0, percMql: 0, cpmql: null, ra: 1, percRa: 33, cpra: 749, percRaMql: 0, rr: 1, percRr: 100, cprr: 748.79, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120237699466590450", adName: "TP900 - HOOK3BODYCTA2 - - 13.10", link: "https://fb.me/1YG6yxzna3V4O6Y", dataCriacao: "13/11/2025", status: "Pausado", investimento: 729, ctr: 1.01, cpm: 103, leads: 10, cpl: 73, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120236071168470450", adName: "TP865 - hook3body2cta2V._generico - - 21.10", link: "https://fb.me/2lTFHrDD5XxeL1b", dataCriacao: "21/10/2025", status: "Pausado", investimento: 668, ctr: 0.90, cpm: 82, leads: 12, cpl: 56, mql: 1, percMql: 8, cpmql: 667.65, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120236071168490450", adName: "TP866 - hook4body2cta2V_generico - - 21.10", link: "https://fb.me/2asnGqgqVokp30p", dataCriacao: "21/10/2025", status: "Pausado", investimento: 663, ctr: 1.00, cpm: 82, leads: 9, cpl: 74, mql: 1, percMql: 11, cpmql: 662.69, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235998177240450", adName: "TP832 - hook 9 body 2 cta 2 - - 20.10", link: "https://fb.me/xQjs7W8rD3UbRBc", dataCriacao: "21/10/2025", status: "Pausado", investimento: 646, ctr: 1.00, cpm: 83, leads: 7, cpl: 92, mql: 1, percMql: 14, cpmql: 645.89, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235997280960450", adName: "TP819 - vertical hook 5 body 2 cta 1 - - 20.10", link: "https://fb.me/2nYS8FgVUo55YWZ", dataCriacao: "20/10/2025", status: "Pausado", investimento: 628, ctr: 1.22, cpm: 134, leads: 5, cpl: 126, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120233674480800450", adName: "TP755 - vv-remarketing-esther- insta - 3x - 1h - - 15.09", link: "https://fb.me/2huxVLq3i1ZdFss", dataCriacao: "15/09/2025", status: "Pausado", investimento: 620, ctr: 1.03, cpm: 177, leads: 4, cpl: 155, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120234887297950450", adName: "TP804 - vertical hook 4 body 1 cta 1 - - 06.10", link: "https://fb.me/1QypXp3N6UUaF4o", dataCriacao: "06/10/2025", status: "Pausado", investimento: 606, ctr: 1.13, cpm: 111, leads: 8, cpl: 76, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120237699466640450", adName: "TP905 - hook4body2cta2 - - 13.10", link: "https://fb.me/xFzi1nMcczOosFT", dataCriacao: "13/11/2025", status: "Pausado", investimento: 605, ctr: 0.87, cpm: 128, leads: 3, cpl: 202, mql: 1, percMql: 33, cpmql: 604.75, ra: 1, percRa: 33, cpra: 605, percRaMql: 100, rr: 1, percRr: 100, cprr: 604.75, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120234887298010450", adName: "TP793 - vertical hook 6 body 1 cta 2 - - 06.10", link: "https://fb.me/2kVAn3xhXoIpMHX", dataCriacao: "06/10/2025", status: "Pausado", investimento: 604, ctr: 0.76, cpm: 121, leads: 6, cpl: 101, mql: 1, percMql: 17, cpmql: 604.20, ra: 1, percRa: 17, cpra: 604, percRaMql: 100, rr: 1, percRr: 100, cprr: 604.20, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120235998177250450", adName: "TP821 - vertical hook 7 body 2 cta 1 - - 20.10", link: "https://fb.me/2e2xOoevkjynce7", dataCriacao: "21/10/2025", status: "Pausado", investimento: 586, ctr: 0.83, cpm: 108, leads: 6, cpl: 98, mql: 1, percMql: 17, cpmql: 585.99, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120238257743760450", adName: "TP923 - vv-black-friday-2025-2- HOOK1 - - 14.11", link: "https://fb.me/1YLG1RVvY8Gmut2", dataCriacao: "21/11/2025", status: "Pausado", investimento: 583, ctr: 0.66, cpm: 61, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235996076180450", adName: "TP815 - vertical hook 1 body 2 cta 1 - - 20.10", link: "https://fb.me/22fbxV8vtF5H0Ph", dataCriacao: "20/10/2025", status: "Pausado", investimento: 569, ctr: 0.85, cpm: 108, leads: 3, cpl: 190, mql: 0, percMql: 0, cpmql: null, ra: 1, percRa: 33, cpra: 569, percRaMql: 0, rr: 1, percRr: 100, cprr: 569.24, ganhosAceleracao: 1, ganhosPontuais: 1, cacAceleracao: 569.24, leadTimeClienteUnico: 4, clientesUnicos: 1, percRrCliente: 100, cacUnico: 569 },
+  { id: "120234744377130450", adName: "TP780 - CREATORS HOOK 1 REELS - - 03.10", link: "https://fb.me/1REOxCQ0GrosOL6", dataCriacao: "03/10/2025", status: "Pausado", investimento: 553, ctr: 1.20, cpm: 135, leads: 6, cpl: 92, mql: 0, percMql: 0, cpmql: null, ra: 1, percRa: 17, cpra: 553, percRaMql: 0, rr: 0, percRr: 0, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235996076190450", adName: "TP816 - vertical hook 2 body 2 cta 1 - - 20.10", link: "https://fb.me/26AJVdlKITDHKho", dataCriacao: "20/10/2025", status: "Pausado", investimento: 551, ctr: 1.11, cpm: 157, leads: 2, cpl: 276, mql: 0, percMql: 0, cpmql: null, ra: 1, percRa: 50, cpra: 551, percRaMql: 0, rr: 1, percRr: 100, cprr: 551.13, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120233673067160450", adName: "TP749 - vv-remarketing-esther- insta - 1x - 1h - - 15.09", link: "https://fb.me/1XDDXiCfnVrBVST", dataCriacao: "15/09/2025", status: "Pausado", investimento: 524, ctr: 0.80, cpm: 149, leads: 2, cpl: 262, mql: 1, percMql: 50, cpmql: 523.84, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120233674303760450", adName: "TP753 - vv-remarketing-esther- insta - 2x - 2h - - 15.09", link: "https://fb.me/1PgZZWkuKcPgTxs", dataCriacao: "15/09/2025", status: "Pausado", investimento: 520, ctr: 1.04, cpm: 142, leads: 7, cpl: 74, mql: 1, percMql: 14, cpmql: 520.21, ra: 1, percRa: 14, cpra: 520, percRaMql: 100, rr: 1, percRr: 100, cprr: 520.21, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120235996076210450", adName: "TP824 - hook 1 body 2 cta 2 - - 20.10", link: "https://fb.me/2oCVQAiq5aOxG3w", dataCriacao: "20/10/2025", status: "Pausado", investimento: 508, ctr: 0.83, cpm: 110, leads: 2, cpl: 254, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120234887297980450", adName: "TP802 - vertical hook 6 body 1 cta 1 - - 06.10", link: "https://fb.me/2cxv3xCJnKOl5y9", dataCriacao: "06/10/2025", status: "Pausado", investimento: 498, ctr: 0.75, cpm: 107, leads: 2, cpl: 249, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235996076230450", adName: "TP826 - hook 3 body 2 cta 2 - - 20.10", link: "https://fb.me/1YlMOqv5Rf9decA", dataCriacao: "20/10/2025", status: "Pausado", investimento: 490, ctr: 0.92, cpm: 136, leads: 2, cpl: 245, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235998177260450", adName: "TP822 - vertical hook 8 body 2 cta 1 - - 20.10", link: "https://fb.me/21GN8uuWPdL6qle", dataCriacao: "21/10/2025", status: "Pausado", investimento: 472, ctr: 0.77, cpm: 106, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120238257743690450", adName: "TP917 - vv-black-friday-2025-1- body 1- hook1 - - 14.11", link: "https://fb.me/1Y1k1ypoKn7wqD2", dataCriacao: "21/11/2025", status: "Pausado", investimento: 448, ctr: 0.60, cpm: 83, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120238257743720450", adName: "TP922 - vv-black-friday-2025-1- body 2- hook 3 - - 14.11", link: "https://fb.me/2ioUHK9U167NB65", dataCriacao: "21/11/2025", status: "Pausado", investimento: 436, ctr: 0.47, cpm: 128, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235998177210450", adName: "TP830 - hook 7 body 2 cta 2 - - 20.10", link: "https://fb.me/2dHIcJt4b5Tumaj", dataCriacao: "21/10/2025", status: "Pausado", investimento: 412, ctr: 0.89, cpm: 126, leads: 5, cpl: 82, mql: 0, percMql: 0, cpmql: null, ra: 1, percRa: 20, cpra: 412, percRaMql: 0, rr: 0, percRr: 0, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235996076200450", adName: "TP817 - vertical hook 3 body 2 cta 1 - - 20.10", link: "https://fb.me/2fJNLZGvz678WKt", dataCriacao: "20/10/2025", status: "Ativo", investimento: 396, ctr: 0.57, cpm: 84, leads: 6, cpl: 66, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120238257743730450", adName: "TP919 - vv-black-friday-2025-1- body 1- hook3 - - 14.11", link: "https://fb.me/2641ITRv1UrTkPX", dataCriacao: "21/11/2025", status: "Pausado", investimento: 358, ctr: 0.83, cpm: 78, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120234887297990450", adName: "TP795 - vertical hook 4 body 1 cta 2 - - 06.10", link: "https://fb.me/1Q0GLEBIfhx7gMd", dataCriacao: "06/10/2025", status: "Pausado", investimento: 354, ctr: 1.57, cpm: 113, leads: 11, cpl: 32, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235998177230450", adName: "TP831 - hook 8 body 2 cta 2 - - 20.10", link: "https://fb.me/22MgVHNRWAndSZI", dataCriacao: "21/10/2025", status: "Pausado", investimento: 354, ctr: 0.78, cpm: 92, leads: 1, cpl: 354, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120238257743710450", adName: "TP924 - vv-black-friday-2025-2- HOOK2 - - 14.11", link: "https://fb.me/21DILUGEWzsXBM4", dataCriacao: "21/11/2025", status: "Pausado", investimento: 315, ctr: 0.65, cpm: 62, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120236070725090450", adName: "TP862 - HOOK4body2cta1V_generico - - 21.10", link: "https://fb.me/2cEWV1TNEYBIuWD", dataCriacao: "21/10/2025", status: "Ativo", investimento: 304, ctr: 0.93, cpm: 134, leads: 3, cpl: 101, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120238257743750450", adName: "TP921 - vv-black-friday-2025-1- body 2- hook 2 - - 14.11", link: "https://fb.me/2gxPR0z6Zu1QRJS", dataCriacao: "21/11/2025", status: "Pausado", investimento: 289, ctr: 0.53, cpm: 73, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "756359602987_1", adName: "Anúncio #2 - 3 Metricas (YouTube)", link: "https://www.youtube.com/watch?v=lVOifVaz5-Y", dataCriacao: "04/06/2025", status: "Ativo", investimento: 240, ctr: null, cpm: null, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "756359602987_2", adName: "Anúncio #2 - 3 Metricas (YouTube)", link: "https://www.youtube.com/watch?v=w_u6dYLfM40", dataCriacao: "04/06/2025", status: "Ativo", investimento: 240, ctr: null, cpm: null, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235997280950450", adName: "TP818 - vertical hook 4 body 2 cta 1 - - 20.10", link: "https://fb.me/2dT6vTnPG8esICD", dataCriacao: "20/10/2025", status: "Pausado", investimento: 199, ctr: 1.00, cpm: 95, leads: 4, cpl: 50, mql: 0, percMql: 0, cpmql: null, ra: 1, percRa: 25, cpra: 199, percRaMql: 100, rr: 2, percRr: 200, cprr: 99.38, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120234744115470450", adName: "TP782 - CREATORS HOOK 3 REELS - - 03.10", link: "https://fb.me/1YrzMc8gTtDuDXq", dataCriacao: "03/10/2025", status: "Pausado", investimento: 197, ctr: 1.45, cpm: 151, leads: 2, cpl: 99, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120238257743780450", adName: "TP920 - vv-black-friday-2025-1- body 2- hook 1 - - 14.11", link: "https://fb.me/1QOdlFUw05AcDS7", dataCriacao: "21/11/2025", status: "Pausado", investimento: 190, ctr: 0.81, cpm: 102, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235996076220450", adName: "TP825 - hook 2 body 2 cta 2 - - 20.10", link: "https://fb.me/227RwX9JwtHmLCS", dataCriacao: "20/10/2025", status: "Pausado", investimento: 177, ctr: 0.93, cpm: 117, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120237695786230450", adName: "TP890 - hook1body1cta1V - - 13.10", link: "https://fb.me/22jcaXcNxWIa9bU", dataCriacao: "13/11/2025", status: "Ativo", investimento: 166, ctr: 0.64, cpm: 71, leads: 1, cpl: 166, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120237699466620450", adName: "TP902 - hOOK1BODY2CTA2 - - 13.10", link: "https://fb.me/1R8MeF5DEoKrXsp", dataCriacao: "13/11/2025", status: "Ativo", investimento: 164, ctr: 0.90, cpm: 105, leads: 1, cpl: 164, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120233787942130450", adName: "TP774 - vv-creators-esther-hook3-estudio - - 17.09", link: "https://fb.me/1ZCM2fNvI2o2Suq", dataCriacao: "17/09/2025", status: "Pausado", investimento: 155, ctr: 1.12, cpm: 133, leads: 2, cpl: 77, mql: 0, percMql: 0, cpmql: null, ra: 1, percRa: 50, cpra: 155, percRaMql: 0, rr: 1, percRr: 100, cprr: 154.58, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: 0, cacUnico: null },
+  { id: "120233674303770450", adName: "TP754 - vv-remarketing-esther- insta - 2x - 3h - - 15.09", link: "https://fb.me/26YHzEd82aK8fU6", dataCriacao: "15/09/2025", status: "Pausado", investimento: 140, ctr: 1.25, cpm: 175, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 1, percRa: null, cpra: 140, percRaMql: 0, rr: 0, percRr: 0, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120237696152130450", adName: "TP895 - HOOK2BODY2CTA1V - - 13.10", link: "https://fb.me/2kusIpqEPso7jgT", dataCriacao: "13/11/2025", status: "Ativo", investimento: 124, ctr: 1.13, cpm: 87, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "756367601719_1", adName: "Anúncio #1 Pag Alta Conversão (YouTube)", link: "https://www.youtube.com/watch?v=lVOifVaz5-Y", dataCriacao: "04/06/2025", status: "Ativo", investimento: 119, ctr: null, cpm: null, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "756367601719_2", adName: "Anúncio #1 Pag Alta Conversão (YouTube)", link: "https://www.youtube.com/watch?v=w_u6dYLfM40", dataCriacao: "04/06/2025", status: "Ativo", investimento: 119, ctr: null, cpm: null, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120235997280990450", adName: "TP828 - hook 5 body 2 cta 2 - - 20.10", link: "https://fb.me/24XweWiHCFZZxMV", dataCriacao: "20/10/2025", status: "Ativo", investimento: 118, ctr: 0.73, cpm: 107, leads: 1, cpl: 118, mql: 0, percMql: 0, cpmql: null, ra: 0, percRa: 0, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120238257743790450", adName: "TP918 - vv-black-friday-2025-1- body 1- hook2 - - 14.11", link: "https://fb.me/220GR4Mk8TWnjSZ", dataCriacao: "21/11/2025", status: "Pausado", investimento: 117, ctr: 0.65, cpm: 85, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
+  { id: "120237764689040450", adName: "TP915 - vv-esther-creators-remarketing - 2x - - 14.11", link: "https://fb.me/1QxCsKwXPQLE7L8", dataCriacao: "14/11/2025", status: "Ativo", investimento: 107, ctr: 0.90, cpm: 137, leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null, ra: 0, percRa: null, cpra: null, percRaMql: null, rr: 0, percRr: null, cprr: null, ganhosAceleracao: null, ganhosPontuais: null, cacAceleracao: null, leadTimeClienteUnico: null, clientesUnicos: 0, percRrCliente: null, cacUnico: null },
 ];
 
-const statusOptions = ["Todos", "Ativo", "Pausado", "Arquivado"];
-const plataformaOptions = ["Todos", "Facebook", "Instagram", "Google Ads"];
-const estrategiaOptions = ["Todos", "Conversão", "Awareness", "Lead Gen", "Retargeting", "Branding"];
-const produtoOptions = ["Todos", "Assessoria", "Consultoria", "Curso"];
+const statusOptions = ["Todos", "Ativo", "Pausado"];
 
-function formatCurrency(value: number): string {
+function formatCurrency(value: number | null): string {
+  if (value === null) return '-';
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -48,23 +130,20 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat("pt-BR").format(value);
-}
-
-function formatPercent(value: number): string {
+function formatPercent(value: number | null): string {
+  if (value === null) return '-';
   return `${value.toFixed(2)}%`;
 }
 
-function getHeatmapColor(value: number, min: number, max: number, invert: boolean = false): string {
-  if (max === min) return "transparent";
+function getHeatmapColor(value: number | null, min: number, max: number, invert: boolean = false): string {
+  if (value === null || max === min) return "transparent";
   const ratio = (value - min) / (max - min);
   const adjustedRatio = invert ? 1 - ratio : ratio;
   
   if (adjustedRatio < 0.2) {
-    return invert ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.1)";
+    return invert ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.15)";
   } else if (adjustedRatio < 0.4) {
-    return invert ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)";
+    return invert ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.25)";
   } else if (adjustedRatio < 0.6) {
     return "rgba(234, 179, 8, 0.2)";
   } else if (adjustedRatio < 0.8) {
@@ -81,17 +160,14 @@ export default function Criativos() {
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [adStatus, setAdStatus] = useState("Todos");
-  const [plataforma, setPlataforma] = useState("Todos");
-  const [estrategia, setEstrategia] = useState("Todos");
-  const [produto, setProduto] = useState("Todos");
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   const filteredData = useMemo(() => {
-    let data = [...mockData];
+    let data = [...rawData];
     
     if (searchTerm) {
       data = data.filter(item => 
-        item.anuncio.toLowerCase().includes(searchTerm.toLowerCase())
+        item.adName.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
@@ -99,22 +175,13 @@ export default function Criativos() {
       data = data.filter(item => item.status === adStatus);
     }
     
-    if (plataforma !== "Todos") {
-      data = data.filter(item => item.plataforma === plataforma);
-    }
-    
-    if (estrategia !== "Todos") {
-      data = data.filter(item => item.estrategia === estrategia);
-    }
-    
-    if (produto !== "Todos") {
-      data = data.filter(item => item.produto === produto);
-    }
-    
     if (sortConfig) {
       data.sort((a, b) => {
         const aValue = a[sortConfig.key as keyof typeof a];
         const bValue = b[sortConfig.key as keyof typeof b];
+        if (aValue === null && bValue === null) return 0;
+        if (aValue === null) return 1;
+        if (bValue === null) return -1;
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
@@ -122,29 +189,34 @@ export default function Criativos() {
     }
     
     return data;
-  }, [searchTerm, adStatus, plataforma, estrategia, produto, sortConfig]);
+  }, [searchTerm, adStatus, sortConfig]);
 
   const totals = useMemo(() => {
     return {
       investimento: filteredData.reduce((acc, item) => acc + item.investimento, 0),
-      impressoes: filteredData.reduce((acc, item) => acc + item.impressoes, 0),
-      cliques: filteredData.reduce((acc, item) => acc + item.cliques, 0),
       leads: filteredData.reduce((acc, item) => acc + item.leads, 0),
       mql: filteredData.reduce((acc, item) => acc + item.mql, 0),
-      rm: filteredData.reduce((acc, item) => acc + item.rm, 0),
+      ra: filteredData.reduce((acc, item) => acc + item.ra, 0),
       rr: filteredData.reduce((acc, item) => acc + item.rr, 0),
+      clientesUnicos: filteredData.reduce((acc, item) => acc + item.clientesUnicos, 0),
     };
   }, [filteredData]);
 
   const ranges = useMemo(() => {
+    const validInvestimento = filteredData.map(d => d.investimento);
+    const validCpm = filteredData.map(d => d.cpm).filter((v): v is number => v !== null);
+    const validCtr = filteredData.map(d => d.ctr).filter((v): v is number => v !== null);
+    const validCpmql = filteredData.map(d => d.cpmql).filter((v): v is number => v !== null);
+    const validPercMql = filteredData.map(d => d.percMql).filter((v): v is number => v !== null);
+    const validPercRr = filteredData.map(d => d.percRr).filter((v): v is number => v !== null);
+    
     return {
-      investimento: { min: Math.min(...filteredData.map(d => d.investimento)), max: Math.max(...filteredData.map(d => d.investimento)) },
-      cpm: { min: Math.min(...filteredData.map(d => d.cpm)), max: Math.max(...filteredData.map(d => d.cpm)) },
-      ctr: { min: Math.min(...filteredData.map(d => d.ctr)), max: Math.max(...filteredData.map(d => d.ctr)) },
-      cpmql: { min: Math.min(...filteredData.map(d => d.cpmql)), max: Math.max(...filteredData.map(d => d.cpmql)) },
-      leadMql: { min: Math.min(...filteredData.map(d => d.leadMql)), max: Math.max(...filteredData.map(d => d.leadMql)) },
-      mqlRm: { min: Math.min(...filteredData.map(d => d.mqlRm)), max: Math.max(...filteredData.map(d => d.mqlRm)) },
-      mqlRr: { min: Math.min(...filteredData.map(d => d.mqlRr)), max: Math.max(...filteredData.map(d => d.mqlRr)) },
+      investimento: { min: Math.min(...validInvestimento), max: Math.max(...validInvestimento) },
+      cpm: { min: validCpm.length ? Math.min(...validCpm) : 0, max: validCpm.length ? Math.max(...validCpm) : 0 },
+      ctr: { min: validCtr.length ? Math.min(...validCtr) : 0, max: validCtr.length ? Math.max(...validCtr) : 0 },
+      cpmql: { min: validCpmql.length ? Math.min(...validCpmql) : 0, max: validCpmql.length ? Math.max(...validCpmql) : 0 },
+      percMql: { min: validPercMql.length ? Math.min(...validPercMql) : 0, max: validPercMql.length ? Math.max(...validPercMql) : 0 },
+      percRr: { min: validPercRr.length ? Math.min(...validPercRr) : 0, max: validPercRr.length ? Math.max(...validPercRr) : 0 },
     };
   }, [filteredData]);
 
@@ -166,7 +238,7 @@ export default function Criativos() {
           </div>
           <div>
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Growth | Criativos</h1>
-            <p className="text-sm text-muted-foreground">Análise de performance de anúncios</p>
+            <p className="text-sm text-muted-foreground">Plano de Mídia 2025 Turbo - Análise de Criativos</p>
           </div>
           <Badge variant="outline" className="ml-2 bg-green-500/10 text-green-600 border-green-500/30">
             <TrendingUp className="w-3 h-3 mr-1" />
@@ -210,7 +282,7 @@ export default function Criativos() {
               placeholder="Buscar anúncio..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 w-[200px]"
+              className="pl-8 w-[250px]"
               data-testid="input-search-ad"
             />
             {searchTerm && (
@@ -227,7 +299,7 @@ export default function Criativos() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Ad Status:</span>
+          <span className="text-sm text-muted-foreground">Status:</span>
           <Select value={adStatus} onValueChange={setAdStatus}>
             <SelectTrigger className="w-[120px]" data-testid="select-status">
               <SelectValue />
@@ -240,46 +312,27 @@ export default function Criativos() {
           </Select>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Plataforma:</span>
-          <Select value={plataforma} onValueChange={setPlataforma}>
-            <SelectTrigger className="w-[130px]" data-testid="select-plataforma">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {plataformaOptions.map(opt => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Estratégia:</span>
-          <Select value={estrategia} onValueChange={setEstrategia}>
-            <SelectTrigger className="w-[130px]" data-testid="select-estrategia">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {estrategiaOptions.map(opt => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Produto:</span>
-          <Select value={produto} onValueChange={setProduto}>
-            <SelectTrigger className="w-[130px]" data-testid="select-produto">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {produtoOptions.map(opt => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="ml-auto flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Total Investido:</span>
+            <span className="font-bold text-primary">{formatCurrency(totals.investimento)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Leads:</span>
+            <span className="font-semibold">{totals.leads}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">MQL:</span>
+            <span className="font-semibold">{totals.mql}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">RR:</span>
+            <span className="font-semibold">{totals.rr}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Clientes:</span>
+            <span className="font-semibold">{totals.clientesUnicos}</span>
+          </div>
         </div>
       </div>
 
@@ -287,7 +340,7 @@ export default function Criativos() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              Performance de Anúncio (Visão de Safra)
+              Performance de Criativos
               <Badge variant="secondary" className="ml-2">{filteredData.length} anúncios</Badge>
             </CardTitle>
           </CardHeader>
@@ -296,59 +349,74 @@ export default function Criativos() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="sticky left-0 bg-muted/50 z-10 min-w-[280px]">
-                      <Button variant="ghost" size="sm" className="gap-1 -ml-3" onClick={() => handleSort('anuncio')}>
-                        Anúncio
+                    <TableHead className="sticky left-0 bg-muted/50 z-10 min-w-[320px]">
+                      <Button variant="ghost" size="sm" className="gap-1 -ml-3" onClick={() => handleSort('adName')}>
+                        Criativo
                         <ArrowUpDown className="w-3 h-3" />
                       </Button>
                     </TableHead>
+                    <TableHead className="text-center whitespace-nowrap w-[80px]">Status</TableHead>
                     <TableHead className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('investimento')}>
                         Investimento
                         <ArrowUpDown className="w-3 h-3" />
                       </Button>
                     </TableHead>
-                    <TableHead className="text-right whitespace-nowrap">
-                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('impressoes')}>
-                        Impressões
-                        <ArrowUpDown className="w-3 h-3" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-right whitespace-nowrap">Frequência</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">CPM</TableHead>
                     <TableHead className="text-right whitespace-nowrap">CTR</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">
-                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('cliques')}>
-                        Cliques
-                        <ArrowUpDown className="w-3 h-3" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="text-right whitespace-nowrap">Cliques&gt;Leads</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">CPM</TableHead>
                     <TableHead className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('leads')}>
                         Leads
                         <ArrowUpDown className="w-3 h-3" />
                       </Button>
                     </TableHead>
-                    <TableHead className="text-right whitespace-nowrap">Lead&gt;MQL</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">CPL</TableHead>
                     <TableHead className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('mql')}>
                         MQL
                         <ArrowUpDown className="w-3 h-3" />
                       </Button>
                     </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">% MQL</TableHead>
                     <TableHead className="text-right whitespace-nowrap">CPMQL</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">MQL&gt;RM</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">RM</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">MQL&gt;RR</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">RR</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('ra')}>
+                        RA
+                        <ArrowUpDown className="w-3 h-3" />
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">% RA</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('rr')}>
+                        RR
+                        <ArrowUpDown className="w-3 h-3" />
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">% RR</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">CPRR</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('clientesUnicos')}>
+                        Clientes
+                        <ArrowUpDown className="w-3 h-3" />
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-center whitespace-nowrap w-[50px]">Link</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredData.map((row) => (
-                    <TableRow key={row.id} className="hover:bg-muted/30" data-testid={`row-anuncio-${row.id}`}>
-                      <TableCell className="sticky left-0 bg-background z-10 font-medium max-w-[280px] truncate" title={row.anuncio}>
-                        {row.anuncio}
+                    <TableRow key={row.id} className="hover:bg-muted/30" data-testid={`row-criativo-${row.id}`}>
+                      <TableCell className="sticky left-0 bg-background z-10 font-medium max-w-[320px]">
+                        <div className="truncate" title={row.adName}>{row.adName}</div>
+                        <div className="text-xs text-muted-foreground">{row.dataCriacao}</div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge 
+                          variant={row.status === 'Ativo' ? 'default' : 'secondary'}
+                          className={row.status === 'Ativo' ? 'bg-green-500/20 text-green-600 border-green-500/30' : 'bg-gray-500/20 text-gray-500'}
+                        >
+                          {row.status}
+                        </Badge>
                       </TableCell>
                       <TableCell 
                         className="text-right font-semibold"
@@ -356,83 +424,91 @@ export default function Criativos() {
                       >
                         {formatCurrency(row.investimento)}
                       </TableCell>
-                      <TableCell className="text-right">
-                        {formatNumber(row.impressoes)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {row.frequencia.toFixed(2)}
+                      <TableCell 
+                        className="text-right"
+                        style={{ backgroundColor: getHeatmapColor(row.ctr, ranges.ctr.min, ranges.ctr.max, false) }}
+                      >
+                        {row.ctr !== null ? `${row.ctr.toFixed(2)}%` : '-'}
                       </TableCell>
                       <TableCell 
                         className="text-right"
                         style={{ backgroundColor: getHeatmapColor(row.cpm, ranges.cpm.min, ranges.cpm.max, true) }}
                       >
-                        {formatCurrency(row.cpm)}
+                        {row.cpm !== null ? formatCurrency(row.cpm) : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {row.leads > 0 ? row.leads : '-'}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatPercent(row.ctr)}
+                        {row.cpl !== null ? formatCurrency(row.cpl) : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {row.mql > 0 ? row.mql : '-'}
+                      </TableCell>
+                      <TableCell 
+                        className="text-right"
+                        style={{ backgroundColor: getHeatmapColor(row.percMql, ranges.percMql.min, ranges.percMql.max, false) }}
+                      >
+                        {row.percMql !== null ? `${row.percMql}%` : '-'}
+                      </TableCell>
+                      <TableCell 
+                        className="text-right"
+                        style={{ backgroundColor: getHeatmapColor(row.cpmql, ranges.cpmql.min, ranges.cpmql.max, true) }}
+                      >
+                        {row.cpmql !== null ? formatCurrency(row.cpmql) : '-'}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatNumber(row.cliques)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {formatPercent(row.cliquesLeads)}
+                        {row.ra > 0 ? row.ra : '-'}
                       </TableCell>
                       <TableCell className="text-right">
-                        {row.leads}
+                        {row.percRa !== null ? `${row.percRa}%` : '-'}
                       </TableCell>
-                      <TableCell 
-                        className="text-right"
-                        style={{ backgroundColor: getHeatmapColor(row.leadMql, ranges.leadMql.min, ranges.leadMql.max, false) }}
-                      >
-                        {row.leadMql}%
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {row.mql}
-                      </TableCell>
-                      <TableCell 
-                        className="text-right"
-                        style={{ backgroundColor: row.cpmql > 0 ? getHeatmapColor(row.cpmql, ranges.cpmql.min, ranges.cpmql.max, true) : 'transparent' }}
-                      >
-                        {row.cpmql > 0 ? formatCurrency(row.cpmql) : '-'}
-                      </TableCell>
-                      <TableCell 
-                        className="text-right"
-                        style={{ backgroundColor: row.mqlRm > 0 ? getHeatmapColor(row.mqlRm, ranges.mqlRm.min, ranges.mqlRm.max, false) : 'transparent' }}
-                      >
-                        {row.mqlRm > 0 ? `${row.mqlRm}%` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {row.rm > 0 ? row.rm : '-'}
-                      </TableCell>
-                      <TableCell 
-                        className="text-right"
-                        style={{ backgroundColor: row.mqlRr > 0 ? getHeatmapColor(row.mqlRr, ranges.mqlRr.min, ranges.mqlRr.max, false) : 'transparent' }}
-                      >
-                        {row.mqlRr > 0 ? `${row.mqlRr}%` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
+                      <TableCell className="text-right font-semibold text-green-600">
                         {row.rr > 0 ? row.rr : '-'}
+                      </TableCell>
+                      <TableCell 
+                        className="text-right"
+                        style={{ backgroundColor: getHeatmapColor(row.percRr, ranges.percRr.min, ranges.percRr.max, false) }}
+                      >
+                        {row.percRr !== null ? `${row.percRr.toFixed(2)}%` : '-'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.cprr !== null ? formatCurrency(row.cprr) : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-bold">
+                        {row.clientesUnicos > 0 ? row.clientesUnicos : '-'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <a 
+                          href={row.link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted"
+                          data-testid={`link-criativo-${row.id}`}
+                        >
+                          <ExternalLink className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                        </a>
                       </TableCell>
                     </TableRow>
                   ))}
-                  
-                  <TableRow className="bg-muted/70 font-bold border-t-2">
-                    <TableCell className="sticky left-0 bg-muted/70 z-10">Total</TableCell>
+                  <TableRow className="bg-muted/50 font-bold border-t-2">
+                    <TableCell className="sticky left-0 bg-muted/50 z-10">TOTAL</TableCell>
+                    <TableCell></TableCell>
                     <TableCell className="text-right">{formatCurrency(totals.investimento)}</TableCell>
-                    <TableCell className="text-right">{formatNumber(totals.impressoes)}</TableCell>
-                    <TableCell className="text-right">-</TableCell>
-                    <TableCell className="text-right">-</TableCell>
-                    <TableCell className="text-right">-</TableCell>
-                    <TableCell className="text-right">{formatNumber(totals.cliques)}</TableCell>
-                    <TableCell className="text-right">-</TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
                     <TableCell className="text-right">{totals.leads}</TableCell>
-                    <TableCell className="text-right">-</TableCell>
+                    <TableCell></TableCell>
                     <TableCell className="text-right">{totals.mql}</TableCell>
-                    <TableCell className="text-right">-</TableCell>
-                    <TableCell className="text-right">-</TableCell>
-                    <TableCell className="text-right">{totals.rm}</TableCell>
-                    <TableCell className="text-right">-</TableCell>
-                    <TableCell className="text-right">{totals.rr}</TableCell>
+                    <TableCell className="text-right">{totals.leads > 0 ? `${((totals.mql / totals.leads) * 100).toFixed(0)}%` : '-'}</TableCell>
+                    <TableCell className="text-right">{totals.mql > 0 ? formatCurrency(totals.investimento / totals.mql) : '-'}</TableCell>
+                    <TableCell className="text-right">{totals.ra}</TableCell>
+                    <TableCell className="text-right">{totals.leads > 0 ? `${((totals.ra / totals.leads) * 100).toFixed(0)}%` : '-'}</TableCell>
+                    <TableCell className="text-right text-green-600">{totals.rr}</TableCell>
+                    <TableCell className="text-right">{totals.ra > 0 ? `${((totals.rr / totals.ra) * 100).toFixed(0)}%` : '-'}</TableCell>
+                    <TableCell className="text-right">{totals.rr > 0 ? formatCurrency(totals.investimento / totals.rr) : '-'}</TableCell>
+                    <TableCell className="text-right">{totals.clientesUnicos}</TableCell>
+                    <TableCell></TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
