@@ -71,6 +71,7 @@ const dashboardCategories = [
       { title: "Visão Geral", url: "/dashboard/financeiro", icon: TrendingUp },
       { title: "DFC", url: "/dashboard/dfc", icon: BarChart3 },
       { title: "Fluxo de Caixa", url: "/dashboard/fluxo-caixa", icon: Wallet },
+      { title: "Revenue Goals", url: "/dashboard/revenue-goals", icon: Target },
       { title: "Inadimplência", url: "/dashboard/inadimplencia", icon: AlertTriangle },
       { title: "Auditoria de Sistemas", url: "/dashboard/auditoria-sistemas", icon: ShieldAlert },
     ],

@@ -812,6 +812,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============== REVENUE GOALS ==============
+  
+  app.get("/api/financeiro/revenue-goals", async (req, res) => {
+    try {
+      const mes = parseInt(req.query.mes as string) || new Date().getMonth() + 1;
+      const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
+      const data = await storage.getRevenueGoals(mes, ano);
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching revenue goals:", error);
+      res.status(500).json({ error: "Failed to fetch revenue goals" });
+    }
+  });
+
   // ============== INADIMPLÊNCIA ==============
   
   app.get("/api/inadimplencia/resumo", async (req, res) => {

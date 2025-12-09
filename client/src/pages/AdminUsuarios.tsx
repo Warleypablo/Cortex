@@ -42,6 +42,7 @@ const AVAILABLE_ROUTES = [
   { path: '/dashboard/financeiro', label: 'Visão Geral', category: 'Financeiro' },
   { path: '/dashboard/dfc', label: 'DFC', category: 'Financeiro' },
   { path: '/dashboard/fluxo-caixa', label: 'Fluxo de Caixa', category: 'Financeiro' },
+  { path: '/dashboard/revenue-goals', label: 'Revenue Goals', category: 'Financeiro' },
   { path: '/dashboard/inadimplencia', label: 'Inadimplência', category: 'Financeiro' },
   { path: '/dashboard/auditoria-sistemas', label: 'Auditoria de Sistemas', category: 'Financeiro' },
   { path: '/dashboard/geg', label: 'Visão Geral', category: 'G&G' },
