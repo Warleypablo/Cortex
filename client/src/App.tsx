@@ -41,6 +41,7 @@ import PresentationMode from "@/pages/PresentationMode";
 import DetalhamentoVendas from "@/pages/DetalhamentoVendas";
 import Criativos from "@/pages/Criativos";
 import GrowthVisaoGeral from "@/pages/GrowthVisaoGeral";
+import RevenueGoals from "@/pages/RevenueGoals";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -129,6 +130,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/dfc">{() => <ProtectedRoute path="/dashboard/dfc" component={DashboardDFC} />}</Route>
       <Route path="/dashboard/inadimplencia">{() => <ProtectedRoute path="/dashboard/inadimplencia" component={DashboardInadimplencia} />}</Route>
       <Route path="/dashboard/fluxo-caixa">{() => <ProtectedRoute path="/dashboard/fluxo-caixa" component={FluxoCaixa} />}</Route>
+      <Route path="/dashboard/revenue-goals">{() => <ProtectedRoute path="/dashboard/revenue-goals" component={RevenueGoals} />}</Route>
       <Route path="/dashboard/auditoria-sistemas">{() => <ProtectedRoute path="/dashboard/auditoria-sistemas" component={AuditoriaSistemas} />}</Route>
       <Route path="/dashboard/inhire">{() => <ProtectedRoute path="/dashboard/inhire" component={DashboardInhire} />}</Route>
       <Route path="/dashboard/recrutamento">{() => <ProtectedRoute path="/dashboard/recrutamento" component={DashboardRecrutamento} />}</Route>
