@@ -158,6 +158,7 @@ const ALL_ROUTES = [
   '/dashboard/retencao',
   '/dashboard/dfc',
   '/dashboard/fluxo-caixa',
+  '/dashboard/revenue-goals',
   '/dashboard/inadimplencia',
   '/dashboard/auditoria-sistemas',
   '/dashboard/tech',

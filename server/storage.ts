@@ -5930,6 +5930,127 @@ export class DbStorage implements IStorage {
     
     return { metodos };
   }
+
+  async getRevenueGoals(mes: number, ano: number): Promise<{
+    resumo: {
+      totalPrevisto: number;
+      totalRecebido: number;
+      totalPendente: number;
+      totalInadimplente: number;
+      percentualRecebido: number;
+      percentualInadimplencia: number;
+      quantidadeParcelas: number;
+      quantidadeRecebidas: number;
+      quantidadePendentes: number;
+      quantidadeInadimplentes: number;
+    };
+    porDia: {
+      dia: number;
+      dataCompleta: string;
+      previsto: number;
+      recebido: number;
+      pendente: number;
+      inadimplente: number;
+    }[];
+  }> {
+    const primeiroDia = `${ano}-${String(mes).padStart(2, '0')}-01`;
+    const ultimoDia = new Date(ano, mes, 0).getDate();
+    const ultimoDiaStr = `${ano}-${String(mes).padStart(2, '0')}-${ultimoDia}`;
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    const dataReferencia = dataHoje < ultimoDiaStr ? dataHoje : ultimoDiaStr;
+    
+    const resumoResult = await db.execute(sql.raw(`
+      SELECT 
+        COALESCE(SUM(valor_bruto::numeric), 0) as total_previsto,
+        COALESCE(SUM(COALESCE(valor_pago::numeric, 0)), 0) as total_recebido,
+        COALESCE(SUM(CASE 
+          WHEN data_vencimento::date > '${dataReferencia}'::date 
+          THEN GREATEST(valor_bruto::numeric - COALESCE(valor_pago::numeric, 0), 0) ELSE 0 
+        END), 0) as total_pendente,
+        COALESCE(SUM(CASE 
+          WHEN data_vencimento::date <= '${dataReferencia}'::date 
+          THEN GREATEST(valor_bruto::numeric - COALESCE(valor_pago::numeric, 0), 0) ELSE 0 
+        END), 0) as total_inadimplente,
+        COUNT(*) as quantidade_parcelas,
+        COUNT(CASE WHEN UPPER(status) IN ('PAGO', 'ACQUITTED') OR COALESCE(valor_pago::numeric, 0) >= valor_bruto::numeric THEN 1 END) as quantidade_recebidas,
+        COUNT(CASE WHEN COALESCE(valor_pago::numeric, 0) < valor_bruto::numeric AND data_vencimento::date > '${dataReferencia}'::date THEN 1 END) as quantidade_pendentes,
+        COUNT(CASE WHEN COALESCE(valor_pago::numeric, 0) < valor_bruto::numeric AND data_vencimento::date <= '${dataReferencia}'::date THEN 1 END) as quantidade_inadimplentes
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_vencimento >= '${primeiroDia}'
+        AND data_vencimento <= '${ultimoDiaStr} 23:59:59'
+    `));
+    
+    const resumoRow = resumoResult.rows[0] as any;
+    const totalPrevisto = parseFloat(resumoRow?.total_previsto || '0');
+    const totalRecebido = parseFloat(resumoRow?.total_recebido || '0');
+    const totalPendente = parseFloat(resumoRow?.total_pendente || '0');
+    const totalInadimplente = parseFloat(resumoRow?.total_inadimplente || '0');
+    
+    const porDiaResult = await db.execute(sql.raw(`
+      SELECT 
+        EXTRACT(DAY FROM data_vencimento) as dia,
+        TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data_completa,
+        COALESCE(SUM(valor_bruto::numeric), 0) as previsto,
+        COALESCE(SUM(COALESCE(valor_pago::numeric, 0)), 0) as recebido,
+        COALESCE(SUM(CASE 
+          WHEN data_vencimento::date > '${dataReferencia}'::date 
+          THEN GREATEST(valor_bruto::numeric - COALESCE(valor_pago::numeric, 0), 0) ELSE 0 
+        END), 0) as pendente,
+        COALESCE(SUM(CASE 
+          WHEN data_vencimento::date <= '${dataReferencia}'::date 
+          THEN GREATEST(valor_bruto::numeric - COALESCE(valor_pago::numeric, 0), 0) ELSE 0 
+        END), 0) as inadimplente
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_vencimento >= '${primeiroDia}'
+        AND data_vencimento <= '${ultimoDiaStr} 23:59:59'
+      GROUP BY EXTRACT(DAY FROM data_vencimento), TO_CHAR(data_vencimento, 'YYYY-MM-DD')
+      ORDER BY dia
+    `));
+    
+    const diasDoMes: { dia: number; dataCompleta: string; previsto: number; recebido: number; pendente: number; inadimplente: number }[] = [];
+    for (let d = 1; d <= ultimoDia; d++) {
+      const dataStr = `${ano}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      diasDoMes.push({
+        dia: d,
+        dataCompleta: dataStr,
+        previsto: 0,
+        recebido: 0,
+        pendente: 0,
+        inadimplente: 0,
+      });
+    }
+    
+    for (const row of porDiaResult.rows as any[]) {
+      const diaNum = parseInt(row.dia);
+      const idx = diaNum - 1;
+      if (idx >= 0 && idx < diasDoMes.length) {
+        diasDoMes[idx].previsto = parseFloat(row.previsto || '0');
+        diasDoMes[idx].recebido = parseFloat(row.recebido || '0');
+        diasDoMes[idx].pendente = parseFloat(row.pendente || '0');
+        diasDoMes[idx].inadimplente = parseFloat(row.inadimplente || '0');
+      }
+    }
+    
+    return {
+      resumo: {
+        totalPrevisto,
+        totalRecebido,
+        totalPendente,
+        totalInadimplente,
+        percentualRecebido: totalPrevisto > 0 ? (totalRecebido / totalPrevisto) * 100 : 0,
+        percentualInadimplencia: totalPrevisto > 0 ? (totalInadimplente / totalPrevisto) * 100 : 0,
+        quantidadeParcelas: parseInt(resumoRow?.quantidade_parcelas || '0'),
+        quantidadeRecebidas: parseInt(resumoRow?.quantidade_recebidas || '0'),
+        quantidadePendentes: parseInt(resumoRow?.quantidade_pendentes || '0'),
+        quantidadeInadimplentes: parseInt(resumoRow?.quantidade_inadimplentes || '0'),
+      },
+      porDia: diasDoMes,
+    };
+  }
 }
 
 export const storage = new DbStorage();
