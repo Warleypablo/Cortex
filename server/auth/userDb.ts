@@ -1,6 +1,6 @@
-import Client from "@replit/database";
-
-const db = new Client();
+import { db } from "../db";
+import { authUsers } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 export interface User {
   id: string;
@@ -13,11 +13,9 @@ export interface User {
   allowedRoutes: string[];
 }
 
-const USERS_PREFIX = "user:";
-const GOOGLE_ID_INDEX_PREFIX = "googleId:";
-
 const USER_CACHE_TTL_MS = 5 * 60 * 1000;
 const userCache = new Map<string, { user: User; timestamp: number }>();
+const googleIdCache = new Map<string, string>();
 
 function getCachedUser(id: string): User | null {
   const cached = userCache.get(id);
@@ -33,6 +31,7 @@ function getCachedUser(id: string): User | null {
 
 function setCachedUser(user: User): void {
   userCache.set(user.id, { user, timestamp: Date.now() });
+  googleIdCache.set(user.googleId, user.id);
 }
 
 export function invalidateUserCache(userId: string): void {
@@ -41,127 +40,7 @@ export function invalidateUserCache(userId: string): void {
 
 export function clearUserCache(): void {
   userCache.clear();
-}
-
-export async function updateUserPermissions(userId: string, allowedRoutes: string[]): Promise<User | null> {
-  try {
-    const user = await findUserById(userId);
-    if (!user) {
-      return null;
-    }
-    
-    const updatedUser: User = {
-      ...user,
-      allowedRoutes,
-    };
-    
-    await db.set(`${USERS_PREFIX}${userId}`, JSON.stringify(updatedUser));
-    setCachedUser(updatedUser);
-    return updatedUser;
-  } catch (error) {
-    console.error("Erro ao atualizar permissões:", error);
-    return null;
-  }
-}
-
-export async function updateUserRole(userId: string, role: 'admin' | 'user'): Promise<User | null> {
-  try {
-    const user = await findUserById(userId);
-    if (!user) {
-      return null;
-    }
-    
-    const updatedUser: User = {
-      ...user,
-      role,
-      allowedRoutes: role === 'admin' ? ALL_ROUTES : DEFAULT_USER_ROUTES,
-    };
-    
-    await db.set(`${USERS_PREFIX}${userId}`, JSON.stringify(updatedUser));
-    setCachedUser(updatedUser);
-    return updatedUser;
-  } catch (error) {
-    console.error("Erro ao atualizar role:", error);
-    return null;
-  }
-}
-
-export async function listAllKeys(): Promise<string[]> {
-  try {
-    const result: any = await db.list();
-    const keys = result.value || result;
-    return Array.isArray(keys) ? keys : [];
-  } catch (error) {
-    console.error("Erro ao listar chaves:", error);
-    return [];
-  }
-}
-
-export async function getAllUsers(): Promise<User[]> {
-  try {
-    const result: any = await db.list(USERS_PREFIX);
-    const keys = result.value || result;
-    const users: User[] = [];
-    
-    if (!Array.isArray(keys)) {
-      return [];
-    }
-    
-    for (const key of keys) {
-      const userResult: any = await db.get(key);
-      if (userResult && userResult.ok !== false) {
-        const userData = userResult.value || userResult;
-        const parsedUser = (typeof userData === 'string' ? JSON.parse(userData) : userData) as User;
-        users.push(parsedUser);
-        setCachedUser(parsedUser);
-      }
-    }
-    
-    return users;
-  } catch (error) {
-    console.error("Erro ao buscar todos os usuários:", error);
-    return [];
-  }
-}
-
-export async function findUserById(id: string): Promise<User | null> {
-  try {
-    const cached = getCachedUser(id);
-    if (cached) {
-      return cached;
-    }
-    
-    const result: any = await db.get(`${USERS_PREFIX}${id}`);
-    
-    if (!result || (result.ok === false)) {
-      return null;
-    }
-    
-    const userData = result.value || result;
-    const parsedUser = (typeof userData === 'string' ? JSON.parse(userData) : userData) as User;
-    setCachedUser(parsedUser);
-    return parsedUser;
-  } catch (error) {
-    console.error("Erro ao buscar usuário por id:", error);
-    return null;
-  }
-}
-
-export async function findUserByGoogleId(googleId: string): Promise<User | null> {
-  try {
-    const result: any = await db.get(`${GOOGLE_ID_INDEX_PREFIX}${googleId}`);
-    
-    if (!result || (result.ok === false)) {
-      return null;
-    }
-    
-    const userIdData = result.value || result;
-    const userId = typeof userIdData === 'string' ? userIdData : String(userIdData);
-    return findUserById(userId);
-  } catch (error) {
-    console.error("Erro ao buscar por Google ID:", error);
-    return null;
-  }
+  googleIdCache.clear();
 }
 
 const ADMIN_EMAILS = [
@@ -169,6 +48,7 @@ const ADMIN_EMAILS = [
   'warley.silva@turbopartners.com.br',
   'warleyreserva4@gmail.com'
 ];
+
 const ALL_ROUTES = [
   '/',
   '/contratos',
@@ -200,7 +80,120 @@ const ALL_ROUTES = [
   '/growth/criativos',
   '/admin/usuarios'
 ];
+
 const DEFAULT_USER_ROUTES = ['/ferramentas'];
+
+function dbUserToUser(dbUser: typeof authUsers.$inferSelect): User {
+  return {
+    id: dbUser.id,
+    googleId: dbUser.googleId,
+    email: dbUser.email,
+    name: dbUser.name,
+    picture: dbUser.picture || '',
+    createdAt: dbUser.createdAt?.toISOString() || new Date().toISOString(),
+    role: dbUser.role as 'admin' | 'user',
+    allowedRoutes: dbUser.allowedRoutes || DEFAULT_USER_ROUTES,
+  };
+}
+
+export async function updateUserPermissions(userId: string, allowedRoutes: string[]): Promise<User | null> {
+  try {
+    const result = await db
+      .update(authUsers)
+      .set({ allowedRoutes })
+      .where(eq(authUsers.id, userId))
+      .returning();
+    
+    if (result.length === 0) return null;
+    
+    const user = dbUserToUser(result[0]);
+    setCachedUser(user);
+    return user;
+  } catch (error) {
+    console.error("Erro ao atualizar permissões:", error);
+    return null;
+  }
+}
+
+export async function updateUserRole(userId: string, role: 'admin' | 'user'): Promise<User | null> {
+  try {
+    const newRoutes = role === 'admin' ? ALL_ROUTES : DEFAULT_USER_ROUTES;
+    
+    const result = await db
+      .update(authUsers)
+      .set({ role, allowedRoutes: newRoutes })
+      .where(eq(authUsers.id, userId))
+      .returning();
+    
+    if (result.length === 0) return null;
+    
+    const user = dbUserToUser(result[0]);
+    setCachedUser(user);
+    return user;
+  } catch (error) {
+    console.error("Erro ao atualizar role:", error);
+    return null;
+  }
+}
+
+export async function getAllUsers(): Promise<User[]> {
+  try {
+    const result = await db.select().from(authUsers);
+    const users = result.map(dbUserToUser);
+    users.forEach(setCachedUser);
+    return users;
+  } catch (error) {
+    console.error("Erro ao buscar todos os usuários:", error);
+    return [];
+  }
+}
+
+export async function findUserById(id: string): Promise<User | null> {
+  try {
+    const cached = getCachedUser(id);
+    if (cached) return cached;
+    
+    const result = await db
+      .select()
+      .from(authUsers)
+      .where(eq(authUsers.id, id))
+      .limit(1);
+    
+    if (result.length === 0) return null;
+    
+    const user = dbUserToUser(result[0]);
+    setCachedUser(user);
+    return user;
+  } catch (error) {
+    console.error("Erro ao buscar usuário por id:", error);
+    return null;
+  }
+}
+
+export async function findUserByGoogleId(googleId: string): Promise<User | null> {
+  try {
+    const cachedUserId = googleIdCache.get(googleId);
+    if (cachedUserId) {
+      const cached = getCachedUser(cachedUserId);
+      if (cached) return cached;
+    }
+    
+    const result = await db
+      .select()
+      .from(authUsers)
+      .where(eq(authUsers.googleId, googleId))
+      .limit(1);
+    
+    if (result.length === 0) return null;
+    
+    const user = dbUserToUser(result[0]);
+    setCachedUser(user);
+    return user;
+  } catch (error) {
+    console.error("Erro ao buscar por Google ID:", error);
+    return null;
+  }
+}
 
 export async function createOrUpdateUser(profile: {
   id: string;
@@ -217,35 +210,47 @@ export async function createOrUpdateUser(profile: {
   const existingUser = await findUserByGoogleId(googleId);
 
   if (existingUser) {
-    const updatedUser: User = {
-      ...existingUser,
-      email,
-      name,
-      picture,
-      role: isAdmin ? 'admin' : existingUser.role,
-      allowedRoutes: isAdmin ? ALL_ROUTES : (existingUser.allowedRoutes || DEFAULT_USER_ROUTES),
-    };
+    const result = await db
+      .update(authUsers)
+      .set({
+        email,
+        name,
+        picture,
+        role: isAdmin ? 'admin' : existingUser.role,
+        allowedRoutes: isAdmin ? ALL_ROUTES : (existingUser.allowedRoutes || DEFAULT_USER_ROUTES),
+      })
+      .where(eq(authUsers.id, existingUser.id))
+      .returning();
     
-    await db.set(`${USERS_PREFIX}${existingUser.id}`, JSON.stringify(updatedUser));
-    setCachedUser(updatedUser);
-    return updatedUser;
+    const user = dbUserToUser(result[0]);
+    setCachedUser(user);
+    return user;
   }
 
   const userId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
-  const newUser: User = {
+  const newUserData = {
     id: userId,
     googleId,
     email,
     name,
     picture,
-    createdAt: new Date().toISOString(),
     role: isAdmin ? 'admin' : 'user',
     allowedRoutes: isAdmin ? ALL_ROUTES : DEFAULT_USER_ROUTES,
   };
 
-  await db.set(`${USERS_PREFIX}${userId}`, JSON.stringify(newUser));
-  await db.set(`${GOOGLE_ID_INDEX_PREFIX}${googleId}`, userId);
+  await db.insert(authUsers).values(newUserData);
+  
+  const newUser: User = {
+    ...newUserData,
+    createdAt: new Date().toISOString(),
+    role: newUserData.role as 'admin' | 'user',
+  };
+  
   setCachedUser(newUser);
-
   return newUser;
+}
+
+export async function listAllKeys(): Promise<string[]> {
+  const users = await getAllUsers();
+  return users.map(u => `user:${u.id}`);
 }
