@@ -54,8 +54,11 @@ const AVAILABLE_ROUTES = [
   { path: '/dashboard/comercial/closers', label: 'Closers', category: 'Comercial' },
   { path: '/dashboard/comercial/sdrs', label: 'SDRs', category: 'Comercial' },
   { path: '/dashboard/comercial/detalhamento-closers', label: 'Detalhamento Closers', category: 'Comercial' },
+  { path: '/dashboard/comercial/detalhamento-vendas', label: 'Detalhamento Vendas', category: 'Comercial' },
   { path: '/dashboard/comercial/analise-vendas', label: 'Análise de Vendas', category: 'Comercial' },
   { path: '/dashboard/comercial/apresentacao', label: 'Modo Apresentação', category: 'Comercial' },
+  { path: '/growth/visao-geral', label: 'Visão Geral', category: 'Growth' },
+  { path: '/growth/criativos', label: 'Criativos', category: 'Growth' },
   { path: '/admin/usuarios', label: 'Gerenciar Usuários', category: 'Administração' },
 ];
 
