@@ -1,9 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
+import { Pool } from "pg";
 
 const app = express();
 
@@ -12,8 +14,26 @@ app.set("trust proxy", 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+function createSessionStore() {
+  if (process.env.DATABASE_URL) {
+    const PgSession = connectPgSimple(session);
+    const sessionPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    });
+    return new PgSession({
+      pool: sessionPool,
+      tableName: 'session',
+      createTableIfMissing: true,
+    });
+  }
+  console.log("DATABASE_URL not set, using memory session store");
+  return undefined;
+}
+
 app.use(
   session({
+    store: createSessionStore(),
     secret: process.env.SESSION_SECRET || "development-secret-change-in-production",
     resave: false,
     saveUninitialized: false,
