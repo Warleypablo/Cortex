@@ -183,6 +183,7 @@ export default function DashboardInadimplencia() {
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteInadimplente | null>(null);
   const [busca, setBusca] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<string>("todos");
+  const [responsavelFiltro, setResponsavelFiltro] = useState<string>("todos");
   
   // Estados para contextualização de inadimplência
   const [clienteContexto, setClienteContexto] = useState<ClienteInadimplente | null>(null);
@@ -350,6 +351,18 @@ export default function DashboardInadimplencia() {
     return Array.from(statusSet).sort();
   }, [clientesData]);
 
+  // Extrair responsáveis únicos dos clientes para o filtro
+  const responsaveisUnicos = useMemo(() => {
+    if (!clientesData?.clientes) return [];
+    const responsavelSet = new Set<string>();
+    clientesData.clientes.forEach((c) => {
+      if (c.responsavel) {
+        responsavelSet.add(c.responsavel);
+      }
+    });
+    return Array.from(responsavelSet).sort();
+  }, [clientesData]);
+
   const clientesFiltrados = useMemo(() => {
     if (!clientesData?.clientes) return [];
     
@@ -364,6 +377,15 @@ export default function DashboardInadimplencia() {
       }
     }
     
+    // Filtrar por responsável
+    if (responsavelFiltro !== "todos") {
+      if (responsavelFiltro === "sem-responsavel") {
+        filtrados = filtrados.filter((c) => !c.responsavel);
+      } else {
+        filtrados = filtrados.filter((c) => c.responsavel === responsavelFiltro);
+      }
+    }
+    
     // Filtrar por busca
     if (busca.trim()) {
       const termo = busca.toLowerCase();
@@ -375,7 +397,7 @@ export default function DashboardInadimplencia() {
     }
     
     return filtrados;
-  }, [clientesData, busca, statusFiltro]);
+  }, [clientesData, busca, statusFiltro, responsavelFiltro]);
 
   const faixasChartData = useMemo(() => {
     if (!resumoData) return [];
@@ -413,6 +435,7 @@ export default function DashboardInadimplencia() {
     setActivePreset("");
     setBusca("");
     setStatusFiltro("todos");
+    setResponsavelFiltro("todos");
   };
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
@@ -1007,48 +1030,87 @@ export default function DashboardInadimplencia() {
         </div>
       </div>
 
-      {/* Filtro de Status */}
-      <div className="flex items-center gap-2" data-testid="filtro-status">
-        <Label className="text-sm text-muted-foreground flex items-center gap-1">
-          <Filter className="h-4 w-4" />
-          Status:
-        </Label>
-        <Select value={statusFiltro} onValueChange={setStatusFiltro}>
-          <SelectTrigger className="w-56" data-testid="select-filtro-status">
-            <SelectValue placeholder="Selecione um status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos" data-testid="option-status-todos">
-              <span className="flex items-center gap-2">
-                Todos ({clientesData?.clientes?.length || 0})
-              </span>
-            </SelectItem>
-            {statusUnicos.map((status) => {
-              const count = clientesData?.clientes?.filter(c => c.statusClickup === status).length || 0;
-              const statusLower = status.toLowerCase();
-              const isAtivo = statusLower.includes("ativo") && !statusLower.includes("inativo") && !statusLower.includes("cancelado");
-              const isCancelado = statusLower.includes("cancelado") || statusLower.includes("cancelamento") || statusLower.includes("inativo");
-              const dotColor = isAtivo ? "bg-green-500" : isCancelado ? "bg-red-500" : "bg-blue-500";
-              
-              return (
-                <SelectItem key={status} value={status} data-testid={`option-status-${status.toLowerCase().replace(/\s+/g, '-')}`}>
-                  <span className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${dotColor}`} />
-                    {status} ({count})
-                  </span>
-                </SelectItem>
-              );
-            })}
-            {clientesData?.clientes?.some(c => !c.statusClickup) && (
-              <SelectItem value="sem-status" data-testid="option-status-sem-status">
+      {/* Filtros de Status e Responsável */}
+      <div className="flex flex-wrap items-center gap-4" data-testid="filtros-clientes">
+        <div className="flex items-center gap-2" data-testid="filtro-status">
+          <Label className="text-sm text-muted-foreground flex items-center gap-1">
+            <Filter className="h-4 w-4" />
+            Status:
+          </Label>
+          <Select value={statusFiltro} onValueChange={setStatusFiltro}>
+            <SelectTrigger className="w-56" data-testid="select-filtro-status">
+              <SelectValue placeholder="Selecione um status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos" data-testid="option-status-todos">
                 <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-gray-400" />
-                  Sem Status ({clientesData?.clientes?.filter(c => !c.statusClickup).length || 0})
+                  Todos ({clientesData?.clientes?.length || 0})
                 </span>
               </SelectItem>
-            )}
-          </SelectContent>
-        </Select>
+              {statusUnicos.map((status) => {
+                const count = clientesData?.clientes?.filter(c => c.statusClickup === status).length || 0;
+                const statusLower = status.toLowerCase();
+                const isAtivo = statusLower.includes("ativo") && !statusLower.includes("inativo") && !statusLower.includes("cancelado");
+                const isCancelado = statusLower.includes("cancelado") || statusLower.includes("cancelamento") || statusLower.includes("inativo");
+                const dotColor = isAtivo ? "bg-green-500" : isCancelado ? "bg-red-500" : "bg-blue-500";
+                
+                return (
+                  <SelectItem key={status} value={status} data-testid={`option-status-${status.toLowerCase().replace(/\s+/g, '-')}`}>
+                    <span className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+                      {status} ({count})
+                    </span>
+                  </SelectItem>
+                );
+              })}
+              {clientesData?.clientes?.some(c => !c.statusClickup) && (
+                <SelectItem value="sem-status" data-testid="option-status-sem-status">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-gray-400" />
+                    Sem Status ({clientesData?.clientes?.filter(c => !c.statusClickup).length || 0})
+                  </span>
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2" data-testid="filtro-responsavel">
+          <Label className="text-sm text-muted-foreground flex items-center gap-1">
+            <Users className="h-4 w-4" />
+            Responsável:
+          </Label>
+          <Select value={responsavelFiltro} onValueChange={setResponsavelFiltro}>
+            <SelectTrigger className="w-56" data-testid="select-filtro-responsavel">
+              <SelectValue placeholder="Selecione um responsável" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos" data-testid="option-responsavel-todos">
+                <span className="flex items-center gap-2">
+                  Todos ({clientesData?.clientes?.length || 0})
+                </span>
+              </SelectItem>
+              {responsaveisUnicos.map((responsavel) => {
+                const count = clientesData?.clientes?.filter(c => c.responsavel === responsavel).length || 0;
+                return (
+                  <SelectItem key={responsavel} value={responsavel} data-testid={`option-responsavel-${responsavel.toLowerCase().replace(/\s+/g, '-')}`}>
+                    <span className="flex items-center gap-2">
+                      {responsavel} ({count})
+                    </span>
+                  </SelectItem>
+                );
+              })}
+              {clientesData?.clientes?.some(c => !c.responsavel) && (
+                <SelectItem value="sem-responsavel" data-testid="option-responsavel-sem-responsavel">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-gray-400" />
+                    Sem Responsável ({clientesData?.clientes?.filter(c => !c.responsavel).length || 0})
+                  </span>
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Card data-testid="card-tabela-clientes">
