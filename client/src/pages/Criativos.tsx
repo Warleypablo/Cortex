@@ -357,45 +357,90 @@ export default function Criativos() {
                         <ArrowUpDown className="w-3 h-3" />
                       </Button>
                     </TableHead>
-                    <TableHead className="text-center whitespace-nowrap w-[80px]">Status</TableHead>
+                    <TableHead className="text-center whitespace-nowrap w-[80px]">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('status')}>
+                        Status
+                        <ArrowUpDown className="w-3 h-3" />
+                      </Button>
+                    </TableHead>
                     <TableHead className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('investimento')}>
                         Investimento
                         <ArrowUpDown className="w-3 h-3" />
                       </Button>
                     </TableHead>
-                    <TableHead className="text-right whitespace-nowrap">CTR</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">CPM</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('ctr')}>
+                        CTR
+                        <ArrowUpDown className="w-3 h-3" />
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('cpm')}>
+                        CPM
+                        <ArrowUpDown className="w-3 h-3" />
+                      </Button>
+                    </TableHead>
                     <TableHead className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('leads')}>
                         Leads
                         <ArrowUpDown className="w-3 h-3" />
                       </Button>
                     </TableHead>
-                    <TableHead className="text-right whitespace-nowrap">CPL</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('cpl')}>
+                        CPL
+                        <ArrowUpDown className="w-3 h-3" />
+                      </Button>
+                    </TableHead>
                     <TableHead className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('mql')}>
                         MQL
                         <ArrowUpDown className="w-3 h-3" />
                       </Button>
                     </TableHead>
-                    <TableHead className="text-right whitespace-nowrap">% MQL</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">CPMQL</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('percMql')}>
+                        % MQL
+                        <ArrowUpDown className="w-3 h-3" />
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('cpmql')}>
+                        CPMQL
+                        <ArrowUpDown className="w-3 h-3" />
+                      </Button>
+                    </TableHead>
                     <TableHead className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('ra')}>
                         RA
                         <ArrowUpDown className="w-3 h-3" />
                       </Button>
                     </TableHead>
-                    <TableHead className="text-right whitespace-nowrap">% RA</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('percRa')}>
+                        % RA
+                        <ArrowUpDown className="w-3 h-3" />
+                      </Button>
+                    </TableHead>
                     <TableHead className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('rr')}>
                         RR
                         <ArrowUpDown className="w-3 h-3" />
                       </Button>
                     </TableHead>
-                    <TableHead className="text-right whitespace-nowrap">% RR</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">CPRR</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('percRr')}>
+                        % RR
+                        <ArrowUpDown className="w-3 h-3" />
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('cprr')}>
+                        CPRR
+                        <ArrowUpDown className="w-3 h-3" />
+                      </Button>
+                    </TableHead>
                     <TableHead className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" className="gap-1" onClick={() => handleSort('clientesUnicos')}>
                         Clientes
