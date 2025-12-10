@@ -25,6 +25,7 @@ Preferred communication style: Simple, everyday language.
     - **Recruitment Analytics Dashboard**: Advanced dashboard with funnel analysis, hunting vs. passive sourcing metrics, and per-vacancy conversion tracking across multiple tabs.
     - **Visão Geral Dashboard**: Overview page with MRR metrics (active MRR, acquisitions, churn), rankings, and evolution charts using a hybrid data strategy (snapshots and event-based).
     - **Meta Ads Analytics Dashboard**: Correlates Meta Ads data with CRM conversion tracking, including UTM mapping for attribution at campaign and adset levels. Features KPI cards, conversion funnel, and analysis tabs for campaigns, adsets, ads, and creatives.
+    - **Commercial SDR/Closer Detail Pages**: Detailed analytics for individual sales team members, including performance metrics, source/pipeline distribution, and trend analysis (DetailClosers.tsx and DetailSDRs.tsx).
 - **Theming**: Dark mode support; light mode is primary.
 
 ### Backend Architecture
