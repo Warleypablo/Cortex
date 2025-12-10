@@ -146,6 +146,32 @@ const formatDate = (dateString: string | null) => {
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+const SOURCE_NAME_MAP: Record<string, string> = {
+  "CALL": "Agendamento Direto",
+  "EMAIL": "Automação",
+  "WEB": "Contato - Instagram",
+  "ADVERTISING": "Contato Recebido",
+  "PARTNER": "CrossSell",
+  "RECOMMENDATION": "Eventos",
+  "TRADE_SHOW": "Indound(Linkedin)",
+  "WEBFORM": "Formulário",
+  "CALLBACK": "Indicação",
+  "RC_GENERATOR": "Indique e Ganhe",
+  "STORE": "Wpp Marketing",
+  "OTHER": "Lista - Wpp Marketing",
+  "REPEAT_SALE": "Vendas Recorrentes",
+  "UC_YWZVA2": "Prospecção Ativa",
+  "UC_PTYW1Y": "Recomendação",
+  "UC_4VCKGM": "Social Selling - Instagram",
+  "UC_7WV0LW": "Upsell",
+  "UC_KYOYOW": "Workshop",
+  "UC_8HI30Y": "Recuperação de Churn"
+};
+
+function getSourceDisplayName(sourceId: string): string {
+  return SOURCE_NAME_MAP[sourceId] || sourceId || "Não informado";
+}
+
 export default function DetalhamentoVendas() {
   const [dataInicio, setDataInicio] = useState<string>("");
   const [dataFim, setDataFim] = useState<string>("");
@@ -320,7 +346,7 @@ export default function DetalhamentoVendas() {
                     <SelectContent>
                       <SelectItem value="all">Todas</SelectItem>
                       {filtros?.sources?.map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                        <SelectItem key={s} value={s}>{getSourceDisplayName(s)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -650,7 +676,7 @@ export default function DetalhamentoVendas() {
                             </td>
                             <td className="p-2">
                               <Badge variant="outline" className="text-[10px] bg-slate-800 border-slate-700">
-                                {n.source || '-'}
+                                {getSourceDisplayName(n.source)}
                               </Badge>
                             </td>
                             <td className="p-2 text-slate-400">
@@ -681,10 +707,10 @@ export default function DetalhamentoVendas() {
                 <CardContent className="p-4">
                   <div className="h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={porFonte || []} layout="vertical">
+                      <BarChart data={(porFonte || []).map(item => ({ ...item, fonte: getSourceDisplayName(item.fonte || '') }))} layout="vertical">
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                         <XAxis type="number" tickFormatter={(v) => formatCurrencyCompact(v)} stroke="#94a3b8" fontSize={10} />
-                        <YAxis type="category" dataKey="fonte" stroke="#94a3b8" fontSize={10} width={80} />
+                        <YAxis type="category" dataKey="fonte" stroke="#94a3b8" fontSize={10} width={100} />
                         <Tooltip 
                           contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}
                           formatter={(value: number) => formatCurrency(value)}
@@ -697,7 +723,7 @@ export default function DetalhamentoVendas() {
                   <div className="mt-4 space-y-2">
                     {porFonte?.map((item) => (
                       <div key={item.fonte} className="flex items-center justify-between text-xs">
-                        <span className="text-slate-400">{item.fonte}</span>
+                        <span className="text-slate-400">{getSourceDisplayName(item.fonte || '')}</span>
                         <div className="flex items-center gap-3">
                           <span className="text-slate-500">{item.quantidade} neg.</span>
                           <span className="text-white font-medium">{formatCurrency(item.total)}</span>
