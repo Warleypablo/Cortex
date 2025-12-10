@@ -29,7 +29,8 @@ export function configurePassport() {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
   if (!clientID || !clientSecret) {
-    console.warn("Google OAuth credentials not found");
+    console.error("ERROR: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set for authentication");
+    console.error("Please configure these environment variables in your hosting platform");
     return;
   }
 
