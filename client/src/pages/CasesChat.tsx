@@ -39,10 +39,22 @@ export default function CasesChat() {
       return response.json();
     },
     onSuccess: (data) => {
+      let content = "Sem resposta do servidor.";
+      
+      if (Array.isArray(data) && data.length > 0) {
+        content = data[0].output || data[0].response || data[0].message || data[0].text || content;
+      } else if (data.output) {
+        content = data.output;
+      } else if (data.response) {
+        content = data.response;
+      } else if (data.message) {
+        content = data.message;
+      }
+      
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
-        content: data.response || data.message || "Sem resposta do servidor.",
+        content,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMessage]);
