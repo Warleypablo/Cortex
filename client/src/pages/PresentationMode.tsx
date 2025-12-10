@@ -1275,12 +1275,12 @@ export default function PresentationMode() {
                   </div>
 
                   <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
-                    <div className="grid grid-cols-14 gap-1 p-2 bg-slate-800/50 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
+                    <div className="grid grid-cols-12 gap-1 p-2 bg-slate-800/50 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
                       <div className="col-span-1">#</div>
                       <div className="col-span-2">SDR</div>
                       <div className="col-span-1 text-right">Leads</div>
-                      <div className="col-span-2 text-right text-cyan-400">Reuniões</div>
-                      <div className="col-span-2 text-right">% RR/Lead</div>
+                      <div className="col-span-1 text-right text-cyan-400">Reuniões</div>
+                      <div className="col-span-1 text-right">% RR/L</div>
                       <div className="col-span-1 text-right">Contr.</div>
                       <div className="col-span-1 text-right">% V/RR</div>
                       <div className="col-span-2 text-right">MRR</div>
@@ -1304,7 +1304,7 @@ export default function PresentationMode() {
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.03 * index }}
-                            className={`grid grid-cols-14 gap-1 p-2 items-center hover:bg-slate-800/30 transition-colors ${
+                            className={`grid grid-cols-12 gap-1 p-2 items-center hover:bg-slate-800/30 transition-colors ${
                               sdr.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(sdr.position) : ''
                             }`}
                           >
@@ -1325,10 +1325,10 @@ export default function PresentationMode() {
                             <div className="col-span-1 text-right text-slate-300 text-xs">
                               {sdr.leads}
                             </div>
-                            <div className="col-span-2 text-right font-black text-cyan-400 text-sm">
+                            <div className="col-span-1 text-right font-black text-cyan-400 text-sm">
                               {sdr.reunioesRealizadas}
                             </div>
-                            <div className="col-span-2 text-right">
+                            <div className="col-span-1 text-right">
                               <Badge 
                                 variant="outline" 
                                 className={`text-[10px] border-0 px-1 ${
