@@ -2548,6 +2548,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/closers/detail/lead-time", async (req, res) => {
+    try {
+      const { closerId, dataInicio, dataFim } = req.query;
+
+      if (!closerId) {
+        return res.status(400).json({ error: "closerId is required" });
+      }
+
+      const dateConditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) {
+        dateConditions.push(sql`d.data_fechamento >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        dateConditions.push(sql`d.data_fechamento <= ${dataFim}`);
+      }
+
+      const dateWhereClause = dateConditions.length > 0 
+        ? sql`AND ${sql.join(dateConditions, sql` AND `)}` 
+        : sql``;
+
+      const result = await db.execute(sql`
+        SELECT 
+          AVG(EXTRACT(EPOCH FROM (d.data_fechamento::timestamp - d.date_create)) / 86400) as lead_time_medio,
+          MIN(EXTRACT(EPOCH FROM (d.data_fechamento::timestamp - d.date_create)) / 86400) as lead_time_min,
+          MAX(EXTRACT(EPOCH FROM (d.data_fechamento::timestamp - d.date_create)) / 86400) as lead_time_max,
+          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (d.data_fechamento::timestamp - d.date_create)) / 86400) as lead_time_mediana,
+          COUNT(*) as total_negocios
+        FROM crm_deal d
+        WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
+          AND d.stage_name = 'Negócio Ganho'
+          AND d.data_fechamento IS NOT NULL
+          AND d.date_create IS NOT NULL
+          ${dateWhereClause}
+      `);
+
+      const row = result.rows[0] as any;
+
+      res.json({
+        leadTimeMedio: parseFloat(row.lead_time_medio) || 0,
+        leadTimeMin: parseFloat(row.lead_time_min) || 0,
+        leadTimeMax: parseFloat(row.lead_time_max) || 0,
+        leadTimeMediana: parseFloat(row.lead_time_mediana) || 0,
+        totalNegocios: parseInt(row.total_negocios) || 0
+      });
+    } catch (error) {
+      console.error("[api] Error fetching lead time data:", error);
+      res.status(500).json({ error: "Failed to fetch lead time data" });
+    }
+  });
+
   // ========================================
   // SDRs DASHBOARD API ENDPOINTS
   // ========================================

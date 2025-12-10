@@ -23,6 +23,7 @@ import {
   Star,
   Calendar,
   Clock,
+  Timer,
   Percent,
   Repeat,
   Banknote,
@@ -113,6 +114,14 @@ interface SourceDistribution {
   source: string;
   count: number;
   percentage: number;
+}
+
+interface LeadTimeData {
+  leadTimeMedio: number;
+  leadTimeMin: number;
+  leadTimeMax: number;
+  leadTimeMediana: number;
+  totalNegocios: number;
 }
 
 function AnimatedCounter({ value, duration = 2000, prefix = "", suffix = "" }: { value: number; duration?: number; prefix?: string; suffix?: string }) {
@@ -251,6 +260,16 @@ export default function DetailClosers() {
     queryKey: ["/api/closers/detail/sources", queryParams],
     queryFn: async () => {
       const res = await fetch(`/api/closers/detail/sources?${queryParams}`);
+      return res.json();
+    },
+    enabled: !!closerId,
+    refetchInterval: 60000,
+  });
+
+  const { data: leadTimeData, isLoading: isLoadingLeadTime } = useQuery<LeadTimeData>({
+    queryKey: ["/api/closers/detail/lead-time", queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/closers/detail/lead-time?${queryParams}`);
       return res.json();
     },
     enabled: !!closerId,
@@ -651,6 +670,65 @@ export default function DetailClosers() {
                 delay={0.7}
               />
             </div>
+
+            {/* Lead Time Card */}
+            {leadTimeData && leadTimeData.totalNegocios > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+                  className="md:col-span-4"
+                >
+                  <div className="relative group">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-600/30 to-cyan-600/30 rounded-2xl blur-xl opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
+                    <Card className="relative bg-slate-900/80 border-slate-700/50 backdrop-blur-xl rounded-2xl overflow-hidden">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-3 text-white">
+                          <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg shadow-blue-500/25">
+                            <Timer className="w-6 h-6 text-white" />
+                          </div>
+                          <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                            Lead Time (Tempo de Fechamento)
+                          </span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                          <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
+                            <div className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                              {leadTimeData.leadTimeMedio.toFixed(1)}
+                            </div>
+                            <div className="text-sm text-slate-400 mt-1">Média (dias)</div>
+                          </div>
+                          <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
+                            <div className="text-3xl font-bold text-emerald-400">
+                              {leadTimeData.leadTimeMin.toFixed(1)}
+                            </div>
+                            <div className="text-sm text-slate-400 mt-1">Mínimo (dias)</div>
+                          </div>
+                          <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
+                            <div className="text-3xl font-bold text-amber-400">
+                              {leadTimeData.leadTimeMax.toFixed(1)}
+                            </div>
+                            <div className="text-sm text-slate-400 mt-1">Máximo (dias)</div>
+                          </div>
+                          <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
+                            <div className="text-3xl font-bold text-violet-400">
+                              {leadTimeData.leadTimeMediana.toFixed(1)}
+                            </div>
+                            <div className="text-sm text-slate-400 mt-1">Mediana (dias)</div>
+                          </div>
+                        </div>
+                        <div className="mt-4 text-center text-slate-500 text-sm">
+                          Baseado em {leadTimeData.totalNegocios} negócios ganhos no período
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </motion.div>
+              </div>
+            )}
 
             {/* Premium Tabs */}
             <motion.div
