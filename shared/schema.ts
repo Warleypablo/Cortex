@@ -981,3 +981,17 @@ export type RecrutamentoCandidaturasPorArea = {
   percentual: number;
   vagasAbertas: number;
 };
+
+// Tabela para contextos de inadimplência (CS/CX workflow)
+export const inadimplenciaContextos = pgTable("inadimplencia_contextos", {
+  clienteId: text("cliente_id").primaryKey(),
+  contexto: text("contexto"),
+  evidencias: text("evidencias"),
+  acao: varchar("acao", { length: 20 }), // 'cobrar' | 'aguardar' | 'abonar'
+  atualizadoPor: varchar("atualizado_por", { length: 100 }),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const insertInadimplenciaContextoSchema = createInsertSchema(inadimplenciaContextos);
+export type InadimplenciaContexto = typeof inadimplenciaContextos.$inferSelect;
+export type InsertInadimplenciaContexto = z.infer<typeof insertInadimplenciaContextoSchema>;
