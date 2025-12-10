@@ -2609,7 +2609,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT DISTINCT u.id, u.nome as name, u.email, u.active
         FROM crm_users u
         INNER JOIN crm_deal d ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
-        WHERE u.active = true OR u.active IS NULL
         ORDER BY u.nome
       `);
       res.json(result.rows);
