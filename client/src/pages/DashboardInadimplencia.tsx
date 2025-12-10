@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Table,
   TableBody,
@@ -69,6 +72,10 @@ import {
   ExternalLink,
   FileText,
   Download,
+  MessageSquarePlus,
+  CheckCircle2,
+  Pause,
+  XCircle,
 } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -133,6 +140,16 @@ interface ParcelaDetalhe {
   urlCobranca: string | null;
 }
 
+interface InadimplenciaContexto {
+  contexto: string | null;
+  evidencias: string | null;
+  acao: string | null;
+  atualizadoPor: string | null;
+  atualizadoEm: string | null;
+}
+
+type AcaoContexto = 'cobrar' | 'aguardar' | 'abonar';
+
 const COLORS = {
   ate30dias: "#22c55e",
   de31a60dias: "#f59e0b",
@@ -166,6 +183,12 @@ export default function DashboardInadimplencia() {
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteInadimplente | null>(null);
   const [busca, setBusca] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<string>("todos");
+  
+  // Estados para contextualização de inadimplência
+  const [clienteContexto, setClienteContexto] = useState<ClienteInadimplente | null>(null);
+  const [contextoTexto, setContextoTexto] = useState("");
+  const [evidenciasTexto, setEvidenciasTexto] = useState("");
+  const [acaoSelecionada, setAcaoSelecionada] = useState<AcaoContexto | null>(null);
 
   useEffect(() => {
     setClienteSelecionado(null);
@@ -217,6 +240,103 @@ export default function DashboardInadimplencia() {
     queryKey: [parcelasUrl, parcelasParams],
     enabled: !!clienteSelecionado?.idCliente,
   });
+
+  // Query para buscar contextos de inadimplência
+  const clienteIds = useMemo(() => {
+    return clientesData?.clientes?.map(c => c.idCliente).join(',') || '';
+  }, [clientesData]);
+
+  const { data: contextosData } = useQuery<{ contextos: Record<string, InadimplenciaContexto> }>({
+    queryKey: ['/api/inadimplencia/contextos', { ids: clienteIds }],
+    enabled: !!clienteIds,
+  });
+
+  // Query para buscar contexto individual ao abrir dialog
+  const { data: contextoAtualData, isLoading: isLoadingContexto } = useQuery<{ contexto: InadimplenciaContexto | null }>({
+    queryKey: ['/api/inadimplencia/contexto', clienteContexto?.idCliente],
+    enabled: !!clienteContexto?.idCliente,
+  });
+
+  // Preencher form quando contexto é carregado
+  useEffect(() => {
+    if (contextoAtualData?.contexto && clienteContexto) {
+      setContextoTexto(contextoAtualData.contexto.contexto || '');
+      setEvidenciasTexto(contextoAtualData.contexto.evidencias || '');
+      setAcaoSelecionada(contextoAtualData.contexto.acao as AcaoContexto || null);
+    }
+  }, [contextoAtualData, clienteContexto]);
+
+  // Mutation para salvar contexto
+  const salvarContextoMutation = useMutation({
+    mutationFn: async (data: { clienteId: string; contexto: string; evidencias: string; acao: AcaoContexto }) => {
+      return apiRequest('PUT', `/api/inadimplencia/contexto/${encodeURIComponent(data.clienteId)}`, {
+        contexto: data.contexto,
+        evidencias: data.evidencias,
+        acao: data.acao,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inadimplencia/contextos'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/inadimplencia/contexto', clienteContexto?.idCliente] });
+      toast({
+        title: "Contexto salvo",
+        description: "O contexto de inadimplência foi salvo com sucesso.",
+      });
+      fecharDialogContexto();
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar o contexto.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const abrirDialogContexto = (cliente: ClienteInadimplente) => {
+    setClienteContexto(cliente);
+    setContextoTexto('');
+    setEvidenciasTexto('');
+    setAcaoSelecionada(null);
+  };
+
+  const fecharDialogContexto = () => {
+    setClienteContexto(null);
+    setContextoTexto('');
+    setEvidenciasTexto('');
+    setAcaoSelecionada(null);
+  };
+
+  const handleSalvarContexto = () => {
+    if (!clienteContexto || !acaoSelecionada) {
+      toast({
+        title: "Atenção",
+        description: "Selecione uma ação (Cobrar, Aguardar ou Abonar).",
+        variant: "destructive",
+      });
+      return;
+    }
+    salvarContextoMutation.mutate({
+      clienteId: clienteContexto.idCliente,
+      contexto: contextoTexto,
+      evidencias: evidenciasTexto,
+      acao: acaoSelecionada,
+    });
+  };
+
+  const getAcaoBadge = (acao: string | null | undefined) => {
+    if (!acao) return { label: 'Sem contexto', variant: 'secondary' as const, icon: AlertCircle };
+    switch (acao) {
+      case 'cobrar':
+        return { label: 'Cobrar', variant: 'destructive' as const, icon: CheckCircle2 };
+      case 'aguardar':
+        return { label: 'Aguardar', variant: 'secondary' as const, icon: Pause };
+      case 'abonar':
+        return { label: 'Abonar', variant: 'outline' as const, icon: XCircle };
+      default:
+        return { label: 'Sem contexto', variant: 'secondary' as const, icon: AlertCircle };
+    }
+  };
 
   // Extrair status únicos dos clientes para o filtro
   const statusUnicos = useMemo(() => {
@@ -955,6 +1075,7 @@ export default function DashboardInadimplencia() {
                     <TableHead className="text-right">Valor Total</TableHead>
                     <TableHead className="text-center">Parcelas</TableHead>
                     <TableHead className="text-center">Dias Atraso</TableHead>
+                    <TableHead className="text-center">Contexto CS</TableHead>
                     <TableHead className="text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1026,14 +1147,58 @@ export default function DashboardInadimplencia() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setClienteSelecionado(cliente)}
-                          data-testid={`button-ver-parcelas-${cliente.idCliente}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        {(() => {
+                          const contexto = contextosData?.contextos?.[cliente.idCliente];
+                          const badge = getAcaoBadge(contexto?.acao);
+                          const IconComponent = badge.icon;
+                          return (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge 
+                                    variant={badge.variant} 
+                                    className="cursor-pointer gap-1"
+                                    onClick={() => abrirDialogContexto(cliente)}
+                                    data-testid={`badge-contexto-${cliente.idCliente}`}
+                                  >
+                                    <IconComponent className="h-3 w-3" />
+                                    {badge.label}
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {contexto?.contexto ? (
+                                    <div className="max-w-xs">
+                                      <p className="font-medium mb-1">Contexto:</p>
+                                      <p className="text-sm">{contexto.contexto}</p>
+                                    </div>
+                                  ) : (
+                                    <p>Clique para contextualizar</p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setClienteSelecionado(cliente)}
+                            data-testid={`button-ver-parcelas-${cliente.idCliente}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => abrirDialogContexto(cliente)}
+                            data-testid={`button-contextualizar-${cliente.idCliente}`}
+                          >
+                            <MessageSquarePlus className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1181,6 +1346,105 @@ export default function DashboardInadimplencia() {
                 </TableBody>
               </Table>
             </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Contextualização */}
+      <Dialog open={!!clienteContexto} onOpenChange={(open) => !open && fecharDialogContexto()}>
+        <DialogContent className="max-w-lg" data-testid="dialog-contextualizar">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquarePlus className="h-5 w-5" />
+              Contextualizar Inadimplência
+            </DialogTitle>
+          </DialogHeader>
+          
+          {isLoadingContexto ? (
+            <div className="p-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="font-medium">{clienteContexto?.nomeCliente}</p>
+                <p className="text-sm text-muted-foreground">
+                  {formatCurrency(clienteContexto?.valorTotal || 0)} em atraso
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="contexto">Contexto do Cliente</Label>
+                <Textarea
+                  id="contexto"
+                  placeholder="Descreva a situação do cliente, histórico de contatos, negociações em andamento..."
+                  value={contextoTexto}
+                  onChange={(e) => setContextoTexto(e.target.value)}
+                  className="min-h-[100px]"
+                  data-testid="textarea-contexto"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="evidencias">Evidências de Trabalho</Label>
+                <Textarea
+                  id="evidencias"
+                  placeholder="Links, prints, registros de contato, e-mails enviados..."
+                  value={evidenciasTexto}
+                  onChange={(e) => setEvidenciasTexto(e.target.value)}
+                  className="min-h-[80px]"
+                  data-testid="textarea-evidencias"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Ação Recomendada</Label>
+                <RadioGroup
+                  value={acaoSelecionada || ''}
+                  onValueChange={(v) => setAcaoSelecionada(v as AcaoContexto)}
+                  className="flex gap-4"
+                  data-testid="radio-acao"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="cobrar" id="cobrar" />
+                    <Label htmlFor="cobrar" className="flex items-center gap-1 cursor-pointer text-red-600 dark:text-red-400 font-medium">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Cobrar
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="aguardar" id="aguardar" />
+                    <Label htmlFor="aguardar" className="flex items-center gap-1 cursor-pointer text-amber-600 dark:text-amber-400 font-medium">
+                      <Pause className="h-4 w-4" />
+                      Aguardar
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="abonar" id="abonar" />
+                    <Label htmlFor="abonar" className="flex items-center gap-1 cursor-pointer text-green-600 dark:text-green-400 font-medium">
+                      <XCircle className="h-4 w-4" />
+                      Abonar
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={fecharDialogContexto} data-testid="button-cancelar-contexto">
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleSalvarContexto} 
+                  disabled={salvarContextoMutation.isPending || !acaoSelecionada}
+                  data-testid="button-salvar-contexto"
+                >
+                  {salvarContextoMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : null}
+                  Salvar Contexto
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
