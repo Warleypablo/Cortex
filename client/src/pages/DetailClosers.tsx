@@ -124,6 +124,32 @@ interface LeadTimeData {
   totalNegocios: number;
 }
 
+const SOURCE_NAME_MAP: Record<string, string> = {
+  "CALL": "Agendamento Direto",
+  "EMAIL": "Automação",
+  "WEB": "Contato - Instagram",
+  "ADVERTISING": "Contato Recebido",
+  "PARTNER": "CrossSell",
+  "RECOMMENDATION": "Eventos",
+  "TRADE_SHOW": "Indound(Linkedin)",
+  "WEBFORM": "Formulário",
+  "CALLBACK": "Indicação",
+  "RC_GENERATOR": "Indique e Ganhe",
+  "STORE": "Wpp Marketing",
+  "OTHER": "Lista - Wpp Marketing",
+  "REPEAT_SALE": "Vendas Recorrentes",
+  "UC_YWZVA2": "Prospecção Ativa",
+  "UC_PTYW1Y": "Recomendação",
+  "UC_4VCKGM": "Social Selling - Instagram",
+  "UC_7WV0LW": "Upsell",
+  "UC_KYOYOW": "Workshop",
+  "UC_8HI30Y": "Recuperação de Churn"
+};
+
+function getSourceDisplayName(sourceId: string): string {
+  return SOURCE_NAME_MAP[sourceId] || sourceId || "Não informado";
+}
+
 function AnimatedCounter({ value, duration = 2000, prefix = "", suffix = "" }: { value: number; duration?: number; prefix?: string; suffix?: string }) {
   const [count, setCount] = useState(0);
   const countRef = useRef(0);
@@ -1029,7 +1055,7 @@ export default function DetailClosers() {
                         <Skeleton className="h-72 bg-slate-800/50 rounded-xl" />
                       ) : sourceData && sourceData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={sourceData.slice(0, 8)} layout="vertical" barSize={20}>
+                          <BarChart data={sourceData.slice(0, 8).map(s => ({ ...s, source: getSourceDisplayName(s.source) }))} layout="vertical" barSize={20}>
                             <defs>
                               <linearGradient id="sourceGradient" x1="0" y1="0" x2="1" y2="0">
                                 <stop offset="0%" stopColor="#06B6D4" stopOpacity={1} />
@@ -1099,7 +1125,7 @@ export default function DetailClosers() {
                                 {index === 0 ? <Crown className="w-5 h-5" /> : index + 1}
                               </div>
                               <span className="flex-1 text-slate-200 text-sm font-medium truncate">
-                                {source.source || 'Não informado'}
+                                {getSourceDisplayName(source.source)}
                               </span>
                               <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 font-bold px-3 py-1">
                                 {source.count} leads
