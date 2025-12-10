@@ -1354,7 +1354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Mensagem é obrigatória" });
       }
 
-      const webhookUrl = "https://n8n.turbopartners.com.br/webhook-test/cases";
+      const webhookUrl = "https://n8n.turbopartners.com.br/webhook/cases";
       
       const webhookResponse = await fetch(webhookUrl, {
         method: "POST",
