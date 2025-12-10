@@ -2844,6 +2844,395 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // SDR DETAIL PAGE ENDPOINTS
+  // ========================================
+
+  app.get("/api/sdrs/detail", async (req, res) => {
+    try {
+      const { sdrId, dataInicio, dataFim } = req.query;
+
+      if (!sdrId) {
+        return res.status(400).json({ error: "sdrId is required" });
+      }
+
+      const sdrIdNum = parseInt(sdrId as string);
+      if (isNaN(sdrIdNum)) {
+        return res.status(400).json({ error: "Invalid sdrId" });
+      }
+
+      const dateConditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) {
+        dateConditions.push(sql`d.date_create >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        dateConditions.push(sql`d.date_create <= ${dataFim}`);
+      }
+
+      const dateWhereClause = dateConditions.length > 0 
+        ? sql` AND ${sql.join(dateConditions, sql` AND `)}` 
+        : sql``;
+
+      const reunioesDateConditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) {
+        reunioesDateConditions.push(sql`d.data_reuniao_realizada >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        reunioesDateConditions.push(sql`d.data_reuniao_realizada <= ${dataFim}`);
+      }
+
+      const reunioesDateWhereClause = reunioesDateConditions.length > 0 
+        ? sql` AND ${sql.join(reunioesDateConditions, sql` AND `)}` 
+        : sql``;
+
+      const result = await db.execute(sql`
+        WITH sdr_info AS (
+          SELECT id, nome, email FROM crm_closers WHERE id = ${sdrIdNum}
+        ),
+        leads_data AS (
+          SELECT 
+            COUNT(DISTINCT d.id) as leads_totais,
+            MIN(d.date_create) as primeiro_lead,
+            MAX(d.date_create) as ultimo_lead
+          FROM crm_deal d
+          WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
+          ${dateWhereClause}
+        ),
+        reunioes_data AS (
+          SELECT COUNT(*) as reunioes_realizadas
+          FROM crm_deal d
+          WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
+            AND d.data_reuniao_realizada IS NOT NULL
+          ${reunioesDateWhereClause}
+        ),
+        vendas_data AS (
+          SELECT 
+            COUNT(*) as negocios_ganhos,
+            COALESCE(SUM(d.valor_recorrente), 0) as valor_recorrente,
+            COALESCE(SUM(d.valor_pontual), 0) as valor_pontual
+          FROM crm_deal d
+          WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
+            AND d.stage_name = 'Negócio Ganho'
+          ${dateWhereClause}
+        ),
+        perdidos_data AS (
+          SELECT COUNT(*) as negocios_perdidos
+          FROM crm_deal d
+          WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
+            AND d.stage_name = 'Negócio Perdido'
+          ${dateWhereClause}
+        ),
+        em_andamento_data AS (
+          SELECT COUNT(*) as em_andamento
+          FROM crm_deal d
+          WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
+            AND d.stage_name NOT IN ('Negócio Ganho', 'Negócio Perdido')
+          ${dateWhereClause}
+        )
+        SELECT 
+          s.id, s.nome, s.email,
+          l.leads_totais, l.primeiro_lead, l.ultimo_lead,
+          r.reunioes_realizadas,
+          v.negocios_ganhos, v.valor_recorrente, v.valor_pontual,
+          p.negocios_perdidos,
+          e.em_andamento
+        FROM sdr_info s
+        CROSS JOIN leads_data l
+        CROSS JOIN reunioes_data r
+        CROSS JOIN vendas_data v
+        CROSS JOIN perdidos_data p
+        CROSS JOIN em_andamento_data e
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "SDR not found" });
+      }
+
+      const row = result.rows[0] as any;
+
+      const leadsTotais = parseInt(row.leads_totais) || 0;
+      const reunioesRealizadas = parseInt(row.reunioes_realizadas) || 0;
+      const negociosGanhos = parseInt(row.negocios_ganhos) || 0;
+      const negociosPerdidos = parseInt(row.negocios_perdidos) || 0;
+      const emAndamento = parseInt(row.em_andamento) || 0;
+      const valorRecorrente = parseFloat(row.valor_recorrente) || 0;
+      const valorPontual = parseFloat(row.valor_pontual) || 0;
+
+      const taxaLeadReuniao = leadsTotais > 0 ? (reunioesRealizadas / leadsTotais) * 100 : 0;
+      const taxaReuniaoVenda = reunioesRealizadas > 0 ? (negociosGanhos / reunioesRealizadas) * 100 : 0;
+      const taxaLeadVenda = leadsTotais > 0 ? (negociosGanhos / leadsTotais) * 100 : 0;
+
+      res.json({
+        sdrId: row.id,
+        sdrName: row.nome,
+        sdrEmail: row.email,
+        leadsTotais,
+        reunioesRealizadas,
+        negociosGanhos,
+        negociosPerdidos,
+        negociosEmAndamento: emAndamento,
+        valorRecorrente,
+        valorPontual,
+        valorTotal: valorRecorrente + valorPontual,
+        taxaLeadReuniao,
+        taxaReuniaoVenda,
+        taxaLeadVenda,
+        primeiroLead: row.primeiro_lead,
+        ultimoLead: row.ultimo_lead,
+        ticketMedio: negociosGanhos > 0 ? (valorRecorrente + valorPontual) / negociosGanhos : 0
+      });
+    } catch (error) {
+      console.error("[api] Error fetching SDR detail:", error);
+      res.status(500).json({ error: "Failed to fetch SDR detail" });
+    }
+  });
+
+  app.get("/api/sdrs/detail/monthly", async (req, res) => {
+    try {
+      const { sdrId, dataInicio, dataFim } = req.query;
+
+      if (!sdrId) {
+        return res.status(400).json({ error: "sdrId is required" });
+      }
+
+      const sdrIdNum = parseInt(sdrId as string);
+      if (isNaN(sdrIdNum)) {
+        return res.status(400).json({ error: "Invalid sdrId" });
+      }
+
+      const dateConditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) {
+        dateConditions.push(sql`d.date_create >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        dateConditions.push(sql`d.date_create <= ${dataFim}`);
+      }
+
+      const dateWhereClause = dateConditions.length > 0 
+        ? sql` AND ${sql.join(dateConditions, sql` AND `)}` 
+        : sql``;
+
+      const result = await db.execute(sql`
+        WITH monthly_leads AS (
+          SELECT 
+            TO_CHAR(d.date_create, 'YYYY-MM') as mes,
+            TO_CHAR(d.date_create, 'Mon/YY') as mes_label,
+            COUNT(DISTINCT d.id) as leads
+          FROM crm_deal d
+          WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
+          ${dateWhereClause}
+          GROUP BY TO_CHAR(d.date_create, 'YYYY-MM'), TO_CHAR(d.date_create, 'Mon/YY')
+        ),
+        monthly_reunioes AS (
+          SELECT 
+            TO_CHAR(d.data_reuniao_realizada, 'YYYY-MM') as mes,
+            COUNT(*) as reunioes
+          FROM crm_deal d
+          WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
+            AND d.data_reuniao_realizada IS NOT NULL
+          ${dateConditions.length > 0 ? sql` AND ${sql.join(dateConditions.map(c => {
+            return sql`d.data_reuniao_realizada >= ${dataInicio} AND d.data_reuniao_realizada <= ${dataFim}`;
+          }), sql` AND `)}` : sql``}
+          GROUP BY TO_CHAR(d.data_reuniao_realizada, 'YYYY-MM')
+        ),
+        monthly_vendas AS (
+          SELECT 
+            TO_CHAR(d.data_fechamento, 'YYYY-MM') as mes,
+            COUNT(*) as vendas,
+            COALESCE(SUM(d.valor_recorrente), 0) as valor_recorrente,
+            COALESCE(SUM(d.valor_pontual), 0) as valor_pontual
+          FROM crm_deal d
+          WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
+            AND d.stage_name = 'Negócio Ganho'
+          ${dateConditions.length > 0 ? sql` AND d.data_fechamento >= ${dataInicio} AND d.data_fechamento <= ${dataFim}` : sql``}
+          GROUP BY TO_CHAR(d.data_fechamento, 'YYYY-MM')
+        )
+        SELECT 
+          l.mes,
+          l.mes_label as "mesLabel",
+          l.leads,
+          COALESCE(r.reunioes, 0) as reunioes,
+          COALESCE(v.vendas, 0) as vendas,
+          COALESCE(v.valor_recorrente, 0) as "valorRecorrente",
+          COALESCE(v.valor_pontual, 0) as "valorPontual"
+        FROM monthly_leads l
+        LEFT JOIN monthly_reunioes r ON l.mes = r.mes
+        LEFT JOIN monthly_vendas v ON l.mes = v.mes
+        ORDER BY l.mes
+      `);
+
+      res.json(result.rows.map((row: any) => ({
+        mes: row.mes,
+        mesLabel: row.mesLabel,
+        leads: parseInt(row.leads) || 0,
+        reunioes: parseInt(row.reunioes) || 0,
+        vendas: parseInt(row.vendas) || 0,
+        valorRecorrente: parseFloat(row.valorRecorrente) || 0,
+        valorPontual: parseFloat(row.valorPontual) || 0
+      })));
+    } catch (error) {
+      console.error("[api] Error fetching SDR monthly data:", error);
+      res.status(500).json({ error: "Failed to fetch monthly data" });
+    }
+  });
+
+  app.get("/api/sdrs/detail/sources", async (req, res) => {
+    try {
+      const { sdrId, dataInicio, dataFim } = req.query;
+
+      if (!sdrId) {
+        return res.status(400).json({ error: "sdrId is required" });
+      }
+
+      const sdrIdNum = parseInt(sdrId as string);
+      if (isNaN(sdrIdNum)) {
+        return res.status(400).json({ error: "Invalid sdrId" });
+      }
+
+      const dateConditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) {
+        dateConditions.push(sql`d.date_create >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        dateConditions.push(sql`d.date_create <= ${dataFim}`);
+      }
+
+      const dateWhereClause = dateConditions.length > 0 
+        ? sql` AND ${sql.join(dateConditions, sql` AND `)}` 
+        : sql``;
+
+      const result = await db.execute(sql`
+        SELECT 
+          COALESCE(d.source, 'Não informado') as source,
+          COUNT(DISTINCT d.id) as leads,
+          COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes,
+          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as vendas
+        FROM crm_deal d
+        WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
+        ${dateWhereClause}
+        GROUP BY COALESCE(d.source, 'Não informado')
+        ORDER BY COUNT(DISTINCT d.id) DESC
+      `);
+
+      const totalLeads = result.rows.reduce((sum: number, row: any) => sum + parseInt(row.leads), 0);
+
+      res.json(result.rows.map((row: any) => ({
+        source: row.source,
+        leads: parseInt(row.leads) || 0,
+        reunioes: parseInt(row.reunioes) || 0,
+        vendas: parseInt(row.vendas) || 0,
+        percentage: totalLeads > 0 ? ((parseInt(row.leads) || 0) / totalLeads) * 100 : 0
+      })));
+    } catch (error) {
+      console.error("[api] Error fetching SDR sources:", error);
+      res.status(500).json({ error: "Failed to fetch sources" });
+    }
+  });
+
+  app.get("/api/sdrs/detail/pipelines", async (req, res) => {
+    try {
+      const { sdrId, dataInicio, dataFim } = req.query;
+
+      if (!sdrId) {
+        return res.status(400).json({ error: "sdrId is required" });
+      }
+
+      const sdrIdNum = parseInt(sdrId as string);
+      if (isNaN(sdrIdNum)) {
+        return res.status(400).json({ error: "Invalid sdrId" });
+      }
+
+      const dateConditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) {
+        dateConditions.push(sql`d.date_create >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        dateConditions.push(sql`d.date_create <= ${dataFim}`);
+      }
+
+      const dateWhereClause = dateConditions.length > 0 
+        ? sql` AND ${sql.join(dateConditions, sql` AND `)}` 
+        : sql``;
+
+      const result = await db.execute(sql`
+        SELECT 
+          COALESCE(d.category_name, 'Não informado') as pipeline,
+          COUNT(DISTINCT d.id) as leads,
+          COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes,
+          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as vendas,
+          COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_recorrente ELSE 0 END), 0) as valor_recorrente
+        FROM crm_deal d
+        WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
+        ${dateWhereClause}
+        GROUP BY COALESCE(d.category_name, 'Não informado')
+        ORDER BY COUNT(DISTINCT d.id) DESC
+      `);
+
+      const totalLeads = result.rows.reduce((sum: number, row: any) => sum + parseInt(row.leads), 0);
+
+      res.json(result.rows.map((row: any) => ({
+        pipeline: row.pipeline,
+        leads: parseInt(row.leads) || 0,
+        reunioes: parseInt(row.reunioes) || 0,
+        vendas: parseInt(row.vendas) || 0,
+        valorRecorrente: parseFloat(row.valor_recorrente) || 0,
+        percentage: totalLeads > 0 ? ((parseInt(row.leads) || 0) / totalLeads) * 100 : 0
+      })));
+    } catch (error) {
+      console.error("[api] Error fetching SDR pipelines:", error);
+      res.status(500).json({ error: "Failed to fetch pipelines" });
+    }
+  });
+
+  app.get("/api/sdrs/detail/stages", async (req, res) => {
+    try {
+      const { sdrId, dataInicio, dataFim } = req.query;
+
+      if (!sdrId) {
+        return res.status(400).json({ error: "sdrId is required" });
+      }
+
+      const sdrIdNum = parseInt(sdrId as string);
+      if (isNaN(sdrIdNum)) {
+        return res.status(400).json({ error: "Invalid sdrId" });
+      }
+
+      const dateConditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) {
+        dateConditions.push(sql`d.date_create >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        dateConditions.push(sql`d.date_create <= ${dataFim}`);
+      }
+
+      const dateWhereClause = dateConditions.length > 0 
+        ? sql` AND ${sql.join(dateConditions, sql` AND `)}` 
+        : sql``;
+
+      const result = await db.execute(sql`
+        SELECT 
+          COALESCE(d.stage_name, 'Não informado') as stage,
+          COUNT(DISTINCT d.id) as count
+        FROM crm_deal d
+        WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
+        ${dateWhereClause}
+        GROUP BY COALESCE(d.stage_name, 'Não informado')
+        ORDER BY COUNT(DISTINCT d.id) DESC
+      `);
+
+      const totalCount = result.rows.reduce((sum: number, row: any) => sum + parseInt(row.count), 0);
+
+      res.json(result.rows.map((row: any) => ({
+        stage: row.stage,
+        count: parseInt(row.count) || 0,
+        percentage: totalCount > 0 ? ((parseInt(row.count) || 0) / totalCount) * 100 : 0
+      })));
+    } catch (error) {
+      console.error("[api] Error fetching SDR stages:", error);
+      res.status(500).json({ error: "Failed to fetch stages" });
+    }
+  });
+
   app.post("/api/deals/test-notification", async (req, res) => {
     try {
       const deal = triggerTestNotification();
