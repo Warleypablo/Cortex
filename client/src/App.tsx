@@ -43,6 +43,7 @@ import DetalhamentoVendas from "@/pages/DetalhamentoVendas";
 import Criativos from "@/pages/Criativos";
 import GrowthVisaoGeral from "@/pages/GrowthVisaoGeral";
 import RevenueGoals from "@/pages/RevenueGoals";
+import CasesChat from "@/pages/CasesChat";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -146,6 +147,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/comercial/apresentacao">{() => <ProtectedRoute path="/dashboard/comercial/apresentacao" component={PresentationMode} />}</Route>
       <Route path="/growth/criativos">{() => <ProtectedRoute path="/growth/criativos" component={Criativos} />}</Route>
       <Route path="/growth/visao-geral">{() => <ProtectedRoute path="/growth/visao-geral" component={GrowthVisaoGeral} />}</Route>
+      <Route path="/cases/chat">{() => <ProtectedRoute path="/cases/chat" component={CasesChat} />}</Route>
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>
       <Route>
