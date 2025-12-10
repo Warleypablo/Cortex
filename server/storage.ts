@@ -672,6 +672,18 @@ export class MemStorage implements IStorage {
   async getTechVelocidade(): Promise<TechVelocidade> {
     throw new Error("Not implemented in MemStorage");
   }
+
+  async getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null } | null> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
+    throw new Error("Not implemented in MemStorage");
+  }
 }
 
 function normalizeCode(code: string): string {
@@ -6058,11 +6070,8 @@ export class DbStorage implements IStorage {
   async getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>> {
     if (!clienteIds.length) return {};
     
-    const placeholders = clienteIds.map((_, i) => `$${i + 1}`).join(', ');
-    const result = await db.execute({
-      text: `SELECT cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em FROM inadimplencia_contextos WHERE cliente_id IN (${placeholders})`,
-      values: clienteIds,
-    });
+    const escapedIds = clienteIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
+    const result = await db.execute(sql.raw(`SELECT cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em FROM inadimplencia_contextos WHERE cliente_id IN (${escapedIds})`));
     
     const contextos: Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> = {};
     for (const row of result.rows as any[]) {
@@ -6078,10 +6087,8 @@ export class DbStorage implements IStorage {
   }
 
   async getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null } | null> {
-    const result = await db.execute({
-      text: `SELECT cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em FROM inadimplencia_contextos WHERE cliente_id = $1`,
-      values: [clienteId],
-    });
+    const escapedId = clienteId.replace(/'/g, "''");
+    const result = await db.execute(sql.raw(`SELECT cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em FROM inadimplencia_contextos WHERE cliente_id = '${escapedId}'`));
     
     if (!result.rows.length) return null;
     const row = result.rows[0] as any;
@@ -6095,20 +6102,23 @@ export class DbStorage implements IStorage {
   }
 
   async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
-    const result = await db.execute({
-      text: `
-        INSERT INTO inadimplencia_contextos (cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em)
-        VALUES ($1, $2, $3, $4, $5, NOW())
-        ON CONFLICT (cliente_id) DO UPDATE SET
-          contexto = EXCLUDED.contexto,
-          evidencias = EXCLUDED.evidencias,
-          acao = EXCLUDED.acao,
-          atualizado_por = EXCLUDED.atualizado_por,
-          atualizado_em = NOW()
-        RETURNING cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em
-      `,
-      values: [data.clienteId, data.contexto || null, data.evidencias || null, data.acao, data.atualizadoPor],
-    });
+    const escapedClienteId = data.clienteId.replace(/'/g, "''");
+    const escapedContexto = (data.contexto || '').replace(/'/g, "''");
+    const escapedEvidencias = (data.evidencias || '').replace(/'/g, "''");
+    const escapedAcao = data.acao.replace(/'/g, "''");
+    const escapedAtualizadoPor = data.atualizadoPor.replace(/'/g, "''");
+    
+    const result = await db.execute(sql.raw(`
+      INSERT INTO inadimplencia_contextos (cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em)
+      VALUES ('${escapedClienteId}', '${escapedContexto}', '${escapedEvidencias}', '${escapedAcao}', '${escapedAtualizadoPor}', NOW())
+      ON CONFLICT (cliente_id) DO UPDATE SET
+        contexto = EXCLUDED.contexto,
+        evidencias = EXCLUDED.evidencias,
+        acao = EXCLUDED.acao,
+        atualizado_por = EXCLUDED.atualizado_por,
+        atualizado_em = NOW()
+      RETURNING cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em
+    `));
     
     const row = result.rows[0] as any;
     return {
