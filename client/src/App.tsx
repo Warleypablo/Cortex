@@ -36,6 +36,7 @@ import Login from "@/pages/Login";
 import DashboardClosers from "@/pages/DashboardClosers";
 import DashboardSDRs from "@/pages/DashboardSDRs";
 import DetailClosers from "@/pages/DetailClosers";
+import DetailSDRs from "@/pages/DetailSDRs";
 import AnaliseVendas from "@/pages/AnaliseVendas";
 import PresentationMode from "@/pages/PresentationMode";
 import DetalhamentoVendas from "@/pages/DetalhamentoVendas";
@@ -139,6 +140,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/comercial/closers">{() => <ProtectedRoute path="/dashboard/comercial/closers" component={DashboardClosers} />}</Route>
       <Route path="/dashboard/comercial/sdrs">{() => <ProtectedRoute path="/dashboard/comercial/sdrs" component={DashboardSDRs} />}</Route>
       <Route path="/dashboard/comercial/detalhamento-closers">{() => <ProtectedRoute path="/dashboard/comercial/detalhamento-closers" component={DetailClosers} />}</Route>
+      <Route path="/dashboard/comercial/detalhamento-sdrs">{() => <ProtectedRoute path="/dashboard/comercial/detalhamento-sdrs" component={DetailSDRs} />}</Route>
       <Route path="/dashboard/comercial/analise-vendas">{() => <ProtectedRoute path="/dashboard/comercial/analise-vendas" component={AnaliseVendas} />}</Route>
       <Route path="/dashboard/comercial/detalhamento-vendas">{() => <ProtectedRoute path="/dashboard/comercial/detalhamento-vendas" component={DetalhamentoVendas} />}</Route>
       <Route path="/dashboard/comercial/apresentacao">{() => <ProtectedRoute path="/dashboard/comercial/apresentacao" component={PresentationMode} />}</Route>
