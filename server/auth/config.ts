@@ -3,9 +3,21 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { findUserById, createOrUpdateUser, type User } from "./userDb";
 
 export function getCallbackURL(): string {
+  // For Render, Railway, or other platforms - set APP_URL env var
+  const appUrl = process.env.APP_URL;
+  if (appUrl) {
+    return `${appUrl}/auth/google/callback`;
+  }
+
   const customDomain = process.env.CUSTOM_DOMAIN;
   if (customDomain) {
     return `https://${customDomain}/auth/google/callback`;
+  }
+
+  // Render.com provides RENDER_EXTERNAL_URL
+  const renderUrl = process.env.RENDER_EXTERNAL_URL;
+  if (renderUrl) {
+    return `${renderUrl}/auth/google/callback`;
   }
 
   const replitDomains = process.env.REPLIT_DOMAINS;
