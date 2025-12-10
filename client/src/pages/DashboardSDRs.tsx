@@ -204,7 +204,7 @@ export default function DashboardSDRs() {
     setMesAtual(agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   };
 
-  const META_REUNIOES = 100;
+  const META_REUNIOES = 250;
 
   const trends: Array<'up' | 'down' | 'stable'> = ['up', 'down', 'stable'];
   
