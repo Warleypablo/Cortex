@@ -1036,6 +1036,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Contextos de inadimplência - GET batch
+  app.get("/api/inadimplencia/contextos", async (req, res) => {
+    try {
+      const idsParam = req.query.ids as string;
+      if (!idsParam) {
+        return res.json({ contextos: {} });
+      }
+      const ids = idsParam.split(',').filter(Boolean);
+      const contextos = await storage.getInadimplenciaContextos(ids);
+      res.json({ contextos });
+    } catch (error) {
+      console.error("[api] Error fetching inadimplencia contextos:", error);
+      res.status(500).json({ error: "Failed to fetch inadimplencia contextos" });
+    }
+  });
+
+  // Contextos de inadimplência - GET single
+  app.get("/api/inadimplencia/contexto/:clienteId", async (req, res) => {
+    try {
+      const { clienteId } = req.params;
+      const contexto = await storage.getInadimplenciaContexto(clienteId);
+      res.json({ contexto });
+    } catch (error) {
+      console.error("[api] Error fetching inadimplencia contexto:", error);
+      res.status(500).json({ error: "Failed to fetch inadimplencia contexto" });
+    }
+  });
+
+  // Contextos de inadimplência - PUT upsert
+  app.put("/api/inadimplencia/contexto/:clienteId", async (req, res) => {
+    try {
+      const { clienteId } = req.params;
+      const { contexto, evidencias, acao } = req.body;
+      
+      if (!['cobrar', 'aguardar', 'abonar'].includes(acao)) {
+        return res.status(400).json({ error: "Invalid acao. Must be 'cobrar', 'aguardar' or 'abonar'" });
+      }
+
+      const userId = (req.user as any)?.id || 'anonymous';
+      const result = await storage.upsertInadimplenciaContexto({
+        clienteId,
+        contexto,
+        evidencias,
+        acao,
+        atualizadoPor: userId,
+      });
+      res.json({ contexto: result });
+    } catch (error) {
+      console.error("[api] Error upserting inadimplencia contexto:", error);
+      res.status(500).json({ error: "Failed to save inadimplencia contexto" });
+    }
+  });
+
   app.get("/api/analytics/cohort-retention", async (req, res) => {
     try {
       const filters: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string } = {};

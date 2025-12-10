@@ -171,6 +171,9 @@ export interface IStorage {
   getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
   getGegMasContratacoes(squad: string, setor: string): Promise<GegMasContratacoes>;
   getGegPessoasPorSetor(squad: string, setor: string): Promise<GegPessoasPorSetor[]>;
+  getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>>;
+  getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null } | null>;
+  upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
   getGegDemissoesPorTipo(squad: string, setor: string): Promise<GegDemissoesPorTipo[]>;
   getGegHeadcountPorTenure(squad: string, setor: string): Promise<GegHeadcountPorTenure[]>;
   getTopResponsaveis(limit?: number, mesAno?: string): Promise<{ nome: string; mrr: number; posicao: number }[]>;
@@ -6049,6 +6052,71 @@ export class DbStorage implements IStorage {
         quantidadeInadimplentes: parseInt(resumoRow?.quantidade_inadimplentes || '0'),
       },
       porDia: diasDoMes,
+    };
+  }
+
+  async getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>> {
+    if (!clienteIds.length) return {};
+    
+    const placeholders = clienteIds.map((_, i) => `$${i + 1}`).join(', ');
+    const result = await db.execute({
+      text: `SELECT cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em FROM inadimplencia_contextos WHERE cliente_id IN (${placeholders})`,
+      values: clienteIds,
+    });
+    
+    const contextos: Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> = {};
+    for (const row of result.rows as any[]) {
+      contextos[row.cliente_id] = {
+        contexto: row.contexto,
+        evidencias: row.evidencias,
+        acao: row.acao,
+        atualizadoPor: row.atualizado_por,
+        atualizadoEm: row.atualizado_em,
+      };
+    }
+    return contextos;
+  }
+
+  async getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null } | null> {
+    const result = await db.execute({
+      text: `SELECT cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em FROM inadimplencia_contextos WHERE cliente_id = $1`,
+      values: [clienteId],
+    });
+    
+    if (!result.rows.length) return null;
+    const row = result.rows[0] as any;
+    return {
+      contexto: row.contexto,
+      evidencias: row.evidencias,
+      acao: row.acao,
+      atualizadoPor: row.atualizado_por,
+      atualizadoEm: row.atualizado_em,
+    };
+  }
+
+  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
+    const result = await db.execute({
+      text: `
+        INSERT INTO inadimplencia_contextos (cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        ON CONFLICT (cliente_id) DO UPDATE SET
+          contexto = EXCLUDED.contexto,
+          evidencias = EXCLUDED.evidencias,
+          acao = EXCLUDED.acao,
+          atualizado_por = EXCLUDED.atualizado_por,
+          atualizado_em = NOW()
+        RETURNING cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em
+      `,
+      values: [data.clienteId, data.contexto || null, data.evidencias || null, data.acao, data.atualizadoPor],
+    });
+    
+    const row = result.rows[0] as any;
+    return {
+      contexto: row.contexto,
+      evidencias: row.evidencias,
+      acao: row.acao,
+      atualizadoPor: row.atualizado_por,
+      atualizadoEm: row.atualizado_em,
     };
   }
 }
