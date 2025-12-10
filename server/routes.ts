@@ -2604,11 +2604,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/sdrs/list", async (req, res) => {
     try {
+      // Get distinct SDRs from crm_deal and join with crm_users to get names
       const result = await db.execute(sql`
-        SELECT id, nome as name, email, active
-        FROM crm_closers
-        WHERE active = true
-        ORDER BY nome
+        SELECT DISTINCT u.id, u.nome as name, u.email, u.active
+        FROM crm_users u
+        INNER JOIN crm_deal d ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
+        WHERE u.active = true OR u.active IS NULL
+        ORDER BY u.nome
       `);
       res.json(result.rows);
     } catch (error) {
@@ -2769,13 +2771,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const resultLeads = await db.execute(sql`
         SELECT 
-          c.nome as sdr_name,
-          c.id as sdr_id,
+          u.nome as sdr_name,
+          u.id as sdr_id,
           COUNT(DISTINCT d.id) as leads
         FROM crm_deal d
-        INNER JOIN crm_closers c ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = c.id
+        INNER JOIN crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
         ${whereClauseLeads}
-        GROUP BY c.id, c.nome
+        GROUP BY u.id, u.nome
       `);
 
       // Query 2: Reuniões por SDR - filtered ONLY by reunion dates
@@ -2792,13 +2794,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const resultReunioes = await db.execute(sql`
         SELECT 
-          c.nome as sdr_name,
-          c.id as sdr_id,
+          u.nome as sdr_name,
+          u.id as sdr_id,
           COUNT(*) as reunioes
         FROM crm_deal d
-        INNER JOIN crm_closers c ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = c.id
+        INNER JOIN crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
         ${whereClauseReunioes}
-        GROUP BY c.id, c.nome
+        GROUP BY u.id, u.nome
       `);
 
       const leadsMap = new Map<number, { name: string; leads: number }>();
@@ -2887,7 +2889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db.execute(sql`
         WITH sdr_info AS (
-          SELECT id, nome, email FROM crm_closers WHERE id = ${sdrIdNum}
+          SELECT id, nome, email FROM crm_users WHERE id = ${sdrIdNum}
         ),
         leads_data AS (
           SELECT 
@@ -3450,14 +3452,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db.execute(sql`
         SELECT 
-          COALESCE(c.nome, 'Não Atribuído') as sdr_name,
+          COALESCE(u.nome, 'Não Atribuído') as sdr_name,
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
           COALESCE(SUM(d.valor_pontual), 0) as pontual,
           COUNT(*) as contratos
         FROM crm_deal d
-        LEFT JOIN crm_closers c ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = c.id
+        LEFT JOIN crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
         ${whereClause}
-        GROUP BY c.id, c.nome
+        GROUP BY u.id, u.nome
         ORDER BY mrr DESC
       `);
 
