@@ -226,7 +226,7 @@ export default function PresentationMode() {
         trend: 'stable' as const,
       };
     })
-    .sort((a, b) => b.total - a.total)
+    .sort((a, b) => b.mrr - a.mrr)
     .map((c, idx) => ({ ...c, position: idx + 1 }));
 
   const sdrMrrMap = new Map<string, { mrr: number; pontual: number; contratos: number }>();
