@@ -60,6 +60,11 @@ const menuItems = [
     url: "/turbozap",
     icon: MessageSquare,
   },
+  {
+    title: "Cases de Sucesso",
+    url: "/cases/chat",
+    icon: Trophy,
+  },
 ];
 
 const dashboardCategories = [
@@ -127,15 +132,7 @@ const dashboardCategories = [
       { title: "Criativos", url: "/growth/criativos", icon: Image },
     ],
   },
-  {
-    title: "Cases de Sucesso",
-    icon: Trophy,
-    baseUrl: "/cases",
-    subItems: [
-      { title: "Chat", url: "/cases/chat", icon: MessageSquare },
-    ],
-  },
-];
+  ];
 
 const adminItems = [
   {
