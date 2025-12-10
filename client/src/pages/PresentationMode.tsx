@@ -1399,12 +1399,12 @@ export default function PresentationMode() {
                       
                       <div className="text-right">
                         <div className="text-[10px] text-slate-400 uppercase tracking-wider">Meta</div>
-                        <div className="text-xl font-black text-white">500</div>
+                        <div className="text-xl font-black text-white">250</div>
                       </div>
                     </div>
 
                     {(() => {
-                      const META_REUNIOES = 500;
+                      const META_REUNIOES = 250;
                       const reunioesAtual = sdrMetrics?.reunioesRealizadas || 0;
                       const percentual = Math.min((reunioesAtual / META_REUNIOES) * 100, 100);
                       const faltam = Math.max(META_REUNIOES - reunioesAtual, 0);
