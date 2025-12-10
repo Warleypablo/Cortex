@@ -1343,6 +1343,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // CASES DE SUCESSO CHAT API ENDPOINT
+  // ========================================
+  app.post("/api/cases/chat", async (req, res) => {
+    try {
+      const { message } = req.body;
+      
+      if (!message || typeof message !== 'string' || message.trim().length === 0) {
+        return res.status(400).json({ error: "Mensagem é obrigatória" });
+      }
+
+      const webhookUrl = "https://n8n.turbopartners.com.br/webhook-test/cases";
+      
+      const webhookResponse = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          message: message.trim(),
+          timestamp: new Date().toISOString()
+        }),
+      });
+
+      if (!webhookResponse.ok) {
+        console.error("[api] Webhook response not ok:", webhookResponse.status, webhookResponse.statusText);
+        return res.status(502).json({ error: "Falha ao comunicar com o servidor de cases" });
+      }
+
+      const responseData = await webhookResponse.json();
+      res.json(responseData);
+    } catch (error) {
+      console.error("[api] Error in Cases chat:", error);
+      res.status(500).json({ error: "Falha ao processar a mensagem" });
+    }
+  });
+
   app.get("/api/auditoria-sistemas", async (req, res) => {
     try {
       const filters: {
