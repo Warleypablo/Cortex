@@ -1275,15 +1275,16 @@ export default function PresentationMode() {
                   </div>
 
                   <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
-                    <div className="grid grid-cols-12 gap-1 p-2 bg-slate-800/50 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
+                    <div className="grid grid-cols-14 gap-1 p-2 bg-slate-800/50 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
                       <div className="col-span-1">#</div>
                       <div className="col-span-2">SDR</div>
+                      <div className="col-span-1 text-right">Leads</div>
                       <div className="col-span-2 text-right text-cyan-400">Reuniões</div>
+                      <div className="col-span-2 text-right">% RR/Lead</div>
+                      <div className="col-span-1 text-right">Contr.</div>
+                      <div className="col-span-1 text-right">% V/RR</div>
                       <div className="col-span-2 text-right">MRR</div>
                       <div className="col-span-2 text-right">Pontual</div>
-                      <div className="col-span-1 text-right">Contr.</div>
-                      <div className="col-span-1 text-right">Conv.</div>
-                      <div className="col-span-1 text-right">Leads</div>
                     </div>
 
                     <div className="divide-y divide-slate-800/50 max-h-[290px] overflow-y-auto">
@@ -1294,13 +1295,16 @@ export default function PresentationMode() {
                           </div>
                         ))
                       ) : sdrRanking.length > 0 ? (
-                        sdrRanking.map((sdr, index) => (
+                        sdrRanking.map((sdr, index) => {
+                          const convRRLead = sdr.leads > 0 ? (sdr.reunioesRealizadas / sdr.leads) * 100 : 0;
+                          const convVRR = sdr.reunioesRealizadas > 0 ? (sdr.contratos / sdr.reunioesRealizadas) * 100 : 0;
+                          return (
                           <motion.div
                             key={sdr.name}
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.03 * index }}
-                            className={`grid grid-cols-12 gap-1 p-2 items-center hover:bg-slate-800/30 transition-colors ${
+                            className={`grid grid-cols-14 gap-1 p-2 items-center hover:bg-slate-800/30 transition-colors ${
                               sdr.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(sdr.position) : ''
                             }`}
                           >
@@ -1318,14 +1322,23 @@ export default function PresentationMode() {
                             <div className="col-span-2 font-medium text-white truncate text-xs">
                               {sdr.name}
                             </div>
+                            <div className="col-span-1 text-right text-slate-300 text-xs">
+                              {sdr.leads}
+                            </div>
                             <div className="col-span-2 text-right font-black text-cyan-400 text-sm">
                               {sdr.reunioesRealizadas}
                             </div>
-                            <div className="col-span-2 text-right font-semibold text-emerald-400 text-xs">
-                              {formatCurrencyCompact(sdr.mrr)}
-                            </div>
-                            <div className="col-span-2 text-right font-semibold text-blue-400 text-xs">
-                              {formatCurrencyCompact(sdr.pontual)}
+                            <div className="col-span-2 text-right">
+                              <Badge 
+                                variant="outline" 
+                                className={`text-[10px] border-0 px-1 ${
+                                  convRRLead >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
+                                  convRRLead >= 15 ? 'bg-amber-500/20 text-amber-400' :
+                                  'bg-slate-700/50 text-slate-400'
+                                }`}
+                              >
+                                {convRRLead.toFixed(0)}%
+                              </Badge>
                             </div>
                             <div className="col-span-1 text-right text-violet-400 text-xs font-semibold">
                               {sdr.contratos}
@@ -1334,19 +1347,22 @@ export default function PresentationMode() {
                               <Badge 
                                 variant="outline" 
                                 className={`text-[10px] border-0 px-1 ${
-                                  sdr.conversao >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
-                                  sdr.conversao >= 15 ? 'bg-amber-500/20 text-amber-400' :
+                                  convVRR >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
+                                  convVRR >= 15 ? 'bg-amber-500/20 text-amber-400' :
                                   'bg-slate-700/50 text-slate-400'
                                 }`}
                               >
-                                {sdr.conversao.toFixed(0)}%
+                                {convVRR.toFixed(0)}%
                               </Badge>
                             </div>
-                            <div className="col-span-1 text-right text-slate-300 text-xs">
-                              {sdr.leads}
+                            <div className="col-span-2 text-right font-semibold text-emerald-400 text-xs">
+                              {formatCurrencyCompact(sdr.mrr)}
+                            </div>
+                            <div className="col-span-2 text-right font-semibold text-blue-400 text-xs">
+                              {formatCurrencyCompact(sdr.pontual)}
                             </div>
                           </motion.div>
-                        ))
+                        );})
                       ) : (
                         <div className="p-6 text-center text-slate-400">
                           Nenhum SDR encontrado
