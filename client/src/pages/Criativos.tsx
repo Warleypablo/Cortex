@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Search, X, ArrowUpDown, TrendingUp, Rocket, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarIcon, Search, X, ArrowUpDown, TrendingUp, Rocket, ExternalLink } from "lucide-react";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -162,35 +163,6 @@ export default function Criativos() {
   const [adStatus, setAdStatus] = useState("Todos");
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  // Refs for synchronized horizontal scroll
-  const topScrollRef = useRef<HTMLDivElement>(null);
-  const tableScrollRef = useRef<HTMLDivElement>(null);
-  const [tableWidth, setTableWidth] = useState(0);
-
-  // Synchronize scroll between top bar and table
-  const syncScroll = useCallback((source: 'top' | 'table') => {
-    const top = topScrollRef.current;
-    const table = tableScrollRef.current;
-    if (!top || !table) return;
-
-    if (source === 'top') {
-      table.scrollLeft = top.scrollLeft;
-    } else {
-      top.scrollLeft = table.scrollLeft;
-    }
-  }, []);
-
-  // Scroll navigation buttons
-  const scrollTable = useCallback((direction: 'left' | 'right') => {
-    const table = tableScrollRef.current;
-    if (!table) return;
-    const scrollAmount = 300;
-    table.scrollBy({
-      left: direction === 'right' ? scrollAmount : -scrollAmount,
-      behavior: 'smooth'
-    });
-  }, []);
-
   const filteredData = useMemo(() => {
     let data = [...rawData];
     
@@ -246,23 +218,6 @@ export default function Criativos() {
       cpmql: { min: validCpmql.length ? Math.min(...validCpmql) : 0, max: validCpmql.length ? Math.max(...validCpmql) : 0 },
       percMql: { min: validPercMql.length ? Math.min(...validPercMql) : 0, max: validPercMql.length ? Math.max(...validPercMql) : 0 },
       percRr: { min: validPercRr.length ? Math.min(...validPercRr) : 0, max: validPercRr.length ? Math.max(...validPercRr) : 0 },
-    };
-  }, [filteredData]);
-
-  // Update table width for top scroll bar
-  useEffect(() => {
-    const updateWidth = () => {
-      if (tableScrollRef.current) {
-        setTableWidth(tableScrollRef.current.scrollWidth);
-      }
-    };
-    updateWidth();
-    // Small delay to ensure table is fully rendered
-    const timer = setTimeout(updateWidth, 100);
-    window.addEventListener('resize', updateWidth);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', updateWidth);
     };
   }, [filteredData]);
 
@@ -382,55 +337,17 @@ export default function Criativos() {
         </div>
       </div>
 
-      <div className="flex-1 p-4 overflow-auto">
-        <Card>
-          <CardHeader className="pb-3">
+      <div className="flex-1 p-4 overflow-hidden">
+        <Card className="h-full flex flex-col">
+          <CardHeader className="pb-3 flex-shrink-0">
             <CardTitle className="text-lg flex items-center gap-2">
               Performance de Criativos
               <Badge variant="secondary" className="ml-2">{filteredData.length} anúncios</Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
-            {/* Scroll Navigation Bar */}
-            <div className="sticky top-0 z-20 bg-card border-b flex items-center gap-2 px-4 py-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => scrollTable('left')}
-                className="h-8 px-2"
-                data-testid="button-scroll-left"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span className="sr-only">Scroll esquerda</span>
-              </Button>
-              
-              {/* Top scroll bar - synchronized with table */}
-              <div 
-                ref={topScrollRef}
-                className="flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-muted-foreground/30 scrollbar-track-transparent"
-                onScroll={() => syncScroll('top')}
-                style={{ height: '12px' }}
-              >
-                <div style={{ width: tableWidth, height: '1px' }} />
-              </div>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => scrollTable('right')}
-                className="h-8 px-2"
-                data-testid="button-scroll-right"
-              >
-                <ChevronRight className="w-4 h-4" />
-                <span className="sr-only">Scroll direita</span>
-              </Button>
-            </div>
-            
-            <div 
-              ref={tableScrollRef}
-              className="overflow-x-auto"
-              onScroll={() => syncScroll('table')}
-            >
+          <CardContent className="p-0 flex-1 overflow-hidden">
+            <ScrollArea className="h-full w-full">
+              <div className="min-w-max">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
@@ -597,7 +514,9 @@ export default function Criativos() {
                   </TableRow>
                 </TableBody>
               </Table>
-            </div>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           </CardContent>
         </Card>
       </div>
