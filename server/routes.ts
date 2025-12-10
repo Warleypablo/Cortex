@@ -1372,8 +1372,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(502).json({ error: "Falha ao comunicar com o servidor de cases" });
       }
 
-      const responseData = await webhookResponse.json();
-      res.json(responseData);
+      const responseText = await webhookResponse.text();
+      
+      if (!responseText || responseText.trim().length === 0) {
+        return res.json({ response: "Mensagem recebida pelo servidor." });
+      }
+
+      try {
+        const responseData = JSON.parse(responseText);
+        res.json(responseData);
+      } catch {
+        res.json({ response: responseText });
+      }
     } catch (error) {
       console.error("[api] Error in Cases chat:", error);
       res.status(500).json({ error: "Falha ao processar a mensagem" });
