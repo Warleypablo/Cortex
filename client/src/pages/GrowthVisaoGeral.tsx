@@ -216,23 +216,61 @@ function MiniSparkline({ data }: { data: number[] }) {
 }
 
 function FunnelVisualization() {
-  const stages = [
+  const [activeTab, setActiveTab] = useState<'mql' | 'leads'>('mql');
+  
+  const mqlStages = [
     { label: 'MQLs', value: 14013, color: 'bg-red-500' },
-    { label: 'RM', value: 5781, percent: 41, color: 'bg-orange-500' },
-    { label: 'RR', value: 2946, percent: 51, color: 'bg-yellow-500' },
-    { label: 'Vendas', value: 1024, percent: 35, color: 'bg-green-500' },
+    { label: 'RM MQL', value: 5781, percent: 41, color: 'bg-orange-500' },
+    { label: 'RR MQL', value: 2946, percent: 51, color: 'bg-yellow-500' },
+    { label: 'Vendas MQL', value: 1024, percent: 35, color: 'bg-green-500' },
   ];
+  
+  const leadsStages = [
+    { label: 'Leads Total', value: 28426, color: 'bg-blue-500' },
+    { label: 'RM Leads', value: 8743, percent: 31, color: 'bg-orange-500' },
+    { label: 'RR Leads', value: 4102, percent: 47, color: 'bg-yellow-500' },
+    { label: 'Vendas Leads', value: 1312, percent: 32, color: 'bg-green-500' },
+  ];
+  
+  const stages = activeTab === 'mql' ? mqlStages : leadsStages;
+  const taxaFinal = activeTab === 'mql' ? 7 : 5;
+  const firstStage = stages[0];
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center">
-          <span className="text-white font-bold text-xs">14.013</span>
-        </div>
-        <span className="text-sm font-medium">MQLs</span>
+      <div className="flex gap-1 p-1 bg-muted rounded-lg mb-2">
+        <button
+          onClick={() => setActiveTab('mql')}
+          className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+            activeTab === 'mql' 
+              ? 'bg-background shadow-sm text-foreground' 
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+          data-testid="tab-funnel-mql"
+        >
+          Funil MQL
+        </button>
+        <button
+          onClick={() => setActiveTab('leads')}
+          className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+            activeTab === 'leads' 
+              ? 'bg-background shadow-sm text-foreground' 
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+          data-testid="tab-funnel-leads"
+        >
+          Funil Geral
+        </button>
       </div>
       
-      {stages.slice(1).map((stage, idx) => (
+      <div className="flex items-center gap-3 mb-2">
+        <div className={`w-12 h-12 rounded-full ${activeTab === 'mql' ? 'bg-gradient-to-br from-red-500 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-cyan-500'} flex items-center justify-center`}>
+          <span className="text-white font-bold text-xs">{formatNumber(firstStage.value)}</span>
+        </div>
+        <span className="text-sm font-medium">{firstStage.label}</span>
+      </div>
+      
+      {stages.slice(1).map((stage) => (
         <div key={stage.label} className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-full ${stage.color} flex items-center justify-center`}>
             <span className="text-white font-bold text-xs">{formatNumber(stage.value)}</span>
@@ -249,7 +287,7 @@ function FunnelVisualization() {
       <div className="mt-2 pt-2 border-t">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Taxa Final</span>
-          <Badge className="bg-green-500">7%</Badge>
+          <Badge className="bg-green-500">{taxaFinal}%</Badge>
         </div>
       </div>
     </div>
