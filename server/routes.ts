@@ -822,7 +822,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const columns = columnsResult.rows.map((r: any) => r.column_name);
             console.log("[api] Google Ads columns:", columns);
             
-            const dateColumn = columns.includes('metric_date') ? 'metric_date' : 
+            const dateColumn = columns.includes('report_date') ? 'report_date' :
+                               columns.includes('metric_date') ? 'metric_date' : 
                                columns.includes('date') ? 'date' : 
                                columns.includes('segments_date') ? 'segments_date' : null;
             
