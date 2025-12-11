@@ -353,7 +353,13 @@ export default function GrowthVisaoGeral() {
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Canal:</span>
-            <Select value={canal} onValueChange={setCanal}>
+            <Select value={canal} onValueChange={(value) => {
+              setCanal(value);
+              // Sincronizar com filtro de investimento
+              if (value === 'Facebook') setInvestimentoSource('meta');
+              else if (value === 'Google') setInvestimentoSource('google');
+              else setInvestimentoSource('todos');
+            }}>
               <SelectTrigger className="w-[120px]" data-testid="select-canal">
                 <SelectValue />
               </SelectTrigger>
@@ -361,8 +367,6 @@ export default function GrowthVisaoGeral() {
                 <SelectItem value="Todos">Todos</SelectItem>
                 <SelectItem value="Facebook">Facebook</SelectItem>
                 <SelectItem value="Google">Google</SelectItem>
-                <SelectItem value="Orgânico">Orgânico</SelectItem>
-                <SelectItem value="Institucional">Institucional</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -392,20 +396,6 @@ export default function GrowthVisaoGeral() {
                 <SelectItem value="Conversão">Conversão</SelectItem>
                 <SelectItem value="Awareness">Awareness</SelectItem>
                 <SelectItem value="Retargeting">Retargeting</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Investimento:</span>
-            <Select value={investimentoSource} onValueChange={setInvestimentoSource}>
-              <SelectTrigger className="w-[110px]" data-testid="select-investimento-source">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="google">Google</SelectItem>
-                <SelectItem value="meta">Meta</SelectItem>
               </SelectContent>
             </Select>
           </div>
