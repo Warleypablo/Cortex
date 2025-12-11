@@ -102,7 +102,7 @@ const mockChannelPerformance = [
     txRrVenda: 35, 
     mqlVenda: 6, 
     vendas: 341, 
-    cpv: 6017, 
+    cac: 6017, 
     valorVendas: 4836479, 
     tm: 14183 
   },
@@ -119,7 +119,7 @@ const mockChannelPerformance = [
     txRrVenda: 34, 
     mqlVenda: 7, 
     vendas: 368, 
-    cpv: 7741, 
+    cac: 7741, 
     valorVendas: 5248351, 
     tm: 14262 
   },
@@ -136,7 +136,7 @@ const mockChannelPerformance = [
     txRrVenda: 38, 
     mqlVenda: 12, 
     vendas: 187, 
-    cpv: null, 
+    cac: null, 
     valorVendas: 2749642, 
     tm: 14704 
   },
@@ -153,7 +153,7 @@ const mockChannelPerformance = [
     txRrVenda: 29, 
     mqlVenda: 12, 
     vendas: 70, 
-    cpv: null, 
+    cac: null, 
     valorVendas: 892742, 
     tm: 12753 
   },
@@ -170,7 +170,7 @@ const mockTotals = {
   rr: 2946,
   txRrVenda: 35,
   vendas: 1024,
-  cpv: null,
+  cac: null,
   valorVendas: 14509270,
   tm: 14169,
 };
@@ -262,9 +262,8 @@ export default function GrowthVisaoGeral() {
     to: new Date(2025, 10, 30),
   });
   const [canal, setCanal] = useState("Todos");
-  const [aquisicao, setAquisicao] = useState("Todos");
+  const [tipoContrato, setTipoContrato] = useState("Todos");
   const [estrategia, setEstrategia] = useState("Todos");
-  const [produto, setProduto] = useState("Assessoria");
 
   const sparklineData = useMemo(() => {
     return mockChannelPerformance.map(ch => ({
@@ -304,15 +303,15 @@ export default function GrowthVisaoGeral() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Aquisição:</span>
-            <Select value={aquisicao} onValueChange={setAquisicao}>
-              <SelectTrigger className="w-[120px]" data-testid="select-aquisicao">
+            <span className="text-sm text-muted-foreground">Tipo:</span>
+            <Select value={tipoContrato} onValueChange={setTipoContrato}>
+              <SelectTrigger className="w-[130px]" data-testid="select-tipo-contrato">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Todos">Todos</SelectItem>
-                <SelectItem value="Inbound">Inbound</SelectItem>
-                <SelectItem value="Outbound">Outbound</SelectItem>
+                <SelectItem value="Recorrente">Recorrente</SelectItem>
+                <SelectItem value="Pontual">Pontual</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -328,20 +327,6 @@ export default function GrowthVisaoGeral() {
                 <SelectItem value="Conversão">Conversão</SelectItem>
                 <SelectItem value="Awareness">Awareness</SelectItem>
                 <SelectItem value="Retargeting">Retargeting</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Produto:</span>
-            <Select value={produto} onValueChange={setProduto}>
-              <SelectTrigger className="w-[120px]" data-testid="select-produto">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Assessoria">Assessoria</SelectItem>
-                <SelectItem value="Consultoria">Consultoria</SelectItem>
-                <SelectItem value="Curso">Curso</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -408,7 +393,7 @@ export default function GrowthVisaoGeral() {
             trend="up"
           />
           <KPICard
-            title="CPV"
+            title="CAC"
             value="R$ 4.786"
             vsLM={-1.9}
             icon={<DollarSign className="w-5 h-5" />}
@@ -509,7 +494,7 @@ export default function GrowthVisaoGeral() {
                     <TableHead className="text-right">Tx RR Venda</TableHead>
                     <TableHead className="text-right">MQL&gt;Venda</TableHead>
                     <TableHead className="text-right">Vendas</TableHead>
-                    <TableHead className="text-right">CPV</TableHead>
+                    <TableHead className="text-right">CAC</TableHead>
                     <TableHead className="text-right">Valor Vendas</TableHead>
                     <TableHead className="text-right">TM</TableHead>
                   </TableRow>
@@ -539,8 +524,8 @@ export default function GrowthVisaoGeral() {
                       <TableCell className="text-right">{row.txRrVenda}%</TableCell>
                       <TableCell className="text-right">{row.mqlVenda}%</TableCell>
                       <TableCell className="text-right font-semibold text-green-600">{formatNumber(row.vendas)}</TableCell>
-                      <TableCell className="text-right" style={{ backgroundColor: row.cpv ? 'rgba(239, 68, 68, 0.15)' : 'transparent' }}>
-                        {row.cpv ? formatCurrency(row.cpv) : '-'}
+                      <TableCell className="text-right" style={{ backgroundColor: row.cac ? 'rgba(239, 68, 68, 0.15)' : 'transparent' }}>
+                        {row.cac ? formatCurrency(row.cac) : '-'}
                       </TableCell>
                       <TableCell className="text-right font-medium" style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)' }}>
                         {formatCurrency(row.valorVendas)}
