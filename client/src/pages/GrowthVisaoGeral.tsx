@@ -311,16 +311,18 @@ export default function GrowthVisaoGeral() {
   const [tipoContrato, setTipoContrato] = useState("Todos");
   const [estrategia, setEstrategia] = useState("Todos");
   const [chartView, setChartView] = useState<'mql' | 'leads'>('mql');
+  const [investimentoSource, setInvestimentoSource] = useState("todos");
 
   const { data: investimentoData, isLoading: investimentoLoading } = useQuery<{
     total: { investimento: number; impressions: number; clicks: number };
-    daily: Array<{ date: string; investimento: number; impressions: number; clicks: number }>;
+    bySource: { google: { investimento: number }; meta: { investimento: number } };
+    daily: Array<{ date: string; investimento: number; impressions: number; clicks: number; google?: number; meta?: number }>;
   }>({
-    queryKey: ['/api/growth/investimento', format(dateRange.from, 'yyyy-MM-dd'), format(dateRange.to, 'yyyy-MM-dd')],
+    queryKey: ['/api/growth/investimento', format(dateRange.from, 'yyyy-MM-dd'), format(dateRange.to, 'yyyy-MM-dd'), investimentoSource],
     queryFn: async () => {
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
       const endDate = format(dateRange.to, 'yyyy-MM-dd');
-      const res = await fetch(`/api/growth/investimento?startDate=${startDate}&endDate=${endDate}`, {
+      const res = await fetch(`/api/growth/investimento?startDate=${startDate}&endDate=${endDate}&source=${investimentoSource}`, {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to fetch investimento');
@@ -394,6 +396,20 @@ export default function GrowthVisaoGeral() {
             </Select>
           </div>
 
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Investimento:</span>
+            <Select value={investimentoSource} onValueChange={setInvestimentoSource}>
+              <SelectTrigger className="w-[110px]" data-testid="select-investimento-source">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="google">Google</SelectItem>
+                <SelectItem value="meta">Meta</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="gap-2" data-testid="button-date-range">
@@ -425,7 +441,9 @@ export default function GrowthVisaoGeral() {
           <KPICard
             title="Investimento"
             value={investimentoLoading ? "Carregando..." : formatCurrency(investimentoData?.total?.investimento || 0)}
-            meta="Google Ads"
+            subtitle={investimentoSource === 'todos' && investimentoData?.bySource ? 
+              `Google: ${formatCurrency(investimentoData.bySource.google.investimento)} | Meta: ${formatCurrency(investimentoData.bySource.meta.investimento)}` :
+              investimentoSource === 'google' ? 'Google Ads' : investimentoSource === 'meta' ? 'Meta Ads' : undefined}
             vsLM={-6.8}
             icon={<DollarSign className="w-5 h-5" />}
             trend="down"

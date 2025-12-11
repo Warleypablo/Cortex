@@ -10,6 +10,7 @@ import { sql } from "drizzle-orm";
 import { analyzeDfc, chatWithDfc, type ChatMessage } from "./services/dfcAnalysis";
 import { setupDealNotifications, triggerTestNotification } from "./services/dealNotifications";
 import PDFDocument from "pdfkit";
+import { format } from "date-fns";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== 'admin') {
@@ -791,80 +792,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Growth - Google Ads Investment Data
+  // Growth - Investment Data (Google Ads + Meta Ads)
   app.get("/api/growth/investimento", async (req, res) => {
     try {
       const startDate = req.query.startDate as string || '2025-10-01';
       const endDate = req.query.endDate as string || '2025-11-30';
+      const source = req.query.source as string || 'todos'; // todos, google, meta
       
-      // First, let's check the table structure to find the correct column names
-      const columnsResult = await db.execute(sql`
-        SELECT column_name FROM information_schema.columns 
-        WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
-        ORDER BY ordinal_position
-      `);
+      let googleTotal = { investimento: 0, impressions: 0, clicks: 0 };
+      let metaTotal = { investimento: 0, impressions: 0, clicks: 0 };
+      let googleDaily: any[] = [];
+      let metaDaily: any[] = [];
       
-      const columns = columnsResult.rows.map((r: any) => r.column_name);
-      console.log("[api] Google Ads campaign_daily_metrics columns:", columns);
-      
-      // Determine the date column name
-      const dateColumn = columns.includes('metric_date') ? 'metric_date' : 
-                         columns.includes('date') ? 'date' : 
-                         columns.includes('segments_date') ? 'segments_date' : null;
-      
-      if (!dateColumn) {
-        console.log("[api] No date column found, returning totals without date filter");
-        // Return total without date filter
-        const result = await db.execute(sql`
-          SELECT 
-            COALESCE(SUM(cost_micros) / 1000000.0, 0) as total_investimento
-          FROM google_ads.campaign_daily_metrics
-        `);
-        const totals = result.rows[0] || { total_investimento: 0 };
-        return res.json({
-          total: { investimento: parseFloat(totals.total_investimento as string) || 0, impressions: 0, clicks: 0 },
-          daily: [],
-          columns: columns
-        });
+      // Fetch Google Ads data if source is 'todos' or 'google'
+      if (source === 'todos' || source === 'google') {
+        try {
+          // Check if google_ads schema exists
+          const schemaCheck = await db.execute(sql`
+            SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'google_ads'
+          `);
+          
+          if (schemaCheck.rows.length > 0) {
+            const columnsResult = await db.execute(sql`
+              SELECT column_name FROM information_schema.columns 
+              WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+              ORDER BY ordinal_position
+            `);
+            
+            const columns = columnsResult.rows.map((r: any) => r.column_name);
+            console.log("[api] Google Ads columns:", columns);
+            
+            const dateColumn = columns.includes('metric_date') ? 'metric_date' : 
+                               columns.includes('date') ? 'date' : 
+                               columns.includes('segments_date') ? 'segments_date' : null;
+            
+            if (dateColumn && columns.includes('cost_micros')) {
+              const googleResult = await db.execute(sql.raw(`
+                SELECT 
+                  COALESCE(SUM(cost_micros) / 1000000.0, 0) as total_investimento,
+                  COALESCE(SUM(impressions), 0) as total_impressions,
+                  COALESCE(SUM(clicks), 0) as total_clicks
+                FROM google_ads.campaign_daily_metrics
+                WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
+              `));
+              
+              const googleDailyResult = await db.execute(sql.raw(`
+                SELECT 
+                  ${dateColumn} as date,
+                  COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
+                  COALESCE(SUM(impressions), 0) as impressions,
+                  COALESCE(SUM(clicks), 0) as clicks
+                FROM google_ads.campaign_daily_metrics
+                WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
+                GROUP BY ${dateColumn}
+                ORDER BY ${dateColumn}
+              `));
+              
+              const gTotals = googleResult.rows[0] || {};
+              googleTotal = {
+                investimento: parseFloat(gTotals.total_investimento as string) || 0,
+                impressions: parseInt(gTotals.total_impressions as string) || 0,
+                clicks: parseInt(gTotals.total_clicks as string) || 0
+              };
+              
+              googleDaily = googleDailyResult.rows.map((row: any) => ({
+                date: row.date,
+                investimento: parseFloat(row.investimento) || 0,
+                impressions: parseInt(row.impressions) || 0,
+                clicks: parseInt(row.clicks) || 0,
+                source: 'google'
+              }));
+            }
+          }
+        } catch (googleError) {
+          console.log("[api] Google Ads query error (may not have data):", googleError);
+        }
       }
       
-      // Dynamic query with proper date column
-      const result = await db.execute(sql.raw(`
-        SELECT 
-          COALESCE(SUM(cost_micros) / 1000000.0, 0) as total_investimento,
-          COALESCE(SUM(impressions), 0) as total_impressions,
-          COALESCE(SUM(clicks), 0) as total_clicks
-        FROM google_ads.campaign_daily_metrics
-        WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
-      `));
+      // Fetch Meta Ads data if source is 'todos' or 'meta'
+      if (source === 'todos' || source === 'meta') {
+        try {
+          const metaResult = await db.execute(sql`
+            SELECT 
+              COALESCE(SUM(spend), 0) as total_investimento,
+              COALESCE(SUM(impressions), 0) as total_impressions,
+              COALESCE(SUM(clicks), 0) as total_clicks
+            FROM meta_insights_daily
+            WHERE date_start >= ${startDate}::date AND date_start <= ${endDate}::date
+          `);
+          
+          const metaDailyResult = await db.execute(sql`
+            SELECT 
+              date_start as date,
+              COALESCE(SUM(spend), 0) as investimento,
+              COALESCE(SUM(impressions), 0) as impressions,
+              COALESCE(SUM(clicks), 0) as clicks
+            FROM meta_insights_daily
+            WHERE date_start >= ${startDate}::date AND date_start <= ${endDate}::date
+            GROUP BY date_start
+            ORDER BY date_start
+          `);
+          
+          const mTotals = metaResult.rows[0] || {};
+          metaTotal = {
+            investimento: parseFloat(mTotals.total_investimento as string) || 0,
+            impressions: parseInt(mTotals.total_impressions as string) || 0,
+            clicks: parseInt(mTotals.total_clicks as string) || 0
+          };
+          
+          metaDaily = metaDailyResult.rows.map((row: any) => ({
+            date: row.date,
+            investimento: parseFloat(row.investimento) || 0,
+            impressions: parseInt(row.impressions) || 0,
+            clicks: parseInt(row.clicks) || 0,
+            source: 'meta'
+          }));
+        } catch (metaError) {
+          console.log("[api] Meta Ads query error:", metaError);
+        }
+      }
       
-      const dailyResult = await db.execute(sql.raw(`
-        SELECT 
-          ${dateColumn} as date,
-          COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
-          COALESCE(SUM(impressions), 0) as impressions,
-          COALESCE(SUM(clicks), 0) as clicks
-        FROM google_ads.campaign_daily_metrics
-        WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
-        GROUP BY ${dateColumn}
-        ORDER BY ${dateColumn}
-      `));
+      // Combine totals
+      const combinedTotal = {
+        investimento: googleTotal.investimento + metaTotal.investimento,
+        impressions: googleTotal.impressions + metaTotal.impressions,
+        clicks: googleTotal.clicks + metaTotal.clicks
+      };
       
-      const totals = result.rows[0] || { total_investimento: 0, total_impressions: 0, total_clicks: 0 };
+      // Combine daily data by date
+      const dailyMap = new Map<string, any>();
+      
+      [...googleDaily, ...metaDaily].forEach(item => {
+        const dateKey = typeof item.date === 'string' ? item.date : format(new Date(item.date), 'yyyy-MM-dd');
+        if (dailyMap.has(dateKey)) {
+          const existing = dailyMap.get(dateKey);
+          dailyMap.set(dateKey, {
+            date: dateKey,
+            investimento: existing.investimento + item.investimento,
+            impressions: existing.impressions + item.impressions,
+            clicks: existing.clicks + item.clicks,
+            google: item.source === 'google' ? item.investimento : existing.google || 0,
+            meta: item.source === 'meta' ? item.investimento : existing.meta || 0
+          });
+        } else {
+          dailyMap.set(dateKey, {
+            date: dateKey,
+            investimento: item.investimento,
+            impressions: item.impressions,
+            clicks: item.clicks,
+            google: item.source === 'google' ? item.investimento : 0,
+            meta: item.source === 'meta' ? item.investimento : 0
+          });
+        }
+      });
+      
+      const combinedDaily = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+      
+      console.log("[api] Investment data - Google:", googleTotal.investimento, "Meta:", metaTotal.investimento, "Total:", combinedTotal.investimento);
       
       res.json({
-        total: {
-          investimento: parseFloat(totals.total_investimento as string) || 0,
-          impressions: parseInt(totals.total_impressions as string) || 0,
-          clicks: parseInt(totals.total_clicks as string) || 0
+        total: combinedTotal,
+        bySource: {
+          google: googleTotal,
+          meta: metaTotal
         },
-        daily: dailyResult.rows.map((row: any) => ({
-          date: row.date,
-          investimento: parseFloat(row.investimento) || 0,
-          impressions: parseInt(row.impressions) || 0,
-          clicks: parseInt(row.clicks) || 0
-        })),
-        dateColumn: dateColumn
+        daily: combinedDaily
       });
     } catch (error) {
       console.error("[api] Error fetching growth investimento:", error);
