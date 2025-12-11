@@ -449,7 +449,7 @@ export default function GrowthVisaoGeral() {
             title="Valor Vendas"
             value="R$ 14.509.270"
             vsLM={14.5}
-            subtitle="Ticket Médio: R$ 14.169"
+            subtitle="TM Rec: R$ 16.240 | TM Pont: R$ 8.970"
             icon={<BarChart3 className="w-5 h-5" />}
             trend="up"
           />
