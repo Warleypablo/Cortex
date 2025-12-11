@@ -791,6 +791,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Growth - Google Ads Investment Data
+  app.get("/api/growth/investimento", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string || '2025-10-01';
+      const endDate = req.query.endDate as string || '2025-11-30';
+      
+      const result = await db.execute(sql`
+        SELECT 
+          COALESCE(SUM(cost_micros) / 1000000.0, 0) as total_investimento,
+          COALESCE(SUM(impressions), 0) as total_impressions,
+          COALESCE(SUM(clicks), 0) as total_clicks
+        FROM google_ads.campaign_daily_metrics
+        WHERE date >= ${startDate}::date AND date <= ${endDate}::date
+      `);
+      
+      const dailyResult = await db.execute(sql`
+        SELECT 
+          date,
+          COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
+          COALESCE(SUM(impressions), 0) as impressions,
+          COALESCE(SUM(clicks), 0) as clicks
+        FROM google_ads.campaign_daily_metrics
+        WHERE date >= ${startDate}::date AND date <= ${endDate}::date
+        GROUP BY date
+        ORDER BY date
+      `);
+      
+      const totals = result.rows[0] || { total_investimento: 0, total_impressions: 0, total_clicks: 0 };
+      
+      res.json({
+        total: {
+          investimento: parseFloat(totals.total_investimento as string) || 0,
+          impressions: parseInt(totals.total_impressions as string) || 0,
+          clicks: parseInt(totals.total_clicks as string) || 0
+        },
+        daily: dailyResult.rows.map((row: any) => ({
+          date: row.date,
+          investimento: parseFloat(row.investimento) || 0,
+          impressions: parseInt(row.impressions) || 0,
+          clicks: parseInt(row.clicks) || 0
+        }))
+      });
+    } catch (error) {
+      console.error("[api] Error fetching growth investimento:", error);
+      res.status(500).json({ error: "Failed to fetch growth investimento" });
+    }
+  });
+
   app.get("/api/financeiro/kpis-completos", async (req, res) => {
     try {
       const kpis = await storage.getFinanceiroKPIsCompletos();
