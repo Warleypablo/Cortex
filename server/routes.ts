@@ -797,26 +797,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDate = req.query.startDate as string || '2025-10-01';
       const endDate = req.query.endDate as string || '2025-11-30';
       
-      const result = await db.execute(sql`
+      // First, let's check the table structure to find the correct column names
+      const columnsResult = await db.execute(sql`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+        ORDER BY ordinal_position
+      `);
+      
+      const columns = columnsResult.rows.map((r: any) => r.column_name);
+      console.log("[api] Google Ads campaign_daily_metrics columns:", columns);
+      
+      // Determine the date column name
+      const dateColumn = columns.includes('metric_date') ? 'metric_date' : 
+                         columns.includes('date') ? 'date' : 
+                         columns.includes('segments_date') ? 'segments_date' : null;
+      
+      if (!dateColumn) {
+        console.log("[api] No date column found, returning totals without date filter");
+        // Return total without date filter
+        const result = await db.execute(sql`
+          SELECT 
+            COALESCE(SUM(cost_micros) / 1000000.0, 0) as total_investimento
+          FROM google_ads.campaign_daily_metrics
+        `);
+        const totals = result.rows[0] || { total_investimento: 0 };
+        return res.json({
+          total: { investimento: parseFloat(totals.total_investimento as string) || 0, impressions: 0, clicks: 0 },
+          daily: [],
+          columns: columns
+        });
+      }
+      
+      // Dynamic query with proper date column
+      const result = await db.execute(sql.raw(`
         SELECT 
           COALESCE(SUM(cost_micros) / 1000000.0, 0) as total_investimento,
           COALESCE(SUM(impressions), 0) as total_impressions,
           COALESCE(SUM(clicks), 0) as total_clicks
         FROM google_ads.campaign_daily_metrics
-        WHERE date >= ${startDate}::date AND date <= ${endDate}::date
-      `);
+        WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
+      `));
       
-      const dailyResult = await db.execute(sql`
+      const dailyResult = await db.execute(sql.raw(`
         SELECT 
-          date,
+          ${dateColumn} as date,
           COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
           COALESCE(SUM(impressions), 0) as impressions,
           COALESCE(SUM(clicks), 0) as clicks
         FROM google_ads.campaign_daily_metrics
-        WHERE date >= ${startDate}::date AND date <= ${endDate}::date
-        GROUP BY date
-        ORDER BY date
-      `);
+        WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
+        GROUP BY ${dateColumn}
+        ORDER BY ${dateColumn}
+      `));
       
       const totals = result.rows[0] || { total_investimento: 0, total_impressions: 0, total_clicks: 0 };
       
@@ -831,7 +863,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           investimento: parseFloat(row.investimento) || 0,
           impressions: parseInt(row.impressions) || 0,
           clicks: parseInt(row.clicks) || 0
-        }))
+        })),
+        dateColumn: dateColumn
       });
     } catch (error) {
       console.error("[api] Error fetching growth investimento:", error);
