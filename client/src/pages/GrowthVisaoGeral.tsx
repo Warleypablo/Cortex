@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -311,6 +312,22 @@ export default function GrowthVisaoGeral() {
   const [estrategia, setEstrategia] = useState("Todos");
   const [chartView, setChartView] = useState<'mql' | 'leads'>('mql');
 
+  const { data: investimentoData, isLoading: investimentoLoading } = useQuery<{
+    total: { investimento: number; impressions: number; clicks: number };
+    daily: Array<{ date: string; investimento: number; impressions: number; clicks: number }>;
+  }>({
+    queryKey: ['/api/growth/investimento', format(dateRange.from, 'yyyy-MM-dd'), format(dateRange.to, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      const startDate = format(dateRange.from, 'yyyy-MM-dd');
+      const endDate = format(dateRange.to, 'yyyy-MM-dd');
+      const res = await fetch(`/api/growth/investimento?startDate=${startDate}&endDate=${endDate}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to fetch investimento');
+      return res.json();
+    }
+  });
+
   const sparklineData = useMemo(() => {
     return mockChannelPerformance.map(ch => ({
       ...ch,
@@ -407,9 +424,8 @@ export default function GrowthVisaoGeral() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <KPICard
             title="Investimento"
-            value="R$ 4.900.385"
-            meta="Meta"
-            metaPercent={210}
+            value={investimentoLoading ? "Carregando..." : formatCurrency(investimentoData?.total?.investimento || 0)}
+            meta="Google Ads"
             vsLM={-6.8}
             icon={<DollarSign className="w-5 h-5" />}
             trend="down"
