@@ -86,6 +86,13 @@ const mockDailyData = eachDayOfInterval({
   LinkedIn: Math.floor(Math.random() * 20) + 5,
   Outros: Math.floor(Math.random() * 15) + 5,
   cpmql: Math.floor(Math.random() * 200) + 250,
+  FacebookLeads: Math.floor(Math.random() * 300) + 160,
+  GoogleLeads: Math.floor(Math.random() * 240) + 120,
+  OrgânicoLeads: Math.floor(Math.random() * 120) + 40,
+  InstitucionalLeads: Math.floor(Math.random() * 80) + 20,
+  LinkedInLeads: Math.floor(Math.random() * 40) + 10,
+  OutrosLeads: Math.floor(Math.random() * 30) + 10,
+  cpl: Math.floor(Math.random() * 100) + 120,
 }));
 
 const mockChannelPerformance = [
@@ -302,6 +309,7 @@ export default function GrowthVisaoGeral() {
   const [canal, setCanal] = useState("Todos");
   const [tipoContrato, setTipoContrato] = useState("Todos");
   const [estrategia, setEstrategia] = useState("Todos");
+  const [chartView, setChartView] = useState<'mql' | 'leads'>('mql');
 
   const sparklineData = useMemo(() => {
     return mockChannelPerformance.map(ch => ({
@@ -466,7 +474,33 @@ export default function GrowthVisaoGeral() {
 
           <Card className="lg:col-span-3">
             <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-base">MQL por Dia</CardTitle>
+              <div className="flex items-center gap-3">
+                <CardTitle className="text-base">{chartView === 'mql' ? 'MQL' : 'Leads'} por Dia</CardTitle>
+                <div className="flex gap-1 p-1 bg-muted rounded-lg">
+                  <button
+                    onClick={() => setChartView('mql')}
+                    className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                      chartView === 'mql' 
+                        ? 'bg-background shadow-sm text-foreground' 
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    data-testid="tab-chart-mql"
+                  >
+                    MQL
+                  </button>
+                  <button
+                    onClick={() => setChartView('leads')}
+                    className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                      chartView === 'leads' 
+                        ? 'bg-background shadow-sm text-foreground' 
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    data-testid="tab-chart-leads"
+                  >
+                    Leads
+                  </button>
+                </div>
+              </div>
               <div className="flex items-center gap-3 flex-wrap text-xs">
                 {Object.entries(channelColors).slice(0, 6).map(([name, color]) => (
                   <div key={name} className="flex items-center gap-1">
@@ -476,7 +510,7 @@ export default function GrowthVisaoGeral() {
                 ))}
                 <div className="flex items-center gap-1">
                   <div className="w-6 h-0.5 bg-black" />
-                  <span>CPMQL</span>
+                  <span>{chartView === 'mql' ? 'CPMQL' : 'CPL'}</span>
                 </div>
               </div>
             </CardHeader>
@@ -496,13 +530,13 @@ export default function GrowthVisaoGeral() {
                         fontSize: '12px'
                       }} 
                     />
-                    <Bar yAxisId="left" dataKey="Facebook" stackId="a" fill={channelColors['Facebook']} />
-                    <Bar yAxisId="left" dataKey="Google" stackId="a" fill={channelColors['Google']} />
-                    <Bar yAxisId="left" dataKey="Orgânico" stackId="a" fill={channelColors['Orgânico']} />
-                    <Bar yAxisId="left" dataKey="Institucional" stackId="a" fill={channelColors['Institucional']} />
-                    <Bar yAxisId="left" dataKey="LinkedIn" stackId="a" fill={channelColors['LinkedIn']} />
-                    <Bar yAxisId="left" dataKey="Outros" stackId="a" fill={channelColors['Outros']} />
-                    <Line yAxisId="right" type="monotone" dataKey="cpmql" stroke="#000" strokeWidth={2} dot={false} name="CPMQL" />
+                    <Bar yAxisId="left" dataKey={chartView === 'mql' ? 'Facebook' : 'FacebookLeads'} stackId="a" fill={channelColors['Facebook']} name="Facebook" />
+                    <Bar yAxisId="left" dataKey={chartView === 'mql' ? 'Google' : 'GoogleLeads'} stackId="a" fill={channelColors['Google']} name="Google" />
+                    <Bar yAxisId="left" dataKey={chartView === 'mql' ? 'Orgânico' : 'OrgânicoLeads'} stackId="a" fill={channelColors['Orgânico']} name="Orgânico" />
+                    <Bar yAxisId="left" dataKey={chartView === 'mql' ? 'Institucional' : 'InstitucionalLeads'} stackId="a" fill={channelColors['Institucional']} name="Institucional" />
+                    <Bar yAxisId="left" dataKey={chartView === 'mql' ? 'LinkedIn' : 'LinkedInLeads'} stackId="a" fill={channelColors['LinkedIn']} name="LinkedIn" />
+                    <Bar yAxisId="left" dataKey={chartView === 'mql' ? 'Outros' : 'OutrosLeads'} stackId="a" fill={channelColors['Outros']} name="Outros" />
+                    <Line yAxisId="right" type="monotone" dataKey={chartView === 'mql' ? 'cpmql' : 'cpl'} stroke="#000" strokeWidth={2} dot={false} name={chartView === 'mql' ? 'CPMQL' : 'CPL'} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
