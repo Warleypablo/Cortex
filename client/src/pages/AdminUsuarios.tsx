@@ -39,6 +39,7 @@ const AVAILABLE_ROUTES = [
   { path: '/patrimonio', label: 'Patrimônio', category: 'Menu Principal' },
   { path: '/ferramentas', label: 'Ferramentas', category: 'Menu Principal' },
   { path: '/turbozap', label: 'TurboZap', category: 'Menu Principal' },
+  { path: '/cases/chat', label: 'Cases de Sucesso', category: 'Menu Principal' },
   { path: '/dashboard/financeiro', label: 'Visão Geral', category: 'Financeiro' },
   { path: '/dashboard/dfc', label: 'DFC', category: 'Financeiro' },
   { path: '/dashboard/fluxo-caixa', label: 'Fluxo de Caixa', category: 'Financeiro' },
