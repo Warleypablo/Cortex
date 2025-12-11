@@ -192,6 +192,24 @@ export default function PresentationMode() {
     refetchInterval: 30000,
   });
 
+  const { data: closerPhotos } = useQuery<Record<string, string>>({
+    queryKey: ["/api/closers/photos"],
+    queryFn: async () => {
+      const res = await fetch("/api/closers/photos");
+      return res.json();
+    },
+    refetchInterval: 300000,
+  });
+
+  const { data: sdrPhotos } = useQuery<Record<string, string>>({
+    queryKey: ["/api/sdrs/photos"],
+    queryFn: async () => {
+      const res = await fetch("/api/sdrs/photos");
+      return res.json();
+    },
+    refetchInterval: 300000,
+  });
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
@@ -739,9 +757,28 @@ export default function PresentationMode() {
                                   </div>
                                 </div>
 
-                                <h3 className="text-base lg:text-lg font-bold text-white truncate mb-3">
-                                  {closer.name}
-                                </h3>
+                                <div className="flex items-center gap-3 mb-3">
+                                  {closerPhotos?.[closer.name] ? (
+                                    <img 
+                                      src={closerPhotos[closer.name]} 
+                                      alt={closer.name}
+                                      className={`w-12 h-12 rounded-full object-cover border-2 ${
+                                        closer.position === 1 ? 'border-yellow-400' :
+                                        closer.position === 2 ? 'border-gray-300' : 'border-amber-500'
+                                      }`}
+                                    />
+                                  ) : (
+                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
+                                      closer.position === 1 ? 'bg-yellow-500/20 text-yellow-400' :
+                                      closer.position === 2 ? 'bg-gray-400/20 text-gray-300' : 'bg-amber-600/20 text-amber-500'
+                                    }`}>
+                                      {closer.name.charAt(0)}
+                                    </div>
+                                  )}
+                                  <h3 className="text-base lg:text-lg font-bold text-white truncate flex-1">
+                                    {closer.name}
+                                  </h3>
+                                </div>
 
                                 <div className="flex-1 space-y-2">
                                   <div className="flex justify-between items-center">
@@ -1237,9 +1274,28 @@ export default function PresentationMode() {
                                   {badges[visualIndex]}
                                 </Badge>
                                 
-                                <h3 className={`${sizes[visualIndex]} font-black text-white mb-1 leading-tight`}>
-                                  {sdr.name.split(' ').slice(0, 2).join(' ')}
-                                </h3>
+                                <div className="flex items-center gap-2 mb-1">
+                                  {sdrPhotos?.[sdr.name] ? (
+                                    <img 
+                                      src={sdrPhotos[sdr.name]} 
+                                      alt={sdr.name}
+                                      className={`w-10 h-10 rounded-full object-cover border-2 ${
+                                        sdr.position === 1 ? 'border-yellow-400' :
+                                        sdr.position === 2 ? 'border-gray-300' : 'border-amber-500'
+                                      }`}
+                                    />
+                                  ) : (
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
+                                      sdr.position === 1 ? 'bg-yellow-500/20 text-yellow-400' :
+                                      sdr.position === 2 ? 'bg-gray-400/20 text-gray-300' : 'bg-amber-600/20 text-amber-500'
+                                    }`}>
+                                      {sdr.name.charAt(0)}
+                                    </div>
+                                  )}
+                                  <h3 className={`${sizes[visualIndex]} font-black text-white leading-tight flex-1`}>
+                                    {sdr.name.split(' ').slice(0, 2).join(' ')}
+                                  </h3>
+                                </div>
                               </div>
                               
                               <div className="space-y-3 mt-auto">

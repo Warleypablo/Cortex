@@ -4144,6 +4144,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint para buscar fotos de usuários via email (staging.auth_users)
+  app.get("/api/user-photos", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          LOWER(TRIM(email)) as email,
+          raw_user_meta_data->>'avatar_url' as avatar_url,
+          raw_user_meta_data->>'picture' as picture
+        FROM staging.auth_users
+        WHERE email IS NOT NULL
+      `);
+
+      const photoMap: Record<string, string> = {};
+      result.rows.forEach((row: any) => {
+        const photoUrl = row.avatar_url || row.picture;
+        if (photoUrl && row.email) {
+          photoMap[row.email] = photoUrl;
+        }
+      });
+
+      res.json(photoMap);
+    } catch (error) {
+      console.error("[api] Error fetching user photos:", error);
+      res.status(500).json({ error: "Failed to fetch user photos" });
+    }
+  });
+
+  // Endpoint para buscar fotos de closers via email
+  app.get("/api/closers/photos", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          c.id,
+          c.nome,
+          LOWER(TRIM(c.email)) as closer_email,
+          a.raw_user_meta_data->>'avatar_url' as avatar_url,
+          a.raw_user_meta_data->>'picture' as picture
+        FROM crm_closers c
+        LEFT JOIN staging.auth_users a ON LOWER(TRIM(c.email)) = LOWER(TRIM(a.email))
+        WHERE c.email IS NOT NULL
+      `);
+
+      const photoMap: Record<string, string> = {};
+      result.rows.forEach((row: any) => {
+        const photoUrl = row.avatar_url || row.picture;
+        if (photoUrl && row.nome) {
+          photoMap[row.nome] = photoUrl;
+        }
+      });
+
+      res.json(photoMap);
+    } catch (error) {
+      console.error("[api] Error fetching closer photos:", error);
+      res.status(500).json({ error: "Failed to fetch closer photos" });
+    }
+  });
+
+  // Endpoint para buscar fotos de SDRs via email
+  app.get("/api/sdrs/photos", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          u.id,
+          u.nome,
+          LOWER(TRIM(u.email)) as sdr_email,
+          a.raw_user_meta_data->>'avatar_url' as avatar_url,
+          a.raw_user_meta_data->>'picture' as picture
+        FROM crm_users u
+        LEFT JOIN staging.auth_users a ON LOWER(TRIM(u.email)) = LOWER(TRIM(a.email))
+        WHERE u.email IS NOT NULL
+      `);
+
+      const photoMap: Record<string, string> = {};
+      result.rows.forEach((row: any) => {
+        const photoUrl = row.avatar_url || row.picture;
+        if (photoUrl && row.nome) {
+          photoMap[row.nome] = photoUrl;
+        }
+      });
+
+      res.json(photoMap);
+    } catch (error) {
+      console.error("[api] Error fetching SDR photos:", error);
+      res.status(500).json({ error: "Failed to fetch SDR photos" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
