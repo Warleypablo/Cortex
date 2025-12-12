@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, TrendingUp, TrendingDown, Target, DollarSign, Users, ShoppingCart, BarChart3, Rocket, Percent } from "lucide-react";
+import { CalendarIcon, TrendingUp, TrendingDown, Target, DollarSign, Users, ShoppingCart, BarChart3, Rocket, Percent, Trophy, CircleDollarSign } from "lucide-react";
 import { format, subDays, eachDayOfInterval, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
@@ -330,6 +330,47 @@ export default function GrowthVisaoGeral() {
     }
   });
 
+  // Query para dados cruzados com Bitrix (Negócios Ganhos)
+  const { data: visaoGeralData, isLoading: visaoGeralLoading } = useQuery<{
+    resumo: {
+      investimento: number;
+      impressions: number;
+      clicks: number;
+      ctr: number;
+      cpc: number | null;
+      negociosGanhos: number;
+      negociosTotais: number;
+      valorPontual: number;
+      valorRecorrente: number;
+      valorVendas: number;
+      valorTotalGeral: number;
+      cac: number | null;
+      roi: number | null;
+    };
+    porAd: Array<{
+      adId: string;
+      investimento: number;
+      impressions: number;
+      clicks: number;
+      negociosGanhos: number;
+      valorVendas: number;
+      cac: number | null;
+      roi: number | null;
+    }>;
+    evolucaoDiaria: Array<{ data: string; negocios: number; valor: number }>;
+  }>({
+    queryKey: ['/api/growth/visao-geral', format(dateRange.from, 'yyyy-MM-dd'), format(dateRange.to, 'yyyy-MM-dd'), canal],
+    queryFn: async () => {
+      const startDate = format(dateRange.from, 'yyyy-MM-dd');
+      const endDate = format(dateRange.to, 'yyyy-MM-dd');
+      const res = await fetch(`/api/growth/visao-geral?startDate=${startDate}&endDate=${endDate}&canal=${canal}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to fetch visao geral');
+      return res.json();
+    }
+  });
+
   const sparklineData = useMemo(() => {
     return mockChannelPerformance.map(ch => ({
       ...ch,
@@ -427,62 +468,67 @@ export default function GrowthVisaoGeral() {
       </div>
 
       <div className="p-4 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           <KPICard
             title="Investimento"
             value={investimentoLoading ? "Carregando..." : formatCurrency(investimentoData?.total?.investimento || 0)}
             subtitle={investimentoSource === 'todos' && investimentoData?.bySource ? 
               `Google: ${formatCurrency(investimentoData.bySource.google.investimento)} | Meta: ${formatCurrency(investimentoData.bySource.meta.investimento)}` :
               investimentoSource === 'google' ? 'Google Ads' : investimentoSource === 'meta' ? 'Meta Ads' : undefined}
-            vsLM={-6.8}
             icon={<DollarSign className="w-5 h-5" />}
-            trend="down"
+            trend="neutral"
           />
           <KPICard
-            title="MQL"
-            value="14.013"
-            meta="Meta"
-            metaPercent={240}
-            vsLM={40.0}
+            title="Impressões"
+            value={visaoGeralLoading ? "..." : formatNumber(visaoGeralData?.resumo?.impressions || 0)}
+            subtitle={visaoGeralData?.resumo?.ctr ? `CTR: ${visaoGeralData.resumo.ctr.toFixed(2)}%` : undefined}
             icon={<Users className="w-5 h-5" />}
-            trend="up"
+            trend="neutral"
           />
           <KPICard
-            title="CPMQL"
-            value="R$ 339"
-            meta="-15% abaixo (Meta R$399)"
-            vsLM={14.7}
+            title="Cliques"
+            value={visaoGeralLoading ? "..." : formatNumber(visaoGeralData?.resumo?.clicks || 0)}
+            subtitle={visaoGeralData?.resumo?.cpc ? `CPC: ${formatCurrency(visaoGeralData.resumo.cpc)}` : undefined}
             icon={<Target className="w-5 h-5" />}
-            trend="up"
+            trend="neutral"
           />
           <KPICard
-            title="Vendas"
-            value="1.024"
-            vsLM={8.9}
-            icon={<ShoppingCart className="w-5 h-5" />}
-            trend="up"
-          />
-          <KPICard
-            title="CAC"
-            value="R$ 4.786"
-            vsLM={-1.9}
-            icon={<DollarSign className="w-5 h-5" />}
-            trend="down"
+            title="Negócios Ganhos"
+            value={visaoGeralLoading ? "..." : formatNumber(visaoGeralData?.resumo?.negociosGanhos || 0)}
+            subtitle={visaoGeralData?.resumo?.negociosTotais ? `Total período: ${visaoGeralData.resumo.negociosTotais}` : undefined}
+            icon={<Trophy className="w-5 h-5" />}
+            trend={(visaoGeralData?.resumo?.negociosGanhos || 0) > 0 ? "up" : "neutral"}
           />
           <KPICard
             title="Valor Vendas"
-            value="R$ 14.509.270"
-            vsLM={14.5}
-            subtitle="TM Rec: R$ 16.240 | TM Pont: R$ 8.970"
-            icon={<BarChart3 className="w-5 h-5" />}
-            trend="up"
+            value={visaoGeralLoading ? "..." : formatCurrency(visaoGeralData?.resumo?.valorVendas || 0)}
+            subtitle={visaoGeralData?.resumo?.valorRecorrente ? 
+              `Rec: ${formatCurrency(visaoGeralData.resumo.valorRecorrente)} | Pont: ${formatCurrency(visaoGeralData.resumo.valorPontual)}` : undefined}
+            icon={<CircleDollarSign className="w-5 h-5" />}
+            trend={(visaoGeralData?.resumo?.valorVendas || 0) > 0 ? "up" : "neutral"}
+          />
+          <KPICard
+            title="CAC"
+            value={visaoGeralLoading ? "..." : visaoGeralData?.resumo?.cac ? formatCurrency(visaoGeralData.resumo.cac) : "-"}
+            subtitle="Custo por Aquisição"
+            icon={<DollarSign className="w-5 h-5" />}
+            trend={visaoGeralData?.resumo?.cac ? "down" : "neutral"}
+          />
+          <KPICard
+            title="ROI"
+            value={visaoGeralLoading ? "..." : visaoGeralData?.resumo?.roi ? `${visaoGeralData.resumo.roi.toFixed(0)}%` : "-"}
+            subtitle="Retorno sobre Investimento"
+            icon={<Percent className="w-5 h-5" />}
+            trend={(visaoGeralData?.resumo?.roi || 0) > 0 ? "up" : "down"}
           />
           <KPICard
             title="ROAS"
-            value="3,06"
-            vsLM={8.7}
-            icon={<Percent className="w-5 h-5" />}
-            trend="up"
+            value={visaoGeralLoading ? "..." : 
+              (visaoGeralData?.resumo?.investimento && visaoGeralData.resumo.investimento > 0) ? 
+                (visaoGeralData.resumo.valorVendas / visaoGeralData.resumo.investimento).toFixed(2) : "-"}
+            subtitle="Return on Ad Spend"
+            icon={<BarChart3 className="w-5 h-5" />}
+            trend={(visaoGeralData?.resumo?.valorVendas || 0) > (visaoGeralData?.resumo?.investimento || 0) ? "up" : "down"}
           />
         </div>
 

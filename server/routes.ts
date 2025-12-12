@@ -965,6 +965,286 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Growth Visão Geral - Cruza Meta/Google Ads com Bitrix (negócios ganhos via utm_content)
+  app.get("/api/growth/visao-geral", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string || '2025-01-01';
+      const endDate = req.query.endDate as string || '2025-12-31';
+      const canal = req.query.canal as string || 'Todos'; // Todos, Facebook, Google
+      
+      // Validar formato de data para evitar SQL injection
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+      }
+      
+      let metaData: any[] = [];
+      let googleData: any[] = [];
+      
+      // Buscar dados do Meta Ads se canal é Todos ou Facebook
+      if (canal === 'Todos' || canal === 'Facebook') {
+        const metaByAdResult = await db.execute(sql`
+          SELECT 
+            ad_id,
+            SUM(spend::numeric) as investimento,
+            SUM(impressions::numeric) as impressions,
+            SUM(clicks::numeric) as clicks
+          FROM meta_insights_daily
+          WHERE date_start >= ${startDate}::date AND date_start <= ${endDate}::date
+          GROUP BY ad_id
+        `);
+        metaData = metaByAdResult.rows as any[];
+      }
+      
+      // Buscar dados do Google Ads se canal é Todos ou Google
+      // Google Ads usa utm_campaign para relacionar com Bitrix (não utm_content)
+      if (canal === 'Todos' || canal === 'Google') {
+        try {
+          const schemaCheck = await db.execute(sql`
+            SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'google_ads'
+          `);
+          
+          if (schemaCheck.rows.length > 0) {
+            const tableCheck = await db.execute(sql`
+              SELECT table_name FROM information_schema.tables 
+              WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+            `);
+            
+            if (tableCheck.rows.length > 0) {
+              const columnsResult = await db.execute(sql`
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+                ORDER BY ordinal_position
+              `);
+              
+              const columns = columnsResult.rows.map((r: any) => r.column_name);
+              const dateColumn = columns.includes('report_date') ? 'report_date' :
+                                 columns.includes('metric_date') ? 'metric_date' : 
+                                 columns.includes('date') ? 'date' : 
+                                 columns.includes('segments_date') ? 'segments_date' : null;
+              
+              if (dateColumn && columns.includes('cost_micros')) {
+                // Query com dados já validados (dateRegex garante formato seguro)
+                const googleResult = await db.execute(sql`
+                  SELECT 
+                    campaign_id,
+                    campaign_name,
+                    COALESCE(SUM(cost_micros::numeric) / 1000000.0, 0) as investimento,
+                    COALESCE(SUM(impressions::numeric), 0) as impressions,
+                    COALESCE(SUM(clicks::numeric), 0) as clicks
+                  FROM google_ads.campaign_daily_metrics
+                  WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+                  GROUP BY campaign_id, campaign_name
+                `);
+                googleData = googleResult.rows as any[];
+              }
+            }
+          }
+        } catch (googleError) {
+          console.log("[api] Google Ads query error (may not have data):", googleError);
+        }
+      }
+      
+      // Buscar negócios ganhos do Bitrix com utm_content e utm_campaign
+      // utm_content é usado para Meta Ads, utm_campaign pode ser usado para Google Ads
+      const dealsResult = await db.execute(sql`
+        SELECT 
+          utm_content,
+          utm_campaign,
+          utm_source,
+          COUNT(DISTINCT deal_id) as negocios_ganhos,
+          SUM(COALESCE(valor_pontual, 0)) as valor_pontual_total,
+          SUM(COALESCE(valor_recorrente, 0)) as valor_recorrente_total,
+          SUM(COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0)) as valor_total
+        FROM crm_deal
+        WHERE stage_name = 'Negócio Ganho (WON)'
+          AND close_date >= ${startDate}::date AND close_date <= ${endDate}::date
+          AND (utm_content IS NOT NULL AND utm_content != '' OR utm_campaign IS NOT NULL AND utm_campaign != '')
+        GROUP BY utm_content, utm_campaign, utm_source
+      `);
+      
+      // Criar mapas de deals: um por utm_content (Meta) e outro por utm_campaign (Google)
+      const dealsMapByContent = new Map<string, any>();
+      const dealsMapByCampaign = new Map<string, any>();
+      
+      for (const row of dealsResult.rows as any[]) {
+        const dealData = {
+          negociosGanhos: parseInt(row.negocios_ganhos) || 0,
+          valorPontual: parseFloat(row.valor_pontual_total) || 0,
+          valorRecorrente: parseFloat(row.valor_recorrente_total) || 0,
+          valorTotal: parseFloat(row.valor_total) || 0,
+          source: row.utm_source
+        };
+        
+        // Map por utm_content (para Meta Ads)
+        if (row.utm_content) {
+          const key = row.utm_content;
+          if (dealsMapByContent.has(key)) {
+            const existing = dealsMapByContent.get(key);
+            existing.negociosGanhos += dealData.negociosGanhos;
+            existing.valorPontual += dealData.valorPontual;
+            existing.valorRecorrente += dealData.valorRecorrente;
+            existing.valorTotal += dealData.valorTotal;
+          } else {
+            dealsMapByContent.set(key, { ...dealData });
+          }
+        }
+        
+        // Map por utm_campaign (para Google Ads)
+        if (row.utm_campaign) {
+          const key = row.utm_campaign;
+          if (dealsMapByCampaign.has(key)) {
+            const existing = dealsMapByCampaign.get(key);
+            existing.negociosGanhos += dealData.negociosGanhos;
+            existing.valorPontual += dealData.valorPontual;
+            existing.valorRecorrente += dealData.valorRecorrente;
+            existing.valorTotal += dealData.valorTotal;
+          } else {
+            dealsMapByCampaign.set(key, { ...dealData });
+          }
+        }
+      }
+      
+      // Agregar dados combinando Ads com Deals
+      let totalInvestimento = 0;
+      let totalImpressions = 0;
+      let totalClicks = 0;
+      let totalNegociosGanhos = 0;
+      let totalValorPontual = 0;
+      let totalValorRecorrente = 0;
+      let totalValorVendas = 0;
+      
+      const adPerformance: any[] = [];
+      
+      // Processar Meta Ads (usa dealsMapByContent com utm_content = ad_id)
+      for (const row of metaData) {
+        const adId = row.ad_id;
+        const investimento = parseFloat(row.investimento) || 0;
+        const impressions = parseInt(row.impressions) || 0;
+        const clicks = parseInt(row.clicks) || 0;
+        
+        const deal = dealsMapByContent.get(adId) || { negociosGanhos: 0, valorPontual: 0, valorRecorrente: 0, valorTotal: 0 };
+        
+        totalInvestimento += investimento;
+        totalImpressions += impressions;
+        totalClicks += clicks;
+        totalNegociosGanhos += deal.negociosGanhos;
+        totalValorPontual += deal.valorPontual;
+        totalValorRecorrente += deal.valorRecorrente;
+        totalValorVendas += deal.valorTotal;
+        
+        adPerformance.push({
+          adId,
+          source: 'Meta',
+          investimento,
+          impressions,
+          clicks,
+          negociosGanhos: deal.negociosGanhos,
+          valorVendas: deal.valorTotal,
+          cac: deal.negociosGanhos > 0 ? investimento / deal.negociosGanhos : null,
+          roi: investimento > 0 ? ((deal.valorTotal - investimento) / investimento) * 100 : null
+        });
+      }
+      
+      // Processar Google Ads (usa dealsMapByCampaign com utm_campaign = campaign_name)
+      for (const row of googleData) {
+        const campaignId = row.campaign_id;
+        const campaignName = row.campaign_name;
+        const investimento = parseFloat(row.investimento) || 0;
+        const impressions = parseInt(row.impressions) || 0;
+        const clicks = parseInt(row.clicks) || 0;
+        
+        // Tentar fazer match via campaign_name ou campaign_id com utm_campaign
+        const deal = dealsMapByCampaign.get(campaignName) || 
+                     dealsMapByCampaign.get(campaignId) || 
+                     { negociosGanhos: 0, valorPontual: 0, valorRecorrente: 0, valorTotal: 0 };
+        
+        totalInvestimento += investimento;
+        totalImpressions += impressions;
+        totalClicks += clicks;
+        totalNegociosGanhos += deal.negociosGanhos;
+        totalValorPontual += deal.valorPontual;
+        totalValorRecorrente += deal.valorRecorrente;
+        totalValorVendas += deal.valorTotal;
+        
+        adPerformance.push({
+          adId: `google_${campaignId}`,
+          name: campaignName,
+          source: 'Google',
+          investimento,
+          impressions,
+          clicks,
+          negociosGanhos: deal.negociosGanhos,
+          valorVendas: deal.valorTotal,
+          cac: deal.negociosGanhos > 0 ? investimento / deal.negociosGanhos : null,
+          roi: investimento > 0 ? ((deal.valorTotal - investimento) / investimento) * 100 : null
+        });
+      }
+      
+      // Buscar totais gerais de deals
+      const totalDealsResult = await db.execute(sql`
+        SELECT 
+          COUNT(DISTINCT deal_id) as total_negocios,
+          SUM(COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0)) as valor_total
+        FROM crm_deal
+        WHERE stage_name = 'Negócio Ganho (WON)'
+          AND close_date >= ${startDate}::date AND close_date <= ${endDate}::date
+      `);
+      
+      const totalDeals = totalDealsResult.rows[0] as any || {};
+      
+      // Calcular métricas gerais
+      const cac = totalNegociosGanhos > 0 ? totalInvestimento / totalNegociosGanhos : null;
+      const roi = totalInvestimento > 0 ? ((totalValorVendas - totalInvestimento) / totalInvestimento) * 100 : null;
+      const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+      const cpc = totalClicks > 0 ? totalInvestimento / totalClicks : null;
+      
+      // Buscar evolução diária de negócios ganhos
+      const dailyDealsResult = await db.execute(sql`
+        SELECT 
+          DATE(close_date) as data,
+          COUNT(DISTINCT deal_id) as negocios,
+          SUM(COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0)) as valor
+        FROM crm_deal
+        WHERE stage_name = 'Negócio Ganho (WON)'
+          AND close_date >= ${startDate}::date AND close_date <= ${endDate}::date
+        GROUP BY DATE(close_date)
+        ORDER BY DATE(close_date)
+      `);
+      
+      const dailyDeals = (dailyDealsResult.rows as any[]).map(row => ({
+        data: row.data,
+        negocios: parseInt(row.negocios) || 0,
+        valor: parseFloat(row.valor) || 0
+      }));
+      
+      console.log("[api] Growth Visão Geral - Canal:", canal, "Investimento:", totalInvestimento, "Negócios:", totalNegociosGanhos, "Valor:", totalValorVendas);
+      
+      res.json({
+        resumo: {
+          investimento: totalInvestimento,
+          impressions: totalImpressions,
+          clicks: totalClicks,
+          ctr,
+          cpc,
+          negociosGanhos: totalNegociosGanhos,
+          negociosTotais: parseInt(totalDeals.total_negocios) || 0,
+          valorPontual: totalValorPontual,
+          valorRecorrente: totalValorRecorrente,
+          valorVendas: totalValorVendas,
+          valorTotalGeral: parseFloat(totalDeals.valor_total) || 0,
+          cac,
+          roi
+        },
+        porAd: adPerformance.sort((a, b) => b.investimento - a.investimento).slice(0, 20),
+        evolucaoDiaria: dailyDeals
+      });
+    } catch (error) {
+      console.error("[api] Error fetching growth visao geral:", error);
+      res.status(500).json({ error: "Failed to fetch growth visao geral" });
+    }
+  });
+
   app.get("/api/financeiro/kpis-completos", async (req, res) => {
     try {
       const kpis = await storage.getFinanceiroKPIsCompletos();
