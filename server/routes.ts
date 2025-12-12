@@ -1052,13 +1052,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           utm_content,
           utm_campaign,
           utm_source,
-          COUNT(DISTINCT deal_id) as negocios_ganhos,
+          COUNT(DISTINCT id) as negocios_ganhos,
           SUM(COALESCE(valor_pontual, 0)) as valor_pontual_total,
           SUM(COALESCE(valor_recorrente, 0)) as valor_recorrente_total,
           SUM(COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0)) as valor_total
         FROM crm_deal
-        WHERE stage_name = 'Negócio Ganho (WON)'
-          AND close_date >= ${startDate}::date AND close_date <= ${endDate}::date
+        WHERE stage_name = 'Negócio Ganho'
+          AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
           AND (utm_content IS NOT NULL AND utm_content != '' OR utm_campaign IS NOT NULL AND utm_campaign != '')
         GROUP BY utm_content, utm_campaign, utm_source
       `);
@@ -1184,11 +1184,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Buscar totais gerais de deals
       const totalDealsResult = await db.execute(sql`
         SELECT 
-          COUNT(DISTINCT deal_id) as total_negocios,
+          COUNT(DISTINCT id) as total_negocios,
           SUM(COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0)) as valor_total
         FROM crm_deal
-        WHERE stage_name = 'Negócio Ganho (WON)'
-          AND close_date >= ${startDate}::date AND close_date <= ${endDate}::date
+        WHERE stage_name = 'Negócio Ganho'
+          AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
       `);
       
       const totalDeals = totalDealsResult.rows[0] as any || {};
@@ -1202,14 +1202,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Buscar evolução diária de negócios ganhos
       const dailyDealsResult = await db.execute(sql`
         SELECT 
-          DATE(close_date) as data,
-          COUNT(DISTINCT deal_id) as negocios,
+          DATE(data_fechamento) as data,
+          COUNT(DISTINCT id) as negocios,
           SUM(COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0)) as valor
         FROM crm_deal
-        WHERE stage_name = 'Negócio Ganho (WON)'
-          AND close_date >= ${startDate}::date AND close_date <= ${endDate}::date
-        GROUP BY DATE(close_date)
-        ORDER BY DATE(close_date)
+        WHERE stage_name = 'Negócio Ganho'
+          AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
+        GROUP BY DATE(data_fechamento)
+        ORDER BY DATE(data_fechamento)
       `);
       
       const dailyDeals = (dailyDealsResult.rows as any[]).map(row => ({
