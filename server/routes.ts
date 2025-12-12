@@ -1229,6 +1229,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("[api] Growth Visão Geral - Canal:", canal, "Investimento:", totalInvestimento, "Negócios:", totalNegociosGanhos, "Valor:", totalValorVendas);
       
+      // Buscar MQLs por canal por dia usando utm_source e coluna mql
+      const mqlPorCanalDiaResult = await db.execute(sql`
+        SELECT 
+          DATE(created_at) as data,
+          COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
+          COUNT(*) as leads,
+          SUM(CASE WHEN mql = 1 THEN 1 ELSE 0 END) as mqls
+        FROM crm_deal
+        WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+        GROUP BY DATE(created_at), COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
+        ORDER BY DATE(created_at), canal
+      `);
+      
+      // Organizar dados por dia com breakdown por canal
+      const mqlPorDia: Record<string, { data: string; canais: Record<string, { leads: number; mqls: number }> }> = {};
+      
+      for (const row of mqlPorCanalDiaResult.rows as any[]) {
+        const dataStr = row.data?.toISOString?.().split('T')[0] || String(row.data);
+        if (!mqlPorDia[dataStr]) {
+          mqlPorDia[dataStr] = { data: dataStr, canais: {} };
+        }
+        const canalNome = String(row.canal || 'Outros');
+        mqlPorDia[dataStr].canais[canalNome] = {
+          leads: parseInt(row.leads) || 0,
+          mqls: parseInt(row.mqls) || 0
+        };
+      }
+      
+      const mqlDiario = Object.values(mqlPorDia).sort((a, b) => a.data.localeCompare(b.data));
+      
+      // Buscar totais de MQL/Leads por canal para o funil
+      const mqlTotaisPorCanalResult = await db.execute(sql`
+        SELECT 
+          COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
+          COUNT(*) as leads,
+          SUM(CASE WHEN mql = 1 THEN 1 ELSE 0 END) as mqls,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_vendas
+        FROM crm_deal
+        WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+        GROUP BY COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
+        ORDER BY mqls DESC
+      `);
+      
+      const mqlPorCanal = (mqlTotaisPorCanalResult.rows as any[]).map(row => ({
+        canal: String(row.canal || 'Outros'),
+        leads: parseInt(row.leads) || 0,
+        mqls: parseInt(row.mqls) || 0,
+        vendas: parseInt(row.vendas) || 0,
+        valorVendas: parseFloat(row.valor_vendas) || 0
+      }));
+      
+      // Calcular totais gerais de MQL
+      const totalLeads = mqlPorCanal.reduce((sum, c) => sum + c.leads, 0);
+      const totalMQLs = mqlPorCanal.reduce((sum, c) => sum + c.mqls, 0);
+      const totalVendasMQL = mqlPorCanal.reduce((sum, c) => sum + c.vendas, 0);
+      
       res.json({
         resumo: {
           investimento: totalInvestimento,
@@ -1243,10 +1300,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           valorVendas: totalValorVendas,
           valorTotalGeral: parseFloat(totalDeals.valor_total) || 0,
           cac,
-          roi
+          roi,
+          totalLeads,
+          totalMQLs,
+          totalVendasMQL,
+          taxaConversaoMQL: totalLeads > 0 ? (totalMQLs / totalLeads) * 100 : 0,
+          taxaVendaMQL: totalMQLs > 0 ? (totalVendasMQL / totalMQLs) * 100 : 0
         },
         porAd: adPerformance.sort((a, b) => b.investimento - a.investimento).slice(0, 20),
-        evolucaoDiaria: dailyDeals
+        evolucaoDiaria: dailyDeals,
+        mqlDiario,
+        mqlPorCanal
       });
     } catch (error) {
       console.error("[api] Error fetching growth visao geral:", error);
