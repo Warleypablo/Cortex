@@ -1259,12 +1259,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const mqlDiario = Object.values(mqlPorDia).sort((a, b) => a.data.localeCompare(b.data));
       
-      // Buscar totais de MQL/Leads por canal para o funil (coluna mql é text)
+      // Buscar totais de MQL/Leads por canal para o funil (coluna mql é text) com RM/RR stages
       const mqlTotaisPorCanalResult = await db.execute(sql`
         SELECT 
           COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
           COUNT(*) as leads,
           SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
+          SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado') THEN 1 ELSE 0 END) as rm,
+          SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado') THEN 1 ELSE 0 END) as rr,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_vendas
         FROM crm_deal
@@ -1273,13 +1275,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY mqls DESC
       `);
       
-      const mqlPorCanal = (mqlTotaisPorCanalResult.rows as any[]).map(row => ({
-        canal: String(row.canal || 'Outros'),
-        leads: parseInt(row.leads) || 0,
-        mqls: parseInt(row.mqls) || 0,
-        vendas: parseInt(row.vendas) || 0,
-        valorVendas: parseFloat(row.valor_vendas) || 0
-      }));
+      const mqlPorCanal = (mqlTotaisPorCanalResult.rows as any[]).map(row => {
+        const leads = parseInt(row.leads) || 0;
+        const mqls = parseInt(row.mqls) || 0;
+        const rm = parseInt(row.rm) || 0;
+        const rr = parseInt(row.rr) || 0;
+        const vendas = parseInt(row.vendas) || 0;
+        const valorVendas = parseFloat(row.valor_vendas) || 0;
+        
+        return {
+          canal: String(row.canal || 'Outros'),
+          leads,
+          mqls,
+          rm,
+          rr,
+          vendas,
+          valorVendas,
+          leadMql: leads > 0 ? Math.round((mqls / leads) * 100) : 0,
+          mqlRm: mqls > 0 ? Math.round((rm / mqls) * 100) : 0,
+          mqlRr: mqls > 0 ? Math.round((rr / mqls) * 100) : 0,
+          txRrVenda: rr > 0 ? Math.round((vendas / rr) * 100) : 0,
+          mqlVenda: mqls > 0 ? Math.round((vendas / mqls) * 100) : 0,
+          tm: vendas > 0 ? Math.round(valorVendas / vendas) : 0
+        };
+      });
       
       // Calcular totais gerais de MQL
       const totalLeads = mqlPorCanal.reduce((sum, c) => sum + c.leads, 0);
