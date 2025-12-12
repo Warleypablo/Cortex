@@ -1229,13 +1229,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("[api] Growth Visão Geral - Canal:", canal, "Investimento:", totalInvestimento, "Negócios:", totalNegociosGanhos, "Valor:", totalValorVendas);
       
-      // Buscar MQLs por canal por dia usando utm_source e coluna mql
+      // Buscar MQLs por canal por dia usando utm_source e coluna mql (coluna é text, comparar com '1')
       const mqlPorCanalDiaResult = await db.execute(sql`
         SELECT 
           DATE(created_at) as data,
           COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
           COUNT(*) as leads,
-          SUM(CASE WHEN mql = 1 THEN 1 ELSE 0 END) as mqls
+          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls
         FROM crm_deal
         WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
         GROUP BY DATE(created_at), COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
@@ -1259,12 +1259,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const mqlDiario = Object.values(mqlPorDia).sort((a, b) => a.data.localeCompare(b.data));
       
-      // Buscar totais de MQL/Leads por canal para o funil
+      // Buscar totais de MQL/Leads por canal para o funil (coluna mql é text)
       const mqlTotaisPorCanalResult = await db.execute(sql`
         SELECT 
           COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
           COUNT(*) as leads,
-          SUM(CASE WHEN mql = 1 THEN 1 ELSE 0 END) as mqls,
+          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_vendas
         FROM crm_deal
