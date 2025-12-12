@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, TrendingUp, TrendingDown, Target, DollarSign, Users, ShoppingCart, BarChart3, Rocket, Percent, Trophy, CircleDollarSign } from "lucide-react";
+import { CalendarIcon, TrendingUp, TrendingDown, Target, DollarSign, Users, ShoppingCart, BarChart3, Rocket, Percent, Trophy, CircleDollarSign, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { format, subDays, subMonths, eachDayOfInterval, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
@@ -336,6 +336,23 @@ const datePresets = [
   { label: 'Ano Atual', getRange: () => ({ from: startOfYear(new Date()), to: new Date() }) },
 ];
 
+interface Lead {
+  id: number;
+  title: string;
+  company: string;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+  utmContent: string;
+  stage: string;
+  isMql: boolean;
+  createdAt: string;
+  closedAt: string | null;
+  valorPontual: number;
+  valorRecorrente: number;
+  valorTotal: number;
+}
+
 export default function GrowthVisaoGeral() {
   const [dateRange, setDateRange] = useState({
     from: startOfMonth(new Date()),
@@ -346,6 +363,37 @@ export default function GrowthVisaoGeral() {
   const [estrategia, setEstrategia] = useState("Todos");
   const [chartView, setChartView] = useState<'mql' | 'leads'>('mql');
   const [investimentoSource, setInvestimentoSource] = useState("todos");
+  const [expandedCanal, setExpandedCanal] = useState<string | null>(null);
+  const [leadsData, setLeadsData] = useState<Record<string, Lead[]>>({});
+  const [loadingLeads, setLoadingLeads] = useState<string | null>(null);
+
+  const toggleCanalExpansion = async (canalName: string) => {
+    if (expandedCanal === canalName) {
+      setExpandedCanal(null);
+      return;
+    }
+    
+    setExpandedCanal(canalName);
+    
+    if (!leadsData[canalName]) {
+      setLoadingLeads(canalName);
+      try {
+        const startDate = format(dateRange.from, 'yyyy-MM-dd');
+        const endDate = format(dateRange.to, 'yyyy-MM-dd');
+        const res = await fetch(`/api/growth/leads-por-canal?startDate=${startDate}&endDate=${endDate}&canal=${encodeURIComponent(canalName)}&limit=30`, {
+          credentials: 'include'
+        });
+        if (res.ok) {
+          const leads = await res.json();
+          setLeadsData(prev => ({ ...prev, [canalName]: leads }));
+        }
+      } catch (error) {
+        console.error('Error fetching leads:', error);
+      } finally {
+        setLoadingLeads(null);
+      }
+    }
+  };
 
   const { data: investimentoData, isLoading: investimentoLoading } = useQuery<{
     total: { investimento: number; impressions: number; clicks: number };
@@ -824,37 +872,118 @@ export default function GrowthVisaoGeral() {
                 </TableHeader>
                 <TableBody>
                   {sparklineData.map((row) => (
-                    <TableRow key={row.canal} className="hover:bg-muted/30" data-testid={`row-canal-${row.canal.toLowerCase()}`}>
-                      <TableCell className="sticky left-0 bg-background z-10 font-medium">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: channelColors[row.canal] || '#6B7280' }} />
-                          {row.canal}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{formatNumber(row.leads)}</TableCell>
-                      <TableCell className="text-right font-medium" style={{ backgroundColor: row.cpmql ? 'rgba(34, 197, 94, 0.15)' : 'transparent' }}>
-                        {row.cpmql ? formatCurrency(row.cpmql) : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">{row.leadMql}%</TableCell>
-                      <TableCell className="text-right font-semibold">{formatNumber((row as any).mqls ?? (row as any).mql ?? 0)}</TableCell>
-                      <TableCell className="text-center">
-                        <MiniSparkline data={row.sparkline} />
-                      </TableCell>
-                      <TableCell className="text-right">{row.mqlRm}%</TableCell>
-                      <TableCell className="text-right">{formatNumber(row.rm)}</TableCell>
-                      <TableCell className="text-right">{row.mqlRr}%</TableCell>
-                      <TableCell className="text-right">{formatNumber(row.rr)}</TableCell>
-                      <TableCell className="text-right">{row.txRrVenda}%</TableCell>
-                      <TableCell className="text-right">{row.mqlVenda}%</TableCell>
-                      <TableCell className="text-right font-semibold text-green-600">{formatNumber(row.vendas)}</TableCell>
-                      <TableCell className="text-right" style={{ backgroundColor: row.cac ? 'rgba(239, 68, 68, 0.15)' : 'transparent' }}>
-                        {row.cac ? formatCurrency(row.cac) : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-medium" style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)' }}>
-                        {formatCurrency(row.valorVendas)}
-                      </TableCell>
-                      <TableCell className="text-right">{formatCurrency(row.tm)}</TableCell>
-                    </TableRow>
+                    <>
+                      <TableRow 
+                        key={row.canal} 
+                        className="hover:bg-muted/30 cursor-pointer" 
+                        data-testid={`row-canal-${row.canal.toLowerCase()}`}
+                        onClick={() => toggleCanalExpansion(row.canal)}
+                      >
+                        <TableCell className="sticky left-0 bg-background z-10 font-medium">
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-5 w-5 p-0"
+                              data-testid={`toggle-canal-${row.canal.toLowerCase()}`}
+                            >
+                              {loadingLeads === row.canal ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : expandedCanal === row.canal ? (
+                                <ChevronDown className="h-3 w-3" />
+                              ) : (
+                                <ChevronRight className="h-3 w-3" />
+                              )}
+                            </Button>
+                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: channelColors[row.canal] || '#6B7280' }} />
+                            {row.canal}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">{formatNumber(row.leads)}</TableCell>
+                        <TableCell className="text-right font-medium" style={{ backgroundColor: row.cpmql ? 'rgba(34, 197, 94, 0.15)' : 'transparent' }}>
+                          {row.cpmql ? formatCurrency(row.cpmql) : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">{row.leadMql}%</TableCell>
+                        <TableCell className="text-right font-semibold">{formatNumber((row as any).mqls ?? (row as any).mql ?? 0)}</TableCell>
+                        <TableCell className="text-center">
+                          <MiniSparkline data={row.sparkline} />
+                        </TableCell>
+                        <TableCell className="text-right">{row.mqlRm}%</TableCell>
+                        <TableCell className="text-right">{formatNumber(row.rm)}</TableCell>
+                        <TableCell className="text-right">{row.mqlRr}%</TableCell>
+                        <TableCell className="text-right">{formatNumber(row.rr)}</TableCell>
+                        <TableCell className="text-right">{row.txRrVenda}%</TableCell>
+                        <TableCell className="text-right">{row.mqlVenda}%</TableCell>
+                        <TableCell className="text-right font-semibold text-green-600">{formatNumber(row.vendas)}</TableCell>
+                        <TableCell className="text-right" style={{ backgroundColor: row.cac ? 'rgba(239, 68, 68, 0.15)' : 'transparent' }}>
+                          {row.cac ? formatCurrency(row.cac) : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-medium" style={{ backgroundColor: 'rgba(34, 197, 94, 0.15)' }}>
+                          {formatCurrency(row.valorVendas)}
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.tm)}</TableCell>
+                      </TableRow>
+                      {expandedCanal === row.canal && (
+                        <TableRow key={`${row.canal}-expanded`} className="bg-muted/20">
+                          <TableCell colSpan={16} className="p-0">
+                            <div className="p-4 max-h-[300px] overflow-y-auto">
+                              <p className="text-sm font-medium mb-3">Últimos {leadsData[row.canal]?.length || 0} leads de {row.canal}</p>
+                              {loadingLeads === row.canal ? (
+                                <div className="flex items-center justify-center py-4">
+                                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                                  <span className="text-sm text-muted-foreground">Carregando leads...</span>
+                                </div>
+                              ) : leadsData[row.canal]?.length > 0 ? (
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow className="text-xs">
+                                      <TableHead className="py-1">Empresa</TableHead>
+                                      <TableHead className="py-1">Título</TableHead>
+                                      <TableHead className="py-1">Stage</TableHead>
+                                      <TableHead className="py-1 text-center">MQL</TableHead>
+                                      <TableHead className="py-1">UTM Source</TableHead>
+                                      <TableHead className="py-1">UTM Campaign</TableHead>
+                                      <TableHead className="py-1">Criado em</TableHead>
+                                      <TableHead className="py-1 text-right">Valor</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {leadsData[row.canal].map((lead) => (
+                                      <TableRow key={lead.id} className="text-xs" data-testid={`lead-row-${lead.id}`}>
+                                        <TableCell className="py-1 font-medium">{lead.company || '-'}</TableCell>
+                                        <TableCell className="py-1 max-w-[200px] truncate">{lead.title || '-'}</TableCell>
+                                        <TableCell className="py-1">
+                                          <Badge variant={lead.stage === 'Negócio Ganho' ? 'default' : 'outline'} className="text-[10px]">
+                                            {lead.stage || '-'}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell className="py-1 text-center">
+                                          {lead.isMql ? (
+                                            <Badge className="bg-green-500 text-[10px]">Sim</Badge>
+                                          ) : (
+                                            <Badge variant="outline" className="text-[10px]">Não</Badge>
+                                          )}
+                                        </TableCell>
+                                        <TableCell className="py-1 text-muted-foreground">{lead.utmSource || '-'}</TableCell>
+                                        <TableCell className="py-1 text-muted-foreground max-w-[150px] truncate">{lead.utmCampaign || '-'}</TableCell>
+                                        <TableCell className="py-1 text-muted-foreground">
+                                          {lead.createdAt ? format(new Date(lead.createdAt), 'dd/MM/yy', { locale: ptBR }) : '-'}
+                                        </TableCell>
+                                        <TableCell className="py-1 text-right font-medium">
+                                          {lead.valorTotal > 0 ? formatCurrency(lead.valorTotal) : '-'}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              ) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">Nenhum lead encontrado para este canal</p>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
                   ))}
                   <TableRow className="bg-muted/50 font-bold border-t-2">
                     <TableCell className="sticky left-0 bg-muted/50 z-10">Total</TableCell>

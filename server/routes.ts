@@ -1378,6 +1378,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint para buscar leads por canal (para o toggle de expansão)
+  app.get("/api/growth/leads-por-canal", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string || '2025-01-01';
+      const endDate = req.query.endDate as string || '2025-12-31';
+      const canal = req.query.canal as string;
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      // Validar formato de data
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+      }
+      
+      if (!canal) {
+        return res.status(400).json({ error: "Canal parameter is required" });
+      }
+      
+      // Construir filtro de canal para utm_source
+      const canalFilterSQL = canal.toLowerCase() === 'facebook' 
+        ? sql`AND (LOWER(utm_source) LIKE '%facebook%' OR LOWER(utm_source) LIKE '%fb%' OR LOWER(utm_source) LIKE '%meta%')`
+        : canal.toLowerCase() === 'instagram'
+        ? sql`AND (LOWER(utm_source) = 'ig' OR LOWER(utm_source) LIKE '%instagram%')`
+        : canal.toLowerCase() === 'google'
+        ? sql`AND (LOWER(utm_source) LIKE '%google%' OR LOWER(utm_source) LIKE '%adwords%' OR LOWER(utm_source) = 'gads')`
+        : canal.toLowerCase() === 'outros'
+        ? sql`AND (utm_source IS NULL OR TRIM(utm_source) = '' OR (
+            LOWER(utm_source) NOT LIKE '%facebook%' AND 
+            LOWER(utm_source) NOT LIKE '%fb%' AND 
+            LOWER(utm_source) NOT LIKE '%meta%' AND
+            LOWER(utm_source) NOT LIKE '%instagram%' AND
+            LOWER(utm_source) != 'ig' AND
+            LOWER(utm_source) NOT LIKE '%google%' AND 
+            LOWER(utm_source) NOT LIKE '%adwords%' AND
+            LOWER(utm_source) NOT LIKE '%linkedin%' AND
+            LOWER(utm_source) NOT LIKE '%organico%' AND
+            LOWER(utm_source) NOT LIKE '%orgânico%'
+          ))`
+        : sql`AND LOWER(utm_source) LIKE ${`%${canal.toLowerCase()}%`}`;
+      
+      const result = await db.execute(sql`
+        SELECT 
+          id,
+          title,
+          company_name,
+          utm_source,
+          utm_medium,
+          utm_campaign,
+          utm_content,
+          stage_name,
+          mql::text as mql,
+          created_at,
+          data_fechamento,
+          COALESCE(valor_pontual, 0) as valor_pontual,
+          COALESCE(valor_recorrente, 0) as valor_recorrente,
+          COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) as valor_total
+        FROM crm_deal
+        WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+          ${canalFilterSQL}
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `);
+      
+      const leads = (result.rows as any[]).map(row => ({
+        id: row.id,
+        title: row.title,
+        company: row.company_name,
+        utmSource: row.utm_source,
+        utmMedium: row.utm_medium,
+        utmCampaign: row.utm_campaign,
+        utmContent: row.utm_content,
+        stage: row.stage_name,
+        isMql: row.mql === '1' || row.mql?.toLowerCase() === 'true',
+        createdAt: row.created_at,
+        closedAt: row.data_fechamento,
+        valorPontual: parseFloat(row.valor_pontual) || 0,
+        valorRecorrente: parseFloat(row.valor_recorrente) || 0,
+        valorTotal: parseFloat(row.valor_total) || 0
+      }));
+      
+      res.json(leads);
+    } catch (error) {
+      console.error("[api] Error fetching leads por canal:", error);
+      res.status(500).json({ error: "Failed to fetch leads por canal" });
+    }
+  });
+
   app.get("/api/financeiro/kpis-completos", async (req, res) => {
     try {
       const kpis = await storage.getFinanceiroKPIsCompletos();
