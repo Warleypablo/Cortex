@@ -1240,77 +1240,112 @@ export default function PresentationMode() {
                       ))}
                     </div>
                   ) : sdrTop3.length > 0 ? (
-                    <div className="flex-1 flex items-end justify-center gap-4 min-h-[20rem]">
-                      {[1, 0, 2].map((dataIndex, visualIndex) => {
-                        const sdr = sdrTop3[dataIndex];
-                        if (!sdr) return null;
+                    <div className="flex-1 grid grid-cols-3 gap-3 items-end">
+                      {[1, 0, 2].map((orderIndex) => {
+                        const sdr = sdrTop3[orderIndex];
+                        if (!sdr) return <div key={orderIndex} />;
                         
-                        const heightMap: Record<number, string> = { 0: 'clamp(16rem, 26vh, 22rem)', 1: 'clamp(20rem, 32vh, 28rem)', 2: 'clamp(14rem, 22vh, 18rem)' };
-                        const sizes = ['text-xl', 'text-2xl', 'text-lg'];
-                        const badges = ['VICE', 'CAMPEÃO', 'BRONZE'];
-                        const badgeColors = ['bg-gray-500', 'bg-gradient-to-r from-yellow-500 to-amber-500', 'bg-amber-700'];
+                        const isFirst = sdr.position === 1;
+                        const heightPercents = { 0: '100%', 1: '85%', 2: '70%' };
                         
                         return (
                           <motion.div
                             key={sdr.name}
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 + visualIndex * 0.1 }}
-                            className="relative w-48 flex flex-col"
-                            style={{ height: heightMap[visualIndex] }}
+                            transition={{ delay: 0.3 + orderIndex * 0.15 }}
+                            className="relative"
+                            style={{ height: heightPercents[orderIndex as keyof typeof heightPercents] }}
                           >
-                            <div className={`h-full rounded-2xl bg-gradient-to-b ${getPositionGradient(sdr.position)} border-2 ${getPositionBorder(sdr.position)} shadow-xl p-4 flex flex-col justify-between backdrop-blur-sm`}>
-                              <div>
-                                {sdr.position === 1 && (
-                                  <motion.div 
-                                    className="flex justify-center mb-2"
-                                    animate={{ y: [0, -5, 0] }}
-                                    transition={{ duration: 2, repeat: Infinity }}
-                                  >
-                                    <Crown className="w-10 h-10 text-yellow-400 drop-shadow-lg" />
-                                  </motion.div>
-                                )}
-                                
-                                <Badge className={`${badgeColors[visualIndex]} text-white text-xs mb-2 font-bold`}>
-                                  {badges[visualIndex]}
-                                </Badge>
-                                
-                                <div className="flex items-center gap-2 mb-1">
+                            <div 
+                              className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${getPositionGradient(sdr.position)} border-2 ${getPositionBorder(sdr.position)} shadow-xl backdrop-blur-sm overflow-hidden`}
+                            >
+                              {isFirst && (
+                                <div className="absolute inset-0 overflow-hidden">
+                                  <motion.div
+                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent"
+                                    animate={{ x: ["-100%", "100%"] }}
+                                    transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+                                  />
+                                </div>
+                              )}
+
+                              <div className="relative p-4 h-full flex flex-col">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${
+                                    sdr.position === 1 ? 'bg-yellow-500/20' :
+                                    sdr.position === 2 ? 'bg-gray-400/20' : 'bg-amber-600/20'
+                                  }`}>
+                                    {sdr.position === 1 && <Crown className="w-6 h-6 text-yellow-400" />}
+                                    {sdr.position === 2 && <Medal className="w-5 h-5 text-gray-300" />}
+                                    {sdr.position === 3 && <Medal className="w-5 h-5 text-amber-600" />}
+                                  </div>
+                                  <div className={`text-xs font-bold uppercase tracking-wide ${
+                                    sdr.position === 1 ? 'text-yellow-400' :
+                                    sdr.position === 2 ? 'text-gray-300' : 'text-amber-500'
+                                  }`}>
+                                    {sdr.position === 1 ? 'CAMPEÃO' : 
+                                     sdr.position === 2 ? 'VICE' : 'BRONZE'}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 mb-3">
                                   {sdrPhotos?.[sdr.name] ? (
                                     <img 
                                       src={sdrPhotos[sdr.name]} 
                                       alt={sdr.name}
-                                      className={`w-10 h-10 rounded-full object-cover border-2 ${
+                                      className={`w-12 h-12 rounded-full object-cover border-2 ${
                                         sdr.position === 1 ? 'border-yellow-400' :
                                         sdr.position === 2 ? 'border-gray-300' : 'border-amber-500'
                                       }`}
                                     />
                                   ) : (
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
+                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
                                       sdr.position === 1 ? 'bg-yellow-500/20 text-yellow-400' :
                                       sdr.position === 2 ? 'bg-gray-400/20 text-gray-300' : 'bg-amber-600/20 text-amber-500'
                                     }`}>
                                       {sdr.name.charAt(0)}
                                     </div>
                                   )}
-                                  <h3 className={`${sizes[visualIndex]} font-black text-white leading-tight flex-1`}>
-                                    {sdr.name.split(' ').slice(0, 2).join(' ')}
+                                  <h3 className="text-base lg:text-lg font-bold text-white truncate flex-1">
+                                    {sdr.name}
                                   </h3>
                                 </div>
-                              </div>
-                              
-                              <div className="space-y-3 mt-auto">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-sm text-slate-400">Reuniões</span>
-                                  <span className="text-2xl font-black text-cyan-400">{sdr.reunioesRealizadas}</span>
+
+                                <div className="flex-1 space-y-2">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-slate-400">Reuniões</span>
+                                    <span className="text-lg font-bold text-cyan-400">
+                                      {sdr.reunioesRealizadas}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-slate-400">MRR</span>
+                                    <span className="text-sm font-semibold text-emerald-400">
+                                      {formatCurrencyCompact(sdr.mrr)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-slate-400">Pontual</span>
+                                    <span className="text-sm font-semibold text-blue-400">
+                                      {formatCurrencyCompact(sdr.pontual)}
+                                    </span>
+                                  </div>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs text-slate-400">MRR</span>
-                                  <span className="text-sm font-semibold text-emerald-400">{formatCurrency(sdr.mrr)}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs text-slate-400">Leads</span>
-                                  <span className="text-sm font-semibold text-blue-400">{sdr.leads}</span>
+
+                                <div className="mt-3 pt-3 border-t border-slate-700/50 grid grid-cols-3 gap-2 text-center">
+                                  <div>
+                                    <div className="text-base font-bold text-white">{sdr.leads}</div>
+                                    <div className="text-[9px] text-slate-400 uppercase">Leads</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-base font-bold text-white">{sdr.contratos}</div>
+                                    <div className="text-[9px] text-slate-400 uppercase">Contratos</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-base font-bold text-white">{sdr.conversao.toFixed(0)}%</div>
+                                    <div className="text-[9px] text-slate-400 uppercase">Conv.</div>
+                                  </div>
                                 </div>
                               </div>
                             </div>
