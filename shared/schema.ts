@@ -988,6 +988,8 @@ export const inadimplenciaContextos = pgTable("inadimplencia_contextos", {
   contexto: text("contexto"),
   evidencias: text("evidencias"),
   acao: varchar("acao", { length: 20 }), // 'cobrar' | 'aguardar' | 'abonar'
+  statusFinanceiro: varchar("status_financeiro", { length: 30 }), // 'cobrado' | 'acordo_realizado' | 'juridico'
+  detalheFinanceiro: text("detalhe_financeiro"),
   atualizadoPor: varchar("atualizado_por", { length: 100 }),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });

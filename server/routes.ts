@@ -1242,10 +1242,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/inadimplencia/contexto/:clienteId", async (req, res) => {
     try {
       const { clienteId } = req.params;
-      const { contexto, evidencias, acao } = req.body;
+      const { contexto, evidencias, acao, statusFinanceiro, detalheFinanceiro } = req.body;
       
-      if (!['cobrar', 'aguardar', 'abonar'].includes(acao)) {
+      // Validar ação CS (opcional agora)
+      if (acao && !['cobrar', 'aguardar', 'abonar'].includes(acao)) {
         return res.status(400).json({ error: "Invalid acao. Must be 'cobrar', 'aguardar' or 'abonar'" });
+      }
+      
+      // Validar status financeiro (opcional)
+      if (statusFinanceiro && !['cobrado', 'acordo_realizado', 'juridico'].includes(statusFinanceiro)) {
+        return res.status(400).json({ error: "Invalid statusFinanceiro. Must be 'cobrado', 'acordo_realizado' or 'juridico'" });
       }
 
       const userId = (req.user as any)?.id || 'anonymous';
@@ -1254,6 +1260,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contexto,
         evidencias,
         acao,
+        statusFinanceiro,
+        detalheFinanceiro,
         atualizadoPor: userId,
       });
       res.json({ contexto: result });

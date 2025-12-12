@@ -171,9 +171,9 @@ export interface IStorage {
   getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
   getGegMasContratacoes(squad: string, setor: string): Promise<GegMasContratacoes>;
   getGegPessoasPorSetor(squad: string, setor: string): Promise<GegPessoasPorSetor[]>;
-  getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>>;
-  getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null } | null>;
-  upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
+  getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>>;
+  getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null } | null>;
+  upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
   getGegDemissoesPorTipo(squad: string, setor: string): Promise<GegDemissoesPorTipo[]>;
   getGegHeadcountPorTenure(squad: string, setor: string): Promise<GegHeadcountPorTenure[]>;
   getTopResponsaveis(limit?: number, mesAno?: string): Promise<{ nome: string; mrr: number; posicao: number }[]>;
@@ -673,15 +673,15 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>> {
+  async getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null } | null> {
+  async getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null } | null> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
+  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -6067,18 +6067,20 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>> {
+  async getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>> {
     if (!clienteIds.length) return {};
     
     const escapedIds = clienteIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
-    const result = await db.execute(sql.raw(`SELECT cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em FROM inadimplencia_contextos WHERE cliente_id IN (${escapedIds})`));
+    const result = await db.execute(sql.raw(`SELECT cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em FROM inadimplencia_contextos WHERE cliente_id IN (${escapedIds})`));
     
-    const contextos: Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> = {};
+    const contextos: Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> = {};
     for (const row of result.rows as any[]) {
       contextos[row.cliente_id] = {
         contexto: row.contexto,
         evidencias: row.evidencias,
         acao: row.acao,
+        statusFinanceiro: row.status_financeiro,
+        detalheFinanceiro: row.detalhe_financeiro,
         atualizadoPor: row.atualizado_por,
         atualizadoEm: row.atualizado_em,
       };
@@ -6086,9 +6088,9 @@ export class DbStorage implements IStorage {
     return contextos;
   }
 
-  async getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null } | null> {
+  async getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null } | null> {
     const escapedId = clienteId.replace(/'/g, "''");
-    const result = await db.execute(sql.raw(`SELECT cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em FROM inadimplencia_contextos WHERE cliente_id = '${escapedId}'`));
+    const result = await db.execute(sql.raw(`SELECT cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em FROM inadimplencia_contextos WHERE cliente_id = '${escapedId}'`));
     
     if (!result.rows.length) return null;
     const row = result.rows[0] as any;
@@ -6096,28 +6098,34 @@ export class DbStorage implements IStorage {
       contexto: row.contexto,
       evidencias: row.evidencias,
       acao: row.acao,
+      statusFinanceiro: row.status_financeiro,
+      detalheFinanceiro: row.detalhe_financeiro,
       atualizadoPor: row.atualizado_por,
       atualizadoEm: row.atualizado_em,
     };
   }
 
-  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
+  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
     const escapedClienteId = data.clienteId.replace(/'/g, "''");
     const escapedContexto = (data.contexto || '').replace(/'/g, "''");
     const escapedEvidencias = (data.evidencias || '').replace(/'/g, "''");
-    const escapedAcao = data.acao.replace(/'/g, "''");
+    const escapedAcao = (data.acao || '').replace(/'/g, "''");
+    const escapedStatusFinanceiro = (data.statusFinanceiro || '').replace(/'/g, "''");
+    const escapedDetalheFinanceiro = (data.detalheFinanceiro || '').replace(/'/g, "''");
     const escapedAtualizadoPor = data.atualizadoPor.replace(/'/g, "''");
     
     const result = await db.execute(sql.raw(`
-      INSERT INTO inadimplencia_contextos (cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em)
-      VALUES ('${escapedClienteId}', '${escapedContexto}', '${escapedEvidencias}', '${escapedAcao}', '${escapedAtualizadoPor}', NOW())
+      INSERT INTO inadimplencia_contextos (cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em)
+      VALUES ('${escapedClienteId}', '${escapedContexto}', '${escapedEvidencias}', NULLIF('${escapedAcao}', ''), NULLIF('${escapedStatusFinanceiro}', ''), NULLIF('${escapedDetalheFinanceiro}', ''), '${escapedAtualizadoPor}', NOW())
       ON CONFLICT (cliente_id) DO UPDATE SET
         contexto = EXCLUDED.contexto,
         evidencias = EXCLUDED.evidencias,
-        acao = EXCLUDED.acao,
+        acao = COALESCE(EXCLUDED.acao, inadimplencia_contextos.acao),
+        status_financeiro = COALESCE(EXCLUDED.status_financeiro, inadimplencia_contextos.status_financeiro),
+        detalhe_financeiro = COALESCE(EXCLUDED.detalhe_financeiro, inadimplencia_contextos.detalhe_financeiro),
         atualizado_por = EXCLUDED.atualizado_por,
         atualizado_em = NOW()
-      RETURNING cliente_id, contexto, evidencias, acao, atualizado_por, atualizado_em
+      RETURNING cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em
     `));
     
     const row = result.rows[0] as any;
@@ -6125,6 +6133,8 @@ export class DbStorage implements IStorage {
       contexto: row.contexto,
       evidencias: row.evidencias,
       acao: row.acao,
+      statusFinanceiro: row.status_financeiro,
+      detalheFinanceiro: row.detalhe_financeiro,
       atualizadoPor: row.atualizado_por,
       atualizadoEm: row.atualizado_em,
     };
