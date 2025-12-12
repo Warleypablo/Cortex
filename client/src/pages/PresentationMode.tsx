@@ -1123,7 +1123,7 @@ export default function PresentationMode() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.4 }}
-              className="space-y-3"
+              className="h-full flex flex-col gap-2"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -1220,11 +1220,11 @@ export default function PresentationMode() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                  <div className="mb-4 flex items-center gap-2">
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
+                <div className="flex flex-col min-h-0">
+                  <div className="mb-2 flex items-center gap-2">
                     <Trophy className="w-5 h-5 text-yellow-500" />
-                    <h2 className="text-xl font-bold text-white">Pódio dos Campeões</h2>
+                    <h2 className="text-lg font-bold text-white">Pódio dos Campeões</h2>
                     <motion.div
                       animate={{ rotate: [0, 15, -15, 0] }}
                       transition={{ duration: 1, repeat: Infinity, repeatDelay: 2 }}
@@ -1240,13 +1240,13 @@ export default function PresentationMode() {
                       ))}
                     </div>
                   ) : sdrTop3.length > 0 ? (
-                    <div className="flex items-end justify-center gap-4 h-[320px]">
+                    <div className="flex-1 flex items-end justify-center gap-3">
                       {[1, 0, 2].map((dataIndex, visualIndex) => {
                         const sdr = sdrTop3[dataIndex];
                         if (!sdr) return null;
                         
-                        const heights = ['h-64', 'h-72', 'h-56'];
-                        const sizes = ['text-2xl', 'text-3xl', 'text-xl'];
+                        const heightPercents = { 0: '85%', 1: '100%', 2: '70%' };
+                        const sizes = ['text-xl', 'text-2xl', 'text-lg'];
                         const badges = ['VICE', 'CAMPEÃO', 'BRONZE'];
                         const badgeColors = ['bg-gray-500', 'bg-gradient-to-r from-yellow-500 to-amber-500', 'bg-amber-700'];
                         
@@ -1256,7 +1256,8 @@ export default function PresentationMode() {
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.2 + visualIndex * 0.1 }}
-                            className={`relative ${heights[visualIndex]} w-56 flex flex-col`}
+                            className="relative w-48 flex flex-col"
+                            style={{ height: heightPercents[visualIndex as keyof typeof heightPercents] }}
                           >
                             <div className={`flex-1 rounded-2xl bg-gradient-to-b ${getPositionGradient(sdr.position)} border-2 ${getPositionBorder(sdr.position)} shadow-xl p-4 flex flex-col justify-between backdrop-blur-sm`}>
                               <div>
@@ -1324,13 +1325,13 @@ export default function PresentationMode() {
                   )}
                 </div>
 
-                <div>
-                  <div className="mb-4 flex items-center gap-2">
+                <div className="flex flex-col min-h-0">
+                  <div className="mb-2 flex items-center gap-2">
                     <Zap className="w-5 h-5 text-cyan-400" />
-                    <h2 className="text-xl font-bold text-white">Ranking Completo</h2>
+                    <h2 className="text-lg font-bold text-white">Ranking Completo</h2>
                   </div>
 
-                  <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
+                  <div className="flex-1 bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden flex flex-col min-h-0">
                     <div className="grid grid-cols-12 gap-1 p-2 bg-slate-800/50 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
                       <div className="col-span-1">#</div>
                       <div className="col-span-2">SDR</div>
@@ -1343,7 +1344,7 @@ export default function PresentationMode() {
                       <div className="col-span-2 text-right">Pontual</div>
                     </div>
 
-                    <div className="divide-y divide-slate-800/50 max-h-[290px] overflow-y-auto">
+                    <div className="flex-1 divide-y divide-slate-800/50 overflow-y-auto">
                       {isLoadingSDRs ? (
                         Array.from({ length: 5 }).map((_, i) => (
                           <div key={i} className="p-2">
@@ -1431,7 +1432,7 @@ export default function PresentationMode() {
 
               {/* BARRA DE META REUNIÕES SDR */}
               <motion.div 
-                className="mt-1 relative"
+                className="relative shrink-0"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5, duration: 0.6 }}
