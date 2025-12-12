@@ -689,18 +689,18 @@ export default function GrowthVisaoGeral() {
           />
           <KPICard
             title="Negócios Ganhos"
-            value={visaoGeralLoading ? "..." : formatNumber(visaoGeralData?.resumo?.negociosGanhos || 0)}
-            subtitle={visaoGeralData?.resumo?.negociosTotais ? `Total período: ${visaoGeralData.resumo.negociosTotais}` : undefined}
+            value={visaoGeralLoading ? "..." : formatNumber(visaoGeralData?.resumo?.negociosTotais || 0)}
+            subtitle={visaoGeralData?.resumo?.negociosGanhos ? `Atribuídos a Ads: ${visaoGeralData.resumo.negociosGanhos}` : undefined}
             icon={<Trophy className="w-5 h-5" />}
-            trend={(visaoGeralData?.resumo?.negociosGanhos || 0) > 0 ? "up" : "neutral"}
+            trend={(visaoGeralData?.resumo?.negociosTotais || 0) > 0 ? "up" : "neutral"}
           />
           <KPICard
             title="Valor Vendas"
-            value={visaoGeralLoading ? "..." : formatCurrency(visaoGeralData?.resumo?.valorVendas || 0)}
-            subtitle={visaoGeralData?.resumo?.valorRecorrente ? 
-              `Rec: ${formatCurrency(visaoGeralData.resumo.valorRecorrente)} | Pont: ${formatCurrency(visaoGeralData.resumo.valorPontual)}` : undefined}
+            value={visaoGeralLoading ? "..." : formatCurrency(visaoGeralData?.resumo?.valorTotalGeral || 0)}
+            subtitle={visaoGeralData?.resumo?.valorVendas ? 
+              `Atribuído a Ads: ${formatCurrency(visaoGeralData.resumo.valorVendas)}` : undefined}
             icon={<CircleDollarSign className="w-5 h-5" />}
-            trend={(visaoGeralData?.resumo?.valorVendas || 0) > 0 ? "up" : "neutral"}
+            trend={(visaoGeralData?.resumo?.valorTotalGeral || 0) > 0 ? "up" : "neutral"}
           />
           <KPICard
             title="CAC"
