@@ -971,6 +971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDate = req.query.startDate as string || '2025-01-01';
       const endDate = req.query.endDate as string || '2025-12-31';
       const canal = req.query.canal as string || 'Todos'; // Todos, Facebook, Google
+      const tipoContrato = req.query.tipoContrato as string || 'Todos'; // Todos, Recorrente, Pontual
       
       // Validar formato de data para evitar SQL injection
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -1047,6 +1048,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Buscar negócios ganhos do Bitrix com utm_content e utm_campaign
       // utm_content é usado para Meta Ads, utm_campaign pode ser usado para Google Ads
+      // Filtro por tipo de contrato: Recorrente (valor_recorrente > 0), Pontual (valor_pontual > 0)
+      const tipoContratoFilter = tipoContrato === 'Recorrente' 
+        ? sql`AND COALESCE(valor_recorrente, 0) > 0`
+        : tipoContrato === 'Pontual'
+        ? sql`AND COALESCE(valor_pontual, 0) > 0`
+        : sql``;
+      
       const dealsResult = await db.execute(sql`
         SELECT 
           utm_content,
@@ -1060,6 +1068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE stage_name = 'Negócio Ganho'
           AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
           AND (utm_content IS NOT NULL AND utm_content != '' OR utm_campaign IS NOT NULL AND utm_campaign != '')
+          ${tipoContratoFilter}
         GROUP BY utm_content, utm_campaign, utm_source
       `);
       
