@@ -1209,10 +1209,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       const totalDeals = totalDealsResult.rows[0] as any || {};
+      const negociosTotaisReal = parseInt(totalDeals.total_negocios) || 0;
+      const valorTotalReal = parseFloat(totalDeals.valor_total) || 0;
       
-      // Calcular métricas gerais
-      const cac = totalNegociosGanhos > 0 ? totalInvestimento / totalNegociosGanhos : null;
-      const roi = totalInvestimento > 0 ? ((totalValorVendas - totalInvestimento) / totalInvestimento) * 100 : null;
+      // Calcular métricas gerais usando totais reais (não apenas atribuídos a ads)
+      const cac = negociosTotaisReal > 0 ? totalInvestimento / negociosTotaisReal : null;
+      const roi = totalInvestimento > 0 ? ((valorTotalReal - totalInvestimento) / totalInvestimento) * 100 : null;
       const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
       const cpc = totalClicks > 0 ? totalInvestimento / totalClicks : null;
       
