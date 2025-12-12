@@ -1190,7 +1190,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Buscar totais gerais de deals
+      // Construir filtro de canal para utm_source (para queries de totais)
+      const canalFilterForDeals = canal === 'Facebook' 
+        ? sql`AND (LOWER(utm_source) LIKE '%facebook%' OR LOWER(utm_source) LIKE '%fb%' OR LOWER(utm_source) LIKE '%meta%' OR LOWER(utm_source) = 'ig' OR LOWER(utm_source) LIKE '%instagram%')`
+        : canal === 'Google'
+        ? sql`AND (LOWER(utm_source) LIKE '%google%' OR LOWER(utm_source) LIKE '%adwords%' OR LOWER(utm_source) = 'gads' OR LOWER(utm_source) LIKE '%ads%')`
+        : sql``;
+      
+      // Buscar totais gerais de deals (filtrado por canal se necessário)
       const totalDealsResult = await db.execute(sql`
         SELECT 
           COUNT(DISTINCT id) as total_negocios,
@@ -1198,6 +1205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM crm_deal
         WHERE stage_name = 'Negócio Ganho'
           AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
+          ${canalFilterForDeals}
       `);
       
       const totalDeals = totalDealsResult.rows[0] as any || {};
@@ -1208,7 +1216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
       const cpc = totalClicks > 0 ? totalInvestimento / totalClicks : null;
       
-      // Buscar evolução diária de negócios ganhos
+      // Buscar evolução diária de negócios ganhos (filtrado por canal se necessário)
       const dailyDealsResult = await db.execute(sql`
         SELECT 
           DATE(data_fechamento) as data,
@@ -1217,6 +1225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM crm_deal
         WHERE stage_name = 'Negócio Ganho'
           AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
+          ${canalFilterForDeals}
         GROUP BY DATE(data_fechamento)
         ORDER BY DATE(data_fechamento)
       `);
@@ -1259,20 +1268,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const mqlDiario = Object.values(mqlPorDia).sort((a, b) => a.data.localeCompare(b.data));
       
+      // Construir filtro de canal para utm_source
+      // Facebook: inclui variações como 'facebook', 'fb', 'meta', 'Facebook Ads', etc.
+      // Google: inclui variações como 'google', 'Google', 'adwords', etc.
+      const canalFilterSQL = canal === 'Facebook' 
+        ? sql`AND (LOWER(utm_source) LIKE '%facebook%' OR LOWER(utm_source) LIKE '%fb%' OR LOWER(utm_source) LIKE '%meta%' OR LOWER(utm_source) = 'ig' OR LOWER(utm_source) LIKE '%instagram%')`
+        : canal === 'Google'
+        ? sql`AND (LOWER(utm_source) LIKE '%google%' OR LOWER(utm_source) LIKE '%adwords%' OR LOWER(utm_source) = 'gads' OR LOWER(utm_source) LIKE '%ads%')`
+        : sql``;
+      
       // Buscar totais de MQL/Leads por canal para o funil (coluna mql é text) com RM/RR stages
+      // Vendas são filtradas por data_fechamento (quando o negócio foi ganho)
       const mqlTotaisPorCanalResult = await db.execute(sql`
+        WITH leads_mqls AS (
+          SELECT 
+            COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
+            COUNT(*) as leads,
+            SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
+            SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado') THEN 1 ELSE 0 END) as rm,
+            SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado') THEN 1 ELSE 0 END) as rr
+          FROM crm_deal
+          WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+            ${canalFilterSQL}
+          GROUP BY COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
+        ),
+        vendas AS (
+          SELECT 
+            COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
+            COUNT(DISTINCT id) as vendas,
+            SUM(COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0)) as valor_vendas
+          FROM crm_deal
+          WHERE stage_name = 'Negócio Ganho'
+            AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
+            ${canalFilterSQL}
+          GROUP BY COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
+        )
         SELECT 
-          COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
-          COUNT(*) as leads,
-          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
-          SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado') THEN 1 ELSE 0 END) as rm,
-          SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado') THEN 1 ELSE 0 END) as rr,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_vendas
-        FROM crm_deal
-        WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
-        GROUP BY COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
-        ORDER BY mqls DESC
+          COALESCE(lm.canal, v.canal) as canal,
+          COALESCE(lm.leads, 0) as leads,
+          COALESCE(lm.mqls, 0) as mqls,
+          COALESCE(lm.rm, 0) as rm,
+          COALESCE(lm.rr, 0) as rr,
+          COALESCE(v.vendas, 0) as vendas,
+          COALESCE(v.valor_vendas, 0) as valor_vendas
+        FROM leads_mqls lm
+        FULL OUTER JOIN vendas v ON lm.canal = v.canal
+        ORDER BY COALESCE(lm.mqls, 0) DESC
       `);
       
       const mqlPorCanal = (mqlTotaisPorCanalResult.rows as any[]).map(row => {
