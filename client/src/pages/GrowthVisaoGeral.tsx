@@ -370,11 +370,11 @@ export default function GrowthVisaoGeral() {
     }>;
     evolucaoDiaria: Array<{ data: string; negocios: number; valor: number }>;
   }>({
-    queryKey: ['/api/growth/visao-geral', format(dateRange.from, 'yyyy-MM-dd'), format(dateRange.to, 'yyyy-MM-dd'), canal],
+    queryKey: ['/api/growth/visao-geral', format(dateRange.from, 'yyyy-MM-dd'), format(dateRange.to, 'yyyy-MM-dd'), canal, tipoContrato],
     queryFn: async () => {
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
       const endDate = format(dateRange.to, 'yyyy-MM-dd');
-      const res = await fetch(`/api/growth/visao-geral?startDate=${startDate}&endDate=${endDate}&canal=${canal}`, {
+      const res = await fetch(`/api/growth/visao-geral?startDate=${startDate}&endDate=${endDate}&canal=${canal}&tipoContrato=${tipoContrato}`, {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to fetch visao geral');
