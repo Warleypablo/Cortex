@@ -398,7 +398,21 @@ export default function GrowthVisaoGeral() {
     }>;
     evolucaoDiaria: Array<{ data: string; negocios: number; valor: number }>;
     mqlDiario: Array<{ data: string; canais: Record<string, { leads: number; mqls: number }> }>;
-    mqlPorCanal: Array<{ canal: string; leads: number; mqls: number; vendas: number; valorVendas: number }>;
+    mqlPorCanal: Array<{ 
+      canal: string; 
+      leads: number; 
+      mqls: number; 
+      rm: number;
+      rr: number;
+      vendas: number; 
+      valorVendas: number;
+      leadMql: number;
+      mqlRm: number;
+      mqlRr: number;
+      txRrVenda: number;
+      mqlVenda: number;
+      tm: number;
+    }>;
   }>({
     queryKey: ['/api/growth/visao-geral', format(dateRange.from, 'yyyy-MM-dd'), format(dateRange.to, 'yyyy-MM-dd'), canal, tipoContrato],
     queryFn: async () => {
@@ -412,12 +426,87 @@ export default function GrowthVisaoGeral() {
     }
   });
 
+  // Type for channel performance data
+  type ChannelData = {
+    canal: string;
+    leads: number;
+    mqls: number;
+    rm: number;
+    rr: number;
+    vendas: number;
+    valorVendas: number;
+    leadMql: number;
+    mqlRm: number;
+    mqlRr: number;
+    txRrVenda: number;
+    mqlVenda: number;
+    tm: number;
+  };
+
+  // Use real data from API, fall back to mock if needed
   const sparklineData = useMemo(() => {
-    return mockChannelPerformance.map(ch => ({
+    const realData = visaoGeralData?.mqlPorCanal || [];
+    
+    if (realData.length > 0) {
+      // Gerar sparklines baseados em dados diários reais se disponíveis
+      const mqlDiario = visaoGeralData?.mqlDiario || [];
+      
+      return realData.map((ch: ChannelData) => {
+        // Extrair sparkline dos dados diários para este canal
+        const sparkline = mqlDiario.map((day: { data: string; canais: Record<string, { leads: number; mqls: number }> }) => {
+          const canalData = day.canais[ch.canal];
+          return canalData?.mqls || 0;
+        });
+        
+        // Se não houver dados diários suficientes, gerar baseado no total
+        const finalSparkline = sparkline.length >= 5 
+          ? sparkline 
+          : Array.from({ length: 30 }, () => Math.floor((ch.mqls / 30) * (0.5 + Math.random())));
+        
+        return {
+          ...ch,
+          cpmql: null as number | null, // Será calculado abaixo
+          cac: null as number | null,
+          sparkline: finalSparkline,
+        };
+      });
+    }
+    
+    // Fallback para mock se não houver dados reais
+    return mockChannelPerformance.map((ch) => ({
       ...ch,
       sparkline: Array.from({ length: 30 }, () => Math.floor(Math.random() * 100) + 50),
     }));
-  }, []);
+  }, [visaoGeralData?.mqlPorCanal, visaoGeralData?.mqlDiario]);
+  
+  // Calculate real totals from data
+  const calculatedTotals = useMemo(() => {
+    const data = visaoGeralData?.mqlPorCanal || [];
+    if (data.length === 0) return mockTotals;
+    
+    const leads = data.reduce((sum: number, c: ChannelData) => sum + c.leads, 0);
+    const mqls = data.reduce((sum: number, c: ChannelData) => sum + c.mqls, 0);
+    const rm = data.reduce((sum: number, c: ChannelData) => sum + c.rm, 0);
+    const rr = data.reduce((sum: number, c: ChannelData) => sum + c.rr, 0);
+    const vendas = data.reduce((sum: number, c: ChannelData) => sum + c.vendas, 0);
+    const valorVendas = data.reduce((sum: number, c: ChannelData) => sum + c.valorVendas, 0);
+    
+    return {
+      leads,
+      cpmql: null as number | null,
+      leadMql: leads > 0 ? Math.round((mqls / leads) * 100) : 0,
+      mql: mqls,
+      mqlRm: mqls > 0 ? Math.round((rm / mqls) * 100) : 0,
+      rm,
+      mqlRr: mqls > 0 ? Math.round((rr / mqls) * 100) : 0,
+      rr,
+      txRrVenda: rr > 0 ? Math.round((vendas / rr) * 100) : 0,
+      vendas,
+      cac: null as number | null,
+      valorVendas,
+      tm: vendas > 0 ? Math.round(valorVendas / vendas) : 0,
+    };
+  }, [visaoGeralData?.mqlPorCanal]);
 
   return (
     <div className="flex flex-col h-full overflow-auto">
@@ -747,7 +836,7 @@ export default function GrowthVisaoGeral() {
                         {row.cpmql ? formatCurrency(row.cpmql) : '-'}
                       </TableCell>
                       <TableCell className="text-right">{row.leadMql}%</TableCell>
-                      <TableCell className="text-right font-semibold">{formatNumber(row.mql)}</TableCell>
+                      <TableCell className="text-right font-semibold">{formatNumber((row as any).mqls ?? (row as any).mql ?? 0)}</TableCell>
                       <TableCell className="text-center">
                         <MiniSparkline data={row.sparkline} />
                       </TableCell>
@@ -769,21 +858,21 @@ export default function GrowthVisaoGeral() {
                   ))}
                   <TableRow className="bg-muted/50 font-bold border-t-2">
                     <TableCell className="sticky left-0 bg-muted/50 z-10">Total</TableCell>
-                    <TableCell className="text-right">{formatNumber(mockTotals.leads)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(mockTotals.cpmql)}</TableCell>
-                    <TableCell className="text-right">{mockTotals.leadMql}%</TableCell>
-                    <TableCell className="text-right">{formatNumber(mockTotals.mql)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(calculatedTotals.leads)}</TableCell>
+                    <TableCell className="text-right">{calculatedTotals.cpmql ? formatCurrency(calculatedTotals.cpmql) : '-'}</TableCell>
+                    <TableCell className="text-right">{calculatedTotals.leadMql}%</TableCell>
+                    <TableCell className="text-right">{formatNumber(calculatedTotals.mql)}</TableCell>
                     <TableCell></TableCell>
-                    <TableCell className="text-right">{mockTotals.mqlRm}%</TableCell>
-                    <TableCell className="text-right">{formatNumber(mockTotals.rm)}</TableCell>
-                    <TableCell className="text-right">{mockTotals.mqlRr}%</TableCell>
-                    <TableCell className="text-right">{formatNumber(mockTotals.rr)}</TableCell>
-                    <TableCell className="text-right">{mockTotals.txRrVenda}%</TableCell>
+                    <TableCell className="text-right">{calculatedTotals.mqlRm}%</TableCell>
+                    <TableCell className="text-right">{formatNumber(calculatedTotals.rm)}</TableCell>
+                    <TableCell className="text-right">{calculatedTotals.mqlRr}%</TableCell>
+                    <TableCell className="text-right">{formatNumber(calculatedTotals.rr)}</TableCell>
+                    <TableCell className="text-right">{calculatedTotals.txRrVenda}%</TableCell>
                     <TableCell></TableCell>
-                    <TableCell className="text-right text-green-600">{formatNumber(mockTotals.vendas)}</TableCell>
-                    <TableCell className="text-right">-</TableCell>
-                    <TableCell className="text-right">{formatCurrency(mockTotals.valorVendas)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(mockTotals.tm)}</TableCell>
+                    <TableCell className="text-right text-green-600">{formatNumber(calculatedTotals.vendas)}</TableCell>
+                    <TableCell className="text-right">{calculatedTotals.cac ? formatCurrency(calculatedTotals.cac) : '-'}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(calculatedTotals.valorVendas)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(calculatedTotals.tm)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
