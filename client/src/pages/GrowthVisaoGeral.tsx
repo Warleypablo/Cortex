@@ -8,7 +8,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon, TrendingUp, TrendingDown, Target, DollarSign, Users, ShoppingCart, BarChart3, Rocket, Percent, Trophy, CircleDollarSign } from "lucide-react";
-import { format, subDays, eachDayOfInterval, startOfMonth, endOfMonth } from "date-fns";
+import { format, subDays, subMonths, eachDayOfInterval, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 
@@ -302,10 +302,21 @@ function FunnelVisualization() {
   );
 }
 
+// Atalhos de período para filtro de datas
+const datePresets = [
+  { label: 'Hoje', getRange: () => ({ from: new Date(), to: new Date() }) },
+  { label: 'Últimos 7 dias', getRange: () => ({ from: subDays(new Date(), 7), to: new Date() }) },
+  { label: 'Últimos 30 dias', getRange: () => ({ from: subDays(new Date(), 30), to: new Date() }) },
+  { label: 'Mês Atual', getRange: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }) },
+  { label: 'Mês Anterior', getRange: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) }) },
+  { label: 'Trimestre Atual', getRange: () => ({ from: startOfQuarter(new Date()), to: endOfQuarter(new Date()) }) },
+  { label: 'Ano Atual', getRange: () => ({ from: startOfYear(new Date()), to: new Date() }) },
+];
+
 export default function GrowthVisaoGeral() {
   const [dateRange, setDateRange] = useState({
-    from: new Date(2025, 9, 1),
-    to: new Date(2025, 10, 30),
+    from: startOfMonth(new Date()),
+    to: new Date(),
   });
   const [canal, setCanal] = useState("Todos");
   const [tipoContrato, setTipoContrato] = useState("Todos");
@@ -451,17 +462,34 @@ export default function GrowthVisaoGeral() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="range"
-                selected={{ from: dateRange.from, to: dateRange.to }}
-                onSelect={(range) => {
-                  if (range?.from && range?.to) {
-                    setDateRange({ from: range.from, to: range.to });
-                  }
-                }}
-                locale={ptBR}
-                numberOfMonths={2}
-              />
+              <div className="flex">
+                <div className="border-r p-2 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground px-2 pb-1">Atalhos</p>
+                  {datePresets.map((preset) => (
+                    <Button
+                      key={preset.label}
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-sm font-normal"
+                      onClick={() => setDateRange(preset.getRange())}
+                      data-testid={`button-preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+                <Calendar
+                  mode="range"
+                  selected={{ from: dateRange.from, to: dateRange.to }}
+                  onSelect={(range) => {
+                    if (range?.from && range?.to) {
+                      setDateRange({ from: range.from, to: range.to });
+                    }
+                  }}
+                  locale={ptBR}
+                  numberOfMonths={2}
+                />
+              </div>
             </PopoverContent>
           </Popover>
         </div>
