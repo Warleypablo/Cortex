@@ -144,11 +144,14 @@ interface InadimplenciaContexto {
   contexto: string | null;
   evidencias: string | null;
   acao: string | null;
+  statusFinanceiro: string | null;
+  detalheFinanceiro: string | null;
   atualizadoPor: string | null;
   atualizadoEm: string | null;
 }
 
 type AcaoContexto = 'cobrar' | 'aguardar' | 'abonar';
+type StatusFinanceiro = 'cobrado' | 'acordo_realizado' | 'juridico';
 
 const COLORS = {
   ate30dias: "#22c55e",
@@ -190,6 +193,8 @@ export default function DashboardInadimplencia() {
   const [contextoTexto, setContextoTexto] = useState("");
   const [evidenciasTexto, setEvidenciasTexto] = useState("");
   const [acaoSelecionada, setAcaoSelecionada] = useState<AcaoContexto | null>(null);
+  const [statusFinanceiroSelecionado, setStatusFinanceiroSelecionado] = useState<StatusFinanceiro | null>(null);
+  const [detalheFinanceiroTexto, setDetalheFinanceiroTexto] = useState("");
 
   useEffect(() => {
     setClienteSelecionado(null);
@@ -264,16 +269,27 @@ export default function DashboardInadimplencia() {
       setContextoTexto(contextoAtualData.contexto.contexto || '');
       setEvidenciasTexto(contextoAtualData.contexto.evidencias || '');
       setAcaoSelecionada(contextoAtualData.contexto.acao as AcaoContexto || null);
+      setStatusFinanceiroSelecionado(contextoAtualData.contexto.statusFinanceiro as StatusFinanceiro || null);
+      setDetalheFinanceiroTexto(contextoAtualData.contexto.detalheFinanceiro || '');
     }
   }, [contextoAtualData, clienteContexto]);
 
   // Mutation para salvar contexto
   const salvarContextoMutation = useMutation({
-    mutationFn: async (data: { clienteId: string; contexto: string; evidencias: string; acao: AcaoContexto }) => {
+    mutationFn: async (data: { 
+      clienteId: string; 
+      contexto: string; 
+      evidencias: string; 
+      acao: AcaoContexto; 
+      statusFinanceiro: StatusFinanceiro | null;
+      detalheFinanceiro: string;
+    }) => {
       return apiRequest('PUT', `/api/inadimplencia/contexto/${encodeURIComponent(data.clienteId)}`, {
         contexto: data.contexto,
         evidencias: data.evidencias,
         acao: data.acao,
+        statusFinanceiro: data.statusFinanceiro,
+        detalheFinanceiro: data.detalheFinanceiro,
       });
     },
     onSuccess: () => {
@@ -299,6 +315,8 @@ export default function DashboardInadimplencia() {
     setContextoTexto('');
     setEvidenciasTexto('');
     setAcaoSelecionada(null);
+    setStatusFinanceiroSelecionado(null);
+    setDetalheFinanceiroTexto('');
   };
 
   const fecharDialogContexto = () => {
@@ -306,23 +324,36 @@ export default function DashboardInadimplencia() {
     setContextoTexto('');
     setEvidenciasTexto('');
     setAcaoSelecionada(null);
+    setStatusFinanceiroSelecionado(null);
+    setDetalheFinanceiroTexto('');
   };
 
   const handleSalvarContexto = () => {
-    if (!clienteContexto || !acaoSelecionada) {
-      toast({
-        title: "Atenção",
-        description: "Selecione uma ação (Cobrar, Aguardar ou Abonar).",
-        variant: "destructive",
-      });
+    if (!clienteContexto) {
       return;
     }
     salvarContextoMutation.mutate({
       clienteId: clienteContexto.idCliente,
       contexto: contextoTexto,
       evidencias: evidenciasTexto,
-      acao: acaoSelecionada,
+      acao: acaoSelecionada || 'cobrar',
+      statusFinanceiro: statusFinanceiroSelecionado,
+      detalheFinanceiro: detalheFinanceiroTexto,
     });
+  };
+
+  const getStatusFinanceiroBadge = (status: string | null | undefined) => {
+    if (!status) return { label: 'Não informado', variant: 'secondary' as const, color: 'text-muted-foreground' };
+    switch (status) {
+      case 'cobrado':
+        return { label: 'Cobrado', variant: 'outline' as const, color: 'text-blue-600 dark:text-blue-400' };
+      case 'acordo_realizado':
+        return { label: 'Acordo Realizado', variant: 'default' as const, color: 'text-green-600 dark:text-green-400' };
+      case 'juridico':
+        return { label: 'Jurídico', variant: 'destructive' as const, color: 'text-red-600 dark:text-red-400' };
+      default:
+        return { label: 'Não informado', variant: 'secondary' as const, color: 'text-muted-foreground' };
+    }
   };
 
   const getAcaoBadge = (acao: string | null | undefined) => {
@@ -1138,6 +1169,7 @@ export default function DashboardInadimplencia() {
                     <TableHead className="text-center">Parcelas</TableHead>
                     <TableHead className="text-center">Dias Atraso</TableHead>
                     <TableHead className="text-center">Contexto CS</TableHead>
+                    <TableHead className="text-center">Contexto Financeiro</TableHead>
                     <TableHead className="text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1235,6 +1267,38 @@ export default function DashboardInadimplencia() {
                                     </div>
                                   ) : (
                                     <p>Clique para contextualizar</p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {(() => {
+                          const contexto = contextosData?.contextos?.[cliente.idCliente];
+                          const badge = getStatusFinanceiroBadge(contexto?.statusFinanceiro);
+                          return (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge 
+                                    variant={badge.variant} 
+                                    className="cursor-pointer"
+                                    onClick={() => abrirDialogContexto(cliente)}
+                                    data-testid={`badge-financeiro-${cliente.idCliente}`}
+                                  >
+                                    {badge.label}
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {contexto?.detalheFinanceiro ? (
+                                    <div className="max-w-xs">
+                                      <p className="font-medium mb-1">Detalhe:</p>
+                                      <p className="text-sm">{contexto.detalheFinanceiro}</p>
+                                    </div>
+                                  ) : (
+                                    <p>Clique para adicionar contexto financeiro</p>
                                   )}
                                 </TooltipContent>
                               </Tooltip>
@@ -1460,7 +1524,7 @@ export default function DashboardInadimplencia() {
               </div>
 
               <div className="space-y-2">
-                <Label>Ação Recomendada</Label>
+                <Label>Ação CS/CX</Label>
                 <RadioGroup
                   value={acaoSelecionada || ''}
                   onValueChange={(v) => setAcaoSelecionada(v as AcaoContexto)}
@@ -1491,13 +1555,63 @@ export default function DashboardInadimplencia() {
                 </RadioGroup>
               </div>
 
+              <div className="border-t pt-4 mt-4">
+                <h4 className="font-medium flex items-center gap-2 mb-4">
+                  <CreditCard className="h-4 w-4" />
+                  Contexto Financeiro
+                </h4>
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Status da Cobrança</Label>
+                    <RadioGroup
+                      value={statusFinanceiroSelecionado || ''}
+                      onValueChange={(v) => setStatusFinanceiroSelecionado(v as StatusFinanceiro)}
+                      className="flex gap-4"
+                      data-testid="radio-status-financeiro"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="cobrado" id="cobrado" />
+                        <Label htmlFor="cobrado" className="flex items-center gap-1 cursor-pointer text-blue-600 dark:text-blue-400 font-medium">
+                          Cobrado
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="acordo_realizado" id="acordo_realizado" />
+                        <Label htmlFor="acordo_realizado" className="flex items-center gap-1 cursor-pointer text-green-600 dark:text-green-400 font-medium">
+                          Acordo Realizado
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="juridico" id="juridico" />
+                        <Label htmlFor="juridico" className="flex items-center gap-1 cursor-pointer text-red-600 dark:text-red-400 font-medium">
+                          Jurídico
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="detalheFinanceiro">Detalhamento Financeiro</Label>
+                    <Textarea
+                      id="detalheFinanceiro"
+                      placeholder="Detalhes sobre a cobrança, acordos realizados, valores negociados, datas de pagamento..."
+                      value={detalheFinanceiroTexto}
+                      onChange={(e) => setDetalheFinanceiroTexto(e.target.value)}
+                      className="min-h-[80px]"
+                      data-testid="textarea-detalhe-financeiro"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={fecharDialogContexto} data-testid="button-cancelar-contexto">
                   Cancelar
                 </Button>
                 <Button 
                   onClick={handleSalvarContexto} 
-                  disabled={salvarContextoMutation.isPending || !acaoSelecionada}
+                  disabled={salvarContextoMutation.isPending}
                   data-testid="button-salvar-contexto"
                 >
                   {salvarContextoMutation.isPending ? (
