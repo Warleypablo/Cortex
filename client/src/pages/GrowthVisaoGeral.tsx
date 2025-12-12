@@ -223,70 +223,93 @@ function MiniSparkline({ data }: { data: number[] }) {
   );
 }
 
-function FunnelVisualization() {
-  const [activeTab, setActiveTab] = useState<'mql' | 'leads'>('mql');
+interface FunnelProps {
+  impressions: number;
+  clicks: number;
+  negociosGanhos: number;
+  valorVendas: number;
+  investimento: number;
+}
+
+function FunnelVisualization({ impressions, clicks, negociosGanhos, valorVendas, investimento }: FunnelProps) {
+  const [activeTab, setActiveTab] = useState<'conversao' | 'valor'>('conversao');
   
-  const mqlStages = [
-    { label: 'MQLs', value: 14013, color: 'bg-red-500' },
-    { label: 'RM MQL', value: 5781, percent: 41, color: 'bg-orange-500' },
-    { label: 'RR MQL', value: 2946, percent: 51, color: 'bg-yellow-500' },
-    { label: 'Vendas MQL', value: 1024, percent: 35, color: 'bg-green-500' },
+  const ctr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : 0;
+  const conversionRate = clicks > 0 ? ((negociosGanhos / clicks) * 100).toFixed(2) : 0;
+  const cac = negociosGanhos > 0 ? investimento / negociosGanhos : 0;
+  const roi = investimento > 0 ? ((valorVendas - investimento) / investimento * 100).toFixed(0) : 0;
+  
+  const conversaoStages = [
+    { label: 'Impressões', value: impressions, color: 'bg-blue-500' },
+    { label: 'Cliques', value: clicks, percent: parseFloat(ctr as string), color: 'bg-orange-500' },
+    { label: 'Negócios Ganhos', value: negociosGanhos, percent: parseFloat(conversionRate as string), color: 'bg-green-500' },
   ];
   
-  const leadsStages = [
-    { label: 'Leads Total', value: 28426, color: 'bg-blue-500' },
-    { label: 'RM Leads', value: 8743, percent: 31, color: 'bg-orange-500' },
-    { label: 'RR Leads', value: 4102, percent: 47, color: 'bg-yellow-500' },
-    { label: 'Vendas Leads', value: 1312, percent: 32, color: 'bg-green-500' },
+  const valorStages = [
+    { label: 'Investimento', value: investimento, color: 'bg-red-500', isCurrency: true },
+    { label: 'Valor Vendas', value: valorVendas, color: 'bg-green-500', isCurrency: true },
+    { label: 'ROI', value: parseFloat(roi as string), color: 'bg-blue-500', isPercent: true },
   ];
   
-  const stages = activeTab === 'mql' ? mqlStages : leadsStages;
-  const taxaFinal = activeTab === 'mql' ? 7 : 5;
+  const stages = activeTab === 'conversao' ? conversaoStages : valorStages;
+  const taxaFinal = activeTab === 'conversao' ? parseFloat(conversionRate as string) : parseFloat(roi as string);
   const firstStage = stages[0];
+
+  const formatValue = (stage: any) => {
+    if (stage.isCurrency) return formatCurrency(stage.value);
+    if (stage.isPercent) return `${stage.value}%`;
+    return formatNumber(stage.value);
+  };
 
   return (
     <div className="flex flex-col gap-3 p-4">
       <div className="flex gap-1 p-1 bg-muted rounded-lg mb-2">
         <button
-          onClick={() => setActiveTab('mql')}
+          onClick={() => setActiveTab('conversao')}
           className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-            activeTab === 'mql' 
+            activeTab === 'conversao' 
               ? 'bg-background shadow-sm text-foreground' 
               : 'text-muted-foreground hover:text-foreground'
           }`}
-          data-testid="tab-funnel-mql"
+          data-testid="tab-funnel-conversao"
         >
-          Funil MQL
+          Conversão
         </button>
         <button
-          onClick={() => setActiveTab('leads')}
+          onClick={() => setActiveTab('valor')}
           className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-            activeTab === 'leads' 
+            activeTab === 'valor' 
               ? 'bg-background shadow-sm text-foreground' 
               : 'text-muted-foreground hover:text-foreground'
           }`}
-          data-testid="tab-funnel-leads"
+          data-testid="tab-funnel-valor"
         >
-          Funil Geral
+          Valor
         </button>
       </div>
       
       <div className="flex items-center gap-3 mb-2">
-        <div className={`w-12 h-12 rounded-full ${activeTab === 'mql' ? 'bg-gradient-to-br from-red-500 to-orange-500' : 'bg-gradient-to-br from-blue-500 to-cyan-500'} flex items-center justify-center`}>
-          <span className="text-white font-bold text-xs">{formatNumber(firstStage.value)}</span>
+        <div className={`w-12 h-12 rounded-full ${firstStage.color} flex items-center justify-center`}>
+          <span className="text-white font-bold text-[9px] text-center leading-tight px-1">
+            {formatValue(firstStage)}
+          </span>
         </div>
         <span className="text-sm font-medium">{firstStage.label}</span>
       </div>
       
-      {stages.slice(1).map((stage) => (
+      {stages.slice(1).map((stage: any) => (
         <div key={stage.label} className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-full ${stage.color} flex items-center justify-center`}>
-            <span className="text-white font-bold text-xs">{formatNumber(stage.value)}</span>
+            <span className="text-white font-bold text-[9px] text-center leading-tight px-1">
+              {formatValue(stage)}
+            </span>
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">{stage.label}</span>
-              <Badge variant="outline" className="text-xs">{stage.percent}%</Badge>
+              {stage.percent !== undefined && (
+                <Badge variant="outline" className="text-xs">{stage.percent}%</Badge>
+              )}
             </div>
           </div>
         </div>
@@ -294,8 +317,8 @@ function FunnelVisualization() {
       
       <div className="mt-2 pt-2 border-t">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Taxa Final</span>
-          <Badge className="bg-green-500">{taxaFinal}%</Badge>
+          <span className="text-muted-foreground">{activeTab === 'conversao' ? 'Taxa Conversão' : 'ROI'}</span>
+          <Badge className={taxaFinal >= 0 ? "bg-green-500" : "bg-red-500"}>{taxaFinal}%</Badge>
         </div>
       </div>
     </div>
@@ -566,14 +589,20 @@ export default function GrowthVisaoGeral() {
               <CardTitle className="text-base">Funil de Conversão</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <FunnelVisualization />
+              <FunnelVisualization 
+                impressions={visaoGeralData?.resumo?.impressions || 0}
+                clicks={visaoGeralData?.resumo?.clicks || 0}
+                negociosGanhos={visaoGeralData?.resumo?.negociosGanhos || 0}
+                valorVendas={visaoGeralData?.resumo?.valorVendas || 0}
+                investimento={visaoGeralData?.resumo?.investimento || 0}
+              />
             </CardContent>
           </Card>
 
           <Card className="lg:col-span-3">
             <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
               <div className="flex items-center gap-3">
-                <CardTitle className="text-base">{chartView === 'mql' ? 'MQL' : 'Leads'} por Dia</CardTitle>
+                <CardTitle className="text-base">Evolução Diária</CardTitle>
                 <div className="flex gap-1 p-1 bg-muted rounded-lg">
                   <button
                     onClick={() => setChartView('mql')}
@@ -582,9 +611,9 @@ export default function GrowthVisaoGeral() {
                         ? 'bg-background shadow-sm text-foreground' 
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
-                    data-testid="tab-chart-mql"
+                    data-testid="tab-chart-negocios"
                   >
-                    MQL
+                    Negócios
                   </button>
                   <button
                     onClick={() => setChartView('leads')}
@@ -593,50 +622,89 @@ export default function GrowthVisaoGeral() {
                         ? 'bg-background shadow-sm text-foreground' 
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
-                    data-testid="tab-chart-leads"
+                    data-testid="tab-chart-investimento"
                   >
-                    Leads
+                    Investimento
                   </button>
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap text-xs">
-                {Object.entries(channelColors).slice(0, 6).map(([name, color]) => (
-                  <div key={name} className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
-                    <span>{name}</span>
-                  </div>
-                ))}
                 <div className="flex items-center gap-1">
-                  <div className="w-6 h-0.5 bg-black" />
-                  <span>{chartView === 'mql' ? 'CPMQL' : 'CPL'}</span>
+                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#22c55e' }} />
+                  <span>{chartView === 'mql' ? 'Negócios Ganhos' : 'Investimento'}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-6 h-0.5 bg-blue-500" />
+                  <span>{chartView === 'mql' ? 'Valor Vendas' : 'Cliques'}</span>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={mockDailyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={4} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} domain={[0, 500]} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                        fontSize: '12px'
-                      }} 
-                    />
-                    <Bar yAxisId="left" dataKey={chartView === 'mql' ? 'Facebook' : 'FacebookLeads'} stackId="a" fill={channelColors['Facebook']} name="Facebook" />
-                    <Bar yAxisId="left" dataKey={chartView === 'mql' ? 'Google' : 'GoogleLeads'} stackId="a" fill={channelColors['Google']} name="Google" />
-                    <Bar yAxisId="left" dataKey={chartView === 'mql' ? 'Orgânico' : 'OrgânicoLeads'} stackId="a" fill={channelColors['Orgânico']} name="Orgânico" />
-                    <Bar yAxisId="left" dataKey={chartView === 'mql' ? 'Institucional' : 'InstitucionalLeads'} stackId="a" fill={channelColors['Institucional']} name="Institucional" />
-                    <Bar yAxisId="left" dataKey={chartView === 'mql' ? 'LinkedIn' : 'LinkedInLeads'} stackId="a" fill={channelColors['LinkedIn']} name="LinkedIn" />
-                    <Bar yAxisId="left" dataKey={chartView === 'mql' ? 'Outros' : 'OutrosLeads'} stackId="a" fill={channelColors['Outros']} name="Outros" />
-                    <Line yAxisId="right" type="monotone" dataKey={chartView === 'mql' ? 'cpmql' : 'cpl'} stroke="#000" strokeWidth={2} dot={false} name={chartView === 'mql' ? 'CPMQL' : 'CPL'} />
-                  </ComposedChart>
-                </ResponsiveContainer>
+                {chartView === 'mql' ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart 
+                      data={visaoGeralData?.evolucaoDiaria?.map(d => ({
+                        date: format(new Date(d.data), 'dd/MM'),
+                        negocios: d.negocios,
+                        valor: d.valor
+                      })) || []} 
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 10 }} allowDecimals={false} />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                          fontSize: '12px'
+                        }}
+                        formatter={(value: any, name: string) => [
+                          name === 'valor' ? formatCurrency(value) : value,
+                          name === 'valor' ? 'Valor Vendas' : 'Negócios Ganhos'
+                        ]}
+                      />
+                      <Bar yAxisId="left" dataKey="negocios" fill="#22c55e" name="Negócios Ganhos" radius={[4, 4, 0, 0]} />
+                      <Line yAxisId="right" type="monotone" dataKey="valor" stroke="#3b82f6" strokeWidth={2} dot={false} name="Valor Vendas" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart 
+                      data={investimentoData?.daily?.map(d => ({
+                        date: format(new Date(d.date), 'dd/MM'),
+                        investimento: d.investimento,
+                        clicks: d.clicks,
+                        google: d.google || 0,
+                        meta: d.meta || 0
+                      })) || []} 
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                          fontSize: '12px'
+                        }}
+                        formatter={(value: any, name: string) => [
+                          name === 'clicks' ? formatNumber(value) : formatCurrency(value),
+                          name === 'clicks' ? 'Cliques' : name === 'google' ? 'Google Ads' : name === 'meta' ? 'Meta Ads' : 'Investimento'
+                        ]}
+                      />
+                      <Bar yAxisId="left" dataKey="meta" stackId="invest" fill="#1877F2" name="Meta Ads" radius={[0, 0, 0, 0]} />
+                      <Bar yAxisId="left" dataKey="google" stackId="invest" fill="#34A853" name="Google Ads" radius={[4, 4, 0, 0]} />
+                      <Line yAxisId="right" type="monotone" dataKey="clicks" stroke="#3b82f6" strokeWidth={2} dot={false} name="Cliques" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </CardContent>
           </Card>
