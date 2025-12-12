@@ -1240,12 +1240,12 @@ export default function PresentationMode() {
                       ))}
                     </div>
                   ) : sdrTop3.length > 0 ? (
-                    <div className="flex-1 flex items-end justify-center gap-3">
+                    <div className="flex-1 flex items-end justify-center gap-3 pb-2">
                       {[1, 0, 2].map((dataIndex, visualIndex) => {
                         const sdr = sdrTop3[dataIndex];
                         if (!sdr) return null;
                         
-                        const heightPercents = { 0: '85%', 1: '100%', 2: '70%' };
+                        const marginTops = { 0: 'mt-16', 1: 'mt-0', 2: 'mt-24' };
                         const sizes = ['text-xl', 'text-2xl', 'text-lg'];
                         const badges = ['VICE', 'CAMPEÃO', 'BRONZE'];
                         const badgeColors = ['bg-gray-500', 'bg-gradient-to-r from-yellow-500 to-amber-500', 'bg-amber-700'];
@@ -1256,8 +1256,7 @@ export default function PresentationMode() {
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.2 + visualIndex * 0.1 }}
-                            className="relative w-48 flex flex-col"
-                            style={{ height: heightPercents[visualIndex as keyof typeof heightPercents] }}
+                            className={`relative w-48 flex flex-col flex-1 ${marginTops[visualIndex as keyof typeof marginTops]}`}
                           >
                             <div className={`flex-1 rounded-2xl bg-gradient-to-b ${getPositionGradient(sdr.position)} border-2 ${getPositionBorder(sdr.position)} shadow-xl p-4 flex flex-col justify-between backdrop-blur-sm`}>
                               <div>
