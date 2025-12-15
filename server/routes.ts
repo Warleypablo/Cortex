@@ -1466,12 +1466,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Growth - Criativos - Listar campanhas disponíveis
+  app.get("/api/growth/criativos/campanhas", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT c.campaign_id, c.campaign_name
+        FROM meta_campaigns c
+        WHERE c.campaign_name IS NOT NULL AND c.campaign_name != ''
+        ORDER BY c.campaign_name
+      `);
+      
+      const campanhas = (result.rows as any[]).map(row => ({
+        id: row.campaign_id,
+        name: row.campaign_name
+      }));
+      
+      res.json(campanhas);
+    } catch (error) {
+      console.error("[api] Error fetching campanhas:", error);
+      res.status(500).json({ error: "Failed to fetch campanhas" });
+    }
+  });
+  
   // Growth - Criativos (dados agregados por anúncio do Meta Ads)
   app.get("/api/growth/criativos", async (req, res) => {
     try {
       const startDate = req.query.startDate as string || '2025-01-01';
       const endDate = req.query.endDate as string || '2025-12-31';
       const status = req.query.status as string || 'Todos'; // Todos, Ativo, Pausado
+      const plataforma = req.query.plataforma as string || 'Todos'; // Todos, Meta Ads, Google Ads, LinkedIn Ads
+      const campanhaId = req.query.campanhaId as string || ''; // campaign_id filter
       
       // Validar formato de data
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -1479,7 +1503,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
       }
       
-      // Buscar dados agregados por anúncio do Meta Ads com info do anúncio
+      // Por enquanto só temos dados do Meta Ads
+      // Se plataforma for Google Ads ou LinkedIn Ads, retornar array vazio
+      if (plataforma === 'Google Ads' || plataforma === 'LinkedIn Ads') {
+        console.log("[api] Growth Criativos - Plataforma:", plataforma, "- sem dados disponíveis");
+        return res.json([]);
+      }
+      
+      // Buscar dados agregados por anúncio do Meta Ads com info do anúncio e campanha
       const adsDataResult = await db.execute(sql`
         SELECT 
           i.ad_id,
@@ -1487,6 +1518,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           a.status as ad_status,
           a.created_time,
           a.preview_shareable_link as link,
+          a.campaign_id,
+          c.campaign_name,
           SUM(i.spend::numeric) as investimento,
           SUM(i.impressions) as impressions,
           SUM(i.clicks) as clicks,
@@ -1500,8 +1533,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SUM(i.video_p100_watched_actions) as video_p100
         FROM meta_insights_daily i
         LEFT JOIN meta_ads a ON i.ad_id = a.ad_id
+        LEFT JOIN meta_campaigns c ON a.campaign_id = c.campaign_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
-        GROUP BY i.ad_id, a.ad_name, a.status, a.created_time, a.preview_shareable_link
+        GROUP BY i.ad_id, a.ad_name, a.status, a.created_time, a.preview_shareable_link, a.campaign_id, c.campaign_name
         ORDER BY SUM(i.spend::numeric) DESC
       `);
       
@@ -1595,6 +1629,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             link: row.link || `https://facebook.com/ads/library/?id=${adId}`,
             dataCriacao: row.created_time ? new Date(row.created_time).toLocaleDateString('pt-BR') : null,
             status: adStatus,
+            plataforma: 'Meta Ads',
+            campaignId: row.campaign_id || null,
+            campaignName: row.campaign_name || null,
             investimento: Math.round(investimento),
             impressions,
             frequency: frequency ? parseFloat(frequency.toFixed(2)) : null,
@@ -1625,9 +1662,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
         .filter(c => {
-          if (status === 'Todos') return true;
-          if (status === 'Ativo') return c.status === 'Ativo';
-          if (status === 'Pausado') return c.status === 'Pausado';
+          // Filtro por status
+          if (status !== 'Todos') {
+            if (status === 'Ativo' && c.status !== 'Ativo') return false;
+            if (status === 'Pausado' && c.status !== 'Pausado') return false;
+          }
+          // Filtro por campanha
+          if (campanhaId && c.campaignId !== campanhaId) return false;
           return true;
         });
       
