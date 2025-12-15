@@ -470,6 +470,7 @@ export default function DashboardInadimplencia() {
   };
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isDownloadingCobrancaPdf, setIsDownloadingCobrancaPdf] = useState(false);
   
   const handleDownloadPdf = async (apenasAtivos: boolean = false) => {
     try {
@@ -505,6 +506,59 @@ export default function DashboardInadimplencia() {
       });
     } finally {
       setIsDownloadingPdf(false);
+    }
+  };
+
+  const handleDownloadCobrancaPdf = async () => {
+    try {
+      setIsDownloadingCobrancaPdf(true);
+      const params = new URLSearchParams();
+      if (dataInicio) params.append('dataInicio', dataInicio);
+      if (dataFim) params.append('dataFim', dataFim);
+      
+      const response = await fetch(`/api/inadimplencia/relatorio-cobranca-pdf?${params.toString()}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          toast({
+            title: "Nenhum cliente encontrado",
+            description: "Não há clientes com ação 'Cobrar' no período selecionado.",
+          });
+          return;
+        }
+        if (response.status === 401 || response.status === 403) {
+          toast({
+            title: "Acesso negado",
+            description: "Você não tem permissão para acessar este relatório.",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw new Error('Erro ao gerar relatório');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-cobranca-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "PDF gerado com sucesso",
+        description: "Relatório de cobrança (clientes a cobrar) baixado.",
+      });
+    } catch (error) {
+      console.error('Erro ao baixar PDF de cobrança:', error);
+      toast({
+        title: "Erro ao gerar PDF",
+        description: "Não foi possível gerar o relatório de cobrança. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloadingCobrancaPdf(false);
     }
   };
 
@@ -682,6 +736,21 @@ export default function DashboardInadimplencia() {
                   <Download className="h-4 w-4 mr-1.5" />
                 )}
                 PDF (Ativos ClickUp)
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleDownloadCobrancaPdf}
+                disabled={isDownloadingCobrancaPdf}
+                className="h-9 px-4 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white shadow-lg shadow-red-500/30 border-0 transition-all"
+                data-testid="button-download-pdf-cobranca"
+              >
+                {isDownloadingCobrancaPdf ? (
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                ) : (
+                  <Receipt className="h-4 w-4 mr-1.5" />
+                )}
+                PDF (Cobrar)
               </Button>
             </div>
           </div>
