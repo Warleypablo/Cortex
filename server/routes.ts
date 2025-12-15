@@ -1859,6 +1859,228 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Relatório PDF de clientes com Contexto CS = "Cobrar"
+  app.get("/api/inadimplencia/relatorio-cobranca-pdf", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      
+      // 1. Buscar todos os clientes
+      const clientesData = await storage.getInadimplenciaClientes(dataInicio, dataFim, 'valor', 500);
+      
+      // 2. Buscar todos os contextos
+      const ids = clientesData.clientes.map(c => c.idCliente);
+      const contextos = await storage.getInadimplenciaContextos(ids);
+      
+      // 3. Filtrar clientes onde acao = 'cobrar'
+      const clientesCobrar = clientesData.clientes.filter(c => 
+        contextos[c.idCliente]?.acao === 'cobrar'
+      );
+      
+      if (clientesCobrar.length === 0) {
+        return res.status(404).json({ error: "Nenhum cliente com ação 'Cobrar' encontrado" });
+      }
+      
+      // 4. Para cada cliente, buscar as parcelas
+      const clientesComParcelas: Array<{
+        cliente: typeof clientesCobrar[0];
+        contexto: typeof contextos[string];
+        parcelas: Array<{
+          id: number;
+          descricao: string;
+          valorBruto: number;
+          naoPago: number;
+          dataVencimento: string;
+          diasAtraso: number;
+          empresa: string;
+          status: string;
+          urlCobranca: string | null;
+        }>;
+      }> = [];
+      
+      for (const cliente of clientesCobrar) {
+        const parcelasData = await storage.getInadimplenciaParcelasCliente(cliente.idCliente, dataInicio, dataFim);
+        clientesComParcelas.push({
+          cliente,
+          contexto: contextos[cliente.idCliente],
+          parcelas: parcelasData.parcelas
+        });
+      }
+      
+      // 5. Gerar PDF
+      const doc = new PDFDocument({ 
+        margin: 40,
+        size: 'A4',
+        layout: 'portrait'
+      });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=relatorio-cobranca-${new Date().toISOString().split('T')[0]}.pdf`);
+      
+      doc.pipe(res);
+      
+      const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { 
+        style: 'currency', 
+        currency: 'BRL',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(value);
+      
+      // Header
+      doc.fontSize(18).fillColor('#1e293b').text('Relatório de Cobrança', { align: 'center' });
+      doc.moveDown(0.3);
+      doc.fontSize(12).fillColor('#dc2626').text('Clientes com Ação: COBRAR', { align: 'center' });
+      doc.moveDown(0.3);
+      
+      const dataHoje = new Date().toLocaleDateString('pt-BR');
+      doc.fontSize(10).fillColor('#64748b').text(`Gerado em: ${dataHoje}`, { align: 'center' });
+      doc.moveDown();
+      
+      // Resumo geral
+      const totalValor = clientesCobrar.reduce((acc, c) => acc + c.valorTotal, 0);
+      const totalParcelas = clientesCobrar.reduce((acc, c) => acc + c.quantidadeParcelas, 0);
+      
+      doc.fontSize(11).fillColor('#1e293b').font('Helvetica-Bold');
+      doc.text(`Total de Clientes a Cobrar: ${clientesCobrar.length}`, 40);
+      doc.font('Helvetica');
+      doc.text(`Total de Parcelas em Atraso: ${totalParcelas}`, 40);
+      doc.text(`Valor Total a Cobrar: ${formatCurrency(totalValor)}`, 40);
+      doc.moveDown();
+      
+      doc.moveTo(40, doc.y).lineTo(pageWidth + 40, doc.y).stroke('#e2e8f0');
+      doc.moveDown();
+      
+      // Cada cliente
+      for (let i = 0; i < clientesComParcelas.length; i++) {
+        const { cliente, contexto, parcelas } = clientesComParcelas[i];
+        
+        // Verificar se precisa de nova página
+        if (doc.y > doc.page.height - 200) {
+          doc.addPage();
+        }
+        
+        // Cabeçalho do cliente
+        doc.fontSize(12).fillColor('#1e293b').font('Helvetica-Bold');
+        doc.text(`${i + 1}. ${cliente.nomeCliente}`, 40);
+        doc.font('Helvetica').fontSize(9).fillColor('#64748b');
+        
+        // Informações do cliente
+        const infoY = doc.y;
+        doc.text(`Empresa: ${cliente.empresa || '-'}`, 40);
+        if (cliente.cnpj) {
+          doc.text(`CNPJ: ${cliente.cnpj}`, 40);
+        }
+        doc.text(`Status ClickUp: ${cliente.statusClickup || '-'}`, 40);
+        doc.text(`Responsável: ${cliente.responsavel || '-'}`, 40);
+        doc.text(`Cluster: ${cliente.cluster || '-'}`, 40);
+        doc.text(`Serviços: ${cliente.servicos || '-'}`, 40);
+        doc.moveDown(0.3);
+        
+        // Valores
+        doc.fontSize(10).fillColor('#dc2626').font('Helvetica-Bold');
+        doc.text(`Valor Total em Atraso: ${formatCurrency(cliente.valorTotal)}`, 40);
+        doc.font('Helvetica').fillColor('#334155');
+        doc.text(`Parcelas em Atraso: ${cliente.quantidadeParcelas} | Dias Atraso Máximo: ${cliente.diasAtrasoMax}`, 40);
+        doc.moveDown(0.5);
+        
+        // Contexto CS
+        doc.fontSize(10).fillColor('#1e293b').font('Helvetica-Bold');
+        doc.text('Contexto CS:', 40);
+        doc.font('Helvetica').fontSize(9).fillColor('#334155');
+        
+        if (contexto) {
+          if (contexto.contexto) {
+            doc.text(`Contexto: ${contexto.contexto}`, 50);
+          }
+          if (contexto.evidencias) {
+            doc.text(`Evidências: ${contexto.evidencias}`, 50);
+          }
+          const acaoLabel = contexto.acao === 'cobrar' ? 'Cobrar' : contexto.acao === 'aguardar' ? 'Aguardar' : contexto.acao === 'abonar' ? 'Abonar' : '-';
+          doc.text(`Ação: ${acaoLabel}`, 50);
+          if (contexto.statusFinanceiro) {
+            const statusLabel = contexto.statusFinanceiro === 'cobrado' ? 'Cobrado' : 
+                               contexto.statusFinanceiro === 'acordo_realizado' ? 'Acordo Realizado' : 
+                               contexto.statusFinanceiro === 'juridico' ? 'Jurídico' : '-';
+            doc.text(`Status Financeiro: ${statusLabel}`, 50);
+          }
+          if (contexto.detalheFinanceiro) {
+            doc.text(`Detalhe Financeiro: ${contexto.detalheFinanceiro}`, 50);
+          }
+          if (contexto.atualizadoPor) {
+            doc.fontSize(8).fillColor('#94a3b8');
+            doc.text(`Atualizado por: ${contexto.atualizadoPor} em ${contexto.atualizadoEm ? new Date(contexto.atualizadoEm).toLocaleDateString('pt-BR') : '-'}`, 50);
+          }
+        }
+        doc.moveDown(0.5);
+        
+        // Tabela de parcelas
+        if (parcelas.length > 0) {
+          doc.fontSize(10).fillColor('#1e293b').font('Helvetica-Bold');
+          doc.text('Parcelas em Atraso:', 40);
+          doc.moveDown(0.3);
+          
+          // Header da tabela
+          const colWidths = { desc: 180, valor: 80, venc: 70, dias: 50, link: 130 };
+          const tableX = 40;
+          let tableY = doc.y;
+          
+          doc.fontSize(8).fillColor('#475569').font('Helvetica-Bold');
+          doc.text('Descrição', tableX, tableY, { width: colWidths.desc });
+          doc.text('Valor', tableX + colWidths.desc, tableY, { width: colWidths.valor, align: 'right' });
+          doc.text('Vencimento', tableX + colWidths.desc + colWidths.valor, tableY, { width: colWidths.venc, align: 'center' });
+          doc.text('Dias', tableX + colWidths.desc + colWidths.valor + colWidths.venc, tableY, { width: colWidths.dias, align: 'center' });
+          doc.text('Link Cobrança', tableX + colWidths.desc + colWidths.valor + colWidths.venc + colWidths.dias, tableY, { width: colWidths.link });
+          
+          doc.moveDown(0.3);
+          doc.moveTo(tableX, doc.y).lineTo(pageWidth + 40, doc.y).stroke('#e2e8f0');
+          doc.moveDown(0.2);
+          
+          doc.font('Helvetica').fontSize(7).fillColor('#334155');
+          
+          for (const parcela of parcelas) {
+            if (doc.y > doc.page.height - 60) {
+              doc.addPage();
+              doc.fontSize(7).fillColor('#334155');
+            }
+            
+            tableY = doc.y;
+            const descTruncada = parcela.descricao.length > 35 ? parcela.descricao.substring(0, 35) + '...' : parcela.descricao;
+            doc.text(descTruncada, tableX, tableY, { width: colWidths.desc });
+            doc.fillColor('#dc2626').text(formatCurrency(parcela.naoPago), tableX + colWidths.desc, tableY, { width: colWidths.valor, align: 'right' });
+            doc.fillColor('#334155');
+            const dataVenc = parcela.dataVencimento ? new Date(parcela.dataVencimento).toLocaleDateString('pt-BR') : '-';
+            doc.text(dataVenc, tableX + colWidths.desc + colWidths.valor, tableY, { width: colWidths.venc, align: 'center' });
+            doc.text(`${parcela.diasAtraso}d`, tableX + colWidths.desc + colWidths.valor + colWidths.venc, tableY, { width: colWidths.dias, align: 'center' });
+            
+            if (parcela.urlCobranca) {
+              const urlTruncada = parcela.urlCobranca.length > 25 ? parcela.urlCobranca.substring(0, 25) + '...' : parcela.urlCobranca;
+              doc.fillColor('#2563eb').text(urlTruncada, tableX + colWidths.desc + colWidths.valor + colWidths.venc + colWidths.dias, tableY, { 
+                width: colWidths.link,
+                link: parcela.urlCobranca
+              });
+              doc.fillColor('#334155');
+            } else {
+              doc.text('-', tableX + colWidths.desc + colWidths.valor + colWidths.venc + colWidths.dias, tableY, { width: colWidths.link });
+            }
+            
+            doc.moveDown(0.4);
+          }
+        }
+        
+        doc.moveDown();
+        doc.moveTo(40, doc.y).lineTo(pageWidth + 40, doc.y).stroke('#cbd5e1');
+        doc.moveDown();
+      }
+      
+      doc.end();
+      
+    } catch (error) {
+      console.error("[api] Error generating cobranca PDF report:", error);
+      res.status(500).json({ error: "Failed to generate cobranca PDF report" });
+    }
+  });
+
   // Contextos de inadimplência - GET batch
   app.get("/api/inadimplencia/contextos", async (req, res) => {
     try {
