@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Search, X, ArrowUpDown, TrendingUp, Rocket, ExternalLink, Loader2 } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Label } from "@/components/ui/label";
+import { CalendarIcon, Search, X, ArrowUpDown, TrendingUp, Rocket, ExternalLink, Loader2, Settings, Plus, Trash2 } from "lucide-react";
 import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfQuarter, endOfQuarter, startOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { getMetricColor, getColorClasses, COLOR_TOKENS, AVAILABLE_METRICS, type MetricColor } from "@/lib/metricFormatting";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { MetricRulesetWithThresholds } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 interface CriativoData {
   id: string;
@@ -91,6 +97,16 @@ export default function Criativos() {
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'investimento', direction: 'desc' });
 
+  const { toast } = useToast();
+  const [configOpen, setConfigOpen] = useState(false);
+  const [editingMetric, setEditingMetric] = useState<string | null>(null);
+  const [editThresholds, setEditThresholds] = useState<Array<{
+    minValue: string;
+    maxValue: string;
+    color: MetricColor;
+    label: string;
+  }>>([]);
+
   const { data: criativos = [], isLoading } = useQuery<CriativoData[]>({
     queryKey: ['/api/growth/criativos', format(dateRange.from, 'yyyy-MM-dd'), format(dateRange.to, 'yyyy-MM-dd'), statusFilter],
     queryFn: async () => {
@@ -103,6 +119,71 @@ export default function Criativos() {
       return res.json();
     }
   });
+
+  const { data: metricRules = [] } = useQuery<MetricRulesetWithThresholds[]>({
+    queryKey: ['/api/metric-rules'],
+  });
+
+  const saveRulesMutation = useMutation({
+    mutationFn: async (data: { metricKey: string; displayLabel: string; thresholds: any[] }) => {
+      return apiRequest('POST', `/api/metric-rules/${data.metricKey}/save`, {
+        displayLabel: data.displayLabel,
+        defaultColor: 'default',
+        thresholds: data.thresholds,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/metric-rules'] });
+      toast({ title: 'Regras salvas com sucesso' });
+      setEditingMetric(null);
+    },
+    onError: () => {
+      toast({ title: 'Erro ao salvar regras', variant: 'destructive' });
+    },
+  });
+
+  const handleEditMetric = (metricKey: string) => {
+    const existing = metricRules.find(r => r.metricKey === metricKey);
+    if (existing) {
+      setEditThresholds(existing.thresholds.map(t => ({
+        minValue: t.minValue?.toString() ?? '',
+        maxValue: t.maxValue?.toString() ?? '',
+        color: (t.color as MetricColor) || 'default',
+        label: t.label || '',
+      })));
+    } else {
+      setEditThresholds([]);
+    }
+    setEditingMetric(metricKey);
+  };
+
+  const handleAddThreshold = () => {
+    setEditThresholds([...editThresholds, { minValue: '', maxValue: '', color: 'green', label: '' }]);
+  };
+
+  const handleRemoveThreshold = (index: number) => {
+    setEditThresholds(editThresholds.filter((_, i) => i !== index));
+  };
+
+  const handleSaveMetric = () => {
+    if (!editingMetric) return;
+    const metricInfo = AVAILABLE_METRICS.find(m => m.key === editingMetric);
+    saveRulesMutation.mutate({
+      metricKey: editingMetric,
+      displayLabel: metricInfo?.label || editingMetric,
+      thresholds: editThresholds.map(t => ({
+        minValue: t.minValue ? parseFloat(t.minValue) : null,
+        maxValue: t.maxValue ? parseFloat(t.maxValue) : null,
+        color: t.color,
+        label: t.label || null,
+      })),
+    });
+  };
+
+  const getCellColor = (value: number | null, metricKey: string) => {
+    const color = getMetricColor(value, metricRules, metricKey);
+    return getColorClasses(color);
+  };
 
   const filteredData = useMemo(() => {
     let result = [...criativos];
@@ -297,9 +378,171 @@ export default function Criativos() {
       <div className="flex-1 p-4 pt-0">
         <Card className="h-full">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-lg">Performance por Criativo</CardTitle>
-              <Badge variant="outline">{filteredData.length} criativos</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{filteredData.length} criativos</Badge>
+                <Sheet open={configOpen} onOpenChange={setConfigOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="sm" data-testid="button-config-metrics">
+                      <Settings className="w-4 h-4 mr-1" />
+                      Formatação
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent className="w-[500px] sm:max-w-[500px] overflow-y-auto">
+                    <SheetHeader>
+                      <SheetTitle>Configurar Formatação de Métricas</SheetTitle>
+                    </SheetHeader>
+                    
+                    {editingMetric === null ? (
+                      <div className="mt-4 space-y-2">
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Defina faixas de valores e cores para destacar métricas importantes.
+                        </p>
+                        {AVAILABLE_METRICS.map(metric => {
+                          const existingRules = metricRules.find(r => r.metricKey === metric.key);
+                          return (
+                            <div 
+                              key={metric.key}
+                              className="flex items-center justify-between p-3 border rounded-lg hover-elevate cursor-pointer"
+                              onClick={() => handleEditMetric(metric.key)}
+                              data-testid={`button-edit-metric-${metric.key}`}
+                            >
+                              <div>
+                                <span className="font-medium">{metric.label}</span>
+                                {existingRules && existingRules.thresholds.length > 0 && (
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    ({existingRules.thresholds.length} regras)
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex gap-1">
+                                {existingRules?.thresholds.map((t, idx) => (
+                                  <div 
+                                    key={idx}
+                                    className={`w-3 h-3 rounded-full ${COLOR_TOKENS[t.color as MetricColor]?.bg || ''}`}
+                                    style={{ backgroundColor: COLOR_TOKENS[t.color as MetricColor]?.bg ? undefined : '#888' }}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="mt-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <Button variant="ghost" size="sm" onClick={() => setEditingMetric(null)}>
+                            ← Voltar
+                          </Button>
+                          <span className="font-medium">
+                            {AVAILABLE_METRICS.find(m => m.key === editingMetric)?.label}
+                          </span>
+                        </div>
+                        
+                        <p className="text-sm text-muted-foreground">
+                          As regras são avaliadas na ordem. A primeira faixa que corresponder ao valor será usada.
+                        </p>
+                        
+                        <div className="space-y-3">
+                          {editThresholds.map((threshold, idx) => (
+                            <div key={idx} className="p-3 border rounded-lg space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium">Regra {idx + 1}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveThreshold(idx)}
+                                  data-testid={`button-remove-threshold-${idx}`}
+                                >
+                                  <Trash2 className="w-4 h-4 text-destructive" />
+                                </Button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <Label className="text-xs">Mínimo</Label>
+                                  <Input
+                                    type="number"
+                                    placeholder="Sem limite"
+                                    value={threshold.minValue}
+                                    onChange={(e) => {
+                                      const newThresholds = [...editThresholds];
+                                      newThresholds[idx].minValue = e.target.value;
+                                      setEditThresholds(newThresholds);
+                                    }}
+                                    data-testid={`input-min-${idx}`}
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">Máximo</Label>
+                                  <Input
+                                    type="number"
+                                    placeholder="Sem limite"
+                                    value={threshold.maxValue}
+                                    onChange={(e) => {
+                                      const newThresholds = [...editThresholds];
+                                      newThresholds[idx].maxValue = e.target.value;
+                                      setEditThresholds(newThresholds);
+                                    }}
+                                    data-testid={`input-max-${idx}`}
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-xs">Cor</Label>
+                                <Select
+                                  value={threshold.color}
+                                  onValueChange={(value) => {
+                                    const newThresholds = [...editThresholds];
+                                    newThresholds[idx].color = value as MetricColor;
+                                    setEditThresholds(newThresholds);
+                                  }}
+                                >
+                                  <SelectTrigger data-testid={`select-color-${idx}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {Object.entries(COLOR_TOKENS).map(([key, val]) => (
+                                      <SelectItem key={key} value={key}>
+                                        <div className="flex items-center gap-2">
+                                          <div className={`w-3 h-3 rounded-full ${val.bg || 'bg-gray-400'}`} />
+                                          {val.label}
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={handleAddThreshold}
+                          data-testid="button-add-threshold"
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Adicionar Faixa
+                        </Button>
+                        
+                        <Button
+                          className="w-full"
+                          onClick={handleSaveMetric}
+                          disabled={saveRulesMutation.isPending}
+                          data-testid="button-save-metric-rules"
+                        >
+                          {saveRulesMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                          ) : null}
+                          Salvar Regras
+                        </Button>
+                      </div>
+                    )}
+                  </SheetContent>
+                </Sheet>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -357,24 +600,24 @@ export default function Criativos() {
                         </TableCell>
                         <TableCell className="text-right">{formatCurrency(item.investimento)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.impressions)}</TableCell>
-                        <TableCell className="text-right">{item.frequency !== null ? item.frequency.toFixed(2) : '-'}</TableCell>
-                        <TableCell className="text-right">{formatPercent(item.videoHook)}</TableCell>
-                        <TableCell className="text-right">{formatPercent(item.videoHold)}</TableCell>
-                        <TableCell className="text-right">{item.ctr !== null ? `${item.ctr}%` : '-'}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.cpm)}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.frequency, 'frequency')}`}>{item.frequency !== null ? item.frequency.toFixed(2) : '-'}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.videoHook, 'videoHook')}`}>{formatPercent(item.videoHook)}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.videoHold, 'videoHold')}`}>{formatPercent(item.videoHold)}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.ctr, 'ctr')}`}>{item.ctr !== null ? `${item.ctr}%` : '-'}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.cpm, 'cpm')}`}>{formatCurrency(item.cpm)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.leads)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.cpl)}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.cpl, 'cpl')}`}>{formatCurrency(item.cpl)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.mql)}</TableCell>
-                        <TableCell className="text-right">{formatPercent(item.percMql)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.cpmql)}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.percMql, 'percMql')}`}>{formatPercent(item.percMql)}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.cpmql, 'cpmql')}`}>{formatCurrency(item.cpmql)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.ra)}</TableCell>
-                        <TableCell className="text-right">{formatPercent(item.percRaMql)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.cpra)}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.percRaMql, 'percRaMql')}`}>{formatPercent(item.percRaMql)}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.cpra, 'cpra')}`}>{formatCurrency(item.cpra)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.rr)}</TableCell>
-                        <TableCell className="text-right">{formatPercent(item.percRrMql)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.cprr)}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.percRrMql, 'percRrMql')}`}>{formatPercent(item.percRrMql)}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.cprr, 'cprr')}`}>{formatCurrency(item.cprr)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.clientesUnicos)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.cacUnico)}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.cacUnico, 'cacUnico')}`}>{formatCurrency(item.cacUnico)}</TableCell>
                         <TableCell>
                           {item.link && (
                             <a 
