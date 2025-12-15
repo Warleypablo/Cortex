@@ -5674,6 +5674,7 @@ export class DbStorage implements IStorage {
       responsavel: string | null;
       cluster: string | null;
       servicos: string | null;
+      telefone: string | null;
     }[];
   }> {
     const hoje = new Date();
@@ -5729,7 +5730,8 @@ export class DbStorage implements IStorage {
           cup.status as status_clickup,
           cup.responsavel,
           cup.cluster,
-          cup.task_id
+          cup.task_id,
+          cup.telefone
         FROM caz_clientes cc
         LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
           AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
@@ -5759,7 +5761,8 @@ export class DbStorage implements IStorage {
         cliente_info.status_clickup,
         cliente_info.responsavel,
         cliente_info.cluster,
-        contratos.servicos
+        contratos.servicos,
+        cliente_info.telefone
       FROM parcelas_agregadas parcelas
       LEFT JOIN cliente_metadata cliente_info ON TRIM(parcelas.id_cliente::text) = cliente_info.id_cliente
       LEFT JOIN contratos_agregados contratos ON TRIM(cliente_info.task_id::text) = contratos.task_id
@@ -5780,6 +5783,7 @@ export class DbStorage implements IStorage {
       responsavel: row.responsavel || null,
       cluster: row.cluster || null,
       servicos: row.servicos || null,
+      telefone: row.telefone || null,
     }));
     
     return { clientes };
