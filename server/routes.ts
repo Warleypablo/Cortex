@@ -1920,6 +1920,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.pipe(res);
       
       const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const marginLeft = 40;
       const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { 
         style: 'currency', 
         currency: 'BRL',
@@ -1927,152 +1928,229 @@ export async function registerRoutes(app: Express): Promise<Server> {
         maximumFractionDigits: 2
       }).format(value);
       
-      // Header
-      doc.fontSize(18).fillColor('#1e293b').text('Relatório de Cobrança', { align: 'center' });
-      doc.moveDown(0.3);
-      doc.fontSize(12).fillColor('#dc2626').text('Clientes com Ação: COBRAR', { align: 'center' });
-      doc.moveDown(0.3);
+      // ==================== CAPA / HEADER ====================
+      doc.rect(0, 0, doc.page.width, 120).fill('#1e293b');
+      doc.fontSize(24).fillColor('#ffffff').font('Helvetica-Bold');
+      doc.text('RELATÓRIO DE COBRANÇA', marginLeft, 35, { align: 'center' });
+      doc.fontSize(14).fillColor('#fbbf24').font('Helvetica');
+      doc.text('Clientes com Ação: COBRAR', marginLeft, 70, { align: 'center' });
       
       const dataHoje = new Date().toLocaleDateString('pt-BR');
-      doc.fontSize(10).fillColor('#64748b').text(`Gerado em: ${dataHoje}`, { align: 'center' });
-      doc.moveDown();
+      doc.fontSize(10).fillColor('#94a3b8');
+      doc.text(`Gerado em: ${dataHoje}`, marginLeft, 95, { align: 'center' });
       
-      // Resumo geral
+      doc.y = 140;
+      
+      // ==================== RESUMO GERAL ====================
       const totalValor = clientesCobrar.reduce((acc, c) => acc + c.valorTotal, 0);
       const totalParcelas = clientesCobrar.reduce((acc, c) => acc + c.quantidadeParcelas, 0);
       
-      doc.fontSize(11).fillColor('#1e293b').font('Helvetica-Bold');
-      doc.text(`Total de Clientes a Cobrar: ${clientesCobrar.length}`, 40);
-      doc.font('Helvetica');
-      doc.text(`Total de Parcelas em Atraso: ${totalParcelas}`, 40);
-      doc.text(`Valor Total a Cobrar: ${formatCurrency(totalValor)}`, 40);
-      doc.moveDown();
+      // Box de resumo
+      const resumoY = doc.y;
+      doc.rect(marginLeft, resumoY, pageWidth, 60).fill('#f8fafc').stroke('#e2e8f0');
       
-      doc.moveTo(40, doc.y).lineTo(pageWidth + 40, doc.y).stroke('#e2e8f0');
-      doc.moveDown();
+      const boxWidth = pageWidth / 3;
       
-      // Cada cliente
+      // Clientes
+      doc.fontSize(10).fillColor('#64748b').font('Helvetica');
+      doc.text('CLIENTES A COBRAR', marginLeft + 10, resumoY + 10);
+      doc.fontSize(20).fillColor('#1e293b').font('Helvetica-Bold');
+      doc.text(`${clientesCobrar.length}`, marginLeft + 10, resumoY + 28);
+      
+      // Parcelas
+      doc.fontSize(10).fillColor('#64748b').font('Helvetica');
+      doc.text('PARCELAS EM ATRASO', marginLeft + boxWidth + 10, resumoY + 10);
+      doc.fontSize(20).fillColor('#1e293b').font('Helvetica-Bold');
+      doc.text(`${totalParcelas}`, marginLeft + boxWidth + 10, resumoY + 28);
+      
+      // Valor Total
+      doc.fontSize(10).fillColor('#64748b').font('Helvetica');
+      doc.text('VALOR TOTAL', marginLeft + (boxWidth * 2) + 10, resumoY + 10);
+      doc.fontSize(18).fillColor('#dc2626').font('Helvetica-Bold');
+      doc.text(formatCurrency(totalValor), marginLeft + (boxWidth * 2) + 10, resumoY + 28);
+      
+      doc.y = resumoY + 80;
+      
+      // ==================== LISTA DE CLIENTES ====================
       for (let i = 0; i < clientesComParcelas.length; i++) {
         const { cliente, contexto, parcelas } = clientesComParcelas[i];
         
         // Verificar se precisa de nova página
-        if (doc.y > doc.page.height - 200) {
+        if (doc.y > doc.page.height - 220) {
           doc.addPage();
         }
         
-        // Cabeçalho do cliente
-        doc.fontSize(12).fillColor('#1e293b').font('Helvetica-Bold');
-        doc.text(`${i + 1}. ${cliente.nomeCliente}`, 40);
-        doc.font('Helvetica').fontSize(9).fillColor('#64748b');
+        const cardY = doc.y;
         
-        // Informações do cliente
-        const infoY = doc.y;
-        doc.text(`Empresa: ${cliente.empresa || '-'}`, 40);
+        // ---- HEADER DO CLIENTE (barra colorida) ----
+        doc.rect(marginLeft, cardY, pageWidth, 28).fill('#1e293b');
+        doc.fontSize(12).fillColor('#ffffff').font('Helvetica-Bold');
+        doc.text(`${i + 1}. ${cliente.nomeCliente}`, marginLeft + 10, cardY + 8);
+        
+        // Valor em destaque no header
+        doc.fontSize(11).fillColor('#fbbf24');
+        doc.text(formatCurrency(cliente.valorTotal), marginLeft + pageWidth - 120, cardY + 8, { width: 110, align: 'right' });
+        
+        doc.y = cardY + 32;
+        
+        // ---- INFORMAÇÕES EM DUAS COLUNAS ----
+        const infoStartY = doc.y;
+        const colWidth = (pageWidth - 20) / 2;
+        
+        // Coluna 1: Dados de Contato e Empresa
+        doc.fontSize(9).fillColor('#1e293b').font('Helvetica-Bold');
+        doc.text('CONTATO E EMPRESA', marginLeft + 5, infoStartY);
+        doc.font('Helvetica').fontSize(8).fillColor('#475569');
+        doc.y = infoStartY + 14;
+        
+        doc.text(`Telefone: `, marginLeft + 5, doc.y, { continued: true });
+        doc.font('Helvetica-Bold').fillColor('#1e293b').text(cliente.telefone || 'Não informado');
+        doc.font('Helvetica').fillColor('#475569');
+        
+        doc.text(`Empresa: ${cliente.empresa || '-'}`, marginLeft + 5);
         if (cliente.cnpj) {
-          doc.text(`CNPJ: ${cliente.cnpj}`, 40);
+          doc.text(`CNPJ: ${cliente.cnpj}`, marginLeft + 5);
         }
-        doc.text(`Telefone: ${cliente.telefone || '-'}`, 40);
-        doc.text(`Status ClickUp: ${cliente.statusClickup || '-'}`, 40);
-        doc.text(`Responsável: ${cliente.responsavel || '-'}`, 40);
-        doc.text(`Cluster: ${cliente.cluster || '-'}`, 40);
-        doc.text(`Serviços: ${cliente.servicos || '-'}`, 40);
-        doc.moveDown(0.3);
+        doc.text(`Responsável: ${cliente.responsavel || '-'}`, marginLeft + 5);
         
-        // Valores
-        doc.fontSize(10).fillColor('#dc2626').font('Helvetica-Bold');
-        doc.text(`Valor Total em Atraso: ${formatCurrency(cliente.valorTotal)}`, 40);
-        doc.font('Helvetica').fillColor('#334155');
-        doc.text(`Parcelas em Atraso: ${cliente.quantidadeParcelas} | Dias Atraso Máximo: ${cliente.diasAtrasoMax}`, 40);
-        doc.moveDown(0.5);
+        const col1EndY = doc.y;
         
-        // Contexto CS
-        doc.fontSize(10).fillColor('#1e293b').font('Helvetica-Bold');
-        doc.text('Contexto CS:', 40);
-        doc.font('Helvetica').fontSize(9).fillColor('#334155');
+        // Coluna 2: Status e Serviços
+        doc.fontSize(9).fillColor('#1e293b').font('Helvetica-Bold');
+        doc.text('STATUS E SERVIÇOS', marginLeft + colWidth + 15, infoStartY);
+        doc.font('Helvetica').fontSize(8).fillColor('#475569');
+        doc.y = infoStartY + 14;
         
-        if (contexto) {
+        doc.text(`Status ClickUp: ${cliente.statusClickup || '-'}`, marginLeft + colWidth + 15, doc.y);
+        doc.text(`Cluster: ${cliente.cluster || '-'}`, marginLeft + colWidth + 15);
+        doc.text(`Serviços: ${cliente.servicos || '-'}`, marginLeft + colWidth + 15);
+        
+        const col2EndY = doc.y;
+        doc.y = Math.max(col1EndY, col2EndY) + 8;
+        
+        // ---- MÉTRICAS DE ATRASO ----
+        const metricsY = doc.y;
+        doc.rect(marginLeft, metricsY, pageWidth, 22).fill('#fef2f2');
+        
+        doc.fontSize(8).fillColor('#991b1b').font('Helvetica-Bold');
+        doc.text(`${cliente.quantidadeParcelas} parcelas em atraso`, marginLeft + 10, metricsY + 6);
+        doc.text(`Atraso máximo: ${cliente.diasAtrasoMax} dias`, marginLeft + 150, metricsY + 6);
+        doc.text(`Parcela mais antiga: ${cliente.parcelaMaisAntiga ? new Date(cliente.parcelaMaisAntiga).toLocaleDateString('pt-BR') : '-'}`, marginLeft + 300, metricsY + 6);
+        
+        doc.y = metricsY + 28;
+        
+        // ---- CONTEXTO CS (se houver) ----
+        if (contexto && (contexto.contexto || contexto.evidencias || contexto.statusFinanceiro || contexto.detalheFinanceiro)) {
+          const ctxY = doc.y;
+          doc.rect(marginLeft, ctxY, pageWidth, 2).fill('#3b82f6');
+          doc.y = ctxY + 6;
+          
+          doc.fontSize(9).fillColor('#1e293b').font('Helvetica-Bold');
+          doc.text('CONTEXTO CS', marginLeft + 5, doc.y);
+          doc.moveDown(0.3);
+          
+          doc.font('Helvetica').fontSize(8).fillColor('#475569');
+          
           if (contexto.contexto) {
-            doc.text(`Contexto: ${contexto.contexto}`, 50);
+            doc.text(`${contexto.contexto}`, marginLeft + 5, doc.y, { width: pageWidth - 10 });
           }
           if (contexto.evidencias) {
-            doc.text(`Evidências: ${contexto.evidencias}`, 50);
+            doc.text(`Evidências: ${contexto.evidencias}`, marginLeft + 5, doc.y, { width: pageWidth - 10 });
           }
-          const acaoLabel = contexto.acao === 'cobrar' ? 'Cobrar' : contexto.acao === 'aguardar' ? 'Aguardar' : contexto.acao === 'abonar' ? 'Abonar' : '-';
-          doc.text(`Ação: ${acaoLabel}`, 50);
           if (contexto.statusFinanceiro) {
             const statusLabel = contexto.statusFinanceiro === 'cobrado' ? 'Cobrado' : 
                                contexto.statusFinanceiro === 'acordo_realizado' ? 'Acordo Realizado' : 
                                contexto.statusFinanceiro === 'juridico' ? 'Jurídico' : '-';
-            doc.text(`Status Financeiro: ${statusLabel}`, 50);
+            doc.font('Helvetica-Bold').fillColor('#1e293b');
+            doc.text(`Status Financeiro: ${statusLabel}`, marginLeft + 5);
+            doc.font('Helvetica').fillColor('#475569');
           }
           if (contexto.detalheFinanceiro) {
-            doc.text(`Detalhe Financeiro: ${contexto.detalheFinanceiro}`, 50);
+            doc.text(`Detalhe: ${contexto.detalheFinanceiro}`, marginLeft + 5, doc.y, { width: pageWidth - 10 });
           }
           if (contexto.atualizadoPor) {
-            doc.fontSize(8).fillColor('#94a3b8');
-            doc.text(`Atualizado por: ${contexto.atualizadoPor} em ${contexto.atualizadoEm ? new Date(contexto.atualizadoEm).toLocaleDateString('pt-BR') : '-'}`, 50);
+            doc.fontSize(7).fillColor('#94a3b8');
+            doc.text(`Atualizado por: ${contexto.atualizadoPor} em ${contexto.atualizadoEm ? new Date(contexto.atualizadoEm).toLocaleDateString('pt-BR') : '-'}`, marginLeft + 5);
           }
+          doc.moveDown(0.3);
         }
-        doc.moveDown(0.5);
         
-        // Tabela de parcelas
+        // ---- TABELA DE PARCELAS ----
         if (parcelas.length > 0) {
-          doc.fontSize(10).fillColor('#1e293b').font('Helvetica-Bold');
-          doc.text('Parcelas em Atraso:', 40);
+          doc.moveDown(0.3);
+          doc.fontSize(9).fillColor('#1e293b').font('Helvetica-Bold');
+          doc.text('PARCELAS EM ATRASO', marginLeft + 5, doc.y);
           doc.moveDown(0.3);
           
           // Header da tabela
-          const colWidths = { desc: 180, valor: 80, venc: 70, dias: 50, link: 130 };
-          const tableX = 40;
+          const colWidths = { desc: 200, valor: 80, venc: 75, dias: 45, link: 110 };
+          const tableX = marginLeft;
           let tableY = doc.y;
           
-          doc.fontSize(8).fillColor('#475569').font('Helvetica-Bold');
-          doc.text('Descrição', tableX, tableY, { width: colWidths.desc });
-          doc.text('Valor', tableX + colWidths.desc, tableY, { width: colWidths.valor, align: 'right' });
-          doc.text('Vencimento', tableX + colWidths.desc + colWidths.valor, tableY, { width: colWidths.venc, align: 'center' });
-          doc.text('Dias', tableX + colWidths.desc + colWidths.valor + colWidths.venc, tableY, { width: colWidths.dias, align: 'center' });
-          doc.text('Link Cobrança', tableX + colWidths.desc + colWidths.valor + colWidths.venc + colWidths.dias, tableY, { width: colWidths.link });
+          // Background do header
+          doc.rect(tableX, tableY - 2, pageWidth, 14).fill('#f1f5f9');
           
-          doc.moveDown(0.3);
-          doc.moveTo(tableX, doc.y).lineTo(pageWidth + 40, doc.y).stroke('#e2e8f0');
-          doc.moveDown(0.2);
+          doc.fontSize(7).fillColor('#475569').font('Helvetica-Bold');
+          doc.text('Descrição', tableX + 5, tableY + 2);
+          doc.text('Valor', tableX + colWidths.desc, tableY + 2, { width: colWidths.valor, align: 'right' });
+          doc.text('Vencimento', tableX + colWidths.desc + colWidths.valor + 5, tableY + 2);
+          doc.text('Atraso', tableX + colWidths.desc + colWidths.valor + colWidths.venc + 5, tableY + 2);
+          doc.text('Link', tableX + colWidths.desc + colWidths.valor + colWidths.venc + colWidths.dias + 5, tableY + 2);
+          
+          doc.y = tableY + 16;
           
           doc.font('Helvetica').fontSize(7).fillColor('#334155');
           
-          for (const parcela of parcelas) {
-            if (doc.y > doc.page.height - 60) {
+          for (let j = 0; j < parcelas.length; j++) {
+            const parcela = parcelas[j];
+            
+            if (doc.y > doc.page.height - 50) {
               doc.addPage();
               doc.fontSize(7).fillColor('#334155');
             }
             
             tableY = doc.y;
-            const descTruncada = parcela.descricao.length > 35 ? parcela.descricao.substring(0, 35) + '...' : parcela.descricao;
-            doc.text(descTruncada, tableX, tableY, { width: colWidths.desc });
-            doc.fillColor('#dc2626').text(formatCurrency(parcela.naoPago), tableX + colWidths.desc, tableY, { width: colWidths.valor, align: 'right' });
-            doc.fillColor('#334155');
+            
+            // Zebra striping
+            if (j % 2 === 1) {
+              doc.rect(tableX, tableY - 1, pageWidth, 12).fill('#fafafa');
+              doc.fillColor('#334155');
+            }
+            
+            const descTruncada = parcela.descricao.length > 40 ? parcela.descricao.substring(0, 40) + '...' : parcela.descricao;
+            doc.text(descTruncada, tableX + 5, tableY + 1, { width: colWidths.desc - 10 });
+            doc.fillColor('#dc2626').font('Helvetica-Bold');
+            doc.text(formatCurrency(parcela.naoPago), tableX + colWidths.desc, tableY + 1, { width: colWidths.valor, align: 'right' });
+            doc.fillColor('#334155').font('Helvetica');
             const dataVenc = parcela.dataVencimento ? new Date(parcela.dataVencimento).toLocaleDateString('pt-BR') : '-';
-            doc.text(dataVenc, tableX + colWidths.desc + colWidths.valor, tableY, { width: colWidths.venc, align: 'center' });
-            doc.text(`${parcela.diasAtraso}d`, tableX + colWidths.desc + colWidths.valor + colWidths.venc, tableY, { width: colWidths.dias, align: 'center' });
+            doc.text(dataVenc, tableX + colWidths.desc + colWidths.valor + 5, tableY + 1);
+            doc.fillColor('#991b1b');
+            doc.text(`${parcela.diasAtraso} dias`, tableX + colWidths.desc + colWidths.valor + colWidths.venc + 5, tableY + 1);
+            doc.fillColor('#334155');
             
             if (parcela.urlCobranca) {
-              const urlTruncada = parcela.urlCobranca.length > 25 ? parcela.urlCobranca.substring(0, 25) + '...' : parcela.urlCobranca;
-              doc.fillColor('#2563eb').text(urlTruncada, tableX + colWidths.desc + colWidths.valor + colWidths.venc + colWidths.dias, tableY, { 
-                width: colWidths.link,
-                link: parcela.urlCobranca
+              doc.fillColor('#2563eb');
+              doc.text('Acessar', tableX + colWidths.desc + colWidths.valor + colWidths.venc + colWidths.dias + 5, tableY + 1, { 
+                link: parcela.urlCobranca,
+                underline: true
               });
               doc.fillColor('#334155');
             } else {
-              doc.text('-', tableX + colWidths.desc + colWidths.valor + colWidths.venc + colWidths.dias, tableY, { width: colWidths.link });
+              doc.text('-', tableX + colWidths.desc + colWidths.valor + colWidths.venc + colWidths.dias + 5, tableY + 1);
             }
             
-            doc.moveDown(0.4);
+            doc.y = tableY + 13;
           }
         }
         
-        doc.moveDown();
-        doc.moveTo(40, doc.y).lineTo(pageWidth + 40, doc.y).stroke('#cbd5e1');
-        doc.moveDown();
+        doc.moveDown(0.5);
+        doc.moveTo(marginLeft, doc.y).lineTo(marginLeft + pageWidth, doc.y).stroke('#e2e8f0');
+        doc.moveDown(0.8);
       }
+      
+      // ==================== RODAPÉ NA ÚLTIMA PÁGINA ====================
+      doc.fontSize(8).fillColor('#94a3b8').font('Helvetica');
+      doc.text(`Relatório gerado automaticamente pelo sistema CRM - ${dataHoje}`, marginLeft, doc.page.height - 40, { align: 'center' });
       
       doc.end();
       
