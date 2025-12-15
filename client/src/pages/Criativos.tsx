@@ -157,7 +157,7 @@ export default function Criativos() {
 
   const SortableHeader = ({ column, label }: { column: keyof CriativoData; label: string }) => (
     <TableHead 
-      className="cursor-pointer hover:bg-muted/50 whitespace-nowrap text-xs"
+      className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100"
       onClick={() => handleSort(column)}
       data-testid={`header-${column}`}
     >
@@ -310,8 +310,8 @@ export default function Criativos() {
             ) : (
               <div className="relative h-[calc(100vh-380px)] overflow-auto">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
-                    <TableRow>
+                  <TableHeader>
+                    <TableRow className="sticky top-0 z-50 bg-zinc-900 dark:bg-zinc-900 shadow-md [&>th]:bg-zinc-900 dark:[&>th]:bg-zinc-900">
                       <SortableHeader column="id" label="AD ID" />
                       <SortableHeader column="adName" label="Criativo" />
                       <SortableHeader column="status" label="Status" />
@@ -335,7 +335,7 @@ export default function Criativos() {
                       <SortableHeader column="cprr" label="CPRR" />
                       <SortableHeader column="clientesUnicos" label="Clientes" />
                       <SortableHeader column="cacUnico" label="CAC" />
-                      <TableHead className="text-xs">Link</TableHead>
+                      <TableHead className="text-xs bg-zinc-900 text-zinc-100">Link</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
