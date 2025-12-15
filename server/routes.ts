@@ -1466,6 +1466,154 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Growth - Criativos (dados agregados por anúncio do Meta Ads)
+  app.get("/api/growth/criativos", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string || '2025-01-01';
+      const endDate = req.query.endDate as string || '2025-12-31';
+      const status = req.query.status as string || 'Todos'; // Todos, Ativo, Pausado
+      
+      // Validar formato de data
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+      }
+      
+      // Buscar dados agregados por anúncio do Meta Ads com info do anúncio
+      const adsDataResult = await db.execute(sql`
+        SELECT 
+          i.ad_id,
+          a.ad_name,
+          a.status as ad_status,
+          a.created_time,
+          a.preview_shareable_link as link,
+          SUM(i.spend::numeric) as investimento,
+          SUM(i.impressions) as impressions,
+          SUM(i.clicks) as clicks,
+          AVG(i.ctr::numeric) as ctr,
+          AVG(i.cpm::numeric) as cpm
+        FROM meta_insights_daily i
+        LEFT JOIN meta_ads a ON i.ad_id = a.ad_id
+        WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
+        GROUP BY i.ad_id, a.ad_name, a.status, a.created_time, a.preview_shareable_link
+        ORDER BY SUM(i.spend::numeric) DESC
+      `);
+      
+      // Buscar dados de conversão do CRM (leads, MQL, RM, RR, Vendas) usando utm_content = ad_id
+      const dealsDataResult = await db.execute(sql`
+        SELECT 
+          utm_content as ad_id,
+          COUNT(*) as leads,
+          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
+          SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado', 'Reunião Agendada') THEN 1 ELSE 0 END) as rm,
+          SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado') THEN 1 ELSE 0 END) as rr,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) ELSE 0 END) as valor_pontual,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_recorrente,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_total
+        FROM crm_deal
+        WHERE utm_content IS NOT NULL 
+          AND utm_content != ''
+          AND created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+        GROUP BY utm_content
+      `);
+      
+      // Criar mapa de deals por ad_id
+      const dealsMap = new Map<string, any>();
+      for (const row of dealsDataResult.rows as any[]) {
+        dealsMap.set(row.ad_id, {
+          leads: parseInt(row.leads) || 0,
+          mqls: parseInt(row.mqls) || 0,
+          rm: parseInt(row.rm) || 0,
+          rr: parseInt(row.rr) || 0,
+          vendas: parseInt(row.vendas) || 0,
+          valorPontual: parseFloat(row.valor_pontual) || 0,
+          valorRecorrente: parseFloat(row.valor_recorrente) || 0,
+          valorTotal: parseFloat(row.valor_total) || 0
+        });
+      }
+      
+      // Combinar dados de ads com deals
+      const criativos = (adsDataResult.rows as any[])
+        .map(row => {
+          const adId = row.ad_id;
+          const investimento = parseFloat(row.investimento) || 0;
+          const impressions = parseInt(row.impressions) || 0;
+          const clicks = parseInt(row.clicks) || 0;
+          const ctr = parseFloat(row.ctr) || (impressions > 0 ? (clicks / impressions) * 100 : null);
+          const cpm = parseFloat(row.cpm) || (impressions > 0 ? (investimento / impressions) * 1000 : null);
+          
+          const deal = dealsMap.get(adId) || { leads: 0, mqls: 0, rm: 0, rr: 0, vendas: 0, valorPontual: 0, valorRecorrente: 0, valorTotal: 0 };
+          
+          const leads = deal.leads;
+          const mqls = deal.mqls;
+          const rm = deal.rm;
+          const rr = deal.rr;
+          const vendas = deal.vendas;
+          
+          // Calcular métricas derivadas
+          const cpl = leads > 0 ? investimento / leads : null;
+          const percMql = leads > 0 ? Math.round((mqls / leads) * 100) : null;
+          const cpmql = mqls > 0 ? investimento / mqls : null;
+          const percRa = leads > 0 ? Math.round((rm / leads) * 100) : null;
+          const cpra = rm > 0 ? investimento / rm : null;
+          const percRaMql = mqls > 0 ? Math.round((rm / mqls) * 100) : null;
+          const percRr = rm > 0 ? Math.round((rr / rm) * 100) : null;
+          const cprr = rr > 0 ? investimento / rr : null;
+          const percRrCliente = rr > 0 ? Math.round((vendas / rr) * 100) : null;
+          const cacUnico = vendas > 0 ? investimento / vendas : null;
+          
+          // Determinar status
+          let adStatus = row.ad_status || 'Desconhecido';
+          if (adStatus.toUpperCase() === 'ACTIVE') adStatus = 'Ativo';
+          else if (adStatus.toUpperCase() === 'PAUSED') adStatus = 'Pausado';
+          
+          return {
+            id: adId,
+            adName: row.ad_name || `Ad ${adId}`,
+            link: row.link || `https://facebook.com/ads/library/?id=${adId}`,
+            dataCriacao: row.created_time ? new Date(row.created_time).toLocaleDateString('pt-BR') : null,
+            status: adStatus,
+            investimento: Math.round(investimento),
+            ctr: ctr ? parseFloat(ctr.toFixed(2)) : null,
+            cpm: cpm ? Math.round(cpm) : null,
+            leads,
+            cpl: cpl ? Math.round(cpl) : null,
+            mql: mqls,
+            percMql,
+            cpmql: cpmql ? parseFloat(cpmql.toFixed(2)) : null,
+            ra: rm,
+            percRa,
+            cpra: cpra ? Math.round(cpra) : null,
+            percRaMql,
+            rr,
+            percRr,
+            cprr: cprr ? parseFloat(cprr.toFixed(2)) : null,
+            ganhosAceleracao: deal.valorRecorrente > 0 ? vendas : null,
+            ganhosPontuais: deal.valorPontual > 0 ? vendas : null,
+            cacAceleracao: deal.valorRecorrente > 0 && vendas > 0 ? investimento / vendas : null,
+            leadTimeClienteUnico: null, // Não temos essa informação diretamente
+            clientesUnicos: vendas,
+            percRrCliente,
+            cacUnico: cacUnico ? Math.round(cacUnico) : null
+          };
+        })
+        .filter(c => {
+          if (status === 'Todos') return true;
+          if (status === 'Ativo') return c.status === 'Ativo';
+          if (status === 'Pausado') return c.status === 'Pausado';
+          return true;
+        });
+      
+      console.log("[api] Growth Criativos - Total:", criativos.length, "Status:", status);
+      
+      res.json(criativos);
+    } catch (error) {
+      console.error("[api] Error fetching growth criativos:", error);
+      res.status(500).json({ error: "Failed to fetch growth criativos" });
+    }
+  });
+
   app.get("/api/financeiro/kpis-completos", async (req, res) => {
     try {
       const kpis = await storage.getFinanceiroKPIsCompletos();
