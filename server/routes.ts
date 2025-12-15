@@ -1899,7 +1899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }> = [];
       
       for (const cliente of clientesCobrar) {
-        const parcelasData = await storage.getInadimplenciaParcelasCliente(cliente.idCliente, dataInicio, dataFim);
+        const parcelasData = await storage.getInadimplenciaDetalheParcelas(cliente.idCliente, dataInicio, dataFim);
         clientesComParcelas.push({
           cliente,
           contexto: contextos[cliente.idCliente],
