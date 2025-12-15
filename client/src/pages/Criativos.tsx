@@ -24,6 +24,9 @@ interface CriativoData {
   link: string;
   dataCriacao: string | null;
   status: string;
+  plataforma: string;
+  campaignId: string | null;
+  campaignName: string | null;
   investimento: number;
   impressions: number;
   frequency: number | null;
@@ -51,6 +54,11 @@ interface CriativoData {
   clientesUnicos: number;
   percRrCliente: number | null;
   cacUnico: number | null;
+}
+
+interface Campanha {
+  id: string;
+  name: string;
 }
 
 type SortConfig = {
@@ -95,6 +103,8 @@ export default function Criativos() {
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("Todos");
+  const [plataformaFilter, setPlataformaFilter] = useState("Todos");
+  const [campanhaFilter, setCampanhaFilter] = useState("");
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'investimento', direction: 'desc' });
 
   const { toast } = useToast();
@@ -107,12 +117,24 @@ export default function Criativos() {
     label: string;
   }>>([]);
 
+  // Buscar lista de campanhas
+  const { data: campanhas = [] } = useQuery<Campanha[]>({
+    queryKey: ['/api/growth/criativos/campanhas'],
+  });
+
   const { data: criativos = [], isLoading } = useQuery<CriativoData[]>({
-    queryKey: ['/api/growth/criativos', format(dateRange.from, 'yyyy-MM-dd'), format(dateRange.to, 'yyyy-MM-dd'), statusFilter],
+    queryKey: ['/api/growth/criativos', format(dateRange.from, 'yyyy-MM-dd'), format(dateRange.to, 'yyyy-MM-dd'), statusFilter, plataformaFilter, campanhaFilter],
     queryFn: async () => {
       const startDate = format(dateRange.from, 'yyyy-MM-dd');
       const endDate = format(dateRange.to, 'yyyy-MM-dd');
-      const res = await fetch(`/api/growth/criativos?startDate=${startDate}&endDate=${endDate}&status=${statusFilter}`, {
+      const params = new URLSearchParams({
+        startDate,
+        endDate,
+        status: statusFilter,
+        plataforma: plataformaFilter,
+      });
+      if (campanhaFilter) params.append('campanhaId', campanhaFilter);
+      const res = await fetch(`/api/growth/criativos?${params.toString()}`, {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to fetch criativos');
@@ -292,6 +314,32 @@ export default function Criativos() {
               <SelectItem value="Todos">Todos</SelectItem>
               <SelectItem value="Ativo">Ativos</SelectItem>
               <SelectItem value="Pausado">Pausados</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={plataformaFilter} onValueChange={setPlataformaFilter}>
+            <SelectTrigger className="w-[140px]" data-testid="select-plataforma">
+              <SelectValue placeholder="Plataforma" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Todos">Todas Plataformas</SelectItem>
+              <SelectItem value="Meta Ads">Meta Ads</SelectItem>
+              <SelectItem value="Google Ads">Google Ads</SelectItem>
+              <SelectItem value="LinkedIn Ads">LinkedIn Ads</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={campanhaFilter} onValueChange={setCampanhaFilter}>
+            <SelectTrigger className="w-[200px]" data-testid="select-campanha">
+              <SelectValue placeholder="Campanha" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todas Campanhas</SelectItem>
+              {campanhas.map((campanha) => (
+                <SelectItem key={campanha.id} value={campanha.id}>
+                  {campanha.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
