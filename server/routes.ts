@@ -1490,8 +1490,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SUM(i.spend::numeric) as investimento,
           SUM(i.impressions) as impressions,
           SUM(i.clicks) as clicks,
+          SUM(i.reach) as reach,
           AVG(i.ctr::numeric) as ctr,
-          AVG(i.cpm::numeric) as cpm
+          AVG(i.cpm::numeric) as cpm,
+          SUM(i.video_play_actions) as video_plays,
+          SUM(i.video_p25_watched_actions) as video_p25,
+          SUM(i.video_p50_watched_actions) as video_p50,
+          SUM(i.video_p75_watched_actions) as video_p75,
+          SUM(i.video_p100_watched_actions) as video_p100
         FROM meta_insights_daily i
         LEFT JOIN meta_ads a ON i.ad_id = a.ad_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
@@ -1540,8 +1546,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const investimento = parseFloat(row.investimento) || 0;
           const impressions = parseInt(row.impressions) || 0;
           const clicks = parseInt(row.clicks) || 0;
+          const reach = parseInt(row.reach) || 0;
+          const videoPlays = parseInt(row.video_plays) || 0;
+          const videoP25 = parseInt(row.video_p25) || 0;
+          const videoP75 = parseInt(row.video_p75) || 0;
+          
           const ctr = parseFloat(row.ctr) || (impressions > 0 ? (clicks / impressions) * 100 : null);
           const cpm = parseFloat(row.cpm) || (impressions > 0 ? (investimento / impressions) * 1000 : null);
+          
+          // Frequência = impressões / alcance
+          const frequency = reach > 0 ? impressions / reach : null;
+          
+          // Vídeo Hook = % de visualizações que passaram 3s (p25 / impressions ou videoPlays)
+          const videoHook = impressions > 0 && videoP25 > 0 ? (videoP25 / impressions) * 100 : null;
+          
+          // Vídeo HOLD = % de quem passou 3s que viu 75% (p75 / p25)
+          const videoHold = videoP25 > 0 && videoP75 > 0 ? (videoP75 / videoP25) * 100 : null;
           
           const deal = dealsMap.get(adId) || { leads: 0, mqls: 0, rm: 0, rr: 0, vendas: 0, valorPontual: 0, valorRecorrente: 0, valorTotal: 0 };
           
@@ -1558,6 +1578,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const percRa = leads > 0 ? Math.round((rm / leads) * 100) : null;
           const cpra = rm > 0 ? investimento / rm : null;
           const percRaMql = mqls > 0 ? Math.round((rm / mqls) * 100) : null;
+          const percRrMql = mqls > 0 ? Math.round((rr / mqls) * 100) : null;
           const percRr = rm > 0 ? Math.round((rr / rm) * 100) : null;
           const cprr = rr > 0 ? investimento / rr : null;
           const percRrCliente = rr > 0 ? Math.round((vendas / rr) * 100) : null;
@@ -1575,6 +1596,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             dataCriacao: row.created_time ? new Date(row.created_time).toLocaleDateString('pt-BR') : null,
             status: adStatus,
             investimento: Math.round(investimento),
+            impressions,
+            frequency: frequency ? parseFloat(frequency.toFixed(2)) : null,
+            videoHook: videoHook ? parseFloat(videoHook.toFixed(2)) : null,
+            videoHold: videoHold ? parseFloat(videoHold.toFixed(2)) : null,
             ctr: ctr ? parseFloat(ctr.toFixed(2)) : null,
             cpm: cpm ? Math.round(cpm) : null,
             leads,
@@ -1586,13 +1611,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             percRa,
             cpra: cpra ? Math.round(cpra) : null,
             percRaMql,
+            percRrMql,
             rr,
             percRr,
             cprr: cprr ? parseFloat(cprr.toFixed(2)) : null,
             ganhosAceleracao: deal.valorRecorrente > 0 ? vendas : null,
             ganhosPontuais: deal.valorPontual > 0 ? vendas : null,
             cacAceleracao: deal.valorRecorrente > 0 && vendas > 0 ? investimento / vendas : null,
-            leadTimeClienteUnico: null, // Não temos essa informação diretamente
+            leadTimeClienteUnico: null,
             clientesUnicos: vendas,
             percRrCliente,
             cacUnico: cacUnico ? Math.round(cacUnico) : null
