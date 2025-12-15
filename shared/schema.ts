@@ -997,3 +997,35 @@ export const inadimplenciaContextos = pgTable("inadimplencia_contextos", {
 export const insertInadimplenciaContextoSchema = createInsertSchema(inadimplenciaContextos);
 export type InadimplenciaContexto = typeof inadimplenciaContextos.$inferSelect;
 export type InsertInadimplenciaContexto = z.infer<typeof insertInadimplenciaContextoSchema>;
+
+// Metric Formatting Rules - Conditional coloring system
+export const metricRulesets = pgTable("metric_rulesets", {
+  id: integer("id").primaryKey(),
+  metricKey: varchar("metric_key", { length: 50 }).notNull().unique(),
+  displayLabel: varchar("display_label", { length: 100 }).notNull(),
+  defaultColor: varchar("default_color", { length: 20 }).default("default"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedBy: varchar("updated_by", { length: 100 }),
+});
+
+export const metricThresholds = pgTable("metric_thresholds", {
+  id: integer("id").primaryKey(),
+  rulesetId: integer("ruleset_id").notNull(),
+  minValue: decimal("min_value", { precision: 15, scale: 4 }),
+  maxValue: decimal("max_value", { precision: 15, scale: 4 }),
+  color: varchar("color", { length: 20 }).notNull(),
+  label: varchar("label", { length: 100 }),
+  sortOrder: integer("sort_order").default(0),
+});
+
+export const insertMetricRulesetSchema = createInsertSchema(metricRulesets).omit({ id: true });
+export const insertMetricThresholdSchema = createInsertSchema(metricThresholds).omit({ id: true });
+
+export type MetricRuleset = typeof metricRulesets.$inferSelect;
+export type InsertMetricRuleset = z.infer<typeof insertMetricRulesetSchema>;
+export type MetricThreshold = typeof metricThresholds.$inferSelect;
+export type InsertMetricThreshold = z.infer<typeof insertMetricThresholdSchema>;
+
+export type MetricRulesetWithThresholds = MetricRuleset & {
+  thresholds: MetricThreshold[];
+};
