@@ -20,6 +20,10 @@ interface CriativoData {
   dataCriacao: string | null;
   status: string;
   investimento: number;
+  impressions: number;
+  frequency: number | null;
+  videoHook: number | null;
+  videoHold: number | null;
   ctr: number | null;
   cpm: number | null;
   leads: number;
@@ -31,6 +35,7 @@ interface CriativoData {
   percRa: number | null;
   cpra: number | null;
   percRaMql: number | null;
+  percRrMql: number | null;
   rr: number;
   percRr: number | null;
   cprr: number | null;
@@ -308,9 +313,14 @@ export default function Criativos() {
                 <Table>
                   <TableHeader className="sticky top-0 bg-card z-10">
                     <TableRow>
+                      <SortableHeader column="id" label="AD ID" />
                       <SortableHeader column="adName" label="Criativo" />
                       <SortableHeader column="status" label="Status" />
                       <SortableHeader column="investimento" label="Invest." />
+                      <SortableHeader column="impressions" label="Impr." />
+                      <SortableHeader column="frequency" label="Freq." />
+                      <SortableHeader column="videoHook" label="V. Hook" />
+                      <SortableHeader column="videoHold" label="V. HOLD" />
                       <SortableHeader column="ctr" label="CTR" />
                       <SortableHeader column="cpm" label="CPM" />
                       <SortableHeader column="leads" label="Leads" />
@@ -319,10 +329,10 @@ export default function Criativos() {
                       <SortableHeader column="percMql" label="% MQL" />
                       <SortableHeader column="cpmql" label="CPMQL" />
                       <SortableHeader column="ra" label="RA" />
-                      <SortableHeader column="percRa" label="% RA" />
+                      <SortableHeader column="percRaMql" label="% RA MQL" />
                       <SortableHeader column="cpra" label="CPRA" />
                       <SortableHeader column="rr" label="RR" />
-                      <SortableHeader column="percRr" label="% RR" />
+                      <SortableHeader column="percRrMql" label="% RR MQL" />
                       <SortableHeader column="cprr" label="CPRR" />
                       <SortableHeader column="clientesUnicos" label="Clientes" />
                       <SortableHeader column="cacUnico" label="CAC" />
@@ -332,7 +342,10 @@ export default function Criativos() {
                   <TableBody>
                     {filteredData.map((item) => (
                       <TableRow key={item.id} data-testid={`row-criativo-${item.id}`}>
-                        <TableCell className="font-medium max-w-[300px] truncate" title={item.adName}>
+                        <TableCell className="font-mono text-xs text-muted-foreground" title={item.id}>
+                          {item.id?.slice(-8) || '-'}
+                        </TableCell>
+                        <TableCell className="font-medium max-w-[250px] truncate" title={item.adName}>
                           {item.adName}
                         </TableCell>
                         <TableCell>
@@ -344,6 +357,10 @@ export default function Criativos() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">{formatCurrency(item.investimento)}</TableCell>
+                        <TableCell className="text-right">{formatNumber(item.impressions)}</TableCell>
+                        <TableCell className="text-right">{item.frequency !== null ? item.frequency.toFixed(2) : '-'}</TableCell>
+                        <TableCell className="text-right">{formatPercent(item.videoHook)}</TableCell>
+                        <TableCell className="text-right">{formatPercent(item.videoHold)}</TableCell>
                         <TableCell className="text-right">{item.ctr !== null ? `${item.ctr}%` : '-'}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.cpm)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.leads)}</TableCell>
@@ -352,10 +369,10 @@ export default function Criativos() {
                         <TableCell className="text-right">{formatPercent(item.percMql)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.cpmql)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.ra)}</TableCell>
-                        <TableCell className="text-right">{formatPercent(item.percRa)}</TableCell>
+                        <TableCell className="text-right">{formatPercent(item.percRaMql)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.cpra)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.rr)}</TableCell>
-                        <TableCell className="text-right">{formatPercent(item.percRr)}</TableCell>
+                        <TableCell className="text-right">{formatPercent(item.percRrMql)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.cprr)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.clientesUnicos)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.cacUnico)}</TableCell>
@@ -375,7 +392,7 @@ export default function Criativos() {
                     ))}
                     {filteredData.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={19} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={24} className="text-center py-8 text-muted-foreground">
                           Nenhum criativo encontrado para o período selecionado
                         </TableCell>
                       </TableRow>
