@@ -329,12 +329,12 @@ export default function Criativos() {
             </SelectContent>
           </Select>
 
-          <Select value={campanhaFilter} onValueChange={setCampanhaFilter}>
+          <Select value={campanhaFilter || "todas"} onValueChange={(v) => setCampanhaFilter(v === "todas" ? "" : v)}>
             <SelectTrigger className="w-[200px]" data-testid="select-campanha">
               <SelectValue placeholder="Campanha" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todas Campanhas</SelectItem>
+              <SelectItem value="todas">Todas Campanhas</SelectItem>
               {campanhas.map((campanha) => (
                 <SelectItem key={campanha.id} value={campanha.id}>
                   {campanha.name}
