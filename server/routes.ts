@@ -1971,6 +1971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (cliente.cnpj) {
           doc.text(`CNPJ: ${cliente.cnpj}`, 40);
         }
+        doc.text(`Telefone: ${cliente.telefone || '-'}`, 40);
         doc.text(`Status ClickUp: ${cliente.statusClickup || '-'}`, 40);
         doc.text(`Responsável: ${cliente.responsavel || '-'}`, 40);
         doc.text(`Cluster: ${cliente.cluster || '-'}`, 40);
