@@ -26,6 +26,7 @@ Preferred communication style: Simple, everyday language.
     - **Visão Geral Dashboard**: Overview page with MRR metrics (active MRR, acquisitions, churn), rankings, and evolution charts using a hybrid data strategy (snapshots and event-based).
     - **Meta Ads Analytics Dashboard**: Correlates Meta Ads data with CRM conversion tracking, including UTM mapping for attribution at campaign and adset levels. Features KPI cards, conversion funnel, and analysis tabs for campaigns, adsets, ads, and creatives.
     - **Growth Visão Geral Dashboard**: Cross-references Meta Ads and Google Ads investment data with Bitrix CRM deals using utm_content (Meta) and utm_campaign (Google) as relationship keys. Displays KPIs for Negócios Ganhos, Valor Vendas, CAC, ROI, and ROAS with Canal filter support.
+    - **Criativos Dashboard (Growth)**: Creative performance analysis with configurable conditional formatting. Users can define threshold ranges (min/max values) with color coding (red, orange, yellow, green, blue, purple) for metrics like CPMQL, CPL, CTR, CPM, Video Hook/Hold, etc. Configuration persists in database tables (metric_rulesets, metric_thresholds) via Sheet component UI.
     - **Commercial SDR/Closer Detail Pages**: Detailed analytics for individual sales team members, including performance metrics, source/pipeline distribution, and trend analysis (DetailClosers.tsx and DetailSDRs.tsx).
 - **Theming**: Dark mode support; light mode is primary.
 
