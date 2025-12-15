@@ -5384,6 +5384,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== Metric Formatting Rules API ==========
+  
+  // GET all metric rulesets with their thresholds
+  app.get("/api/metric-rules", async (req, res) => {
+    try {
+      const rulesets = await storage.getMetricRulesets();
+      res.json(rulesets);
+    } catch (error) {
+      console.error("[api] Error fetching metric rulesets:", error);
+      res.status(500).json({ error: "Failed to fetch metric rulesets" });
+    }
+  });
+
+  // GET single metric ruleset by key
+  app.get("/api/metric-rules/:metricKey", async (req, res) => {
+    try {
+      const ruleset = await storage.getMetricRuleset(req.params.metricKey);
+      if (!ruleset) {
+        return res.status(404).json({ error: "Ruleset not found" });
+      }
+      res.json(ruleset);
+    } catch (error) {
+      console.error("[api] Error fetching metric ruleset:", error);
+      res.status(500).json({ error: "Failed to fetch metric ruleset" });
+    }
+  });
+
+  // POST create/update ruleset
+  app.post("/api/metric-rules", async (req, res) => {
+    try {
+      const { metricKey, displayLabel, defaultColor, updatedBy } = req.body;
+      if (!metricKey || !displayLabel) {
+        return res.status(400).json({ error: "metricKey and displayLabel are required" });
+      }
+      const ruleset = await storage.upsertMetricRuleset({
+        metricKey,
+        displayLabel,
+        defaultColor: defaultColor || 'default',
+        updatedBy: updatedBy || null,
+      });
+      res.json(ruleset);
+    } catch (error) {
+      console.error("[api] Error creating metric ruleset:", error);
+      res.status(500).json({ error: "Failed to create metric ruleset" });
+    }
+  });
+
+  // DELETE ruleset by key
+  app.delete("/api/metric-rules/:metricKey", async (req, res) => {
+    try {
+      await storage.deleteMetricRuleset(req.params.metricKey);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting metric ruleset:", error);
+      res.status(500).json({ error: "Failed to delete metric ruleset" });
+    }
+  });
+
+  // POST create threshold
+  app.post("/api/metric-rules/:metricKey/thresholds", async (req, res) => {
+    try {
+      const { minValue, maxValue, color, label, sortOrder } = req.body;
+      if (!color) {
+        return res.status(400).json({ error: "color is required" });
+      }
+      
+      // Get ruleset first
+      const ruleset = await storage.getMetricRuleset(req.params.metricKey);
+      if (!ruleset) {
+        return res.status(404).json({ error: "Ruleset not found" });
+      }
+      
+      const threshold = await storage.createMetricThreshold({
+        rulesetId: ruleset.id,
+        minValue: minValue !== undefined ? minValue : null,
+        maxValue: maxValue !== undefined ? maxValue : null,
+        color,
+        label: label || null,
+        sortOrder: sortOrder || 0,
+      });
+      res.json(threshold);
+    } catch (error) {
+      console.error("[api] Error creating metric threshold:", error);
+      res.status(500).json({ error: "Failed to create metric threshold" });
+    }
+  });
+
+  // PATCH update threshold
+  app.patch("/api/metric-thresholds/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { minValue, maxValue, color, label, sortOrder } = req.body;
+      
+      const threshold = await storage.updateMetricThreshold(id, {
+        minValue,
+        maxValue,
+        color,
+        label,
+        sortOrder,
+      });
+      res.json(threshold);
+    } catch (error) {
+      console.error("[api] Error updating metric threshold:", error);
+      res.status(500).json({ error: "Failed to update metric threshold" });
+    }
+  });
+
+  // DELETE threshold
+  app.delete("/api/metric-thresholds/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteMetricThreshold(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting metric threshold:", error);
+      res.status(500).json({ error: "Failed to delete metric threshold" });
+    }
+  });
+
+  // POST save complete ruleset with thresholds (bulk save)
+  app.post("/api/metric-rules/:metricKey/save", async (req, res) => {
+    try {
+      const { displayLabel, defaultColor, updatedBy, thresholds } = req.body;
+      const metricKey = req.params.metricKey;
+      
+      if (!displayLabel) {
+        return res.status(400).json({ error: "displayLabel is required" });
+      }
+      
+      // Upsert ruleset
+      const ruleset = await storage.upsertMetricRuleset({
+        metricKey,
+        displayLabel,
+        defaultColor: defaultColor || 'default',
+        updatedBy: updatedBy || null,
+      });
+      
+      // Delete all existing thresholds for this ruleset
+      await storage.deleteMetricThresholdsByRuleset(ruleset.id);
+      
+      // Create new thresholds
+      const newThresholds = [];
+      if (thresholds && Array.isArray(thresholds)) {
+        for (let i = 0; i < thresholds.length; i++) {
+          const t = thresholds[i];
+          const threshold = await storage.createMetricThreshold({
+            rulesetId: ruleset.id,
+            minValue: t.minValue !== undefined ? t.minValue : null,
+            maxValue: t.maxValue !== undefined ? t.maxValue : null,
+            color: t.color || 'default',
+            label: t.label || null,
+            sortOrder: i,
+          });
+          newThresholds.push(threshold);
+        }
+      }
+      
+      res.json({
+        ...ruleset,
+        thresholds: newThresholds,
+      });
+    } catch (error) {
+      console.error("[api] Error saving metric ruleset:", error);
+      res.status(500).json({ error: "Failed to save metric ruleset" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
