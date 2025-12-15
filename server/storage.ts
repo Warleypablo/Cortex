@@ -215,6 +215,16 @@ export interface IStorage {
   getTechProjetosFechados(limit?: number): Promise<TechProjetoDetalhe[]>;
   getTechTasksPorStatus(): Promise<TechTaskStatus[]>;
   getTechVelocidade(): Promise<TechVelocidade>;
+  
+  // Metric Formatting Rules
+  getMetricRulesets(): Promise<import("@shared/schema").MetricRulesetWithThresholds[]>;
+  getMetricRuleset(metricKey: string): Promise<import("@shared/schema").MetricRulesetWithThresholds | null>;
+  upsertMetricRuleset(data: import("@shared/schema").InsertMetricRuleset): Promise<import("@shared/schema").MetricRuleset>;
+  deleteMetricRuleset(metricKey: string): Promise<void>;
+  createMetricThreshold(data: import("@shared/schema").InsertMetricThreshold): Promise<import("@shared/schema").MetricThreshold>;
+  updateMetricThreshold(id: number, data: Partial<import("@shared/schema").InsertMetricThreshold>): Promise<import("@shared/schema").MetricThreshold>;
+  deleteMetricThreshold(id: number): Promise<void>;
+  deleteMetricThresholdsByRuleset(rulesetId: number): Promise<void>;
 }
 
 // GEG Dashboard Extended Types
@@ -682,6 +692,32 @@ export class MemStorage implements IStorage {
   }
 
   async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  // Metric Formatting Rules - MemStorage stubs
+  async getMetricRulesets(): Promise<import("@shared/schema").MetricRulesetWithThresholds[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getMetricRuleset(metricKey: string): Promise<import("@shared/schema").MetricRulesetWithThresholds | null> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async upsertMetricRuleset(data: import("@shared/schema").InsertMetricRuleset): Promise<import("@shared/schema").MetricRuleset> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async deleteMetricRuleset(metricKey: string): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async createMetricThreshold(data: import("@shared/schema").InsertMetricThreshold): Promise<import("@shared/schema").MetricThreshold> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async updateMetricThreshold(id: number, data: Partial<import("@shared/schema").InsertMetricThreshold>): Promise<import("@shared/schema").MetricThreshold> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async deleteMetricThreshold(id: number): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async deleteMetricThresholdsByRuleset(rulesetId: number): Promise<void> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -6142,6 +6178,200 @@ export class DbStorage implements IStorage {
       atualizadoPor: row.atualizado_por,
       atualizadoEm: row.atualizado_em,
     };
+  }
+
+  // Metric Formatting Rules - DbStorage implementations
+  async getMetricRulesets(): Promise<import("@shared/schema").MetricRulesetWithThresholds[]> {
+    const rulesetsResult = await db.execute(sql.raw(`
+      SELECT id, metric_key, display_label, default_color, updated_at, updated_by
+      FROM metric_rulesets
+      ORDER BY display_label
+    `));
+    
+    const rulesets: import("@shared/schema").MetricRulesetWithThresholds[] = [];
+    
+    for (const row of rulesetsResult.rows as any[]) {
+      const thresholdsResult = await db.execute(sql.raw(`
+        SELECT id, ruleset_id, min_value, max_value, color, label, sort_order
+        FROM metric_thresholds
+        WHERE ruleset_id = ${row.id}
+        ORDER BY sort_order
+      `));
+      
+      rulesets.push({
+        id: row.id,
+        metricKey: row.metric_key,
+        displayLabel: row.display_label,
+        defaultColor: row.default_color,
+        updatedAt: row.updated_at,
+        updatedBy: row.updated_by,
+        thresholds: (thresholdsResult.rows as any[]).map(t => ({
+          id: t.id,
+          rulesetId: t.ruleset_id,
+          minValue: t.min_value,
+          maxValue: t.max_value,
+          color: t.color,
+          label: t.label,
+          sortOrder: t.sort_order,
+        })),
+      });
+    }
+    
+    return rulesets;
+  }
+
+  async getMetricRuleset(metricKey: string): Promise<import("@shared/schema").MetricRulesetWithThresholds | null> {
+    const escapedKey = metricKey.replace(/'/g, "''");
+    const rulesetResult = await db.execute(sql.raw(`
+      SELECT id, metric_key, display_label, default_color, updated_at, updated_by
+      FROM metric_rulesets
+      WHERE metric_key = '${escapedKey}'
+    `));
+    
+    if (!rulesetResult.rows.length) return null;
+    
+    const row = rulesetResult.rows[0] as any;
+    
+    const thresholdsResult = await db.execute(sql.raw(`
+      SELECT id, ruleset_id, min_value, max_value, color, label, sort_order
+      FROM metric_thresholds
+      WHERE ruleset_id = ${row.id}
+      ORDER BY sort_order
+    `));
+    
+    return {
+      id: row.id,
+      metricKey: row.metric_key,
+      displayLabel: row.display_label,
+      defaultColor: row.default_color,
+      updatedAt: row.updated_at,
+      updatedBy: row.updated_by,
+      thresholds: (thresholdsResult.rows as any[]).map(t => ({
+        id: t.id,
+        rulesetId: t.ruleset_id,
+        minValue: t.min_value,
+        maxValue: t.max_value,
+        color: t.color,
+        label: t.label,
+        sortOrder: t.sort_order,
+      })),
+    };
+  }
+
+  async upsertMetricRuleset(data: import("@shared/schema").InsertMetricRuleset): Promise<import("@shared/schema").MetricRuleset> {
+    const escapedKey = data.metricKey.replace(/'/g, "''");
+    const escapedLabel = data.displayLabel.replace(/'/g, "''");
+    const escapedColor = (data.defaultColor || 'default').replace(/'/g, "''");
+    const escapedUpdatedBy = (data.updatedBy || '').replace(/'/g, "''");
+    
+    const result = await db.execute(sql.raw(`
+      INSERT INTO metric_rulesets (metric_key, display_label, default_color, updated_by, updated_at)
+      VALUES ('${escapedKey}', '${escapedLabel}', '${escapedColor}', NULLIF('${escapedUpdatedBy}', ''), NOW())
+      ON CONFLICT (metric_key) DO UPDATE SET
+        display_label = EXCLUDED.display_label,
+        default_color = EXCLUDED.default_color,
+        updated_by = EXCLUDED.updated_by,
+        updated_at = NOW()
+      RETURNING id, metric_key, display_label, default_color, updated_at, updated_by
+    `));
+    
+    const row = result.rows[0] as any;
+    return {
+      id: row.id,
+      metricKey: row.metric_key,
+      displayLabel: row.display_label,
+      defaultColor: row.default_color,
+      updatedAt: row.updated_at,
+      updatedBy: row.updated_by,
+    };
+  }
+
+  async deleteMetricRuleset(metricKey: string): Promise<void> {
+    const escapedKey = metricKey.replace(/'/g, "''");
+    
+    // First get the ruleset id
+    const rulesetResult = await db.execute(sql.raw(`
+      SELECT id FROM metric_rulesets WHERE metric_key = '${escapedKey}'
+    `));
+    
+    if (rulesetResult.rows.length > 0) {
+      const rulesetId = (rulesetResult.rows[0] as any).id;
+      // Delete thresholds first
+      await db.execute(sql.raw(`DELETE FROM metric_thresholds WHERE ruleset_id = ${rulesetId}`));
+      // Then delete ruleset
+      await db.execute(sql.raw(`DELETE FROM metric_rulesets WHERE id = ${rulesetId}`));
+    }
+  }
+
+  async createMetricThreshold(data: import("@shared/schema").InsertMetricThreshold): Promise<import("@shared/schema").MetricThreshold> {
+    const minVal = data.minValue !== null && data.minValue !== undefined ? data.minValue : 'NULL';
+    const maxVal = data.maxValue !== null && data.maxValue !== undefined ? data.maxValue : 'NULL';
+    const escapedColor = data.color.replace(/'/g, "''");
+    const escapedLabel = (data.label || '').replace(/'/g, "''");
+    const sortOrder = data.sortOrder || 0;
+    
+    const result = await db.execute(sql.raw(`
+      INSERT INTO metric_thresholds (ruleset_id, min_value, max_value, color, label, sort_order)
+      VALUES (${data.rulesetId}, ${minVal}, ${maxVal}, '${escapedColor}', NULLIF('${escapedLabel}', ''), ${sortOrder})
+      RETURNING id, ruleset_id, min_value, max_value, color, label, sort_order
+    `));
+    
+    const row = result.rows[0] as any;
+    return {
+      id: row.id,
+      rulesetId: row.ruleset_id,
+      minValue: row.min_value,
+      maxValue: row.max_value,
+      color: row.color,
+      label: row.label,
+      sortOrder: row.sort_order,
+    };
+  }
+
+  async updateMetricThreshold(id: number, data: Partial<import("@shared/schema").InsertMetricThreshold>): Promise<import("@shared/schema").MetricThreshold> {
+    const updates: string[] = [];
+    
+    if (data.minValue !== undefined) {
+      updates.push(`min_value = ${data.minValue !== null ? data.minValue : 'NULL'}`);
+    }
+    if (data.maxValue !== undefined) {
+      updates.push(`max_value = ${data.maxValue !== null ? data.maxValue : 'NULL'}`);
+    }
+    if (data.color !== undefined) {
+      updates.push(`color = '${data.color.replace(/'/g, "''")}'`);
+    }
+    if (data.label !== undefined) {
+      updates.push(`label = NULLIF('${(data.label || '').replace(/'/g, "''")}', '')`);
+    }
+    if (data.sortOrder !== undefined) {
+      updates.push(`sort_order = ${data.sortOrder}`);
+    }
+    
+    const result = await db.execute(sql.raw(`
+      UPDATE metric_thresholds
+      SET ${updates.join(', ')}
+      WHERE id = ${id}
+      RETURNING id, ruleset_id, min_value, max_value, color, label, sort_order
+    `));
+    
+    const row = result.rows[0] as any;
+    return {
+      id: row.id,
+      rulesetId: row.ruleset_id,
+      minValue: row.min_value,
+      maxValue: row.max_value,
+      color: row.color,
+      label: row.label,
+      sortOrder: row.sort_order,
+    };
+  }
+
+  async deleteMetricThreshold(id: number): Promise<void> {
+    await db.execute(sql.raw(`DELETE FROM metric_thresholds WHERE id = ${id}`));
+  }
+
+  async deleteMetricThresholdsByRuleset(rulesetId: number): Promise<void> {
+    await db.execute(sql.raw(`DELETE FROM metric_thresholds WHERE ruleset_id = ${rulesetId}`));
   }
 }
 
