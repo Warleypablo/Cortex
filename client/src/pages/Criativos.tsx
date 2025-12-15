@@ -9,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon, Search, X, ArrowUpDown, TrendingUp, Rocket, ExternalLink, Loader2 } from "lucide-react";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfQuarter, endOfQuarter, startOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -309,9 +308,9 @@ export default function Criativos() {
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <ScrollArea className="h-[calc(100vh-380px)]">
+              <div className="relative h-[calc(100vh-380px)] overflow-auto">
                 <Table>
-                  <TableHeader className="sticky top-0 bg-card z-10">
+                  <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
                     <TableRow>
                       <SortableHeader column="id" label="AD ID" />
                       <SortableHeader column="adName" label="Criativo" />
@@ -399,8 +398,7 @@ export default function Criativos() {
                     )}
                   </TableBody>
                 </Table>
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
+              </div>
             )}
           </CardContent>
         </Card>
