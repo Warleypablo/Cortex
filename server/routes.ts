@@ -2364,7 +2364,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientesComParcelas.push({
           cliente,
           contexto: contextos[cliente.idCliente],
-          parcelas: parcelasData.parcelas
+          parcelas: parcelasData.parcelas.map(p => ({
+            ...p,
+            dataVencimento: p.dataVencimento instanceof Date ? p.dataVencimento.toISOString() : String(p.dataVencimento)
+          }))
         });
       }
       
@@ -2724,6 +2727,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching juridico clientes:", error);
       res.status(500).json({ error: "Failed to fetch juridico clientes" });
+    }
+  });
+
+  app.put("/api/juridico/clientes/:clienteId/contexto", async (req, res) => {
+    try {
+      const { clienteId } = req.params;
+      const { contextoJuridico, procedimentoJuridico, statusJuridico } = req.body;
+      
+      const user = (req as any).user;
+      const atualizadoPor = user?.name || user?.googleId || 'Sistema';
+      
+      const result = await storage.upsertContextoJuridico({
+        clienteId,
+        contextoJuridico,
+        procedimentoJuridico,
+        statusJuridico,
+        atualizadoPor,
+      });
+      
+      console.log("[api] Contexto jurídico atualizado para cliente:", clienteId);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("[api] Error updating contexto juridico:", error);
+      res.status(500).json({ error: "Failed to update contexto juridico" });
     }
   });
 
