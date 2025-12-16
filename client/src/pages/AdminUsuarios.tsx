@@ -61,6 +61,7 @@ const AVAILABLE_ROUTES = [
   { path: '/dashboard/comercial/apresentacao', label: 'Modo Apresentação', category: 'Comercial' },
   { path: '/growth/visao-geral', label: 'Visão Geral', category: 'Growth' },
   { path: '/growth/criativos', label: 'Criativos', category: 'Growth' },
+  { path: '/growth/performance-plataformas', label: 'Por Plataforma', category: 'Growth' },
   { path: '/juridico/clientes', label: 'Clientes Cobrança', category: 'Jurídico' },
   { path: '/admin/usuarios', label: 'Gerenciar Usuários', category: 'Administração' },
 ];
