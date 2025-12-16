@@ -5318,13 +5318,7 @@ export class DbStorage implements IStorage {
 
     // Calcular tempo médio de entrega (diferença entre lancamento e data_criada para projetos fechados)
     const tempoMedioResult = await db.execute(sql`
-      SELECT AVG(
-        CASE 
-          WHEN lancamento IS NOT NULL AND data_criada IS NOT NULL 
-          THEN EXTRACT(DAY FROM (lancamento::date - data_criada::date))
-          ELSE NULL 
-        END
-      ) as tempo_medio
+      SELECT AVG(lancamento::date - data_criada::date) as tempo_medio
       FROM staging.cup_projetos_tech_fechados
       WHERE lancamento IS NOT NULL AND data_criada IS NOT NULL
     `);
@@ -5514,13 +5508,7 @@ export class DbStorage implements IStorage {
 
     // Tempo médio de entrega
     const tempoMedioResult = await db.execute(sql`
-      SELECT AVG(
-        CASE 
-          WHEN lancamento IS NOT NULL AND data_criada IS NOT NULL 
-          THEN EXTRACT(DAY FROM (lancamento::date - data_criada::date))
-          ELSE NULL 
-        END
-      ) as tempo_medio
+      SELECT AVG(lancamento::date - data_criada::date) as tempo_medio
       FROM staging.cup_projetos_tech_fechados
       WHERE lancamento IS NOT NULL AND data_criada IS NOT NULL
     `);
