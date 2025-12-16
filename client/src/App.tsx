@@ -42,6 +42,7 @@ import PresentationMode from "@/pages/PresentationMode";
 import DetalhamentoVendas from "@/pages/DetalhamentoVendas";
 import Criativos from "@/pages/Criativos";
 import GrowthVisaoGeral from "@/pages/GrowthVisaoGeral";
+import PerformancePlataformas from "@/pages/PerformancePlataformas";
 import RevenueGoals from "@/pages/RevenueGoals";
 import CasesChat from "@/pages/CasesChat";
 
@@ -147,6 +148,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/comercial/apresentacao">{() => <ProtectedRoute path="/dashboard/comercial/apresentacao" component={PresentationMode} />}</Route>
       <Route path="/growth/criativos">{() => <ProtectedRoute path="/growth/criativos" component={Criativos} />}</Route>
       <Route path="/growth/visao-geral">{() => <ProtectedRoute path="/growth/visao-geral" component={GrowthVisaoGeral} />}</Route>
+      <Route path="/growth/performance-plataformas">{() => <ProtectedRoute path="/growth/performance-plataformas" component={PerformancePlataformas} />}</Route>
       <Route path="/cases/chat">{() => <ProtectedRoute path="/cases/chat" component={CasesChat} />}</Route>
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>

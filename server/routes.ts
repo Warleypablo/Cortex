@@ -1682,6 +1682,399 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Growth - Performance por Plataformas (dados hierárquicos: Plataforma > Campanha > Conjunto > Anúncio)
+  app.get("/api/growth/performance-plataformas", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string || '2025-01-01';
+      const endDate = req.query.endDate as string || '2025-12-31';
+      const status = req.query.status as string || 'Todos';
+      
+      // Validar formato de data
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+      }
+      
+      // Buscar dados agregados por campanha do Meta Ads
+      const campaignsDataResult = await db.execute(sql`
+        SELECT 
+          c.campaign_id,
+          c.campaign_name,
+          c.status as campaign_status,
+          SUM(i.spend::numeric) as investimento,
+          SUM(i.impressions) as impressions,
+          SUM(i.clicks) as clicks,
+          SUM(i.reach) as reach,
+          AVG(i.ctr::numeric) as ctr,
+          AVG(i.cpm::numeric) as cpm
+        FROM meta_campaigns c
+        LEFT JOIN meta_insights_daily i ON c.campaign_id = i.campaign_id
+        WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
+        GROUP BY c.campaign_id, c.campaign_name, c.status
+        ORDER BY SUM(i.spend::numeric) DESC
+      `);
+      
+      // Buscar dados agregados por adset do Meta Ads
+      const adsetsDataResult = await db.execute(sql`
+        SELECT 
+          aset.adset_id,
+          aset.adset_name,
+          aset.campaign_id,
+          aset.status as adset_status,
+          SUM(i.spend::numeric) as investimento,
+          SUM(i.impressions) as impressions,
+          SUM(i.clicks) as clicks,
+          SUM(i.reach) as reach,
+          AVG(i.ctr::numeric) as ctr,
+          AVG(i.cpm::numeric) as cpm
+        FROM meta_adsets aset
+        LEFT JOIN meta_insights_daily i ON aset.adset_id = i.adset_id
+        WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
+        GROUP BY aset.adset_id, aset.adset_name, aset.campaign_id, aset.status
+        ORDER BY SUM(i.spend::numeric) DESC
+      `);
+      
+      // Buscar dados agregados por anúncio do Meta Ads
+      const adsDataResult = await db.execute(sql`
+        SELECT 
+          a.ad_id,
+          a.ad_name,
+          a.adset_id,
+          a.campaign_id,
+          a.status as ad_status,
+          a.created_time,
+          a.preview_shareable_link as link,
+          SUM(i.spend::numeric) as investimento,
+          SUM(i.impressions) as impressions,
+          SUM(i.clicks) as clicks,
+          SUM(i.reach) as reach,
+          AVG(i.ctr::numeric) as ctr,
+          AVG(i.cpm::numeric) as cpm
+        FROM meta_ads a
+        LEFT JOIN meta_insights_daily i ON a.ad_id = i.ad_id
+        WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
+        GROUP BY a.ad_id, a.ad_name, a.adset_id, a.campaign_id, a.status, a.created_time, a.preview_shareable_link
+        ORDER BY SUM(i.spend::numeric) DESC
+      `);
+      
+      // Buscar dados de conversão do CRM por ad_id
+      const dealsDataResult = await db.execute(sql`
+        SELECT 
+          utm_content as ad_id,
+          COUNT(*) as leads,
+          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
+          SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado', 'Reunião Agendada') THEN 1 ELSE 0 END) as rm,
+          SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado') THEN 1 ELSE 0 END) as rr,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_total
+        FROM crm_deal
+        WHERE utm_content IS NOT NULL 
+          AND utm_content != ''
+          AND created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+        GROUP BY utm_content
+      `);
+      
+      // Criar mapa de deals por ad_id
+      const dealsMap = new Map<string, any>();
+      for (const row of dealsDataResult.rows as any[]) {
+        dealsMap.set(row.ad_id, {
+          leads: parseInt(row.leads) || 0,
+          mqls: parseInt(row.mqls) || 0,
+          rm: parseInt(row.rm) || 0,
+          rr: parseInt(row.rr) || 0,
+          vendas: parseInt(row.vendas) || 0,
+          valorTotal: parseFloat(row.valor_total) || 0
+        });
+      }
+      
+      // Helper para calcular métricas derivadas
+      const calcMetrics = (investimento: number, impressions: number, clicks: number, reach: number, ctr: number | null, cpm: number | null, deal: any) => {
+        const leads = deal.leads;
+        const mqls = deal.mqls;
+        const rm = deal.rm;
+        const rr = deal.rr;
+        const vendas = deal.vendas;
+        
+        const frequency = reach > 0 ? impressions / reach : null;
+        const cpl = leads > 0 ? investimento / leads : null;
+        const percMql = leads > 0 ? Math.round((mqls / leads) * 100) : null;
+        const cpmql = mqls > 0 ? investimento / mqls : null;
+        const percRa = leads > 0 ? Math.round((rm / leads) * 100) : null;
+        const cpra = rm > 0 ? investimento / rm : null;
+        const percRaMql = mqls > 0 ? Math.round((rm / mqls) * 100) : null;
+        const percRrMql = mqls > 0 ? Math.round((rr / mqls) * 100) : null;
+        const percRr = rm > 0 ? Math.round((rr / rm) * 100) : null;
+        const cprr = rr > 0 ? investimento / rr : null;
+        const percRrCliente = rr > 0 ? Math.round((vendas / rr) * 100) : null;
+        const cacUnico = vendas > 0 ? investimento / vendas : null;
+        
+        return {
+          investimento: Math.round(investimento),
+          impressions,
+          frequency: frequency ? parseFloat(frequency.toFixed(2)) : null,
+          ctr: ctr ? parseFloat((typeof ctr === 'number' ? ctr : 0).toFixed(2)) : null,
+          cpm: cpm ? Math.round(typeof cpm === 'number' ? cpm : 0) : null,
+          leads,
+          cpl: cpl ? Math.round(cpl) : null,
+          mql: mqls,
+          percMql,
+          cpmql: cpmql ? parseFloat(cpmql.toFixed(2)) : null,
+          ra: rm,
+          percRa,
+          cpra: cpra ? Math.round(cpra) : null,
+          percRaMql,
+          percRrMql,
+          rr,
+          percRr,
+          cprr: cprr ? parseFloat(cprr.toFixed(2)) : null,
+          clientesUnicos: vendas,
+          percRrCliente,
+          cacUnico: cacUnico ? Math.round(cacUnico) : null
+        };
+      };
+      
+      // Processar anúncios
+      const adsMap = new Map<string, any>();
+      const adsByAdset = new Map<string, any[]>();
+      
+      for (const row of adsDataResult.rows as any[]) {
+        const adId = row.ad_id;
+        const adsetId = row.adset_id;
+        const investimento = parseFloat(row.investimento) || 0;
+        const impressions = parseInt(row.impressions) || 0;
+        const clicks = parseInt(row.clicks) || 0;
+        const reach = parseInt(row.reach) || 0;
+        const ctr = parseFloat(row.ctr) || (impressions > 0 ? (clicks / impressions) * 100 : null);
+        const cpm = parseFloat(row.cpm) || (impressions > 0 ? (investimento / impressions) * 1000 : null);
+        
+        let adStatus = row.ad_status || 'Desconhecido';
+        if (adStatus.toUpperCase() === 'ACTIVE') adStatus = 'Ativo';
+        else if (adStatus.toUpperCase() === 'PAUSED') adStatus = 'Pausado';
+        
+        if (status !== 'Todos' && ((status === 'Ativo' && adStatus !== 'Ativo') || (status === 'Pausado' && adStatus !== 'Pausado'))) {
+          continue;
+        }
+        
+        const deal = dealsMap.get(adId) || { leads: 0, mqls: 0, rm: 0, rr: 0, vendas: 0, valorTotal: 0 };
+        const metrics = calcMetrics(investimento, impressions, clicks, reach, ctr, cpm, deal);
+        
+        const adNode = {
+          id: `ad_${adId}`,
+          type: 'ad' as const,
+          name: row.ad_name || `Ad ${adId}`,
+          parentId: `adset_${adsetId}`,
+          status: adStatus,
+          link: row.link || `https://facebook.com/ads/library/?id=${adId}`,
+          ...metrics
+        };
+        
+        adsMap.set(adId, adNode);
+        
+        if (!adsByAdset.has(adsetId)) {
+          adsByAdset.set(adsetId, []);
+        }
+        adsByAdset.get(adsetId)!.push(adNode);
+      }
+      
+      // Processar adsets e agregar métricas dos anúncios
+      const adsetsMap = new Map<string, any>();
+      const adsetsByCampaign = new Map<string, any[]>();
+      
+      for (const row of adsetsDataResult.rows as any[]) {
+        const adsetId = row.adset_id;
+        const campaignId = row.campaign_id;
+        const ads = adsByAdset.get(adsetId) || [];
+        
+        if (ads.length === 0 && status !== 'Todos') continue;
+        
+        // Agregar métricas dos anúncios
+        let aggInvest = 0, aggImpr = 0, aggLeads = 0, aggMqls = 0, aggRm = 0, aggRr = 0, aggVendas = 0;
+        for (const ad of ads) {
+          aggInvest += ad.investimento || 0;
+          aggImpr += ad.impressions || 0;
+          aggLeads += ad.leads || 0;
+          aggMqls += ad.mql || 0;
+          aggRm += ad.ra || 0;
+          aggRr += ad.rr || 0;
+          aggVendas += ad.clientesUnicos || 0;
+        }
+        
+        const deal = { leads: aggLeads, mqls: aggMqls, rm: aggRm, rr: aggRr, vendas: aggVendas, valorTotal: 0 };
+        const metrics = calcMetrics(aggInvest, aggImpr, 0, 0, aggImpr > 0 ? null : null, null, deal);
+        
+        // Recalcular CTR e CPM com valores agregados
+        metrics.ctr = aggImpr > 0 && ads.length > 0 ? parseFloat((ads.reduce((sum, a) => sum + (a.ctr || 0), 0) / ads.length).toFixed(2)) : null;
+        metrics.cpm = aggInvest > 0 && aggImpr > 0 ? Math.round((aggInvest / aggImpr) * 1000) : null;
+        
+        let adsetStatus = row.adset_status || 'Desconhecido';
+        if (adsetStatus.toUpperCase() === 'ACTIVE') adsetStatus = 'Ativo';
+        else if (adsetStatus.toUpperCase() === 'PAUSED') adsetStatus = 'Pausado';
+        
+        const adsetNode = {
+          id: `adset_${adsetId}`,
+          type: 'adset' as const,
+          name: row.adset_name || `Conjunto ${adsetId}`,
+          parentId: `campaign_${campaignId}`,
+          status: adsetStatus,
+          childrenCount: ads.length,
+          ...metrics
+        };
+        
+        adsetsMap.set(adsetId, adsetNode);
+        
+        if (!adsetsByCampaign.has(campaignId)) {
+          adsetsByCampaign.set(campaignId, []);
+        }
+        adsetsByCampaign.get(campaignId)!.push(adsetNode);
+      }
+      
+      // Processar campanhas e agregar métricas dos adsets
+      const campaignsMap = new Map<string, any>();
+      const campaignsByPlatform = new Map<string, any[]>();
+      
+      for (const row of campaignsDataResult.rows as any[]) {
+        const campaignId = row.campaign_id;
+        const adsets = adsetsByCampaign.get(campaignId) || [];
+        
+        if (adsets.length === 0 && status !== 'Todos') continue;
+        
+        // Agregar métricas dos adsets
+        let aggInvest = 0, aggImpr = 0, aggLeads = 0, aggMqls = 0, aggRm = 0, aggRr = 0, aggVendas = 0;
+        for (const adset of adsets) {
+          aggInvest += adset.investimento || 0;
+          aggImpr += adset.impressions || 0;
+          aggLeads += adset.leads || 0;
+          aggMqls += adset.mql || 0;
+          aggRm += adset.ra || 0;
+          aggRr += adset.rr || 0;
+          aggVendas += adset.clientesUnicos || 0;
+        }
+        
+        const deal = { leads: aggLeads, mqls: aggMqls, rm: aggRm, rr: aggRr, vendas: aggVendas, valorTotal: 0 };
+        const metrics = calcMetrics(aggInvest, aggImpr, 0, 0, null, null, deal);
+        
+        // Recalcular CTR e CPM com valores agregados
+        metrics.ctr = aggImpr > 0 && adsets.length > 0 ? parseFloat((adsets.reduce((sum, a) => sum + (a.ctr || 0), 0) / adsets.length).toFixed(2)) : null;
+        metrics.cpm = aggInvest > 0 && aggImpr > 0 ? Math.round((aggInvest / aggImpr) * 1000) : null;
+        
+        let campaignStatus = row.campaign_status || 'Desconhecido';
+        if (campaignStatus.toUpperCase() === 'ACTIVE') campaignStatus = 'Ativo';
+        else if (campaignStatus.toUpperCase() === 'PAUSED') campaignStatus = 'Pausado';
+        
+        const campaignNode = {
+          id: `campaign_${campaignId}`,
+          type: 'campaign' as const,
+          name: row.campaign_name || `Campanha ${campaignId}`,
+          parentId: 'platform_meta',
+          status: campaignStatus,
+          childrenCount: adsets.length,
+          ...metrics
+        };
+        
+        campaignsMap.set(campaignId, campaignNode);
+        
+        const platform = 'meta';
+        if (!campaignsByPlatform.has(platform)) {
+          campaignsByPlatform.set(platform, []);
+        }
+        campaignsByPlatform.get(platform)!.push(campaignNode);
+      }
+      
+      // Criar nodes de plataformas
+      const platforms = [];
+      
+      // Meta Ads
+      const metaCampaigns = campaignsByPlatform.get('meta') || [];
+      if (metaCampaigns.length > 0) {
+        let aggInvest = 0, aggImpr = 0, aggLeads = 0, aggMqls = 0, aggRm = 0, aggRr = 0, aggVendas = 0;
+        for (const camp of metaCampaigns) {
+          aggInvest += camp.investimento || 0;
+          aggImpr += camp.impressions || 0;
+          aggLeads += camp.leads || 0;
+          aggMqls += camp.mql || 0;
+          aggRm += camp.ra || 0;
+          aggRr += camp.rr || 0;
+          aggVendas += camp.clientesUnicos || 0;
+        }
+        
+        const deal = { leads: aggLeads, mqls: aggMqls, rm: aggRm, rr: aggRr, vendas: aggVendas, valorTotal: 0 };
+        const metrics = calcMetrics(aggInvest, aggImpr, 0, 0, null, null, deal);
+        metrics.ctr = aggImpr > 0 && metaCampaigns.length > 0 ? parseFloat((metaCampaigns.reduce((sum, c) => sum + (c.ctr || 0), 0) / metaCampaigns.length).toFixed(2)) : null;
+        metrics.cpm = aggInvest > 0 && aggImpr > 0 ? Math.round((aggInvest / aggImpr) * 1000) : null;
+        
+        platforms.push({
+          id: 'platform_meta',
+          type: 'platform' as const,
+          name: 'Meta Ads',
+          parentId: null,
+          status: 'Ativo',
+          childrenCount: metaCampaigns.length,
+          ...metrics
+        });
+      }
+      
+      // Google Ads - placeholder (sem dados reais por enquanto)
+      platforms.push({
+        id: 'platform_google',
+        type: 'platform' as const,
+        name: 'Google Ads',
+        parentId: null,
+        status: 'Ativo',
+        childrenCount: 0,
+        investimento: 0, impressions: 0, frequency: null, ctr: null, cpm: null,
+        leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null,
+        ra: 0, percRa: null, cpra: null, percRaMql: null, percRrMql: null,
+        rr: 0, percRr: null, cprr: null,
+        clientesUnicos: 0, percRrCliente: null, cacUnico: null
+      });
+      
+      // LinkedIn Ads - placeholder
+      platforms.push({
+        id: 'platform_linkedin',
+        type: 'platform' as const,
+        name: 'LinkedIn Ads',
+        parentId: null,
+        status: 'Ativo',
+        childrenCount: 0,
+        investimento: 0, impressions: 0, frequency: null, ctr: null, cpm: null,
+        leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null,
+        ra: 0, percRa: null, cpra: null, percRaMql: null, percRrMql: null,
+        rr: 0, percRr: null, cprr: null,
+        clientesUnicos: 0, percRrCliente: null, cacUnico: null
+      });
+      
+      // TikTok Ads - placeholder
+      platforms.push({
+        id: 'platform_tiktok',
+        type: 'platform' as const,
+        name: 'TikTok Ads',
+        parentId: null,
+        status: 'Ativo',
+        childrenCount: 0,
+        investimento: 0, impressions: 0, frequency: null, ctr: null, cpm: null,
+        leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null,
+        ra: 0, percRa: null, cpra: null, percRaMql: null, percRrMql: null,
+        rr: 0, percRr: null, cprr: null,
+        clientesUnicos: 0, percRrCliente: null, cacUnico: null
+      });
+      
+      // Montar lista flat de todos os nodes
+      const nodes = [
+        ...platforms,
+        ...Array.from(campaignsMap.values()),
+        ...Array.from(adsetsMap.values()),
+        ...Array.from(adsMap.values())
+      ];
+      
+      console.log("[api] Growth Performance Plataformas - Platforms:", platforms.length, "Campaigns:", campaignsMap.size, "Adsets:", adsetsMap.size, "Ads:", adsMap.size);
+      
+      res.json(nodes);
+    } catch (error) {
+      console.error("[api] Error fetching growth performance plataformas:", error);
+      res.status(500).json({ error: "Failed to fetch growth performance plataformas" });
+    }
+  });
+
   app.get("/api/financeiro/kpis-completos", async (req, res) => {
     try {
       const kpis = await storage.getFinanceiroKPIsCompletos();
