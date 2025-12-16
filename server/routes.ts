@@ -2706,42 +2706,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const clientesComDados: Array<{
         cliente: typeof clientesCobrar[0];
         contexto: typeof contextos[string];
-        juridico: any;
         parcelas: any[];
       }> = [];
-      
-      // 5. Buscar dados jurídicos existentes
-      const clienteIds = clientesCobrar.map(c => c.idCliente);
-      let juridicoResult: any = { rows: [] };
-      if (clienteIds.length > 0) {
-        juridicoResult = await db.execute(sql.raw(`
-          SELECT * FROM juridico_clientes WHERE cliente_id = ANY(ARRAY[${clienteIds.map(id => `'${id}'`).join(',')}]::text[])
-        `));
-      }
-      const juridicoMap = new Map<string, any>();
-      for (const row of juridicoResult.rows as any[]) {
-        juridicoMap.set(row.cliente_id, {
-          id: row.id,
-          procedimento: row.procedimento,
-          statusJuridico: row.status_juridico,
-          observacoes: row.observacoes,
-          valorAcordado: row.valor_acordado ? parseFloat(row.valor_acordado) : null,
-          dataAcordo: row.data_acordo,
-          numeroParcelas: row.numero_parcelas,
-          protocoloProcesso: row.protocolo_processo,
-          advogadoResponsavel: row.advogado_responsavel,
-          dataCriacao: row.data_criacao,
-          dataAtualizacao: row.data_atualizacao,
-          atualizadoPor: row.atualizado_por,
-        });
-      }
       
       for (const cliente of clientesCobrar) {
         const parcelasData = await storage.getInadimplenciaDetalheParcelas(cliente.idCliente, dataInicio, dataFim);
         clientesComDados.push({
           cliente,
           contexto: contextos[cliente.idCliente],
-          juridico: juridicoMap.get(cliente.idCliente) || null,
           parcelas: parcelasData.parcelas,
         });
       }
@@ -2752,102 +2724,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching juridico clientes:", error);
       res.status(500).json({ error: "Failed to fetch juridico clientes" });
-    }
-  });
-
-  // Jurídico - Atualizar/Criar status jurídico de um cliente
-  app.put("/api/juridico/cliente/:clienteId", async (req, res) => {
-    try {
-      const { clienteId } = req.params;
-      const { procedimento, statusJuridico, observacoes, valorAcordado, dataAcordo, numeroParcelas, protocoloProcesso, advogadoResponsavel } = req.body;
-      
-      // Validar procedimento
-      const procedimentosValidos = ['notificacao', 'protesto', 'acao_judicial', 'acordo', 'baixa'];
-      if (procedimento && !procedimentosValidos.includes(procedimento)) {
-        return res.status(400).json({ error: `Invalid procedimento. Must be one of: ${procedimentosValidos.join(', ')}` });
-      }
-      
-      // Validar status jurídico
-      const statusValidos = ['aguardando_documentos', 'em_andamento', 'finalizado', 'suspenso'];
-      if (statusJuridico && !statusValidos.includes(statusJuridico)) {
-        return res.status(400).json({ error: `Invalid statusJuridico. Must be one of: ${statusValidos.join(', ')}` });
-      }
-      
-      const userId = (req.user as any)?.name || (req.user as any)?.id || 'anonymous';
-      
-      // Verificar se já existe registro
-      const existingResult = await db.execute(sql`
-        SELECT id FROM juridico_clientes WHERE cliente_id = ${clienteId}
-      `);
-      
-      let result;
-      if (existingResult.rows.length > 0) {
-        // Update
-        result = await db.execute(sql`
-          UPDATE juridico_clientes SET
-            procedimento = ${procedimento || null},
-            status_juridico = ${statusJuridico || null},
-            observacoes = ${observacoes || null},
-            valor_acordado = ${valorAcordado ? valorAcordado.toString() : null},
-            data_acordo = ${dataAcordo || null},
-            numero_parcelas = ${numeroParcelas || null},
-            protocolo_processo = ${protocoloProcesso || null},
-            advogado_responsavel = ${advogadoResponsavel || null},
-            data_atualizacao = NOW(),
-            atualizado_por = ${userId}
-          WHERE cliente_id = ${clienteId}
-          RETURNING *
-        `);
-      } else {
-        // Insert - let SERIAL handle id auto-increment
-        result = await db.execute(sql`
-          INSERT INTO juridico_clientes (cliente_id, procedimento, status_juridico, observacoes, valor_acordado, data_acordo, numero_parcelas, protocolo_processo, advogado_responsavel, data_criacao, data_atualizacao, atualizado_por)
-          VALUES (${clienteId}, ${procedimento || null}, ${statusJuridico || null}, ${observacoes || null}, ${valorAcordado ? valorAcordado.toString() : null}, ${dataAcordo || null}, ${numeroParcelas || null}, ${protocoloProcesso || null}, ${advogadoResponsavel || null}, NOW(), NOW(), ${userId})
-          RETURNING *
-        `);
-      }
-      
-      res.json({ juridico: result.rows[0] });
-    } catch (error) {
-      console.error("[api] Error upserting juridico cliente:", error);
-      res.status(500).json({ error: "Failed to save juridico cliente" });
-    }
-  });
-
-  // Jurídico - Buscar status jurídico de um cliente específico
-  app.get("/api/juridico/cliente/:clienteId", async (req, res) => {
-    try {
-      const { clienteId } = req.params;
-      
-      const result = await db.execute(sql`
-        SELECT * FROM juridico_clientes WHERE cliente_id = ${clienteId}
-      `);
-      
-      if (result.rows.length === 0) {
-        return res.json({ juridico: null });
-      }
-      
-      const row = result.rows[0] as any;
-      res.json({
-        juridico: {
-          id: row.id,
-          clienteId: row.cliente_id,
-          procedimento: row.procedimento,
-          statusJuridico: row.status_juridico,
-          observacoes: row.observacoes,
-          valorAcordado: row.valor_acordado ? parseFloat(row.valor_acordado) : null,
-          dataAcordo: row.data_acordo,
-          numeroParcelas: row.numero_parcelas,
-          protocoloProcesso: row.protocolo_processo,
-          advogadoResponsavel: row.advogado_responsavel,
-          dataCriacao: row.data_criacao,
-          dataAtualizacao: row.data_atualizacao,
-          atualizadoPor: row.atualizado_por,
-        }
-      });
-    } catch (error) {
-      console.error("[api] Error fetching juridico cliente:", error);
-      res.status(500).json({ error: "Failed to fetch juridico cliente" });
     }
   });
 
