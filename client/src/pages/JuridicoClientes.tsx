@@ -338,7 +338,7 @@ export default function JuridicoClientes() {
                 Cobrança Jurídica
               </h1>
               <p className="text-muted-foreground text-sm">
-                Gerencie clientes com pendências para tratamento jurídico
+                Clientes inadimplentes com mais de 3 dias de atraso
               </p>
             </div>
           </div>
