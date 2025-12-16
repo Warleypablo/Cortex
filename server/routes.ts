@@ -2687,36 +2687,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== JURÍDICO - Clientes para ação legal ====================
   
-  // Jurídico - Listar clientes com ação "cobrar" para tratamento legal
+  // Jurídico - Listar todos clientes inadimplentes com mais de 3 dias de atraso
   app.get("/api/juridico/clientes", async (req, res) => {
     try {
       const dataInicio = req.query.dataInicio as string | undefined;
       const dataFim = req.query.dataFim as string | undefined;
       
       // 1. Buscar todos os clientes inadimplentes
-      const clientesData = await storage.getInadimplenciaClientes(dataInicio, dataFim, 'valor', 500);
+      const clientesData = await storage.getInadimplenciaClientes(dataInicio, dataFim, 'valor', 1000);
       
-      // 2. Buscar todos os contextos para filtrar por ação = 'cobrar'
-      const ids = clientesData.clientes.map(c => c.idCliente);
+      // 2. Filtrar clientes com mais de 3 dias de atraso
+      const clientesFiltrados = clientesData.clientes.filter(c => c.diasAtrasoMax > 3);
+      
+      // 3. Buscar contextos para os clientes filtrados
+      const ids = clientesFiltrados.map(c => c.idCliente);
       const contextos = await storage.getInadimplenciaContextos(ids);
-      
-      // 3. Filtrar clientes onde ação = 'cobrar'
-      const clientesCobrar = clientesData.clientes.filter(c => 
-        contextos[c.idCliente]?.acao === 'cobrar'
-      );
       
       // 4. Buscar parcelas detalhadas para cada cliente
       const clientesComDados: Array<{
-        cliente: typeof clientesCobrar[0];
+        cliente: typeof clientesFiltrados[0];
         contexto: typeof contextos[string];
         parcelas: any[];
       }> = [];
       
-      for (const cliente of clientesCobrar) {
+      for (const cliente of clientesFiltrados) {
         const parcelasData = await storage.getInadimplenciaDetalheParcelas(cliente.idCliente, dataInicio, dataFim);
         clientesComDados.push({
           cliente,
-          contexto: contextos[cliente.idCliente],
+          contexto: contextos[cliente.idCliente] || {},
           parcelas: parcelasData.parcelas,
         });
       }
