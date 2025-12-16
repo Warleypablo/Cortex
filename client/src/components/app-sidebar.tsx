@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Tv, Sparkles, Image, Trophy } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Tv, Sparkles, Image, Trophy, Layers } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -129,6 +129,7 @@ const dashboardCategories = [
     baseUrl: "/growth",
     subItems: [
       { title: "Visão Geral", url: "/growth/visao-geral", icon: Eye },
+      { title: "Por Plataforma", url: "/growth/performance-plataformas", icon: Layers },
       { title: "Criativos", url: "/growth/criativos", icon: Image },
     ],
   },
