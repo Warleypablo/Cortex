@@ -78,6 +78,7 @@ const ALL_ROUTES = [
   '/dashboard/comercial/apresentacao',
   '/growth/visao-geral',
   '/growth/criativos',
+  '/growth/performance-plataformas',
   '/juridico/clientes',
   '/admin/usuarios'
 ];
