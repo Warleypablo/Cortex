@@ -1029,3 +1029,24 @@ export type InsertMetricThreshold = z.infer<typeof insertMetricThresholdSchema>;
 export type MetricRulesetWithThresholds = MetricRuleset & {
   thresholds: MetricThreshold[];
 };
+
+// Tabela para controle jurídico de inadimplência
+export const juridicoClientes = pgTable("juridico_clientes", {
+  id: integer("id").primaryKey(),
+  clienteId: text("cliente_id").notNull().unique(),
+  procedimento: varchar("procedimento", { length: 50 }), // 'notificacao' | 'protesto' | 'acao_judicial' | 'acordo' | 'baixa'
+  statusJuridico: varchar("status_juridico", { length: 50 }), // 'aguardando_documentos' | 'em_andamento' | 'finalizado' | 'suspenso'
+  observacoes: text("observacoes"),
+  valorAcordado: decimal("valor_acordado", { precision: 15, scale: 2 }),
+  dataAcordo: date("data_acordo"),
+  numeroParcelas: integer("numero_parcelas"),
+  protocoloProcesso: varchar("protocolo_processo", { length: 100 }),
+  advogadoResponsavel: varchar("advogado_responsavel", { length: 100 }),
+  dataCriacao: timestamp("data_criacao").defaultNow(),
+  dataAtualizacao: timestamp("data_atualizacao").defaultNow(),
+  atualizadoPor: varchar("atualizado_por", { length: 100 }),
+});
+
+export const insertJuridicoClienteSchema = createInsertSchema(juridicoClientes).omit({ id: true });
+export type JuridicoCliente = typeof juridicoClientes.$inferSelect;
+export type InsertJuridicoCliente = z.infer<typeof insertJuridicoClienteSchema>;
