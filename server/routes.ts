@@ -2980,7 +2980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           (SELECT COUNT(DISTINCT cnpj) FROM cup_clientes) as total_clientes,
           COUNT(DISTINCT CASE WHEN c.status IN ('ativo', 'onboarding', 'triagem') THEN c.id_task END) as clientes_ativos,
           COUNT(DISTINCT CASE WHEN c.status = 'churn' THEN c.id_task END) as clientes_churn,
-          COUNT(DISTINCT CASE WHEN c.status = 'churn' AND c.updated_at >= CURRENT_DATE - INTERVAL '30 days' THEN c.id_task END) as churn_mes
+          COUNT(DISTINCT CASE WHEN c.status = 'churn' THEN c.id_task END) as churn_mes
         FROM cup_contratos c
       `);
       
@@ -3010,7 +3010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(CASE WHEN c.status IN ('ativo', 'onboarding', 'triagem') THEN c.valorr ELSE 0 END), 0) as mrr
         FROM meses m
         LEFT JOIN cup_contratos c ON date_trunc('month', c.created_at) <= m.mes
-          AND (c.status IN ('ativo', 'onboarding', 'triagem') OR date_trunc('month', c.updated_at) > m.mes)
+          AND c.status IN ('ativo', 'onboarding', 'triagem')
         GROUP BY m.mes
         ORDER BY m.mes
       `);
@@ -3035,7 +3035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           COUNT(*) as headcount,
           COUNT(CASE WHEN admissao >= CURRENT_DATE - INTERVAL '90 days' THEN 1 END) as contratacoes_90d,
-          COUNT(CASE WHEN status = 'Desligado' AND updated_at >= CURRENT_DATE - INTERVAL '90 days' THEN 1 END) as desligamentos_90d,
+          COUNT(CASE WHEN status = 'Desligado' THEN 1 END) as desligamentos_90d,
           COALESCE(AVG(
             CASE WHEN admissao IS NOT NULL AND LOWER(status) = 'ativo'
             THEN EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) + 
@@ -3043,7 +3043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             END
           ), 0) as tempo_medio_meses
         FROM rh_pessoal
-        WHERE LOWER(status) = 'ativo' OR (status = 'Desligado' AND updated_at >= CURRENT_DATE - INTERVAL '90 days')
+        WHERE LOWER(status) = 'ativo' OR status = 'Desligado'
       `);
       
       // Distribuição por setor
