@@ -2996,24 +2996,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM cup_contratos
       `);
       
-      // MRR histórico para cálculo de variação
-      const mrrHistoricoResult = await db.execute(sql`
-        WITH meses AS (
-          SELECT generate_series(
-            date_trunc('month', CURRENT_DATE - INTERVAL '12 months'),
-            date_trunc('month', CURRENT_DATE),
-            INTERVAL '1 month'
-          ) as mes
-        )
-        SELECT 
-          TO_CHAR(m.mes, 'YYYY-MM') as mes,
-          COALESCE(SUM(CASE WHEN c.status IN ('ativo', 'onboarding', 'triagem') THEN c.valorr ELSE 0 END), 0) as mrr
-        FROM meses m
-        LEFT JOIN cup_contratos c ON date_trunc('month', c.created_at) <= m.mes
-          AND c.status IN ('ativo', 'onboarding', 'triagem')
-        GROUP BY m.mes
-        ORDER BY m.mes
+      // MRR atual (não tem histórico disponível na tabela)
+      const mrrAtualResult = await db.execute(sql`
+        SELECT COALESCE(SUM(CASE WHEN status IN ('ativo', 'onboarding', 'triagem') THEN valorr ELSE 0 END), 0) as mrr
+        FROM cup_contratos
       `);
+      const mrrHistoricoResult = { rows: [{ mes: new Date().toISOString().slice(0,7), mrr: mrrAtualResult.rows[0]?.mrr || 0 }] };
       
       // Receita por serviço
       const receitaPorServicoResult = await db.execute(sql`
