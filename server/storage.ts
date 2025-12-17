@@ -216,6 +216,8 @@ export interface IStorage {
   getTechProjetosFechados(limit?: number): Promise<TechProjetoDetalhe[]>;
   getTechTasksPorStatus(): Promise<TechTaskStatus[]>;
   getTechVelocidade(): Promise<TechVelocidade>;
+  getTechTempoResponsavel(): Promise<TechTempoResponsavel[]>;
+  getTechAllProjetos(tipo: 'abertos' | 'fechados', responsavel?: string, tipoP?: string): Promise<TechProjetoDetalhe[]>;
   
   // Metric Formatting Rules
   getMetricRulesets(): Promise<import("@shared/schema").MetricRulesetWithThresholds[]>;
@@ -313,6 +315,14 @@ export interface TechVelocidade {
   projetosEntreguesMes: number;
   tempoMedioEntrega: number;
   taxaCumprimentoPrazo: number;
+}
+
+export interface TechTempoResponsavel {
+  responsavel: string;
+  totalEntregas: number;
+  tempoMedioEntrega: number;
+  taxaNoPrazo: number;
+  valorTotalEntregue: number;
 }
 
 export class MemStorage implements IStorage {
@@ -681,6 +691,14 @@ export class MemStorage implements IStorage {
   }
 
   async getTechVelocidade(): Promise<TechVelocidade> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechTempoResponsavel(): Promise<TechTempoResponsavel[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechAllProjetos(tipo: 'abertos' | 'fechados', responsavel?: string, tipoP?: string): Promise<TechProjetoDetalhe[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -5531,6 +5549,78 @@ export class DbStorage implements IStorage {
       tempoMedioEntrega,
       taxaCumprimentoPrazo,
     };
+  }
+
+  async getTechTempoResponsavel(): Promise<TechTempoResponsavel[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(responsavel, 'Não atribuído') as responsavel,
+        COUNT(*) as total_entregas,
+        AVG(lancamento::date - data_criada::date) as tempo_medio,
+        COUNT(CASE WHEN lancamento <= data_vencimento THEN 1 END)::float / 
+          NULLIF(COUNT(CASE WHEN lancamento IS NOT NULL AND data_vencimento IS NOT NULL THEN 1 END), 0) * 100 as taxa_no_prazo,
+        COALESCE(SUM(valor_p), 0) as valor_total_entregue
+      FROM staging.cup_projetos_tech_fechados
+      WHERE lancamento IS NOT NULL AND data_criada IS NOT NULL
+      GROUP BY responsavel
+      ORDER BY total_entregas DESC
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      responsavel: row.responsavel,
+      totalEntregas: parseInt(row.total_entregas || '0'),
+      tempoMedioEntrega: parseFloat(row.tempo_medio || '0'),
+      taxaNoPrazo: parseFloat(row.taxa_no_prazo || '0'),
+      valorTotalEntregue: parseFloat(row.valor_total_entregue || '0'),
+    }));
+  }
+
+  async getTechAllProjetos(tipo: 'abertos' | 'fechados', responsavel?: string, tipoP?: string): Promise<TechProjetoDetalhe[]> {
+    const table = tipo === 'abertos' ? 'staging.cup_projetos_tech' : 'staging.cup_projetos_tech_fechados';
+    
+    let whereConditions: string[] = [];
+    if (responsavel) {
+      whereConditions.push(`responsavel = '${responsavel.replace(/'/g, "''")}'`);
+    }
+    if (tipoP) {
+      whereConditions.push(`tipo = '${tipoP.replace(/'/g, "''")}'`);
+    }
+    
+    const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
+    const orderBy = tipo === 'abertos' ? 'ORDER BY data_criada DESC' : 'ORDER BY lancamento DESC NULLS LAST';
+    
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        clickup_task_id,
+        task_name,
+        status_projeto,
+        responsavel,
+        fase_projeto,
+        tipo,
+        tipo_projeto,
+        valor_p,
+        data_vencimento,
+        lancamento,
+        data_criada
+      FROM ${table}
+      ${whereClause}
+      ${orderBy}
+      LIMIT 500
+    `));
+
+    return (result.rows as any[]).map(row => ({
+      clickupTaskId: row.clickup_task_id,
+      taskName: row.task_name,
+      statusProjeto: row.status_projeto,
+      responsavel: row.responsavel,
+      faseProjeto: row.fase_projeto,
+      tipo: row.tipo,
+      tipoProjeto: row.tipo_projeto,
+      valorP: row.valor_p ? parseFloat(row.valor_p) : null,
+      dataVencimento: row.data_vencimento,
+      lancamento: row.lancamento,
+      dataCriada: row.data_criada,
+    }));
   }
 
   // ============== INADIMPLÊNCIA ==============

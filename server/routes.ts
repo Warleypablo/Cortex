@@ -3698,6 +3698,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/tech/tempo-responsavel", async (req, res) => {
+    try {
+      const data = await storage.getTechTempoResponsavel();
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching tech tempo por responsavel:", error);
+      res.status(500).json({ error: "Failed to fetch tech tempo por responsavel" });
+    }
+  });
+
+  app.get("/api/tech/projetos", async (req, res) => {
+    try {
+      const tipo = (req.query.tipo as 'abertos' | 'fechados') || 'abertos';
+      const responsavel = req.query.responsavel as string | undefined;
+      const tipoP = req.query.tipoP as string | undefined;
+      const projetos = await storage.getTechAllProjetos(tipo, responsavel, tipoP);
+      res.json(projetos);
+    } catch (error) {
+      console.error("[api] Error fetching tech projetos:", error);
+      res.status(500).json({ error: "Failed to fetch tech projetos" });
+    }
+  });
+
   // ==================== COMERCIAL - CLOSERS ====================
   
   app.get("/api/closers/list", async (req, res) => {
