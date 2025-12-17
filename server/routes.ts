@@ -3133,8 +3133,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .text('INVESTORS REPORT', 40, 60, { align: 'center' });
       doc.fontSize(14).font('Helvetica').fillColor(textColor)
         .text('Turbo Partners', { align: 'center' });
+      const mesesPtBr = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+      const dataAtual = new Date();
+      const mesAnoFormatado = `${mesesPtBr[dataAtual.getMonth()]} de ${dataAtual.getFullYear()}`;
       doc.fontSize(12).fillColor('#718096')
-        .text(format(new Date(), "MMMM 'de' yyyy", { locale: require('date-fns/locale/pt-BR') }), { align: 'center' });
+        .text(mesAnoFormatado, { align: 'center' });
       
       doc.moveDown(1);
       
