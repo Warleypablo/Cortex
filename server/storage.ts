@@ -216,7 +216,7 @@ export interface IStorage {
   getTechProjetosFechados(limit?: number): Promise<TechProjetoDetalhe[]>;
   getTechTasksPorStatus(): Promise<TechTaskStatus[]>;
   getTechVelocidade(): Promise<TechVelocidade>;
-  getTechTempoResponsavel(): Promise<TechTempoResponsavel[]>;
+  getTechTempoResponsavel(startDate?: string, endDate?: string, responsavel?: string): Promise<TechTempoResponsavel[]>;
   getTechAllProjetos(tipo: 'abertos' | 'fechados', responsavel?: string, tipoP?: string): Promise<TechProjetoDetalhe[]>;
   
   // Metric Formatting Rules
@@ -697,7 +697,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getTechTempoResponsavel(): Promise<TechTempoResponsavel[]> {
+  async getTechTempoResponsavel(startDate?: string, endDate?: string, responsavel?: string): Promise<TechTempoResponsavel[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -5554,8 +5554,34 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getTechTempoResponsavel(): Promise<TechTempoResponsavel[]> {
-    // Primeiro, buscar dados de projetos fechados (com métricas de entrega quando disponíveis)
+  async getTechTempoResponsavel(startDate?: string, endDate?: string, responsavelFilter?: string): Promise<TechTempoResponsavel[]> {
+    // Build WHERE clauses safely using parameterized queries
+    const fechadosConditions: ReturnType<typeof sql>[] = [];
+    const ativosConditions: ReturnType<typeof sql>[] = [];
+    
+    // Validate date format (YYYY-MM-DD) to prevent injection
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    
+    if (startDate && dateRegex.test(startDate)) {
+      fechadosConditions.push(sql`lancamento >= ${startDate}::date`);
+      ativosConditions.push(sql`data_criada >= ${startDate}::date`);
+    }
+    if (endDate && dateRegex.test(endDate)) {
+      fechadosConditions.push(sql`lancamento <= ${endDate}::date`);
+      ativosConditions.push(sql`data_criada <= ${endDate}::date`);
+    }
+    if (responsavelFilter && responsavelFilter !== 'todos') {
+      fechadosConditions.push(sql`responsavel = ${responsavelFilter}`);
+      ativosConditions.push(sql`responsavel = ${responsavelFilter}`);
+    }
+    
+    const fechadosWhere = fechadosConditions.length > 0 
+      ? sql`WHERE ${sql.join(fechadosConditions, sql` AND `)}` 
+      : sql``;
+    const ativosWhere = ativosConditions.length > 0 
+      ? sql`WHERE ${sql.join(ativosConditions, sql` AND `)}` 
+      : sql``;
+    
     const result = await db.execute(sql`
       WITH fechados_stats AS (
         SELECT 
@@ -5572,6 +5598,7 @@ export class DbStorage implements IStorage {
             NULLIF(COUNT(CASE WHEN lancamento IS NOT NULL AND data_vencimento IS NOT NULL THEN 1 END), 0) * 100 as taxa_no_prazo,
           COALESCE(SUM(valor_p), 0) as valor_total_entregue
         FROM staging.cup_projetos_tech_fechados
+        ${fechadosWhere}
         GROUP BY responsavel
       ),
       ativos_stats AS (
@@ -5587,6 +5614,7 @@ export class DbStorage implements IStorage {
           ) as tempo_em_aberto,
           COALESCE(SUM(valor_p), 0) as valor_ativos
         FROM staging.cup_projetos_tech
+        ${ativosWhere}
         GROUP BY responsavel
       )
       SELECT 
