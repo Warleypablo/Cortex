@@ -2887,15 +2887,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE TO_CHAR(data_vencimento, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
       `);
       
-      // Top 10 clientes por receita (usando INNER JOIN já que queremos apenas quem tem receita)
+      // Top 10 clientes por receita (cup_clientes -> caz_clientes -> caz_parcelas)
       const topClientesResult = await db.execute(sql`
         SELECT 
-          c.nome as cliente,
+          cup.nome as cliente,
           COALESCE(SUM(p.valor_liquido), 0) as receita_total
-        FROM cup_clientes c
-        INNER JOIN caz_parcelas p ON p.id_cliente = c.id_conta_azul AND p.status = 'pago'
+        FROM cup_clientes cup
+        INNER JOIN caz_clientes caz ON caz.cnpj = cup.cnpj
+        INNER JOIN caz_parcelas p ON p.id_cliente = caz.ids AND p.status = 'pago'
         WHERE p.data_vencimento >= CURRENT_DATE - INTERVAL '12 months'
-        GROUP BY c.id, c.nome
+        GROUP BY cup.cnpj, cup.nome
         HAVING SUM(p.valor_liquido) > 0
         ORDER BY receita_total DESC
         LIMIT 10
