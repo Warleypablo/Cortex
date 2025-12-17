@@ -547,14 +547,14 @@ export default function TechProjetos() {
             </CardHeader>
             <CardContent className="pt-2">
               {isLoadingTempo ? (
-                <Skeleton className="h-[300px] w-full" />
+                <Skeleton className="h-[380px] w-full" />
               ) : performanceChartData.length === 0 ? (
-                <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                <div className="flex items-center justify-center h-[380px] text-muted-foreground">
                   Nenhum dado encontrado
                 </div>
               ) : (
                 <div className="bg-muted/30 rounded-lg p-4">
-                  <ResponsiveContainer width="100%" height={280}>
+                  <ResponsiveContainer width="100%" height={360}>
                     <ComposedChart data={performanceChartData} margin={{ top: 20, right: 40, left: 10, bottom: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                       <XAxis 
