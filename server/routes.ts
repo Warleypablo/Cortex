@@ -2866,12 +2866,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       // Faturamento via caz_parcelas (últimos 12 meses) - tipo_evento = 'RECEITA' e status = 'QUITADO'
+      // Inadimplência só considera parcelas já vencidas (data_vencimento < CURRENT_DATE)
       const faturamentoResult = await db.execute(sql`
         SELECT 
           TO_CHAR(data_vencimento, 'YYYY-MM') as mes,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_liquido ELSE 0 END), 0) as faturamento,
           COALESCE(SUM(valor_bruto), 0) as valor_bruto,
-          COALESCE(SUM(perda), 0) + COALESCE(SUM(nao_pago), 0) as inadimplencia
+          COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE THEN perda ELSE 0 END), 0) + 
+          COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE THEN nao_pago ELSE 0 END), 0) as inadimplencia
         FROM caz_parcelas
         WHERE data_vencimento >= CURRENT_DATE - INTERVAL '12 months'
         GROUP BY TO_CHAR(data_vencimento, 'YYYY-MM')
@@ -2880,11 +2882,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       // Faturamento do mês atual (tipo_evento = 'RECEITA' e status = 'QUITADO')
+      // Inadimplência só considera parcelas já vencidas
       const faturamentoMesResult = await db.execute(sql`
         SELECT 
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_liquido ELSE 0 END), 0) as faturamento_mes,
           COALESCE(SUM(valor_bruto), 0) as valor_bruto_mes,
-          COALESCE(SUM(perda), 0) + COALESCE(SUM(nao_pago), 0) as inadimplencia_mes
+          COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE THEN perda ELSE 0 END), 0) + 
+          COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE THEN nao_pago ELSE 0 END), 0) as inadimplencia_mes
         FROM caz_parcelas
         WHERE TO_CHAR(data_vencimento, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
       `);
