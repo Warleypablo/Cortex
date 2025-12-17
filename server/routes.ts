@@ -2814,6 +2814,263 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============ INVESTORS REPORT ENDPOINTS ============
+  
+  // Endpoint consolidado com todas as métricas do Investors Report
+  app.get("/api/investors-report", async (req, res) => {
+    try {
+      // Métricas de Clientes (cup_clientes)
+      const clientesResult = await db.execute(sql`
+        SELECT 
+          COUNT(DISTINCT id) as total_clientes,
+          COUNT(DISTINCT CASE WHEN status = 'Ativo' THEN id END) as clientes_ativos
+        FROM cup_clientes
+      `);
+      
+      // Métricas de Contratos (cup_contratos)
+      const contratosResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) as total_contratos,
+          COUNT(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN 1 END) as contratos_recorrentes,
+          COUNT(CASE WHEN valorp > 0 THEN 1 END) as contratos_pontuais,
+          COALESCE(SUM(CASE WHEN status IN ('ativo', 'onboarding', 'triagem') THEN valorr ELSE 0 END), 0) as mrr_ativo,
+          COALESCE(AVG(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN valorr END), 0) as aov_recorrente
+        FROM cup_contratos
+      `);
+      
+      // Métricas de Equipe (rh_pessoal)
+      const equipeResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) as headcount,
+          COALESCE(AVG(
+            CASE WHEN status = 'ativo' AND admissao IS NOT NULL 
+            THEN EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) + 
+                 EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12
+            END
+          ), 0) as tempo_medio_meses
+        FROM rh_pessoal
+        WHERE status = 'ativo'
+      `);
+      
+      // Distribuição por setor (rh_pessoal)
+      const setorResult = await db.execute(sql`
+        SELECT 
+          COALESCE(setor, 'Não definido') as setor,
+          COUNT(*) as quantidade
+        FROM rh_pessoal
+        WHERE status = 'ativo'
+        GROUP BY setor
+        ORDER BY quantidade DESC
+      `);
+      
+      // Faturamento via caz_parcelas (últimos 12 meses)
+      const faturamentoResult = await db.execute(sql`
+        SELECT 
+          TO_CHAR(data_vencimento, 'YYYY-MM') as mes,
+          COALESCE(SUM(CASE WHEN status = 'pago' THEN valor_liquido ELSE 0 END), 0) as faturamento,
+          COALESCE(SUM(valor_bruto), 0) as valor_bruto,
+          COALESCE(SUM(perda), 0) + COALESCE(SUM(nao_pago), 0) as inadimplencia
+        FROM caz_parcelas
+        WHERE data_vencimento >= CURRENT_DATE - INTERVAL '12 months'
+        GROUP BY TO_CHAR(data_vencimento, 'YYYY-MM')
+        ORDER BY mes DESC
+        LIMIT 12
+      `);
+      
+      // Faturamento do mês atual
+      const faturamentoMesResult = await db.execute(sql`
+        SELECT 
+          COALESCE(SUM(CASE WHEN status = 'pago' THEN valor_liquido ELSE 0 END), 0) as faturamento_mes,
+          COALESCE(SUM(valor_bruto), 0) as valor_bruto_mes,
+          COALESCE(SUM(perda), 0) + COALESCE(SUM(nao_pago), 0) as inadimplencia_mes
+        FROM caz_parcelas
+        WHERE TO_CHAR(data_vencimento, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+      `);
+      
+      // Top 10 clientes por receita (usando INNER JOIN já que queremos apenas quem tem receita)
+      const topClientesResult = await db.execute(sql`
+        SELECT 
+          c.nome as cliente,
+          COALESCE(SUM(p.valor_liquido), 0) as receita_total
+        FROM cup_clientes c
+        INNER JOIN caz_parcelas p ON p.id_cliente = c.id_conta_azul AND p.status = 'pago'
+        WHERE p.data_vencimento >= CURRENT_DATE - INTERVAL '12 months'
+        GROUP BY c.id, c.nome
+        HAVING SUM(p.valor_liquido) > 0
+        ORDER BY receita_total DESC
+        LIMIT 10
+      `);
+      
+      const clientes = clientesResult.rows[0] || { total_clientes: 0, clientes_ativos: 0 };
+      const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0 };
+      const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0 };
+      const faturamentoMes = faturamentoMesResult.rows[0] || { faturamento_mes: 0, valor_bruto_mes: 0, inadimplencia_mes: 0 };
+      
+      const headcount = Number(equipe.headcount) || 1;
+      const mrrAtivo = Number(contratos.mrr_ativo) || 0;
+      const receitaPorCabeca = headcount > 0 ? mrrAtivo / headcount : 0;
+      
+      const valorBrutoMes = Number(faturamentoMes.valor_bruto_mes) || 1;
+      const inadimplenciaMes = Number(faturamentoMes.inadimplencia_mes) || 0;
+      const taxaInadimplencia = valorBrutoMes > 0 ? (inadimplenciaMes / valorBrutoMes) * 100 : 0;
+      
+      const contratosRecorrentes = Number(contratos.contratos_recorrentes) || 1;
+      const clientesAtivos = Number(clientes.clientes_ativos) || 1;
+      const contratosPorCliente = clientesAtivos > 0 ? contratosRecorrentes / clientesAtivos : 0;
+
+      res.json({
+        clientes: {
+          total: Number(clientes.total_clientes) || 0,
+          ativos: Number(clientes.clientes_ativos) || 0,
+        },
+        contratos: {
+          total: Number(contratos.total_contratos) || 0,
+          recorrentes: Number(contratos.contratos_recorrentes) || 0,
+          pontuais: Number(contratos.contratos_pontuais) || 0,
+          contratosPorCliente: Number(contratosPorCliente.toFixed(2)),
+        },
+        receita: {
+          mrrAtivo: mrrAtivo,
+          aovRecorrente: Number(contratos.aov_recorrente) || 0,
+          faturamentoMes: Number(faturamentoMes.faturamento_mes) || 0,
+          taxaInadimplencia: Number(taxaInadimplencia.toFixed(2)),
+        },
+        equipe: {
+          headcount: headcount,
+          tempoMedioMeses: Number(Number(equipe.tempo_medio_meses).toFixed(1)) || 0,
+          receitaPorCabeca: Number(receitaPorCabeca.toFixed(2)),
+        },
+        distribuicaoSetor: setorResult.rows.map((r: any) => ({
+          setor: r.setor,
+          quantidade: Number(r.quantidade),
+        })),
+        evolucaoFaturamento: faturamentoResult.rows.map((r: any) => ({
+          mes: r.mes,
+          faturamento: Number(r.faturamento) || 0,
+          inadimplencia: Number(r.inadimplencia) || 0,
+        })).reverse(),
+        topClientes: topClientesResult.rows.map((r: any) => ({
+          cliente: r.cliente,
+          receita: Number(r.receita_total) || 0,
+        })),
+      });
+    } catch (error) {
+      console.error("[api] Error fetching investors report:", error);
+      res.status(500).json({ error: "Failed to fetch investors report data" });
+    }
+  });
+
+  // Endpoint para exportar Investors Report como PDF
+  app.get("/api/investors-report/pdf", async (req, res) => {
+    try {
+      // Buscar os mesmos dados do endpoint principal
+      const clientesResult = await db.execute(sql`
+        SELECT 
+          COUNT(DISTINCT id) as total_clientes,
+          COUNT(DISTINCT CASE WHEN status = 'Ativo' THEN id END) as clientes_ativos
+        FROM cup_clientes
+      `);
+      
+      const contratosResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) as total_contratos,
+          COUNT(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN 1 END) as contratos_recorrentes,
+          COUNT(CASE WHEN valorp > 0 THEN 1 END) as contratos_pontuais,
+          COALESCE(SUM(CASE WHEN status IN ('ativo', 'onboarding', 'triagem') THEN valorr ELSE 0 END), 0) as mrr_ativo,
+          COALESCE(AVG(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN valorr END), 0) as aov_recorrente
+        FROM cup_contratos
+      `);
+      
+      const equipeResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) as headcount,
+          COALESCE(AVG(
+            CASE WHEN status = 'ativo' AND admissao IS NOT NULL 
+            THEN EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) + 
+                 EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12
+            END
+          ), 0) as tempo_medio_meses
+        FROM rh_pessoal
+        WHERE status = 'ativo'
+      `);
+
+      const clientes = clientesResult.rows[0] || { total_clientes: 0, clientes_ativos: 0 };
+      const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0 };
+      const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0 };
+
+      const headcount = Number(equipe.headcount) || 1;
+      const mrrAtivo = Number(contratos.mrr_ativo) || 0;
+      const receitaPorCabeca = headcount > 0 ? mrrAtivo / headcount : 0;
+      const contratosRecorrentes = Number(contratos.contratos_recorrentes) || 1;
+      const clientesAtivos = Number(clientes.clientes_ativos) || 1;
+      const contratosPorCliente = clientesAtivos > 0 ? contratosRecorrentes / clientesAtivos : 0;
+
+      const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        }).format(value);
+      };
+
+      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=investors-report-${format(new Date(), 'yyyy-MM')}.pdf`);
+      
+      doc.pipe(res);
+
+      // Header
+      doc.fontSize(24).font('Helvetica-Bold').text('Investors Report', { align: 'center' });
+      doc.fontSize(14).font('Helvetica').text(format(new Date(), 'MM/yyyy'), { align: 'center' });
+      doc.moveDown(2);
+
+      // Quote
+      doc.fontSize(10).font('Helvetica-Oblique').fillColor('#666666')
+        .text('"Tornamos a vida de quem vende online mais fácil e rentável, usando desse know how, para construir as marcas da próxima geração"', { align: 'center' });
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#333333').text('— Turbo Partners', { align: 'center' });
+      doc.moveDown(2);
+
+      // Section: Clientes & Contratos
+      doc.fontSize(16).font('Helvetica-Bold').fillColor('#000000').text('Clientes & Contratos');
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica')
+        .text(`• ${Number(clientes.clientes_ativos) || 0} Clientes Ativos`)
+        .text(`• ${Number(contratos.contratos_recorrentes) || 0} Contratos Recorrentes`)
+        .text(`• ${Number(contratos.contratos_pontuais) || 0} Contratos Pontuais`)
+        .text(`• ${contratosPorCliente.toFixed(2)}x Contratos por Cliente`);
+      doc.moveDown(1);
+
+      // Section: Receita
+      doc.fontSize(16).font('Helvetica-Bold').text('Receita');
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica')
+        .text(`• MRR Ativo: ${formatCurrency(mrrAtivo)}`)
+        .text(`• AOV Recorrente: ${formatCurrency(Number(contratos.aov_recorrente) || 0)}`);
+      doc.moveDown(1);
+
+      // Section: Team
+      doc.fontSize(16).font('Helvetica-Bold').text('Team');
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica')
+        .text(`• Colaboradores ativos: ${headcount}`)
+        .text(`• Tempo médio de casa: ${Number(equipe.tempo_medio_meses).toFixed(1)} meses`)
+        .text(`• Receita por cabeça: ${formatCurrency(receitaPorCabeca)}`);
+      doc.moveDown(2);
+
+      // Footer quote
+      doc.fontSize(10).font('Helvetica-Oblique').fillColor('#666666')
+        .text('"Você sonha grande, é inconformado e por isso melhora todos os dias. Pensando como dono, fazendo o que tem que ser feito, você terá o que merece"', { align: 'center' });
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#333333').text('— UZK', { align: 'center' });
+
+      doc.end();
+    } catch (error) {
+      console.error("[api] Error generating investors report PDF:", error);
+      res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  });
+
   app.get("/api/top-responsaveis", async (req, res) => {
     try {
       let limit = 5;

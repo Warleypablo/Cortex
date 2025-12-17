@@ -142,6 +142,14 @@ const dashboardCategories = [
       { title: "Clientes Inadimplentes", url: "/juridico/clientes", icon: Gavel },
     ],
   },
+  {
+    title: "Reports",
+    icon: FileText,
+    baseUrl: "/investors-report",
+    subItems: [
+      { title: "Investors Report", url: "/investors-report", icon: TrendingUp },
+    ],
+  },
 ];
 
 const adminItems = [
