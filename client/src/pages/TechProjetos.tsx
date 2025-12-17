@@ -287,11 +287,13 @@ export default function TechProjetos() {
   // Estatísticas gerais
   const stats = useMemo(() => {
     if (!tempoResponsavel || tempoResponsavel.length === 0) {
-      return { avgTempo: 0, avgTaxa: 0, totalEntregas: 0, totalValor: 0, totalAtivos: 0, avgTempoEmAberto: 0 };
+      return { avgTempo: 0, avgTaxa: 0, totalEntregas: 0, totalValor: 0, totalAtivos: 0, avgTempoEmAberto: 0, valorAtivos: 0, ticketMedio: 0 };
     }
     const totalEntregas = tempoResponsavel.reduce((sum, r) => sum + r.totalEntregas, 0);
     const totalValor = tempoResponsavel.reduce((sum, r) => sum + r.valorTotalEntregue, 0);
     const totalAtivos = tempoResponsavel.reduce((sum, r) => sum + (r.projetosAtivos || 0), 0);
+    const valorAtivos = tempoResponsavel.reduce((sum, r) => sum + (r.valorAtivos || 0), 0);
+    const ticketMedio = totalEntregas > 0 ? totalValor / totalEntregas : 0;
     
     // Calcular média ponderada do tempo de entrega
     const entregasComTempo = tempoResponsavel.filter(r => r.totalEntregas > 0 && r.tempoMedioEntrega > 0);
@@ -314,7 +316,7 @@ export default function TechProjetos() {
         ativosComTempo.reduce((sum, r) => sum + (r.projetosAtivos || 0), 0)
       : 0;
     
-    return { avgTempo, avgTaxa, totalEntregas, totalValor, totalAtivos, avgTempoEmAberto };
+    return { avgTempo, avgTaxa, totalEntregas, totalValor, totalAtivos, avgTempoEmAberto, valorAtivos, ticketMedio };
   }, [tempoResponsavel]);
 
   return (
@@ -377,7 +379,7 @@ export default function TechProjetos() {
           
           <CardContent>
             {/* KPIs de Performance Geral */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-3">
@@ -396,18 +398,18 @@ export default function TechProjetos() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20">
+          <Card className="bg-gradient-to-br from-indigo-500/10 to-indigo-500/5 border-indigo-500/20">
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-cyan-500/20 rounded-lg">
-                  <Clock className="h-5 w-5 text-cyan-500" />
+                <div className="p-2 bg-indigo-500/20 rounded-lg">
+                  <Clock className="h-5 w-5 text-indigo-500" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Tempo Aberto</p>
                   {isLoadingTempo ? (
                     <Skeleton className="h-7 w-16 mt-1" />
                   ) : (
-                    <p className="text-2xl font-bold text-cyan-600">
+                    <p className="text-2xl font-bold text-indigo-600">
                       {Math.round(stats.avgTempoEmAberto)}
                       <span className="text-sm font-normal ml-1">dias</span>
                     </p>
@@ -488,6 +490,42 @@ export default function TechProjetos() {
                     <Skeleton className="h-7 w-20 mt-1" />
                   ) : (
                     <p className="text-xl font-bold text-purple-600">{formatCurrencyShort(stats.totalValor)}</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-500/20 rounded-lg">
+                  <TrendingUp className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Valor em Aberto</p>
+                  {isLoadingTempo ? (
+                    <Skeleton className="h-7 w-20 mt-1" />
+                  ) : (
+                    <p className="text-xl font-bold text-amber-600">{formatCurrencyShort(stats.valorAtivos)}</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-cyan-500/20 rounded-lg">
+                  <DollarSign className="h-5 w-5 text-cyan-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Ticket Médio</p>
+                  {isLoadingTempo ? (
+                    <Skeleton className="h-7 w-20 mt-1" />
+                  ) : (
+                    <p className="text-xl font-bold text-cyan-600">{formatCurrencyShort(stats.ticketMedio)}</p>
                   )}
                 </div>
               </div>
