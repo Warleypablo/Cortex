@@ -2888,13 +2888,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       // Top 10 clientes por receita (cup_clientes -> caz_clientes -> caz_parcelas)
+      // Usando CAST para garantir compatibilidade de tipos
       const topClientesResult = await db.execute(sql`
         SELECT 
           cup.nome as cliente,
           COALESCE(SUM(p.valor_liquido), 0) as receita_total
         FROM cup_clientes cup
-        INNER JOIN caz_clientes caz ON caz.cnpj = cup.cnpj
-        INNER JOIN caz_parcelas p ON p.id_cliente = caz.ids AND p.status = 'pago'
+        INNER JOIN caz_clientes caz ON caz.cnpj::text = cup.cnpj::text
+        INNER JOIN caz_parcelas p ON p.id_cliente::text = caz.ids::text AND p.status = 'pago'
         WHERE p.data_vencimento >= CURRENT_DATE - INTERVAL '12 months'
         GROUP BY cup.cnpj, cup.nome
         HAVING SUM(p.valor_liquido) > 0
