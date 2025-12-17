@@ -2969,10 +2969,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint para exportar Investors Report como PDF
+  // Endpoint para exportar Investors Report como PDF - Versão completa com histórico
   app.get("/api/investors-report/pdf", async (req, res) => {
     try {
-      // Buscar os mesmos dados do endpoint principal
+      // ===== BUSCAR TODOS OS DADOS =====
+      
+      // Clientes ativos
       const clientesResult = await db.execute(sql`
         SELECT 
           (SELECT COUNT(DISTINCT cnpj) FROM cup_clientes) as total_clientes,
@@ -2981,6 +2983,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE c.status IN ('ativo', 'onboarding', 'triagem')
       `);
       
+      // Contratos
       const contratosResult = await db.execute(sql`
         SELECT 
           COUNT(*) as total_contratos,
@@ -2991,7 +2994,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM cup_contratos
       `);
       
-      // Métricas de Equipe (rh_pessoal) - status case-insensitive
+      // Equipe
       const equipeResult = await db.execute(sql`
         SELECT 
           COUNT(*) as headcount,
@@ -3005,20 +3008,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE LOWER(status) = 'ativo'
       `);
       
-      // Faturamento do mês atual - alinhado com Dashboard Financeiro
-      // valor_pago já representa valores pagos
+      // Distribuição por setor
+      const setorResult = await db.execute(sql`
+        SELECT 
+          COALESCE(setor, 'Não definido') as setor,
+          COUNT(*) as quantidade
+        FROM rh_pessoal
+        WHERE LOWER(status) = 'ativo'
+        GROUP BY setor
+        ORDER BY quantidade DESC
+      `);
+      
+      // Faturamento do mês atual
       const faturamentoMesResult = await db.execute(sql`
         SELECT 
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_mes
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_mes,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto_mes,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia_mes
         FROM caz_parcelas
         WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
           AND tipo_evento IN ('RECEITA', 'DESPESA')
       `);
+      
+      // Evolução mensal (últimos 12 meses)
+      const evolucaoMensalResult = await db.execute(sql`
+        SELECT 
+          TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia
+        FROM caz_parcelas
+        WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
+          AND tipo_evento IN ('RECEITA', 'DESPESA')
+        GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+        ORDER BY mes
+      `);
+      
+      // Evolução anual (últimos 3 anos)
+      const evolucaoAnualResult = await db.execute(sql`
+        SELECT 
+          EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento))::text as ano,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesa,
+          COUNT(DISTINCT id_cliente) as clientes_faturados
+        FROM caz_parcelas
+        WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '3 years'
+          AND tipo_evento IN ('RECEITA', 'DESPESA')
+        GROUP BY EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento))
+        ORDER BY ano
+      `);
+      
+      // Top 10 clientes por receita
+      const topClientesResult = await db.execute(sql`
+        SELECT 
+          COALESCE(caz.nome, 'Não identificado') as cliente,
+          COALESCE(SUM(p.valor_pago::numeric), 0) as receita_total
+        FROM caz_parcelas p
+        LEFT JOIN caz_clientes caz ON p.id_cliente::text = caz.ids::text
+        WHERE p.tipo_evento = 'RECEITA' 
+          AND COALESCE(p.data_quitacao, p.data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
+          AND p.valor_pago::numeric > 0
+        GROUP BY caz.nome
+        HAVING SUM(p.valor_pago::numeric) > 0
+        ORDER BY receita_total DESC
+        LIMIT 10
+      `);
 
+      // ===== PROCESSAR DADOS =====
       const clientes = clientesResult.rows[0] || { total_clientes: 0, clientes_ativos: 0 };
       const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0 };
       const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0 };
-      const faturamentoMes = faturamentoMesResult.rows[0] || { faturamento_mes: 0 };
+      const faturamentoMes = faturamentoMesResult.rows[0] || { faturamento_mes: 0, valor_bruto_mes: 0, inadimplencia_mes: 0 };
 
       const headcount = Number(equipe.headcount) || 1;
       const mrrAtivo = Number(contratos.mrr_ativo) || 0;
@@ -3026,6 +3085,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contratosRecorrentes = Number(contratos.contratos_recorrentes) || 1;
       const clientesAtivos = Number(clientes.clientes_ativos) || 1;
       const contratosPorCliente = clientesAtivos > 0 ? contratosRecorrentes / clientesAtivos : 0;
+      const valorBrutoMes = Number(faturamentoMes.valor_bruto_mes) || 1;
+      const inadimplenciaMes = Number(faturamentoMes.inadimplencia_mes) || 0;
+      const taxaInadimplencia = valorBrutoMes > 0 ? (inadimplenciaMes / valorBrutoMes) * 100 : 0;
 
       const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('pt-BR', {
@@ -3035,56 +3097,248 @@ export async function registerRoutes(app: Express): Promise<Server> {
           maximumFractionDigits: 0,
         }).format(value);
       };
+      
+      const formatCurrencyShort = (value: number) => {
+        if (value >= 1000000) return `R$ ${(value / 1000000).toFixed(2)}M`;
+        if (value >= 1000) return `R$ ${(value / 1000).toFixed(0)}K`;
+        return formatCurrency(value);
+      };
 
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const mesesNomes: { [key: string]: string } = {
+        '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr', '05': 'Mai', '06': 'Jun',
+        '07': 'Jul', '08': 'Ago', '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
+      };
+
+      // ===== GERAR PDF =====
+      const doc = new PDFDocument({ margin: 40, size: 'A4' });
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=investors-report-${format(new Date(), 'yyyy-MM')}.pdf`);
       
       doc.pipe(res);
 
-      // Header
-      doc.fontSize(24).font('Helvetica-Bold').text('Investors Report', { align: 'center' });
-      doc.fontSize(14).font('Helvetica').text(format(new Date(), 'MM/yyyy'), { align: 'center' });
-      doc.moveDown(2);
+      // Cores
+      const primaryColor = '#1a365d';
+      const accentColor = '#3182ce';
+      const textColor = '#2d3748';
+      const lightGray = '#e2e8f0';
 
+      // ===== PÁGINA 1: CAPA E KPIs =====
+      
+      // Header com linha decorativa
+      doc.rect(40, 40, 515, 4).fill(accentColor);
+      doc.moveDown(1);
+      
+      doc.fontSize(28).font('Helvetica-Bold').fillColor(primaryColor)
+        .text('INVESTORS REPORT', 40, 60, { align: 'center' });
+      doc.fontSize(14).font('Helvetica').fillColor(textColor)
+        .text('Turbo Partners', { align: 'center' });
+      doc.fontSize(12).fillColor('#718096')
+        .text(format(new Date(), "MMMM 'de' yyyy", { locale: require('date-fns/locale/pt-BR') }), { align: 'center' });
+      
+      doc.moveDown(1);
+      
       // Quote
-      doc.fontSize(10).font('Helvetica-Oblique').fillColor('#666666')
-        .text('"Tornamos a vida de quem vende online mais fácil e rentável, usando desse know how, para construir as marcas da próxima geração"', { align: 'center' });
-      doc.fontSize(10).font('Helvetica-Bold').fillColor('#333333').text('— Turbo Partners', { align: 'center' });
+      doc.fontSize(10).font('Helvetica-Oblique').fillColor('#718096')
+        .text('"Tornamos a vida de quem vende online mais fácil e rentável, usando desse know how, para construir as marcas da próxima geração"', 60, doc.y, { align: 'center', width: 475 });
+      
       doc.moveDown(2);
-
-      // Section: Clientes & Contratos
-      doc.fontSize(16).font('Helvetica-Bold').fillColor('#000000').text('Clientes & Contratos');
-      doc.moveDown(0.5);
-      doc.fontSize(11).font('Helvetica')
-        .text(`• ${Number(clientes.clientes_ativos) || 0} Clientes Ativos`)
-        .text(`• ${Number(contratos.contratos_recorrentes) || 0} Contratos Recorrentes`)
-        .text(`• ${Number(contratos.contratos_pontuais) || 0} Contratos Pontuais`)
-        .text(`• ${contratosPorCliente.toFixed(2)}x Contratos por Cliente`);
+      
+      // Linha separadora
+      doc.rect(40, doc.y, 515, 1).fill(lightGray);
       doc.moveDown(1);
 
-      // Section: Receita
-      doc.fontSize(16).font('Helvetica-Bold').text('Receita');
+      // ===== KPIs PRINCIPAIS (2 colunas x 3 linhas) =====
+      doc.fontSize(16).font('Helvetica-Bold').fillColor(primaryColor).text('Indicadores Principais', 40);
       doc.moveDown(0.5);
-      doc.fontSize(11).font('Helvetica')
-        .text(`• MRR Ativo: ${formatCurrency(mrrAtivo)}`)
-        .text(`• AOV Recorrente: ${formatCurrency(Number(contratos.aov_recorrente) || 0)}`);
+      
+      const kpiStartY = doc.y;
+      const kpiWidth = 240;
+      const kpiHeight = 60;
+      const kpiGap = 20;
+      
+      const kpis = [
+        { label: 'Clientes Ativos', value: String(Number(clientes.clientes_ativos) || 0), sub: `${Number(clientes.total_clientes) || 0} total cadastrados` },
+        { label: 'Contratos Recorrentes', value: String(Number(contratos.contratos_recorrentes) || 0), sub: `${Number(contratos.contratos_pontuais) || 0} pontuais` },
+        { label: 'MRR Ativo', value: formatCurrencyShort(mrrAtivo), sub: `AOV: ${formatCurrency(Number(contratos.aov_recorrente) || 0)}` },
+        { label: 'Faturamento Mês', value: formatCurrencyShort(Number(faturamentoMes.faturamento_mes) || 0), sub: 'Realizado via ERP' },
+        { label: 'Colaboradores', value: String(headcount), sub: `Tempo médio: ${Number(equipe.tempo_medio_meses).toFixed(1)} meses` },
+        { label: 'Receita por Cabeça', value: formatCurrencyShort(receitaPorCabeca), sub: 'MRR ÷ Headcount' },
+      ];
+      
+      kpis.forEach((kpi, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const x = 40 + col * (kpiWidth + kpiGap);
+        const y = kpiStartY + row * (kpiHeight + 10);
+        
+        // Box
+        doc.rect(x, y, kpiWidth, kpiHeight).fill('#f7fafc');
+        doc.rect(x, y, 4, kpiHeight).fill(accentColor);
+        
+        // Content
+        doc.fontSize(10).font('Helvetica').fillColor('#718096').text(kpi.label, x + 12, y + 8);
+        doc.fontSize(20).font('Helvetica-Bold').fillColor(primaryColor).text(kpi.value, x + 12, y + 22);
+        doc.fontSize(9).font('Helvetica').fillColor('#a0aec0').text(kpi.sub, x + 12, y + 44);
+      });
+      
+      doc.y = kpiStartY + 3 * (kpiHeight + 10) + 20;
+
+      // ===== EVOLUÇÃO ANUAL =====
+      doc.fontSize(16).font('Helvetica-Bold').fillColor(primaryColor).text('Evolução Anual', 40);
+      doc.moveDown(0.5);
+      
+      // Tabela de evolução anual
+      const anoTableY = doc.y;
+      const colWidths = [80, 140, 140, 140];
+      
+      // Header
+      doc.rect(40, anoTableY, 500, 25).fill('#edf2f7');
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(textColor);
+      doc.text('Ano', 50, anoTableY + 8);
+      doc.text('Faturamento', 130, anoTableY + 8);
+      doc.text('Despesas', 270, anoTableY + 8);
+      doc.text('Resultado', 410, anoTableY + 8);
+      
+      // Rows
+      let rowY = anoTableY + 25;
+      evolucaoAnualResult.rows.forEach((row: any, i: number) => {
+        const faturamento = Number(row.faturamento) || 0;
+        const despesa = Number(row.despesa) || 0;
+        const resultado = faturamento - despesa;
+        
+        if (i % 2 === 0) doc.rect(40, rowY, 500, 22).fill('#f7fafc');
+        
+        doc.fontSize(10).font('Helvetica').fillColor(textColor);
+        doc.text(row.ano, 50, rowY + 6);
+        doc.text(formatCurrency(faturamento), 130, rowY + 6);
+        doc.text(formatCurrency(despesa), 270, rowY + 6);
+        doc.fillColor(resultado >= 0 ? '#38a169' : '#e53e3e').text(formatCurrency(resultado), 410, rowY + 6);
+        
+        rowY += 22;
+      });
+      
+      doc.y = rowY + 20;
+
+      // ===== EVOLUÇÃO MENSAL (últimos 12 meses) =====
+      doc.fontSize(16).font('Helvetica-Bold').fillColor(primaryColor).text('Evolução Mensal (Últimos 12 meses)', 40);
+      doc.moveDown(0.5);
+      
+      const mesTableY = doc.y;
+      
+      // Header
+      doc.rect(40, mesTableY, 500, 22).fill('#edf2f7');
+      doc.fontSize(9).font('Helvetica-Bold').fillColor(textColor);
+      doc.text('Mês', 50, mesTableY + 6);
+      doc.text('Faturamento', 150, mesTableY + 6);
+      doc.text('Inadimplência', 280, mesTableY + 6);
+      doc.text('% Inadimp.', 410, mesTableY + 6);
+      
+      rowY = mesTableY + 22;
+      evolucaoMensalResult.rows.slice(-12).forEach((row: any, i: number) => {
+        const faturamento = Number(row.faturamento) || 0;
+        const inadimplencia = Number(row.inadimplencia) || 0;
+        const taxa = faturamento > 0 ? (inadimplencia / faturamento) * 100 : 0;
+        const [ano, mes] = row.mes.split('-');
+        const mesLabel = `${mesesNomes[mes]}/${ano.slice(2)}`;
+        
+        if (i % 2 === 0) doc.rect(40, rowY, 500, 18).fill('#f7fafc');
+        
+        doc.fontSize(9).font('Helvetica').fillColor(textColor);
+        doc.text(mesLabel, 50, rowY + 4);
+        doc.text(formatCurrency(faturamento), 150, rowY + 4);
+        doc.fillColor(inadimplencia > 0 ? '#e53e3e' : textColor).text(formatCurrency(inadimplencia), 280, rowY + 4);
+        doc.fillColor(taxa > 5 ? '#e53e3e' : taxa > 2 ? '#dd6b20' : '#38a169').text(`${taxa.toFixed(1)}%`, 410, rowY + 4);
+        
+        rowY += 18;
+      });
+
+      // ===== PÁGINA 2 =====
+      doc.addPage();
+      
+      // Header linha
+      doc.rect(40, 40, 515, 4).fill(accentColor);
       doc.moveDown(1);
+      
+      doc.fontSize(20).font('Helvetica-Bold').fillColor(primaryColor).text('Detalhamento', 40, 55);
+      doc.moveDown(1.5);
 
-      // Section: Team
-      doc.fontSize(16).font('Helvetica-Bold').text('Team');
+      // ===== TOP 10 CLIENTES =====
+      doc.fontSize(14).font('Helvetica-Bold').fillColor(primaryColor).text('Top 10 Clientes por Receita (12 meses)', 40);
       doc.moveDown(0.5);
-      doc.fontSize(11).font('Helvetica')
-        .text(`• Colaboradores ativos: ${headcount}`)
-        .text(`• Tempo médio de casa: ${Number(equipe.tempo_medio_meses).toFixed(1)} meses`)
-        .text(`• Receita por cabeça: ${formatCurrency(receitaPorCabeca)}`);
-      doc.moveDown(2);
+      
+      const topTableY = doc.y;
+      
+      // Header
+      doc.rect(40, topTableY, 500, 22).fill('#edf2f7');
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(textColor);
+      doc.text('#', 50, topTableY + 6);
+      doc.text('Cliente', 80, topTableY + 6);
+      doc.text('Receita Total', 400, topTableY + 6);
+      
+      rowY = topTableY + 22;
+      topClientesResult.rows.forEach((row: any, i: number) => {
+        if (i % 2 === 0) doc.rect(40, rowY, 500, 20).fill('#f7fafc');
+        
+        doc.fontSize(10).font('Helvetica').fillColor(textColor);
+        doc.text(String(i + 1), 50, rowY + 5);
+        doc.text(String(row.cliente).slice(0, 45), 80, rowY + 5);
+        doc.font('Helvetica-Bold').text(formatCurrency(Number(row.receita_total) || 0), 400, rowY + 5);
+        
+        rowY += 20;
+      });
+      
+      doc.y = rowY + 20;
 
-      // Footer quote
-      doc.fontSize(10).font('Helvetica-Oblique').fillColor('#666666')
-        .text('"Você sonha grande, é inconformado e por isso melhora todos os dias. Pensando como dono, fazendo o que tem que ser feito, você terá o que merece"', { align: 'center' });
-      doc.fontSize(10).font('Helvetica-Bold').fillColor('#333333').text('— UZK', { align: 'center' });
+      // ===== DISTRIBUIÇÃO POR SETOR =====
+      doc.fontSize(14).font('Helvetica-Bold').fillColor(primaryColor).text('Distribuição da Equipe por Setor', 40);
+      doc.moveDown(0.5);
+      
+      const setorTableY = doc.y;
+      const totalColaboradores = setorResult.rows.reduce((acc: number, r: any) => acc + Number(r.quantidade), 0);
+      
+      // Header
+      doc.rect(40, setorTableY, 500, 22).fill('#edf2f7');
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(textColor);
+      doc.text('Setor', 50, setorTableY + 6);
+      doc.text('Quantidade', 300, setorTableY + 6);
+      doc.text('% do Total', 420, setorTableY + 6);
+      
+      rowY = setorTableY + 22;
+      setorResult.rows.forEach((row: any, i: number) => {
+        const quantidade = Number(row.quantidade) || 0;
+        const percentual = totalColaboradores > 0 ? (quantidade / totalColaboradores) * 100 : 0;
+        
+        if (i % 2 === 0) doc.rect(40, rowY, 500, 20).fill('#f7fafc');
+        
+        doc.fontSize(10).font('Helvetica').fillColor(textColor);
+        doc.text(String(row.setor), 50, rowY + 5);
+        doc.text(String(quantidade), 300, rowY + 5);
+        doc.text(`${percentual.toFixed(1)}%`, 420, rowY + 5);
+        
+        rowY += 20;
+      });
+      
+      doc.y = rowY + 30;
+
+      // ===== RESUMO FINAL =====
+      doc.rect(40, doc.y, 515, 80).fill('#f7fafc');
+      doc.rect(40, doc.y, 515, 4).fill(accentColor);
+      
+      const resumoY = doc.y + 15;
+      doc.fontSize(12).font('Helvetica-Bold').fillColor(primaryColor).text('Resumo Executivo', 55, resumoY);
+      doc.fontSize(10).font('Helvetica').fillColor(textColor);
+      doc.text(`Este relatório apresenta os principais indicadores da Turbo Partners. Com ${clientesAtivos} clientes ativos gerando um MRR de ${formatCurrencyShort(mrrAtivo)}, a empresa mantém uma base sólida. A equipe de ${headcount} colaboradores demonstra comprometimento com tempo médio de casa de ${Number(equipe.tempo_medio_meses).toFixed(1)} meses.`, 55, resumoY + 18, { width: 485 });
+
+      // Footer
+      doc.y = 750;
+      doc.rect(40, doc.y, 515, 1).fill(lightGray);
+      doc.moveDown(0.5);
+      doc.fontSize(9).font('Helvetica-Oblique').fillColor('#a0aec0')
+        .text('"Você sonha grande, é inconformado e por isso melhora todos os dias. Pensando como dono, fazendo o que tem que ser feito, você terá o que merece" — UZK', { align: 'center' });
+      
+      doc.fontSize(8).fillColor('#cbd5e0')
+        .text(`Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`, { align: 'center' });
 
       doc.end();
     } catch (error) {
