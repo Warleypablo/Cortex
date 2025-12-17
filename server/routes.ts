@@ -3156,6 +3156,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const margemBruta = receitaTotal12m > 0 ? ((receitaTotal12m - despesaTotal12m) / receitaTotal12m) * 100 : 0;
       const inadimplenciaTotal12m = evolMensal.reduce((acc: number, r: any) => acc + (Number(r.inadimplencia) || 0), 0);
       const taxaInadimplencia = receitaTotal12m > 0 ? (inadimplenciaTotal12m / receitaTotal12m) * 100 : 0;
+      
+      // ===== MÉTRICAS AVANÇADAS PARA INVESTIDORES =====
+      // NOTA: Algumas métricas são estimativas baseadas em heurísticas do setor
+      
+      // CAC Estimado - usa despesas totais como proxy (sem dados de marketing separados)
+      const cacEstimado = clientesAtivos > 0 ? (despesaTotal12m / 12) / (clientesAtivos / 12) : 0;
+      
+      // LTV/CAC Ratio (saudável: > 3x)
+      const ltvCacRatio = cacEstimado > 0 ? ltv / cacEstimado : 0;
+      
+      // Payback Period (meses para recuperar CAC)
+      const paybackPeriod = aovRecorrente > 0 ? cacEstimado / aovRecorrente : 0;
+      
+      // Net Revenue Retention (NRR) - Baseado em churn de MRR
+      // Simplificado: 100% - (MRR churned / MRR total) 
+      const mrrChurnMensal = mrrChurn > 0 ? mrrChurn / Math.max(clientesChurn, 1) : 0;
+      const churnMrrPct = mrrAtivo > 0 ? (mrrChurnMensal / mrrAtivo) * 100 : 0;
+      const nrr = 100 - churnMrrPct; // NRR sem expansão (conservador)
+      
+      // Quick Ratio SaaS = New MRR / Churned MRR (simplificado)
+      // Assume crescimento MoM como proxy de New MRR
+      const newMrrEstimado = mrrAtivo * Math.max(variacaoMoM, 0) / 100;
+      const quickRatioSaas = mrrChurnMensal > 0 ? Math.max(newMrrEstimado / mrrChurnMensal, 0.5) : 4;
+      
+      // Rule of 40 = Growth Rate + Profit Margin
+      const growthRate = variacaoMoM * 12; // Anualizado do MoM
+      const ruleOf40 = growthRate + margemBruta;
+      
+      // Magic Number - Eficiência de crescimento
+      // Simplificado: Crescimento de receita / Despesas
+      const crescimentoReceita = receitaTotal12m * Math.max(growthRate, 0) / 100;
+      const magicNumber = despesaTotal12m > 0 ? crescimentoReceita / despesaTotal12m : 0;
+      
+      // Gross Revenue Retention (GRR) - Retenção bruta (sem expansão)
+      const grr = 100 - churnMrrPct;
+      
+      // Receita por funcionário
+      const revenuePerEmployee = headcount > 0 ? arr / headcount : 0;
 
       const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
@@ -3257,7 +3295,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.fontSize(8).font('Helvetica').fillColor(kpi.deltaColor).text(kpi.delta, x + 8, kpi2Y + 40);
       });
       
-      doc.y = kpi2Y + kpiH + 20;
+      doc.y = kpi2Y + kpiH + 12;
+      
+      // Terceira linha: Unit Economics & Projeções
+      const kpis3 = [
+        { label: 'LTV/CAC (est.)', value: ltvCacRatio.toFixed(1) + 'x', delta: ltvCacRatio >= 3 ? 'Saudável (>3x)' : 'Abaixo ideal', deltaColor: ltvCacRatio >= 3 ? colors.success : colors.warning },
+        { label: 'Payback (est.)', value: paybackPeriod.toFixed(1) + ' meses', delta: paybackPeriod <= 12 ? 'Excelente' : 'Recuperar CAC', deltaColor: paybackPeriod <= 12 ? colors.success : colors.warning },
+        { label: 'Rule of 40', value: ruleOf40.toFixed(0) + '%', delta: ruleOf40 >= 40 ? 'Atingido' : 'Abaixo', deltaColor: ruleOf40 >= 40 ? colors.success : colors.warning },
+        { label: 'NRR (conserv.)', value: formatPctAbs(Math.max(Math.min(nrr, 120), 0)), delta: nrr >= 100 ? 'Saudável' : 'Atenção', deltaColor: nrr >= 100 ? colors.success : colors.warning },
+      ];
+      
+      const kpi3Y = doc.y;
+      kpis3.forEach((kpi, i) => {
+        const x = lm + i * (kpiW + 10);
+        doc.rect(x, kpi3Y, kpiW, kpiH).fill(colors.light);
+        doc.rect(x, kpi3Y, 3, kpiH).fill(colors.bar3);
+        doc.fontSize(8).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 8, kpi3Y + 6);
+        doc.fontSize(16).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 8, kpi3Y + 20);
+        doc.fontSize(8).font('Helvetica').fillColor(kpi.deltaColor).text(kpi.delta, x + 8, kpi3Y + 40);
+      });
+      
+      doc.y = kpi3Y + kpiH + 12;
+      
+      // Quarta linha: Métricas SaaS Avançadas
+      const kpis4 = [
+        { label: 'Quick Ratio (est.)', value: quickRatioSaas.toFixed(1), delta: quickRatioSaas >= 4 ? 'Forte' : 'Moderado', deltaColor: quickRatioSaas >= 4 ? colors.success : colors.muted },
+        { label: 'Magic # (est.)', value: magicNumber.toFixed(2), delta: magicNumber >= 0.5 ? 'Eficiente' : 'Em análise', deltaColor: magicNumber >= 0.5 ? colors.success : colors.muted },
+        { label: 'ARR/Func.', value: formatCurrencyShort(revenuePerEmployee), delta: 'Produtividade', deltaColor: colors.muted },
+        { label: 'GRR (conserv.)', value: formatPctAbs(Math.max(Math.min(grr, 100), 0)), delta: grr >= 85 ? 'Saudável' : 'Atenção', deltaColor: grr >= 85 ? colors.success : colors.warning },
+      ];
+      
+      const kpi4Y = doc.y;
+      kpis4.forEach((kpi, i) => {
+        const x = lm + i * (kpiW + 10);
+        doc.rect(x, kpi4Y, kpiW, kpiH).fill(colors.light);
+        doc.rect(x, kpi4Y, 3, kpiH).fill(colors.bar4);
+        doc.fontSize(8).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 8, kpi4Y + 6);
+        doc.fontSize(16).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 8, kpi4Y + 20);
+        doc.fontSize(8).font('Helvetica').fillColor(kpi.deltaColor).text(kpi.delta, x + 8, kpi4Y + 40);
+      });
+      
+      doc.y = kpi4Y + kpiH + 20;
 
       // ===== SEÇÃO 2: EVOLUÇÃO ANUAL COM BARRAS COMPARATIVAS =====
       doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('2. EVOLUÇÃO ANUAL', lm, doc.y);
