@@ -106,7 +106,8 @@ const dashboardCategories = [
     icon: Monitor,
     baseUrl: "/dashboard/tech",
     subItems: [
-      { title: "Projetos", url: "/dashboard/tech", icon: Rocket },
+      { title: "Visão Geral", url: "/dashboard/tech", icon: Eye },
+      { title: "Projetos", url: "/tech/projetos", icon: Rocket },
     ],
   },
   {

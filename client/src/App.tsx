@@ -27,6 +27,7 @@ import DashboardInadimplencia from "@/pages/DashboardInadimplencia";
 import DashboardInhire from "@/pages/DashboardInhire";
 import DashboardRecrutamento from "@/pages/DashboardRecrutamento";
 import DashboardTech from "@/pages/DashboardTech";
+import TechProjetos from "@/pages/TechProjetos";
 import FluxoCaixa from "@/pages/FluxoCaixa";
 import MetaAds from "@/pages/MetaAds";
 import AuditoriaSistemas from "@/pages/AuditoriaSistemas";
@@ -139,6 +140,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/inhire">{() => <ProtectedRoute path="/dashboard/inhire" component={DashboardInhire} />}</Route>
       <Route path="/dashboard/recrutamento">{() => <ProtectedRoute path="/dashboard/recrutamento" component={DashboardRecrutamento} />}</Route>
       <Route path="/dashboard/tech">{() => <ProtectedRoute path="/dashboard/tech" component={DashboardTech} />}</Route>
+      <Route path="/tech/projetos">{() => <ProtectedRoute path="/tech/projetos" component={TechProjetos} />}</Route>
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
       <Route path="/dashboard/comercial/closers">{() => <ProtectedRoute path="/dashboard/comercial/closers" component={DashboardClosers} />}</Route>
       <Route path="/dashboard/comercial/sdrs">{() => <ProtectedRoute path="/dashboard/comercial/sdrs" component={DashboardSDRs} />}</Route>
