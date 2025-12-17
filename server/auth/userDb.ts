@@ -70,6 +70,7 @@ const ALL_ROUTES = [
   '/dashboard/inadimplencia',
   '/dashboard/auditoria-sistemas',
   '/dashboard/tech',
+  '/tech/projetos',
   '/dashboard/comercial/closers',
   '/dashboard/comercial/sdrs',
   '/dashboard/comercial/detalhamento-closers',
