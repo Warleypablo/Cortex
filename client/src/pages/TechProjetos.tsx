@@ -43,6 +43,7 @@ import {
   ComposedChart,
   Line,
   Legend,
+  CartesianGrid,
 } from "recharts";
 
 interface TechProjetoDetalhe {
@@ -534,53 +535,77 @@ export default function TechProjetos() {
         </div>
 
         {/* Gráficos de Performance */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Gráfico de Barras - Entregas e Tempo */}
-          <Card className="lg:col-span-2">
+          <Card className="lg:col-span-2 border">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2">
-                <BarChart3 className="h-4 w-4" />
+                <BarChart3 className="h-4 w-4 text-primary" />
                 Performance por Desenvolvedor
               </CardTitle>
               <CardDescription>Entregas e tempo médio de cada responsável</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-2">
               {isLoadingTempo ? (
-                <Skeleton className="h-[280px] w-full" />
+                <Skeleton className="h-[300px] w-full" />
               ) : performanceChartData.length === 0 ? (
-                <div className="flex items-center justify-center h-[280px] text-muted-foreground">
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground">
                   Nenhum dado encontrado
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart data={performanceChartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
-                    <RechartsTooltip 
-                      content={({ active, payload, label }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-card border rounded-lg p-3 shadow-lg">
-                              <p className="font-medium mb-2">{data.fullName}</p>
-                              <div className="space-y-1 text-sm">
-                                <p>Entregas: <span className="font-medium">{data.entregas}</span></p>
-                                <p>Tempo médio: <span className="font-medium">{data.tempoMedio}d</span></p>
-                                <p>No prazo: <span className="font-medium">{data.taxa}%</span></p>
-                                <p>Valor: <span className="font-medium">{formatCurrency(data.valor)}</span></p>
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <ResponsiveContainer width="100%" height={280}>
+                    <ComposedChart data={performanceChartData} margin={{ top: 20, right: 40, left: 10, bottom: 10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} 
+                        axisLine={{ stroke: 'hsl(var(--border))' }}
+                        tickLine={{ stroke: 'hsl(var(--border))' }}
+                      />
+                      <YAxis 
+                        yAxisId="left" 
+                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                        axisLine={{ stroke: 'hsl(var(--border))' }}
+                        tickLine={{ stroke: 'hsl(var(--border))' }}
+                        label={{ value: 'Entregas', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                      />
+                      <YAxis 
+                        yAxisId="right" 
+                        orientation="right" 
+                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                        axisLine={{ stroke: 'hsl(var(--border))' }}
+                        tickLine={{ stroke: 'hsl(var(--border))' }}
+                        label={{ value: 'Dias', angle: 90, position: 'insideRight', fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                      />
+                      <RechartsTooltip 
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-card border rounded-lg p-3 shadow-lg">
+                                <p className="font-medium mb-2">{data.fullName}</p>
+                                <div className="space-y-1 text-sm">
+                                  <p>Entregas: <span className="font-medium">{data.entregas}</span></p>
+                                  <p>Tempo médio: <span className="font-medium">{data.tempoMedio}d</span></p>
+                                  <p>No prazo: <span className="font-medium">{data.taxa}%</span></p>
+                                  <p>Valor: <span className="font-medium">{formatCurrency(data.valor)}</span></p>
+                                </div>
                               </div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Legend formatter={(value) => value === 'entregas' ? 'Entregas' : 'Tempo (dias)'} />
-                    <Bar yAxisId="left" dataKey="entregas" fill="#3b82f6" radius={[4, 4, 0, 0]} name="entregas" />
-                    <Line yAxisId="right" type="monotone" dataKey="tempoMedio" stroke="#f97316" strokeWidth={3} dot={{ fill: '#f97316', r: 5 }} name="tempoMedio" />
-                  </ComposedChart>
-                </ResponsiveContainer>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend 
+                        formatter={(value) => value === 'entregas' ? 'Entregas' : 'Tempo (dias)'} 
+                        wrapperStyle={{ paddingTop: '10px' }}
+                      />
+                      <Bar yAxisId="left" dataKey="entregas" fill="#3b82f6" radius={[4, 4, 0, 0]} name="entregas" />
+                      <Line yAxisId="right" type="monotone" dataKey="tempoMedio" stroke="#f97316" strokeWidth={3} dot={{ fill: '#f97316', r: 5 }} name="tempoMedio" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
               )}
             </CardContent>
           </Card>
