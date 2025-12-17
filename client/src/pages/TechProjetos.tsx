@@ -171,9 +171,31 @@ export default function TechProjetos() {
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'data' | 'valor' | 'prazo'>('data');
+  
+  // Filtros de período - padrão últimos 90 dias
+  const [startDate, setStartDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 90);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0];
+  });
+  const [statsResponsavelFilter, setStatsResponsavelFilter] = useState<string>('todos');
 
   const { data: tempoResponsavel, isLoading: isLoadingTempo } = useQuery<TechTempoResponsavel[]>({
-    queryKey: ['/api/tech/tempo-responsavel'],
+    queryKey: ['/api/tech/tempo-responsavel', startDate, endDate, statsResponsavelFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+      if (statsResponsavelFilter !== 'todos') params.set('responsavel', statsResponsavelFilter);
+      const res = await fetch(`/api/tech/tempo-responsavel?${params.toString()}`, {
+        credentials: "include"
+      });
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    }
   });
 
   const { data: responsaveis, isLoading: isLoadingResp } = useQuery<TechProjetoResponsavel[]>({
@@ -304,8 +326,58 @@ export default function TechProjetos() {
           <p className="text-muted-foreground text-sm">Análise técnica detalhada e métricas de performance</p>
         </div>
 
-        {/* KPIs de Performance Geral */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        {/* Card de Análise com Filtros */}
+        <Card className="mb-6">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  Visão Geral de Performance
+                </CardTitle>
+                <CardDescription>Métricas e análises por período e responsável</CardDescription>
+              </div>
+              
+              {/* Barra de Filtros */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-[140px] h-9"
+                    data-testid="input-start-date"
+                  />
+                  <span className="text-muted-foreground">até</span>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-[140px] h-9"
+                    data-testid="input-end-date"
+                  />
+                </div>
+                
+                <Select value={statsResponsavelFilter} onValueChange={setStatsResponsavelFilter}>
+                  <SelectTrigger className="w-[160px] h-9" data-testid="select-stats-responsavel">
+                    <User className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    {uniqueResponsaveis.map(r => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          
+          <CardContent>
+            {/* KPIs de Performance Geral */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-3">
@@ -537,6 +609,8 @@ export default function TechProjetos() {
             </CardContent>
           </Card>
         </div>
+          </CardContent>
+        </Card>
 
         {/* Cards de Performance Detalhada */}
         <Card className="mb-6">
