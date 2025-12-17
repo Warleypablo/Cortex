@@ -535,9 +535,9 @@ export default function TechProjetos() {
         </div>
 
         {/* Gráficos de Performance */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
           {/* Gráfico de Barras - Entregas e Tempo */}
-          <Card className="lg:col-span-2 border">
+          <Card className="lg:col-span-2 border flex flex-col">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-primary" />
@@ -545,16 +545,16 @@ export default function TechProjetos() {
               </CardTitle>
               <CardDescription>Entregas e tempo médio de cada responsável</CardDescription>
             </CardHeader>
-            <CardContent className="pt-2">
+            <CardContent className="pt-2 flex-1 flex flex-col">
               {isLoadingTempo ? (
-                <Skeleton className="h-[380px] w-full" />
+                <Skeleton className="flex-1 w-full min-h-[300px]" />
               ) : performanceChartData.length === 0 ? (
-                <div className="flex items-center justify-center h-[380px] text-muted-foreground">
+                <div className="flex items-center justify-center flex-1 min-h-[300px] text-muted-foreground">
                   Nenhum dado encontrado
                 </div>
               ) : (
-                <div className="bg-muted/30 rounded-lg p-4">
-                  <ResponsiveContainer width="100%" height={360}>
+                <div className="bg-muted/30 rounded-lg p-4 flex-1 flex flex-col min-h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={performanceChartData} margin={{ top: 20, right: 40, left: 10, bottom: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                       <XAxis 
@@ -611,7 +611,7 @@ export default function TechProjetos() {
           </Card>
 
           {/* Ranking de Carga de Trabalho */}
-          <Card>
+          <Card className="border flex flex-col">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2">
                 <User className="h-4 w-4 text-blue-500" />
@@ -619,15 +619,15 @@ export default function TechProjetos() {
               </CardTitle>
               <CardDescription>Top 5 por projetos ativos</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 flex flex-col">
               {isLoadingTempo ? (
-                <Skeleton className="h-[280px] w-full" />
+                <Skeleton className="flex-1 w-full min-h-[300px]" />
               ) : rankingCargaData.length === 0 ? (
-                <div className="flex items-center justify-center h-[280px] text-muted-foreground">
+                <div className="flex items-center justify-center flex-1 min-h-[300px] text-muted-foreground">
                   Nenhum dado encontrado
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3 flex-1">
                   {rankingCargaData.map((r: TechTempoResponsavel, index: number) => {
                     const tempoColor = getTempoColor(r.tempoEmAberto || 0);
                     const maxAtivos = Math.max(...rankingCargaData.map(x => x.projetosAtivos || 0));
