@@ -323,6 +323,9 @@ export interface TechTempoResponsavel {
   tempoMedioEntrega: number;
   taxaNoPrazo: number;
   valorTotalEntregue: number;
+  projetosAtivos?: number;
+  tempoEmAberto?: number;
+  valorAtivos?: number;
 }
 
 export class MemStorage implements IStorage {
@@ -5552,18 +5555,53 @@ export class DbStorage implements IStorage {
   }
 
   async getTechTempoResponsavel(): Promise<TechTempoResponsavel[]> {
+    // Primeiro, buscar dados de projetos fechados (com métricas de entrega quando disponíveis)
     const result = await db.execute(sql`
+      WITH fechados_stats AS (
+        SELECT 
+          COALESCE(responsavel, 'Não atribuído') as responsavel,
+          COUNT(*) as total_entregas,
+          AVG(
+            CASE 
+              WHEN lancamento IS NOT NULL AND data_criada IS NOT NULL 
+              THEN lancamento::date - data_criada::date 
+              ELSE NULL 
+            END
+          ) as tempo_medio,
+          COUNT(CASE WHEN lancamento IS NOT NULL AND data_vencimento IS NOT NULL AND lancamento <= data_vencimento THEN 1 END)::float / 
+            NULLIF(COUNT(CASE WHEN lancamento IS NOT NULL AND data_vencimento IS NOT NULL THEN 1 END), 0) * 100 as taxa_no_prazo,
+          COALESCE(SUM(valor_p), 0) as valor_total_entregue
+        FROM staging.cup_projetos_tech_fechados
+        GROUP BY responsavel
+      ),
+      ativos_stats AS (
+        SELECT 
+          COALESCE(responsavel, 'Não atribuído') as responsavel,
+          COUNT(*) as projetos_ativos,
+          AVG(
+            CASE 
+              WHEN data_criada IS NOT NULL 
+              THEN CURRENT_DATE - data_criada::date 
+              ELSE NULL 
+            END
+          ) as tempo_em_aberto,
+          COALESCE(SUM(valor_p), 0) as valor_ativos
+        FROM staging.cup_projetos_tech
+        GROUP BY responsavel
+      )
       SELECT 
-        COALESCE(responsavel, 'Não atribuído') as responsavel,
-        COUNT(*) as total_entregas,
-        AVG(lancamento::date - data_criada::date) as tempo_medio,
-        COUNT(CASE WHEN lancamento <= data_vencimento THEN 1 END)::float / 
-          NULLIF(COUNT(CASE WHEN lancamento IS NOT NULL AND data_vencimento IS NOT NULL THEN 1 END), 0) * 100 as taxa_no_prazo,
-        COALESCE(SUM(valor_p), 0) as valor_total_entregue
-      FROM staging.cup_projetos_tech_fechados
-      WHERE lancamento IS NOT NULL AND data_criada IS NOT NULL
-      GROUP BY responsavel
-      ORDER BY total_entregas DESC
+        COALESCE(f.responsavel, a.responsavel) as responsavel,
+        COALESCE(f.total_entregas, 0) as total_entregas,
+        COALESCE(f.tempo_medio, 0) as tempo_medio,
+        COALESCE(f.taxa_no_prazo, 0) as taxa_no_prazo,
+        COALESCE(f.valor_total_entregue, 0) as valor_total_entregue,
+        COALESCE(a.projetos_ativos, 0) as projetos_ativos,
+        COALESCE(a.tempo_em_aberto, 0) as tempo_em_aberto,
+        COALESCE(a.valor_ativos, 0) as valor_ativos
+      FROM fechados_stats f
+      FULL OUTER JOIN ativos_stats a ON f.responsavel = a.responsavel
+      WHERE COALESCE(f.total_entregas, 0) > 0 OR COALESCE(a.projetos_ativos, 0) > 0
+      ORDER BY COALESCE(f.total_entregas, 0) + COALESCE(a.projetos_ativos, 0) DESC
     `);
 
     return (result.rows as any[]).map(row => ({
@@ -5572,6 +5610,9 @@ export class DbStorage implements IStorage {
       tempoMedioEntrega: parseFloat(row.tempo_medio || '0'),
       taxaNoPrazo: parseFloat(row.taxa_no_prazo || '0'),
       valorTotalEntregue: parseFloat(row.valor_total_entregue || '0'),
+      projetosAtivos: parseInt(row.projetos_ativos || '0'),
+      tempoEmAberto: parseFloat(row.tempo_em_aberto || '0'),
+      valorAtivos: parseFloat(row.valor_ativos || '0'),
     }));
   }
 
