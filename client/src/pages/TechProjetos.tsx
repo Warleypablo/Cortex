@@ -65,6 +65,9 @@ interface TechTempoResponsavel {
   tempoMedioEntrega: number;
   taxaNoPrazo: number;
   valorTotalEntregue: number;
+  projetosAtivos?: number;
+  tempoEmAberto?: number;
+  valorAtivos?: number;
 }
 
 interface TechProjetoResponsavel {
@@ -188,7 +191,9 @@ export default function TechProjetos() {
       params.set('tipo', activeTab);
       if (responsavelFilter !== 'todos') params.set('responsavel', responsavelFilter);
       if (tipoFilter !== 'todos') params.set('tipoP', tipoFilter);
-      const res = await fetch(`/api/tech/projetos?${params.toString()}`);
+      const res = await fetch(`/api/tech/projetos?${params.toString()}`, {
+        credentials: "include"
+      });
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     }
@@ -234,35 +239,60 @@ export default function TechProjetos() {
 
   // Dados para gráfico de performance
   const performanceChartData = useMemo(() => {
-    return tempoResponsavel?.slice(0, 6).map(r => ({
+    return tempoResponsavel?.slice(0, 8).map(r => ({
       name: r.responsavel?.split(' ')[0] || 'N/A',
       fullName: r.responsavel,
       entregas: r.totalEntregas,
-      tempoMedio: Math.round(r.tempoMedioEntrega),
-      taxa: Math.round(r.taxaNoPrazo),
+      ativos: r.projetosAtivos || 0,
+      tempoMedio: Math.round(r.tempoMedioEntrega || 0),
+      tempoEmAberto: Math.round(r.tempoEmAberto || 0),
+      taxa: Math.round(r.taxaNoPrazo || 0),
       valor: r.valorTotalEntregue,
-      fill: getPerformanceColor(r.taxaNoPrazo)
+      valorAtivos: r.valorAtivos || 0,
+      fill: getPerformanceColor(r.taxaNoPrazo || 0)
     })) || [];
   }, [tempoResponsavel]);
 
-  // Ranking de performance
-  const rankingData = useMemo(() => {
+  // Ranking de carga de trabalho (projetos ativos)
+  const rankingCargaData = useMemo(() => {
     if (!tempoResponsavel) return [];
     return [...tempoResponsavel]
-      .sort((a, b) => b.taxaNoPrazo - a.taxaNoPrazo)
+      .filter(r => (r.projetosAtivos || 0) > 0)
+      .sort((a, b) => (b.projetosAtivos || 0) - (a.projetosAtivos || 0))
       .slice(0, 5);
   }, [tempoResponsavel]);
 
   // Estatísticas gerais
   const stats = useMemo(() => {
     if (!tempoResponsavel || tempoResponsavel.length === 0) {
-      return { avgTempo: 0, avgTaxa: 0, totalEntregas: 0, totalValor: 0 };
+      return { avgTempo: 0, avgTaxa: 0, totalEntregas: 0, totalValor: 0, totalAtivos: 0, avgTempoEmAberto: 0 };
     }
     const totalEntregas = tempoResponsavel.reduce((sum, r) => sum + r.totalEntregas, 0);
     const totalValor = tempoResponsavel.reduce((sum, r) => sum + r.valorTotalEntregue, 0);
-    const avgTempo = tempoResponsavel.reduce((sum, r) => sum + r.tempoMedioEntrega * r.totalEntregas, 0) / totalEntregas;
-    const avgTaxa = tempoResponsavel.reduce((sum, r) => sum + r.taxaNoPrazo * r.totalEntregas, 0) / totalEntregas;
-    return { avgTempo, avgTaxa, totalEntregas, totalValor };
+    const totalAtivos = tempoResponsavel.reduce((sum, r) => sum + (r.projetosAtivos || 0), 0);
+    
+    // Calcular média ponderada do tempo de entrega
+    const entregasComTempo = tempoResponsavel.filter(r => r.totalEntregas > 0 && r.tempoMedioEntrega > 0);
+    const avgTempo = entregasComTempo.length > 0 
+      ? entregasComTempo.reduce((sum, r) => sum + r.tempoMedioEntrega * r.totalEntregas, 0) / 
+        entregasComTempo.reduce((sum, r) => sum + r.totalEntregas, 0)
+      : 0;
+    
+    // Calcular média ponderada da taxa de cumprimento
+    const entregasComTaxa = tempoResponsavel.filter(r => r.totalEntregas > 0 && r.taxaNoPrazo > 0);
+    const avgTaxa = entregasComTaxa.length > 0
+      ? entregasComTaxa.reduce((sum, r) => sum + r.taxaNoPrazo * r.totalEntregas, 0) / 
+        entregasComTaxa.reduce((sum, r) => sum + r.totalEntregas, 0)
+      : 0;
+    
+    // Calcular média do tempo em aberto
+    const ativosComTempo = tempoResponsavel.filter(r => (r.projetosAtivos || 0) > 0 && (r.tempoEmAberto || 0) > 0);
+    const avgTempoEmAberto = ativosComTempo.length > 0
+      ? ativosComTempo.reduce((sum, r) => sum + (r.tempoEmAberto || 0) * (r.projetosAtivos || 0), 0) / 
+        ativosComTempo.reduce((sum, r) => sum + (r.projetosAtivos || 0), 0)
+      : 0;
+    
+    return { avgTempo, avgTaxa, totalEntregas, totalValor, totalAtivos, avgTempoEmAberto };
   }, [tempoResponsavel]);
 
   return (
@@ -275,19 +305,40 @@ export default function TechProjetos() {
         </div>
 
         {/* KPIs de Performance Geral */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <Activity className="h-5 w-5 text-blue-500" />
+                  <FolderOpen className="h-5 w-5 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Total Entregas</p>
+                  <p className="text-xs text-muted-foreground">Proj. Ativos</p>
                   {isLoadingTempo ? (
                     <Skeleton className="h-7 w-12 mt-1" />
                   ) : (
-                    <p className="text-2xl font-bold text-blue-600">{stats.totalEntregas}</p>
+                    <p className="text-2xl font-bold text-blue-600">{stats.totalAtivos}</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-cyan-500/20 rounded-lg">
+                  <Clock className="h-5 w-5 text-cyan-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Tempo Aberto</p>
+                  {isLoadingTempo ? (
+                    <Skeleton className="h-7 w-16 mt-1" />
+                  ) : (
+                    <p className="text-2xl font-bold text-cyan-600">
+                      {Math.round(stats.avgTempoEmAberto)}
+                      <span className="text-sm font-normal ml-1">dias</span>
+                    </p>
                   )}
                 </div>
               </div>
@@ -298,14 +349,14 @@ export default function TechProjetos() {
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-500/20 rounded-lg">
-                  <Target className="h-5 w-5 text-green-500" />
+                  <FolderCheck className="h-5 w-5 text-green-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Taxa Média Prazo</p>
+                  <p className="text-xs text-muted-foreground">Entregas</p>
                   {isLoadingTempo ? (
-                    <Skeleton className="h-7 w-14 mt-1" />
+                    <Skeleton className="h-7 w-12 mt-1" />
                   ) : (
-                    <p className="text-2xl font-bold text-green-600">{stats.avgTaxa.toFixed(0)}%</p>
+                    <p className="text-2xl font-bold text-green-600">{stats.totalEntregas}</p>
                   )}
                 </div>
               </div>
@@ -319,13 +370,33 @@ export default function TechProjetos() {
                   <Timer className="h-5 w-5 text-orange-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Tempo Médio</p>
+                  <p className="text-xs text-muted-foreground">Tempo Entrega</p>
                   {isLoadingTempo ? (
                     <Skeleton className="h-7 w-16 mt-1" />
                   ) : (
                     <p className="text-2xl font-bold text-orange-600">
-                      {Math.round(stats.avgTempo)}
-                      <span className="text-sm font-normal ml-1">dias</span>
+                      {stats.avgTempo > 0 ? Math.round(stats.avgTempo) : '-'}
+                      {stats.avgTempo > 0 && <span className="text-sm font-normal ml-1">dias</span>}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/20 rounded-lg">
+                  <Target className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">No Prazo</p>
+                  {isLoadingTempo ? (
+                    <Skeleton className="h-7 w-14 mt-1" />
+                  ) : (
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {stats.avgTaxa > 0 ? `${stats.avgTaxa.toFixed(0)}%` : '-'}
                     </p>
                   )}
                 </div>
@@ -404,27 +475,28 @@ export default function TechProjetos() {
             </CardContent>
           </Card>
 
-          {/* Ranking de Performance */}
+          {/* Ranking de Carga de Trabalho */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-yellow-500" />
-                Ranking de Performance
+                <User className="h-4 w-4 text-blue-500" />
+                Carga por Responsável
               </CardTitle>
-              <CardDescription>Top 5 por taxa de cumprimento</CardDescription>
+              <CardDescription>Top 5 por projetos ativos</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingTempo ? (
                 <Skeleton className="h-[280px] w-full" />
-              ) : rankingData.length === 0 ? (
+              ) : rankingCargaData.length === 0 ? (
                 <div className="flex items-center justify-center h-[280px] text-muted-foreground">
                   Nenhum dado encontrado
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {rankingData.map((r, index) => {
-                    const color = getPerformanceColor(r.taxaNoPrazo);
-                    const medals = ['🥇', '🥈', '🥉'];
+                  {rankingCargaData.map((r: TechTempoResponsavel, index: number) => {
+                    const tempoColor = getTempoColor(r.tempoEmAberto || 0);
+                    const maxAtivos = Math.max(...rankingCargaData.map(x => x.projetosAtivos || 0));
+                    const percentual = maxAtivos > 0 ? ((r.projetosAtivos || 0) / maxAtivos) * 100 : 0;
                     return (
                       <div 
                         key={index}
@@ -433,34 +505,29 @@ export default function TechProjetos() {
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <span className="text-lg">
-                              {index < 3 ? medals[index] : `#${index + 1}`}
-                            </span>
-                            <span className="font-medium text-sm truncate max-w-[120px]">
+                            <div 
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs"
+                              style={{ backgroundColor: '#3b82f6' }}
+                            >
+                              {(r.responsavel || 'NA').substring(0, 2).toUpperCase()}
+                            </div>
+                            <span className="font-medium text-sm truncate max-w-[100px]">
                               {r.responsavel}
                             </span>
                           </div>
-                          <Badge 
-                            variant="outline" 
-                            style={{ 
-                              backgroundColor: `${color}20`, 
-                              color: color,
-                              borderColor: `${color}50`
-                            }}
-                          >
-                            {r.taxaNoPrazo.toFixed(0)}%
+                          <Badge variant="secondary">
+                            {r.projetosAtivos || 0} ativos
                           </Badge>
                         </div>
                         <Progress 
-                          value={r.taxaNoPrazo} 
+                          value={percentual} 
                           className="h-2"
-                          style={{ 
-                            '--progress-background': color 
-                          } as React.CSSProperties}
                         />
                         <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-                          <span>{r.totalEntregas} entregas</span>
-                          <span>{Math.round(r.tempoMedioEntrega)}d média</span>
+                          <span style={{ color: tempoColor }}>
+                            {Math.round(r.tempoEmAberto || 0)}d em aberto
+                          </span>
+                          <span>{formatCurrencyShort(r.valorAtivos || 0)}</span>
                         </div>
                       </div>
                     );
@@ -478,83 +545,94 @@ export default function TechProjetos() {
               <Gauge className="h-4 w-4" />
               Métricas Detalhadas por Responsável
             </CardTitle>
-            <CardDescription>Análise completa de cada desenvolvedor</CardDescription>
+            <CardDescription>Projetos ativos, tempo em aberto e entregas</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoadingTempo ? (
               <Skeleton className="h-[180px] w-full" />
             ) : !tempoResponsavel || tempoResponsavel.length === 0 ? (
               <div className="flex items-center justify-center h-[150px] text-muted-foreground">
-                Nenhum dado de entrega encontrado
+                Nenhum dado encontrado
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {tempoResponsavel.slice(0, 8).map((resp, index) => {
-                  const taxaColor = getPerformanceColor(resp.taxaNoPrazo);
-                  const tempoColor = getTempoColor(resp.tempoMedioEntrega);
+                  const tempoAbertoColor = getTempoColor(resp.tempoEmAberto || 0);
+                  const hasAtivos = (resp.projetosAtivos || 0) > 0;
+                  const hasEntregas = resp.totalEntregas > 0;
                   return (
                     <div 
                       key={index}
                       className="p-4 rounded-lg border bg-card hover-elevate relative overflow-hidden"
                       data-testid={`card-responsavel-${index}`}
                     >
-                      {/* Indicador visual de performance */}
+                      {/* Indicador visual de carga */}
                       <div 
                         className="absolute top-0 left-0 w-1 h-full" 
-                        style={{ backgroundColor: taxaColor }}
+                        style={{ backgroundColor: hasAtivos ? tempoAbertoColor : '#94a3b8' }}
                       />
                       
-                      <div className="flex items-center gap-3 mb-4 pl-2">
+                      <div className="flex items-center gap-3 mb-3 pl-2">
                         <div 
                           className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-white font-bold"
-                          style={{ backgroundColor: taxaColor }}
+                          style={{ backgroundColor: '#3b82f6' }}
                         >
                           {(resp.responsavel || 'NA').substring(0, 2).toUpperCase()}
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="font-medium text-sm truncate">{resp.responsavel}</p>
-                          <p className="text-xs text-muted-foreground">{resp.totalEntregas} projetos entregues</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="text-blue-600 font-medium">{resp.projetosAtivos || 0} ativos</span>
+                            <span>|</span>
+                            <span className="text-green-600">{resp.totalEntregas} entregas</span>
+                          </div>
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-3 pl-2">
+                      <div className="grid grid-cols-2 gap-2 pl-2 mb-3">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className="p-2 rounded-md bg-muted/50">
+                            <div className="p-2 rounded-md bg-blue-500/10">
                               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                                <Target className="h-3 w-3" />
-                                No Prazo
+                                <Clock className="h-3 w-3 text-blue-500" />
+                                Em Aberto
                               </div>
-                              <p className="font-bold" style={{ color: taxaColor }}>
-                                {resp.taxaNoPrazo?.toFixed(0) || 0}%
+                              <p className="font-bold" style={{ color: tempoAbertoColor }}>
+                                {hasAtivos ? `${Math.round(resp.tempoEmAberto || 0)}d` : '-'}
                               </p>
                             </div>
                           </TooltipTrigger>
-                          <TooltipContent>Taxa de cumprimento de prazo</TooltipContent>
+                          <TooltipContent>Tempo médio dos projetos em aberto</TooltipContent>
                         </Tooltip>
                         
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className="p-2 rounded-md bg-muted/50">
+                            <div className="p-2 rounded-md bg-green-500/10">
                               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                                <Clock className="h-3 w-3" />
-                                Tempo
+                                <Timer className="h-3 w-3 text-green-500" />
+                                Entrega
                               </div>
-                              <p className="font-bold" style={{ color: tempoColor }}>
-                                {Math.round(resp.tempoMedioEntrega)}d
+                              <p className="font-bold text-green-600">
+                                {hasEntregas && resp.tempoMedioEntrega > 0 ? `${Math.round(resp.tempoMedioEntrega)}d` : '-'}
                               </p>
                             </div>
                           </TooltipTrigger>
-                          <TooltipContent>Tempo médio de entrega</TooltipContent>
+                          <TooltipContent>Tempo médio de entrega (projetos fechados)</TooltipContent>
                         </Tooltip>
                       </div>
                       
-                      <div className="mt-3 pt-3 border-t pl-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Valor entregue</span>
-                          <span className="font-semibold text-sm text-green-600">
+                      <div className="grid grid-cols-2 gap-2 pl-2">
+                        <div className="text-center">
+                          <span className="text-xs text-muted-foreground">Valor Ativos</span>
+                          <p className="font-semibold text-sm text-blue-600">
+                            {formatCurrencyShort(resp.valorAtivos || 0)}
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-xs text-muted-foreground">Valor Entregue</span>
+                          <p className="font-semibold text-sm text-green-600">
                             {formatCurrencyShort(resp.valorTotalEntregue)}
-                          </span>
+                          </p>
                         </div>
                       </div>
                     </div>
