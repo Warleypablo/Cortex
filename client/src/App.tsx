@@ -47,6 +47,7 @@ import PerformancePlataformas from "@/pages/PerformancePlataformas";
 import RevenueGoals from "@/pages/RevenueGoals";
 import CasesChat from "@/pages/CasesChat";
 import JuridicoClientes from "@/pages/JuridicoClientes";
+import InvestorsReport from "@/pages/InvestorsReport";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -153,6 +154,7 @@ function ProtectedRouter() {
       <Route path="/growth/visao-geral">{() => <ProtectedRoute path="/growth/visao-geral" component={GrowthVisaoGeral} />}</Route>
       <Route path="/growth/performance-plataformas">{() => <ProtectedRoute path="/growth/performance-plataformas" component={PerformancePlataformas} />}</Route>
       <Route path="/juridico/clientes">{() => <ProtectedRoute path="/juridico/clientes" component={JuridicoClientes} />}</Route>
+      <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
       <Route path="/cases/chat">{() => <ProtectedRoute path="/cases/chat" component={CasesChat} />}</Route>
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>
