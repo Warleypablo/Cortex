@@ -2819,12 +2819,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint consolidado com todas as métricas do Investors Report
   app.get("/api/investors-report", async (req, res) => {
     try {
-      // Métricas de Clientes (cup_clientes) - chave primária é cnpj
+      // Métricas de Clientes - contagem baseada em cup_clientes e cup_contratos
+      // Cliente ativo = cliente que possui contrato com status ativo/onboarding/triagem
       const clientesResult = await db.execute(sql`
         SELECT 
-          COUNT(DISTINCT cnpj) as total_clientes,
-          COUNT(DISTINCT CASE WHEN status = 'Ativo' THEN cnpj END) as clientes_ativos
-        FROM cup_clientes
+          (SELECT COUNT(DISTINCT cnpj) FROM cup_clientes) as total_clientes,
+          COUNT(DISTINCT c.id_task) as clientes_ativos
+        FROM cup_contratos c
+        WHERE c.status IN ('ativo', 'onboarding', 'triagem')
       `);
       
       // Métricas de Contratos (cup_contratos)
@@ -2887,17 +2889,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE TO_CHAR(data_vencimento, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
       `);
       
-      // Top 10 clientes por receita (cup_clientes -> caz_clientes -> caz_parcelas)
-      // Usando CAST para garantir compatibilidade de tipos
+      // Top 10 clientes por receita baseado em caz_parcelas com cliente_nome
       const topClientesResult = await db.execute(sql`
         SELECT 
-          cup.nome as cliente,
+          COALESCE(caz.nome, 'Não identificado') as cliente,
           COALESCE(SUM(p.valor_liquido), 0) as receita_total
-        FROM cup_clientes cup
-        INNER JOIN caz_clientes caz ON caz.cnpj::text = cup.cnpj::text
-        INNER JOIN caz_parcelas p ON p.id_cliente::text = caz.ids::text AND p.status = 'pago'
-        WHERE p.data_vencimento >= CURRENT_DATE - INTERVAL '12 months'
-        GROUP BY cup.cnpj, cup.nome
+        FROM caz_parcelas p
+        LEFT JOIN caz_clientes caz ON p.id_cliente::text = caz.ids::text
+        WHERE p.status = 'pago' 
+          AND p.data_vencimento >= CURRENT_DATE - INTERVAL '12 months'
+          AND p.valor_liquido > 0
+        GROUP BY caz.nome
         HAVING SUM(p.valor_liquido) > 0
         ORDER BY receita_total DESC
         LIMIT 10
@@ -2968,9 +2970,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Buscar os mesmos dados do endpoint principal
       const clientesResult = await db.execute(sql`
         SELECT 
-          COUNT(DISTINCT id) as total_clientes,
-          COUNT(DISTINCT CASE WHEN status = 'Ativo' THEN id END) as clientes_ativos
-        FROM cup_clientes
+          (SELECT COUNT(DISTINCT cnpj) FROM cup_clientes) as total_clientes,
+          COUNT(DISTINCT c.id_task) as clientes_ativos
+        FROM cup_contratos c
+        WHERE c.status IN ('ativo', 'onboarding', 'triagem')
       `);
       
       const contratosResult = await db.execute(sql`
