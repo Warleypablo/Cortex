@@ -3700,7 +3700,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/tech/tempo-responsavel", async (req, res) => {
     try {
-      const data = await storage.getTechTempoResponsavel();
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const responsavel = req.query.responsavel as string | undefined;
+      const data = await storage.getTechTempoResponsavel(startDate, endDate, responsavel);
       res.json(data);
     } catch (error) {
       console.error("[api] Error fetching tech tempo por responsavel:", error);
