@@ -2865,47 +2865,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY quantidade DESC
       `);
       
-      // Faturamento via caz_parcelas (últimos 12 meses) - tipo_evento = 'RECEITA' e status = 'QUITADO'
-      // Inadimplência só considera parcelas já vencidas (data_vencimento < CURRENT_DATE)
+      // Faturamento via caz_parcelas (últimos 12 meses) - alinhado com Dashboard Financeiro
+      // Usa valor_pago, data_quitacao (ou data_vencimento), e status = 'QUITADO'
       const faturamentoResult = await db.execute(sql`
         SELECT 
-          TO_CHAR(data_vencimento, 'YYYY-MM') as mes,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_liquido ELSE 0 END), 0) as faturamento,
-          COALESCE(SUM(valor_bruto), 0) as valor_bruto,
-          COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE THEN perda ELSE 0 END), 0) + 
-          COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE THEN nao_pago ELSE 0 END), 0) as inadimplencia
+          TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia
         FROM caz_parcelas
-        WHERE data_vencimento >= CURRENT_DATE - INTERVAL '12 months'
-        GROUP BY TO_CHAR(data_vencimento, 'YYYY-MM')
+        WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
+          AND tipo_evento IN ('RECEITA', 'DESPESA')
+        GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
         ORDER BY mes DESC
         LIMIT 12
       `);
       
-      // Faturamento do mês atual (tipo_evento = 'RECEITA' e status = 'QUITADO')
-      // Inadimplência só considera parcelas já vencidas
+      // Faturamento do mês atual - alinhado com Dashboard Financeiro
+      // Usa valor_pago, data_quitacao (ou data_vencimento), e status = 'QUITADO'
       const faturamentoMesResult = await db.execute(sql`
         SELECT 
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_liquido ELSE 0 END), 0) as faturamento_mes,
-          COALESCE(SUM(valor_bruto), 0) as valor_bruto_mes,
-          COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE THEN perda ELSE 0 END), 0) + 
-          COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE THEN nao_pago ELSE 0 END), 0) as inadimplencia_mes
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_mes,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto_mes,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia_mes
         FROM caz_parcelas
-        WHERE TO_CHAR(data_vencimento, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+        WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+          AND tipo_evento IN ('RECEITA', 'DESPESA')
       `);
       
-      // Top 10 clientes por receita baseado em caz_parcelas (tipo_evento = 'RECEITA' e status = 'QUITADO')
+      // Top 10 clientes por receita - alinhado com Dashboard Financeiro
       const topClientesResult = await db.execute(sql`
         SELECT 
           COALESCE(caz.nome, 'Não identificado') as cliente,
-          COALESCE(SUM(p.valor_liquido), 0) as receita_total
+          COALESCE(SUM(p.valor_pago::numeric), 0) as receita_total
         FROM caz_parcelas p
         LEFT JOIN caz_clientes caz ON p.id_cliente::text = caz.ids::text
         WHERE p.tipo_evento = 'RECEITA' 
           AND p.status = 'QUITADO'
-          AND p.data_vencimento >= CURRENT_DATE - INTERVAL '12 months'
-          AND p.valor_liquido > 0
+          AND COALESCE(p.data_quitacao, p.data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
+          AND p.valor_pago::numeric > 0
         GROUP BY caz.nome
-        HAVING SUM(p.valor_liquido) > 0
+        HAVING SUM(p.valor_pago::numeric) > 0
         ORDER BY receita_total DESC
         LIMIT 10
       `);
@@ -3005,12 +3005,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE LOWER(status) = 'ativo'
       `);
       
-      // Faturamento do mês atual
+      // Faturamento do mês atual - alinhado com Dashboard Financeiro
       const faturamentoMesResult = await db.execute(sql`
         SELECT 
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_liquido ELSE 0 END), 0) as faturamento_mes
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_mes
         FROM caz_parcelas
-        WHERE TO_CHAR(data_vencimento, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+        WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+          AND tipo_evento IN ('RECEITA', 'DESPESA')
       `);
 
       const clientes = clientesResult.rows[0] || { total_clientes: 0, clientes_ativos: 0 };
