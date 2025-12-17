@@ -3110,7 +3110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // ===== GERAR PDF =====
-      const doc = new PDFDocument({ margin: 40, size: 'A4' });
+      const doc = new PDFDocument({ margin: 50, size: 'A4' });
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=investors-report-${format(new Date(), 'yyyy-MM')}.pdf`);
@@ -3118,230 +3118,258 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.pipe(res);
 
       // Cores
-      const primaryColor = '#1a365d';
-      const accentColor = '#3182ce';
-      const textColor = '#2d3748';
-      const lightGray = '#e2e8f0';
+      const colors = {
+        primary: '#1e3a5f',
+        accent: '#2563eb',
+        success: '#16a34a',
+        danger: '#dc2626',
+        warning: '#ea580c',
+        text: '#1f2937',
+        muted: '#6b7280',
+        light: '#f3f4f6',
+        border: '#e5e7eb',
+        bar1: '#3b82f6',
+        bar2: '#10b981',
+        bar3: '#f59e0b',
+      };
 
-      // ===== PÁGINA 1: CAPA E KPIs =====
+      const pageWidth = 515;
+      const leftMargin = 50;
       
-      // Header com linha decorativa
-      doc.rect(40, 40, 515, 4).fill(accentColor);
-      doc.moveDown(1);
+      // Helper: Desenhar barra horizontal
+      const drawBar = (x: number, y: number, width: number, height: number, color: string, label?: string, value?: string) => {
+        doc.rect(x, y, width, height).fill(color);
+        if (label) {
+          doc.fontSize(8).font('Helvetica').fillColor(colors.text).text(label, x, y - 12, { width: 150 });
+        }
+        if (value) {
+          doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text).text(value, x + width + 8, y + 2);
+        }
+      };
+
+      // Helper: Desenhar linha de tabela
+      const drawTableRow = (y: number, cols: { text: string; x: number; width?: number; align?: string; bold?: boolean; color?: string }[], bgColor?: string) => {
+        if (bgColor) {
+          doc.rect(leftMargin, y, pageWidth, 20).fill(bgColor);
+        }
+        cols.forEach(col => {
+          doc.fontSize(9).font(col.bold ? 'Helvetica-Bold' : 'Helvetica').fillColor(col.color || colors.text);
+          doc.text(col.text, col.x, y + 5, { width: col.width || 100, align: (col.align as any) || 'left' });
+        });
+        return y + 20;
+      };
+
+      // ===== PÁGINA 1 =====
       
-      doc.fontSize(28).font('Helvetica-Bold').fillColor(primaryColor)
-        .text('INVESTORS REPORT', 40, 60, { align: 'center' });
-      doc.fontSize(14).font('Helvetica').fillColor(textColor)
-        .text('Turbo Partners', { align: 'center' });
+      // Header
+      doc.rect(leftMargin, 40, pageWidth, 3).fill(colors.accent);
+      
+      doc.fontSize(26).font('Helvetica-Bold').fillColor(colors.primary)
+        .text('INVESTORS REPORT', leftMargin, 55, { align: 'center', width: pageWidth });
+      
       const mesesPtBr = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
       const dataAtual = new Date();
-      const mesAnoFormatado = `${mesesPtBr[dataAtual.getMonth()]} de ${dataAtual.getFullYear()}`;
-      doc.fontSize(12).fillColor('#718096')
-        .text(mesAnoFormatado, { align: 'center' });
       
-      doc.moveDown(1);
+      doc.fontSize(11).font('Helvetica').fillColor(colors.muted)
+        .text(`Turbo Partners - ${mesesPtBr[dataAtual.getMonth()]} de ${dataAtual.getFullYear()}`, { align: 'center', width: pageWidth });
       
-      // Quote
-      doc.fontSize(10).font('Helvetica-Oblique').fillColor('#718096')
-        .text('"Tornamos a vida de quem vende online mais fácil e rentável, usando desse know how, para construir as marcas da próxima geração"', 60, doc.y, { align: 'center', width: 475 });
-      
-      doc.moveDown(2);
-      
-      // Linha separadora
-      doc.rect(40, doc.y, 515, 1).fill(lightGray);
-      doc.moveDown(1);
+      doc.moveDown(1.5);
 
-      // ===== KPIs PRINCIPAIS (2 colunas x 3 linhas) =====
-      doc.fontSize(16).font('Helvetica-Bold').fillColor(primaryColor).text('Indicadores Principais', 40);
+      // ===== KPIs em Grid 3x2 =====
+      doc.fontSize(14).font('Helvetica-Bold').fillColor(colors.primary).text('Indicadores Principais', leftMargin, doc.y);
       doc.moveDown(0.5);
       
-      const kpiStartY = doc.y;
-      const kpiWidth = 240;
-      const kpiHeight = 60;
-      const kpiGap = 20;
+      const kpiY = doc.y;
+      const kpiW = 160;
+      const kpiH = 50;
+      const kpiGap = 15;
       
-      const kpis = [
-        { label: 'Clientes Ativos', value: String(Number(clientes.clientes_ativos) || 0), sub: `${Number(clientes.total_clientes) || 0} total cadastrados` },
-        { label: 'Contratos Recorrentes', value: String(Number(contratos.contratos_recorrentes) || 0), sub: `${Number(contratos.contratos_pontuais) || 0} pontuais` },
-        { label: 'MRR Ativo', value: formatCurrencyShort(mrrAtivo), sub: `AOV: ${formatCurrency(Number(contratos.aov_recorrente) || 0)}` },
-        { label: 'Faturamento Mês', value: formatCurrencyShort(Number(faturamentoMes.faturamento_mes) || 0), sub: 'Realizado via ERP' },
-        { label: 'Colaboradores', value: String(headcount), sub: `Tempo médio: ${Number(equipe.tempo_medio_meses).toFixed(1)} meses` },
-        { label: 'Receita por Cabeça', value: formatCurrencyShort(receitaPorCabeca), sub: 'MRR ÷ Headcount' },
+      const kpisData = [
+        { label: 'Clientes Ativos', value: String(Number(clientes.clientes_ativos) || 0) },
+        { label: 'Contratos Recorrentes', value: String(Number(contratos.contratos_recorrentes) || 0) },
+        { label: 'MRR Ativo', value: formatCurrencyShort(mrrAtivo) },
+        { label: 'Faturamento Mês', value: formatCurrencyShort(Number(faturamentoMes.faturamento_mes) || 0) },
+        { label: 'Colaboradores', value: String(headcount) },
+        { label: 'Receita/Cabeça', value: formatCurrencyShort(receitaPorCabeca) },
       ];
       
-      kpis.forEach((kpi, i) => {
-        const col = i % 2;
-        const row = Math.floor(i / 2);
-        const x = 40 + col * (kpiWidth + kpiGap);
-        const y = kpiStartY + row * (kpiHeight + 10);
+      kpisData.forEach((kpi, i) => {
+        const col = i % 3;
+        const row = Math.floor(i / 3);
+        const x = leftMargin + col * (kpiW + kpiGap);
+        const y = kpiY + row * (kpiH + 10);
         
-        // Box
-        doc.rect(x, y, kpiWidth, kpiHeight).fill('#f7fafc');
-        doc.rect(x, y, 4, kpiHeight).fill(accentColor);
-        
-        // Content
-        doc.fontSize(10).font('Helvetica').fillColor('#718096').text(kpi.label, x + 12, y + 8);
-        doc.fontSize(20).font('Helvetica-Bold').fillColor(primaryColor).text(kpi.value, x + 12, y + 22);
-        doc.fontSize(9).font('Helvetica').fillColor('#a0aec0').text(kpi.sub, x + 12, y + 44);
+        doc.rect(x, y, kpiW, kpiH).fill(colors.light);
+        doc.rect(x, y, 3, kpiH).fill(colors.accent);
+        doc.fontSize(9).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 10, y + 8);
+        doc.fontSize(18).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 10, y + 24);
       });
-      
-      doc.y = kpiStartY + 3 * (kpiHeight + 10) + 20;
 
-      // ===== EVOLUÇÃO ANUAL =====
-      doc.fontSize(16).font('Helvetica-Bold').fillColor(primaryColor).text('Evolução Anual', 40);
+      doc.y = kpiY + 2 * (kpiH + 10) + 25;
+
+      // ===== GRÁFICO: Evolução Anual (Barras Horizontais) =====
+      doc.fontSize(14).font('Helvetica-Bold').fillColor(colors.primary).text('Faturamento Anual', leftMargin, doc.y);
       doc.moveDown(0.5);
       
-      // Tabela de evolução anual
-      const anoTableY = doc.y;
-      const colWidths = [80, 140, 140, 140];
+      const chartY = doc.y;
+      const barHeight = 22;
+      const barGap = 30;
+      const maxBarWidth = 350;
       
-      // Header
-      doc.rect(40, anoTableY, 500, 25).fill('#edf2f7');
-      doc.fontSize(10).font('Helvetica-Bold').fillColor(textColor);
-      doc.text('Ano', 50, anoTableY + 8);
-      doc.text('Faturamento', 130, anoTableY + 8);
-      doc.text('Despesas', 270, anoTableY + 8);
-      doc.text('Resultado', 410, anoTableY + 8);
+      const anoData = evolucaoAnualResult.rows.map((r: any) => ({
+        ano: r.ano,
+        faturamento: Number(r.faturamento) || 0,
+        despesa: Number(r.despesa) || 0,
+      }));
       
-      // Rows
-      let rowY = anoTableY + 25;
-      evolucaoAnualResult.rows.forEach((row: any, i: number) => {
-        const faturamento = Number(row.faturamento) || 0;
-        const despesa = Number(row.despesa) || 0;
-        const resultado = faturamento - despesa;
+      const maxFat = Math.max(...anoData.map((d: any) => d.faturamento), 1);
+      
+      anoData.forEach((d: any, i: number) => {
+        const y = chartY + i * barGap;
+        const barW = (d.faturamento / maxFat) * maxBarWidth;
         
-        if (i % 2 === 0) doc.rect(40, rowY, 500, 22).fill('#f7fafc');
+        // Label ano
+        doc.fontSize(10).font('Helvetica-Bold').fillColor(colors.text).text(d.ano, leftMargin, y + 4);
         
-        doc.fontSize(10).font('Helvetica').fillColor(textColor);
-        doc.text(row.ano, 50, rowY + 6);
-        doc.text(formatCurrency(faturamento), 130, rowY + 6);
-        doc.text(formatCurrency(despesa), 270, rowY + 6);
-        doc.fillColor(resultado >= 0 ? '#38a169' : '#e53e3e').text(formatCurrency(resultado), 410, rowY + 6);
+        // Barra
+        doc.rect(leftMargin + 50, y, barW, barHeight).fill(colors.bar1);
         
-        rowY += 22;
+        // Valor
+        doc.fontSize(9).font('Helvetica-Bold').fillColor(colors.primary)
+          .text(formatCurrencyShort(d.faturamento), leftMargin + 55 + barW, y + 5);
       });
-      
-      doc.y = rowY + 20;
 
-      // ===== EVOLUÇÃO MENSAL (últimos 12 meses) =====
-      doc.fontSize(16).font('Helvetica-Bold').fillColor(primaryColor).text('Evolução Mensal (Últimos 12 meses)', 40);
+      doc.y = chartY + anoData.length * barGap + 20;
+
+      // ===== GRÁFICO: Evolução Mensal (últimos 6 meses) =====
+      doc.fontSize(14).font('Helvetica-Bold').fillColor(colors.primary).text('Faturamento Mensal (6 meses)', leftMargin, doc.y);
       doc.moveDown(0.5);
       
-      const mesTableY = doc.y;
+      const mesChartY = doc.y;
+      const mesData = evolucaoMensalResult.rows.slice(-6).map((r: any) => {
+        const [ano, mes] = r.mes.split('-');
+        return {
+          label: `${mesesNomes[mes]}/${ano.slice(2)}`,
+          faturamento: Number(r.faturamento) || 0,
+        };
+      });
       
-      // Header
-      doc.rect(40, mesTableY, 500, 22).fill('#edf2f7');
-      doc.fontSize(9).font('Helvetica-Bold').fillColor(textColor);
-      doc.text('Mês', 50, mesTableY + 6);
-      doc.text('Faturamento', 150, mesTableY + 6);
-      doc.text('Inadimplência', 280, mesTableY + 6);
-      doc.text('% Inadimp.', 410, mesTableY + 6);
+      const maxMesFat = Math.max(...mesData.map((d: any) => d.faturamento), 1);
       
-      rowY = mesTableY + 22;
-      evolucaoMensalResult.rows.slice(-12).forEach((row: any, i: number) => {
-        const faturamento = Number(row.faturamento) || 0;
-        const inadimplencia = Number(row.inadimplencia) || 0;
-        const taxa = faturamento > 0 ? (inadimplencia / faturamento) * 100 : 0;
-        const [ano, mes] = row.mes.split('-');
-        const mesLabel = `${mesesNomes[mes]}/${ano.slice(2)}`;
+      mesData.forEach((d: any, i: number) => {
+        const y = mesChartY + i * 28;
+        const barW = (d.faturamento / maxMesFat) * maxBarWidth;
         
-        if (i % 2 === 0) doc.rect(40, rowY, 500, 18).fill('#f7fafc');
-        
-        doc.fontSize(9).font('Helvetica').fillColor(textColor);
-        doc.text(mesLabel, 50, rowY + 4);
-        doc.text(formatCurrency(faturamento), 150, rowY + 4);
-        doc.fillColor(inadimplencia > 0 ? '#e53e3e' : textColor).text(formatCurrency(inadimplencia), 280, rowY + 4);
-        doc.fillColor(taxa > 5 ? '#e53e3e' : taxa > 2 ? '#dd6b20' : '#38a169').text(`${taxa.toFixed(1)}%`, 410, rowY + 4);
-        
-        rowY += 18;
+        doc.fontSize(9).font('Helvetica').fillColor(colors.text).text(d.label, leftMargin, y + 4, { width: 50 });
+        doc.rect(leftMargin + 55, y, barW, 18).fill(colors.bar2);
+        doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text)
+          .text(formatCurrencyShort(d.faturamento), leftMargin + 60 + barW, y + 3);
+      });
+
+      doc.y = mesChartY + mesData.length * 28 + 25;
+
+      // ===== Tabela: Evolução Anual Detalhada =====
+      doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('Detalhamento Anual', leftMargin, doc.y);
+      doc.moveDown(0.3);
+      
+      let tblY = doc.y;
+      tblY = drawTableRow(tblY, [
+        { text: 'Ano', x: leftMargin + 5, bold: true },
+        { text: 'Faturamento', x: leftMargin + 100, bold: true },
+        { text: 'Despesas', x: leftMargin + 230, bold: true },
+        { text: 'Resultado', x: leftMargin + 360, bold: true },
+      ], colors.light);
+      
+      anoData.forEach((d: any, i: number) => {
+        const resultado = d.faturamento - d.despesa;
+        tblY = drawTableRow(tblY, [
+          { text: d.ano, x: leftMargin + 5 },
+          { text: formatCurrency(d.faturamento), x: leftMargin + 100 },
+          { text: formatCurrency(d.despesa), x: leftMargin + 230 },
+          { text: formatCurrency(resultado), x: leftMargin + 360, color: resultado >= 0 ? colors.success : colors.danger, bold: true },
+        ], i % 2 === 0 ? '#fafafa' : undefined);
       });
 
       // ===== PÁGINA 2 =====
       doc.addPage();
+      doc.rect(leftMargin, 40, pageWidth, 3).fill(colors.accent);
       
-      // Header linha
-      doc.rect(40, 40, 515, 4).fill(accentColor);
-      doc.moveDown(1);
+      doc.fontSize(18).font('Helvetica-Bold').fillColor(colors.primary)
+        .text('Detalhamento', leftMargin, 55);
       
-      doc.fontSize(20).font('Helvetica-Bold').fillColor(primaryColor).text('Detalhamento', 40, 55);
-      doc.moveDown(1.5);
+      doc.y = 85;
 
-      // ===== TOP 10 CLIENTES =====
-      doc.fontSize(14).font('Helvetica-Bold').fillColor(primaryColor).text('Top 10 Clientes por Receita (12 meses)', 40);
-      doc.moveDown(0.5);
+      // ===== Top 10 Clientes =====
+      doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('Top 10 Clientes por Receita (12 meses)', leftMargin, doc.y);
+      doc.moveDown(0.3);
       
-      const topTableY = doc.y;
+      tblY = doc.y;
+      tblY = drawTableRow(tblY, [
+        { text: '#', x: leftMargin + 5, bold: true, width: 25 },
+        { text: 'Cliente', x: leftMargin + 35, bold: true, width: 280 },
+        { text: 'Receita', x: leftMargin + 380, bold: true, width: 100 },
+      ], colors.light);
       
-      // Header
-      doc.rect(40, topTableY, 500, 22).fill('#edf2f7');
-      doc.fontSize(10).font('Helvetica-Bold').fillColor(textColor);
-      doc.text('#', 50, topTableY + 6);
-      doc.text('Cliente', 80, topTableY + 6);
-      doc.text('Receita Total', 400, topTableY + 6);
+      const topMax = Math.max(...topClientesResult.rows.map((r: any) => Number(r.receita_total) || 0), 1);
       
-      rowY = topTableY + 22;
       topClientesResult.rows.forEach((row: any, i: number) => {
-        if (i % 2 === 0) doc.rect(40, rowY, 500, 20).fill('#f7fafc');
+        const receita = Number(row.receita_total) || 0;
+        const barW = (receita / topMax) * 150;
         
-        doc.fontSize(10).font('Helvetica').fillColor(textColor);
-        doc.text(String(i + 1), 50, rowY + 5);
-        doc.text(String(row.cliente).slice(0, 45), 80, rowY + 5);
-        doc.font('Helvetica-Bold').text(formatCurrency(Number(row.receita_total) || 0), 400, rowY + 5);
+        if (i % 2 === 0) doc.rect(leftMargin, tblY, pageWidth, 22).fill('#fafafa');
         
-        rowY += 20;
+        doc.fontSize(9).font('Helvetica').fillColor(colors.text);
+        doc.text(String(i + 1), leftMargin + 5, tblY + 6);
+        doc.text(String(row.cliente).slice(0, 40), leftMargin + 35, tblY + 6);
+        
+        // Mini barra
+        doc.rect(leftMargin + 280, tblY + 4, barW, 12).fill(colors.bar1);
+        
+        doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.primary)
+          .text(formatCurrencyShort(receita), leftMargin + 435, tblY + 6);
+        
+        tblY += 22;
       });
-      
-      doc.y = rowY + 20;
 
-      // ===== DISTRIBUIÇÃO POR SETOR =====
-      doc.fontSize(14).font('Helvetica-Bold').fillColor(primaryColor).text('Distribuição da Equipe por Setor', 40);
-      doc.moveDown(0.5);
+      doc.y = tblY + 20;
+
+      // ===== Distribuição por Setor =====
+      doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('Distribuição da Equipe por Setor', leftMargin, doc.y);
+      doc.moveDown(0.3);
       
-      const setorTableY = doc.y;
-      const totalColaboradores = setorResult.rows.reduce((acc: number, r: any) => acc + Number(r.quantidade), 0);
+      const setorChartY = doc.y;
+      const totalColab = setorResult.rows.reduce((acc: number, r: any) => acc + Number(r.quantidade), 0);
+      const setorMax = Math.max(...setorResult.rows.map((r: any) => Number(r.quantidade)), 1);
       
-      // Header
-      doc.rect(40, setorTableY, 500, 22).fill('#edf2f7');
-      doc.fontSize(10).font('Helvetica-Bold').fillColor(textColor);
-      doc.text('Setor', 50, setorTableY + 6);
-      doc.text('Quantidade', 300, setorTableY + 6);
-      doc.text('% do Total', 420, setorTableY + 6);
-      
-      rowY = setorTableY + 22;
-      setorResult.rows.forEach((row: any, i: number) => {
-        const quantidade = Number(row.quantidade) || 0;
-        const percentual = totalColaboradores > 0 ? (quantidade / totalColaboradores) * 100 : 0;
+      setorResult.rows.slice(0, 8).forEach((row: any, i: number) => {
+        const qtd = Number(row.quantidade) || 0;
+        const pct = totalColab > 0 ? (qtd / totalColab) * 100 : 0;
+        const barW = (qtd / setorMax) * 200;
+        const y = setorChartY + i * 24;
         
-        if (i % 2 === 0) doc.rect(40, rowY, 500, 20).fill('#f7fafc');
+        doc.fontSize(8).font('Helvetica').fillColor(colors.text)
+          .text(String(row.setor).slice(0, 25), leftMargin, y + 3, { width: 140 });
         
-        doc.fontSize(10).font('Helvetica').fillColor(textColor);
-        doc.text(String(row.setor), 50, rowY + 5);
-        doc.text(String(quantidade), 300, rowY + 5);
-        doc.text(`${percentual.toFixed(1)}%`, 420, rowY + 5);
+        doc.rect(leftMargin + 150, y, barW, 16).fill(colors.bar3);
         
-        rowY += 20;
+        doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text)
+          .text(`${qtd} (${pct.toFixed(0)}%)`, leftMargin + 155 + barW, y + 3);
       });
-      
-      doc.y = rowY + 30;
 
-      // ===== RESUMO FINAL =====
-      doc.rect(40, doc.y, 515, 80).fill('#f7fafc');
-      doc.rect(40, doc.y, 515, 4).fill(accentColor);
+      doc.y = setorChartY + Math.min(setorResult.rows.length, 8) * 24 + 30;
+
+      // ===== Resumo Executivo =====
+      doc.rect(leftMargin, doc.y, pageWidth, 70).fill(colors.light);
+      doc.rect(leftMargin, doc.y, pageWidth, 3).fill(colors.accent);
       
-      const resumoY = doc.y + 15;
-      doc.fontSize(12).font('Helvetica-Bold').fillColor(primaryColor).text('Resumo Executivo', 55, resumoY);
-      doc.fontSize(10).font('Helvetica').fillColor(textColor);
-      doc.text(`Este relatório apresenta os principais indicadores da Turbo Partners. Com ${clientesAtivos} clientes ativos gerando um MRR de ${formatCurrencyShort(mrrAtivo)}, a empresa mantém uma base sólida. A equipe de ${headcount} colaboradores demonstra comprometimento com tempo médio de casa de ${Number(equipe.tempo_medio_meses).toFixed(1)} meses.`, 55, resumoY + 18, { width: 485 });
+      const resumoY = doc.y + 12;
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('Resumo Executivo', leftMargin + 10, resumoY);
+      doc.fontSize(9).font('Helvetica').fillColor(colors.text)
+        .text(`Com ${clientesAtivos} clientes ativos gerando um MRR de ${formatCurrencyShort(mrrAtivo)}, a Turbo Partners mantém uma base sólida de receita recorrente. A equipe de ${headcount} colaboradores possui tempo médio de casa de ${Number(equipe.tempo_medio_meses).toFixed(1)} meses, demonstrando retenção de talentos.`, leftMargin + 10, resumoY + 16, { width: pageWidth - 20 });
 
       // Footer
-      doc.y = 750;
-      doc.rect(40, doc.y, 515, 1).fill(lightGray);
-      doc.moveDown(0.5);
-      doc.fontSize(9).font('Helvetica-Oblique').fillColor('#a0aec0')
-        .text('"Você sonha grande, é inconformado e por isso melhora todos os dias. Pensando como dono, fazendo o que tem que ser feito, você terá o que merece" — UZK', { align: 'center' });
-      
-      doc.fontSize(8).fillColor('#cbd5e0')
-        .text(`Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`, { align: 'center' });
+      doc.fontSize(8).font('Helvetica').fillColor(colors.muted)
+        .text(`Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`, leftMargin, 780, { align: 'center', width: pageWidth });
 
       doc.end();
     } catch (error) {
