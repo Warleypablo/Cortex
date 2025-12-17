@@ -2866,11 +2866,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       // Faturamento via caz_parcelas (últimos 12 meses) - alinhado com Dashboard Financeiro
-      // Usa valor_pago, data_quitacao (ou data_vencimento), e status = 'QUITADO'
+      // Usa valor_pago (já representa valores pagos, sem precisar filtrar por status)
       const faturamentoResult = await db.execute(sql`
         SELECT 
           TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia
         FROM caz_parcelas
@@ -2882,10 +2882,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       // Faturamento do mês atual - alinhado com Dashboard Financeiro
-      // Usa valor_pago, data_quitacao (ou data_vencimento), e status = 'QUITADO'
+      // Usa valor_pago (já representa valores pagos, sem precisar filtrar por status)
       const faturamentoMesResult = await db.execute(sql`
         SELECT 
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_mes,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_mes,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto_mes,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia_mes
         FROM caz_parcelas
@@ -2894,6 +2894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       // Top 10 clientes por receita - alinhado com Dashboard Financeiro
+      // valor_pago já representa valores pagos
       const topClientesResult = await db.execute(sql`
         SELECT 
           COALESCE(caz.nome, 'Não identificado') as cliente,
@@ -2901,7 +2902,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM caz_parcelas p
         LEFT JOIN caz_clientes caz ON p.id_cliente::text = caz.ids::text
         WHERE p.tipo_evento = 'RECEITA' 
-          AND p.status = 'QUITADO'
           AND COALESCE(p.data_quitacao, p.data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
           AND p.valor_pago::numeric > 0
         GROUP BY caz.nome
@@ -3006,9 +3006,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       // Faturamento do mês atual - alinhado com Dashboard Financeiro
+      // valor_pago já representa valores pagos
       const faturamentoMesResult = await db.execute(sql`
         SELECT 
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'QUITADO' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_mes
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_mes
         FROM caz_parcelas
         WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
           AND tipo_evento IN ('RECEITA', 'DESPESA')
