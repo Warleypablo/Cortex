@@ -2819,11 +2819,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint consolidado com todas as métricas do Investors Report
   app.get("/api/investors-report", async (req, res) => {
     try {
-      // Métricas de Clientes (cup_clientes)
+      // Métricas de Clientes (cup_clientes) - chave primária é cnpj
       const clientesResult = await db.execute(sql`
         SELECT 
-          COUNT(DISTINCT id) as total_clientes,
-          COUNT(DISTINCT CASE WHEN status = 'Ativo' THEN id END) as clientes_ativos
+          COUNT(DISTINCT cnpj) as total_clientes,
+          COUNT(DISTINCT CASE WHEN status = 'Ativo' THEN cnpj END) as clientes_ativos
         FROM cup_clientes
       `);
       
