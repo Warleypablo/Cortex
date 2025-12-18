@@ -3068,6 +3068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       // Métricas mensais de contratos (churn, MRR vendido, pontual vendido) - cup_contratos
+      // Filtra apenas dados até o mês atual (não inclui datas futuras)
       const contratosEvolucaoResult = await db.execute(sql`
         SELECT 
           mes,
@@ -3084,6 +3085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           FROM cup_contratos
           WHERE data_encerramento IS NOT NULL
             AND data_encerramento >= CURRENT_DATE - INTERVAL '12 months'
+            AND data_encerramento <= CURRENT_DATE
             AND COALESCE(valorr, 0) > 0
           UNION ALL
           -- MRR vendido (contratos recorrentes iniciados no mês - valorr > 0)
@@ -3095,6 +3097,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           FROM cup_contratos
           WHERE data_inicio IS NOT NULL
             AND data_inicio >= CURRENT_DATE - INTERVAL '12 months'
+            AND data_inicio <= CURRENT_DATE
             AND COALESCE(valorr, 0) > 0
           UNION ALL
           -- Pontual vendido (contratos pontuais iniciados no mês - valorp > 0)
@@ -3106,14 +3109,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           FROM cup_contratos
           WHERE data_inicio IS NOT NULL
             AND data_inicio >= CURRENT_DATE - INTERVAL '12 months'
+            AND data_inicio <= CURRENT_DATE
             AND COALESCE(valorp, 0) > 0
         ) sub
         WHERE mes IS NOT NULL
+          AND mes <= TO_CHAR(CURRENT_DATE, 'YYYY-MM')
         GROUP BY mes
         ORDER BY mes
       `);
       
       // Receita líquida e geração de caixa mensal - caz_parcelas
+      // Filtra apenas dados até o mês atual (não inclui datas futuras)
       const fluxoCaixaResult = await db.execute(sql`
         SELECT 
           TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
@@ -3123,8 +3129,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as geracao_caixa
         FROM caz_parcelas
         WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
+          AND COALESCE(data_quitacao, data_vencimento) <= CURRENT_DATE
           AND tipo_evento IN ('RECEITA', 'DESPESA')
         GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+        HAVING TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') <= TO_CHAR(CURRENT_DATE, 'YYYY-MM')
         ORDER BY mes
       `);
       
