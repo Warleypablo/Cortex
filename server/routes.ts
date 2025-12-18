@@ -3492,18 +3492,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // ==================== PÁGINA 2: ANÁLISE DETALHADA ====================
       doc.addPage();
-      doc.rect(lm, 45, pw, 4).fill(colors.accent);
-      doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('ANÁLISE DETALHADA', lm, 60);
-      doc.y = 85;
+      doc.rect(lm, 40, pw, 3).fill(colors.accent);
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('ANÁLISE DETALHADA', lm, 50);
+      doc.y = 68;
 
       // ===== SEÇÃO 4: CLIENTES E RETENÇÃO =====
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('4. BASE DE CLIENTES', lm, doc.y);
-      doc.moveDown(0.4);
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(colors.primary).text('4. BASE DE CLIENTES', lm, doc.y);
+      doc.moveDown(0.25);
       
       const clienteKpiY = doc.y;
-      const ckGap = 10;
+      const ckGap = 8;
       const ckW = (pw - ckGap * 4) / 5;
-      const ckH = 50;
+      const ckH = 42;
       
       const clienteKpis = [
         { label: 'Contratos Ativos', value: String(contratosRecorrentesAtivos), color: colors.success },
@@ -3516,27 +3516,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       clienteKpis.forEach((kpi, i) => {
         const x = lm + i * (ckW + ckGap);
         doc.rect(x, clienteKpiY, ckW, ckH).fill(colors.light);
-        doc.rect(x, clienteKpiY, 4, ckH).fill(kpi.color);
-        doc.fontSize(7).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 12, clienteKpiY + 10);
-        doc.fontSize(15).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 12, clienteKpiY + 26);
+        doc.rect(x, clienteKpiY, 3, ckH).fill(kpi.color);
+        doc.fontSize(6).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 10, clienteKpiY + 8);
+        doc.fontSize(13).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 10, clienteKpiY + 22);
       });
       
-      doc.y = clienteKpiY + ckH + 20;
+      doc.y = clienteKpiY + ckH + 12;
 
       // ===== SEÇÃO 5: RECEITA POR SERVIÇO =====
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('5. RECEITA POR SERVIÇO', lm, doc.y);
-      doc.moveDown(0.4);
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(colors.primary).text('5. RECEITA POR SERVIÇO', lm, doc.y);
+      doc.moveDown(0.25);
       
       tblY = doc.y;
-      doc.rect(lm, tblY, pw, 18).fill(colors.light);
-      doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.text);
-      doc.text('Serviço', lm + 12, tblY + 5);
-      doc.text('Contratos', lm + 170, tblY + 5);
-      doc.text('MRR', lm + 230, tblY + 5);
-      doc.text('% MRR', lm + 300, tblY + 5);
-      doc.text('Ticket Médio', lm + 360, tblY + 5);
-      doc.text('Gráfico', lm + 430, tblY + 5);
-      tblY += 18;
+      doc.rect(lm, tblY, pw, 15).fill(colors.light);
+      doc.fontSize(6).font('Helvetica-Bold').fillColor(colors.text);
+      doc.text('Serviço', lm + 10, tblY + 4);
+      doc.text('Contratos', lm + 165, tblY + 4);
+      doc.text('MRR', lm + 225, tblY + 4);
+      doc.text('% MRR', lm + 295, tblY + 4);
+      doc.text('Ticket Médio', lm + 355, tblY + 4);
+      doc.text('Gráfico', lm + 425, tblY + 4);
+      tblY += 15;
       
       const servicoData = receitaPorServicoResult.rows || [];
       const mrrTotal = servicoData.reduce((acc: number, r: any) => acc + (Number(r.mrr_servico) || 0), 0);
@@ -3547,21 +3547,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const pctMrr = mrrTotal > 0 ? (mrrServ / mrrTotal) * 100 : 0;
         const barW = (mrrServ / maxServicoMrr) * 55;
         
-        if (i % 2 === 0) doc.rect(lm, tblY, pw, 17).fill('#fafafa');
+        if (i % 2 === 0) doc.rect(lm, tblY, pw, 14).fill('#fafafa');
         
-        doc.fontSize(7).font('Helvetica').fillColor(colors.text);
-        doc.text(String(row.servico).slice(0, 28), lm + 12, tblY + 5);
-        doc.text(String(row.qtd_contratos), lm + 170, tblY + 5);
-        doc.font('Helvetica-Bold').text(formatCurrencyShort(mrrServ), lm + 230, tblY + 5);
-        doc.font('Helvetica').text(formatPctAbs(pctMrr), lm + 300, tblY + 5);
-        doc.text(formatCurrency(Number(row.ticket_medio) || 0), lm + 360, tblY + 5);
+        doc.fontSize(6).font('Helvetica').fillColor(colors.text);
+        doc.text(String(row.servico).slice(0, 28), lm + 10, tblY + 4);
+        doc.text(String(row.qtd_contratos), lm + 165, tblY + 4);
+        doc.font('Helvetica-Bold').text(formatCurrencyShort(mrrServ), lm + 225, tblY + 4);
+        doc.font('Helvetica').text(formatPctAbs(pctMrr), lm + 295, tblY + 4);
+        doc.text(formatCurrency(Number(row.ticket_medio) || 0), lm + 355, tblY + 4);
         
-        doc.rect(lm + 430, tblY + 4, barW, 10).fill(colors.bar4);
+        doc.rect(lm + 425, tblY + 3, barW, 8).fill(colors.bar4);
         
-        tblY += 17;
+        tblY += 14;
       });
       
-      doc.y = tblY + 18;
+      doc.y = tblY + 10;
 
       // Processar dados de contratos e fluxo de caixa
       const contratosEvolData = contratosEvolucaoResult.rows || [];
@@ -3601,7 +3601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .sort((a: any, b: any) => a.mes.localeCompare(b.mes))
         .slice(-12);
       
-      // Função para desenhar página de indicador - Design Elegante
+      // Função para desenhar página de indicador - Design Compacto
       const drawIndicatorPage = (title: string, data: any[], valueKey: string, accentColor: string) => {
         doc.addPage();
         
@@ -3617,48 +3617,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const piorMes = data[piorMesIdx];
         
         // === HEADER ===
-        doc.rect(lm, 50, 4, 35).fill(accentColor);
-        doc.fontSize(26).font('Helvetica-Bold').fillColor('#1f2937').text(title, lm + 18, 55);
-        doc.fontSize(10).font('Helvetica').fillColor('#6b7280').text('Últimos 12 meses', lm + 18, 83);
+        doc.rect(lm, 40, 3, 28).fill(accentColor);
+        doc.fontSize(20).font('Helvetica-Bold').fillColor('#1f2937').text(title, lm + 14, 42);
+        doc.fontSize(9).font('Helvetica').fillColor('#6b7280').text('Últimos 12 meses', lm + 14, 65);
         
         // === CARDS DE DESTAQUE ===
-        const cardY = 120;
-        const cardGap = 20;
+        const cardY = 85;
+        const cardGap = 15;
         const cardW = (pw - cardGap * 2) / 3;
-        const cardH = 80;
+        const cardH = 58;
         
         // Card 1: Total
-        doc.roundedRect(lm, cardY, cardW, cardH, 8).fill('#f8fafc');
-        doc.roundedRect(lm, cardY, cardW, cardH, 8).strokeColor('#e2e8f0').lineWidth(1).stroke();
-        doc.fontSize(10).font('Helvetica').fillColor('#64748b').text('Total Acumulado', lm + 18, cardY + 15);
-        doc.fontSize(20).font('Helvetica-Bold').fillColor(accentColor).text(formatCurrency(total), lm + 18, cardY + 38);
+        doc.roundedRect(lm, cardY, cardW, cardH, 6).fill('#f8fafc');
+        doc.roundedRect(lm, cardY, cardW, cardH, 6).strokeColor('#e2e8f0').lineWidth(1).stroke();
+        doc.fontSize(8).font('Helvetica').fillColor('#64748b').text('Total Acumulado', lm + 12, cardY + 10);
+        doc.fontSize(16).font('Helvetica-Bold').fillColor(accentColor).text(formatCurrency(total), lm + 12, cardY + 28);
         
         // Card 2: Média
-        doc.roundedRect(lm + cardW + cardGap, cardY, cardW, cardH, 8).fill('#f8fafc');
-        doc.roundedRect(lm + cardW + cardGap, cardY, cardW, cardH, 8).strokeColor('#e2e8f0').lineWidth(1).stroke();
-        doc.fontSize(10).font('Helvetica').fillColor('#64748b').text('Média Mensal', lm + cardW + cardGap + 18, cardY + 15);
-        doc.fontSize(20).font('Helvetica-Bold').fillColor('#1f2937').text(formatCurrency(media), lm + cardW + cardGap + 18, cardY + 38);
+        doc.roundedRect(lm + cardW + cardGap, cardY, cardW, cardH, 6).fill('#f8fafc');
+        doc.roundedRect(lm + cardW + cardGap, cardY, cardW, cardH, 6).strokeColor('#e2e8f0').lineWidth(1).stroke();
+        doc.fontSize(8).font('Helvetica').fillColor('#64748b').text('Média Mensal', lm + cardW + cardGap + 12, cardY + 10);
+        doc.fontSize(16).font('Helvetica-Bold').fillColor('#1f2937').text(formatCurrency(media), lm + cardW + cardGap + 12, cardY + 28);
         
         // Card 3: Melhor Mês
         const melhorMesParts = (melhorMes?.mes || '').split('-');
         const melhorMesLabel = `${mesesNomes[melhorMesParts[1]] || ''}/${melhorMesParts[0]?.slice(2) || ''}`;
-        doc.roundedRect(lm + (cardW + cardGap) * 2, cardY, cardW, cardH, 8).fill('#f0fdf4');
-        doc.roundedRect(lm + (cardW + cardGap) * 2, cardY, cardW, cardH, 8).strokeColor('#bbf7d0').lineWidth(1).stroke();
-        doc.fontSize(10).font('Helvetica').fillColor('#16a34a').text('Melhor Mês', lm + (cardW + cardGap) * 2 + 18, cardY + 15);
-        doc.fontSize(16).font('Helvetica-Bold').fillColor('#15803d').text(formatCurrencyShort(maxVal), lm + (cardW + cardGap) * 2 + 18, cardY + 38);
-        doc.fontSize(9).font('Helvetica').fillColor('#22c55e').text(melhorMesLabel, lm + (cardW + cardGap) * 2 + 18, cardY + 58);
+        doc.roundedRect(lm + (cardW + cardGap) * 2, cardY, cardW, cardH, 6).fill('#f0fdf4');
+        doc.roundedRect(lm + (cardW + cardGap) * 2, cardY, cardW, cardH, 6).strokeColor('#bbf7d0').lineWidth(1).stroke();
+        doc.fontSize(8).font('Helvetica').fillColor('#16a34a').text('Melhor Mês', lm + (cardW + cardGap) * 2 + 12, cardY + 10);
+        doc.fontSize(14).font('Helvetica-Bold').fillColor('#15803d').text(formatCurrencyShort(maxVal), lm + (cardW + cardGap) * 2 + 12, cardY + 28);
+        doc.fontSize(8).font('Helvetica').fillColor('#22c55e').text(melhorMesLabel, lm + (cardW + cardGap) * 2 + 12, cardY + 44);
         
         // === SPARKLINE ===
-        const sparkY = 225;
-        const sparkH = 65;
+        const sparkY = 160;
+        const sparkH = 50;
         const sparkW = pw;
         const sparkMax = Math.max(...valores.map(v => Math.abs(v)), 1);
         
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#374151').text('Evolução', lm, sparkY - 18);
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#374151').text('Evolução', lm, sparkY - 14);
         
         // Linha de tendência
         const pointSpacing = sparkW / (data.length - 1);
-        doc.strokeColor(accentColor).lineWidth(2.5);
+        doc.strokeColor(accentColor).lineWidth(2);
         
         let path = doc.moveTo(lm, sparkY + sparkH - (Math.abs(valores[0]) / sparkMax) * sparkH);
         for (let i = 1; i < data.length; i++) {
@@ -3672,30 +3672,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data.forEach((d: any, i: number) => {
           const x = lm + i * pointSpacing;
           const y = sparkY + sparkH - (Math.abs(valores[i]) / sparkMax) * sparkH;
-          doc.circle(x, y, 4).fill(accentColor);
+          doc.circle(x, y, 3).fill(accentColor);
         });
         
         // Labels início e fim
         const primeiroParts = (data[0]?.mes || '').split('-');
         const ultimoParts = (data[data.length - 1]?.mes || '').split('-');
-        doc.fontSize(8).font('Helvetica').fillColor('#9ca3af')
-          .text(`${mesesNomes[primeiroParts[1]]?.slice(0, 3) || ''}`, lm - 10, sparkY + sparkH + 10, { width: 30, align: 'center' });
-        doc.fontSize(8).font('Helvetica').fillColor('#9ca3af')
-          .text(`${mesesNomes[ultimoParts[1]]?.slice(0, 3) || ''}`, lm + sparkW - 20, sparkY + sparkH + 10, { width: 30, align: 'center' });
+        doc.fontSize(7).font('Helvetica').fillColor('#9ca3af')
+          .text(`${mesesNomes[primeiroParts[1]]?.slice(0, 3) || ''}`, lm - 10, sparkY + sparkH + 6, { width: 30, align: 'center' });
+        doc.fontSize(7).font('Helvetica').fillColor('#9ca3af')
+          .text(`${mesesNomes[ultimoParts[1]]?.slice(0, 3) || ''}`, lm + sparkW - 20, sparkY + sparkH + 6, { width: 30, align: 'center' });
         
         // === TABELA DE VALORES ===
-        const tableY = 330;
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#374151').text('Detalhamento Mensal', lm, tableY - 18);
+        const tableY = 235;
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#374151').text('Detalhamento Mensal', lm, tableY - 14);
         
         // Cabeçalho
-        doc.rect(lm, tableY, pw, 24).fill('#f1f5f9');
-        doc.fontSize(9).font('Helvetica-Bold').fillColor('#475569');
-        doc.text('Mês', lm + 15, tableY + 7);
-        doc.text('Valor', lm + 120, tableY + 7);
-        doc.text('% do Total', lm + 240, tableY + 7);
-        doc.text('', lm + 340, tableY + 7);
+        doc.rect(lm, tableY, pw, 18).fill('#f1f5f9');
+        doc.fontSize(7).font('Helvetica-Bold').fillColor('#475569');
+        doc.text('Mês', lm + 12, tableY + 5);
+        doc.text('Valor', lm + 110, tableY + 5);
+        doc.text('% do Total', lm + 230, tableY + 5);
+        doc.text('', lm + 320, tableY + 5);
         
-        let rowY = tableY + 24;
+        let rowY = tableY + 18;
         data.forEach((d: any, i: number) => {
           const val = d[valueKey] || 0;
           const mesParts = (d.mes || '').split('-');
@@ -3703,26 +3703,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const pctTotal = total > 0 ? (val / total) * 100 : 0;
           
           // Fundo alternado
-          if (i % 2 === 0) doc.rect(lm, rowY, pw, 22).fill('#fafafa');
+          if (i % 2 === 0) doc.rect(lm, rowY, pw, 16).fill('#fafafa');
           
           // Highlight melhor/pior
-          if (i === melhorMesIdx) doc.rect(lm, rowY, pw, 22).fill('#f0fdf4');
-          if (i === piorMesIdx && minVal < media * 0.7) doc.rect(lm, rowY, pw, 22).fill('#fef2f2');
+          if (i === melhorMesIdx) doc.rect(lm, rowY, pw, 16).fill('#f0fdf4');
+          if (i === piorMesIdx && minVal < media * 0.7) doc.rect(lm, rowY, pw, 16).fill('#fef2f2');
           
-          doc.fontSize(9).font('Helvetica').fillColor('#374151');
-          doc.text(mesLabel, lm + 15, rowY + 6);
-          doc.font('Helvetica-Bold').text(formatCurrencyShort(val), lm + 120, rowY + 6);
+          doc.fontSize(7).font('Helvetica').fillColor('#374151');
+          doc.text(mesLabel, lm + 12, rowY + 4);
+          doc.font('Helvetica-Bold').text(formatCurrencyShort(val), lm + 110, rowY + 4);
           
-          doc.font('Helvetica').fillColor('#64748b').text(`${pctTotal.toFixed(1)}%`, lm + 240, rowY + 6);
+          doc.font('Helvetica').fillColor('#64748b').text(`${pctTotal.toFixed(1)}%`, lm + 230, rowY + 4);
           
           // Barra de progresso
-          const barMaxW = 140;
-          const barH = 8;
+          const barMaxW = 130;
+          const barH = 6;
           const barPct = Math.min((Math.abs(val) / sparkMax), 1);
-          doc.rect(lm + 320, rowY + 7, barMaxW, barH).fill('#e5e7eb');
-          doc.rect(lm + 320, rowY + 7, barMaxW * barPct, barH).fill(accentColor);
+          doc.rect(lm + 310, rowY + 5, barMaxW, barH).fill('#e5e7eb');
+          doc.rect(lm + 310, rowY + 5, barMaxW * barPct, barH).fill(accentColor);
           
-          rowY += 22;
+          rowY += 16;
         });
       };
       
@@ -3743,18 +3743,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // ==================== PÁGINA 8: EQUIPE E INSIGHTS ====================
       doc.addPage();
-      doc.rect(lm, 45, pw, 4).fill(colors.accent);
-      doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('EQUIPE E INSIGHTS', lm, 60);
-      doc.y = 90;
+      doc.rect(lm, 40, pw, 3).fill(colors.accent);
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('EQUIPE E INSIGHTS', lm, 50);
+      doc.y = 68;
 
       // ===== SEÇÃO 7: MÉTRICAS DE EQUIPE =====
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('7. MÉTRICAS DE EQUIPE', lm, doc.y);
-      doc.moveDown(0.4);
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(colors.primary).text('7. MÉTRICAS DE EQUIPE', lm, doc.y);
+      doc.moveDown(0.25);
       
       const eqKpiY = doc.y;
-      const eqGap = 10;
+      const eqGap = 8;
       const eqW = (pw - eqGap * 4) / 5;
-      const eqH = 55;
+      const eqH = 45;
       
       const equipeKpis = [
         { label: 'Headcount', value: String(headcount), sub: 'colaboradores ativos' },
@@ -3767,86 +3767,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
       equipeKpis.forEach((kpi, i) => {
         const x = lm + i * (eqW + eqGap);
         doc.rect(x, eqKpiY, eqW, eqH).fill(colors.light);
-        doc.rect(x, eqKpiY, 4, eqH).fill(colors.bar3);
-        doc.fontSize(8).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 12, eqKpiY + 10);
-        doc.fontSize(17).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 12, eqKpiY + 25);
-        doc.fontSize(7).font('Helvetica').fillColor(colors.muted).text(kpi.sub, x + 12, eqKpiY + 44);
+        doc.rect(x, eqKpiY, 3, eqH).fill(colors.bar3);
+        doc.fontSize(6).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 10, eqKpiY + 8);
+        doc.fontSize(14).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 10, eqKpiY + 20);
+        doc.fontSize(6).font('Helvetica').fillColor(colors.muted).text(kpi.sub, x + 10, eqKpiY + 36);
       });
       
-      doc.y = eqKpiY + eqH + 20;
+      doc.y = eqKpiY + eqH + 12;
 
       // ===== SEÇÃO 8: DISTRIBUIÇÃO POR SETOR =====
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('8. DISTRIBUIÇÃO POR SETOR', lm, doc.y);
-      doc.moveDown(0.4);
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(colors.primary).text('8. DISTRIBUIÇÃO POR SETOR', lm, doc.y);
+      doc.moveDown(0.25);
       
       const setorData = setorResult.rows || [];
       const totalSetorQtd = setorData.reduce((acc: number, r: any) => acc + (Number(r.quantidade) || 0), 0);
       const maxSetorQtd = Math.max(...setorData.map((r: any) => Number(r.quantidade) || 0), 1);
       
       tblY = doc.y;
-      doc.rect(lm, tblY, pw, 18).fill(colors.light);
-      doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.text);
-      doc.text('Setor', lm + 12, tblY + 5);
-      doc.text('Qtd', lm + 170, tblY + 5);
-      doc.text('% Total', lm + 220, tblY + 5);
-      doc.text('Tempo Médio', lm + 290, tblY + 5);
-      doc.text('Gráfico', lm + 375, tblY + 5);
-      tblY += 18;
+      doc.rect(lm, tblY, pw, 15).fill(colors.light);
+      doc.fontSize(6).font('Helvetica-Bold').fillColor(colors.text);
+      doc.text('Setor', lm + 10, tblY + 4);
+      doc.text('Qtd', lm + 165, tblY + 4);
+      doc.text('% Total', lm + 210, tblY + 4);
+      doc.text('Tempo Médio', lm + 280, tblY + 4);
+      doc.text('Gráfico', lm + 365, tblY + 4);
+      tblY += 15;
       
       setorData.slice(0, 10).forEach((row: any, i: number) => {
         const qtd = Number(row.quantidade) || 0;
         const pct = totalSetorQtd > 0 ? (qtd / totalSetorQtd) * 100 : 0;
         const barW = (qtd / maxSetorQtd) * 100;
         
-        if (i % 2 === 0) doc.rect(lm, tblY, pw, 16).fill('#fafafa');
+        if (i % 2 === 0) doc.rect(lm, tblY, pw, 14).fill('#fafafa');
         
-        doc.fontSize(7).font('Helvetica').fillColor(colors.text);
-        doc.text(String(row.setor).slice(0, 28), lm + 12, tblY + 4);
-        doc.font('Helvetica-Bold').text(String(qtd), lm + 170, tblY + 4);
-        doc.font('Helvetica').text(formatPctAbs(pct), lm + 220, tblY + 4);
-        doc.text(`${Number(row.tempo_medio || 0).toFixed(1)}m`, lm + 300, tblY + 4);
-        doc.rect(lm + 375, tblY + 3, barW, 10).fill(colors.bar3);
+        doc.fontSize(6).font('Helvetica').fillColor(colors.text);
+        doc.text(String(row.setor).slice(0, 28), lm + 10, tblY + 4);
+        doc.font('Helvetica-Bold').text(String(qtd), lm + 165, tblY + 4);
+        doc.font('Helvetica').text(formatPctAbs(pct), lm + 210, tblY + 4);
+        doc.text(`${Number(row.tempo_medio || 0).toFixed(1)}m`, lm + 290, tblY + 4);
+        doc.rect(lm + 365, tblY + 3, barW, 8).fill(colors.bar3);
         
-        tblY += 16;
+        tblY += 14;
       });
       
-      doc.y = tblY + 22;
+      doc.y = tblY + 12;
 
       // ===== SEÇÃO 9: INSIGHTS E OUTLOOK =====
-      doc.rect(lm, doc.y, pw, 140).fill(colors.light);
-      doc.rect(lm, doc.y, pw, 4).fill(colors.accent);
+      doc.rect(lm, doc.y, pw, 120).fill(colors.light);
+      doc.rect(lm, doc.y, pw, 3).fill(colors.accent);
       
-      const insY = doc.y + 15;
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('9. INSIGHTS E OUTLOOK', lm + 15, insY);
+      const insY = doc.y + 10;
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(colors.primary).text('9. INSIGHTS E OUTLOOK', lm + 12, insY);
       
-      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text).text('Pontos Positivos:', lm + 15, insY + 22);
-      doc.fontSize(8).font('Helvetica').fillColor(colors.text);
+      doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.text).text('Pontos Positivos:', lm + 12, insY + 18);
+      doc.fontSize(7).font('Helvetica').fillColor(colors.text);
       const positivos = [];
       if (variacaoMoM > 0) positivos.push(`MRR cresceu ${formatPct(variacaoMoM)} no último mês`);
       if (margemBruta > 25) positivos.push(`Margem bruta saudável de ${formatPctAbs(margemBruta)}`);
       if (churnRate < 5) positivos.push(`Churn rate controlado em ${formatPctAbs(churnRate)}`);
       if (tempoMedioMeses > 12) positivos.push(`Boa retenção de talentos (${tempoMedioMeses.toFixed(1)} meses médio)`);
       positivos.slice(0, 3).forEach((p, i) => {
-        doc.text(`• ${p}`, lm + 20, insY + 36 + i * 12, { width: pw - 40 });
+        doc.text(`• ${p}`, lm + 15, insY + 30 + i * 10, { width: pw - 40 });
       });
       
-      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text).text('Pontos de Atenção:', lm + 15, insY + 75);
+      doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.text).text('Pontos de Atenção:', lm + 12, insY + 62);
       const alertas = [];
       if (taxaInadimplencia > 3) alertas.push(`Inadimplência de ${formatPctAbs(taxaInadimplencia)} requer atenção`);
       if (Number(concentracao.top5_pct) > 40) alertas.push(`Alta concentração: Top 5 representa ${formatPctAbs(Number(concentracao.top5_pct))} da receita`);
       if (variacaoMoM < 0) alertas.push(`MRR caiu ${formatPct(Math.abs(variacaoMoM))} no último mês`);
       if (churnRate > 5) alertas.push(`Churn rate elevado de ${formatPctAbs(churnRate)}`);
       alertas.slice(0, 3).forEach((a, i) => {
-        doc.fontSize(8).font('Helvetica').fillColor(colors.danger).text(`• ${a}`, lm + 20, insY + 89 + i * 12, { width: pw - 40 });
+        doc.fontSize(7).font('Helvetica').fillColor(colors.danger).text(`• ${a}`, lm + 15, insY + 74 + i * 10, { width: pw - 40 });
       });
       
-      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text).text('Métricas-Chave:', lm + 280, insY + 22);
-      doc.fontSize(8).font('Helvetica').fillColor(colors.text);
-      doc.text(`ARR: ${formatCurrencyShort(arr)}`, lm + 285, insY + 36);
-      doc.text(`LTV: ${formatCurrencyShort(ltv)}`, lm + 285, insY + 50);
-      doc.text(`Receita/Cabeça: ${formatCurrencyShort(receitaPorCabeca)}`, lm + 285, insY + 64);
-      doc.text(`Contratos Ativos: ${contratosRecorrentesAtivos}`, lm + 285, insY + 78);
-      doc.text(`Headcount: ${headcount}`, lm + 285, insY + 92);
+      doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.text).text('Métricas-Chave:', lm + 270, insY + 18);
+      doc.fontSize(7).font('Helvetica').fillColor(colors.text);
+      doc.text(`ARR: ${formatCurrencyShort(arr)}`, lm + 275, insY + 30);
+      doc.text(`LTV: ${formatCurrencyShort(ltv)}`, lm + 275, insY + 42);
+      doc.text(`Receita/Cabeça: ${formatCurrencyShort(receitaPorCabeca)}`, lm + 275, insY + 54);
+      doc.text(`Contratos Ativos: ${contratosRecorrentesAtivos}`, lm + 275, insY + 66);
+      doc.text(`Headcount: ${headcount}`, lm + 275, insY + 78);
 
       // Footer
       doc.fontSize(7).font('Helvetica').fillColor(colors.muted)
