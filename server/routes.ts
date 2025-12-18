@@ -12,6 +12,8 @@ import { setupDealNotifications, triggerTestNotification } from "./services/deal
 import PDFDocument from "pdfkit";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import * as path from "path";
+import * as fs from "fs";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== 'admin') {
@@ -3350,6 +3352,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.rect(0, 0, 595, 842).fill('#0f172a');
       doc.rect(0, 0, 595, 280).fill('#1e293b');
       
+      // Logo da empresa no topo
+      const logoPath = path.join(process.cwd(), 'attached_assets', 'Logo-Turbo-branca_(1)_1766081013390.png');
+      if (fs.existsSync(logoPath)) {
+        try {
+          doc.image(logoPath, 197, 80, { width: 200 });
+        } catch (e) {
+          console.log('[PDF] Error loading logo:', e);
+          doc.fontSize(24).font('Helvetica-Bold').fillColor('#ffffff')
+            .text('TURBO', 50, 120, { align: 'center', width: 495 });
+        }
+      } else {
+        console.log('[PDF] Logo not found at:', logoPath);
+        doc.fontSize(24).font('Helvetica-Bold').fillColor('#ffffff')
+          .text('TURBO', 50, 120, { align: 'center', width: 495 });
+      }
+      
       // Linha accent decorativa
       doc.rect(50, 320, 495, 4).fill(colors.accent);
       
@@ -3378,7 +3396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.fontSize(11).font('Helvetica-Oblique').fillColor('#cbd5e1')
         .text('as marcas da próxima geração."', 50, 606, { align: 'center', width: 495 });
       
-      // Logo/Nome da empresa
+      // Nome da empresa (fallback/reforço)
       doc.fontSize(18).font('Helvetica-Bold').fillColor('#ffffff')
         .text('TURBO PARTNERS', 50, 720, { align: 'center', width: 495 });
       
