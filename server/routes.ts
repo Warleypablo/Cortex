@@ -3554,6 +3554,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       doc.y = tblY + 15;
 
+      // ==================== PÁGINA 3: INDICADORES MENSAIS ====================
+      doc.addPage();
+      doc.rect(lm, 35, pw, 4).fill(colors.accent);
+      doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('INDICADORES MENSAIS', lm, 50);
+      doc.y = 70;
+
       // ===== SEÇÃO 6: INDICADORES MENSAIS (CONTRATOS) =====
       doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('6. INDICADORES MENSAIS', lm, doc.y);
       doc.moveDown(0.3);
@@ -3721,7 +3727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       doc.y = chartY + chartH + 15;
 
-      // ==================== PÁGINA 3: EQUIPE E INSIGHTS ====================
+      // ==================== PÁGINA 4: EQUIPE E INSIGHTS ====================
       doc.addPage();
       doc.rect(lm, 35, pw, 4).fill(colors.accent);
       doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('EQUIPE E INSIGHTS', lm, 50);
