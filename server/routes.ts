@@ -2974,15 +2974,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // ===== QUERIES AVANÇADAS =====
       
-      // Clientes ativos e churn (usando data_encerramento para churn mensal)
+      // Contratos ativos e churn (usando data_encerramento como fonte única)
       const clientesResult = await db.execute(sql`
         SELECT 
-          (SELECT COUNT(DISTINCT cnpj) FROM cup_clientes) as total_clientes,
-          COUNT(DISTINCT CASE WHEN c.status IN ('ativo', 'onboarding', 'triagem') THEN c.id_task END) as clientes_ativos,
-          COUNT(DISTINCT CASE WHEN c.status = 'churn' THEN c.id_task END) as clientes_churn,
+          COUNT(DISTINCT CASE WHEN c.status IN ('ativo', 'onboarding', 'triagem') THEN c.id_task END) as contratos_ativos,
+          COUNT(DISTINCT CASE WHEN c.data_encerramento IS NOT NULL THEN c.id_task END) as contratos_encerrados_total,
           COUNT(DISTINCT CASE WHEN c.data_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
             AND c.data_encerramento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
-            THEN c.id_task END) as churn_mes
+            THEN c.id_task END) as churn_mes,
+          COALESCE(SUM(CASE WHEN c.data_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
+            AND c.data_encerramento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+            THEN c.valorr ELSE 0 END), 0) as mrr_churn_mes
         FROM cup_contratos c
       `);
       
@@ -3122,26 +3124,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
 
       // ===== PROCESSAR DADOS =====
-      const clientes = clientesResult.rows[0] || { total_clientes: 0, clientes_ativos: 0, clientes_churn: 0, churn_mes: 0 };
+      // Usando apenas contratos como fonte única de verdade
+      const contratosData = clientesResult.rows[0] || { contratos_ativos: 0, contratos_encerrados_total: 0, churn_mes: 0, mrr_churn_mes: 0 };
       const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0, mrr_churn: 0 };
       const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0, contratacoes_90d: 0, desligamentos_90d: 0 };
       const concentracao = concentracaoResult.rows[0] || { top5_pct: 0, top10_pct: 0, top20_pct: 0 };
 
       const headcount = Number(equipe.headcount) || 1;
       const mrrAtivo = Number(contratos.mrr_ativo) || 0;
-      const mrrChurn = Number(contratos.mrr_churn) || 0;
-      const clientesAtivos = Number(clientes.clientes_ativos) || 1;
-      const clientesChurn = Number(clientes.clientes_churn) || 0;
-      const churnMes = Number(clientes.churn_mes) || 0;
+      const contratosAtivos = Number(contratosData.contratos_ativos) || 1;
+      const churnMes = Number(contratosData.churn_mes) || 0;
+      const mrrChurnMes = Number(contratosData.mrr_churn_mes) || 0;
       const contratosRecorrentes = Number(contratos.contratos_recorrentes) || 0;
       const aovRecorrente = Number(contratos.aov_recorrente) || 0;
       const receitaPorCabeca = headcount > 0 ? mrrAtivo / headcount : 0;
       const tempoMedioMeses = Number(equipe.tempo_medio_meses) || 0;
       
-      // Cálculos avançados
-      const churnRate = clientesAtivos > 0 ? (churnMes / clientesAtivos) * 100 : 0;
+      // Cálculos avançados - usando apenas contratos
+      const churnRate = contratosAtivos > 0 ? (churnMes / contratosAtivos) * 100 : 0;
       const arr = mrrAtivo * 12;
-      const ltv = churnRate > 0 ? (aovRecorrente * 12) / (churnRate / 100) : aovRecorrente * 24; // Se churn=0, assume 24 meses
+      // LTV = AOV × (1 / churn rate mensal) - usando apenas contratos
+      const ltv = churnRate > 0 ? (aovRecorrente * 12) / (churnRate / 100) : aovRecorrente * 24;
       
       // Variação MoM/YoY
       const mrrHistData = mrrHistoricoResult.rows || [];
@@ -3160,10 +3163,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const taxaInadimplencia = receitaTotal12m > 0 ? (inadimplenciaTotal12m / receitaTotal12m) * 100 : 0;
       
       // ===== MÉTRICAS AVANÇADAS PARA INVESTIDORES =====
-      // NOTA: Algumas métricas são estimativas baseadas em heurísticas do setor
+      // NOTA: Todas as métricas usam contratos como fonte única de verdade
       
       // CAC Estimado - usa despesas totais como proxy (sem dados de marketing separados)
-      const cacEstimado = clientesAtivos > 0 ? (despesaTotal12m / 12) / (clientesAtivos / 12) : 0;
+      const cacEstimado = contratosAtivos > 0 ? (despesaTotal12m / 12) / (contratosAtivos / 12) : 0;
       
       // LTV/CAC Ratio (saudável: > 3x)
       const ltvCacRatio = cacEstimado > 0 ? ltv / cacEstimado : 0;
@@ -3171,28 +3174,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Payback Period (meses para recuperar CAC)
       const paybackPeriod = aovRecorrente > 0 ? cacEstimado / aovRecorrente : 0;
       
-      // Net Revenue Retention (NRR) - Baseado em churn de MRR
-      // Simplificado: 100% - (MRR churned / MRR total) 
-      const mrrChurnMensal = mrrChurn > 0 ? mrrChurn / Math.max(clientesChurn, 1) : 0;
-      const churnMrrPct = mrrAtivo > 0 ? (mrrChurnMensal / mrrAtivo) * 100 : 0;
-      const nrr = 100 - churnMrrPct; // NRR sem expansão (conservador)
+      // NRR e GRR usando MRR churn do mês (contratos encerrados no mês)
+      // NRR = (MRR atual / MRR inicial) * 100 ≈ 100% - (MRR churned / MRR total)
+      const churnMrrPct = mrrAtivo > 0 ? (mrrChurnMes / mrrAtivo) * 100 : 0;
+      const nrr = Math.max(0, Math.min(100 - churnMrrPct, 120)); // NRR conservador, cap 0-120%
       
-      // Quick Ratio SaaS = New MRR / Churned MRR (simplificado)
-      // Assume crescimento MoM como proxy de New MRR
+      // Quick Ratio SaaS = New MRR / Churned MRR
+      // Usando crescimento MoM como proxy de New MRR
       const newMrrEstimado = mrrAtivo * Math.max(variacaoMoM, 0) / 100;
-      const quickRatioSaas = mrrChurnMensal > 0 ? Math.max(newMrrEstimado / mrrChurnMensal, 0.5) : 4;
+      const quickRatioSaas = mrrChurnMes > 0 ? Math.max(newMrrEstimado / mrrChurnMes, 0.5) : 4;
       
       // Rule of 40 = Growth Rate + Profit Margin
       const growthRate = variacaoMoM * 12; // Anualizado do MoM
       const ruleOf40 = growthRate + margemBruta;
       
       // Magic Number - Eficiência de crescimento
-      // Simplificado: Crescimento de receita / Despesas
       const crescimentoReceita = receitaTotal12m * Math.max(growthRate, 0) / 100;
       const magicNumber = despesaTotal12m > 0 ? crescimentoReceita / despesaTotal12m : 0;
       
       // Gross Revenue Retention (GRR) - Retenção bruta (sem expansão)
-      const grr = 100 - churnMrrPct;
+      const grr = Math.max(0, Math.min(100 - churnMrrPct, 100)); // GRR cap 0-100%
       
       // Receita por funcionário
       const revenuePerEmployee = headcount > 0 ? arr / headcount : 0;
@@ -3447,11 +3448,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ckH = 45;
       
       const clienteKpis = [
-        { label: 'Clientes Ativos', value: String(clientesAtivos), color: colors.success },
-        { label: 'Total Cadastrados', value: String(Number(clientes.total_clientes) || 0), color: colors.accent },
-        { label: 'Churned', value: String(clientesChurn), color: colors.danger },
+        { label: 'Contratos Ativos', value: String(contratosAtivos), color: colors.success },
+        { label: 'Total Contratos', value: String(Number(contratos.total_contratos) || 0), color: colors.accent },
+        { label: 'Churned (mês)', value: String(churnMes), color: colors.danger },
         { label: 'Contratos Rec.', value: String(contratosRecorrentes), color: colors.bar2 },
-        { label: 'Contratos/Cliente', value: clientesAtivos > 0 ? (contratosRecorrentes / clientesAtivos).toFixed(2) : '0', color: colors.bar3 },
+        { label: 'MRR Churn (mês)', value: formatCurrencyShort(mrrChurnMes), color: colors.bar3 },
       ];
       
       clienteKpis.forEach((kpi, i) => {
@@ -3661,7 +3662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.text(`ARR: ${formatCurrencyShort(arr)}`, lm + 285, insY + 30);
       doc.text(`LTV: ${formatCurrencyShort(ltv)}`, lm + 285, insY + 42);
       doc.text(`Receita/Cabeça: ${formatCurrencyShort(receitaPorCabeca)}`, lm + 285, insY + 54);
-      doc.text(`Clientes Ativos: ${clientesAtivos}`, lm + 285, insY + 66);
+      doc.text(`Contratos Ativos: ${contratosAtivos}`, lm + 285, insY + 66);
       doc.text(`Headcount: ${headcount}`, lm + 285, insY + 78);
 
       // Footer
