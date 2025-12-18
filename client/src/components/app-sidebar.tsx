@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Tv, Sparkles, Image, Trophy, Layers, Scale, Gavel } from "lucide-react";
-import turboLogo from "@assets/Logo_(11)_1766084062617.png";
+import { useTheme } from "@/components/ThemeProvider";
+import turboLogoLight from "@assets/Logo_(12)_1766085175718.png";
+import turboLogoDark from "@assets/Logo_(11)_1766084062617.png";
 import {
   Sidebar,
   SidebarContent,
@@ -163,6 +165,8 @@ const adminItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { theme } = useTheme();
+  const turboLogo = theme === "dark" ? turboLogoDark : turboLogoLight;
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     dashboardCategories.forEach(cat => {
