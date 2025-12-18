@@ -3335,27 +3335,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bar4: '#8b5cf6',
       };
 
-      const pw = 515; // page width
-      const lm = 40;  // left margin
+      const lm = 50;  // left margin (mais generoso)
+      const rm = 50;  // right margin
+      const pw = 595 - lm - rm; // page width (A4 = 595pt)
       const mesesPtBr = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
       const dataAtual = new Date();
 
       // ==================== PÁGINA 1: RESUMO EXECUTIVO ====================
-      doc.rect(lm, 35, pw, 4).fill(colors.accent);
+      doc.rect(lm, 45, pw, 4).fill(colors.accent);
       doc.fontSize(22).font('Helvetica-Bold').fillColor(colors.primary)
-        .text('INVESTORS REPORT', lm, 50, { align: 'center', width: pw });
+        .text('INVESTORS REPORT', lm, 60, { align: 'center', width: pw });
       doc.fontSize(10).font('Helvetica').fillColor(colors.muted)
-        .text(`Turbo Partners | ${mesesPtBr[dataAtual.getMonth()]} ${dataAtual.getFullYear()} | Relatório Executivo`, { align: 'center', width: pw });
+        .text(`Turbo Partners | ${mesesPtBr[dataAtual.getMonth()]} ${dataAtual.getFullYear()} | Relatório Executivo`, lm, 85, { align: 'center', width: pw });
       
-      doc.y = 90;
+      doc.y = 110;
 
       // ===== SEÇÃO 1: MÉTRICAS FINANCEIRAS PRINCIPAIS =====
       doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('1. MÉTRICAS FINANCEIRAS', lm, doc.y);
-      doc.moveDown(0.4);
+      doc.moveDown(0.5);
       
       const kpiY = doc.y;
-      const kpiW = 120;
-      const kpiH = 55;
+      const kpiGap = 12;
+      const kpiW = (pw - kpiGap * 3) / 4;
+      const kpiH = 58;
       
       const kpis = [
         { label: 'MRR Ativo', value: formatCurrencyShort(mrrAtivo), delta: formatPct(variacaoMoM), deltaColor: variacaoMoM >= 0 ? colors.success : colors.danger },
@@ -3365,15 +3367,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ];
       
       kpis.forEach((kpi, i) => {
-        const x = lm + i * (kpiW + 10);
+        const x = lm + i * (kpiW + kpiGap);
         doc.rect(x, kpiY, kpiW, kpiH).fill(colors.light);
-        doc.rect(x, kpiY, 3, kpiH).fill(colors.accent);
-        doc.fontSize(8).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 8, kpiY + 6);
-        doc.fontSize(16).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 8, kpiY + 20);
-        doc.fontSize(8).font('Helvetica').fillColor(kpi.deltaColor).text(kpi.delta, x + 8, kpiY + 40);
+        doc.rect(x, kpiY, 4, kpiH).fill(colors.accent);
+        doc.fontSize(9).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 12, kpiY + 10);
+        doc.fontSize(17).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 12, kpiY + 26);
+        doc.fontSize(8).font('Helvetica').fillColor(kpi.deltaColor).text(kpi.delta, x + 12, kpiY + 46);
       });
       
-      doc.y = kpiY + kpiH + 15;
+      doc.y = kpiY + kpiH + 18;
       
       // Segunda linha de KPIs
       const kpis2 = [
@@ -3385,21 +3387,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const kpi2Y = doc.y;
       kpis2.forEach((kpi, i) => {
-        const x = lm + i * (kpiW + 10);
+        const x = lm + i * (kpiW + kpiGap);
         doc.rect(x, kpi2Y, kpiW, kpiH).fill(colors.light);
-        doc.rect(x, kpi2Y, 3, kpiH).fill(colors.bar2);
-        doc.fontSize(8).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 8, kpi2Y + 6);
-        doc.fontSize(16).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 8, kpi2Y + 20);
-        doc.fontSize(8).font('Helvetica').fillColor(kpi.deltaColor).text(kpi.delta, x + 8, kpi2Y + 40);
+        doc.rect(x, kpi2Y, 4, kpiH).fill(colors.bar2);
+        doc.fontSize(9).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 12, kpi2Y + 10);
+        doc.fontSize(17).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 12, kpi2Y + 26);
+        doc.fontSize(8).font('Helvetica').fillColor(kpi.deltaColor).text(kpi.delta, x + 12, kpi2Y + 46);
       });
       
-      doc.y = kpi2Y + kpiH + 12;
-      
-      doc.y = doc.y + 15;
+      doc.y = kpi2Y + kpiH + 20;
 
       // ===== SEÇÃO 2: EVOLUÇÃO ANUAL COM BARRAS COMPARATIVAS =====
       doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('2. EVOLUÇÃO ANUAL', lm, doc.y);
-      doc.moveDown(0.3);
+      doc.moveDown(0.4);
       
       const anoData = evolucaoAnualResult.rows.map((r: any) => ({
         ano: r.ano,
@@ -3410,14 +3410,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Tabela com barras inline
       let tblY = doc.y;
-      doc.rect(lm, tblY, pw, 18).fill(colors.light);
+      doc.rect(lm, tblY, pw, 20).fill(colors.light);
       doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text);
-      doc.text('Ano', lm + 5, tblY + 5);
-      doc.text('Receita', lm + 60, tblY + 5);
-      doc.text('Gráfico', lm + 160, tblY + 5);
-      doc.text('Despesa', lm + 340, tblY + 5);
-      doc.text('Resultado', lm + 430, tblY + 5);
-      tblY += 18;
+      doc.text('Ano', lm + 12, tblY + 6);
+      doc.text('Receita', lm + 60, tblY + 6);
+      doc.text('Gráfico', lm + 140, tblY + 6);
+      doc.text('Despesa', lm + 320, tblY + 6);
+      doc.text('Resultado', lm + 410, tblY + 6);
+      tblY += 20;
       
       const maxRec = Math.max(...anoData.map((d: any) => d.receita), 1);
       
@@ -3425,37 +3425,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const resultado = d.receita - d.despesa;
         const barW = (d.receita / maxRec) * 160;
         
-        if (i % 2 === 0) doc.rect(lm, tblY, pw, 20).fill('#fafafa');
+        if (i % 2 === 0) doc.rect(lm, tblY, pw, 22).fill('#fafafa');
         
-        doc.fontSize(9).font('Helvetica-Bold').fillColor(colors.text).text(d.ano, lm + 5, tblY + 5);
-        doc.fontSize(8).font('Helvetica').fillColor(colors.text).text(formatCurrencyShort(d.receita), lm + 60, tblY + 5);
+        doc.fontSize(9).font('Helvetica-Bold').fillColor(colors.text).text(d.ano, lm + 12, tblY + 6);
+        doc.fontSize(8).font('Helvetica').fillColor(colors.text).text(formatCurrencyShort(d.receita), lm + 60, tblY + 6);
         
         // Barra visual
-        doc.rect(lm + 160, tblY + 3, barW, 14).fill(colors.bar1);
+        doc.rect(lm + 140, tblY + 4, barW, 14).fill(colors.bar1);
         
-        doc.fontSize(8).font('Helvetica').fillColor(colors.text).text(formatCurrencyShort(d.despesa), lm + 340, tblY + 5);
+        doc.fontSize(8).font('Helvetica').fillColor(colors.text).text(formatCurrencyShort(d.despesa), lm + 320, tblY + 6);
         doc.fontSize(8).font('Helvetica-Bold').fillColor(resultado >= 0 ? colors.success : colors.danger)
-          .text(formatCurrencyShort(resultado), lm + 430, tblY + 5);
+          .text(formatCurrencyShort(resultado), lm + 410, tblY + 6);
         
-        tblY += 20;
+        tblY += 22;
       });
       
-      doc.y = tblY + 15;
+      doc.y = tblY + 18;
 
       // ===== SEÇÃO 3: EVOLUÇÃO MENSAL (12 MESES) =====
       doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('3. EVOLUÇÃO MENSAL (12 MESES)', lm, doc.y);
-      doc.moveDown(0.3);
+      doc.moveDown(0.4);
       
       tblY = doc.y;
-      doc.rect(lm, tblY, pw, 16).fill(colors.light);
+      doc.rect(lm, tblY, pw, 18).fill(colors.light);
       doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.text);
-      doc.text('Mês', lm + 5, tblY + 4);
-      doc.text('Receita', lm + 55, tblY + 4);
-      doc.text('Despesa', lm + 120, tblY + 4);
-      doc.text('Resultado', lm + 185, tblY + 4);
-      doc.text('Margem', lm + 255, tblY + 4);
-      doc.text('Gráfico Comparativo', lm + 310, tblY + 4);
-      tblY += 16;
+      doc.text('Mês', lm + 12, tblY + 5);
+      doc.text('Receita', lm + 60, tblY + 5);
+      doc.text('Despesa', lm + 130, tblY + 5);
+      doc.text('Resultado', lm + 200, tblY + 5);
+      doc.text('Margem', lm + 275, tblY + 5);
+      doc.text('Gráfico Comparativo', lm + 340, tblY + 5);
+      tblY += 18;
       
       const mesData = evolMensal.slice(-12);
       const maxMes = Math.max(...mesData.map((d: any) => Math.max(Number(d.receita), Number(d.despesa))), 1);
@@ -3470,39 +3470,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const mes = mesParts[1] || '01';
         const mesLabel = `${mesesNomes[mes] || mes}/${ano.slice(2)}`;
         
-        if (i % 2 === 0) doc.rect(lm, tblY, pw, 16).fill('#fafafa');
+        if (i % 2 === 0) doc.rect(lm, tblY, pw, 17).fill('#fafafa');
         
         doc.fontSize(7).font('Helvetica').fillColor(colors.text);
-        doc.text(mesLabel, lm + 5, tblY + 4);
-        doc.text(formatCurrencyShort(receita), lm + 55, tblY + 4);
-        doc.text(formatCurrencyShort(despesa), lm + 120, tblY + 4);
+        doc.text(mesLabel, lm + 12, tblY + 5);
+        doc.text(formatCurrencyShort(receita), lm + 60, tblY + 5);
+        doc.text(formatCurrencyShort(despesa), lm + 130, tblY + 5);
         doc.font('Helvetica-Bold').fillColor(resultado >= 0 ? colors.success : colors.danger)
-          .text(formatCurrencyShort(resultado), lm + 185, tblY + 4);
+          .text(formatCurrencyShort(resultado), lm + 200, tblY + 5);
         doc.fillColor(margem >= 30 ? colors.success : margem >= 10 ? colors.warning : colors.danger)
-          .text(formatPctAbs(margem), lm + 255, tblY + 4);
+          .text(formatPctAbs(margem), lm + 275, tblY + 5);
         
         // Mini barras comparativas
         const barRecW = (receita / maxMes) * 100;
         const barDespW = (despesa / maxMes) * 100;
-        doc.rect(lm + 310, tblY + 2, barRecW, 5).fill(colors.bar1);
-        doc.rect(lm + 310, tblY + 8, barDespW, 5).fill(colors.danger);
+        doc.rect(lm + 340, tblY + 3, barRecW, 5).fill(colors.bar1);
+        doc.rect(lm + 340, tblY + 9, barDespW, 5).fill(colors.danger);
         
-        tblY += 16;
+        tblY += 17;
       });
 
       // ==================== PÁGINA 2: ANÁLISE DETALHADA ====================
       doc.addPage();
-      doc.rect(lm, 35, pw, 4).fill(colors.accent);
-      doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('ANÁLISE DETALHADA', lm, 50);
-      doc.y = 70;
+      doc.rect(lm, 45, pw, 4).fill(colors.accent);
+      doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('ANÁLISE DETALHADA', lm, 60);
+      doc.y = 85;
 
       // ===== SEÇÃO 4: CLIENTES E RETENÇÃO =====
       doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('4. BASE DE CLIENTES', lm, doc.y);
-      doc.moveDown(0.3);
+      doc.moveDown(0.4);
       
       const clienteKpiY = doc.y;
-      const ckW = 100;
-      const ckH = 45;
+      const ckGap = 10;
+      const ckW = (pw - ckGap * 4) / 5;
+      const ckH = 50;
       
       const clienteKpis = [
         { label: 'Contratos Ativos', value: String(contratosRecorrentesAtivos), color: colors.success },
@@ -3513,29 +3514,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ];
       
       clienteKpis.forEach((kpi, i) => {
-        const x = lm + i * (ckW + 5);
+        const x = lm + i * (ckW + ckGap);
         doc.rect(x, clienteKpiY, ckW, ckH).fill(colors.light);
-        doc.rect(x, clienteKpiY, 3, ckH).fill(kpi.color);
-        doc.fontSize(7).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 8, clienteKpiY + 5);
-        doc.fontSize(14).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 8, clienteKpiY + 20);
+        doc.rect(x, clienteKpiY, 4, ckH).fill(kpi.color);
+        doc.fontSize(7).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 12, clienteKpiY + 10);
+        doc.fontSize(15).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 12, clienteKpiY + 26);
       });
       
-      doc.y = clienteKpiY + ckH + 15;
+      doc.y = clienteKpiY + ckH + 20;
 
       // ===== SEÇÃO 5: RECEITA POR SERVIÇO =====
       doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('5. RECEITA POR SERVIÇO', lm, doc.y);
-      doc.moveDown(0.3);
+      doc.moveDown(0.4);
       
       tblY = doc.y;
-      doc.rect(lm, tblY, pw, 16).fill(colors.light);
+      doc.rect(lm, tblY, pw, 18).fill(colors.light);
       doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.text);
-      doc.text('Serviço', lm + 5, tblY + 4);
-      doc.text('Contratos', lm + 180, tblY + 4);
-      doc.text('MRR', lm + 240, tblY + 4);
-      doc.text('% MRR', lm + 310, tblY + 4);
-      doc.text('Ticket Médio', lm + 370, tblY + 4);
-      doc.text('Gráfico', lm + 440, tblY + 4);
-      tblY += 16;
+      doc.text('Serviço', lm + 12, tblY + 5);
+      doc.text('Contratos', lm + 170, tblY + 5);
+      doc.text('MRR', lm + 230, tblY + 5);
+      doc.text('% MRR', lm + 300, tblY + 5);
+      doc.text('Ticket Médio', lm + 360, tblY + 5);
+      doc.text('Gráfico', lm + 430, tblY + 5);
+      tblY += 18;
       
       const servicoData = receitaPorServicoResult.rows || [];
       const mrrTotal = servicoData.reduce((acc: number, r: any) => acc + (Number(r.mrr_servico) || 0), 0);
@@ -3544,23 +3545,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       servicoData.forEach((row: any, i: number) => {
         const mrrServ = Number(row.mrr_servico) || 0;
         const pctMrr = mrrTotal > 0 ? (mrrServ / mrrTotal) * 100 : 0;
-        const barW = (mrrServ / maxServicoMrr) * 65;
+        const barW = (mrrServ / maxServicoMrr) * 55;
         
-        if (i % 2 === 0) doc.rect(lm, tblY, pw, 16).fill('#fafafa');
+        if (i % 2 === 0) doc.rect(lm, tblY, pw, 17).fill('#fafafa');
         
         doc.fontSize(7).font('Helvetica').fillColor(colors.text);
-        doc.text(String(row.servico).slice(0, 30), lm + 5, tblY + 4);
-        doc.text(String(row.qtd_contratos), lm + 180, tblY + 4);
-        doc.font('Helvetica-Bold').text(formatCurrencyShort(mrrServ), lm + 240, tblY + 4);
-        doc.font('Helvetica').text(formatPctAbs(pctMrr), lm + 310, tblY + 4);
-        doc.text(formatCurrency(Number(row.ticket_medio) || 0), lm + 370, tblY + 4);
+        doc.text(String(row.servico).slice(0, 28), lm + 12, tblY + 5);
+        doc.text(String(row.qtd_contratos), lm + 170, tblY + 5);
+        doc.font('Helvetica-Bold').text(formatCurrencyShort(mrrServ), lm + 230, tblY + 5);
+        doc.font('Helvetica').text(formatPctAbs(pctMrr), lm + 300, tblY + 5);
+        doc.text(formatCurrency(Number(row.ticket_medio) || 0), lm + 360, tblY + 5);
         
-        doc.rect(lm + 440, tblY + 3, barW, 10).fill(colors.bar4);
+        doc.rect(lm + 430, tblY + 4, barW, 10).fill(colors.bar4);
         
-        tblY += 16;
+        tblY += 17;
       });
       
-      doc.y = tblY + 15;
+      doc.y = tblY + 18;
 
       // Processar dados de contratos e fluxo de caixa
       const contratosEvolData = contratosEvolucaoResult.rows || [];
@@ -3616,43 +3617,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const piorMes = data[piorMesIdx];
         
         // === HEADER ===
-        doc.rect(lm, 40, 4, 35).fill(accentColor);
-        doc.fontSize(26).font('Helvetica-Bold').fillColor('#1f2937').text(title, lm + 15, 45);
-        doc.fontSize(10).font('Helvetica').fillColor('#6b7280').text('Últimos 12 meses', lm + 15, 73);
+        doc.rect(lm, 50, 4, 35).fill(accentColor);
+        doc.fontSize(26).font('Helvetica-Bold').fillColor('#1f2937').text(title, lm + 18, 55);
+        doc.fontSize(10).font('Helvetica').fillColor('#6b7280').text('Últimos 12 meses', lm + 18, 83);
         
         // === CARDS DE DESTAQUE ===
-        const cardY = 110;
-        const cardW = (pw - 30) / 3;
-        const cardH = 75;
+        const cardY = 120;
+        const cardGap = 20;
+        const cardW = (pw - cardGap * 2) / 3;
+        const cardH = 80;
         
         // Card 1: Total
-        doc.roundedRect(lm, cardY, cardW, cardH, 6).fill('#f8fafc');
-        doc.roundedRect(lm, cardY, cardW, cardH, 6).strokeColor('#e2e8f0').lineWidth(1).stroke();
-        doc.fontSize(10).font('Helvetica').fillColor('#64748b').text('Total Acumulado', lm + 15, cardY + 12);
-        doc.fontSize(20).font('Helvetica-Bold').fillColor(accentColor).text(formatCurrency(total), lm + 15, cardY + 32);
+        doc.roundedRect(lm, cardY, cardW, cardH, 8).fill('#f8fafc');
+        doc.roundedRect(lm, cardY, cardW, cardH, 8).strokeColor('#e2e8f0').lineWidth(1).stroke();
+        doc.fontSize(10).font('Helvetica').fillColor('#64748b').text('Total Acumulado', lm + 18, cardY + 15);
+        doc.fontSize(20).font('Helvetica-Bold').fillColor(accentColor).text(formatCurrency(total), lm + 18, cardY + 38);
         
         // Card 2: Média
-        doc.roundedRect(lm + cardW + 15, cardY, cardW, cardH, 6).fill('#f8fafc');
-        doc.roundedRect(lm + cardW + 15, cardY, cardW, cardH, 6).strokeColor('#e2e8f0').lineWidth(1).stroke();
-        doc.fontSize(10).font('Helvetica').fillColor('#64748b').text('Média Mensal', lm + cardW + 30, cardY + 12);
-        doc.fontSize(20).font('Helvetica-Bold').fillColor('#1f2937').text(formatCurrency(media), lm + cardW + 30, cardY + 32);
+        doc.roundedRect(lm + cardW + cardGap, cardY, cardW, cardH, 8).fill('#f8fafc');
+        doc.roundedRect(lm + cardW + cardGap, cardY, cardW, cardH, 8).strokeColor('#e2e8f0').lineWidth(1).stroke();
+        doc.fontSize(10).font('Helvetica').fillColor('#64748b').text('Média Mensal', lm + cardW + cardGap + 18, cardY + 15);
+        doc.fontSize(20).font('Helvetica-Bold').fillColor('#1f2937').text(formatCurrency(media), lm + cardW + cardGap + 18, cardY + 38);
         
         // Card 3: Melhor Mês
         const melhorMesParts = (melhorMes?.mes || '').split('-');
         const melhorMesLabel = `${mesesNomes[melhorMesParts[1]] || ''}/${melhorMesParts[0]?.slice(2) || ''}`;
-        doc.roundedRect(lm + (cardW + 15) * 2, cardY, cardW, cardH, 6).fill('#f0fdf4');
-        doc.roundedRect(lm + (cardW + 15) * 2, cardY, cardW, cardH, 6).strokeColor('#bbf7d0').lineWidth(1).stroke();
-        doc.fontSize(10).font('Helvetica').fillColor('#16a34a').text('Melhor Mês', lm + (cardW + 15) * 2 + 15, cardY + 12);
-        doc.fontSize(16).font('Helvetica-Bold').fillColor('#15803d').text(formatCurrencyShort(maxVal), lm + (cardW + 15) * 2 + 15, cardY + 32);
-        doc.fontSize(9).font('Helvetica').fillColor('#22c55e').text(melhorMesLabel, lm + (cardW + 15) * 2 + 15, cardY + 52);
+        doc.roundedRect(lm + (cardW + cardGap) * 2, cardY, cardW, cardH, 8).fill('#f0fdf4');
+        doc.roundedRect(lm + (cardW + cardGap) * 2, cardY, cardW, cardH, 8).strokeColor('#bbf7d0').lineWidth(1).stroke();
+        doc.fontSize(10).font('Helvetica').fillColor('#16a34a').text('Melhor Mês', lm + (cardW + cardGap) * 2 + 18, cardY + 15);
+        doc.fontSize(16).font('Helvetica-Bold').fillColor('#15803d').text(formatCurrencyShort(maxVal), lm + (cardW + cardGap) * 2 + 18, cardY + 38);
+        doc.fontSize(9).font('Helvetica').fillColor('#22c55e').text(melhorMesLabel, lm + (cardW + cardGap) * 2 + 18, cardY + 58);
         
         // === SPARKLINE ===
-        const sparkY = 210;
-        const sparkH = 60;
+        const sparkY = 225;
+        const sparkH = 65;
         const sparkW = pw;
         const sparkMax = Math.max(...valores.map(v => Math.abs(v)), 1);
         
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#374151').text('Evolução', lm, sparkY - 15);
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#374151').text('Evolução', lm, sparkY - 18);
         
         // Linha de tendência
         const pointSpacing = sparkW / (data.length - 1);
@@ -3677,23 +3679,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const primeiroParts = (data[0]?.mes || '').split('-');
         const ultimoParts = (data[data.length - 1]?.mes || '').split('-');
         doc.fontSize(8).font('Helvetica').fillColor('#9ca3af')
-          .text(`${mesesNomes[primeiroParts[1]]?.slice(0, 3) || ''}`, lm - 10, sparkY + sparkH + 8, { width: 30, align: 'center' });
+          .text(`${mesesNomes[primeiroParts[1]]?.slice(0, 3) || ''}`, lm - 10, sparkY + sparkH + 10, { width: 30, align: 'center' });
         doc.fontSize(8).font('Helvetica').fillColor('#9ca3af')
-          .text(`${mesesNomes[ultimoParts[1]]?.slice(0, 3) || ''}`, lm + sparkW - 20, sparkY + sparkH + 8, { width: 30, align: 'center' });
+          .text(`${mesesNomes[ultimoParts[1]]?.slice(0, 3) || ''}`, lm + sparkW - 20, sparkY + sparkH + 10, { width: 30, align: 'center' });
         
         // === TABELA DE VALORES ===
-        const tableY = 310;
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#374151').text('Detalhamento Mensal', lm, tableY - 15);
+        const tableY = 330;
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#374151').text('Detalhamento Mensal', lm, tableY - 18);
         
         // Cabeçalho
-        doc.rect(lm, tableY, pw, 22).fill('#f1f5f9');
+        doc.rect(lm, tableY, pw, 24).fill('#f1f5f9');
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#475569');
-        doc.text('Mês', lm + 10, tableY + 6);
-        doc.text('Valor', lm + 120, tableY + 6);
-        doc.text('% do Total', lm + 240, tableY + 6);
-        doc.text('', lm + 340, tableY + 6);
+        doc.text('Mês', lm + 15, tableY + 7);
+        doc.text('Valor', lm + 120, tableY + 7);
+        doc.text('% do Total', lm + 240, tableY + 7);
+        doc.text('', lm + 340, tableY + 7);
         
-        let rowY = tableY + 22;
+        let rowY = tableY + 24;
         data.forEach((d: any, i: number) => {
           const val = d[valueKey] || 0;
           const mesParts = (d.mes || '').split('-');
@@ -3701,26 +3703,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const pctTotal = total > 0 ? (val / total) * 100 : 0;
           
           // Fundo alternado
-          if (i % 2 === 0) doc.rect(lm, rowY, pw, 20).fill('#fafafa');
+          if (i % 2 === 0) doc.rect(lm, rowY, pw, 22).fill('#fafafa');
           
           // Highlight melhor/pior
-          if (i === melhorMesIdx) doc.rect(lm, rowY, pw, 20).fill('#f0fdf4');
-          if (i === piorMesIdx && minVal < media * 0.7) doc.rect(lm, rowY, pw, 20).fill('#fef2f2');
+          if (i === melhorMesIdx) doc.rect(lm, rowY, pw, 22).fill('#f0fdf4');
+          if (i === piorMesIdx && minVal < media * 0.7) doc.rect(lm, rowY, pw, 22).fill('#fef2f2');
           
           doc.fontSize(9).font('Helvetica').fillColor('#374151');
-          doc.text(mesLabel, lm + 10, rowY + 5);
-          doc.font('Helvetica-Bold').text(formatCurrencyShort(val), lm + 120, rowY + 5);
+          doc.text(mesLabel, lm + 15, rowY + 6);
+          doc.font('Helvetica-Bold').text(formatCurrencyShort(val), lm + 120, rowY + 6);
           
-          doc.font('Helvetica').fillColor('#64748b').text(`${pctTotal.toFixed(1)}%`, lm + 240, rowY + 5);
+          doc.font('Helvetica').fillColor('#64748b').text(`${pctTotal.toFixed(1)}%`, lm + 240, rowY + 6);
           
           // Barra de progresso
-          const barMaxW = 120;
-          const barH = 6;
+          const barMaxW = 140;
+          const barH = 8;
           const barPct = Math.min((Math.abs(val) / sparkMax), 1);
           doc.rect(lm + 320, rowY + 7, barMaxW, barH).fill('#e5e7eb');
           doc.rect(lm + 320, rowY + 7, barMaxW * barPct, barH).fill(accentColor);
           
-          rowY += 20;
+          rowY += 22;
         });
       };
       
@@ -3741,16 +3743,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // ==================== PÁGINA 8: EQUIPE E INSIGHTS ====================
       doc.addPage();
-      doc.rect(lm, 35, pw, 4).fill(colors.accent);
-      doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('EQUIPE E INSIGHTS', lm, 50);
-      doc.y = 70;
+      doc.rect(lm, 45, pw, 4).fill(colors.accent);
+      doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('EQUIPE E INSIGHTS', lm, 60);
+      doc.y = 90;
 
       // ===== SEÇÃO 7: MÉTRICAS DE EQUIPE =====
       doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('7. MÉTRICAS DE EQUIPE', lm, doc.y);
-      doc.moveDown(0.3);
+      doc.moveDown(0.4);
       
       const eqKpiY = doc.y;
-      const eqW = 100;
+      const eqGap = 10;
+      const eqW = (pw - eqGap * 4) / 5;
+      const eqH = 55;
       
       const equipeKpis = [
         { label: 'Headcount', value: String(headcount), sub: 'colaboradores ativos' },
@@ -3761,61 +3765,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ];
       
       equipeKpis.forEach((kpi, i) => {
-        const x = lm + i * (eqW + 5);
-        doc.rect(x, eqKpiY, eqW, 50).fill(colors.light);
-        doc.rect(x, eqKpiY, 3, 50).fill(colors.bar3);
-        doc.fontSize(8).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 8, eqKpiY + 6);
-        doc.fontSize(18).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 8, eqKpiY + 20);
-        doc.fontSize(7).font('Helvetica').fillColor(colors.muted).text(kpi.sub, x + 8, eqKpiY + 40);
+        const x = lm + i * (eqW + eqGap);
+        doc.rect(x, eqKpiY, eqW, eqH).fill(colors.light);
+        doc.rect(x, eqKpiY, 4, eqH).fill(colors.bar3);
+        doc.fontSize(8).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 12, eqKpiY + 10);
+        doc.fontSize(17).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 12, eqKpiY + 25);
+        doc.fontSize(7).font('Helvetica').fillColor(colors.muted).text(kpi.sub, x + 12, eqKpiY + 44);
       });
       
-      doc.y = eqKpiY + 60;
+      doc.y = eqKpiY + eqH + 20;
 
       // ===== SEÇÃO 8: DISTRIBUIÇÃO POR SETOR =====
       doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('8. DISTRIBUIÇÃO POR SETOR', lm, doc.y);
-      doc.moveDown(0.3);
+      doc.moveDown(0.4);
       
       const setorData = setorResult.rows || [];
       const totalSetorQtd = setorData.reduce((acc: number, r: any) => acc + (Number(r.quantidade) || 0), 0);
       const maxSetorQtd = Math.max(...setorData.map((r: any) => Number(r.quantidade) || 0), 1);
       
       tblY = doc.y;
-      doc.rect(lm, tblY, pw, 14).fill(colors.light);
+      doc.rect(lm, tblY, pw, 18).fill(colors.light);
       doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.text);
-      doc.text('Setor', lm + 5, tblY + 3);
-      doc.text('Qtd', lm + 180, tblY + 3);
-      doc.text('% Total', lm + 220, tblY + 3);
-      doc.text('Tempo Médio', lm + 280, tblY + 3);
-      doc.text('Gráfico', lm + 360, tblY + 3);
-      tblY += 14;
+      doc.text('Setor', lm + 12, tblY + 5);
+      doc.text('Qtd', lm + 170, tblY + 5);
+      doc.text('% Total', lm + 220, tblY + 5);
+      doc.text('Tempo Médio', lm + 290, tblY + 5);
+      doc.text('Gráfico', lm + 375, tblY + 5);
+      tblY += 18;
       
       setorData.slice(0, 10).forEach((row: any, i: number) => {
         const qtd = Number(row.quantidade) || 0;
         const pct = totalSetorQtd > 0 ? (qtd / totalSetorQtd) * 100 : 0;
-        const barW = (qtd / maxSetorQtd) * 140;
+        const barW = (qtd / maxSetorQtd) * 100;
         
-        if (i % 2 === 0) doc.rect(lm, tblY, pw, 14).fill('#fafafa');
+        if (i % 2 === 0) doc.rect(lm, tblY, pw, 16).fill('#fafafa');
         
         doc.fontSize(7).font('Helvetica').fillColor(colors.text);
-        doc.text(String(row.setor).slice(0, 30), lm + 5, tblY + 3);
-        doc.font('Helvetica-Bold').text(String(qtd), lm + 180, tblY + 3);
-        doc.font('Helvetica').text(formatPctAbs(pct), lm + 220, tblY + 3);
-        doc.text(`${Number(row.tempo_medio || 0).toFixed(1)}m`, lm + 290, tblY + 3);
-        doc.rect(lm + 360, tblY + 2, barW, 10).fill(colors.bar3);
+        doc.text(String(row.setor).slice(0, 28), lm + 12, tblY + 4);
+        doc.font('Helvetica-Bold').text(String(qtd), lm + 170, tblY + 4);
+        doc.font('Helvetica').text(formatPctAbs(pct), lm + 220, tblY + 4);
+        doc.text(`${Number(row.tempo_medio || 0).toFixed(1)}m`, lm + 300, tblY + 4);
+        doc.rect(lm + 375, tblY + 3, barW, 10).fill(colors.bar3);
         
-        tblY += 14;
+        tblY += 16;
       });
       
-      doc.y = tblY + 20;
+      doc.y = tblY + 22;
 
       // ===== SEÇÃO 9: INSIGHTS E OUTLOOK =====
-      doc.rect(lm, doc.y, pw, 130).fill(colors.light);
+      doc.rect(lm, doc.y, pw, 140).fill(colors.light);
       doc.rect(lm, doc.y, pw, 4).fill(colors.accent);
       
-      const insY = doc.y + 12;
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('10. INSIGHTS E OUTLOOK', lm + 10, insY);
+      const insY = doc.y + 15;
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('9. INSIGHTS E OUTLOOK', lm + 15, insY);
       
-      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text).text('Pontos Positivos:', lm + 10, insY + 18);
+      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text).text('Pontos Positivos:', lm + 15, insY + 22);
       doc.fontSize(8).font('Helvetica').fillColor(colors.text);
       const positivos = [];
       if (variacaoMoM > 0) positivos.push(`MRR cresceu ${formatPct(variacaoMoM)} no último mês`);
@@ -3823,30 +3827,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (churnRate < 5) positivos.push(`Churn rate controlado em ${formatPctAbs(churnRate)}`);
       if (tempoMedioMeses > 12) positivos.push(`Boa retenção de talentos (${tempoMedioMeses.toFixed(1)} meses médio)`);
       positivos.slice(0, 3).forEach((p, i) => {
-        doc.text(`• ${p}`, lm + 15, insY + 30 + i * 10, { width: pw - 30 });
+        doc.text(`• ${p}`, lm + 20, insY + 36 + i * 12, { width: pw - 40 });
       });
       
-      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text).text('Pontos de Atenção:', lm + 10, insY + 65);
+      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text).text('Pontos de Atenção:', lm + 15, insY + 75);
       const alertas = [];
       if (taxaInadimplencia > 3) alertas.push(`Inadimplência de ${formatPctAbs(taxaInadimplencia)} requer atenção`);
       if (Number(concentracao.top5_pct) > 40) alertas.push(`Alta concentração: Top 5 representa ${formatPctAbs(Number(concentracao.top5_pct))} da receita`);
       if (variacaoMoM < 0) alertas.push(`MRR caiu ${formatPct(Math.abs(variacaoMoM))} no último mês`);
       if (churnRate > 5) alertas.push(`Churn rate elevado de ${formatPctAbs(churnRate)}`);
       alertas.slice(0, 3).forEach((a, i) => {
-        doc.fontSize(8).font('Helvetica').fillColor(colors.danger).text(`• ${a}`, lm + 15, insY + 77 + i * 10, { width: pw - 30 });
+        doc.fontSize(8).font('Helvetica').fillColor(colors.danger).text(`• ${a}`, lm + 20, insY + 89 + i * 12, { width: pw - 40 });
       });
       
-      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text).text('Métricas-Chave:', lm + 280, insY + 18);
+      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text).text('Métricas-Chave:', lm + 280, insY + 22);
       doc.fontSize(8).font('Helvetica').fillColor(colors.text);
-      doc.text(`ARR: ${formatCurrencyShort(arr)}`, lm + 285, insY + 30);
-      doc.text(`LTV: ${formatCurrencyShort(ltv)}`, lm + 285, insY + 42);
-      doc.text(`Receita/Cabeça: ${formatCurrencyShort(receitaPorCabeca)}`, lm + 285, insY + 54);
-      doc.text(`Contratos Ativos: ${contratosRecorrentesAtivos}`, lm + 285, insY + 66);
-      doc.text(`Headcount: ${headcount}`, lm + 285, insY + 78);
+      doc.text(`ARR: ${formatCurrencyShort(arr)}`, lm + 285, insY + 36);
+      doc.text(`LTV: ${formatCurrencyShort(ltv)}`, lm + 285, insY + 50);
+      doc.text(`Receita/Cabeça: ${formatCurrencyShort(receitaPorCabeca)}`, lm + 285, insY + 64);
+      doc.text(`Contratos Ativos: ${contratosRecorrentesAtivos}`, lm + 285, insY + 78);
+      doc.text(`Headcount: ${headcount}`, lm + 285, insY + 92);
 
       // Footer
       doc.fontSize(7).font('Helvetica').fillColor(colors.muted)
-        .text(`Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")} | Turbo Partners - Relatório Confidencial`, lm, 780, { align: 'center', width: pw });
+        .text(`Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")} | Turbo Partners - Relatório Confidencial`, lm, 785, { align: 'center', width: pw });
 
       doc.end();
     } catch (error) {
