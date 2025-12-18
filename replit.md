@@ -1,8 +1,17 @@
-# CRM Dashboard - Marketing Digital
+# Turbo Cortex - Plataforma Interna Turbo Partners
 
 ## Overview
 
-This CRM dashboard provides a unified view of client relationships, contracts, services, and revenue for a digital marketing agency. It integrates financial data from Conta Azul (ERP) and operational data from ClickUp, centralizing client information, contract status, invoicing, team assignments, and financial metrics across different marketing squads. The project aims to enhance client management, financial tracking, and retention analysis to improve business intelligence and operational efficiency.
+Turbo Cortex é a plataforma interna exclusiva da equipe Turbo Partners, oferecendo uma visão unificada de relacionamento com clientes, contratos, serviços e receita. Integra dados financeiros do Conta Azul (ERP) e dados operacionais do ClickUp, centralizando informações de clientes, status de contratos, faturamento, atribuições de equipe e métricas financeiras entre diferentes squads de marketing. O projeto visa melhorar a gestão de clientes, acompanhamento financeiro e análise de retenção para aprimorar a inteligência de negócios e eficiência operacional.
+
+## Branding
+
+- **Nome da Plataforma**: Turbo Cortex
+- **Logo**: attached_assets/Logo-Turbo-branca_(1)_1766081013390.png
+- **Paleta de Cores**: Baseada na identidade visual da Turbo Partners (turbopartners.com.br)
+  - Primary: Laranja vibrante (HSL 24 95% 53%)
+  - Background: Tons escuros sofisticados
+  - Accent: Variações quentes do laranja
 
 ## User Preferences
 
