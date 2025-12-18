@@ -5104,12 +5104,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const closerInfo = closerResult.rows[0] as any;
 
+      // Usa data_fechamento como referência principal para filtros de data
       const dateConditions: ReturnType<typeof sql>[] = [];
       if (dataInicio) {
-        dateConditions.push(sql`d.date_create >= ${dataInicio}`);
+        dateConditions.push(sql`d.data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        dateConditions.push(sql`d.date_create <= ${dataFim}`);
+        dateConditions.push(sql`d.data_fechamento <= ${dataFim}`);
       }
 
       const dateWhereClause = dateConditions.length > 0 
@@ -5125,10 +5126,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes_realizadas,
           COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_recorrente END), 0) as valor_recorrente,
           COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_pontual END), 0) as valor_pontual,
-          MIN(d.date_create) as primeiro_negocio,
-          MAX(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.data_fechamento END) as ultimo_negocio
+          MIN(d.data_fechamento) as primeiro_negocio,
+          MAX(d.data_fechamento) as ultimo_negocio
         FROM crm_deal d
         WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
+          AND d.data_fechamento IS NOT NULL
         ${dateWhereClause}
       `);
 
@@ -5248,12 +5250,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "closerId is required" });
       }
 
+      // Usa data_fechamento como referência principal
       const dateConditions: ReturnType<typeof sql>[] = [];
       if (dataInicio) {
-        dateConditions.push(sql`d.date_create >= ${dataInicio}`);
+        dateConditions.push(sql`d.data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        dateConditions.push(sql`d.date_create <= ${dataFim}`);
+        dateConditions.push(sql`d.data_fechamento <= ${dataFim}`);
       }
 
       const dateWhereClause = dateConditions.length > 0 
@@ -5266,6 +5269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(*) as count
         FROM crm_deal d
         WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
+          AND d.data_fechamento IS NOT NULL
           ${dateWhereClause}
         GROUP BY d.stage_name
         ORDER BY count DESC
@@ -5294,12 +5298,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "closerId is required" });
       }
 
+      // Usa data_fechamento como referência principal
       const dateConditions: ReturnType<typeof sql>[] = [];
       if (dataInicio) {
-        dateConditions.push(sql`d.date_create >= ${dataInicio}`);
+        dateConditions.push(sql`d.data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        dateConditions.push(sql`d.date_create <= ${dataFim}`);
+        dateConditions.push(sql`d.data_fechamento <= ${dataFim}`);
       }
 
       const dateWhereClause = dateConditions.length > 0 
@@ -5312,6 +5317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(*) as count
         FROM crm_deal d
         WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
+          AND d.data_fechamento IS NOT NULL
           ${dateWhereClause}
         GROUP BY d.source
         ORDER BY count DESC
