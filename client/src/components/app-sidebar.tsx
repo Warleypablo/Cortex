@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Tv, Sparkles, Image, Trophy, Layers, Scale, Gavel } from "lucide-react";
+import turboLogo from "@assets/Logo-Turbo-branca_(1)_1766081013390.png";
 import {
   Sidebar,
   SidebarContent,
@@ -190,13 +191,11 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-6 py-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <BarChart3 className="w-5 h-5 text-primary-foreground" />
-          </div>
+        <div className="flex items-center gap-3">
+          <img src={turboLogo} alt="Turbo Partners" className="h-9 w-auto" />
           <div>
-            <h2 className="font-semibold text-sidebar-foreground">CRM Dashboard</h2>
-            <p className="text-xs text-muted-foreground">Marketing Digital</p>
+            <h2 className="font-semibold text-sidebar-foreground text-lg">Turbo Cortex</h2>
+            <p className="text-xs text-muted-foreground">Plataforma Interna</p>
           </div>
         </div>
       </SidebarHeader>
