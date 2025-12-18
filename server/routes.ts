@@ -3554,16 +3554,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       doc.y = tblY + 15;
 
-      // ==================== PÁGINA 3: INDICADORES MENSAIS ====================
-      doc.addPage();
-      doc.rect(lm, 35, pw, 4).fill(colors.accent);
-      doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('INDICADORES MENSAIS', lm, 50);
-      doc.y = 70;
-
-      // ===== SEÇÃO 6: INDICADORES MENSAIS (CONTRATOS) =====
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('6. INDICADORES MENSAIS', lm, doc.y);
-      doc.moveDown(0.3);
-      
       // Processar dados de contratos e fluxo de caixa
       const contratosEvolData = contratosEvolucaoResult.rows || [];
       const fluxoCaixaData = fluxoCaixaResult.rows || [];
@@ -3602,132 +3592,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .sort((a: any, b: any) => a.mes.localeCompare(b.mes))
         .slice(-12);
       
-      // Função para desenhar gráfico de barras
-      const drawBarChart = (title: string, data: any[], valueKey: string, barColor: string, startY: number, chartW: number, chartH: number) => {
-        const maxVal = Math.max(...data.map((d: any) => Math.abs(d[valueKey])), 1);
-        const barW = (chartW - 60) / data.length - 2;
+      // Função para desenhar gráfico grande (uma página inteira)
+      const drawFullPageChart = (title: string, subtitle: string, data: any[], valueKey: string, barColor: string) => {
+        doc.addPage();
         
-        doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.primary).text(title, lm, startY);
-        const chartY = startY + 12;
+        // Header
+        doc.rect(lm, 35, pw, 4).fill(colors.accent);
+        
+        // Título grande
+        doc.fontSize(22).font('Helvetica-Bold').fillColor(colors.primary).text(title, lm, 60);
+        doc.fontSize(10).font('Helvetica').fillColor(colors.muted).text(subtitle, lm, 88);
+        
+        // Área do gráfico
+        const chartX = lm + 50;
+        const chartY = 130;
+        const chartW = pw - 60;
+        const chartH = 400;
+        const barSpacing = 8;
+        const barW = (chartW - (data.length - 1) * barSpacing) / data.length;
+        
+        // Calcular max e steps do eixo Y
+        const maxVal = Math.max(...data.map((d: any) => Math.abs(d[valueKey])), 1);
+        const niceMax = Math.ceil(maxVal / 50000) * 50000;
+        const ySteps = 5;
+        const stepVal = niceMax / ySteps;
         
         // Fundo do gráfico
-        doc.rect(lm, chartY, chartW, chartH).fill('#fafafa');
+        doc.rect(chartX, chartY, chartW, chartH).fill('#fafafa');
         
-        // Barras
+        // Linhas horizontais e labels do eixo Y
+        for (let i = 0; i <= ySteps; i++) {
+          const y = chartY + chartH - (i / ySteps) * chartH;
+          const val = stepVal * i;
+          
+          // Linha horizontal
+          doc.strokeColor('#e0e0e0').lineWidth(0.5);
+          doc.moveTo(chartX, y).lineTo(chartX + chartW, y).stroke();
+          
+          // Label do valor
+          doc.fontSize(9).font('Helvetica').fillColor(colors.muted)
+            .text(val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : val >= 1000 ? `${Math.round(val / 1000)}K` : String(val), 
+              lm, y - 5, { width: 45, align: 'right' });
+        }
+        
+        // Desenhar barras
         data.forEach((d: any, i: number) => {
           const val = d[valueKey];
-          const barH = (Math.abs(val) / maxVal) * (chartH - 20);
-          const x = lm + 5 + i * (barW + 2);
-          const y = chartY + chartH - barH - 15;
+          const barH = (Math.abs(val) / niceMax) * chartH;
+          const x = chartX + i * (barW + barSpacing);
+          const y = chartY + chartH - barH;
           
+          // Barra com cantos arredondados no topo
           doc.rect(x, y, barW, barH).fill(val >= 0 ? barColor : colors.danger);
+          
+          // Valor em cima da barra
+          if (barH > 25) {
+            doc.fontSize(8).font('Helvetica-Bold').fillColor('#fff')
+              .text(formatCurrencyShort(val), x, y + 8, { width: barW, align: 'center' });
+          }
           
           // Label do mês
           const mesParts = (d.mes || '').split('-');
           const mesLabel = mesesNomes[mesParts[1]] || mesParts[1] || '';
-          doc.fontSize(5).font('Helvetica').fillColor(colors.muted)
-            .text(mesLabel.slice(0, 3), x, chartY + chartH - 12, { width: barW, align: 'center' });
+          doc.fontSize(9).font('Helvetica').fillColor(colors.text)
+            .text(mesLabel, x, chartY + chartH + 8, { width: barW, align: 'center' });
         });
         
-        // Valor máximo
-        doc.fontSize(6).font('Helvetica').fillColor(colors.muted)
-          .text(formatCurrencyShort(maxVal), lm + chartW - 40, chartY + 2);
-        
-        return chartY + chartH + 8;
+        // Total no rodapé
+        const total = data.reduce((sum: number, d: any) => sum + (d[valueKey] || 0), 0);
+        doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary)
+          .text(`Total: ${formatCurrency(total)}`, lm, chartY + chartH + 50);
       };
       
-      const chartW = 250;
-      const chartH = 60;
-      let chartY = doc.y;
+      // Página 3: Churn MRR
+      drawFullPageChart('Churn MRR', 'Receita recorrente perdida por mês (últimos 12 meses)', indicadoresMensais, 'churnMrr', colors.danger);
       
-      // Linha 1: Churn MRR e MRR Vendido
-      drawBarChart('Churn MRR (mensal)', indicadoresMensais, 'churnMrr', colors.danger, chartY, chartW, chartH);
-      drawBarChart('MRR Vendido (mensal)', indicadoresMensais, 'mrrVendido', colors.success, chartY, chartW, chartH);
-      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.primary).text('Churn MRR (mensal)', lm, chartY);
-      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.primary).text('MRR Vendido (mensal)', lm + chartW + 15, chartY);
+      // Página 4: MRR Vendido
+      drawFullPageChart('MRR Vendido', 'Receita recorrente vendida por mês (últimos 12 meses)', indicadoresMensais, 'mrrVendido', colors.success);
       
-      chartY += 12;
-      // Desenhar gráfico Churn
-      let maxChurn = Math.max(...indicadoresMensais.map((d: any) => d.churnMrr), 1);
-      let barW = (chartW - 10) / indicadoresMensais.length - 2;
-      doc.rect(lm, chartY, chartW, chartH).fill('#fafafa');
-      indicadoresMensais.forEach((d: any, i: number) => {
-        const barH = (d.churnMrr / maxChurn) * (chartH - 18);
-        const x = lm + 5 + i * (barW + 2);
-        doc.rect(x, chartY + chartH - barH - 15, barW, barH).fill(colors.danger);
-        const mesParts = (d.mes || '').split('-');
-        doc.fontSize(5).font('Helvetica').fillColor(colors.muted)
-          .text((mesesNomes[mesParts[1]] || '').slice(0, 3), x, chartY + chartH - 12, { width: barW, align: 'center' });
-      });
-      doc.fontSize(6).fillColor(colors.muted).text(formatCurrencyShort(maxChurn), lm + chartW - 40, chartY + 2);
+      // Página 5: Pontual Vendido
+      drawFullPageChart('Pontual Vendido', 'Receita pontual vendida por mês (últimos 12 meses)', indicadoresMensais, 'pontualVendido', colors.accent);
       
-      // Desenhar gráfico MRR Vendido
-      let maxMrr = Math.max(...indicadoresMensais.map((d: any) => d.mrrVendido), 1);
-      doc.rect(lm + chartW + 15, chartY, chartW, chartH).fill('#fafafa');
-      indicadoresMensais.forEach((d: any, i: number) => {
-        const barH = (d.mrrVendido / maxMrr) * (chartH - 18);
-        const x = lm + chartW + 20 + i * (barW + 2);
-        doc.rect(x, chartY + chartH - barH - 15, barW, barH).fill(colors.success);
-        const mesParts = (d.mes || '').split('-');
-        doc.fontSize(5).font('Helvetica').fillColor(colors.muted)
-          .text((mesesNomes[mesParts[1]] || '').slice(0, 3), x, chartY + chartH - 12, { width: barW, align: 'center' });
-      });
-      doc.fontSize(6).fillColor(colors.muted).text(formatCurrencyShort(maxMrr), lm + chartW * 2 + 15 - 40, chartY + 2);
+      // Página 6: Receita Líquida
+      drawFullPageChart('Receita Líquida', 'Receita líquida mensal (últimos 12 meses)', indicadoresMensais, 'receitaLiquida', '#5B8DEF');
       
-      chartY += chartH + 10;
-      
-      // Linha 2: Pontual Vendido e Receita Líquida
-      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.primary).text('Pontual Vendido (mensal)', lm, chartY);
-      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.primary).text('Receita Líquida (mensal)', lm + chartW + 15, chartY);
-      chartY += 12;
-      
-      let maxPontual = Math.max(...indicadoresMensais.map((d: any) => d.pontualVendido), 1);
-      doc.rect(lm, chartY, chartW, chartH).fill('#fafafa');
-      indicadoresMensais.forEach((d: any, i: number) => {
-        const barH = (d.pontualVendido / maxPontual) * (chartH - 18);
-        const x = lm + 5 + i * (barW + 2);
-        doc.rect(x, chartY + chartH - barH - 15, barW, barH).fill(colors.accent);
-        const mesParts = (d.mes || '').split('-');
-        doc.fontSize(5).font('Helvetica').fillColor(colors.muted)
-          .text((mesesNomes[mesParts[1]] || '').slice(0, 3), x, chartY + chartH - 12, { width: barW, align: 'center' });
-      });
-      doc.fontSize(6).fillColor(colors.muted).text(formatCurrencyShort(maxPontual), lm + chartW - 40, chartY + 2);
-      
-      let maxReceita = Math.max(...indicadoresMensais.map((d: any) => d.receitaLiquida), 1);
-      doc.rect(lm + chartW + 15, chartY, chartW, chartH).fill('#fafafa');
-      indicadoresMensais.forEach((d: any, i: number) => {
-        const barH = (d.receitaLiquida / maxReceita) * (chartH - 18);
-        const x = lm + chartW + 20 + i * (barW + 2);
-        doc.rect(x, chartY + chartH - barH - 15, barW, barH).fill(colors.bar1);
-        const mesParts = (d.mes || '').split('-');
-        doc.fontSize(5).font('Helvetica').fillColor(colors.muted)
-          .text((mesesNomes[mesParts[1]] || '').slice(0, 3), x, chartY + chartH - 12, { width: barW, align: 'center' });
-      });
-      doc.fontSize(6).fillColor(colors.muted).text(formatCurrencyShort(maxReceita), lm + chartW * 2 + 15 - 40, chartY + 2);
-      
-      chartY += chartH + 10;
-      
-      // Linha 3: Geração de Caixa
-      doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.primary).text('Geração de Caixa (mensal)', lm, chartY);
-      chartY += 12;
-      
-      let maxCaixa = Math.max(...indicadoresMensais.map((d: any) => Math.abs(d.geracaoCaixa)), 1);
-      doc.rect(lm, chartY, pw, chartH).fill('#fafafa');
-      const caixaBarW = (pw - 10) / indicadoresMensais.length - 2;
-      indicadoresMensais.forEach((d: any, i: number) => {
-        const val = d.geracaoCaixa;
-        const barH = (Math.abs(val) / maxCaixa) * (chartH - 18);
-        const x = lm + 5 + i * (caixaBarW + 2);
-        doc.rect(x, chartY + chartH - barH - 15, caixaBarW, barH).fill(val >= 0 ? colors.success : colors.danger);
-        const mesParts = (d.mes || '').split('-');
-        doc.fontSize(5).font('Helvetica').fillColor(colors.muted)
-          .text((mesesNomes[mesParts[1]] || '').slice(0, 3), x, chartY + chartH - 12, { width: caixaBarW, align: 'center' });
-      });
-      doc.fontSize(6).fillColor(colors.muted).text(formatCurrencyShort(maxCaixa), lm + pw - 40, chartY + 2);
-      
-      doc.y = chartY + chartH + 15;
+      // Página 7: Geração de Caixa
+      drawFullPageChart('Geração de Caixa', 'Geração de caixa mensal (últimos 12 meses)', indicadoresMensais, 'geracaoCaixa', colors.success);
 
-      // ==================== PÁGINA 4: EQUIPE E INSIGHTS ====================
+      // ==================== PÁGINA 8: EQUIPE E INSIGHTS ====================
       doc.addPage();
       doc.rect(lm, 35, pw, 4).fill(colors.accent);
       doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('EQUIPE E INSIGHTS', lm, 50);
