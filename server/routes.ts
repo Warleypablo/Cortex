@@ -2974,23 +2974,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // ===== QUERIES AVANÇADAS =====
       
-      // Contratos ativos, churn e LT médio (usando data_encerramento como fonte única)
+      // Clientes ativos (igual à página) - usando cup_clientes e cup_contratos
+      const clientesContagem = await db.execute(sql`
+        SELECT 
+          (SELECT COUNT(DISTINCT cnpj) FROM cup_clientes) as total_clientes,
+          COUNT(DISTINCT c.id_task) as clientes_ativos
+        FROM cup_contratos c
+        WHERE c.status IN ('ativo', 'onboarding', 'triagem')
+      `);
+
+      // Contratos ativos, churn e LT médio
+      // LT calculado APENAS sobre contratos já encerrados (com data_encerramento preenchida)
       const clientesResult = await db.execute(sql`
         SELECT 
-          COUNT(DISTINCT CASE WHEN c.status IN ('ativo', 'onboarding', 'triagem') AND c.valorr > 0 THEN c.id_task END) as contratos_ativos,
-          COUNT(DISTINCT CASE WHEN c.data_encerramento IS NOT NULL AND c.valorr > 0 THEN c.id_task END) as contratos_encerrados_total,
-          COUNT(DISTINCT CASE WHEN c.data_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
+          COUNT(CASE WHEN c.valorr > 0 AND c.status IN ('ativo', 'onboarding', 'triagem') THEN 1 END) as contratos_recorrentes_ativos,
+          COUNT(CASE WHEN c.data_encerramento IS NOT NULL AND c.valorr > 0 THEN 1 END) as contratos_encerrados_total,
+          COUNT(CASE WHEN c.data_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
             AND c.data_encerramento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
             AND c.valorr > 0
-            THEN c.id_task END) as churn_mes,
+            THEN 1 END) as churn_mes,
           COALESCE(SUM(CASE WHEN c.data_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
             AND c.data_encerramento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
             AND c.valorr > 0
             THEN c.valorr ELSE 0 END), 0) as mrr_churn_mes,
           COALESCE(AVG(
-            CASE WHEN c.data_inicio IS NOT NULL AND c.valorr > 0 THEN
-              EXTRACT(MONTH FROM AGE(COALESCE(c.data_encerramento, CURRENT_DATE), c.data_inicio)) +
-              EXTRACT(YEAR FROM AGE(COALESCE(c.data_encerramento, CURRENT_DATE), c.data_inicio)) * 12
+            CASE WHEN c.data_encerramento IS NOT NULL AND c.data_inicio IS NOT NULL AND c.valorr > 0 THEN
+              EXTRACT(MONTH FROM AGE(c.data_encerramento, c.data_inicio)) +
+              EXTRACT(YEAR FROM AGE(c.data_encerramento, c.data_inicio)) * 12
             END
           ), 6) as lt_medio_meses
         FROM cup_contratos c
@@ -3132,30 +3142,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
 
       // ===== PROCESSAR DADOS =====
-      // Usando apenas contratos como fonte única de verdade
-      const contratosData = clientesResult.rows[0] || { contratos_ativos: 0, contratos_encerrados_total: 0, churn_mes: 0, mrr_churn_mes: 0, lt_medio_meses: 6 };
+      // Usando dados consistentes com a página do Investors Report
+      const clientesInfo = clientesContagem.rows[0] || { total_clientes: 0, clientes_ativos: 0 };
+      const contratosData = clientesResult.rows[0] || { contratos_recorrentes_ativos: 0, contratos_encerrados_total: 0, churn_mes: 0, mrr_churn_mes: 0, lt_medio_meses: 6 };
       const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0, mrr_churn: 0 };
       const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0, contratacoes_90d: 0, desligamentos_90d: 0 };
       const concentracao = concentracaoResult.rows[0] || { top5_pct: 0, top10_pct: 0, top20_pct: 0 };
 
       const headcount = Number(equipe.headcount) || 1;
       const mrrAtivo = Number(contratos.mrr_ativo) || 0;
-      const contratosAtivos = Number(contratosData.contratos_ativos) || 1;
+      const clientesAtivos = Number(clientesInfo.clientes_ativos) || 1;
+      const contratosRecorrentesAtivos = Number(contratosData.contratos_recorrentes_ativos) || 1;
       const churnMes = Number(contratosData.churn_mes) || 0;
       const mrrChurnMes = Number(contratosData.mrr_churn_mes) || 0;
-      const ltMedio = Number(contratosData.lt_medio_meses) || 6; // LT médio em meses
+      const ltMedio = Number(contratosData.lt_medio_meses) || 6; // LT médio em meses (baseado em contratos encerrados)
       
       console.log('[DEBUG LT] Raw data:', JSON.stringify(contratosData));
-      console.log('[DEBUG LT] LT médio calculado:', ltMedio);
+      console.log('[DEBUG LT] LT médio calculado:', ltMedio, 'meses');
+      console.log('[DEBUG] Clientes ativos:', clientesAtivos, 'Contratos recorrentes:', contratosRecorrentesAtivos);
+      
       const contratosRecorrentes = Number(contratos.contratos_recorrentes) || 0;
       const aovRecorrente = Number(contratos.aov_recorrente) || 0;
       const receitaPorCabeca = headcount > 0 ? mrrAtivo / headcount : 0;
       const tempoMedioMeses = Number(equipe.tempo_medio_meses) || 0;
       
-      // Cálculos avançados - usando apenas contratos
-      const churnRate = contratosAtivos > 0 ? (churnMes / contratosAtivos) * 100 : 0;
+      // Cálculos avançados - usando apenas contratos recorrentes
+      const churnRate = contratosRecorrentesAtivos > 0 ? (churnMes / contratosRecorrentesAtivos) * 100 : 0;
       const arr = mrrAtivo * 12;
-      // LTV = AOV × LT (tempo de vida médio em meses)
+      // LTV = AOV × LT (tempo de vida médio em meses, baseado em contratos encerrados)
       const ltv = aovRecorrente * ltMedio;
       
       // Variação MoM/YoY
@@ -3178,7 +3192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // NOTA: Todas as métricas usam contratos como fonte única de verdade
       
       // CAC Estimado - usa despesas totais como proxy (sem dados de marketing separados)
-      const cacEstimado = contratosAtivos > 0 ? (despesaTotal12m / 12) / (contratosAtivos / 12) : 0;
+      const cacEstimado = contratosRecorrentesAtivos > 0 ? (despesaTotal12m / 12) / (contratosRecorrentesAtivos / 12) : 0;
       
       // LTV/CAC Ratio (saudável: > 3x)
       const ltvCacRatio = cacEstimado > 0 ? ltv / cacEstimado : 0;
@@ -3460,7 +3474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ckH = 45;
       
       const clienteKpis = [
-        { label: 'Contratos Ativos', value: String(contratosAtivos), color: colors.success },
+        { label: 'Contratos Ativos', value: String(contratosRecorrentesAtivos), color: colors.success },
         { label: 'Total Contratos', value: String(Number(contratos.total_contratos) || 0), color: colors.accent },
         { label: 'Churned (mês)', value: String(churnMes), color: colors.danger },
         { label: 'Contratos Rec.', value: String(contratosRecorrentes), color: colors.bar2 },
@@ -3674,7 +3688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.text(`ARR: ${formatCurrencyShort(arr)}`, lm + 285, insY + 30);
       doc.text(`LTV: ${formatCurrencyShort(ltv)}`, lm + 285, insY + 42);
       doc.text(`Receita/Cabeça: ${formatCurrencyShort(receitaPorCabeca)}`, lm + 285, insY + 54);
-      doc.text(`Contratos Ativos: ${contratosAtivos}`, lm + 285, insY + 66);
+      doc.text(`Contratos Ativos: ${contratosRecorrentesAtivos}`, lm + 285, insY + 66);
       doc.text(`Headcount: ${headcount}`, lm + 285, insY + 78);
 
       // Footer
