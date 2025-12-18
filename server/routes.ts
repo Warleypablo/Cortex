@@ -3067,8 +3067,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND salario::numeric > 0
       `);
       
-      // Métricas mensais baseadas em crm_deal.close_date (fonte de verdade)
-      // MRR Vendido e Pontual = deals ganhos, Churn MRR = deals perdidos
+      // Métricas mensais de contratos (churn, MRR vendido, pontual vendido) - cup_contratos
+      // Filtra apenas dados até o mês atual (não inclui datas futuras)
       const contratosEvolucaoResult = await db.execute(sql`
         SELECT 
           mes,
@@ -3076,31 +3076,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(mrr_vendido), 0) as mrr_vendido,
           COALESCE(SUM(pontual_vendido), 0) as pontual_vendido
         FROM (
-          -- Deals ganhos (MRR vendido e Pontual vendido)
+          -- Churn MRR (contratos encerrados no mês - usa valorr)
           SELECT 
-            TO_CHAR(close_date, 'YYYY-MM') as mes,
-            0 as churn_mrr,
-            COALESCE(valor_recorrente, 0) as mrr_vendido,
-            COALESCE(valor_pontual, 0) as pontual_vendido
-          FROM crm_deal
-          WHERE close_date IS NOT NULL
-            AND close_date >= CURRENT_DATE - INTERVAL '12 months'
-            AND close_date <= CURRENT_DATE
-            AND (stage_name ILIKE '%ganho%' OR stage_name ILIKE '%won%')
-          UNION ALL
-          -- Deals perdidos (Churn MRR)
-          SELECT 
-            TO_CHAR(close_date, 'YYYY-MM') as mes,
-            COALESCE(valor_recorrente, 0) as churn_mrr,
+            TO_CHAR(data_encerramento, 'YYYY-MM') as mes,
+            COALESCE(valorr, 0) as churn_mrr,
             0 as mrr_vendido,
             0 as pontual_vendido
-          FROM crm_deal
-          WHERE close_date IS NOT NULL
-            AND close_date >= CURRENT_DATE - INTERVAL '12 months'
-            AND close_date <= CURRENT_DATE
-            AND (stage_name ILIKE '%perdido%' OR stage_name ILIKE '%lost%')
+          FROM cup_contratos
+          WHERE data_encerramento IS NOT NULL
+            AND data_encerramento >= CURRENT_DATE - INTERVAL '12 months'
+            AND data_encerramento <= CURRENT_DATE
+            AND COALESCE(valorr, 0) > 0
+          UNION ALL
+          -- MRR vendido (contratos recorrentes iniciados no mês - valorr > 0)
+          SELECT 
+            TO_CHAR(data_inicio, 'YYYY-MM') as mes,
+            0 as churn_mrr,
+            COALESCE(valorr, 0) as mrr_vendido,
+            0 as pontual_vendido
+          FROM cup_contratos
+          WHERE data_inicio IS NOT NULL
+            AND data_inicio >= CURRENT_DATE - INTERVAL '12 months'
+            AND data_inicio <= CURRENT_DATE
+            AND COALESCE(valorr, 0) > 0
+          UNION ALL
+          -- Pontual vendido (contratos pontuais iniciados no mês - valorp > 0)
+          SELECT 
+            TO_CHAR(data_inicio, 'YYYY-MM') as mes,
+            0 as churn_mrr,
+            0 as mrr_vendido,
+            COALESCE(valorp, 0) as pontual_vendido
+          FROM cup_contratos
+          WHERE data_inicio IS NOT NULL
+            AND data_inicio >= CURRENT_DATE - INTERVAL '12 months'
+            AND data_inicio <= CURRENT_DATE
+            AND COALESCE(valorp, 0) > 0
         ) sub
         WHERE mes IS NOT NULL
+          AND mes <= TO_CHAR(CURRENT_DATE, 'YYYY-MM')
         GROUP BY mes
         ORDER BY mes
       `);
