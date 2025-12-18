@@ -3625,6 +3625,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tblY += 14;
       });
       
+      doc.y = tblY + 12;
+
+      // ===== SEÇÃO 6: TOP 10 CLIENTES =====
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(colors.primary).text('6. TOP 10 CLIENTES POR RECEITA', lm, doc.y);
+      doc.moveDown(0.25);
+      
+      tblY = doc.y;
+      doc.rect(lm, tblY, pw, 15).fill(colors.light);
+      doc.fontSize(6).font('Helvetica-Bold').fillColor(colors.text);
+      doc.text('Cliente', lm + 10, tblY + 4);
+      doc.text('MRR', lm + 245, tblY + 4);
+      doc.text('% MRR', lm + 315, tblY + 4);
+      doc.text('Conc.', lm + 380, tblY + 4);
+      doc.text('Gráfico', lm + 425, tblY + 4);
+      tblY += 15;
+      
+      const topClientesData = topClientesResult.rows || [];
+      const mrrTotalClientes = topClientesData.reduce((acc: number, r: any) => acc + (Number(r.mrr_cliente) || 0), 0);
+      const maxClienteMrr = Math.max(...topClientesData.map((r: any) => Number(r.mrr_cliente) || 0), 1);
+      let acumulado = 0;
+      
+      topClientesData.slice(0, 10).forEach((row: any, i: number) => {
+        const mrrCl = Number(row.mrr_cliente) || 0;
+        const pctMrr = mrrTotalClientes > 0 ? (mrrCl / mrrTotalClientes) * 100 : 0;
+        acumulado += pctMrr;
+        const barW = (mrrCl / maxClienteMrr) * 55;
+        
+        if (i % 2 === 0) doc.rect(lm, tblY, pw, 14).fill('#fafafa');
+        
+        doc.fontSize(6).font('Helvetica').fillColor(colors.text);
+        doc.text(String(row.cliente || 'N/A').slice(0, 40), lm + 10, tblY + 4);
+        doc.font('Helvetica-Bold').text(formatCurrencyShort(mrrCl), lm + 245, tblY + 4);
+        doc.font('Helvetica').text(formatPctAbs(pctMrr), lm + 315, tblY + 4);
+        doc.fillColor(acumulado > 50 ? colors.warning : colors.text).text(formatPctAbs(acumulado), lm + 380, tblY + 4);
+        
+        doc.rect(lm + 425, tblY + 3, barW, 8).fill(colors.success);
+        
+        tblY += 14;
+      });
+      
       doc.y = tblY + 10;
 
       // Processar dados de contratos e fluxo de caixa
