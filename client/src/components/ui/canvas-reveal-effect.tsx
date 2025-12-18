@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Component, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
@@ -15,6 +15,67 @@ interface ShaderProps {
   uniforms: Uniforms;
   maxFps?: number;
 }
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallback: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class WebGLErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
+const CSSFallback = ({ 
+  colors, 
+  containerClassName 
+}: { 
+  colors: number[][]; 
+  containerClassName?: string;
+}) => {
+  const color1 = colors[0] ? `rgb(${colors[0].join(',')})` : 'rgb(139, 92, 246)';
+  const color2 = colors[1] ? `rgb(${colors[1].join(',')})` : 'rgb(59, 130, 246)';
+  
+  return (
+    <div className={cn("h-full relative w-full overflow-hidden", containerClassName)}>
+      <div 
+        className="absolute inset-0 animate-pulse"
+        style={{
+          background: `radial-gradient(circle at 20% 80%, ${color1}20 0%, transparent 50%),
+                       radial-gradient(circle at 80% 20%, ${color2}20 0%, transparent 50%),
+                       radial-gradient(circle at 50% 50%, ${color1}10 0%, transparent 70%)`,
+        }}
+      />
+      <div 
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `radial-gradient(${color1}30 1px, transparent 1px), radial-gradient(${color2}30 1px, transparent 1px)`,
+          backgroundSize: '40px 40px',
+          backgroundPosition: '0 0, 20px 20px',
+          animation: 'fadeIn 2s ease-in-out',
+        }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/50" />
+    </div>
+  );
+};
 
 export const CanvasRevealEffect = ({
   animationSpeed = 10,
@@ -33,21 +94,39 @@ export const CanvasRevealEffect = ({
   showGradient?: boolean;
   reverse?: boolean;
 }) => {
+  const [webglSupported, setWebglSupported] = useState(true);
+
+  useEffect(() => {
+    try {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl') || canvas.getContext('webgl2') || canvas.getContext('experimental-webgl');
+      setWebglSupported(!!gl);
+    } catch {
+      setWebglSupported(false);
+    }
+  }, []);
+
+  if (!webglSupported) {
+    return <CSSFallback colors={colors} containerClassName={containerClassName} />;
+  }
+
   return (
-    <div className={cn("h-full relative w-full", containerClassName)}>
-      <div className="h-full w-full">
-        <DotMatrix
-          colors={colors ?? [[0, 255, 255]]}
-          dotSize={dotSize ?? 3}
-          opacities={opacities ?? [0.3, 0.3, 0.3, 0.5, 0.5, 0.5, 0.8, 0.8, 0.8, 1]}
-          shader={`${reverse ? 'u_reverse_active' : 'false'}_;animation_speed_factor_${animationSpeed.toFixed(1)}_;`}
-          center={["x", "y"]}
-        />
+    <WebGLErrorBoundary fallback={<CSSFallback colors={colors} containerClassName={containerClassName} />}>
+      <div className={cn("h-full relative w-full", containerClassName)}>
+        <div className="h-full w-full">
+          <DotMatrix
+            colors={colors ?? [[0, 255, 255]]}
+            dotSize={dotSize ?? 3}
+            opacities={opacities ?? [0.3, 0.3, 0.3, 0.5, 0.5, 0.5, 0.8, 0.8, 0.8, 1]}
+            shader={`${reverse ? 'u_reverse_active' : 'false'}_;animation_speed_factor_${animationSpeed.toFixed(1)}_;`}
+            center={["x", "y"]}
+          />
+        </div>
+        {showGradient && (
+          <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
+        )}
       </div>
-      {showGradient && (
-        <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
-      )}
-    </div>
+    </WebGLErrorBoundary>
   );
 };
 
