@@ -3592,76 +3592,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .sort((a: any, b: any) => a.mes.localeCompare(b.mes))
         .slice(-12);
       
-      // Função para desenhar gráfico grande (uma página inteira)
+      // Função para desenhar gráfico grande (uma página inteira) - Design Moderno
       const drawFullPageChart = (title: string, subtitle: string, data: any[], valueKey: string, barColor: string) => {
         doc.addPage();
         
-        // Header
-        doc.rect(lm, 35, pw, 4).fill(colors.accent);
+        // Fundo branco limpo
+        doc.rect(0, 0, 612, 792).fill('#ffffff');
         
-        // Título grande
-        doc.fontSize(22).font('Helvetica-Bold').fillColor(colors.primary).text(title, lm, 60);
-        doc.fontSize(10).font('Helvetica').fillColor(colors.muted).text(subtitle, lm, 88);
+        // Header com linha colorida sutil
+        doc.rect(0, 0, 612, 6).fill(barColor);
+        
+        // Título elegante
+        doc.fontSize(28).font('Helvetica-Bold').fillColor('#1a1a2e').text(title, lm, 45);
+        doc.fontSize(11).font('Helvetica').fillColor('#6b7280').text(subtitle, lm, 82);
         
         // Área do gráfico
-        const chartX = lm + 50;
+        const chartX = lm + 55;
         const chartY = 130;
-        const chartW = pw - 60;
-        const chartH = 400;
-        const barSpacing = 8;
+        const chartW = pw - 65;
+        const chartH = 380;
+        const barSpacing = 12;
         const barW = (chartW - (data.length - 1) * barSpacing) / data.length;
         
         // Calcular max e steps do eixo Y
         const maxVal = Math.max(...data.map((d: any) => Math.abs(d[valueKey])), 1);
-        const niceMax = Math.ceil(maxVal / 50000) * 50000;
+        const niceMax = Math.ceil(maxVal / 50000) * 50000 || 50000;
         const ySteps = 5;
         const stepVal = niceMax / ySteps;
         
-        // Fundo do gráfico
-        doc.rect(chartX, chartY, chartW, chartH).fill('#fafafa');
-        
-        // Linhas horizontais e labels do eixo Y
+        // Linhas horizontais sutis e labels do eixo Y
         for (let i = 0; i <= ySteps; i++) {
           const y = chartY + chartH - (i / ySteps) * chartH;
           const val = stepVal * i;
           
-          // Linha horizontal
-          doc.strokeColor('#e0e0e0').lineWidth(0.5);
+          // Linha horizontal pontilhada
+          doc.strokeColor('#e5e7eb').lineWidth(0.5);
           doc.moveTo(chartX, y).lineTo(chartX + chartW, y).stroke();
           
           // Label do valor
-          doc.fontSize(9).font('Helvetica').fillColor(colors.muted)
-            .text(val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : val >= 1000 ? `${Math.round(val / 1000)}K` : String(val), 
-              lm, y - 5, { width: 45, align: 'right' });
+          const valStr = val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : val >= 1000 ? `${Math.round(val / 1000)}K` : String(val);
+          doc.fontSize(9).font('Helvetica').fillColor('#9ca3af')
+            .text(valStr, lm - 5, y - 4, { width: 55, align: 'right' });
         }
         
-        // Desenhar barras
+        // Desenhar barras com design moderno
         data.forEach((d: any, i: number) => {
           const val = d[valueKey];
-          const barH = (Math.abs(val) / niceMax) * chartH;
+          const barH = Math.max((Math.abs(val) / niceMax) * chartH, 2);
           const x = chartX + i * (barW + barSpacing);
           const y = chartY + chartH - barH;
           
-          // Barra com cantos arredondados no topo
-          doc.rect(x, y, barW, barH).fill(val >= 0 ? barColor : colors.danger);
+          // Sombra sutil
+          doc.rect(x + 2, y + 2, barW, barH).fill('#00000010');
           
-          // Valor em cima da barra
-          if (barH > 25) {
-            doc.fontSize(8).font('Helvetica-Bold').fillColor('#fff')
-              .text(formatCurrencyShort(val), x, y + 8, { width: barW, align: 'center' });
-          }
+          // Barra principal com cor
+          const fillColor = val >= 0 ? barColor : colors.danger;
+          doc.rect(x, y, barW, barH).fill(fillColor);
+          
+          // Highlight no topo da barra (efeito 3D sutil)
+          doc.rect(x, y, barW, Math.min(3, barH)).fill('#ffffff30');
+          
+          // Valor abaixo da barra (fora dela)
+          doc.fontSize(8).font('Helvetica-Bold').fillColor('#374151')
+            .text(formatCurrencyShort(val), x - 5, chartY + chartH + 25, { width: barW + 10, align: 'center' });
           
           // Label do mês
           const mesParts = (d.mes || '').split('-');
           const mesLabel = mesesNomes[mesParts[1]] || mesParts[1] || '';
-          doc.fontSize(9).font('Helvetica').fillColor(colors.text)
-            .text(mesLabel, x, chartY + chartH + 8, { width: barW, align: 'center' });
+          doc.fontSize(10).font('Helvetica').fillColor('#4b5563')
+            .text(mesLabel.slice(0, 3), x, chartY + chartH + 8, { width: barW, align: 'center' });
         });
         
-        // Total no rodapé
+        // Linha base do gráfico
+        doc.strokeColor('#d1d5db').lineWidth(1);
+        doc.moveTo(chartX, chartY + chartH).lineTo(chartX + chartW, chartY + chartH).stroke();
+        
+        // Card com total no rodapé
         const total = data.reduce((sum: number, d: any) => sum + (d[valueKey] || 0), 0);
-        doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary)
-          .text(`Total: ${formatCurrency(total)}`, lm, chartY + chartH + 50);
+        const cardY = chartY + chartH + 55;
+        
+        // Background do card
+        doc.roundedRect(lm, cardY, 180, 50, 8).fill('#f8fafc');
+        doc.roundedRect(lm, cardY, 180, 50, 8).strokeColor('#e2e8f0').lineWidth(1).stroke();
+        
+        doc.fontSize(10).font('Helvetica').fillColor('#6b7280').text('Total Acumulado', lm + 15, cardY + 10);
+        doc.fontSize(18).font('Helvetica-Bold').fillColor(barColor).text(formatCurrency(total), lm + 15, cardY + 26);
+        
+        // Média mensal
+        const media = total / data.length;
+        doc.roundedRect(lm + 200, cardY, 180, 50, 8).fill('#f8fafc');
+        doc.roundedRect(lm + 200, cardY, 180, 50, 8).strokeColor('#e2e8f0').lineWidth(1).stroke();
+        
+        doc.fontSize(10).font('Helvetica').fillColor('#6b7280').text('Média Mensal', lm + 215, cardY + 10);
+        doc.fontSize(18).font('Helvetica-Bold').fillColor('#1f2937').text(formatCurrency(media), lm + 215, cardY + 26);
       };
       
       // Página 3: Churn MRR
