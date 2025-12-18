@@ -2974,7 +2974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // ===== QUERIES AVANÇADAS =====
       
-      // Contratos ativos e churn (usando data_encerramento como fonte única)
+      // Contratos ativos, churn e LT médio (usando data_encerramento como fonte única)
       const clientesResult = await db.execute(sql`
         SELECT 
           COUNT(DISTINCT CASE WHEN c.status IN ('ativo', 'onboarding', 'triagem') THEN c.id_task END) as contratos_ativos,
@@ -2984,7 +2984,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             THEN c.id_task END) as churn_mes,
           COALESCE(SUM(CASE WHEN c.data_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
             AND c.data_encerramento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
-            THEN c.valorr ELSE 0 END), 0) as mrr_churn_mes
+            THEN c.valorr ELSE 0 END), 0) as mrr_churn_mes,
+          COALESCE(AVG(
+            CASE WHEN c.data_inicio IS NOT NULL THEN
+              EXTRACT(MONTH FROM AGE(COALESCE(c.data_encerramento, CURRENT_DATE), c.data_inicio)) +
+              EXTRACT(YEAR FROM AGE(COALESCE(c.data_encerramento, CURRENT_DATE), c.data_inicio)) * 12
+            END
+          ), 6) as lt_medio_meses
         FROM cup_contratos c
       `);
       
@@ -3125,7 +3131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // ===== PROCESSAR DADOS =====
       // Usando apenas contratos como fonte única de verdade
-      const contratosData = clientesResult.rows[0] || { contratos_ativos: 0, contratos_encerrados_total: 0, churn_mes: 0, mrr_churn_mes: 0 };
+      const contratosData = clientesResult.rows[0] || { contratos_ativos: 0, contratos_encerrados_total: 0, churn_mes: 0, mrr_churn_mes: 0, lt_medio_meses: 6 };
       const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0, mrr_churn: 0 };
       const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0, contratacoes_90d: 0, desligamentos_90d: 0 };
       const concentracao = concentracaoResult.rows[0] || { top5_pct: 0, top10_pct: 0, top20_pct: 0 };
@@ -3135,6 +3141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contratosAtivos = Number(contratosData.contratos_ativos) || 1;
       const churnMes = Number(contratosData.churn_mes) || 0;
       const mrrChurnMes = Number(contratosData.mrr_churn_mes) || 0;
+      const ltMedio = Number(contratosData.lt_medio_meses) || 6; // LT médio em meses
       const contratosRecorrentes = Number(contratos.contratos_recorrentes) || 0;
       const aovRecorrente = Number(contratos.aov_recorrente) || 0;
       const receitaPorCabeca = headcount > 0 ? mrrAtivo / headcount : 0;
@@ -3143,8 +3150,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Cálculos avançados - usando apenas contratos
       const churnRate = contratosAtivos > 0 ? (churnMes / contratosAtivos) * 100 : 0;
       const arr = mrrAtivo * 12;
-      // LTV = AOV × (1 / churn rate mensal) - usando apenas contratos
-      const ltv = churnRate > 0 ? (aovRecorrente * 12) / (churnRate / 100) : aovRecorrente * 24;
+      // LTV = AOV × LT (tempo de vida médio em meses)
+      const ltv = aovRecorrente * ltMedio;
       
       // Variação MoM/YoY
       const mrrHistData = mrrHistoricoResult.rows || [];
@@ -3283,7 +3290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Segunda linha de KPIs
       const kpis2 = [
         { label: 'AOV Recorrente', value: formatCurrency(aovRecorrente), delta: 'Ticket médio', deltaColor: colors.muted },
-        { label: 'LTV Estimado', value: formatCurrencyShort(ltv), delta: 'AOV × 12 / Churn', deltaColor: colors.muted },
+        { label: 'LTV', value: formatCurrencyShort(ltv), delta: `AOV × ${ltMedio.toFixed(0)} meses`, deltaColor: colors.muted },
         { label: 'Inadimplência', value: formatPctAbs(taxaInadimplencia), delta: formatCurrency(inadimplenciaTotal12m), deltaColor: taxaInadimplencia > 5 ? colors.danger : colors.success },
         { label: 'Churn Rate', value: formatPctAbs(churnRate), delta: `${churnMes} este mês`, deltaColor: churnRate > 5 ? colors.danger : colors.success },
       ];
