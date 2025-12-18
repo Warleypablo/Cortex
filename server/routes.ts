@@ -2974,13 +2974,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // ===== QUERIES AVANÇADAS =====
       
-      // Clientes ativos e churn
+      // Clientes ativos e churn (usando data_encerramento para churn mensal)
       const clientesResult = await db.execute(sql`
         SELECT 
           (SELECT COUNT(DISTINCT cnpj) FROM cup_clientes) as total_clientes,
           COUNT(DISTINCT CASE WHEN c.status IN ('ativo', 'onboarding', 'triagem') THEN c.id_task END) as clientes_ativos,
           COUNT(DISTINCT CASE WHEN c.status = 'churn' THEN c.id_task END) as clientes_churn,
-          COUNT(DISTINCT CASE WHEN c.status = 'churn' THEN c.id_task END) as churn_mes
+          COUNT(DISTINCT CASE WHEN c.data_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
+            AND c.data_encerramento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+            THEN c.id_task END) as churn_mes
         FROM cup_contratos c
       `);
       
