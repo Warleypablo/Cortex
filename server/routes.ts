@@ -3155,11 +3155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contratosRecorrentesAtivos = Number(contratosData.contratos_recorrentes_ativos) || 1;
       const churnMes = Number(contratosData.churn_mes) || 0;
       const mrrChurnMes = Number(contratosData.mrr_churn_mes) || 0;
-      const ltMedio = Number(contratosData.lt_medio_meses) || 6; // LT médio em meses (baseado em contratos encerrados)
-      
-      console.log('[DEBUG LT] Raw data:', JSON.stringify(contratosData));
-      console.log('[DEBUG LT] LT médio calculado:', ltMedio, 'meses');
-      console.log('[DEBUG] Clientes ativos:', clientesAtivos, 'Contratos recorrentes:', contratosRecorrentesAtivos);
+      const ltMedio = 5; // LT fixo de 5 meses (definido pelo negócio)
       
       const contratosRecorrentes = Number(contratos.contratos_recorrentes) || 0;
       const aovRecorrente = Number(contratos.aov_recorrente) || 0;
@@ -3191,15 +3187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ===== MÉTRICAS AVANÇADAS PARA INVESTIDORES =====
       // NOTA: Todas as métricas usam contratos como fonte única de verdade
       
-      // CAC Estimado - usa despesas totais como proxy (sem dados de marketing separados)
-      const cacEstimado = contratosRecorrentesAtivos > 0 ? (despesaTotal12m / 12) / (contratosRecorrentesAtivos / 12) : 0;
-      
-      // LTV/CAC Ratio (saudável: > 3x)
-      const ltvCacRatio = cacEstimado > 0 ? ltv / cacEstimado : 0;
-      
-      // Payback Period (meses para recuperar CAC)
-      const paybackPeriod = aovRecorrente > 0 ? cacEstimado / aovRecorrente : 0;
-      
+            
       // NRR e GRR usando MRR churn do mês (contratos encerrados no mês)
       // NRR = (MRR atual / MRR inicial) * 100 ≈ 100% - (MRR churned / MRR total)
       const churnMrrPct = mrrAtivo > 0 ? (mrrChurnMes / mrrAtivo) * 100 : 0;
@@ -3328,10 +3316,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Terceira linha: Unit Economics & Projeções
       const kpis3 = [
-        { label: 'LTV/CAC (est.)', value: ltvCacRatio.toFixed(1) + 'x', delta: ltvCacRatio >= 3 ? 'Saudável (>3x)' : 'Abaixo ideal', deltaColor: ltvCacRatio >= 3 ? colors.success : colors.warning },
-        { label: 'Payback (est.)', value: paybackPeriod.toFixed(1) + ' meses', delta: paybackPeriod <= 12 ? 'Excelente' : 'Recuperar CAC', deltaColor: paybackPeriod <= 12 ? colors.success : colors.warning },
+        { label: 'LT Médio', value: `${ltMedio} meses`, delta: 'Tempo médio de contrato', deltaColor: colors.muted },
         { label: 'Rule of 40', value: ruleOf40.toFixed(0) + '%', delta: ruleOf40 >= 40 ? 'Atingido' : 'Abaixo', deltaColor: ruleOf40 >= 40 ? colors.success : colors.warning },
         { label: 'NRR (conserv.)', value: formatPctAbs(Math.max(Math.min(nrr, 120), 0)), delta: nrr >= 100 ? 'Saudável' : 'Atenção', deltaColor: nrr >= 100 ? colors.success : colors.warning },
+        { label: 'GRR (conserv.)', value: formatPctAbs(Math.max(Math.min(grr, 100), 0)), delta: grr >= 85 ? 'Saudável' : 'Atenção', deltaColor: grr >= 85 ? colors.success : colors.warning },
       ];
       
       const kpi3Y = doc.y;
@@ -3351,7 +3339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { label: 'Quick Ratio (est.)', value: quickRatioSaas.toFixed(1), delta: quickRatioSaas >= 4 ? 'Forte' : 'Moderado', deltaColor: quickRatioSaas >= 4 ? colors.success : colors.muted },
         { label: 'Magic # (est.)', value: magicNumber.toFixed(2), delta: magicNumber >= 0.5 ? 'Eficiente' : 'Em análise', deltaColor: magicNumber >= 0.5 ? colors.success : colors.muted },
         { label: 'ARR/Func.', value: formatCurrencyShort(revenuePerEmployee), delta: 'Produtividade', deltaColor: colors.muted },
-        { label: 'GRR (conserv.)', value: formatPctAbs(Math.max(Math.min(grr, 100), 0)), delta: grr >= 85 ? 'Saudável' : 'Atenção', deltaColor: grr >= 85 ? colors.success : colors.warning },
+        { label: 'Margem Bruta', value: formatPctAbs(margemBruta), delta: margemBruta >= 25 ? 'Saudável' : 'Atenção', deltaColor: margemBruta >= 25 ? colors.success : colors.warning },
       ];
       
       const kpi4Y = doc.y;
