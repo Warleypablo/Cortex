@@ -3144,6 +3144,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const churnMes = Number(contratosData.churn_mes) || 0;
       const mrrChurnMes = Number(contratosData.mrr_churn_mes) || 0;
       const ltMedio = Number(contratosData.lt_medio_meses) || 6; // LT médio em meses
+      
+      console.log('[DEBUG LT] Raw data:', JSON.stringify(contratosData));
+      console.log('[DEBUG LT] LT médio calculado:', ltMedio);
       const contratosRecorrentes = Number(contratos.contratos_recorrentes) || 0;
       const aovRecorrente = Number(contratos.aov_recorrente) || 0;
       const receitaPorCabeca = headcount > 0 ? mrrAtivo / headcount : 0;
