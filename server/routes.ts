@@ -11,6 +11,7 @@ import { analyzeDfc, chatWithDfc, type ChatMessage } from "./services/dfcAnalysi
 import { setupDealNotifications, triggerTestNotification } from "./services/dealNotifications";
 import PDFDocument from "pdfkit";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== 'admin') {
@@ -3316,6 +3317,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=investors-report-${format(new Date(), 'yyyy-MM')}.pdf`);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       
       doc.pipe(res);
 
@@ -3341,7 +3345,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mesesPtBr = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
       const dataAtual = new Date();
 
+      // ==================== PÁGINA DE CAPA ====================
+      // Fundo gradiente simulado com retângulos
+      doc.rect(0, 0, 595, 842).fill('#0f172a');
+      doc.rect(0, 0, 595, 280).fill('#1e293b');
+      
+      // Linha accent decorativa
+      doc.rect(50, 320, 495, 4).fill(colors.accent);
+      
+      // Título principal
+      doc.fontSize(36).font('Helvetica-Bold').fillColor('#ffffff')
+        .text('INVESTORS', 50, 350, { align: 'center', width: 495 });
+      doc.fontSize(36).font('Helvetica-Bold').fillColor(colors.accent)
+        .text('REPORT', 50, 395, { align: 'center', width: 495 });
+      
+      // Subtítulo
+      doc.fontSize(14).font('Helvetica').fillColor('#94a3b8')
+        .text('Relatório Executivo para Investidores', 50, 450, { align: 'center', width: 495 });
+      
+      // Período
+      doc.fontSize(12).font('Helvetica').fillColor('#64748b')
+        .text(`${mesesPtBr[dataAtual.getMonth()]} ${dataAtual.getFullYear()}`, 50, 480, { align: 'center', width: 495 });
+      
+      // Linha divisória
+      doc.rect(150, 530, 295, 1).fill('#334155');
+      
+      // Mantra
+      doc.fontSize(11).font('Helvetica-Oblique').fillColor('#cbd5e1')
+        .text('"Tornamos a vida de quem vende online mais fácil e rentável,', 50, 570, { align: 'center', width: 495 });
+      doc.fontSize(11).font('Helvetica-Oblique').fillColor('#cbd5e1')
+        .text('usando desse know how, para construir', 50, 588, { align: 'center', width: 495 });
+      doc.fontSize(11).font('Helvetica-Oblique').fillColor('#cbd5e1')
+        .text('as marcas da próxima geração."', 50, 606, { align: 'center', width: 495 });
+      
+      // Logo/Nome da empresa
+      doc.fontSize(18).font('Helvetica-Bold').fillColor('#ffffff')
+        .text('TURBO PARTNERS', 50, 720, { align: 'center', width: 495 });
+      
+      // Data de geração
+      doc.fontSize(9).font('Helvetica').fillColor('#64748b')
+        .text(`Gerado em ${format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`, 50, 800, { align: 'center', width: 495 });
+
       // ==================== PÁGINA 1: RESUMO EXECUTIVO ====================
+      doc.addPage();
       doc.rect(lm, 45, pw, 4).fill(colors.accent);
       doc.fontSize(22).font('Helvetica-Bold').fillColor(colors.primary)
         .text('INVESTORS REPORT', lm, 60, { align: 'center', width: pw });
