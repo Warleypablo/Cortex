@@ -2977,16 +2977,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Contratos ativos, churn e LT médio (usando data_encerramento como fonte única)
       const clientesResult = await db.execute(sql`
         SELECT 
-          COUNT(DISTINCT CASE WHEN c.status IN ('ativo', 'onboarding', 'triagem') THEN c.id_task END) as contratos_ativos,
-          COUNT(DISTINCT CASE WHEN c.data_encerramento IS NOT NULL THEN c.id_task END) as contratos_encerrados_total,
+          COUNT(DISTINCT CASE WHEN c.status IN ('ativo', 'onboarding', 'triagem') AND c.valorr > 0 THEN c.id_task END) as contratos_ativos,
+          COUNT(DISTINCT CASE WHEN c.data_encerramento IS NOT NULL AND c.valorr > 0 THEN c.id_task END) as contratos_encerrados_total,
           COUNT(DISTINCT CASE WHEN c.data_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
             AND c.data_encerramento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+            AND c.valorr > 0
             THEN c.id_task END) as churn_mes,
           COALESCE(SUM(CASE WHEN c.data_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
             AND c.data_encerramento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+            AND c.valorr > 0
             THEN c.valorr ELSE 0 END), 0) as mrr_churn_mes,
           COALESCE(AVG(
-            CASE WHEN c.data_inicio IS NOT NULL THEN
+            CASE WHEN c.data_inicio IS NOT NULL AND c.valorr > 0 THEN
               EXTRACT(MONTH FROM AGE(COALESCE(c.data_encerramento, CURRENT_DATE), c.data_inicio)) +
               EXTRACT(YEAR FROM AGE(COALESCE(c.data_encerramento, CURRENT_DATE), c.data_inicio)) * 12
             END
