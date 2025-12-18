@@ -3531,70 +3531,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       doc.y = tblY + 15;
 
-      // ===== SEÇÃO 6: CONCENTRAÇÃO DE RECEITA =====
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('6. CONCENTRAÇÃO DE RECEITA', lm, doc.y);
-      doc.moveDown(0.3);
-      
-      const concY = doc.y;
-      const concW = 165;
-      
-      const concKpis = [
-        { label: 'Top 5 Clientes', value: formatPctAbs(Number(concentracao.top5_pct) || 0), desc: 'da receita total' },
-        { label: 'Top 10 Clientes', value: formatPctAbs(Number(concentracao.top10_pct) || 0), desc: 'da receita total' },
-        { label: 'Top 20% Clientes', value: formatPctAbs(Number(concentracao.top20_pct) || 0), desc: 'da receita total' },
-      ];
-      
-      concKpis.forEach((kpi, i) => {
-        const x = lm + i * (concW + 10);
-        doc.rect(x, concY, concW, 40).fill(colors.light);
-        doc.fontSize(8).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 10, concY + 6);
-        doc.fontSize(16).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 10, concY + 18);
-        doc.fontSize(7).font('Helvetica').fillColor(colors.muted).text(kpi.desc, x + 70, concY + 22);
-      });
-      
-      doc.y = concY + 50;
-
-      // ===== SEÇÃO 7: TOP 10 CLIENTES =====
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('7. TOP 10 CLIENTES (12 MESES)', lm, doc.y);
-      doc.moveDown(0.3);
-      
-      tblY = doc.y;
-      doc.rect(lm, tblY, pw, 14).fill(colors.light);
-      doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.text);
-      doc.text('#', lm + 5, tblY + 3);
-      doc.text('Cliente', lm + 20, tblY + 3);
-      doc.text('Receita 12m', lm + 300, tblY + 3);
-      doc.text('Meses Ativos', lm + 380, tblY + 3);
-      doc.text('Gráfico', lm + 450, tblY + 3);
-      tblY += 14;
-      
-      const topData = topClientesResult.rows || [];
-      const topMaxRec = Math.max(...topData.map((r: any) => Number(r.receita_12m) || 0), 1);
-      
-      topData.forEach((row: any, i: number) => {
-        const receita = Number(row.receita_12m) || 0;
-        const barW = (receita / topMaxRec) * 55;
-        
-        if (i % 2 === 0) doc.rect(lm, tblY, pw, 14).fill('#fafafa');
-        
-        doc.fontSize(7).font('Helvetica').fillColor(colors.text);
-        doc.text(String(i + 1), lm + 5, tblY + 3);
-        doc.text(String(row.cliente).slice(0, 45), lm + 20, tblY + 3);
-        doc.font('Helvetica-Bold').text(formatCurrencyShort(receita), lm + 300, tblY + 3);
-        doc.font('Helvetica').text(String(row.meses_ativos || 0), lm + 395, tblY + 3);
-        doc.rect(lm + 450, tblY + 2, barW, 10).fill(colors.bar1);
-        
-        tblY += 14;
-      });
-
       // ==================== PÁGINA 3: EQUIPE E INSIGHTS ====================
       doc.addPage();
       doc.rect(lm, 35, pw, 4).fill(colors.accent);
       doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('EQUIPE E INSIGHTS', lm, 50);
       doc.y = 70;
 
-      // ===== SEÇÃO 8: MÉTRICAS DE EQUIPE =====
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('8. MÉTRICAS DE EQUIPE', lm, doc.y);
+      // ===== SEÇÃO 6: MÉTRICAS DE EQUIPE =====
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('6. MÉTRICAS DE EQUIPE', lm, doc.y);
       doc.moveDown(0.3);
       
       const eqKpiY = doc.y;
@@ -3619,8 +3563,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       doc.y = eqKpiY + 60;
 
-      // ===== SEÇÃO 9: DISTRIBUIÇÃO POR SETOR =====
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('9. DISTRIBUIÇÃO POR SETOR', lm, doc.y);
+      // ===== SEÇÃO 7: DISTRIBUIÇÃO POR SETOR =====
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('7. DISTRIBUIÇÃO POR SETOR', lm, doc.y);
       doc.moveDown(0.3);
       
       const setorData = setorResult.rows || [];
@@ -3656,7 +3600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       doc.y = tblY + 20;
 
-      // ===== SEÇÃO 10: INSIGHTS E OUTLOOK =====
+      // ===== SEÇÃO 8: INSIGHTS E OUTLOOK =====
       doc.rect(lm, doc.y, pw, 130).fill(colors.light);
       doc.rect(lm, doc.y, pw, 4).fill(colors.accent);
       
