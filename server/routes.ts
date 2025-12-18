@@ -3075,40 +3075,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(mrr_vendido), 0) as mrr_vendido,
           COALESCE(SUM(pontual_vendido), 0) as pontual_vendido
         FROM (
-          -- Churn MRR (contratos encerrados no mês)
+          -- Churn MRR (contratos encerrados no mês - usa valorr)
           SELECT 
             TO_CHAR(data_encerramento, 'YYYY-MM') as mes,
-            valorr as churn_mrr,
+            COALESCE(valorr, 0) as churn_mrr,
             0 as mrr_vendido,
             0 as pontual_vendido
           FROM cup_contratos
           WHERE data_encerramento IS NOT NULL
             AND data_encerramento >= CURRENT_DATE - INTERVAL '12 months'
-            AND valorr > 0
+            AND COALESCE(valorr, 0) > 0
           UNION ALL
-          -- MRR vendido (contratos recorrentes iniciados no mês)
+          -- MRR vendido (contratos recorrentes iniciados no mês - valorr > 0)
           SELECT 
             TO_CHAR(data_inicio, 'YYYY-MM') as mes,
             0 as churn_mrr,
-            valorr as mrr_vendido,
+            COALESCE(valorr, 0) as mrr_vendido,
             0 as pontual_vendido
           FROM cup_contratos
           WHERE data_inicio IS NOT NULL
             AND data_inicio >= CURRENT_DATE - INTERVAL '12 months'
-            AND valorr > 0
-            AND LOWER(tipo) = 'recorrente'
+            AND COALESCE(valorr, 0) > 0
           UNION ALL
-          -- Pontual vendido (contratos pontuais iniciados no mês)
+          -- Pontual vendido (contratos pontuais iniciados no mês - valorp > 0)
           SELECT 
             TO_CHAR(data_inicio, 'YYYY-MM') as mes,
             0 as churn_mrr,
             0 as mrr_vendido,
-            valorr as pontual_vendido
+            COALESCE(valorp, 0) as pontual_vendido
           FROM cup_contratos
           WHERE data_inicio IS NOT NULL
             AND data_inicio >= CURRENT_DATE - INTERVAL '12 months'
-            AND valorr > 0
-            AND LOWER(tipo) = 'pontual'
+            AND COALESCE(valorp, 0) > 0
         ) sub
         WHERE mes IS NOT NULL
         GROUP BY mes
