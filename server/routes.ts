@@ -3326,45 +3326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       doc.y = kpi2Y + kpiH + 12;
       
-      // Terceira linha: Unit Economics & Projeções
-      const kpis3 = [
-        { label: 'LT Médio', value: `${ltMedio} meses`, delta: 'Tempo médio de contrato', deltaColor: colors.muted },
-        { label: 'Rule of 40', value: ruleOf40.toFixed(0) + '%', delta: ruleOf40 >= 40 ? 'Atingido' : 'Abaixo', deltaColor: ruleOf40 >= 40 ? colors.success : colors.warning },
-        { label: 'NRR (conserv.)', value: formatPctAbs(Math.max(Math.min(nrr, 120), 0)), delta: nrr >= 100 ? 'Saudável' : 'Atenção', deltaColor: nrr >= 100 ? colors.success : colors.warning },
-        { label: 'GRR (conserv.)', value: formatPctAbs(Math.max(Math.min(grr, 100), 0)), delta: grr >= 85 ? 'Saudável' : 'Atenção', deltaColor: grr >= 85 ? colors.success : colors.warning },
-      ];
-      
-      const kpi3Y = doc.y;
-      kpis3.forEach((kpi, i) => {
-        const x = lm + i * (kpiW + 10);
-        doc.rect(x, kpi3Y, kpiW, kpiH).fill(colors.light);
-        doc.rect(x, kpi3Y, 3, kpiH).fill(colors.bar3);
-        doc.fontSize(8).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 8, kpi3Y + 6);
-        doc.fontSize(16).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 8, kpi3Y + 20);
-        doc.fontSize(8).font('Helvetica').fillColor(kpi.deltaColor).text(kpi.delta, x + 8, kpi3Y + 40);
-      });
-      
-      doc.y = kpi3Y + kpiH + 12;
-      
-      // Quarta linha: Métricas SaaS Avançadas
-      const kpis4 = [
-        { label: 'Quick Ratio (est.)', value: quickRatioSaas.toFixed(1), delta: quickRatioSaas >= 4 ? 'Forte' : 'Moderado', deltaColor: quickRatioSaas >= 4 ? colors.success : colors.muted },
-        { label: 'Magic # (est.)', value: magicNumber.toFixed(2), delta: magicNumber >= 0.5 ? 'Eficiente' : 'Em análise', deltaColor: magicNumber >= 0.5 ? colors.success : colors.muted },
-        { label: 'ARR/Func.', value: formatCurrencyShort(revenuePerEmployee), delta: 'Produtividade', deltaColor: colors.muted },
-        { label: 'Margem Bruta', value: formatPctAbs(margemBruta), delta: margemBruta >= 25 ? 'Saudável' : 'Atenção', deltaColor: margemBruta >= 25 ? colors.success : colors.warning },
-      ];
-      
-      const kpi4Y = doc.y;
-      kpis4.forEach((kpi, i) => {
-        const x = lm + i * (kpiW + 10);
-        doc.rect(x, kpi4Y, kpiW, kpiH).fill(colors.light);
-        doc.rect(x, kpi4Y, 3, kpiH).fill(colors.bar4);
-        doc.fontSize(8).font('Helvetica').fillColor(colors.muted).text(kpi.label, x + 8, kpi4Y + 6);
-        doc.fontSize(16).font('Helvetica-Bold').fillColor(colors.primary).text(kpi.value, x + 8, kpi4Y + 20);
-        doc.fontSize(8).font('Helvetica').fillColor(kpi.deltaColor).text(kpi.delta, x + 8, kpi4Y + 40);
-      });
-      
-      doc.y = kpi4Y + kpiH + 20;
+      doc.y = doc.y + 15;
 
       // ===== SEÇÃO 2: EVOLUÇÃO ANUAL COM BARRAS COMPARATIVAS =====
       doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('2. EVOLUÇÃO ANUAL', lm, doc.y);
