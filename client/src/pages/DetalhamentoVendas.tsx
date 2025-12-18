@@ -343,7 +343,7 @@ export default function DetalhamentoVendas() {
                     <SelectTrigger className="bg-slate-800 border-slate-700 text-sm h-9" data-testid="select-source">
                       <SelectValue placeholder="Todas" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-slate-800 border-slate-700">
                       <SelectItem value="all">Todas</SelectItem>
                       {filtros?.sources?.map((s) => (
                         <SelectItem key={s} value={s}>{getSourceDisplayName(s)}</SelectItem>
@@ -357,7 +357,7 @@ export default function DetalhamentoVendas() {
                     <SelectTrigger className="bg-slate-800 border-slate-700 text-sm h-9" data-testid="select-category">
                       <SelectValue placeholder="Todas" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-slate-800 border-slate-700">
                       <SelectItem value="all">Todas</SelectItem>
                       {filtros?.categories?.map((c) => (
                         <SelectItem key={c} value={c}>{c}</SelectItem>
@@ -371,7 +371,7 @@ export default function DetalhamentoVendas() {
                     <SelectTrigger className="bg-slate-800 border-slate-700 text-sm h-9" data-testid="select-closer">
                       <SelectValue placeholder="Todos" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-slate-800 border-slate-700">
                       <SelectItem value="all">Todos</SelectItem>
                       {filtros?.closers?.map((c) => (
                         <SelectItem key={c} value={c}>{c}</SelectItem>
@@ -592,7 +592,7 @@ export default function DetalhamentoVendas() {
                       <SelectTrigger className="w-32 bg-slate-800 border-slate-700 h-8 text-xs">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-slate-800 border-slate-700">
                         <SelectItem value="close_date">Data</SelectItem>
                         <SelectItem value="valor">Valor Total</SelectItem>
                         <SelectItem value="mrr">MRR</SelectItem>
@@ -935,7 +935,7 @@ export default function DetalhamentoVendas() {
                     <SelectTrigger className="w-36 bg-slate-800 border-slate-700 h-8 text-xs">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-slate-800 border-slate-700">
                       <SelectItem value="source">UTM Source</SelectItem>
                       <SelectItem value="medium">UTM Medium</SelectItem>
                       <SelectItem value="campaign">UTM Campaign</SelectItem>
