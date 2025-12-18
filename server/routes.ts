@@ -3067,6 +3067,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND salario::numeric > 0
       `);
       
+      // Métricas mensais de contratos (churn, MRR vendido, pontual vendido) - cup_contratos
+      const contratosEvolucaoResult = await db.execute(sql`
+        SELECT 
+          mes,
+          COALESCE(SUM(churn_mrr), 0) as churn_mrr,
+          COALESCE(SUM(mrr_vendido), 0) as mrr_vendido,
+          COALESCE(SUM(pontual_vendido), 0) as pontual_vendido
+        FROM (
+          -- Churn MRR (contratos encerrados no mês)
+          SELECT 
+            TO_CHAR(data_encerramento, 'YYYY-MM') as mes,
+            valorr as churn_mrr,
+            0 as mrr_vendido,
+            0 as pontual_vendido
+          FROM cup_contratos
+          WHERE data_encerramento IS NOT NULL
+            AND data_encerramento >= CURRENT_DATE - INTERVAL '12 months'
+            AND valorr > 0
+          UNION ALL
+          -- MRR vendido (contratos recorrentes iniciados no mês)
+          SELECT 
+            TO_CHAR(data_inicio, 'YYYY-MM') as mes,
+            0 as churn_mrr,
+            valorr as mrr_vendido,
+            0 as pontual_vendido
+          FROM cup_contratos
+          WHERE data_inicio IS NOT NULL
+            AND data_inicio >= CURRENT_DATE - INTERVAL '12 months'
+            AND valorr > 0
+            AND LOWER(tipo) = 'recorrente'
+          UNION ALL
+          -- Pontual vendido (contratos pontuais iniciados no mês)
+          SELECT 
+            TO_CHAR(data_inicio, 'YYYY-MM') as mes,
+            0 as churn_mrr,
+            0 as mrr_vendido,
+            valorr as pontual_vendido
+          FROM cup_contratos
+          WHERE data_inicio IS NOT NULL
+            AND data_inicio >= CURRENT_DATE - INTERVAL '12 months'
+            AND valorr > 0
+            AND LOWER(tipo) = 'pontual'
+        ) sub
+        WHERE mes IS NOT NULL
+        GROUP BY mes
+        ORDER BY mes
+      `);
+      
+      // Receita líquida e geração de caixa mensal - caz_parcelas
+      const fluxoCaixaResult = await db.execute(sql`
+        SELECT 
+          TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receita_liquida,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
+          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as geracao_caixa
+        FROM caz_parcelas
+        WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
+          AND tipo_evento IN ('RECEITA', 'DESPESA')
+        GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+        ORDER BY mes
+      `);
+      
       // Distribuição por setor
       const setorResult = await db.execute(sql`
         SELECT 
@@ -3493,14 +3556,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       doc.y = tblY + 15;
 
+      // ===== SEÇÃO 6: INDICADORES MENSAIS (CONTRATOS) =====
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('6. INDICADORES MENSAIS', lm, doc.y);
+      doc.moveDown(0.3);
+      
+      // Processar dados de contratos e fluxo de caixa
+      const contratosEvolData = contratosEvolucaoResult.rows || [];
+      const fluxoCaixaData = fluxoCaixaResult.rows || [];
+      
+      // Criar mapa combinado por mês
+      const mesesMap = new Map();
+      contratosEvolData.forEach((r: any) => {
+        mesesMap.set(r.mes, {
+          mes: r.mes,
+          churnMrr: Number(r.churn_mrr) || 0,
+          mrrVendido: Number(r.mrr_vendido) || 0,
+          pontualVendido: Number(r.pontual_vendido) || 0,
+          receitaLiquida: 0,
+          geracaoCaixa: 0,
+        });
+      });
+      fluxoCaixaData.forEach((r: any) => {
+        if (mesesMap.has(r.mes)) {
+          const item = mesesMap.get(r.mes);
+          item.receitaLiquida = Number(r.receita_liquida) || 0;
+          item.geracaoCaixa = Number(r.geracao_caixa) || 0;
+        } else {
+          mesesMap.set(r.mes, {
+            mes: r.mes,
+            churnMrr: 0,
+            mrrVendido: 0,
+            pontualVendido: 0,
+            receitaLiquida: Number(r.receita_liquida) || 0,
+            geracaoCaixa: Number(r.geracao_caixa) || 0,
+          });
+        }
+      });
+      
+      const indicadoresMensais = Array.from(mesesMap.values())
+        .filter((d: any) => d.mes)
+        .sort((a: any, b: any) => a.mes.localeCompare(b.mes))
+        .slice(-12);
+      
+      // Tabela de indicadores mensais
+      tblY = doc.y;
+      doc.rect(lm, tblY, pw, 14).fill(colors.light);
+      doc.fontSize(6).font('Helvetica-Bold').fillColor(colors.text);
+      doc.text('Mês', lm + 3, tblY + 4);
+      doc.text('Churn MRR', lm + 55, tblY + 4);
+      doc.text('MRR Vendido', lm + 120, tblY + 4);
+      doc.text('Pontual', lm + 195, tblY + 4);
+      doc.text('Rec. Líquida', lm + 265, tblY + 4);
+      doc.text('Geração Caixa', lm + 345, tblY + 4);
+      doc.text('Saldo', lm + 430, tblY + 4);
+      tblY += 14;
+      
+      indicadoresMensais.forEach((row: any, i: number) => {
+        const mesParts = (row.mes || '').split('-');
+        const ano = mesParts[0] || '2024';
+        const mes = mesParts[1] || '01';
+        const mesLabel = `${mesesNomes[mes] || mes}/${ano.slice(2)}`;
+        const saldo = row.mrrVendido - row.churnMrr;
+        
+        if (i % 2 === 0) doc.rect(lm, tblY, pw, 13).fill('#fafafa');
+        
+        doc.fontSize(6).font('Helvetica').fillColor(colors.text);
+        doc.text(mesLabel, lm + 3, tblY + 4);
+        doc.font('Helvetica-Bold').fillColor(colors.danger).text(formatCurrencyShort(row.churnMrr), lm + 55, tblY + 4);
+        doc.fillColor(colors.success).text(formatCurrencyShort(row.mrrVendido), lm + 120, tblY + 4);
+        doc.fillColor(colors.accent).text(formatCurrencyShort(row.pontualVendido), lm + 195, tblY + 4);
+        doc.fillColor(colors.text).text(formatCurrencyShort(row.receitaLiquida), lm + 265, tblY + 4);
+        doc.fillColor(row.geracaoCaixa >= 0 ? colors.success : colors.danger).text(formatCurrencyShort(row.geracaoCaixa), lm + 345, tblY + 4);
+        doc.fillColor(saldo >= 0 ? colors.success : colors.danger).text(formatCurrencyShort(saldo), lm + 430, tblY + 4);
+        
+        tblY += 13;
+      });
+      
+      doc.y = tblY + 15;
+
       // ==================== PÁGINA 3: EQUIPE E INSIGHTS ====================
       doc.addPage();
       doc.rect(lm, 35, pw, 4).fill(colors.accent);
       doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.primary).text('EQUIPE E INSIGHTS', lm, 50);
       doc.y = 70;
 
-      // ===== SEÇÃO 6: MÉTRICAS DE EQUIPE =====
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('6. MÉTRICAS DE EQUIPE', lm, doc.y);
+      // ===== SEÇÃO 7: MÉTRICAS DE EQUIPE =====
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('7. MÉTRICAS DE EQUIPE', lm, doc.y);
       doc.moveDown(0.3);
       
       const eqKpiY = doc.y;
@@ -3525,8 +3666,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       doc.y = eqKpiY + 60;
 
-      // ===== SEÇÃO 7: DISTRIBUIÇÃO POR SETOR =====
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('7. DISTRIBUIÇÃO POR SETOR', lm, doc.y);
+      // ===== SEÇÃO 8: DISTRIBUIÇÃO POR SETOR =====
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(colors.primary).text('8. DISTRIBUIÇÃO POR SETOR', lm, doc.y);
       doc.moveDown(0.3);
       
       const setorData = setorResult.rows || [];
@@ -3562,7 +3703,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       doc.y = tblY + 20;
 
-      // ===== SEÇÃO 8: INSIGHTS E OUTLOOK =====
+      // ===== SEÇÃO 9: INSIGHTS E OUTLOOK =====
       doc.rect(lm, doc.y, pw, 130).fill(colors.light);
       doc.rect(lm, doc.y, pw, 4).fill(colors.accent);
       
