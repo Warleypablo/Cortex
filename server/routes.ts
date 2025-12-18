@@ -3059,12 +3059,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Salário fixo médio
       const salarioMedioResult = await db.execute(sql`
         SELECT 
-          COALESCE(AVG(proporcional), 0) as salario_medio,
+          COALESCE(AVG(salario), 0) as salario_medio,
           COUNT(*) as total_colaboradores
         FROM rh_pessoal
         WHERE LOWER(status) = 'ativo'
-          AND proporcional IS NOT NULL
-          AND proporcional > 0
+          AND salario IS NOT NULL
+          AND salario > 0
       `);
       
       // Distribuição por setor
