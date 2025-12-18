@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { SiGoogle } from "react-icons/si";
 import { motion } from "framer-motion";
-import { CanvasRevealEffect } from "@/components/ui/canvas-reveal-effect";
+import { WebGLShader } from "@/components/ui/web-gl-shader";
 import turboLogo from "@assets/Logo-Turbo-branca_(1)_1766081013390.png";
 
 export default function Login() {
@@ -14,21 +13,9 @@ export default function Login() {
 
   return (
     <div className="flex w-full flex-col min-h-screen bg-black relative overflow-hidden">
-      <div className="absolute inset-0 z-0">
-        <CanvasRevealEffect
-          animationSpeed={3}
-          containerClassName="bg-black"
-          colors={[
-            [255, 255, 255],
-            [255, 255, 255],
-          ]}
-          dotSize={6}
-          showGradient={true}
-          reverse={false}
-        />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(0,0,0,0.9)_0%,_transparent_100%)]" />
-        <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-black to-transparent" />
-      </div>
+      <WebGLShader />
+      
+      <div className="absolute inset-0 z-[1] bg-[radial-gradient(circle_at_center,_rgba(0,0,0,0.7)_0%,_rgba(0,0,0,0.4)_100%)]" />
 
       <div className="relative z-10 flex flex-col flex-1 items-center justify-center px-4">
         <motion.div
@@ -78,7 +65,7 @@ export default function Login() {
               onClick={handleGoogleLogin}
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
-              className="backdrop-blur-[2px] w-full flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-full py-3.5 px-4 transition-all duration-300"
+              className="backdrop-blur-md w-full flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-full py-3.5 px-4 transition-all duration-300 hover:border-white/20"
               data-testid="button-google-login"
             >
               <SiGoogle className="w-5 h-5" />
