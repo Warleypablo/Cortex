@@ -3056,6 +3056,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE LOWER(status) = 'ativo' OR status = 'Desligado'
       `);
       
+      // Salário fixo médio
+      const salarioMedioResult = await db.execute(sql`
+        SELECT 
+          COALESCE(AVG(proporcional), 0) as salario_medio,
+          COUNT(*) as total_colaboradores
+        FROM rh_pessoal
+        WHERE LOWER(status) = 'ativo'
+          AND proporcional IS NOT NULL
+          AND proporcional > 0
+      `);
+      
       // Distribuição por setor
       const setorResult = await db.execute(sql`
         SELECT 
@@ -3147,6 +3158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contratosData = clientesResult.rows[0] || { contratos_recorrentes_ativos: 0, contratos_encerrados_total: 0, churn_mes: 0, mrr_churn_mes: 0, lt_medio_meses: 6 };
       const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0, mrr_churn: 0 };
       const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0, contratacoes_90d: 0, desligamentos_90d: 0 };
+      const salarioMedio = Number((salarioMedioResult.rows[0] as any)?.salario_medio) || 0;
       const concentracao = concentracaoResult.rows[0] || { top5_pct: 0, top10_pct: 0, top20_pct: 0 };
 
       const headcount = Number(equipe.headcount) || 1;
@@ -3586,12 +3598,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.moveDown(0.3);
       
       const eqKpiY = doc.y;
-      const eqW = 125;
+      const eqW = 100;
       
       const equipeKpis = [
         { label: 'Headcount', value: String(headcount), sub: 'colaboradores ativos' },
         { label: 'Tempo Médio', value: `${tempoMedioMeses.toFixed(1)}m`, sub: 'de permanência' },
         { label: 'Contratações 90d', value: String(Number(equipe.contratacoes_90d) || 0), sub: 'novos membros' },
+        { label: 'Salário Fixo', value: formatCurrencyShort(salarioMedio), sub: 'média mensal' },
         { label: 'Receita/Cabeça', value: formatCurrencyShort(receitaPorCabeca), sub: 'MRR ÷ Headcount' },
       ];
       
