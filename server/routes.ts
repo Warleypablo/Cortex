@@ -3690,16 +3690,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#475569');
         doc.text('Mês', lm + 10, tableY + 6);
         doc.text('Valor', lm + 120, tableY + 6);
-        doc.text('vs Média', lm + 220, tableY + 6);
-        doc.text('% do Total', lm + 320, tableY + 6);
-        doc.text('', lm + 420, tableY + 6);
+        doc.text('% do Total', lm + 240, tableY + 6);
+        doc.text('', lm + 340, tableY + 6);
         
         let rowY = tableY + 22;
         data.forEach((d: any, i: number) => {
           const val = d[valueKey] || 0;
           const mesParts = (d.mes || '').split('-');
           const mesLabel = `${mesesNomes[mesParts[1]] || mesParts[1]}/${mesParts[0]?.slice(2) || ''}`;
-          const diffMedia = val - media;
           const pctTotal = total > 0 ? (val / total) * 100 : 0;
           
           // Fundo alternado
@@ -3713,19 +3711,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           doc.text(mesLabel, lm + 10, rowY + 5);
           doc.font('Helvetica-Bold').text(formatCurrencyShort(val), lm + 120, rowY + 5);
           
-          // Diferença com cor
-          const diffColor = diffMedia >= 0 ? '#16a34a' : '#dc2626';
-          const diffSign = diffMedia >= 0 ? '+' : '';
-          doc.font('Helvetica').fillColor(diffColor).text(`${diffSign}${formatCurrencyShort(diffMedia)}`, lm + 220, rowY + 5);
-          
-          doc.fillColor('#64748b').text(`${pctTotal.toFixed(1)}%`, lm + 320, rowY + 5);
+          doc.font('Helvetica').fillColor('#64748b').text(`${pctTotal.toFixed(1)}%`, lm + 240, rowY + 5);
           
           // Barra de progresso
-          const barMaxW = 80;
+          const barMaxW = 120;
           const barH = 6;
           const barPct = Math.min((Math.abs(val) / sparkMax), 1);
-          doc.rect(lm + 400, rowY + 7, barMaxW, barH).fill('#e5e7eb');
-          doc.rect(lm + 400, rowY + 7, barMaxW * barPct, barH).fill(accentColor);
+          doc.rect(lm + 320, rowY + 7, barMaxW, barH).fill('#e5e7eb');
+          doc.rect(lm + 320, rowY + 7, barMaxW * barPct, barH).fill(accentColor);
           
           rowY += 20;
         });
