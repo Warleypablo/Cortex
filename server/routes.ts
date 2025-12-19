@@ -2731,7 +2731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/juridico/clientes/:clienteId/contexto", async (req, res) => {
     try {
       const { clienteId } = req.params;
-      const { contextoJuridico, procedimentoJuridico, statusJuridico } = req.body;
+      const { contextoJuridico, procedimentoJuridico, statusJuridico, valorAcordado } = req.body;
       
       const user = (req as any).user;
       const atualizadoPor = user?.name || user?.googleId || 'Sistema';
@@ -2741,6 +2741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contextoJuridico,
         procedimentoJuridico,
         statusJuridico,
+        valorAcordado: valorAcordado != null ? parseFloat(valorAcordado) : undefined,
         atualizadoPor,
       });
       
