@@ -2870,10 +2870,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Faturamento via caz_parcelas (últimos 12 meses) - alinhado com Dashboard Financeiro
       // Usa valor_pago (já representa valores pagos, sem precisar filtrar por status)
+      // Inclui receitas, despesas e geração de caixa
       const faturamentoResult = await db.execute(sql`
         SELECT 
           TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia
         FROM caz_parcelas
@@ -2896,22 +2898,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND tipo_evento IN ('RECEITA', 'DESPESA')
       `);
       
-      // Top 10 clientes por receita - alinhado com Dashboard Financeiro
-      // valor_pago já representa valores pagos
-      const topClientesResult = await db.execute(sql`
-        SELECT 
-          COALESCE(caz.nome, 'Não identificado') as cliente,
-          COALESCE(SUM(p.valor_pago::numeric), 0) as receita_total
-        FROM caz_parcelas p
-        LEFT JOIN caz_clientes caz ON p.id_cliente::text = caz.ids::text
-        WHERE p.tipo_evento = 'RECEITA' 
-          AND COALESCE(p.data_quitacao, p.data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
-          AND p.valor_pago::numeric > 0
-        GROUP BY caz.nome
-        HAVING SUM(p.valor_pago::numeric) > 0
-        ORDER BY receita_total DESC
-        LIMIT 10
-      `);
       
       const clientes = clientesResult.rows[0] || { total_clientes: 0, clientes_ativos: 0 };
       const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0 };
@@ -2956,15 +2942,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           setor: r.setor,
           quantidade: Number(r.quantidade),
         })),
-        evolucaoFaturamento: faturamentoResult.rows.map((r: any) => ({
-          mes: r.mes,
-          faturamento: Number(r.faturamento) || 0,
-          inadimplencia: Number(r.inadimplencia) || 0,
-        })).reverse(),
-        topClientes: topClientesResult.rows.map((r: any) => ({
-          cliente: r.cliente,
-          receita: Number(r.receita_total) || 0,
-        })),
+        evolucaoFaturamento: faturamentoResult.rows.map((r: any) => {
+          const faturamento = Number(r.faturamento) || 0;
+          const despesas = Number(r.despesas) || 0;
+          return {
+            mes: r.mes,
+            faturamento,
+            despesas,
+            geracaoCaixa: faturamento - despesas,
+            inadimplencia: Number(r.inadimplencia) || 0,
+          };
+        }).reverse(),
       });
     } catch (error) {
       console.error("[api] Error fetching investors report:", error);
