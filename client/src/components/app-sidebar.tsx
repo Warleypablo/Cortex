@@ -90,7 +90,6 @@ const dashboardCategories = [
     baseUrl: "/dashboard/geg",
     subItems: [
       { title: "Visão Geral", url: "/dashboard/geg", icon: UsersRound },
-      { title: "Inhire", url: "/dashboard/inhire", icon: UserCheck },
       { title: "Recrutamento", url: "/dashboard/recrutamento", icon: UserPlus },
     ],
   },
