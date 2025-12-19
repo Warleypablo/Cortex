@@ -108,7 +108,7 @@ const formatPercent = (value: number) => {
   return `${sign}${value.toFixed(1)}%`;
 };
 
-const COLORS = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'];
+const COLORS = ['#1978D5', '#041F60', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'];
 
 type PeriodPreset = 'ytd' | 'ultimo-mes' | 'ultimo-trimestre' | 'ultimo-semestre' | 'ultimo-ano' | '2025' | '2024' | '2023' | '2022' | 'custom' | 'all';
 
@@ -440,8 +440,8 @@ export default function InvestorsReport() {
   };
 
   const pieData = data ? [
-    { name: 'Recorrentes', value: data.contratos.recorrentes, color: '#f97316' },
-    { name: 'Pontuais', value: data.contratos.pontuais, color: '#3b82f6' },
+    { name: 'Recorrentes', value: data.contratos.recorrentes, color: '#1978D5' },
+    { name: 'Pontuais', value: data.contratos.pontuais, color: '#041F60' },
   ] : [];
 
   return (
@@ -449,13 +449,13 @@ export default function InvestorsReport() {
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* Hero Header */}
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-orange-500/20 via-orange-600/10 to-transparent border border-orange-500/20 p-6">
-          <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-transparent" />
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-500/20 via-blue-600/10 to-transparent border border-blue-500/20 p-6">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent" />
           <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold flex items-center gap-3 text-white" data-testid="page-title">
-                <div className="p-2 bg-orange-500/20 rounded-lg">
-                  <Building2 className="h-7 w-7 text-orange-400" />
+                <div className="p-2 bg-blue-500/20 rounded-lg">
+                  <Building2 className="h-7 w-7 text-blue-400" />
                 </div>
                 Investors Report
               </h1>
@@ -464,7 +464,7 @@ export default function InvestorsReport() {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <Badge variant="outline" className="border-orange-500/50 text-orange-400 px-3 py-1">
+              <Badge variant="outline" className="border-blue-500/50 text-blue-400 px-3 py-1">
                 <Activity className="h-3 w-3 mr-1" />
                 Live Data
               </Badge>
@@ -472,7 +472,7 @@ export default function InvestorsReport() {
                 onClick={handleExportHTML}
                 disabled={isCapturing}
                 variant="outline"
-                className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+                className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
                 data-testid="button-export-html"
               >
                 <Download className="h-4 w-4 mr-2" />
@@ -518,15 +518,15 @@ export default function InvestorsReport() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-700/50 hover:border-orange-500/30 transition-colors">
+          <Card className="bg-slate-900/50 border-slate-700/50 hover:border-blue-500/30 transition-colors">
             <CardContent className="pt-5 pb-4">
               {isLoading ? (
                 <Skeleton className="h-16 w-full" />
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-orange-500/20 rounded">
-                      <FileText className="h-4 w-4 text-orange-400" />
+                    <div className="p-1.5 bg-blue-500/20 rounded">
+                      <FileText className="h-4 w-4 text-blue-400" />
                     </div>
                     <span className="text-slate-400 text-sm">Contratos Rec.</span>
                   </div>
@@ -701,7 +701,7 @@ export default function InvestorsReport() {
         {/* Date Range Filter - Simplified */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-slate-900/30 rounded-lg p-4 border border-slate-700/30">
           <div className="flex items-center gap-3">
-            <CalendarRange className="h-5 w-5 text-orange-400" />
+            <CalendarRange className="h-5 w-5 text-blue-400" />
             <span className="text-white font-medium">Período</span>
           </div>
           
@@ -719,7 +719,7 @@ export default function InvestorsReport() {
               </SelectTrigger>
               <SelectContent className="bg-slate-900 border-slate-700">
                 <SelectGroup>
-                  <SelectLabel className="text-orange-400 text-xs uppercase tracking-wider">Períodos</SelectLabel>
+                  <SelectLabel className="text-blue-400 text-xs uppercase tracking-wider">Períodos</SelectLabel>
                   {PERIOD_PRESETS.map((preset) => (
                     <SelectItem 
                       key={preset.value} 
@@ -731,7 +731,7 @@ export default function InvestorsReport() {
                   ))}
                 </SelectGroup>
                 <SelectGroup>
-                  <SelectLabel className="text-orange-400 text-xs uppercase tracking-wider mt-2">Anos</SelectLabel>
+                  <SelectLabel className="text-blue-400 text-xs uppercase tracking-wider mt-2">Anos</SelectLabel>
                   {YEAR_PRESETS.map((preset) => (
                     <SelectItem 
                       key={preset.value} 
@@ -743,7 +743,7 @@ export default function InvestorsReport() {
                   ))}
                 </SelectGroup>
                 <SelectGroup>
-                  <SelectLabel className="text-orange-400 text-xs uppercase tracking-wider mt-2">Customizado</SelectLabel>
+                  <SelectLabel className="text-blue-400 text-xs uppercase tracking-wider mt-2">Customizado</SelectLabel>
                   <SelectItem 
                     value="custom"
                     className="text-white hover:bg-slate-800 focus:bg-slate-800"
@@ -761,7 +761,7 @@ export default function InvestorsReport() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+                    className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
                     data-testid="filter-custom-calendar"
                   >
                     <Calendar className="h-4 w-4 mr-2" />
@@ -877,7 +877,7 @@ export default function InvestorsReport() {
                       labelStyle={{ color: '#f8fafc' }}
                     />
                     <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} />
-                    <ReferenceLine y={avgMargem} stroke="#f97316" strokeDasharray="5 5" strokeWidth={1} label={{ value: `Média: ${avgMargem.toFixed(1)}%`, position: 'right', fill: '#f97316', fontSize: 10 }} />
+                    <ReferenceLine y={avgMargem} stroke="#1978D5" strokeDasharray="5 5" strokeWidth={1} label={{ value: `Média: ${avgMargem.toFixed(1)}%`, position: 'right', fill: '#1978D5', fontSize: 10 }} />
                     <Area type="monotone" dataKey="margem" stroke="#3b82f6" fill="url(#gradientMargem)" strokeWidth={0} />
                     <Line type="monotone" dataKey="margem" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3, fill: '#3b82f6' }} activeDot={{ r: 5 }} />
                   </ComposedChart>
@@ -893,7 +893,7 @@ export default function InvestorsReport() {
           <Card className="bg-slate-900/50 border-slate-700/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2 text-white">
-                <BarChart3 className="h-5 w-5 text-orange-400" />
+                <BarChart3 className="h-5 w-5 text-blue-400" />
                 Receita vs Despesas
               </CardTitle>
               <CardDescription className="text-slate-400">Comparativo mensal</CardDescription>
@@ -919,7 +919,7 @@ export default function InvestorsReport() {
                     <Legend wrapperStyle={{ paddingTop: '10px' }} />
                     <Bar dataKey="faturamento" fill="#10b981" name="Faturamento" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="despesas" fill="#ef4444" name="Despesas" radius={[4, 4, 0, 0]} />
-                    <Line type="monotone" dataKey="geracaoCaixa" stroke="#f97316" strokeWidth={2.5} dot={{ r: 3, fill: '#f97316' }} name="Geração Caixa" />
+                    <Line type="monotone" dataKey="geracaoCaixa" stroke="#1978D5" strokeWidth={2.5} dot={{ r: 3, fill: '#1978D5' }} name="Geração Caixa" />
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
@@ -973,7 +973,7 @@ export default function InvestorsReport() {
           <Card className="bg-slate-900/50 border-slate-700/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2 text-white">
-                <PieChartIcon className="h-5 w-5 text-orange-400" />
+                <PieChartIcon className="h-5 w-5 text-blue-400" />
                 Mix de Contratos
               </CardTitle>
               <CardDescription className="text-slate-400">Recorrentes vs Pontuais</CardDescription>
@@ -1044,7 +1044,7 @@ export default function InvestorsReport() {
         <Card className="bg-slate-900/50 border-slate-700/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-medium flex items-center gap-2 text-white">
-              <Calendar className="h-5 w-5 text-orange-400" />
+              <Calendar className="h-5 w-5 text-blue-400" />
               Resumo por Ano
             </CardTitle>
             <CardDescription className="text-slate-400">Totais consolidados</CardDescription>
@@ -1141,7 +1141,7 @@ export default function InvestorsReport() {
                         </td>
                       </tr>
                     ))}
-                    <tr className="bg-slate-800/70 font-bold border-t-2 border-orange-500/30">
+                    <tr className="bg-slate-800/70 font-bold border-t-2 border-blue-500/30">
                       <td className="py-3 px-3 text-white">TOTAL</td>
                       <td className="py-3 px-3 text-right text-emerald-400">{formatCurrency(totals.faturamento)}</td>
                       <td className="py-3 px-3 text-right text-red-400">{formatCurrency(totals.despesas)}</td>
@@ -1161,12 +1161,12 @@ export default function InvestorsReport() {
         </Card>
 
         {/* Footer Quote */}
-        <Card className="bg-gradient-to-r from-orange-500/10 via-orange-600/5 to-transparent border-orange-500/20">
+        <Card className="bg-gradient-to-r from-blue-500/10 via-blue-600/5 to-transparent border-blue-500/20">
           <CardContent className="py-6">
             <blockquote className="text-center italic text-slate-400 text-lg">
               "Tornamos a vida de quem vende online mais fácil e rentável, usando desse know how, para construir as marcas da próxima geração"
             </blockquote>
-            <p className="text-center text-sm font-semibold mt-3 text-orange-400">— Turbo Partners</p>
+            <p className="text-center text-sm font-semibold mt-3 text-blue-400">— Turbo Partners</p>
           </CardContent>
         </Card>
       </div>
