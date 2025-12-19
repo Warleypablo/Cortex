@@ -2868,22 +2868,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY quantidade DESC
       `);
       
-      // Faturamento via caz_parcelas (últimos 12 meses) - alinhado com Dashboard Financeiro
-      // Usa valor_pago (já representa valores pagos, sem precisar filtrar por status)
-      // Inclui receitas, despesas e geração de caixa
+      // Faturamento histórico estendido - combina caz_parcelas (últimos 12 meses) com caz_receber/caz_pagar (histórico anterior)
+      // Para dados recentes usa caz_parcelas (mais detalhado), para histórico usa caz_receber e caz_pagar
       const faturamentoResult = await db.execute(sql`
-        SELECT 
-          TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia
-        FROM caz_parcelas
-        WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
-          AND tipo_evento IN ('RECEITA', 'DESPESA')
-        GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+        WITH dados_recentes AS (
+          -- Últimos 12 meses via caz_parcelas (mais detalhado)
+          SELECT 
+            TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
+            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento,
+            COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas,
+            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto,
+            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' 
+              THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia
+          FROM caz_parcelas
+          WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
+            AND tipo_evento IN ('RECEITA', 'DESPESA')
+          GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+        ),
+        dados_historicos AS (
+          -- Dados anteriores via caz_receber e caz_pagar
+          SELECT 
+            mes,
+            SUM(faturamento) as faturamento,
+            SUM(despesas) as despesas,
+            SUM(valor_bruto) as valor_bruto,
+            0 as inadimplencia
+          FROM (
+            -- Receitas de caz_receber
+            SELECT 
+              TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM') as mes,
+              COALESCE(SUM(pago::numeric), 0) as faturamento,
+              0 as despesas,
+              COALESCE(SUM(total::numeric), 0) as valor_bruto
+            FROM caz_receber
+            WHERE UPPER(status) IN ('PAGO', 'ACQUITTED')
+              AND COALESCE(data_vencimento, data_criacao) < CURRENT_DATE - INTERVAL '12 months'
+              AND COALESCE(data_vencimento, data_criacao) >= CURRENT_DATE - INTERVAL '5 years'
+            GROUP BY TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM')
+            
+            UNION ALL
+            
+            -- Despesas de caz_pagar
+            SELECT 
+              TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM') as mes,
+              0 as faturamento,
+              COALESCE(SUM(pago::numeric), 0) as despesas,
+              0 as valor_bruto
+            FROM caz_pagar
+            WHERE UPPER(status) IN ('PAGO', 'ACQUITTED')
+              AND COALESCE(data_vencimento, data_criacao) < CURRENT_DATE - INTERVAL '12 months'
+              AND COALESCE(data_vencimento, data_criacao) >= CURRENT_DATE - INTERVAL '5 years'
+            GROUP BY TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM')
+          ) combined
+          GROUP BY mes
+        )
+        -- Combina dados recentes e históricos
+        SELECT mes, faturamento, despesas, valor_bruto, inadimplencia
+        FROM dados_recentes
+        UNION ALL
+        SELECT mes, faturamento, despesas, valor_bruto, inadimplencia
+        FROM dados_historicos
+        WHERE mes NOT IN (SELECT mes FROM dados_recentes)
         ORDER BY mes DESC
-        LIMIT 12
       `);
       
       // Faturamento do mês atual - alinhado com Dashboard Financeiro
