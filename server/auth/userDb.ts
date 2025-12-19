@@ -45,8 +45,7 @@ export function clearUserCache(): void {
 
 const ADMIN_EMAILS = [
   'caio.massaroni@turbopartners.com.br',
-  'warley.silva@turbopartners.com.br',
-  'warleyreserva4@gmail.com'
+  'warley.silva@turbopartners.com.br'
 ];
 
 // Emails externos permitidos (investidores, consultores, etc.)
@@ -55,10 +54,9 @@ const ALLOWED_EXTERNAL_EMAILS = [
   'warleyreserva4@gmail.com'
 ];
 
-// Rotas permitidas para usuários externos (apenas visualização)
-const EXTERNAL_USER_ROUTES = [
-  '/investors-report',
-  '/ferramentas'
+// Rotas permitidas para usuários externos (apenas Investors Report)
+export const EXTERNAL_USER_ROUTES = [
+  '/investors-report'
 ];
 
 export function isEmailAllowed(email: string): boolean {
@@ -73,6 +71,67 @@ export function isEmailAllowed(email: string): boolean {
 
 export function isExternalEmail(email: string): boolean {
   return ALLOWED_EXTERNAL_EMAILS.includes(email);
+}
+
+// Verifica se o email é permitido para login externo (sem Google)
+export function isExternalEmailAllowed(email: string): boolean {
+  return ALLOWED_EXTERNAL_EMAILS.includes(email.toLowerCase().trim());
+}
+
+// Cria ou busca usuário externo (para login sem Google OAuth)
+export async function createExternalUser(email: string): Promise<User> {
+  const normalizedEmail = email.toLowerCase().trim();
+  
+  // Buscar usuário existente pelo email COM googleId externo (criado via login externo)
+  const existingUsers = await db
+    .select()
+    .from(authUsers)
+    .where(eq(authUsers.email, normalizedEmail));
+  
+  // Verificar se já existe um usuário com este email
+  const existingExternalUser = existingUsers.find(u => u.googleId.startsWith('external-'));
+  
+  if (existingExternalUser) {
+    // Garantir que usuário externo sempre tem role "user" e rotas restritas
+    await db
+      .update(authUsers)
+      .set({ 
+        allowedRoutes: EXTERNAL_USER_ROUTES,
+        role: 'user'
+      })
+      .where(eq(authUsers.id, existingExternalUser.id));
+    
+    const user: User = {
+      ...dbUserToUser(existingExternalUser),
+      role: 'user',
+      allowedRoutes: EXTERNAL_USER_ROUTES
+    };
+    setCachedUser(user);
+    return user;
+  }
+  
+  // Criar novo usuário externo
+  const userId = `ext-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+  const newUserData = {
+    id: userId,
+    googleId: `external-${normalizedEmail}`,
+    email: normalizedEmail,
+    name: normalizedEmail.split('@')[0],
+    picture: '',
+    role: 'user' as const,
+    allowedRoutes: EXTERNAL_USER_ROUTES,
+  };
+  
+  await db.insert(authUsers).values(newUserData);
+  
+  const newUser: User = {
+    ...newUserData,
+    createdAt: new Date().toISOString(),
+  };
+  
+  setCachedUser(newUser);
+  console.log(`✅ Novo usuário externo criado: ${normalizedEmail}`);
+  return newUser;
 }
 
 const ALL_ROUTES = [
