@@ -56,8 +56,13 @@ interface InvestorsReportData {
     receitaPorCabeca: number;
   };
   distribuicaoSetor: Array<{ setor: string; quantidade: number }>;
-  evolucaoFaturamento: Array<{ mes: string; faturamento: number; inadimplencia: number }>;
-  topClientes: Array<{ cliente: string; receita: number }>;
+  evolucaoFaturamento: Array<{ 
+    mes: string; 
+    faturamento: number; 
+    despesas: number;
+    geracaoCaixa: number;
+    inadimplencia: number;
+  }>;
 }
 
 const formatCurrency = (value: number) => {
@@ -533,43 +538,56 @@ export default function InvestorsReport() {
             </CardContent>
           </Card>
 
-          {/* Top Clientes */}
+          {/* Histórico Financeiro Mensal */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-primary" />
-                Top 10 Clientes por Receita
+                <BarChart3 className="h-4 w-4 text-primary" />
+                Histórico Financeiro (12 meses)
               </CardTitle>
-              <CardDescription>Baseado em faturamento realizado (caz_parcelas)</CardDescription>
+              <CardDescription>Evolução mensal de faturamento, despesas e geração de caixa</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[280px] w-full" />
-              ) : !data?.topClientes?.length ? (
+              ) : !data?.evolucaoFaturamento?.length ? (
                 <div className="flex items-center justify-center h-[280px] text-muted-foreground">
                   Nenhum dado encontrado
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[280px] overflow-y-auto">
-                  {data.topClientes.map((cliente, index) => (
-                    <div 
-                      key={index}
-                      className="flex items-center justify-between p-2 rounded-lg border bg-card hover-elevate"
-                      data-testid={`top-cliente-${index}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Badge variant="secondary" className="w-6 h-6 flex items-center justify-center text-xs">
-                          {index + 1}
-                        </Badge>
-                        <span className="font-medium text-sm truncate max-w-[200px]">
-                          {cliente.cliente || 'Cliente não identificado'}
-                        </span>
-                      </div>
-                      <span className="font-semibold text-green-600">
-                        {formatCurrency(cliente.receita)}
-                      </span>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto max-h-[280px]">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-background border-b">
+                      <tr className="text-muted-foreground">
+                        <th className="text-left py-2 px-2 font-medium">Mês</th>
+                        <th className="text-right py-2 px-2 font-medium">Faturamento</th>
+                        <th className="text-right py-2 px-2 font-medium">Despesas</th>
+                        <th className="text-right py-2 px-2 font-medium">Geração Caixa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {data.evolucaoFaturamento.map((item, index) => (
+                        <tr 
+                          key={item.mes}
+                          className="hover:bg-muted/50"
+                          data-testid={`historico-financeiro-${index}`}
+                        >
+                          <td className="py-2 px-2 font-medium">
+                            {new Date(item.mes + '-01').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
+                          </td>
+                          <td className="py-2 px-2 text-right text-green-600">
+                            {formatCurrencyShort(item.faturamento)}
+                          </td>
+                          <td className="py-2 px-2 text-right text-red-500">
+                            {formatCurrencyShort(item.despesas)}
+                          </td>
+                          <td className={`py-2 px-2 text-right font-semibold ${item.geracaoCaixa >= 0 ? 'text-blue-500' : 'text-red-600'}`}>
+                            {formatCurrencyShort(item.geracaoCaixa)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </CardContent>
