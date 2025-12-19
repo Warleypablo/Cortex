@@ -261,22 +261,48 @@ export default function InvestorsReport() {
       }));
   }, [filteredData]);
 
+  // Calcula resumo anual com TODOS os dados (não filtrados) para YoY
+  const fullAnnualSummary = useMemo(() => {
+    if (!data?.evolucaoFaturamento) return {};
+    const byYear: Record<string, { faturamento: number; despesas: number; geracaoCaixa: number; meses: number }> = {};
+    
+    data.evolucaoFaturamento.forEach(item => {
+      const year = item.mes.split('-')[0];
+      if (!byYear[year]) {
+        byYear[year] = { faturamento: 0, despesas: 0, geracaoCaixa: 0, meses: 0 };
+      }
+      byYear[year].faturamento += item.faturamento;
+      byYear[year].despesas += item.despesas;
+      byYear[year].geracaoCaixa += item.geracaoCaixa;
+      byYear[year].meses += 1;
+    });
+    
+    return byYear;
+  }, [data?.evolucaoFaturamento]);
+
   const yoyGrowth = useMemo(() => {
-    if (annualSummary.length < 2) return null;
-    const currentYear = annualSummary[0];
-    const previousYear = annualSummary[1];
+    // Se há dados filtrados, pegar o ano mais recente dos dados filtrados
+    if (annualSummary.length === 0) return null;
     
-    if (!previousYear || previousYear.faturamento === 0) return null;
+    const currentYearData = annualSummary[0];
+    const currentYear = currentYearData.year;
+    const previousYear = String(parseInt(currentYear) - 1);
     
-    const adjustedPrevious = (previousYear.faturamento / previousYear.meses) * currentYear.meses;
-    const growth = ((currentYear.faturamento - adjustedPrevious) / adjustedPrevious) * 100;
+    // Buscar dados do ano anterior nos dados completos
+    const previousYearData = fullAnnualSummary[previousYear];
+    
+    if (!previousYearData || previousYearData.faturamento === 0) return null;
+    
+    // Ajustar proporcionalmente se o ano atual não tem 12 meses
+    const adjustedPrevious = (previousYearData.faturamento / previousYearData.meses) * currentYearData.meses;
+    const growth = ((currentYearData.faturamento - adjustedPrevious) / adjustedPrevious) * 100;
     
     return {
       growth,
-      currentYear: currentYear.year,
-      previousYear: previousYear.year
+      currentYear,
+      previousYear
     };
-  }, [annualSummary]);
+  }, [annualSummary, fullAnnualSummary]);
 
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => ({
