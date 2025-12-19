@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Scale,
   Users,
@@ -44,6 +45,9 @@ import {
   Calendar,
   FileText,
   ExternalLink,
+  Trophy,
+  Target,
+  Wallet,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -196,6 +200,22 @@ export default function JuridicoClientes() {
     return { total, count: filteredClientes.length, urgentes, semAcao };
   }, [filteredClientes]);
 
+  const recuperadosStats = useMemo(() => {
+    const recuperados = clientes.filter(c => 
+      c.contexto?.statusJuridico === 'concluido' && 
+      (c.contexto?.procedimentoJuridico === 'acordo' || c.contexto?.procedimentoJuridico === 'baixa')
+    );
+    const clientesRecuperados = recuperados.length;
+    const valorNegociado = recuperados.reduce((acc, c) => acc + (c.contexto?.valorAcordado || 0), 0);
+    const valorOriginal = recuperados.reduce((acc, c) => acc + c.cliente.valorTotal, 0);
+    const taxaRecuperacao = valorOriginal > 0 ? (valorNegociado / valorOriginal) * 100 : 0;
+    const porProcedimento = {
+      acordo: recuperados.filter(c => c.contexto?.procedimentoJuridico === 'acordo').length,
+      baixa: recuperados.filter(c => c.contexto?.procedimentoJuridico === 'baixa').length,
+    };
+    return { clientesRecuperados, valorNegociado, valorOriginal, taxaRecuperacao, porProcedimento, lista: recuperados };
+  }, [clientes]);
+
   const openEditModal = (cliente: ClienteJuridico) => {
     setEditingCliente(cliente);
     setEditForm({
@@ -288,90 +308,111 @@ export default function JuridicoClientes() {
 
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
         
-        {/* Cards de Resumo - Grandes e Claros */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-red-50 rounded-2xl">
-                  <DollarSign className="h-8 w-8 text-red-500" />
-                </div>
-                <div>
-                  <p className="text-slate-500 text-sm font-medium">Valor Total</p>
-                  <p className="text-3xl font-bold text-slate-800" data-testid="text-total-value">
-                    {formatCurrency(totals.total)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <Tabs defaultValue="ativos" className="space-y-6">
+          <TabsList className="bg-white shadow-sm border p-1 h-auto">
+            <TabsTrigger 
+              value="ativos" 
+              className="data-[state=active]:bg-primary data-[state=active]:text-white px-6 py-3 text-base"
+              data-testid="tab-casos-ativos"
+            >
+              <Gavel className="w-5 h-5 mr-2" />
+              Casos Ativos ({totals.count})
+            </TabsTrigger>
+            <TabsTrigger 
+              value="recuperados" 
+              className="data-[state=active]:bg-green-600 data-[state=active]:text-white px-6 py-3 text-base"
+              data-testid="tab-recuperados"
+            >
+              <Trophy className="w-5 h-5 mr-2" />
+              Recuperados ({recuperadosStats.clientesRecuperados})
+            </TabsTrigger>
+          </TabsList>
 
-          <Card className={`bg-white shadow-sm hover:shadow-md transition-shadow ${totals.urgentes > 0 ? 'ring-2 ring-red-200' : ''}`}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-orange-50 rounded-2xl">
-                  <AlertTriangle className="h-8 w-8 text-orange-500" />
-                </div>
-                <div>
-                  <p className="text-slate-500 text-sm font-medium">Casos Urgentes</p>
-                  <p className="text-3xl font-bold text-orange-600" data-testid="text-urgent-cases">
-                    {totals.urgentes}
-                  </p>
-                  <p className="text-xs text-slate-400">mais de 90 dias</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <TabsContent value="ativos" className="space-y-6 mt-0">
+            {/* Cards de Resumo - Grandes e Claros */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-4 bg-red-50 rounded-2xl">
+                      <DollarSign className="h-8 w-8 text-red-500" />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-sm font-medium">Valor Total</p>
+                      <p className="text-3xl font-bold text-slate-800" data-testid="text-total-value">
+                        {formatCurrency(totals.total)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-amber-50 rounded-2xl">
-                  <Clock className="h-8 w-8 text-amber-500" />
-                </div>
-                <div>
-                  <p className="text-slate-500 text-sm font-medium">Sem Ação Definida</p>
-                  <p className="text-3xl font-bold text-amber-600" data-testid="text-no-action">
-                    {totals.semAcao}
-                  </p>
-                  <p className="text-xs text-slate-400">precisam de análise</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              <Card className={`bg-white shadow-sm hover:shadow-md transition-shadow ${totals.urgentes > 0 ? 'ring-2 ring-red-200' : ''}`}>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-4 bg-orange-50 rounded-2xl">
+                      <AlertTriangle className="h-8 w-8 text-orange-500" />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-sm font-medium">Casos Urgentes</p>
+                      <p className="text-3xl font-bold text-orange-600" data-testid="text-urgent-cases">
+                        {totals.urgentes}
+                      </p>
+                      <p className="text-xs text-slate-400">mais de 90 dias</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-        {/* Filtros Simples */}
-        <Card className="bg-white shadow-sm">
-          <CardContent className="py-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                <Input
-                  placeholder="Buscar por nome ou empresa..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-12 text-base bg-slate-50 border-slate-200"
-                  data-testid="input-search"
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-[220px] h-12 bg-slate-50 border-slate-200" data-testid="filter-status">
-                  <SelectValue placeholder="Filtrar por ação" />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  <SelectItem value="all">Todos os casos</SelectItem>
-                  <SelectItem value="pendente">Sem ação definida</SelectItem>
-                  {PROCEDIMENTOS.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-4 bg-amber-50 rounded-2xl">
+                      <Clock className="h-8 w-8 text-amber-500" />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-sm font-medium">Sem Ação Definida</p>
+                      <p className="text-3xl font-bold text-amber-600" data-testid="text-no-action">
+                        {totals.semAcao}
+                      </p>
+                      <p className="text-xs text-slate-400">precisam de análise</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Lista de Clientes - Cards Grandes */}
+            {/* Filtros Simples */}
+            <Card className="bg-white shadow-sm">
+              <CardContent className="py-4">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    <Input
+                      placeholder="Buscar por nome ou empresa..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 h-12 text-base bg-slate-50 border-slate-200"
+                      data-testid="input-search"
+                    />
+                  </div>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full md:w-[220px] h-12 bg-slate-50 border-slate-200" data-testid="filter-status">
+                      <SelectValue placeholder="Filtrar por ação" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white">
+                      <SelectItem value="all">Todos os casos</SelectItem>
+                      <SelectItem value="pendente">Sem ação definida</SelectItem>
+                      {PROCEDIMENTOS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Lista de Clientes - Cards Grandes */}
         {sortedClientes.length === 0 ? (
           <Card className="bg-white shadow-sm">
             <CardContent className="py-16 text-center">
@@ -607,6 +648,177 @@ export default function JuridicoClientes() {
             })}
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="recuperados" className="space-y-6 mt-0">
+            {/* Cards de Métricas de Recuperação */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-4 bg-green-50 rounded-2xl">
+                      <Trophy className="h-8 w-8 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-sm font-medium">Clientes Recuperados</p>
+                      <p className="text-3xl font-bold text-green-600" data-testid="text-clientes-recuperados">
+                        {recuperadosStats.clientesRecuperados}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-4 bg-emerald-50 rounded-2xl">
+                      <Wallet className="h-8 w-8 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-sm font-medium">Valor Recuperado</p>
+                      <p className="text-2xl font-bold text-emerald-600" data-testid="text-valor-recuperado">
+                        {formatCurrency(recuperadosStats.valorNegociado)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-4 bg-blue-50 rounded-2xl">
+                      <Target className="h-8 w-8 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-sm font-medium">Valor Original</p>
+                      <p className="text-2xl font-bold text-blue-600" data-testid="text-valor-original">
+                        {formatCurrency(recuperadosStats.valorOriginal)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-4 bg-purple-50 rounded-2xl">
+                      <TrendingUp className="h-8 w-8 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-sm font-medium">Taxa de Recuperação</p>
+                      <p className="text-3xl font-bold text-purple-600" data-testid="text-taxa-recuperacao">
+                        {recuperadosStats.taxaRecuperacao.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Breakdown por Tipo */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="bg-white shadow-sm">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-green-50 rounded-xl">
+                        <Handshake className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-sm">Acordos Fechados</p>
+                        <p className="text-2xl font-bold text-green-600">{recuperadosStats.porProcedimento.acordo}</p>
+                      </div>
+                    </div>
+                    <Badge className="bg-green-100 text-green-700 border-green-200 text-lg px-4 py-1">
+                      Acordo
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white shadow-sm">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-gray-50 rounded-xl">
+                        <XCircle className="h-6 w-6 text-gray-500" />
+                      </div>
+                      <div>
+                        <p className="text-slate-500 text-sm">Baixas Realizadas</p>
+                        <p className="text-2xl font-bold text-gray-600">{recuperadosStats.porProcedimento.baixa}</p>
+                      </div>
+                    </div>
+                    <Badge className="bg-gray-100 text-gray-600 border-gray-200 text-lg px-4 py-1">
+                      Baixa
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Lista de Clientes Recuperados */}
+            {recuperadosStats.lista.length === 0 ? (
+              <Card className="bg-white shadow-sm">
+                <CardContent className="py-16 text-center">
+                  <Trophy className="h-16 w-16 mx-auto text-slate-200 mb-4" />
+                  <p className="text-xl font-medium text-slate-600">Nenhum cliente recuperado ainda</p>
+                  <p className="text-slate-400 mt-1">Clientes com acordo/baixa concluídos aparecerão aqui</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="bg-white shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    Clientes Recuperados
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {recuperadosStats.lista.map((item, index) => {
+                      const procInfo = getProcedimentoInfo(item.contexto?.procedimentoJuridico);
+                      return (
+                        <div 
+                          key={item.cliente.idCliente}
+                          className="flex items-center justify-between p-4 bg-green-50/50 rounded-xl border border-green-100"
+                          data-testid={`row-recuperado-${index}`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="p-2 bg-green-100 rounded-lg">
+                              <CheckCircle2 className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-800">{item.cliente.nomeCliente}</p>
+                              <p className="text-sm text-slate-500">{item.cliente.empresa}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-6">
+                            {procInfo && (
+                              <Badge className={`${procInfo.color} border`}>
+                                {procInfo.label}
+                              </Badge>
+                            )}
+                            <div className="text-right">
+                              <p className="text-sm text-slate-500">Valor Original</p>
+                              <p className="font-medium text-slate-600">{formatCurrency(item.cliente.valorTotal)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-slate-500">Valor Recuperado</p>
+                              <p className="font-bold text-green-600">{formatCurrency(item.contexto?.valorAcordado || 0)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Modal de Edição - Simples e Grande */}
