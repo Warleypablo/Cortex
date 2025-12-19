@@ -47,7 +47,6 @@ const AVAILABLE_ROUTES = [
   { path: '/dashboard/inadimplencia', label: 'Inadimplência', category: 'Financeiro' },
   { path: '/dashboard/auditoria-sistemas', label: 'Auditoria de Sistemas', category: 'Financeiro' },
   { path: '/dashboard/geg', label: 'Visão Geral', category: 'G&G' },
-  { path: '/dashboard/inhire', label: 'Inhire', category: 'G&G' },
   { path: '/dashboard/recrutamento', label: 'Recrutamento', category: 'G&G' },
   { path: '/visao-geral', label: 'Visão Geral', category: 'Operação' },
   { path: '/dashboard/retencao', label: 'Análise de Retenção', category: 'Operação' },
