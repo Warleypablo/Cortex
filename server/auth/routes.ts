@@ -2,6 +2,7 @@ import { Router } from "express";
 import passport from "passport";
 import type { User } from "./userDb";
 import { getCallbackURL } from "./config";
+import { isExternalEmailAllowed, createExternalUser, EXTERNAL_USER_ROUTES } from "./userDb";
 
 const router = Router();
 
@@ -97,6 +98,40 @@ router.get("/api/auth/me", (req, res) => {
     return res.status(401).json({ message: "Not authenticated" });
   }
   res.json(req.user as User);
+});
+
+// Login externo para investidores (sem Google OAuth)
+router.post("/auth/external-login", async (req, res) => {
+  const { email } = req.body;
+  
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ message: "Email é obrigatório" });
+  }
+  
+  const normalizedEmail = email.toLowerCase().trim();
+  
+  // Verifica se o email está na lista de externos permitidos
+  if (!isExternalEmailAllowed(normalizedEmail)) {
+    console.log(`❌ Login externo negado para: ${normalizedEmail}`);
+    return res.status(403).json({ message: "Email não autorizado para acesso externo" });
+  }
+  
+  try {
+    // Cria ou busca usuário externo
+    const user = await createExternalUser(normalizedEmail);
+    
+    req.login(user, (err) => {
+      if (err) {
+        console.error("Erro no login externo:", err);
+        return res.status(500).json({ message: "Erro ao fazer login" });
+      }
+      console.log(`✅ Login externo bem-sucedido: ${normalizedEmail}`);
+      res.json({ message: "Login realizado com sucesso", user });
+    });
+  } catch (error) {
+    console.error("Erro ao criar usuário externo:", error);
+    return res.status(500).json({ message: "Erro interno do servidor" });
+  }
 });
 
 export default router;
