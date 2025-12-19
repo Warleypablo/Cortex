@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { useQuery } from "@tanstack/react-query";
 import { format, subMonths, startOfMonth, endOfMonth, startOfYear, subYears, startOfQuarter, subQuarters, endOfQuarter } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import html2canvas from "html2canvas";
 import { 
   Users, 
   FileText, 
@@ -31,7 +32,8 @@ import {
   Percent,
   Activity,
   CalendarRange,
-  ChevronDown
+  ChevronDown,
+  Camera
 } from "lucide-react";
 import {
   LineChart,
@@ -188,6 +190,8 @@ export default function InvestorsReport() {
   });
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [selectingStart, setSelectingStart] = useState(true);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const pageRef = useRef<HTMLDivElement>(null);
   
   const handlePresetChange = (preset: PeriodPreset) => {
     setSelectedPreset(preset);
@@ -364,13 +368,43 @@ export default function InvestorsReport() {
     }
   };
 
+  const handleScreenshot = async () => {
+    if (!pageRef.current || isCapturing) return;
+    
+    setIsCapturing(true);
+    try {
+      const canvas = await html2canvas(pageRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#0f172a',
+        logging: false,
+        windowWidth: pageRef.current.scrollWidth,
+        windowHeight: pageRef.current.scrollHeight
+      });
+      
+      const image = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = image;
+      const periodLabel = format(dateRange.start, 'MMMyy', { locale: ptBR }) + '-' + format(dateRange.end, 'MMMyy', { locale: ptBR });
+      link.download = `investors-report-screenshot-${periodLabel}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Erro ao capturar tela:', error);
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
   const pieData = data ? [
     { name: 'Recorrentes', value: data.contratos.recorrentes, color: '#f97316' },
     { name: 'Pontuais', value: data.contratos.pontuais, color: '#3b82f6' },
   ] : [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6" data-testid="investors-report-page">
+    <div ref={pageRef} className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6" data-testid="investors-report-page">
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* Hero Header */}
@@ -394,12 +428,14 @@ export default function InvestorsReport() {
                 Live Data
               </Badge>
               <Button 
-                onClick={handleExportPDF} 
-                className="bg-orange-500 hover:bg-orange-600 text-white"
-                data-testid="button-export-pdf"
+                onClick={handleScreenshot}
+                disabled={isCapturing}
+                variant="outline"
+                className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+                data-testid="button-screenshot"
               >
-                <Download className="h-4 w-4 mr-2" />
-                Exportar PDF
+                <Camera className="h-4 w-4 mr-2" />
+                {isCapturing ? 'Capturando...' : 'Capturar Tela'}
               </Button>
             </div>
           </div>
