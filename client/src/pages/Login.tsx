@@ -42,9 +42,27 @@ function GlassFilter() {
 
 export default function Login() {
   const [isHovered, setIsHovered] = useState(false);
+  const [isDevLoading, setIsDevLoading] = useState(false);
+  
+  // Mostra botão de dev login apenas em desenvolvimento
+  const isDevelopment = import.meta.env.DEV;
 
   const handleGoogleLogin = () => {
     window.location.href = "/auth/google";
+  };
+  
+  const handleDevLogin = async () => {
+    setIsDevLoading(true);
+    try {
+      const response = await fetch("/auth/dev-login", { method: "POST" });
+      if (response.ok) {
+        window.location.href = "/";
+      }
+    } catch (error) {
+      console.error("Dev login failed:", error);
+    } finally {
+      setIsDevLoading(false);
+    }
   };
 
   return (
@@ -118,6 +136,17 @@ export default function Login() {
                 <SiGoogle className="w-5 h-5" />
                 <span className="font-medium">Entrar com Google</span>
               </button>
+              
+              {isDevelopment && (
+                <button
+                  onClick={handleDevLogin}
+                  disabled={isDevLoading}
+                  className="w-full flex items-center justify-center gap-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded-full py-2.5 px-4 transition-all duration-300 text-sm"
+                  data-testid="button-dev-login"
+                >
+                  <span>{isDevLoading ? "Entrando..." : "Entrar como Admin (Dev)"}</span>
+                </button>
+              )}
             </motion.div>
 
             <motion.div
