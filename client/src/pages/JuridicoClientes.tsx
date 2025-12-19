@@ -208,7 +208,7 @@ export default function JuridicoClientes() {
     { nome: "COPPINI Empreendimentos Digitais LTDA", valorOriginal: 2209.70, valorRecuperado: 2209.70 },
     { nome: "FLOREST", valorOriginal: 3997.00, valorRecuperado: 3997.00 },
     { nome: "GO COFFE", valorOriginal: 3283.00, valorRecuperado: 3283.00 },
-    { nome: "GOLIK", valorOriginal: 1500.00, valorRecuperado: 1500.00 },
+    { nome: "GOLIK", valorOriginal: 2800.00, valorRecuperado: 1500.00 },
     { nome: "100% CIFRAS", valorOriginal: 882.83, valorRecuperado: 882.83 },
     { nome: "VOLTA VIBE", valorOriginal: 1000.00, valorRecuperado: 1000.00 },
     { nome: "CHOCOLATERIA BRASIL", valorOriginal: 6987.59, valorRecuperado: 6987.59 },
