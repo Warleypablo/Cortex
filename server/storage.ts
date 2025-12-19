@@ -6381,12 +6381,12 @@ export class DbStorage implements IStorage {
 
   async getClientesComContextoJuridico(): Promise<string[]> {
     try {
+      // Query sem valor_acordado para compatibilidade com produção
       const result = await db.execute(sql.raw(`
         SELECT cliente_id FROM inadimplencia_contextos 
         WHERE contexto_juridico IS NOT NULL 
            OR procedimento_juridico IS NOT NULL 
            OR status_juridico IS NOT NULL
-           OR valor_acordado IS NOT NULL
       `));
       return (result.rows as any[]).map(r => r.cliente_id);
     } catch (error) {
