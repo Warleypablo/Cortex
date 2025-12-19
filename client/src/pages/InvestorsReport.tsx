@@ -4,7 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useQuery } from "@tanstack/react-query";
+import { format, subMonths, startOfMonth, endOfMonth, startOfYear, subYears, startOfQuarter, subQuarters, endOfQuarter } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { 
   Users, 
   FileText, 
@@ -24,7 +28,9 @@ import {
   ArrowDownRight,
   Target,
   Percent,
-  Activity
+  Activity,
+  CalendarRange,
+  ChevronDown
 } from "lucide-react";
 import {
   LineChart,
@@ -103,10 +109,87 @@ const formatPercent = (value: number) => {
 
 const COLORS = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'];
 
-type YearFilter = '2022' | '2023' | '2024' | '2025' | 'all';
+type PeriodPreset = 'ytd' | 'ultimo-mes' | 'ultimo-trimestre' | 'ultimo-semestre' | 'ultimo-ano' | '2024' | '2023' | '2022' | 'custom' | 'all';
+
+const PERIOD_PRESETS: { value: PeriodPreset; label: string; getRange: () => { start: Date; end: Date } }[] = [
+  { 
+    value: 'all', 
+    label: 'Todo Período',
+    getRange: () => ({ start: new Date('2022-01-01'), end: new Date() })
+  },
+  { 
+    value: 'ytd', 
+    label: 'YTD (Ano Atual)',
+    getRange: () => ({ start: startOfYear(new Date()), end: new Date() })
+  },
+  { 
+    value: 'ultimo-mes', 
+    label: 'Último Mês',
+    getRange: () => ({ start: startOfMonth(subMonths(new Date(), 1)), end: endOfMonth(subMonths(new Date(), 1)) })
+  },
+  { 
+    value: 'ultimo-trimestre', 
+    label: 'Último Trimestre',
+    getRange: () => ({ start: startOfQuarter(subQuarters(new Date(), 1)), end: endOfQuarter(subQuarters(new Date(), 1)) })
+  },
+  { 
+    value: 'ultimo-semestre', 
+    label: 'Último Semestre',
+    getRange: () => ({ start: startOfMonth(subMonths(new Date(), 6)), end: new Date() })
+  },
+  { 
+    value: 'ultimo-ano', 
+    label: 'Últimos 12 Meses',
+    getRange: () => ({ start: startOfMonth(subMonths(new Date(), 12)), end: new Date() })
+  },
+  { 
+    value: '2024', 
+    label: '2024',
+    getRange: () => ({ start: new Date('2024-01-01'), end: new Date('2024-12-31') })
+  },
+  { 
+    value: '2023', 
+    label: '2023',
+    getRange: () => ({ start: new Date('2023-01-01'), end: new Date('2023-12-31') })
+  },
+  { 
+    value: '2022', 
+    label: '2022',
+    getRange: () => ({ start: new Date('2022-01-01'), end: new Date('2022-12-31') })
+  },
+];
 
 export default function InvestorsReport() {
-  const [yearFilter, setYearFilter] = useState<YearFilter>('all');
+  const [selectedPreset, setSelectedPreset] = useState<PeriodPreset>('all');
+  const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
+    start: new Date('2022-01-01'),
+    end: new Date()
+  });
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [selectingStart, setSelectingStart] = useState(true);
+  
+  const handlePresetChange = (preset: PeriodPreset) => {
+    setSelectedPreset(preset);
+    if (preset !== 'custom') {
+      const presetConfig = PERIOD_PRESETS.find(p => p.value === preset);
+      if (presetConfig) {
+        setDateRange(presetConfig.getRange());
+      }
+    }
+  };
+  
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date) return;
+    if (selectingStart) {
+      setDateRange(prev => ({ ...prev, start: date }));
+      setSelectingStart(false);
+    } else {
+      setDateRange(prev => ({ ...prev, end: date }));
+      setCalendarOpen(false);
+      setSelectingStart(true);
+      setSelectedPreset('custom');
+    }
+  };
   
   const { data, isLoading, error } = useQuery<InvestorsReportData>({
     queryKey: ['/api/investors-report'],
@@ -116,12 +199,11 @@ export default function InvestorsReport() {
     if (!data?.evolucaoFaturamento) return [];
     
     return data.evolucaoFaturamento.filter(item => {
-      const year = parseInt(item.mes.split('-')[0]);
-      if (year < 2022 || year > 2025) return false;
-      if (yearFilter === 'all') return true;
-      return item.mes.startsWith(yearFilter);
+      const [year, month] = item.mes.split('-').map(Number);
+      const itemDate = new Date(year, month - 1, 1);
+      return itemDate >= dateRange.start && itemDate <= dateRange.end;
     });
-  }, [data?.evolucaoFaturamento, yearFilter]);
+  }, [data?.evolucaoFaturamento, dateRange]);
 
   const chartDataWithMetrics = useMemo(() => {
     let accumulated = 0;
@@ -470,24 +552,75 @@ export default function InvestorsReport() {
           </Card>
         </div>
 
-        {/* Year Filter */}
-        <div className="flex items-center justify-between bg-slate-900/30 rounded-lg p-4 border border-slate-700/30">
+        {/* Date Range Filter */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 bg-slate-900/30 rounded-lg p-4 border border-slate-700/30">
           <div className="flex items-center gap-3">
-            <Calendar className="h-5 w-5 text-orange-400" />
+            <CalendarRange className="h-5 w-5 text-orange-400" />
             <span className="text-white font-medium">Período de Análise</span>
             <Badge variant="secondary" className="bg-slate-700 text-slate-300">
               {chartDataWithMetrics.length} meses
             </Badge>
           </div>
-          <Tabs value={yearFilter} onValueChange={(v) => setYearFilter(v as YearFilter)}>
-            <TabsList className="bg-slate-800 border border-slate-700">
-              <TabsTrigger value="2022" data-testid="filter-2022" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">2022</TabsTrigger>
-              <TabsTrigger value="2023" data-testid="filter-2023" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">2023</TabsTrigger>
-              <TabsTrigger value="2024" data-testid="filter-2024" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">2024</TabsTrigger>
-              <TabsTrigger value="2025" data-testid="filter-2025" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">2025</TabsTrigger>
-              <TabsTrigger value="all" data-testid="filter-all" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">2022-2025</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Preset Buttons */}
+            {PERIOD_PRESETS.map((preset) => (
+              <Button
+                key={preset.value}
+                size="sm"
+                variant={selectedPreset === preset.value ? "default" : "ghost"}
+                className={selectedPreset === preset.value 
+                  ? "bg-orange-500 hover:bg-orange-600 text-white" 
+                  : "text-slate-400 hover:text-white hover:bg-slate-700"}
+                onClick={() => handlePresetChange(preset.value)}
+                data-testid={`filter-${preset.value}`}
+              >
+                {preset.label}
+              </Button>
+            ))}
+            
+            {/* Custom Date Picker */}
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm"
+                  variant={selectedPreset === 'custom' ? "default" : "outline"}
+                  className={selectedPreset === 'custom'
+                    ? "bg-orange-500 hover:bg-orange-600 text-white"
+                    : "border-slate-600 text-slate-300 hover:bg-slate-700"}
+                  data-testid="filter-custom"
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
+                  {selectedPreset === 'custom' 
+                    ? `${format(dateRange.start, 'dd/MM/yy', { locale: ptBR })} - ${format(dateRange.end, 'dd/MM/yy', { locale: ptBR })}`
+                    : 'Personalizado'}
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-4 bg-slate-900 border-slate-700" align="end">
+                <div className="space-y-4">
+                  <div className="text-sm text-slate-400">
+                    {selectingStart ? 'Selecione a data inicial' : 'Selecione a data final'}
+                  </div>
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectingStart ? dateRange.start : dateRange.end}
+                    onSelect={handleDateSelect}
+                    defaultMonth={selectingStart ? dateRange.start : dateRange.end}
+                    disabled={(date) => date > new Date() || date < new Date('2022-01-01')}
+                  />
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">
+                      De: <span className="text-white">{format(dateRange.start, 'dd/MM/yyyy', { locale: ptBR })}</span>
+                    </span>
+                    <span className="text-slate-400">
+                      Até: <span className="text-white">{format(dateRange.end, 'dd/MM/yyyy', { locale: ptBR })}</span>
+                    </span>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         {/* Charts Row 1: Faturamento Evolution + Margem */}

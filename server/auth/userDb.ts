@@ -49,6 +49,31 @@ const ADMIN_EMAILS = [
   'warleyreserva4@gmail.com'
 ];
 
+// Emails externos permitidos (investidores, consultores, etc.)
+const ALLOWED_EXTERNAL_EMAILS = [
+  'ajame@icloud.com'
+];
+
+// Rotas permitidas para usuários externos (apenas visualização)
+const EXTERNAL_USER_ROUTES = [
+  '/investors-report',
+  '/ferramentas'
+];
+
+export function isEmailAllowed(email: string): boolean {
+  // Emails do domínio turbopartners são sempre permitidos
+  if (email.endsWith('@turbopartners.com.br')) return true;
+  // Emails na lista de admin são permitidos
+  if (ADMIN_EMAILS.includes(email)) return true;
+  // Emails externos na whitelist são permitidos
+  if (ALLOWED_EXTERNAL_EMAILS.includes(email)) return true;
+  return false;
+}
+
+export function isExternalEmail(email: string): boolean {
+  return ALLOWED_EXTERNAL_EMAILS.includes(email);
+}
+
 const ALL_ROUTES = [
   '/',
   '/contratos',
@@ -209,8 +234,21 @@ export async function createOrUpdateUser(profile: {
   const name = profile.displayName;
   const picture = profile.photos?.[0]?.value || "";
 
+  // Verificar se o email é permitido
+  if (!isEmailAllowed(email)) {
+    throw new Error(`Email não autorizado: ${email}`);
+  }
+
   const isAdmin = ADMIN_EMAILS.includes(email);
+  const isExternal = isExternalEmail(email);
   const existingUser = await findUserByGoogleId(googleId);
+
+  // Determinar rotas baseado no tipo de usuário
+  const getUserRoutes = (existingRoutes?: string[]) => {
+    if (isAdmin) return ALL_ROUTES;
+    if (isExternal) return EXTERNAL_USER_ROUTES;
+    return existingRoutes || DEFAULT_USER_ROUTES;
+  };
 
   if (existingUser) {
     const result = await db
@@ -220,7 +258,7 @@ export async function createOrUpdateUser(profile: {
         name,
         picture,
         role: isAdmin ? 'admin' : existingUser.role,
-        allowedRoutes: isAdmin ? ALL_ROUTES : (existingUser.allowedRoutes || DEFAULT_USER_ROUTES),
+        allowedRoutes: getUserRoutes(existingUser.allowedRoutes),
       })
       .where(eq(authUsers.id, existingUser.id))
       .returning();
@@ -238,7 +276,7 @@ export async function createOrUpdateUser(profile: {
     name,
     picture,
     role: isAdmin ? 'admin' : 'user',
-    allowedRoutes: isAdmin ? ALL_ROUTES : DEFAULT_USER_ROUTES,
+    allowedRoutes: getUserRoutes(),
   };
 
   await db.insert(authUsers).values(newUserData);
@@ -250,6 +288,7 @@ export async function createOrUpdateUser(profile: {
   };
   
   setCachedUser(newUser);
+  console.log(`✅ Novo usuário criado: ${email} (${isExternal ? 'externo' : 'interno'})`);
   return newUser;
 }
 
