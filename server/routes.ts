@@ -2706,21 +2706,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ids = clientesFiltrados.map(c => c.idCliente);
       const contextos = await storage.getInadimplenciaContextos(ids);
       
-      // 4. Buscar parcelas detalhadas para cada cliente
-      const clientesComDados: Array<{
-        cliente: typeof clientesFiltrados[0];
-        contexto: typeof contextos[string];
-        parcelas: any[];
-      }> = [];
+      // 4. Buscar parcelas em paralelo (otimizado)
+      const parcelasPromises = clientesFiltrados.map(cliente => 
+        storage.getInadimplenciaDetalheParcelas(cliente.idCliente, dataInicio, dataFim)
+      );
+      const parcelasResults = await Promise.all(parcelasPromises);
       
-      for (const cliente of clientesFiltrados) {
-        const parcelasData = await storage.getInadimplenciaDetalheParcelas(cliente.idCliente, dataInicio, dataFim);
-        clientesComDados.push({
-          cliente,
-          contexto: contextos[cliente.idCliente] || {},
-          parcelas: parcelasData.parcelas,
-        });
-      }
+      // 5. Montar resposta
+      const clientesComDados = clientesFiltrados.map((cliente, index) => ({
+        cliente,
+        contexto: contextos[cliente.idCliente] || {},
+        parcelas: parcelasResults[index].parcelas,
+      }));
       
       console.log("[api] Juridico clientes - Total:", clientesComDados.length);
       

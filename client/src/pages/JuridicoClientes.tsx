@@ -6,15 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { Progress } from "@/components/ui/progress";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -31,27 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   Scale,
   Users,
   DollarSign,
-  Clock,
   Search,
   AlertTriangle,
   Phone,
   Building2,
-  Receipt,
-  ExternalLink,
-  AlertCircle,
-  ChevronDown,
-  ChevronRight,
-  Edit,
-  FileText,
+  Edit3,
   Loader2,
   CheckCircle2,
   Gavel,
@@ -59,8 +37,13 @@ import {
   Handshake,
   Send,
   XCircle,
-  Filter,
+  Clock,
   TrendingUp,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -132,25 +115,24 @@ const formatDate = (date: string | null) => {
 };
 
 const PROCEDIMENTOS = [
-  { value: "notificacao", label: "Notificação Extrajudicial", icon: Send, color: "text-blue-500" },
-  { value: "protesto", label: "Protesto", icon: FileWarning, color: "text-orange-500" },
-  { value: "acao_judicial", label: "Ação Judicial", icon: Gavel, color: "text-red-500" },
-  { value: "acordo", label: "Acordo", icon: Handshake, color: "text-green-500" },
-  { value: "baixa", label: "Baixa", icon: XCircle, color: "text-gray-500" },
+  { value: "notificacao", label: "Notificação", icon: Send, color: "bg-blue-100 text-blue-700 border-blue-200" },
+  { value: "protesto", label: "Protesto", icon: FileWarning, color: "bg-orange-100 text-orange-700 border-orange-200" },
+  { value: "acao_judicial", label: "Ação Judicial", icon: Gavel, color: "bg-red-100 text-red-700 border-red-200" },
+  { value: "acordo", label: "Acordo", icon: Handshake, color: "bg-green-100 text-green-700 border-green-200" },
+  { value: "baixa", label: "Baixa", icon: XCircle, color: "bg-gray-100 text-gray-600 border-gray-200" },
 ];
 
 const STATUS_JURIDICO = [
-  { value: "pendente", label: "Pendente", color: "bg-amber-500/20 text-amber-700 border-amber-500/30", icon: Clock },
-  { value: "em_andamento", label: "Em Andamento", color: "bg-blue-500/20 text-blue-700 border-blue-500/30", icon: TrendingUp },
-  { value: "concluido", label: "Concluído", color: "bg-emerald-500/20 text-emerald-700 border-emerald-500/30", icon: CheckCircle2 },
-  { value: "cancelado", label: "Cancelado", color: "bg-gray-500/20 text-gray-600 border-gray-500/30", icon: XCircle },
+  { value: "pendente", label: "Aguardando", color: "bg-amber-100 text-amber-700 border-amber-200", icon: Clock },
+  { value: "em_andamento", label: "Em Andamento", color: "bg-blue-100 text-blue-700 border-blue-200", icon: TrendingUp },
+  { value: "concluido", label: "Concluído", color: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle2 },
+  { value: "cancelado", label: "Cancelado", color: "bg-gray-100 text-gray-600 border-gray-200", icon: XCircle },
 ];
 
 export default function JuridicoClientes() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [procedimentoFilter, setProcedimentoFilter] = useState<string>("all");
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [expandedClient, setExpandedClient] = useState<string | null>(null);
   const [editingCliente, setEditingCliente] = useState<ClienteJuridico | null>(null);
   const [editForm, setEditForm] = useState({
     contextoJuridico: "",
@@ -161,6 +143,7 @@ export default function JuridicoClientes() {
 
   const { data, isLoading } = useQuery<{ clientes: ClienteJuridico[] }>({
     queryKey: ["/api/juridico/clientes"],
+    staleTime: 5 * 60 * 1000,
   });
 
   const updateMutation = useMutation({
@@ -173,18 +156,11 @@ export default function JuridicoClientes() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/juridico/clientes"] });
-      toast({
-        title: "Contexto atualizado",
-        description: "O contexto jurídico foi salvo com sucesso.",
-      });
+      toast({ title: "Salvo com sucesso!" });
       setEditingCliente(null);
     },
     onError: () => {
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar o contexto jurídico.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao salvar", variant: "destructive" });
     },
   });
 
@@ -195,40 +171,27 @@ export default function JuridicoClientes() {
       const matchesSearch =
         searchTerm === "" ||
         item.cliente.nomeCliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.cliente.empresa?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.cliente.cnpj?.includes(searchTerm);
+        item.cliente.empresa?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesStatus =
         statusFilter === "all" ||
-        (statusFilter === "sem_status" && !item.contexto?.statusJuridico) ||
-        item.contexto?.statusJuridico === statusFilter;
+        (statusFilter === "pendente" && !item.contexto?.procedimentoJuridico) ||
+        item.contexto?.procedimentoJuridico === statusFilter;
 
-      const matchesProcedimento =
-        procedimentoFilter === "all" ||
-        (procedimentoFilter === "sem_procedimento" && !item.contexto?.procedimentoJuridico) ||
-        item.contexto?.procedimentoJuridico === procedimentoFilter;
-
-      return matchesSearch && matchesStatus && matchesProcedimento;
+      return matchesSearch && matchesStatus;
     });
-  }, [clientes, searchTerm, statusFilter, procedimentoFilter]);
+  }, [clientes, searchTerm, statusFilter]);
+
+  const sortedClientes = useMemo(() => {
+    return [...filteredClientes].sort((a, b) => b.cliente.diasAtrasoMax - a.cliente.diasAtrasoMax);
+  }, [filteredClientes]);
 
   const totals = useMemo(() => {
     const total = filteredClientes.reduce((acc, item) => acc + item.cliente.valorTotal, 0);
-    const totalParcelas = filteredClientes.reduce((acc, item) => acc + item.cliente.quantidadeParcelas, 0);
-    const comContextoJuridico = filteredClientes.filter(c => c.contexto?.procedimentoJuridico || c.contexto?.statusJuridico).length;
     const urgentes = filteredClientes.filter(c => c.cliente.diasAtrasoMax > 90).length;
-    return { total, totalParcelas, count: filteredClientes.length, comContextoJuridico, urgentes };
+    const semAcao = filteredClientes.filter(c => !c.contexto?.procedimentoJuridico).length;
+    return { total, count: filteredClientes.length, urgentes, semAcao };
   }, [filteredClientes]);
-
-  const toggleRow = (id: string) => {
-    const newExpanded = new Set(expandedRows);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-    }
-    setExpandedRows(newExpanded);
-  };
 
   const openEditModal = (cliente: ClienteJuridico) => {
     setEditingCliente(cliente);
@@ -247,610 +210,502 @@ export default function JuridicoClientes() {
     });
   };
 
-  const getStatusBadge = (status: string | null) => {
-    if (!status) {
-      return (
-        <Badge variant="outline" className="text-muted-foreground border-dashed">
-          <AlertCircle className="h-3 w-3 mr-1" />
-          Sem status
-        </Badge>
-      );
-    }
-    const statusConfig = STATUS_JURIDICO.find(s => s.value === status);
-    if (!statusConfig) return <Badge variant="outline">{status}</Badge>;
-    const IconComponent = statusConfig.icon;
-    return (
-      <Badge className={`${statusConfig.color} border`}>
-        <IconComponent className="h-3 w-3 mr-1" />
-        {statusConfig.label}
-      </Badge>
-    );
+  const getProcedimentoInfo = (value: string | null) => {
+    if (!value) return null;
+    return PROCEDIMENTOS.find(p => p.value === value);
   };
 
-  const getProcedimentoBadge = (value: string | null) => {
-    if (!value) {
-      return (
-        <span className="text-muted-foreground text-sm italic">Não definido</span>
-      );
-    }
-    const proc = PROCEDIMENTOS.find(p => p.value === value);
-    if (!proc) return <span className="text-sm">{value}</span>;
-    const IconComponent = proc.icon;
-    return (
-      <div className="flex items-center gap-1.5">
-        <IconComponent className={`h-4 w-4 ${proc.color}`} />
-        <span className="text-sm font-medium">{proc.label}</span>
-      </div>
-    );
+  const getStatusInfo = (value: string | null) => {
+    if (!value) return null;
+    return STATUS_JURIDICO.find(s => s.value === value);
   };
 
-  const getUrgencyIndicator = (diasAtraso: number) => {
-    if (diasAtraso > 90) {
-      return (
-        <Tooltip>
-          <TooltipTrigger>
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          </TooltipTrigger>
-          <TooltipContent>Urgente: mais de 90 dias de atraso</TooltipContent>
-        </Tooltip>
-      );
-    }
-    if (diasAtraso > 60) {
-      return (
-        <Tooltip>
-          <TooltipTrigger>
-            <div className="w-2 h-2 rounded-full bg-orange-500" />
-          </TooltipTrigger>
-          <TooltipContent>Atenção: mais de 60 dias de atraso</TooltipContent>
-        </Tooltip>
-      );
-    }
-    return null;
+  const getUrgencyLevel = (dias: number) => {
+    if (dias > 90) return { level: "URGENTE", color: "bg-red-500", textColor: "text-white" };
+    if (dias > 60) return { level: "ATENÇÃO", color: "bg-orange-500", textColor: "text-white" };
+    if (dias > 30) return { level: "MODERADO", color: "bg-amber-400", textColor: "text-amber-900" };
+    return { level: "RECENTE", color: "bg-slate-300", textColor: "text-slate-700" };
   };
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+      <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
+        <Skeleton className="h-12 w-80" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
         </div>
-        <Skeleton className="h-96" />
+        <div className="space-y-4">
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+        </div>
       </div>
     );
   }
 
-  const progressPercent = totals.count > 0 ? (totals.comContextoJuridico / totals.count) * 100 : 0;
-
   return (
-    <TooltipProvider>
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
+    <div className="min-h-screen bg-slate-50">
+      {/* Header Simples */}
+      <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
+        <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-primary/10 rounded-xl">
-              <Scale className="w-8 h-8 text-primary" />
+              <Scale className="w-7 h-7 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold" data-testid="text-page-title">
+              <h1 className="text-2xl font-bold text-slate-800" data-testid="text-page-title">
                 Cobrança Jurídica
               </h1>
-              <p className="text-muted-foreground text-sm">
-                Clientes inadimplentes com mais de 3 dias de atraso
+              <p className="text-slate-500">
+                {totals.count} cliente{totals.count !== 1 && 's'} • {formatCurrency(totals.total)} em aberto
               </p>
             </div>
           </div>
-          {totals.urgentes > 0 && (
-            <Badge variant="destructive" className="text-sm px-3 py-1.5">
-              <AlertTriangle className="h-4 w-4 mr-1.5" />
-              {totals.urgentes} caso{totals.urgentes !== 1 ? "s" : ""} urgente{totals.urgentes !== 1 ? "s" : ""}
-            </Badge>
-          )}
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="border-l-4 border-l-red-500">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Valor em Cobrança</CardTitle>
-              <DollarSign className="h-5 w-5 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-value">
-                {formatCurrency(totals.total)}
+      <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
+        
+        {/* Cards de Resumo - Grandes e Claros */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-red-50 rounded-2xl">
+                  <DollarSign className="h-8 w-8 text-red-500" />
+                </div>
+                <div>
+                  <p className="text-slate-500 text-sm font-medium">Valor Total</p>
+                  <p className="text-3xl font-bold text-slate-800" data-testid="text-total-value">
+                    {formatCurrency(totals.total)}
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {totals.totalParcelas} parcela{totals.totalParcelas !== 1 ? "s" : ""} em atraso
-              </p>
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-blue-500">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Clientes</CardTitle>
-              <Users className="h-5 w-5 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-client-count">
-                {totals.count}
+          <Card className={`bg-white shadow-sm hover:shadow-md transition-shadow ${totals.urgentes > 0 ? 'ring-2 ring-red-200' : ''}`}>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-orange-50 rounded-2xl">
+                  <AlertTriangle className="h-8 w-8 text-orange-500" />
+                </div>
+                <div>
+                  <p className="text-slate-500 text-sm font-medium">Casos Urgentes</p>
+                  <p className="text-3xl font-bold text-orange-600" data-testid="text-urgent-cases">
+                    {totals.urgentes}
+                  </p>
+                  <p className="text-xs text-slate-400">mais de 90 dias</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Ticket médio: {formatCurrency(totals.count > 0 ? totals.total / totals.count : 0)}
-              </p>
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-amber-500">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Casos Urgentes</CardTitle>
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-amber-600" data-testid="text-urgent-cases">
-                {totals.urgentes}
+          <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-amber-50 rounded-2xl">
+                  <Clock className="h-8 w-8 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-slate-500 text-sm font-medium">Sem Ação Definida</p>
+                  <p className="text-3xl font-bold text-amber-600" data-testid="text-no-action">
+                    {totals.semAcao}
+                  </p>
+                  <p className="text-xs text-slate-400">precisam de análise</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Mais de 90 dias de atraso
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-l-4 border-l-emerald-500">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Andamento</CardTitle>
-              <FileText className="h-5 w-5 text-emerald-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-emerald-600" data-testid="text-with-treatment">
-                  {totals.comContextoJuridico}
-                </span>
-                <span className="text-sm text-muted-foreground">/ {totals.count}</span>
-              </div>
-              <Progress value={progressPercent} className="h-2 mt-2" />
-              <p className="text-xs text-muted-foreground mt-1">
-                {Math.round(progressPercent)}% com procedimento definido
-              </p>
             </CardContent>
           </Card>
         </div>
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 mb-6">
-              <div className="relative flex-1 min-w-[250px]">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        {/* Filtros Simples */}
+        <Card className="bg-white shadow-sm">
+          <CardContent className="py-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                 <Input
-                  placeholder="Buscar por nome, empresa ou CNPJ..."
+                  placeholder="Buscar por nome ou empresa..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-12 text-base bg-slate-50 border-slate-200"
                   data-testid="input-search"
                 />
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[160px]" data-testid="filter-status">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os status</SelectItem>
-                    <SelectItem value="sem_status">Sem status</SelectItem>
-                    {STATUS_JURIDICO.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={procedimentoFilter} onValueChange={setProcedimentoFilter}>
-                  <SelectTrigger className="w-[200px]" data-testid="filter-procedimento">
-                    <SelectValue placeholder="Procedimento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os procedimentos</SelectItem>
-                    <SelectItem value="sem_procedimento">Sem procedimento</SelectItem>
-                    {PROCEDIMENTOS.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full md:w-[220px] h-12 bg-slate-50 border-slate-200" data-testid="filter-status">
+                  <SelectValue placeholder="Filtrar por ação" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="all">Todos os casos</SelectItem>
+                  <SelectItem value="pendente">Sem ação definida</SelectItem>
+                  {PROCEDIMENTOS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-
-            {filteredClientes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <Scale className="h-16 w-16 mb-4 opacity-20" />
-                <p className="text-lg font-medium">Nenhum cliente encontrado</p>
-                <p className="text-sm">Tente ajustar os filtros de busca</p>
-              </div>
-            ) : (
-              <div className="rounded-lg border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead className="font-semibold">Cliente</TableHead>
-                      <TableHead className="text-right font-semibold">Valor Devido</TableHead>
-                      <TableHead className="text-center font-semibold">Atraso</TableHead>
-                      <TableHead className="font-semibold">Procedimento</TableHead>
-                      <TableHead className="font-semibold">Status</TableHead>
-                      <TableHead className="w-12"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredClientes.map((item, index) => {
-                      const isExpanded = expandedRows.has(item.cliente.idCliente);
-                      return (
-                        <>
-                          <TableRow 
-                            key={item.cliente.idCliente}
-                            className={`cursor-pointer transition-colors ${isExpanded ? 'bg-muted/30' : 'hover:bg-muted/20'}`}
-                            onClick={() => toggleRow(item.cliente.idCliente)}
-                            data-testid={`row-client-${index}`}
-                          >
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {getUrgencyIndicator(item.cliente.diasAtrasoMax)}
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  data-testid={`button-expand-${index}`}
-                                >
-                                  {isExpanded ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-semibold" data-testid={`text-client-name-${index}`}>
-                                  {item.cliente.nomeCliente}
-                                </span>
-                                <span className="text-sm text-muted-foreground">
-                                  {item.cliente.empresa}
-                                  {item.cliente.cnpj && ` - ${item.cliente.cnpj}`}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex flex-col items-end">
-                                <span className="font-bold text-destructive" data-testid={`text-value-${index}`}>
-                                  {formatCurrency(item.cliente.valorTotal)}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {item.cliente.quantidadeParcelas} parcela{item.cliente.quantidadeParcelas !== 1 ? "s" : ""}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge 
-                                variant={item.cliente.diasAtrasoMax > 90 ? "destructive" : item.cliente.diasAtrasoMax > 60 ? "secondary" : "outline"}
-                                className="font-mono"
-                              >
-                                {item.cliente.diasAtrasoMax}d
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {getProcedimentoBadge(item.contexto?.procedimentoJuridico)}
-                            </TableCell>
-                            <TableCell>
-                              {getStatusBadge(item.contexto?.statusJuridico)}
-                            </TableCell>
-                            <TableCell>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openEditModal(item);
-                                    }}
-                                    data-testid={`button-edit-${index}`}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Editar contexto jurídico</TooltipContent>
-                              </Tooltip>
-                            </TableCell>
-                          </TableRow>
-                          {isExpanded && (
-                            <TableRow className="bg-muted/20 hover:bg-muted/20">
-                              <TableCell colSpan={7} className="p-0">
-                                <div className="p-6 space-y-6">
-                                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    <Card className="bg-background">
-                                      <CardHeader className="pb-3">
-                                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                          <Building2 className="h-4 w-4 text-muted-foreground" />
-                                          Informações do Cliente
-                                        </CardTitle>
-                                      </CardHeader>
-                                      <CardContent className="space-y-2 text-sm">
-                                        {item.cliente.telefone && (
-                                          <div className="flex items-center gap-2">
-                                            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                                            <span>{item.cliente.telefone}</span>
-                                          </div>
-                                        )}
-                                        {item.cliente.responsavel && (
-                                          <div className="flex items-center gap-2">
-                                            <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                                            <span>Responsável: {item.cliente.responsavel}</span>
-                                          </div>
-                                        )}
-                                        {item.cliente.servicos && (
-                                          <div className="text-muted-foreground">
-                                            Serviços: {item.cliente.servicos}
-                                          </div>
-                                        )}
-                                        {item.cliente.cluster && (
-                                          <Badge variant="outline" className="mt-2">{item.cliente.cluster}</Badge>
-                                        )}
-                                      </CardContent>
-                                    </Card>
-
-                                    <Card className="bg-background border-amber-500/30">
-                                      <CardHeader className="pb-3">
-                                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                          <AlertTriangle className="h-4 w-4 text-amber-500" />
-                                          Contexto CS
-                                        </CardTitle>
-                                      </CardHeader>
-                                      <CardContent className="text-sm">
-                                        {item.contexto?.contexto ? (
-                                          <p className="text-muted-foreground leading-relaxed">{item.contexto.contexto}</p>
-                                        ) : (
-                                          <p className="text-muted-foreground italic">Sem contexto registrado pelo CS</p>
-                                        )}
-                                      </CardContent>
-                                    </Card>
-
-                                    <Card className="bg-background border-primary/30">
-                                      <CardHeader className="pb-3">
-                                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                          <Scale className="h-4 w-4 text-primary" />
-                                          Contexto Jurídico
-                                        </CardTitle>
-                                      </CardHeader>
-                                      <CardContent className="text-sm">
-                                        {item.contexto?.contextoJuridico ? (
-                                          <>
-                                            <p className="text-muted-foreground leading-relaxed">{item.contexto.contextoJuridico}</p>
-                                            {item.contexto.atualizadoJuridicoPor && (
-                                              <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
-                                                Atualizado por <span className="font-medium">{item.contexto.atualizadoJuridicoPor}</span> em {formatDate(item.contexto.atualizadoJuridicoEm)}
-                                              </p>
-                                            )}
-                                          </>
-                                        ) : (
-                                          <div className="flex flex-col items-center justify-center py-4 text-center">
-                                            <FileText className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                                            <p className="text-muted-foreground italic text-xs">
-                                              Nenhum contexto jurídico registrado
-                                            </p>
-                                            <Button 
-                                              variant="ghost" 
-                                              size="sm" 
-                                              className="mt-2 text-primary"
-                                              onClick={() => openEditModal(item)}
-                                            >
-                                              Adicionar contexto
-                                            </Button>
-                                          </div>
-                                        )}
-                                      </CardContent>
-                                    </Card>
-                                  </div>
-
-                                  <Card className="bg-background">
-                                    <CardHeader className="pb-3">
-                                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                        <Receipt className="h-4 w-4 text-muted-foreground" />
-                                        Parcelas em Atraso
-                                        <Badge variant="outline" className="ml-2">{item.parcelas.length}</Badge>
-                                      </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                      <div className="max-h-[200px] overflow-auto rounded-md border">
-                                        <Table>
-                                          <TableHeader>
-                                            <TableRow className="bg-muted/30">
-                                              <TableHead className="text-xs">Descrição</TableHead>
-                                              <TableHead className="text-xs">Vencimento</TableHead>
-                                              <TableHead className="text-xs text-center">Dias Atraso</TableHead>
-                                              <TableHead className="text-xs text-right">Valor</TableHead>
-                                              <TableHead className="w-10"></TableHead>
-                                            </TableRow>
-                                          </TableHeader>
-                                          <TableBody>
-                                            {item.parcelas.map((parcela, pIndex) => (
-                                              <TableRow key={parcela.id} data-testid={`row-parcela-${index}-${pIndex}`}>
-                                                <TableCell className="font-medium max-w-[200px] truncate text-sm">
-                                                  {parcela.descricao}
-                                                </TableCell>
-                                                <TableCell className="text-sm">{formatDate(parcela.dataVencimento)}</TableCell>
-                                                <TableCell className="text-center">
-                                                  <Badge
-                                                    variant={
-                                                      parcela.diasAtraso > 90
-                                                        ? "destructive"
-                                                        : parcela.diasAtraso > 30
-                                                        ? "secondary"
-                                                        : "outline"
-                                                    }
-                                                    className="font-mono text-xs"
-                                                  >
-                                                    {parcela.diasAtraso}d
-                                                  </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right font-medium text-destructive text-sm">
-                                                  {formatCurrency(parcela.naoPago)}
-                                                </TableCell>
-                                                <TableCell>
-                                                  {parcela.urlCobranca && (
-                                                    <Tooltip>
-                                                      <TooltipTrigger asChild>
-                                                        <a
-                                                          href={parcela.urlCobranca}
-                                                          target="_blank"
-                                                          rel="noopener noreferrer"
-                                                          className="text-primary hover:text-primary/80"
-                                                          onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                          <ExternalLink className="h-4 w-4" />
-                                                        </a>
-                                                      </TooltipTrigger>
-                                                      <TooltipContent>Abrir cobrança</TooltipContent>
-                                                    </Tooltip>
-                                                  )}
-                                                </TableCell>
-                                              </TableRow>
-                                            ))}
-                                          </TableBody>
-                                        </Table>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
           </CardContent>
         </Card>
 
-        <Dialog open={!!editingCliente} onOpenChange={() => setEditingCliente(null)}>
-          <DialogContent className="sm:max-w-[550px]">
-            <DialogHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Scale className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <DialogTitle>Contexto Jurídico</DialogTitle>
-                  <DialogDescription className="mt-1">
-                    {editingCliente?.cliente.nomeCliente}
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
+        {/* Lista de Clientes - Cards Grandes */}
+        {sortedClientes.length === 0 ? (
+          <Card className="bg-white shadow-sm">
+            <CardContent className="py-16 text-center">
+              <Scale className="h-16 w-16 mx-auto text-slate-200 mb-4" />
+              <p className="text-xl font-medium text-slate-600">Nenhum caso encontrado</p>
+              <p className="text-slate-400 mt-1">Tente mudar os filtros de busca</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {sortedClientes.map((item, index) => {
+              const urgency = getUrgencyLevel(item.cliente.diasAtrasoMax);
+              const procedimento = getProcedimentoInfo(item.contexto?.procedimentoJuridico);
+              const status = getStatusInfo(item.contexto?.statusJuridico);
+              const isExpanded = expandedClient === item.cliente.idCliente;
+              const ProcIcon = procedimento?.icon;
+              const StatusIcon = status?.icon;
 
-            <div className="space-y-5 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Procedimento</label>
-                  <Select
-                    value={editForm.procedimentoJuridico}
-                    onValueChange={(value) => setEditForm({ ...editForm, procedimentoJuridico: value })}
-                  >
-                    <SelectTrigger data-testid="select-procedimento">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PROCEDIMENTOS.map((proc) => {
-                        const IconComponent = proc.icon;
-                        return (
-                          <SelectItem key={proc.value} value={proc.value}>
-                            <div className="flex items-center gap-2">
-                              <IconComponent className={`h-4 w-4 ${proc.color}`} />
-                              {proc.label}
+              return (
+                <Card 
+                  key={item.cliente.idCliente} 
+                  className={`bg-white shadow-sm hover:shadow-md transition-all ${
+                    item.cliente.diasAtrasoMax > 90 ? 'border-l-4 border-l-red-500' : 
+                    item.cliente.diasAtrasoMax > 60 ? 'border-l-4 border-l-orange-400' : ''
+                  }`}
+                  data-testid={`card-client-${index}`}
+                >
+                  <CardContent className="py-5">
+                    {/* Linha Principal */}
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                      
+                      {/* Info do Cliente */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-3">
+                          <Badge className={`${urgency.color} ${urgency.textColor} text-xs font-bold px-2 py-1 shrink-0`}>
+                            {urgency.level}
+                          </Badge>
+                          <div className="min-w-0">
+                            <h3 className="text-lg font-semibold text-slate-800 truncate" data-testid={`text-client-name-${index}`}>
+                              {item.cliente.nomeCliente}
+                            </h3>
+                            <p className="text-slate-500 text-sm truncate">
+                              {item.cliente.empresa}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Valor e Dias */}
+                      <div className="flex items-center gap-6 lg:gap-8">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-red-600" data-testid={`text-value-${index}`}>
+                            {formatCurrency(item.cliente.valorTotal)}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {item.cliente.quantidadeParcelas} parcela{item.cliente.quantidadeParcelas !== 1 && 's'}
+                          </p>
+                        </div>
+                        <div className="text-center min-w-[80px]">
+                          <p className="text-2xl font-bold text-slate-700">
+                            {item.cliente.diasAtrasoMax}
+                          </p>
+                          <p className="text-xs text-slate-400">dias atraso</p>
+                        </div>
+                      </div>
+
+                      {/* Status e Ações */}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {procedimento ? (
+                          <Badge className={`${procedimento.color} border text-sm px-3 py-1.5`}>
+                            {ProcIcon && <ProcIcon className="h-4 w-4 mr-1.5" />}
+                            {procedimento.label}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-dashed border-2 text-slate-400 px-3 py-1.5">
+                            Sem ação
+                          </Badge>
+                        )}
+                        {status && (
+                          <Badge className={`${status.color} border text-sm px-3 py-1.5`}>
+                            {StatusIcon && <StatusIcon className="h-4 w-4 mr-1.5" />}
+                            {status.label}
+                          </Badge>
+                        )}
+                        
+                        <Button 
+                          size="lg"
+                          className="bg-primary hover:bg-primary/90 text-white font-medium"
+                          onClick={() => openEditModal(item)}
+                          data-testid={`button-edit-${index}`}
+                        >
+                          <Edit3 className="h-4 w-4 mr-2" />
+                          Atualizar
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setExpandedClient(isExpanded ? null : item.cliente.idCliente)}
+                          data-testid={`button-expand-${index}`}
+                        >
+                          {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Área Expandida */}
+                    {isExpanded && (
+                      <div className="mt-6 pt-6 border-t border-slate-100 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          
+                          {/* Informações do Cliente */}
+                          <div className="bg-slate-50 rounded-xl p-4">
+                            <h4 className="font-semibold text-slate-700 flex items-center gap-2 mb-3">
+                              <Building2 className="h-4 w-4" />
+                              Dados do Cliente
+                            </h4>
+                            <div className="space-y-2 text-sm">
+                              {item.cliente.telefone && (
+                                <div className="flex items-center gap-2 text-slate-600">
+                                  <Phone className="h-4 w-4 text-slate-400" />
+                                  <span>{item.cliente.telefone}</span>
+                                </div>
+                              )}
+                              {item.cliente.responsavel && (
+                                <div className="flex items-center gap-2 text-slate-600">
+                                  <Users className="h-4 w-4 text-slate-400" />
+                                  <span>Responsável: {item.cliente.responsavel}</span>
+                                </div>
+                              )}
+                              {item.cliente.cnpj && (
+                                <p className="text-slate-500">CNPJ: {item.cliente.cnpj}</p>
+                              )}
                             </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
+                          </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Status</label>
-                  <Select
-                    value={editForm.statusJuridico}
-                    onValueChange={(value) => setEditForm({ ...editForm, statusJuridico: value })}
-                  >
-                    <SelectTrigger data-testid="select-status">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_JURIDICO.map((status) => {
-                        const IconComponent = status.icon;
-                        return (
-                          <SelectItem key={status.value} value={status.value}>
-                            <div className="flex items-center gap-2">
-                              <IconComponent className="h-4 w-4" />
-                              {status.label}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
+                          {/* Contexto do CS */}
+                          <div className="bg-amber-50 rounded-xl p-4">
+                            <h4 className="font-semibold text-amber-800 flex items-center gap-2 mb-3">
+                              <AlertTriangle className="h-4 w-4" />
+                              Observações do CS
+                            </h4>
+                            <p className="text-sm text-amber-900/80 leading-relaxed">
+                              {item.contexto?.contexto || "Sem observações registradas"}
+                            </p>
+                          </div>
+
+                          {/* Contexto Jurídico */}
+                          <div className="bg-primary/5 rounded-xl p-4">
+                            <h4 className="font-semibold text-primary flex items-center gap-2 mb-3">
+                              <Scale className="h-4 w-4" />
+                              Anotações Jurídicas
+                            </h4>
+                            {item.contexto?.contextoJuridico ? (
+                              <>
+                                <p className="text-sm text-slate-600 leading-relaxed">
+                                  {item.contexto.contextoJuridico}
+                                </p>
+                                {item.contexto.atualizadoJuridicoPor && (
+                                  <p className="text-xs text-slate-400 mt-3 pt-2 border-t border-slate-200">
+                                    Por {item.contexto.atualizadoJuridicoPor} em {formatDate(item.contexto.atualizadoJuridicoEm)}
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-sm text-slate-400 italic">
+                                Nenhuma anotação ainda
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Parcelas */}
+                        <div className="bg-white rounded-xl border border-slate-200">
+                          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                            <h4 className="font-semibold text-slate-700 flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              Parcelas em Atraso
+                            </h4>
+                            <Badge variant="secondary">{item.parcelas.length}</Badge>
+                          </div>
+                          <div className="max-h-[200px] overflow-y-auto">
+                            {item.parcelas.map((parcela, pIndex) => (
+                              <div 
+                                key={parcela.id}
+                                className="px-4 py-3 border-b border-slate-50 last:border-0 flex items-center justify-between hover:bg-slate-50"
+                                data-testid={`row-parcela-${index}-${pIndex}`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-slate-700 truncate">{parcela.descricao}</p>
+                                  <p className="text-sm text-slate-400">
+                                    Venceu em {formatDate(parcela.dataVencimento)}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <Badge 
+                                    variant={parcela.diasAtraso > 90 ? "destructive" : "secondary"}
+                                    className="font-mono"
+                                  >
+                                    {parcela.diasAtraso}d
+                                  </Badge>
+                                  <p className="font-bold text-red-600 min-w-[100px] text-right">
+                                    {formatCurrency(parcela.naoPago)}
+                                  </p>
+                                  {parcela.urlCobranca && (
+                                    <a
+                                      href={parcela.urlCobranca}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-primary hover:text-primary/80"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modal de Edição - Simples e Grande */}
+      <Dialog open={!!editingCliente} onOpenChange={() => setEditingCliente(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 bg-primary/10 rounded-xl">
+                <Scale className="h-6 w-6 text-primary" />
               </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Observações / Contexto</label>
-                <Textarea
-                  placeholder="Descreva as ações tomadas, acordos realizados, protocolo de processos, datas importantes..."
-                  value={editForm.contextoJuridico}
-                  onChange={(e) => setEditForm({ ...editForm, contextoJuridico: e.target.value })}
-                  className="min-h-[140px] resize-none"
-                  data-testid="textarea-contexto"
-                />
+              <div>
+                <DialogTitle className="text-xl">Atualizar Caso</DialogTitle>
+                <DialogDescription className="text-base">
+                  {editingCliente?.cliente.nomeCliente}
+                </DialogDescription>
               </div>
+            </div>
+          </DialogHeader>
 
-              {editingCliente?.contexto?.atualizadoJuridicoPor && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                  <Clock className="h-3.5 w-3.5" />
-                  Última atualização por <span className="font-medium">{editingCliente.contexto.atualizadoJuridicoPor}</span> em{" "}
-                  {formatDate(editingCliente.contexto.atualizadoJuridicoEm)}
-                </div>
-              )}
+          <div className="space-y-6 py-4">
+            {/* Tipo de Ação */}
+            <div className="space-y-3">
+              <label className="text-base font-semibold text-slate-700">
+                Qual ação está sendo tomada?
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {PROCEDIMENTOS.map((proc) => {
+                  const Icon = proc.icon;
+                  const isSelected = editForm.procedimentoJuridico === proc.value;
+                  return (
+                    <Button
+                      key={proc.value}
+                      type="button"
+                      variant={isSelected ? "default" : "outline"}
+                      className={`h-auto py-3 justify-start ${isSelected ? '' : 'hover:bg-slate-50'}`}
+                      onClick={() => setEditForm({ ...editForm, procedimentoJuridico: proc.value })}
+                      data-testid={`button-proc-${proc.value}`}
+                    >
+                      <Icon className="h-5 w-5 mr-2" />
+                      {proc.label}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
 
-            <DialogFooter className="gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setEditingCliente(null)}
-                data-testid="button-cancel"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={updateMutation.isPending}
-                data-testid="button-save"
-              >
-                {updateMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Salvar Alterações
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-    </TooltipProvider>
+            {/* Status */}
+            <div className="space-y-3">
+              <label className="text-base font-semibold text-slate-700">
+                Qual o status atual?
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {STATUS_JURIDICO.map((status) => {
+                  const Icon = status.icon;
+                  const isSelected = editForm.statusJuridico === status.value;
+                  return (
+                    <Button
+                      key={status.value}
+                      type="button"
+                      variant={isSelected ? "default" : "outline"}
+                      className={`h-auto py-3 justify-start ${isSelected ? '' : 'hover:bg-slate-50'}`}
+                      onClick={() => setEditForm({ ...editForm, statusJuridico: status.value })}
+                      data-testid={`button-status-${status.value}`}
+                    >
+                      <Icon className="h-5 w-5 mr-2" />
+                      {status.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Anotações */}
+            <div className="space-y-3">
+              <label className="text-base font-semibold text-slate-700">
+                Anotações e observações
+              </label>
+              <Textarea
+                placeholder="Descreva o andamento do caso, acordos, protocolos..."
+                value={editForm.contextoJuridico}
+                onChange={(e) => setEditForm({ ...editForm, contextoJuridico: e.target.value })}
+                className="min-h-[120px] text-base resize-none"
+                data-testid="textarea-contexto"
+              />
+            </div>
+
+            {editingCliente?.contexto?.atualizadoJuridicoPor && (
+              <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-50 p-3 rounded-lg">
+                <Calendar className="h-4 w-4" />
+                Última atualização por {editingCliente.contexto.atualizadoJuridicoPor} em{" "}
+                {formatDate(editingCliente.contexto.atualizadoJuridicoEm)}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-3">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setEditingCliente(null)}
+              className="flex-1"
+              data-testid="button-cancel"
+            >
+              Cancelar
+            </Button>
+            <Button
+              size="lg"
+              onClick={handleSave}
+              disabled={updateMutation.isPending}
+              className="flex-1 bg-primary hover:bg-primary/90"
+              data-testid="button-save"
+            >
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-5 w-5 mr-2" />
+                  Salvar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
