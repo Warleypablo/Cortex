@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { format, subMonths, startOfMonth, endOfMonth, startOfYear, subYears, startOfQuarter, subQuarters, endOfQuarter } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -613,69 +614,106 @@ export default function InvestorsReport() {
           </Card>
         </div>
 
-        {/* Date Range Filter - Simple Start/End */}
-        <div className="flex flex-wrap items-center gap-4 bg-muted/30 rounded-lg p-4 border border-border">
-          <div className="flex items-center gap-2">
-            <CalendarRange className="h-5 w-5 text-primary" />
-            <span className="font-medium">Período:</span>
+        {/* Date Range Filter - Simplified */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-slate-900/30 rounded-lg p-4 border border-slate-700/30">
+          <div className="flex items-center gap-3">
+            <CalendarRange className="h-5 w-5 text-orange-400" />
+            <span className="text-white font-medium">Período</span>
           </div>
           
-          {/* Start Date */}
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-sm">De</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-testid="date-start"
-                >
-                  <Calendar className="h-4 w-4 mr-2 text-primary" />
-                  {format(dateRange.start, 'dd/MM/yyyy', { locale: ptBR })}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent
-                  mode="single"
-                  selected={dateRange.start}
-                  onSelect={(date) => date && setDateRange(prev => ({ ...prev, start: startOfMonth(date) }))}
-                  defaultMonth={dateRange.start}
-                  disabled={(date) => date > dateRange.end || date < new Date('2022-01-01')}
-                />
-              </PopoverContent>
-            </Popover>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Period Selector Dropdown */}
+            <Select 
+              value={selectedPreset} 
+              onValueChange={(value) => handlePresetChange(value as PeriodPreset)}
+            >
+              <SelectTrigger 
+                className="w-[200px] bg-slate-800/50 border-slate-600 text-white"
+                data-testid="select-period"
+              >
+                <SelectValue placeholder="Selecione o período" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-900 border-slate-700">
+                <SelectGroup>
+                  <SelectLabel className="text-orange-400 text-xs uppercase tracking-wider">Períodos</SelectLabel>
+                  {PERIOD_PRESETS.map((preset) => (
+                    <SelectItem 
+                      key={preset.value} 
+                      value={preset.value}
+                      className="text-white hover:bg-slate-800 focus:bg-slate-800"
+                    >
+                      {preset.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel className="text-orange-400 text-xs uppercase tracking-wider mt-2">Anos</SelectLabel>
+                  {YEAR_PRESETS.map((preset) => (
+                    <SelectItem 
+                      key={preset.value} 
+                      value={preset.value}
+                      className="text-white hover:bg-slate-800 focus:bg-slate-800"
+                    >
+                      {preset.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel className="text-orange-400 text-xs uppercase tracking-wider mt-2">Customizado</SelectLabel>
+                  <SelectItem 
+                    value="custom"
+                    className="text-white hover:bg-slate-800 focus:bg-slate-800"
+                  >
+                    Período Personalizado
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            
+            {/* Custom Date Picker - Only visible when custom is selected */}
+            {selectedPreset === 'custom' && (
+              <Popover open={calendarOpen} onOpenChange={handleCalendarOpenChange}>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+                    data-testid="filter-custom-calendar"
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    {format(dateRange.start, 'dd/MM/yy', { locale: ptBR })} - {format(dateRange.end, 'dd/MM/yy', { locale: ptBR })}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-4 bg-slate-900 border-slate-700" align="start">
+                  <div className="space-y-4">
+                    <div className="text-sm font-medium text-white">
+                      {selectingStart ? '1. Selecione a data inicial' : '2. Selecione a data final'}
+                    </div>
+                    <CalendarComponent
+                      mode="single"
+                      selected={selectingStart ? dateRange.start : dateRange.end}
+                      onSelect={handleDateSelect}
+                      defaultMonth={selectingStart ? dateRange.start : dateRange.end}
+                      disabled={(date) => date > new Date() || date < new Date('2022-01-01')}
+                    />
+                    <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-700">
+                      <span className="text-slate-400">
+                        De: <span className="text-white font-medium">{format(dateRange.start, 'dd/MM/yyyy', { locale: ptBR })}</span>
+                      </span>
+                      <span className="text-slate-400">
+                        Até: <span className="text-white font-medium">{format(dateRange.end, 'dd/MM/yyyy', { locale: ptBR })}</span>
+                      </span>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+            
+            {/* Period Info Badge */}
+            <Badge variant="secondary" className="bg-slate-700/50 text-slate-300 border border-slate-600">
+              {chartDataWithMetrics.length} meses • {format(dateRange.start, 'MMM/yy', { locale: ptBR })} - {format(dateRange.end, 'MMM/yy', { locale: ptBR })}
+            </Badge>
           </div>
-          
-          {/* End Date */}
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-sm">até</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-testid="date-end"
-                >
-                  <Calendar className="h-4 w-4 mr-2 text-primary" />
-                  {format(dateRange.end, 'dd/MM/yyyy', { locale: ptBR })}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <CalendarComponent
-                  mode="single"
-                  selected={dateRange.end}
-                  onSelect={(date) => date && setDateRange(prev => ({ ...prev, end: endOfMonth(date) }))}
-                  defaultMonth={dateRange.end}
-                  disabled={(date) => date < dateRange.start || date > new Date()}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          
-          {/* Period Summary */}
-          <Badge variant="secondary" className="ml-auto">
-            {chartDataWithMetrics.length} meses
-          </Badge>
         </div>
 
         {/* Charts Row 1: Faturamento Evolution + Margem */}
