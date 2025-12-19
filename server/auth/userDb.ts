@@ -51,7 +51,8 @@ const ADMIN_EMAILS = [
 
 // Emails externos permitidos (investidores, consultores, etc.)
 const ALLOWED_EXTERNAL_EMAILS = [
-  'ajame@icloud.com'
+  'ajame@icloud.com',
+  'warleyreserva4@gmail.com'
 ];
 
 // Rotas permitidas para usuários externos (apenas visualização)
