@@ -445,16 +445,16 @@ export default function JuridicoClientes() {
             </Card>
 
             {/* Lista de Clientes - Cards Grandes */}
-        {sortedClientes.length === 0 ? (
-          <Card className="bg-white shadow-sm">
-            <CardContent className="py-16 text-center">
-              <Scale className="h-16 w-16 mx-auto text-slate-200 mb-4" />
-              <p className="text-xl font-medium text-slate-600">Nenhum caso encontrado</p>
-              <p className="text-slate-400 mt-1">Tente mudar os filtros de busca</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
+            {sortedClientes.length === 0 ? (
+              <Card className="bg-white shadow-sm">
+                <CardContent className="py-16 text-center">
+                  <Scale className="h-16 w-16 mx-auto text-slate-200 mb-4" />
+                  <p className="text-xl font-medium text-slate-600">Nenhum caso encontrado</p>
+                  <p className="text-slate-400 mt-1">Tente mudar os filtros de busca</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
             {sortedClientes.map((item, index) => {
               const urgency = getUrgencyLevel(item.cliente.diasAtrasoMax);
               const procedimento = getProcedimentoInfo(item.contexto?.procedimentoJuridico);
@@ -677,9 +677,9 @@ export default function JuridicoClientes() {
                   </CardContent>
                 </Card>
               );
-            })}
-          </div>
-        )}
+              })}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="recuperados" className="space-y-6 mt-0">
