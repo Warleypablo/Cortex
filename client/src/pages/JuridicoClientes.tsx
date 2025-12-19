@@ -48,7 +48,17 @@ import {
   Trophy,
   Target,
   Wallet,
+  BarChart3,
+  PieChart,
+  Zap,
+  Activity,
+  ArrowUpRight,
+  ArrowDownRight,
+  Flame,
+  Timer,
+  Receipt,
 } from "lucide-react";
+import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -194,10 +204,75 @@ export default function JuridicoClientes() {
   }, [filteredClientes]);
 
   const totals = useMemo(() => {
-    const total = filteredClientes.reduce((acc, item) => acc + item.cliente.valorTotal, 0);
-    const urgentes = filteredClientes.filter(c => c.cliente.diasAtrasoMax > 90).length;
-    const semAcao = filteredClientes.filter(c => !c.contexto?.procedimentoJuridico).length;
-    return { total, count: filteredClientes.length, urgentes, semAcao };
+    // Single-pass reducer for performance optimization
+    const stats = filteredClientes.reduce((acc, c) => {
+      const dias = c.cliente.diasAtrasoMax;
+      const proc = c.contexto?.procedimentoJuridico || 'sem_acao';
+      
+      acc.total += c.cliente.valorTotal;
+      acc.totalDias += dias;
+      
+      // Urgency buckets
+      if (dias > 90) acc.urgentes++;
+      else if (dias > 60) acc.atencao++;
+      else if (dias > 30) acc.moderado++;
+      else acc.recente++;
+      
+      // Procedimento counts
+      acc.porProcedimento[proc] = (acc.porProcedimento[proc] || 0) + 1;
+      
+      return acc;
+    }, {
+      total: 0,
+      totalDias: 0,
+      urgentes: 0,
+      atencao: 0,
+      moderado: 0,
+      recente: 0,
+      porProcedimento: {} as Record<string, number>
+    });
+    
+    const count = filteredClientes.length;
+    const semAcao = stats.porProcedimento['sem_acao'] || 0;
+    const ticketMedio = count > 0 ? stats.total / count : 0;
+    const diasMedio = count > 0 ? stats.totalDias / count : 0;
+    const percentUrgente = count > 0 ? (stats.urgentes / count) * 100 : 0;
+    
+    const porProcedimento = stats.porProcedimento;
+    
+    // Distribuição por urgência para gráfico
+    const distribuicaoUrgencia = [
+      { name: 'Urgente (+90d)', value: stats.urgentes, color: '#ef4444' },
+      { name: 'Atenção (60-90d)', value: stats.atencao, color: '#f97316' },
+      { name: 'Moderado (30-60d)', value: stats.moderado, color: '#fbbf24' },
+      { name: 'Recente (-30d)', value: stats.recente, color: '#94a3b8' },
+    ].filter(d => d.value > 0);
+    
+    // Distribuição por procedimento para gráfico
+    const distribuicaoProcedimento = [
+      { name: 'Sem Ação', value: porProcedimento['sem_acao'], color: '#d1d5db' },
+      { name: 'Notificação', value: porProcedimento['notificacao'], color: '#3b82f6' },
+      { name: 'Protesto', value: porProcedimento['protesto'], color: '#f97316' },
+      { name: 'Ação Judicial', value: porProcedimento['acao_judicial'], color: '#ef4444' },
+      { name: 'Acordo', value: porProcedimento['acordo'], color: '#22c55e' },
+      { name: 'Baixa', value: porProcedimento['baixa'], color: '#6b7280' },
+    ].filter(d => d.value > 0);
+    
+    return { 
+      total: stats.total, 
+      count, 
+      urgentes: stats.urgentes, 
+      atencao: stats.atencao,
+      moderado: stats.moderado,
+      recente: stats.recente,
+      semAcao, 
+      ticketMedio, 
+      diasMedio, 
+      percentUrgente,
+      porProcedimento,
+      distribuicaoUrgencia,
+      distribuicaoProcedimento
+    };
   }, [filteredClientes]);
 
   // Clientes pré-negociados (recuperados antes do registro no sistema jurídico)
@@ -361,60 +436,242 @@ export default function JuridicoClientes() {
           </TabsList>
 
           <TabsContent value="ativos" className="space-y-6 mt-0">
-            {/* Cards de Resumo - Grandes e Claros */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-4 bg-red-50 rounded-2xl">
-                      <DollarSign className="h-8 w-8 text-red-500" />
+            {/* Métricas Principais */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              <Card className="bg-gradient-to-br from-red-500 to-red-600 shadow-lg">
+                <CardContent className="pt-5 pb-4">
+                  <div className="text-white">
+                    <div className="flex items-center justify-between mb-2">
+                      <DollarSign className="h-5 w-5 opacity-80" />
+                      <Flame className="h-4 w-4 opacity-60" />
                     </div>
-                    <div>
-                      <p className="text-slate-500 text-sm font-medium">Valor Total</p>
-                      <p className="text-3xl font-bold text-slate-800" data-testid="text-total-value">
-                        {formatCurrency(totals.total)}
-                      </p>
+                    <p className="text-red-100 text-xs font-medium uppercase tracking-wide">Valor Total</p>
+                    <p className="text-2xl font-bold mt-1" data-testid="text-total-value">
+                      {formatCurrency(totals.total)}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg">
+                <CardContent className="pt-5 pb-4">
+                  <div className="text-white">
+                    <div className="flex items-center justify-between mb-2">
+                      <AlertTriangle className="h-5 w-5 opacity-80" />
+                      <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{totals.percentUrgente.toFixed(0)}%</span>
+                    </div>
+                    <p className="text-orange-100 text-xs font-medium uppercase tracking-wide">Urgentes (+90d)</p>
+                    <p className="text-3xl font-bold mt-1" data-testid="text-urgent-cases">
+                      {totals.urgentes}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-amber-400 to-amber-500 shadow-lg">
+                <CardContent className="pt-5 pb-4">
+                  <div className="text-white">
+                    <div className="flex items-center justify-between mb-2">
+                      <Clock className="h-5 w-5 opacity-80" />
+                    </div>
+                    <p className="text-amber-100 text-xs font-medium uppercase tracking-wide">Sem Ação</p>
+                    <p className="text-3xl font-bold mt-1" data-testid="text-no-action">
+                      {totals.semAcao}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white shadow-sm border dark:bg-slate-800 dark:border-slate-700">
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Receipt className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wide">Ticket Médio</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-200 mt-1" data-testid="text-ticket-medio">
+                    {formatCurrency(totals.ticketMedio)}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white shadow-sm border dark:bg-slate-800 dark:border-slate-700">
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Timer className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wide">Dias Médio</p>
+                  <p className="text-3xl font-bold text-slate-700 dark:text-slate-200 mt-1" data-testid="text-dias-medio">
+                    {Math.round(totals.diasMedio)}
+                    <span className="text-sm font-normal text-slate-400 ml-1">dias</span>
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white shadow-sm border dark:bg-slate-800 dark:border-slate-700">
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Users className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wide">Total Casos</p>
+                  <p className="text-3xl font-bold text-slate-700 dark:text-slate-200 mt-1" data-testid="text-total-casos">
+                    {totals.count}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Gráficos e Distribuição */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Gráfico de Urgência */}
+              <Card className="bg-white shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-slate-400" />
+                    Distribuição por Urgência
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4">
+                    <div className="w-32 h-32">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsPie>
+                          <Pie
+                            data={totals.distribuicaoUrgencia}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={25}
+                            outerRadius={50}
+                            dataKey="value"
+                            strokeWidth={2}
+                            stroke="#fff"
+                          >
+                            {totals.distribuicaoUrgencia.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                        </RechartsPie>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      {totals.distribuicaoUrgencia.map((item) => (
+                        <div key={item.name} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                            <span className="text-sm text-slate-600">{item.name}</span>
+                          </div>
+                          <span className="font-semibold text-slate-700">{item.value}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className={`bg-white shadow-sm hover:shadow-md transition-shadow ${totals.urgentes > 0 ? 'ring-2 ring-red-200' : ''}`}>
-                <CardContent className="pt-6">
+              {/* Gráfico de Procedimentos */}
+              <Card className="bg-white shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <PieChart className="h-5 w-5 text-slate-400" />
+                    Distribuição por Ação
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
                   <div className="flex items-center gap-4">
-                    <div className="p-4 bg-orange-50 rounded-2xl">
-                      <AlertTriangle className="h-8 w-8 text-orange-500" />
+                    <div className="w-32 h-32">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsPie>
+                          <Pie
+                            data={totals.distribuicaoProcedimento}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={25}
+                            outerRadius={50}
+                            dataKey="value"
+                            strokeWidth={2}
+                            stroke="#fff"
+                          >
+                            {totals.distribuicaoProcedimento.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                        </RechartsPie>
+                      </ResponsiveContainer>
                     </div>
-                    <div>
-                      <p className="text-slate-500 text-sm font-medium">Casos Urgentes</p>
-                      <p className="text-3xl font-bold text-orange-600" data-testid="text-urgent-cases">
-                        {totals.urgentes}
-                      </p>
-                      <p className="text-xs text-slate-400">mais de 90 dias</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-4 bg-amber-50 rounded-2xl">
-                      <Clock className="h-8 w-8 text-amber-500" />
-                    </div>
-                    <div>
-                      <p className="text-slate-500 text-sm font-medium">Sem Ação Definida</p>
-                      <p className="text-3xl font-bold text-amber-600" data-testid="text-no-action">
-                        {totals.semAcao}
-                      </p>
-                      <p className="text-xs text-slate-400">precisam de análise</p>
+                    <div className="flex-1 space-y-2">
+                      {totals.distribuicaoProcedimento.map((item) => (
+                        <div key={item.name} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                            <span className="text-sm text-slate-600">{item.name}</span>
+                          </div>
+                          <span className="font-semibold text-slate-700">{item.value}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Filtros Simples */}
+            {/* Barra de Progresso Visual - Urgência */}
+            <Card className="bg-white shadow-sm">
+              <CardContent className="py-4">
+                <div className="flex items-center gap-4 mb-3">
+                  <Activity className="h-5 w-5 text-slate-400" />
+                  <span className="font-medium text-slate-700">Panorama de Urgência</span>
+                </div>
+                <div className="flex h-4 rounded-full overflow-hidden bg-slate-100">
+                  {totals.urgentes > 0 && (
+                    <div 
+                      className="bg-red-500 flex items-center justify-center text-[10px] font-bold text-white"
+                      style={{ width: `${(totals.urgentes / totals.count) * 100}%` }}
+                      title={`Urgente: ${totals.urgentes}`}
+                    />
+                  )}
+                  {totals.atencao > 0 && (
+                    <div 
+                      className="bg-orange-500 flex items-center justify-center text-[10px] font-bold text-white"
+                      style={{ width: `${(totals.atencao / totals.count) * 100}%` }}
+                      title={`Atenção: ${totals.atencao}`}
+                    />
+                  )}
+                  {totals.moderado > 0 && (
+                    <div 
+                      className="bg-amber-400 flex items-center justify-center text-[10px] font-bold text-white"
+                      style={{ width: `${(totals.moderado / totals.count) * 100}%` }}
+                      title={`Moderado: ${totals.moderado}`}
+                    />
+                  )}
+                  {totals.recente > 0 && (
+                    <div 
+                      className="bg-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-600"
+                      style={{ width: `${(totals.recente / totals.count) * 100}%` }}
+                      title={`Recente: ${totals.recente}`}
+                    />
+                  )}
+                </div>
+                <div className="flex justify-between mt-2 text-xs text-slate-500">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-red-500 rounded-full" />
+                    <span>Urgente ({totals.urgentes})</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full" />
+                    <span>Atenção ({totals.atencao})</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-amber-400 rounded-full" />
+                    <span>Moderado ({totals.moderado})</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-slate-300 rounded-full" />
+                    <span>Recente ({totals.recente})</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Filtros */}
             <Card className="bg-white shadow-sm">
               <CardContent className="py-4">
                 <div className="flex flex-col md:flex-row gap-4">
