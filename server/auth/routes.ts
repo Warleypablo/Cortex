@@ -1,8 +1,15 @@
 import { Router } from "express";
 import passport from "passport";
+import bcrypt from "bcryptjs";
 import type { User } from "./userDb";
 import { getCallbackURL } from "./config";
 import { isExternalEmailAllowed, createExternalUser, EXTERNAL_USER_ROUTES } from "./userDb";
+
+// Senhas hasheadas para usuários externos (hash de "Turboinvest*")
+const EXTERNAL_USER_PASSWORDS: Record<string, string> = {
+  'ajame@icloud.com': '$2b$10$fCajbl5u9ulRxVQSthFoUuEmH/qlxSnFWM6YaJlM2HkNHJa1BJ7Z6',
+  'warleyreserva4@gmail.com': '$2b$10$fCajbl5u9ulRxVQSthFoUuEmH/qlxSnFWM6YaJlM2HkNHJa1BJ7Z6',
+};
 
 const router = Router();
 
@@ -100,12 +107,16 @@ router.get("/api/auth/me", (req, res) => {
   res.json(req.user as User);
 });
 
-// Login externo para investidores (sem Google OAuth)
+// Login externo para investidores (sem Google OAuth, com senha)
 router.post("/auth/external-login", async (req, res) => {
-  const { email } = req.body;
+  const { email, password } = req.body;
   
   if (!email || typeof email !== 'string') {
     return res.status(400).json({ message: "Email é obrigatório" });
+  }
+  
+  if (!password || typeof password !== 'string') {
+    return res.status(400).json({ message: "Senha é obrigatória" });
   }
   
   const normalizedEmail = email.toLowerCase().trim();
@@ -114,6 +125,19 @@ router.post("/auth/external-login", async (req, res) => {
   if (!isExternalEmailAllowed(normalizedEmail)) {
     console.log(`❌ Login externo negado para: ${normalizedEmail}`);
     return res.status(403).json({ message: "Email não autorizado para acesso externo" });
+  }
+  
+  // Verifica a senha
+  const storedHash = EXTERNAL_USER_PASSWORDS[normalizedEmail];
+  if (!storedHash) {
+    console.log(`❌ Senha não configurada para: ${normalizedEmail}`);
+    return res.status(403).json({ message: "Acesso não configurado para este email" });
+  }
+  
+  const isPasswordValid = bcrypt.compareSync(password, storedHash);
+  if (!isPasswordValid) {
+    console.log(`❌ Senha incorreta para: ${normalizedEmail}`);
+    return res.status(401).json({ message: "Senha incorreta" });
   }
   
   try {
