@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { SiGoogle } from "react-icons/si";
-import { Mail, ArrowLeft, Loader2 } from "lucide-react";
+import { Mail, ArrowLeft, Loader2, Lock, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { WebGLShader } from "@/components/ui/web-gl-shader";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,8 @@ export default function Login() {
   const [isDevLoading, setIsDevLoading] = useState(false);
   const [showExternalLogin, setShowExternalLogin] = useState(false);
   const [externalEmail, setExternalEmail] = useState('');
+  const [externalPassword, setExternalPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [externalLoading, setExternalLoading] = useState(false);
   const [externalError, setExternalError] = useState('');
   
@@ -80,7 +82,7 @@ export default function Login() {
       const response = await fetch("/auth/external-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: externalEmail })
+        body: JSON.stringify({ email: externalEmail, password: externalPassword })
       });
       
       if (response.ok) {
@@ -219,6 +221,7 @@ export default function Login() {
                       setShowExternalLogin(false);
                       setExternalError('');
                       setExternalEmail('');
+                      setExternalPassword('');
                     }}
                     className="flex items-center gap-2 text-white/50 hover:text-white/80 transition-colors text-sm"
                     data-testid="button-back-login"
@@ -235,16 +238,39 @@ export default function Login() {
                   </div>
                   
                   <form onSubmit={handleExternalLogin} className="space-y-4">
-                    <div className="space-y-2">
-                      <Input
-                        type="email"
-                        placeholder="seu@email.com"
-                        value={externalEmail}
-                        onChange={(e) => setExternalEmail(e.target.value)}
-                        className="bg-white/[0.05] border-white/[0.1] text-white placeholder:text-white/30 rounded-full px-4 py-3 h-auto focus:border-orange-500/50 focus:ring-orange-500/20"
-                        required
-                        data-testid="input-external-email"
-                      />
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                        <Input
+                          type="email"
+                          placeholder="seu@email.com"
+                          value={externalEmail}
+                          onChange={(e) => setExternalEmail(e.target.value)}
+                          className="bg-white/[0.05] border-white/[0.1] text-white placeholder:text-white/30 rounded-full pl-10 pr-4 py-3 h-auto focus:border-orange-500/50 focus:ring-orange-500/20"
+                          required
+                          data-testid="input-external-email"
+                        />
+                      </div>
+                      <div className="relative">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Senha"
+                          value={externalPassword}
+                          onChange={(e) => setExternalPassword(e.target.value)}
+                          className="bg-white/[0.05] border-white/[0.1] text-white placeholder:text-white/30 rounded-full pl-10 pr-12 py-3 h-auto focus:border-orange-500/50 focus:ring-orange-500/20"
+                          required
+                          data-testid="input-external-password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                          data-testid="button-toggle-password"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                       {externalError && (
                         <p className="text-red-400 text-sm px-2" data-testid="text-external-error">
                           {externalError}
@@ -254,7 +280,7 @@ export default function Login() {
                     
                     <button
                       type="submit"
-                      disabled={externalLoading || !externalEmail}
+                      disabled={externalLoading || !externalEmail || !externalPassword}
                       className="backdrop-blur-md w-full flex items-center justify-center gap-3 bg-orange-500 hover:bg-orange-600 text-white rounded-full py-3.5 px-4 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid="button-submit-external"
                     >
