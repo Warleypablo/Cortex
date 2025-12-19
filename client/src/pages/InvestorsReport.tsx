@@ -614,28 +614,27 @@ export default function InvestorsReport() {
         </div>
 
         {/* Date Range Filter - Simple Start/End */}
-        <div className="flex flex-wrap items-center gap-4 bg-slate-900/30 rounded-lg p-4 border border-slate-700/30">
+        <div className="flex flex-wrap items-center gap-4 bg-muted/30 rounded-lg p-4 border border-border">
           <div className="flex items-center gap-2">
-            <CalendarRange className="h-5 w-5 text-orange-400" />
-            <span className="text-white font-medium">Período:</span>
+            <CalendarRange className="h-5 w-5 text-primary" />
+            <span className="font-medium">Período:</span>
           </div>
           
           {/* Start Date */}
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 text-sm">De</span>
+            <span className="text-muted-foreground text-sm">De</span>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-slate-600 bg-slate-800/50 text-white hover:bg-slate-700"
                   data-testid="date-start"
                 >
-                  <Calendar className="h-4 w-4 mr-2 text-orange-400" />
+                  <Calendar className="h-4 w-4 mr-2 text-primary" />
                   {format(dateRange.start, 'dd/MM/yyyy', { locale: ptBR })}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-700" align="start">
+              <PopoverContent className="w-auto p-0" align="start">
                 <CalendarComponent
                   mode="single"
                   selected={dateRange.start}
@@ -649,20 +648,19 @@ export default function InvestorsReport() {
           
           {/* End Date */}
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 text-sm">até</span>
+            <span className="text-muted-foreground text-sm">até</span>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-slate-600 bg-slate-800/50 text-white hover:bg-slate-700"
                   data-testid="date-end"
                 >
-                  <Calendar className="h-4 w-4 mr-2 text-orange-400" />
+                  <Calendar className="h-4 w-4 mr-2 text-primary" />
                   {format(dateRange.end, 'dd/MM/yyyy', { locale: ptBR })}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-700" align="start">
+              <PopoverContent className="w-auto p-0" align="start">
                 <CalendarComponent
                   mode="single"
                   selected={dateRange.end}
@@ -675,7 +673,7 @@ export default function InvestorsReport() {
           </div>
           
           {/* Period Summary */}
-          <Badge variant="secondary" className="bg-slate-700/50 text-slate-300 border border-slate-600 ml-auto">
+          <Badge variant="secondary" className="ml-auto">
             {chartDataWithMetrics.length} meses
           </Badge>
         </div>
