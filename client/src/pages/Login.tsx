@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { SiGoogle } from "react-icons/si";
-import { motion } from "framer-motion";
+import { Mail, ArrowLeft, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { WebGLShader } from "@/components/ui/web-gl-shader";
+import { Input } from "@/components/ui/input";
 import turboLogo from "@assets/Logo-Turbo-branca_(1)_1766081013390.png";
 
 function GlassFilter() {
@@ -43,6 +45,10 @@ function GlassFilter() {
 export default function Login() {
   const [isHovered, setIsHovered] = useState(false);
   const [isDevLoading, setIsDevLoading] = useState(false);
+  const [showExternalLogin, setShowExternalLogin] = useState(false);
+  const [externalEmail, setExternalEmail] = useState('');
+  const [externalLoading, setExternalLoading] = useState(false);
+  const [externalError, setExternalError] = useState('');
   
   // Mostra botão de dev login apenas em desenvolvimento
   const isDevelopment = import.meta.env.DEV;
@@ -62,6 +68,32 @@ export default function Login() {
       console.error("Dev login failed:", error);
     } finally {
       setIsDevLoading(false);
+    }
+  };
+  
+  const handleExternalLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setExternalError('');
+    setExternalLoading(true);
+    
+    try {
+      const response = await fetch("/auth/external-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: externalEmail })
+      });
+      
+      if (response.ok) {
+        window.location.href = "/investors-report";
+      } else {
+        const data = await response.json();
+        setExternalError(data.message || "Email não autorizado");
+      }
+    } catch (error) {
+      console.error("External login failed:", error);
+      setExternalError("Erro ao fazer login. Tente novamente.");
+    } finally {
+      setExternalLoading(false);
     }
   };
 
@@ -116,54 +148,136 @@ export default function Login() {
               </p>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.4 }}
-              className="space-y-4 pt-2"
-            >
-              <p className="text-white/40 text-sm">
-                Acesso exclusivo para colaboradores
-              </p>
-
-              <button
-                onClick={handleGoogleLogin}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
-                className="backdrop-blur-md w-full flex items-center justify-center gap-3 bg-white/[0.05] hover:bg-white/[0.1] text-white border border-white/[0.1] rounded-full py-3.5 px-4 transition-all duration-300 hover:border-white/20 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
-                data-testid="button-google-login"
-              >
-                <SiGoogle className="w-5 h-5" />
-                <span className="font-medium">Entrar com Google</span>
-              </button>
-              
-              {isDevelopment && (
-                <button
-                  onClick={handleDevLogin}
-                  disabled={isDevLoading}
-                  className="w-full flex items-center justify-center gap-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded-full py-2.5 px-4 transition-all duration-300 text-sm"
-                  data-testid="button-dev-login"
+            <AnimatePresence mode="wait">
+              {!showExternalLogin ? (
+                <motion.div
+                  key="main-login"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4 pt-2"
                 >
-                  <span>{isDevLoading ? "Entrando..." : "Entrar como Admin (Dev)"}</span>
-                </button>
+                  <p className="text-white/40 text-sm">
+                    Acesso exclusivo para colaboradores
+                  </p>
+
+                  <button
+                    onClick={handleGoogleLogin}
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => setIsHovered(false)}
+                    className="backdrop-blur-md w-full flex items-center justify-center gap-3 bg-white/[0.05] hover:bg-white/[0.1] text-white border border-white/[0.1] rounded-full py-3.5 px-4 transition-all duration-300 hover:border-white/20 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                    data-testid="button-google-login"
+                  >
+                    <SiGoogle className="w-5 h-5" />
+                    <span className="font-medium">Entrar com Google</span>
+                  </button>
+                  
+                  <div className="flex items-center gap-4 my-2">
+                    <div className="h-px bg-white/10 flex-1" />
+                    <span className="text-white/30 text-xs uppercase tracking-wider">ou</span>
+                    <div className="h-px bg-white/10 flex-1" />
+                  </div>
+                  
+                  <button
+                    onClick={() => setShowExternalLogin(true)}
+                    className="backdrop-blur-md w-full flex items-center justify-center gap-3 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/20 rounded-full py-3 px-4 transition-all duration-300 hover:border-orange-500/40"
+                    data-testid="button-external-login"
+                  >
+                    <Mail className="w-5 h-5" />
+                    <span className="font-medium">Login Externo</span>
+                  </button>
+                  
+                  {isDevelopment && (
+                    <button
+                      onClick={handleDevLogin}
+                      disabled={isDevLoading}
+                      className="w-full flex items-center justify-center gap-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded-full py-2.5 px-4 transition-all duration-300 text-sm"
+                      data-testid="button-dev-login"
+                    >
+                      <span>{isDevLoading ? "Entrando..." : "Entrar como Admin (Dev)"}</span>
+                    </button>
+                  )}
+                  
+                  <div className="pt-4">
+                    <p className="text-xs text-white/40">
+                      Autenticação segura via Google OAuth 2.0
+                    </p>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="external-login"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4 pt-2"
+                >
+                  <button
+                    onClick={() => {
+                      setShowExternalLogin(false);
+                      setExternalError('');
+                      setExternalEmail('');
+                    }}
+                    className="flex items-center gap-2 text-white/50 hover:text-white/80 transition-colors text-sm"
+                    data-testid="button-back-login"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Voltar</span>
+                  </button>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-white font-medium">Acesso para Investidores</h3>
+                    <p className="text-white/40 text-sm">
+                      Digite seu email autorizado para acessar os relatórios
+                    </p>
+                  </div>
+                  
+                  <form onSubmit={handleExternalLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <Input
+                        type="email"
+                        placeholder="seu@email.com"
+                        value={externalEmail}
+                        onChange={(e) => setExternalEmail(e.target.value)}
+                        className="bg-white/[0.05] border-white/[0.1] text-white placeholder:text-white/30 rounded-full px-4 py-3 h-auto focus:border-orange-500/50 focus:ring-orange-500/20"
+                        required
+                        data-testid="input-external-email"
+                      />
+                      {externalError && (
+                        <p className="text-red-400 text-sm px-2" data-testid="text-external-error">
+                          {externalError}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <button
+                      type="submit"
+                      disabled={externalLoading || !externalEmail}
+                      className="backdrop-blur-md w-full flex items-center justify-center gap-3 bg-orange-500 hover:bg-orange-600 text-white rounded-full py-3.5 px-4 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="button-submit-external"
+                    >
+                      {externalLoading ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span className="font-medium">Entrando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-5 h-5" />
+                          <span className="font-medium">Entrar</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                  
+                  <p className="text-xs text-white/30 text-center pt-2">
+                    Acesso limitado aos relatórios de investidores
+                  </p>
+                </motion.div>
               )}
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5, duration: 0.4 }}
-            >
-              <div className="flex items-center gap-4 my-4">
-                <div className="h-px bg-white/10 flex-1" />
-                <span className="text-white/30 text-xs uppercase tracking-wider">Seguro</span>
-                <div className="h-px bg-white/10 flex-1" />
-              </div>
-
-              <p className="text-xs text-white/40">
-                Autenticação via Google OAuth 2.0
-              </p>
-            </motion.div>
+            </AnimatePresence>
           </div>
         </motion.div>
 
