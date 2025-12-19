@@ -6380,14 +6380,19 @@ export class DbStorage implements IStorage {
   }
 
   async getClientesComContextoJuridico(): Promise<string[]> {
-    const result = await db.execute(sql.raw(`
-      SELECT cliente_id FROM inadimplencia_contextos 
-      WHERE contexto_juridico IS NOT NULL 
-         OR procedimento_juridico IS NOT NULL 
-         OR status_juridico IS NOT NULL
-         OR valor_acordado IS NOT NULL
-    `));
-    return (result.rows as any[]).map(r => r.cliente_id);
+    try {
+      const result = await db.execute(sql.raw(`
+        SELECT cliente_id FROM inadimplencia_contextos 
+        WHERE contexto_juridico IS NOT NULL 
+           OR procedimento_juridico IS NOT NULL 
+           OR status_juridico IS NOT NULL
+           OR valor_acordado IS NOT NULL
+      `));
+      return (result.rows as any[]).map(r => r.cliente_id);
+    } catch (error) {
+      console.warn('[storage] getClientesComContextoJuridico error (colunas podem não existir):', error);
+      return [];
+    }
   }
 
   async getClientesByIds(ids: string[]): Promise<{ id: string; nome: string; empresa: string }[]> {
