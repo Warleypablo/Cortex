@@ -6263,24 +6263,24 @@ export class DbStorage implements IStorage {
     if (!clienteIds.length) return {};
     
     const escapedIds = clienteIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
-    const result = await db.execute(sql.raw(`SELECT cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em, contexto_juridico, procedimento_juridico, status_juridico, valor_acordado, atualizado_juridico_por, atualizado_juridico_em FROM inadimplencia_contextos WHERE cliente_id IN (${escapedIds})`));
+    const result = await db.execute(sql.raw(`SELECT * FROM inadimplencia_contextos WHERE cliente_id IN (${escapedIds})`));
     
     const contextos: Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }> = {};
     for (const row of result.rows as any[]) {
       contextos[row.cliente_id] = {
-        contexto: row.contexto,
-        evidencias: row.evidencias,
-        acao: row.acao,
-        statusFinanceiro: row.status_financeiro,
-        detalheFinanceiro: row.detalhe_financeiro,
-        atualizadoPor: row.atualizado_por,
-        atualizadoEm: row.atualizado_em,
-        contextoJuridico: row.contexto_juridico,
-        procedimentoJuridico: row.procedimento_juridico,
-        statusJuridico: row.status_juridico,
+        contexto: row.contexto || null,
+        evidencias: row.evidencias || null,
+        acao: row.acao || null,
+        statusFinanceiro: row.status_financeiro || null,
+        detalheFinanceiro: row.detalhe_financeiro || null,
+        atualizadoPor: row.atualizado_por || null,
+        atualizadoEm: row.atualizado_em || null,
+        contextoJuridico: row.contexto_juridico || null,
+        procedimentoJuridico: row.procedimento_juridico || null,
+        statusJuridico: row.status_juridico || null,
         valorAcordado: row.valor_acordado ? parseFloat(row.valor_acordado) : null,
-        atualizadoJuridicoPor: row.atualizado_juridico_por,
-        atualizadoJuridicoEm: row.atualizado_juridico_em,
+        atualizadoJuridicoPor: row.atualizado_juridico_por || null,
+        atualizadoJuridicoEm: row.atualizado_juridico_em || null,
       };
     }
     return contextos;
@@ -6288,24 +6288,24 @@ export class DbStorage implements IStorage {
 
   async getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null } | null> {
     const escapedId = clienteId.replace(/'/g, "''");
-    const result = await db.execute(sql.raw(`SELECT cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em, contexto_juridico, procedimento_juridico, status_juridico, valor_acordado, atualizado_juridico_por, atualizado_juridico_em FROM inadimplencia_contextos WHERE cliente_id = '${escapedId}'`));
+    const result = await db.execute(sql.raw(`SELECT * FROM inadimplencia_contextos WHERE cliente_id = '${escapedId}'`));
     
     if (!result.rows.length) return null;
     const row = result.rows[0] as any;
     return {
-      contexto: row.contexto,
-      evidencias: row.evidencias,
-      acao: row.acao,
-      statusFinanceiro: row.status_financeiro,
-      detalheFinanceiro: row.detalhe_financeiro,
-      atualizadoPor: row.atualizado_por,
-      atualizadoEm: row.atualizado_em,
-      contextoJuridico: row.contexto_juridico,
-      procedimentoJuridico: row.procedimento_juridico,
-      statusJuridico: row.status_juridico,
+      contexto: row.contexto || null,
+      evidencias: row.evidencias || null,
+      acao: row.acao || null,
+      statusFinanceiro: row.status_financeiro || null,
+      detalheFinanceiro: row.detalhe_financeiro || null,
+      atualizadoPor: row.atualizado_por || null,
+      atualizadoEm: row.atualizado_em || null,
+      contextoJuridico: row.contexto_juridico || null,
+      procedimentoJuridico: row.procedimento_juridico || null,
+      statusJuridico: row.status_juridico || null,
       valorAcordado: row.valor_acordado ? parseFloat(row.valor_acordado) : null,
-      atualizadoJuridicoPor: row.atualizado_juridico_por,
-      atualizadoJuridicoEm: row.atualizado_juridico_em,
+      atualizadoJuridicoPor: row.atualizado_juridico_por || null,
+      atualizadoJuridicoEm: row.atualizado_juridico_em || null,
     };
   }
 
