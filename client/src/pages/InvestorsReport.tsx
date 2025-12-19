@@ -184,10 +184,25 @@ export default function InvestorsReport() {
       setDateRange(prev => ({ ...prev, start: date }));
       setSelectingStart(false);
     } else {
-      setDateRange(prev => ({ ...prev, end: date }));
+      // Ensure end date is after start date - swap if needed
+      const newEnd = date;
+      const newStart = dateRange.start;
+      if (newEnd < newStart) {
+        setDateRange({ start: newEnd, end: newStart });
+      } else {
+        setDateRange(prev => ({ ...prev, end: date }));
+      }
       setCalendarOpen(false);
       setSelectingStart(true);
       setSelectedPreset('custom');
+    }
+  };
+  
+  const handleCalendarOpenChange = (open: boolean) => {
+    setCalendarOpen(open);
+    // Reset to start selection if closing without completing
+    if (!open && !selectingStart) {
+      setSelectingStart(true);
     }
   };
   
@@ -580,7 +595,7 @@ export default function InvestorsReport() {
             ))}
             
             {/* Custom Date Picker */}
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <Popover open={calendarOpen} onOpenChange={handleCalendarOpenChange}>
               <PopoverTrigger asChild>
                 <Button
                   size="sm"
