@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { useQuery } from "@tanstack/react-query";
 import { format, subMonths, startOfMonth, endOfMonth, startOfYear, subYears, startOfQuarter, subQuarters, endOfQuarter } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import html2canvas from "html2canvas";
 import { 
   Users, 
   FileText, 
@@ -32,8 +31,7 @@ import {
   Percent,
   Activity,
   CalendarRange,
-  ChevronDown,
-  Camera
+  ChevronDown
 } from "lucide-react";
 import {
   LineChart,
@@ -368,31 +366,74 @@ export default function InvestorsReport() {
     }
   };
 
-  const handleScreenshot = async () => {
+  const handleExportHTML = async () => {
     if (!pageRef.current || isCapturing) return;
     
     setIsCapturing(true);
     try {
-      const canvas = await html2canvas(pageRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#0f172a',
-        logging: false,
-        windowWidth: pageRef.current.scrollWidth,
-        windowHeight: pageRef.current.scrollHeight
-      });
+      const clone = pageRef.current.cloneNode(true) as HTMLElement;
       
-      const image = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = image;
+      const exportButtons = clone.querySelectorAll('[data-testid="button-screenshot"], [data-testid="button-export-pdf"]');
+      exportButtons.forEach(btn => btn.remove());
+      
+      let cssText = '';
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          if (sheet.cssRules) {
+            for (const rule of Array.from(sheet.cssRules)) {
+              cssText += rule.cssText + '\n';
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+      
       const periodLabel = format(dateRange.start, 'MMMyy', { locale: ptBR }) + '-' + format(dateRange.end, 'MMMyy', { locale: ptBR });
-      link.download = `investors-report-screenshot-${periodLabel}.png`;
+      const generatedDate = format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+      
+      const htmlContent = `<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Investors Report - Turbo Partners (${periodLabel})</title>
+  <style>
+    ${cssText}
+    body { margin: 0; padding: 0; }
+    .export-watermark {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.7);
+      color: #94a3b8;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: system-ui, sans-serif;
+      z-index: 9999;
+    }
+  </style>
+</head>
+<body class="dark">
+  ${clone.outerHTML}
+  <div class="export-watermark">
+    Exportado em ${generatedDate} • Período: ${periodLabel}
+  </div>
+</body>
+</html>`;
+      
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `investors-report-${periodLabel}.html`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Erro ao capturar tela:', error);
+      console.error('Erro ao exportar HTML:', error);
     } finally {
       setIsCapturing(false);
     }
@@ -428,14 +469,14 @@ export default function InvestorsReport() {
                 Live Data
               </Badge>
               <Button 
-                onClick={handleScreenshot}
+                onClick={handleExportHTML}
                 disabled={isCapturing}
                 variant="outline"
                 className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
-                data-testid="button-screenshot"
+                data-testid="button-export-html"
               >
-                <Camera className="h-4 w-4 mr-2" />
-                {isCapturing ? 'Capturando...' : 'Capturar Tela'}
+                <Download className="h-4 w-4 mr-2" />
+                {isCapturing ? 'Exportando...' : 'Exportar'}
               </Button>
             </div>
           </div>
