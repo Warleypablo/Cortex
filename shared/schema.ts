@@ -992,6 +992,8 @@ export const inadimplenciaContextos = pgTable("inadimplencia_contextos", {
   detalheFinanceiro: text("detalhe_financeiro"),
   atualizadoPor: varchar("atualizado_por", { length: 100 }),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
+  valorAcordado: decimal("valor_acordado", { precision: 15, scale: 2 }),
+  dataAcordo: date("data_acordo"),
 });
 
 export const insertInadimplenciaContextoSchema = createInsertSchema(inadimplenciaContextos);

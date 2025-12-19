@@ -77,6 +77,7 @@ interface Contexto {
   contextoJuridico: string | null;
   procedimentoJuridico: string | null;
   statusJuridico: string | null;
+  valorAcordado: number | null;
   atualizadoJuridicoPor: string | null;
   atualizadoJuridicoEm: string | null;
 }
@@ -138,6 +139,7 @@ export default function JuridicoClientes() {
     contextoJuridico: "",
     procedimentoJuridico: "",
     statusJuridico: "",
+    valorAcordado: "",
   });
   const { toast } = useToast();
 
@@ -147,11 +149,12 @@ export default function JuridicoClientes() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { clienteId: string; contextoJuridico: string; procedimentoJuridico: string; statusJuridico: string }) => {
+    mutationFn: async (data: { clienteId: string; contextoJuridico: string; procedimentoJuridico: string; statusJuridico: string; valorAcordado?: number }) => {
       return apiRequest("PUT", `/api/juridico/clientes/${data.clienteId}/contexto`, {
         contextoJuridico: data.contextoJuridico,
         procedimentoJuridico: data.procedimentoJuridico,
         statusJuridico: data.statusJuridico,
+        valorAcordado: data.valorAcordado,
       });
     },
     onSuccess: () => {
@@ -199,14 +202,31 @@ export default function JuridicoClientes() {
       contextoJuridico: cliente.contexto?.contextoJuridico || "",
       procedimentoJuridico: cliente.contexto?.procedimentoJuridico || "",
       statusJuridico: cliente.contexto?.statusJuridico || "",
+      valorAcordado: cliente.contexto?.valorAcordado?.toString() || "",
     });
+  };
+
+  const parseBRLCurrency = (value: string): number | undefined => {
+    if (!value || value.trim() === '') return undefined;
+    // Remove R$, spaces, and handle both formats: 1.234,56 (BRL) and 1234.56 (US)
+    let cleaned = value.replace(/R\$\s*/gi, '').replace(/\s/g, '').trim();
+    // If has comma, assume BRL format (1.234,56)
+    if (cleaned.includes(',')) {
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    }
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? undefined : num;
   };
 
   const handleSave = () => {
     if (!editingCliente) return;
+    const valorNum = parseBRLCurrency(editForm.valorAcordado);
     updateMutation.mutate({
       clienteId: editingCliente.cliente.idCliente,
-      ...editForm,
+      contextoJuridico: editForm.contextoJuridico,
+      procedimentoJuridico: editForm.procedimentoJuridico,
+      statusJuridico: editForm.statusJuridico,
+      valorAcordado: valorNum,
     });
   };
 
@@ -410,6 +430,14 @@ export default function JuridicoClientes() {
                             {item.cliente.quantidadeParcelas} parcela{item.cliente.quantidadeParcelas !== 1 && 's'}
                           </p>
                         </div>
+                        {item.contexto?.valorAcordado != null && item.contexto.valorAcordado > 0 && (
+                          <div className="text-center">
+                            <p className="text-2xl font-bold text-green-600" data-testid={`text-valor-pago-${index}`}>
+                              {formatCurrency(item.contexto.valorAcordado)}
+                            </p>
+                            <p className="text-xs text-green-500 font-medium">recebido</p>
+                          </div>
+                        )}
                         <div className="text-center min-w-[80px]">
                           <p className="text-2xl font-bold text-slate-700">
                             {item.cliente.diasAtrasoMax}
@@ -649,6 +677,27 @@ export default function JuridicoClientes() {
                   );
                 })}
               </div>
+            </div>
+
+            {/* Valor Recebido */}
+            <div className="space-y-3">
+              <label className="text-base font-semibold text-slate-700">
+                Valor pago pelo cliente (após negociação)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">R$</span>
+                <Input
+                  type="text"
+                  placeholder="0,00"
+                  value={editForm.valorAcordado}
+                  onChange={(e) => setEditForm({ ...editForm, valorAcordado: e.target.value })}
+                  className="pl-10 h-12 text-lg font-semibold"
+                  data-testid="input-valor-acordado"
+                />
+              </div>
+              <p className="text-sm text-slate-400">
+                Deixe em branco se ainda não houve pagamento
+              </p>
             </div>
 
             {/* Anotações */}
