@@ -341,13 +341,20 @@ export default function InvestorsReport() {
 
   const handleExportPDF = async () => {
     try {
-      const response = await fetch('/api/investors-report/pdf');
+      const startDateStr = format(dateRange.start, 'yyyy-MM-dd');
+      const endDateStr = format(dateRange.end, 'yyyy-MM-dd');
+      const params = new URLSearchParams({
+        startDate: startDateStr,
+        endDate: endDateStr
+      });
+      const response = await fetch(`/api/investors-report/pdf?${params}`);
       if (!response.ok) throw new Error('Erro ao gerar PDF');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `investors-report-${new Date().toISOString().slice(0, 7)}.pdf`;
+      const periodLabel = format(dateRange.start, 'MMMyy', { locale: ptBR }) + '-' + format(dateRange.end, 'MMMyy', { locale: ptBR });
+      a.download = `investors-report-${periodLabel}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
