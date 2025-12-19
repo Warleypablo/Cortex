@@ -6379,6 +6379,30 @@ export class DbStorage implements IStorage {
     };
   }
 
+  async getClientesComContextoJuridico(): Promise<string[]> {
+    const result = await db.execute(sql.raw(`
+      SELECT cliente_id FROM inadimplencia_contextos 
+      WHERE contexto_juridico IS NOT NULL 
+         OR procedimento_juridico IS NOT NULL 
+         OR status_juridico IS NOT NULL
+         OR valor_acordado IS NOT NULL
+    `));
+    return (result.rows as any[]).map(r => r.cliente_id);
+  }
+
+  async getClientesByIds(ids: string[]): Promise<{ id: string; nome: string; empresa: string }[]> {
+    if (!ids.length) return [];
+    const escapedIds = ids.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
+    const result = await db.execute(sql.raw(`
+      SELECT id, nome, empresa FROM clientes WHERE id IN (${escapedIds})
+    `));
+    return (result.rows as any[]).map(r => ({
+      id: r.id,
+      nome: r.nome || '',
+      empresa: r.empresa || '',
+    }));
+  }
+
   // Metric Formatting Rules - DbStorage implementations
   async getMetricRulesets(): Promise<import("@shared/schema").MetricRulesetWithThresholds[]> {
     const rulesetsResult = await db.execute(sql.raw(`
