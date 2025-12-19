@@ -200,21 +200,53 @@ export default function JuridicoClientes() {
     return { total, count: filteredClientes.length, urgentes, semAcao };
   }, [filteredClientes]);
 
+  // Clientes pré-negociados (recuperados antes do registro no sistema jurídico)
+  const clientesPreNegociados = useMemo(() => [
+    { nome: "GC BY ME", valorOriginal: 3447.50, valorRecuperado: 3447.50 },
+    { nome: "100% Voce Industria e Comércio", valorOriginal: 3997.00, valorRecuperado: 3997.00 },
+    { nome: "Livraria Nossa Senhora Aparecida", valorOriginal: 3697.00, valorRecuperado: 3697.00 },
+    { nome: "COPPINI Empreendimentos Digitais LTDA", valorOriginal: 2209.70, valorRecuperado: 2209.70 },
+    { nome: "FLOREST", valorOriginal: 3997.00, valorRecuperado: 3997.00 },
+    { nome: "GO COFFE", valorOriginal: 3283.00, valorRecuperado: 3283.00 },
+    { nome: "GOLIK", valorOriginal: 1500.00, valorRecuperado: 1500.00 },
+    { nome: "100% CIFRAS", valorOriginal: 882.83, valorRecuperado: 882.83 },
+    { nome: "VOLTA VIBE", valorOriginal: 1000.00, valorRecuperado: 1000.00 },
+    { nome: "CHOCOLATERIA BRASIL", valorOriginal: 6987.59, valorRecuperado: 6987.59 },
+  ], []);
+
   const recuperadosStats = useMemo(() => {
-    const recuperados = clientes.filter(c => 
+    const recuperadosSistema = clientes.filter(c => 
       c.contexto?.statusJuridico === 'concluido' && 
       (c.contexto?.procedimentoJuridico === 'acordo' || c.contexto?.procedimentoJuridico === 'baixa')
     );
-    const clientesRecuperados = recuperados.length;
-    const valorNegociado = recuperados.reduce((acc, c) => acc + (c.contexto?.valorAcordado || 0), 0);
-    const valorOriginal = recuperados.reduce((acc, c) => acc + c.cliente.valorTotal, 0);
+    
+    // Combina recuperados do sistema + pré-negociados
+    const totalRecuperados = recuperadosSistema.length + clientesPreNegociados.length;
+    const valorNegociadoSistema = recuperadosSistema.reduce((acc, c) => acc + (c.contexto?.valorAcordado || 0), 0);
+    const valorOriginalSistema = recuperadosSistema.reduce((acc, c) => acc + c.cliente.valorTotal, 0);
+    
+    const valorPreNegociado = clientesPreNegociados.reduce((acc, c) => acc + c.valorRecuperado, 0);
+    const valorOriginalPre = clientesPreNegociados.reduce((acc, c) => acc + c.valorOriginal, 0);
+    
+    const valorNegociado = valorNegociadoSistema + valorPreNegociado;
+    const valorOriginal = valorOriginalSistema + valorOriginalPre;
     const taxaRecuperacao = valorOriginal > 0 ? (valorNegociado / valorOriginal) * 100 : 0;
+    
     const porProcedimento = {
-      acordo: recuperados.filter(c => c.contexto?.procedimentoJuridico === 'acordo').length,
-      baixa: recuperados.filter(c => c.contexto?.procedimentoJuridico === 'baixa').length,
+      acordo: recuperadosSistema.filter(c => c.contexto?.procedimentoJuridico === 'acordo').length + clientesPreNegociados.length,
+      baixa: recuperadosSistema.filter(c => c.contexto?.procedimentoJuridico === 'baixa').length,
     };
-    return { clientesRecuperados, valorNegociado, valorOriginal, taxaRecuperacao, porProcedimento, lista: recuperados };
-  }, [clientes]);
+    
+    return { 
+      clientesRecuperados: totalRecuperados, 
+      valorNegociado, 
+      valorOriginal, 
+      taxaRecuperacao, 
+      porProcedimento, 
+      lista: recuperadosSistema,
+      listaPreNegociados: clientesPreNegociados
+    };
+  }, [clientes, clientesPreNegociados]);
 
   const openEditModal = (cliente: ClienteJuridico) => {
     setEditingCliente(cliente);
@@ -760,63 +792,86 @@ export default function JuridicoClientes() {
             </div>
 
             {/* Lista de Clientes Recuperados */}
-            {recuperadosStats.lista.length === 0 ? (
-              <Card className="bg-white shadow-sm">
-                <CardContent className="py-16 text-center">
-                  <Trophy className="h-16 w-16 mx-auto text-slate-200 mb-4" />
-                  <p className="text-xl font-medium text-slate-600">Nenhum cliente recuperado ainda</p>
-                  <p className="text-slate-400 mt-1">Clientes com acordo/baixa concluídos aparecerão aqui</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="bg-white shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    Clientes Recuperados
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {recuperadosStats.lista.map((item, index) => {
-                      const procInfo = getProcedimentoInfo(item.contexto?.procedimentoJuridico);
-                      return (
-                        <div 
-                          key={item.cliente.idCliente}
-                          className="flex items-center justify-between p-4 bg-green-50/50 rounded-xl border border-green-100"
-                          data-testid={`row-recuperado-${index}`}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="p-2 bg-green-100 rounded-lg">
-                              <CheckCircle2 className="h-5 w-5 text-green-600" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-slate-800">{item.cliente.nomeCliente}</p>
-                              <p className="text-sm text-slate-500">{item.cliente.empresa}</p>
-                            </div>
+            <Card className="bg-white shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  Clientes Recuperados
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {/* Clientes do sistema */}
+                  {recuperadosStats.lista.map((item, index) => {
+                    const procInfo = getProcedimentoInfo(item.contexto?.procedimentoJuridico);
+                    return (
+                      <div 
+                        key={item.cliente.idCliente}
+                        className="flex items-center justify-between p-4 bg-green-50/50 rounded-xl border border-green-100"
+                        data-testid={`row-recuperado-${index}`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="p-2 bg-green-100 rounded-lg">
+                            <CheckCircle2 className="h-5 w-5 text-green-600" />
                           </div>
-                          <div className="flex items-center gap-6">
-                            {procInfo && (
-                              <Badge className={`${procInfo.color} border`}>
-                                {procInfo.label}
-                              </Badge>
-                            )}
-                            <div className="text-right">
-                              <p className="text-sm text-slate-500">Valor Original</p>
-                              <p className="font-medium text-slate-600">{formatCurrency(item.cliente.valorTotal)}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm text-slate-500">Valor Recuperado</p>
-                              <p className="font-bold text-green-600">{formatCurrency(item.contexto?.valorAcordado || 0)}</p>
-                            </div>
+                          <div>
+                            <p className="font-semibold text-slate-800">{item.cliente.nomeCliente}</p>
+                            <p className="text-sm text-slate-500">{item.cliente.empresa}</p>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                        <div className="flex items-center gap-6 flex-wrap">
+                          {procInfo && (
+                            <Badge className={`${procInfo.color} border`}>
+                              {procInfo.label}
+                            </Badge>
+                          )}
+                          <div className="text-right">
+                            <p className="text-sm text-slate-500">Valor Original</p>
+                            <p className="font-medium text-slate-600">{formatCurrency(item.cliente.valorTotal)}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-slate-500">Valor Recuperado</p>
+                            <p className="font-bold text-green-600">{formatCurrency(item.contexto?.valorAcordado || 0)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Clientes pré-negociados (históricos) */}
+                  {recuperadosStats.listaPreNegociados.map((item, index) => (
+                    <div 
+                      key={`pre-${index}`}
+                      className="flex items-center justify-between p-4 bg-emerald-50/50 rounded-xl border border-emerald-100"
+                      data-testid={`row-pre-negociado-${index}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="p-2 bg-emerald-100 rounded-lg">
+                          <Handshake className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-800">{item.nome}</p>
+                          <p className="text-xs text-emerald-600">Negociado antes do registro</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6 flex-wrap">
+                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+                          Acordo
+                        </Badge>
+                        <div className="text-right">
+                          <p className="text-sm text-slate-500">Valor Original</p>
+                          <p className="font-medium text-slate-600">{formatCurrency(item.valorOriginal)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-slate-500">Valor Recuperado</p>
+                          <p className="font-bold text-emerald-600">{formatCurrency(item.valorRecuperado)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
