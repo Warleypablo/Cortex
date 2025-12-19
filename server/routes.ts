@@ -2696,38 +2696,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dataInicio = req.query.dataInicio as string | undefined;
       const dataFim = req.query.dataFim as string | undefined;
       
-      // 1. Buscar clientes inadimplentes E clientes com contexto jurídico em paralelo
-      const [clientesData, clientesComJuridico] = await Promise.all([
-        storage.getInadimplenciaClientes(dataInicio, dataFim, 'valor', 1000),
-        storage.getClientesComContextoJuridico(),
-      ]);
+      // 1. Buscar clientes inadimplentes
+      const clientesData = await storage.getInadimplenciaClientes(dataInicio, dataFim, 'valor', 1000);
       
       // 2. Filtrar clientes inadimplentes com mais de 3 dias de atraso
       const clientesFiltrados = clientesData.clientes.filter(c => c.diasAtrasoMax > 3);
-      const idsInadimplentes = new Set(clientesFiltrados.map(c => c.idCliente));
+      const todosIds = clientesFiltrados.map(c => c.idCliente);
       
-      // 3. Identificar clientes com histórico jurídico que não estão mais inadimplentes
-      const clientesHistoricoIds = clientesComJuridico.filter(id => !idsInadimplentes.has(id));
+      // 3. Buscar contextos jurídicos
+      const contextos = await storage.getInadimplenciaContextos(todosIds);
       
-      // 4. Combinar todos os IDs
-      const todosIds = [...clientesFiltrados.map(c => c.idCliente), ...clientesHistoricoIds];
-      
-      // 5. Buscar contextos e dados dos clientes histórico em paralelo
-      const [contextos, clientesHistoricoData] = await Promise.all([
-        storage.getInadimplenciaContextos(todosIds),
-        clientesHistoricoIds.length > 0 ? storage.getClientesByIds(clientesHistoricoIds) : Promise.resolve([]),
-      ]);
-      
-      // Criar mapa de clientes históricos
-      const clientesHistoricoMap = new Map(clientesHistoricoData.map(c => [c.id, c]));
-      
-      // 6. Buscar parcelas em paralelo para inadimplentes
+      // 4. Buscar parcelas em paralelo
       const parcelasPromises = clientesFiltrados.map(cliente => 
         storage.getInadimplenciaDetalheParcelas(cliente.idCliente, dataInicio, dataFim)
       );
       const parcelasResults = await Promise.all(parcelasPromises);
       
-      // 7. Montar resposta - primeiro os inadimplentes atuais
+      // 5. Montar resposta
       const clientesComDados = clientesFiltrados.map((cliente, index) => ({
         cliente,
         contexto: contextos[cliente.idCliente] || {},
@@ -2735,27 +2720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isHistorico: false,
       }));
       
-      // 8. Adicionar clientes do histórico jurídico (que não estão mais inadimplentes)
-      for (const clienteId of clientesHistoricoIds) {
-        const contexto = contextos[clienteId] || {};
-        const clienteData = clientesHistoricoMap.get(clienteId);
-        
-        clientesComDados.push({
-          cliente: {
-            idCliente: clienteId,
-            nomeCliente: clienteData?.nome || `Cliente ${clienteId}`,
-            empresa: clienteData?.empresa || '',
-            valorTotal: 0,
-            diasAtrasoMax: 0,
-            parcelasVencidas: 0,
-          } as any,
-          contexto,
-          parcelas: [],
-          isHistorico: true,
-        });
-      }
-      
-      console.log("[api] Juridico clientes - Inadimplentes:", clientesFiltrados.length, "Histórico:", clientesHistoricoIds.length);
+      console.log("[api] Juridico clientes - Total:", clientesFiltrados.length);
       
       res.json({ clientes: clientesComDados });
     } catch (error) {
