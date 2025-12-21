@@ -34,6 +34,7 @@ import FluxoCaixa from "@/pages/FluxoCaixa";
 import MetaAds from "@/pages/MetaAds";
 import AuditoriaSistemas from "@/pages/AuditoriaSistemas";
 import AdminUsuarios from "@/pages/AdminUsuarios";
+import AdminLogs from "@/pages/AdminLogs";
 import AccessDenied from "@/pages/AccessDenied";
 import Login from "@/pages/Login";
 import DashboardClosers from "@/pages/DashboardClosers";
@@ -161,6 +162,7 @@ function ProtectedRouter() {
       <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
       <Route path="/cases/chat">{() => <ProtectedRoute path="/cases/chat" component={CasesChat} />}</Route>
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
+      <Route path="/admin/logs">{() => <ProtectedRoute path="/admin/logs" component={AdminLogs} />}</Route>
       <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>
       <Route>
         {() => (
