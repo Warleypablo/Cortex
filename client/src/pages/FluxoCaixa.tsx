@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -90,6 +91,8 @@ const getMesNome = (mes: number, ano: number) => {
 };
 
 export default function FluxoCaixa() {
+  useSetPageInfo("Fluxo de Caixa", "Análise de entradas e saídas do período");
+  
   const hoje = new Date();
   const [mesAno, setMesAno] = useState(`${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`);
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
@@ -194,37 +197,25 @@ export default function FluxoCaixa() {
     const saldoFinal = fluxoDiario[fluxoDiario.length - 1]?.saldoAcumulado || insightsPeriodo?.saldoAtual || 0;
     return { entradas, saidas, saldo: entradas - saidas, saldoFinal };
   }, [fluxoDiario, insightsPeriodo]);
-
+  
   return (
     <div className="bg-background min-h-screen">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header com Seletor de Mês */}
-        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <CircleDollarSign className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold" data-testid="text-title">Fluxo de Caixa</h1>
-              <p className="text-sm text-muted-foreground">Análise de entradas e saídas do período</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <CalendarDays className="w-5 h-5 text-muted-foreground" />
-            <Select value={mesAno} onValueChange={setMesAno}>
-              <SelectTrigger className="w-[200px]" data-testid="select-mes">
-                <SelectValue placeholder="Selecione o mês" />
-              </SelectTrigger>
-              <SelectContent>
-                {mesesDisponiveis.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        {/* Seletor de Mês */}
+        <div className="mb-6 flex items-center gap-3">
+          <CalendarDays className="w-5 h-5 text-muted-foreground" />
+          <Select value={mesAno} onValueChange={setMesAno}>
+            <SelectTrigger className="w-[200px]" data-testid="select-mes">
+              <SelectValue placeholder="Selecione o mês" />
+            </SelectTrigger>
+            <SelectContent>
+              {mesesDisponiveis.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Período Selecionado Badge */}

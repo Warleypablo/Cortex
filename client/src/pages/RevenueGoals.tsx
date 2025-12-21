@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -131,6 +132,8 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export default function RevenueGoals() {
+  useSetPageInfo("Revenue Goals", "Acompanhamento de recebimentos do mês");
+  
   const hoje = new Date();
   const [mes, setMes] = useState(hoje.getMonth() + 1);
   const [ano, setAno] = useState(hoje.getFullYear());
@@ -168,20 +171,10 @@ export default function RevenueGoals() {
     pendente: d.pendente,
     inadimplente: d.inadimplente,
   })) || [];
-
+  
   return (
     <div className="p-6 space-y-6" data-testid="page-revenue-goals">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="title-revenue-goals">
-            <Target className="w-6 h-6 text-primary" />
-            Revenue Goals
-          </h1>
-          <p className="text-muted-foreground">
-            Acompanhamento de recebimentos do mês
-          </p>
-        </div>
-        
+      <div className="flex justify-end gap-4">
         <div className="flex items-center gap-2">
           <Button
             variant="outline"

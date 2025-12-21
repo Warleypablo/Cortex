@@ -14,6 +14,7 @@ import { LogOut, User } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import ThemeToggle from "@/components/ThemeToggle";
+import { usePageInfo } from "@/contexts/PageContext";
 
 interface User {
   id: string;
@@ -26,6 +27,7 @@ interface User {
 
 export default function TopBar() {
   const [, setLocation] = useLocation();
+  const { title, subtitle } = usePageInfo();
   
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -51,9 +53,17 @@ export default function TopBar() {
   };
 
   return (
-    <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
-      <div className="flex items-center gap-2">
+    <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
+      <div className="flex items-center gap-4">
         <SidebarTrigger data-testid="button-sidebar-toggle" />
+        {title && (
+          <div className="flex flex-col">
+            <h1 className="text-lg font-semibold leading-tight" data-testid="header-title">{title}</h1>
+            {subtitle && (
+              <p className="text-xs text-muted-foreground" data-testid="header-subtitle">{subtitle}</p>
+            )}
+          </div>
+        )}
       </div>
       
       <div className="flex items-center gap-2">

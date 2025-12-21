@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 const COLORS_DESPESA = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#14b8a6', '#06b6d4'];
 
 export default function DashboardFinanceiro() {
+  useSetPageInfo("Dashboard Financeiro", "Análise completa de receitas, despesas e fluxo de caixa");
+  
   const [activeTab, setActiveTab] = useState("visao-geral");
   const [periodoMeses, setPeriodoMeses] = useState(6);
   const [mesSelecionado, setMesSelecionado] = useState<{ ano: number; mes: number; mesAno: string } | null>(null);
@@ -999,12 +1002,7 @@ export default function DashboardFinanceiro() {
 
   return (
     <div className="bg-background min-h-screen">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold mb-2" data-testid="text-title">Dashboard Financeiro</h1>
-          <p className="text-muted-foreground">Análise completa de receitas, despesas e fluxo de caixa</p>
-        </div>
-
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
             <TabsTrigger value="visao-geral" className="gap-2" data-testid="tab-visao-geral">
