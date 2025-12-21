@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -13,8 +12,6 @@ import {
   CheckCircle,
   Clock,
   Target,
-  ChevronLeft,
-  ChevronRight,
   BarChart3
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
@@ -135,35 +132,16 @@ export default function RevenueGoals() {
   useSetPageInfo("Revenue Goals", "Acompanhamento de recebimentos do mês");
   
   const hoje = new Date();
-  const [mes, setMes] = useState(hoje.getMonth() + 1);
-  const [ano, setAno] = useState(hoje.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState({ month: hoje.getMonth() + 1, year: hoje.getFullYear() });
 
   const { data, isLoading } = useQuery<RevenueGoalsData>({
-    queryKey: ['/api/financeiro/revenue-goals', mes, ano],
+    queryKey: ['/api/financeiro/revenue-goals', selectedMonth.month, selectedMonth.year],
     queryFn: async () => {
-      const response = await fetch(`/api/financeiro/revenue-goals?mes=${mes}&ano=${ano}`);
+      const response = await fetch(`/api/financeiro/revenue-goals?mes=${selectedMonth.month}&ano=${selectedMonth.year}`);
       if (!response.ok) throw new Error('Failed to fetch revenue goals');
       return response.json();
     },
   });
-
-  const handlePreviousMonth = () => {
-    if (mes === 1) {
-      setMes(12);
-      setAno(ano - 1);
-    } else {
-      setMes(mes - 1);
-    }
-  };
-
-  const handleNextMonth = () => {
-    if (mes === 12) {
-      setMes(1);
-      setAno(ano + 1);
-    } else {
-      setMes(mes + 1);
-    }
-  };
 
   const chartData = data?.porDia.map(d => ({
     dia: d.dia,
@@ -174,54 +152,11 @@ export default function RevenueGoals() {
   
   return (
     <div className="p-6 space-y-6" data-testid="page-revenue-goals">
-      <div className="flex justify-end gap-4">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handlePreviousMonth}
-            data-testid="button-previous-month"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          
-          <div className="flex items-center gap-2">
-            <Select value={String(mes)} onValueChange={(v) => setMes(parseInt(v))}>
-              <SelectTrigger className="w-[140px]" data-testid="select-month">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {mesesNomes.map((nome, idx) => (
-                  <SelectItem key={idx + 1} value={String(idx + 1)}>
-                    {nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Select value={String(ano)} onValueChange={(v) => setAno(parseInt(v))}>
-              <SelectTrigger className="w-[100px]" data-testid="select-year">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[2023, 2024, 2025, 2026].map((a) => (
-                  <SelectItem key={a} value={String(a)}>
-                    {a}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleNextMonth}
-            data-testid="button-next-month"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
+      <div className="flex justify-end">
+        <MonthYearPicker
+          value={selectedMonth}
+          onChange={setSelectedMonth}
+        />
       </div>
 
       {isLoading ? (
