@@ -4,16 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import type { DateRange } from "react-day-picker";
+import { format } from "date-fns";
 import { 
   DollarSign, 
   TrendingUp, 
   Target, 
-  CalendarDays,
   Filter,
   RotateCcw,
   Trophy,
@@ -156,15 +157,20 @@ export default function AnaliseVendas() {
   useSetPageInfo("Análise de Vendas", "Métricas de performance comercial em tempo real");
   
   const hoje = new Date();
-  const inicioAno = new Date(hoje.getFullYear(), 0, 1).toISOString().split('T')[0];
-  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
+  const inicioAno = new Date(hoje.getFullYear(), 0, 1);
+  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
 
-  const [dataInicio, setDataInicio] = useState<string>(inicioAno);
-  const [dataFim, setDataFim] = useState<string>(fimMes);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: inicioAno,
+    to: fimMes
+  });
   const [pipeline, setPipeline] = useState<string>("");
   const [source, setSource] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const dataInicioStr = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+  const dataFimStr = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -173,8 +179,8 @@ export default function AnaliseVendas() {
 
   const buildQueryParams = () => {
     const params = new URLSearchParams();
-    if (dataInicio) params.append("dataInicio", dataInicio);
-    if (dataFim) params.append("dataFim", dataFim);
+    if (dataInicioStr) params.append("dataInicio", dataInicioStr);
+    if (dataFimStr) params.append("dataFim", dataFimStr);
     if (pipeline && pipeline !== "all") params.append("pipeline", pipeline);
     if (source && source !== "all") params.append("source", source);
     return params.toString();
@@ -227,8 +233,7 @@ export default function AnaliseVendas() {
   });
 
   const resetFilters = () => {
-    setDataInicio(inicioAno);
-    setDataFim(fimMes);
+    setDateRange({ from: inicioAno, to: fimMes });
     setPipeline("");
     setSource("");
   };
@@ -412,32 +417,16 @@ export default function AnaliseVendas() {
               <div className="relative">
                 <div className="absolute -inset-1 bg-gradient-to-r from-violet-600/20 to-blue-600/20 rounded-2xl blur-lg" />
                 <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-violet-500/20 p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <Label className="text-violet-300 flex items-center gap-2 text-sm font-medium">
                         <Calendar className="w-4 h-4" />
-                        Data Início
+                        Período
                       </Label>
-                      <Input
-                        type="date"
-                        value={dataInicio}
-                        onChange={(e) => setDataInicio(e.target.value)}
-                        className="bg-slate-800/50 border-slate-700/50 text-white focus:ring-violet-500/50 focus:border-violet-500/50 rounded-xl"
-                        data-testid="input-data-inicio"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-violet-300 flex items-center gap-2 text-sm font-medium">
-                        <CalendarDays className="w-4 h-4" />
-                        Data Fim
-                      </Label>
-                      <Input
-                        type="date"
-                        value={dataFim}
-                        onChange={(e) => setDataFim(e.target.value)}
-                        className="bg-slate-800/50 border-slate-700/50 text-white focus:ring-violet-500/50 focus:border-violet-500/50 rounded-xl"
-                        data-testid="input-data-fim"
+                      <DateRangePicker
+                        value={dateRange}
+                        onChange={setDateRange}
+                        triggerClassName="bg-slate-800/50 border-slate-700/50 text-white focus:ring-violet-500/50 focus:border-violet-500/50 rounded-xl w-full"
                       />
                     </div>
 
