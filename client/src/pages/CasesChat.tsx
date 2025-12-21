@@ -16,7 +16,7 @@ interface Message {
 }
 
 export default function CasesChat() {
-  useSetPageInfo("Assistente IA", "Faça perguntas sobre a agência, cases de sucesso e estratégias");
+  useSetPageInfo("GPTurbo", "Assistente IA que analisa cases de sucesso, fornece insights sobre seus dados, clientes, contratos e muito mais");
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -109,8 +109,11 @@ export default function CasesChat() {
         <CardHeader className="border-b py-4">
           <CardTitle className="text-lg flex items-center gap-2">
             <Bot className="w-5 h-5 text-primary" />
-            Assistente de Cases
+            GPTurbo
           </CardTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            Analisa cases de sucesso, fornece insights sobre seus dados, clientes, contratos e estratégias utilizadas
+          </p>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
           <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
@@ -120,11 +123,11 @@ export default function CasesChat() {
                   <Trophy className="w-8 h-8 text-primary" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2" data-testid="text-empty-state">
-                  Bem-vindo ao Chat de Cases!
+                  Bem-vindo ao GPTurbo!
                 </h3>
                 <p className="text-muted-foreground max-w-md">
-                  Pergunte sobre cases de sucesso, estratégias utilizadas, resultados alcançados
-                  e muito mais sobre os projetos da agência.
+                  Pergunte sobre cases de sucesso, análises de dados, informações de clientes, contratos, 
+                  estratégias utilizadas, resultados alcançados e muito mais sobre seus negócios.
                 </p>
               </div>
             ) : (
