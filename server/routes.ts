@@ -8,6 +8,8 @@ import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole } from 
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { analyzeDfc, chatWithDfc, type ChatMessage } from "./services/dfcAnalysis";
+import { chat as unifiedAssistantChat } from "./services/unifiedAssistant";
+import type { UnifiedAssistantRequest, AssistantContext } from "@shared/schema";
 import { setupDealNotifications, triggerTestNotification } from "./services/dealNotifications";
 import PDFDocument from "pdfkit";
 import { format } from "date-fns";
@@ -4232,6 +4234,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("[api] Error in Cases chat:", error);
+      res.status(500).json({ error: "Falha ao processar a mensagem" });
+    }
+  });
+
+  // ========================================
+  // UNIFIED ASSISTANT CHAT API ENDPOINT
+  // ========================================
+  app.post("/api/assistants/chat", async (req, res) => {
+    try {
+      const { message, context, historico, metadata } = req.body;
+      
+      if (!message || typeof message !== 'string' || message.trim().length === 0) {
+        return res.status(400).json({ error: "Mensagem é obrigatória" });
+      }
+
+      const validContexts: AssistantContext[] = ['geral', 'financeiro', 'cases', 'clientes'];
+      const assistantContext: AssistantContext = validContexts.includes(context) ? context : 'geral';
+
+      const request: UnifiedAssistantRequest = {
+        message: message.trim(),
+        context: assistantContext,
+        historico: Array.isArray(historico) ? historico : undefined,
+        metadata: metadata || undefined,
+      };
+
+      const response = await unifiedAssistantChat(request);
+      res.json(response);
+    } catch (error) {
+      console.error("[api] Error in Unified Assistant chat:", error);
       res.status(500).json({ error: "Falha ao processar a mensagem" });
     }
   });
