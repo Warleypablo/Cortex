@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { usePageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -226,6 +227,7 @@ function FloatingParticles() {
 }
 
 export default function DetailSDRs() {
+  const { setPageInfo } = usePageInfo();
   const now = new Date();
   const inicioAno = `${now.getFullYear()}-01-01`;
   const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -298,6 +300,14 @@ export default function DetailSDRs() {
     refetchInterval: 60000,
   });
 
+  useEffect(() => {
+    if (metrics?.sdrName) {
+      setPageInfo(metrics.sdrName, "Análise detalhada de performance individual");
+    } else {
+      setPageInfo("Detalhamento de SDRs", "Selecione um SDR para ver detalhes");
+    }
+  }, [metrics?.sdrName, setPageInfo]);
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
@@ -364,11 +374,7 @@ export default function DetailSDRs() {
             <div className="p-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500">
               <Users className="h-6 w-6 text-white" />
             </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-teal-400 bg-clip-text text-transparent" data-testid="page-title">
-              Detalhamento de SDRs
-            </h1>
           </div>
-          <p className="text-slate-400 ml-12" data-testid="page-subtitle">Análise detalhada de performance individual</p>
         </motion.div>
 
         <motion.div 

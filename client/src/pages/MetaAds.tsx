@@ -10,6 +10,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { DollarSign, Eye, MousePointer, Users, TrendingUp, Target, Smartphone, Filter, X, CalendarIcon } from "lucide-react";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, FunnelChart, Funnel, LabelList } from "recharts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MetaOverview, CampaignPerformance, AdsetPerformance, AdPerformance, ConversionFunnel, MetaLeadFilters } from "@shared/schema";
@@ -18,6 +19,8 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function MetaAds() {
+  useSetPageInfo("Meta Ads Analytics", "Análise de performance de campanhas Meta integrada com conversões reais do CRM");
+  
   const queryClient = useQueryClient();
   
   const [periodo, setPeriodo] = useState<string>("30");
@@ -252,11 +255,6 @@ export default function MetaAds() {
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold mb-2" data-testid="text-title">Meta Ads Analytics</h1>
-          <p className="text-muted-foreground">Análise de performance de campanhas Meta integrada com conversões reais do CRM</p>
-        </div>
-
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <div>

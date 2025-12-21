@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -86,6 +87,7 @@ function formatPercent(value: number | null): string {
 }
 
 export default function Criativos() {
+  useSetPageInfo("Criativos", "Performance de Anúncios Meta Ads");
   const [dateRange, setDateRange] = useState({
     from: startOfMonth(new Date()),
     to: new Date(),
@@ -266,10 +268,6 @@ export default function Criativos() {
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-purple-500/10">
             <Rocket className="w-6 h-6 text-purple-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Criativos</h1>
-            <p className="text-sm text-muted-foreground">Performance de Anúncios Meta Ads</p>
           </div>
         </div>
         

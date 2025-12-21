@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Maximize2,
@@ -103,6 +104,7 @@ type DashboardView = 'closers' | 'sdrs';
 const ROTATION_INTERVAL = 30000;
 
 export default function PresentationMode() {
+  useSetPageInfo("Modo Apresentação", "Dashboard comercial para TV");
   const [, navigate] = useLocation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
