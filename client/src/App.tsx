@@ -224,6 +224,7 @@ function App() {
         <TooltipProvider>
           <AppLayout />
           <Toaster />
+          <AssistantWidget />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
