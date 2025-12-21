@@ -16,7 +16,7 @@ interface Message {
 }
 
 export default function CasesChat() {
-  useSetPageInfo("GPTurbo", "Assistente IA que analisa cases de sucesso, fornece insights sobre seus dados, clientes, contratos e muito mais");
+  useSetPageInfo("GPTurbo");
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
