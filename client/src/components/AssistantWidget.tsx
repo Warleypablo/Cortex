@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,12 +81,6 @@ export function AssistantWidget() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Check authentication status
-  const { data: user, isLoading: isLoadingUser } = useQuery({
-    queryKey: ["/api/auth/me"],
-    retry: false,
-  });
-
   const scrollToBottom = () => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -151,11 +145,6 @@ export function AssistantWidget() {
 
   // Don't show on login or presentation mode
   if (location === "/login" || location === "/dashboard/comercial/apresentacao") {
-    return null;
-  }
-
-  // Don't show while loading or if not authenticated
-  if (isLoadingUser || !user) {
     return null;
   }
 
