@@ -23,7 +23,13 @@ import {
   ChevronUp,
   ChevronDown,
   Minus,
-  Headphones
+  Headphones,
+  BarChart3,
+  Shield,
+  Wallet,
+  ArrowLeftRight,
+  Megaphone,
+  Construction
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -98,7 +104,9 @@ interface RankingSDR {
   trend: 'up' | 'down' | 'stable';
 }
 
-type DashboardView = 'closers' | 'sdrs';
+type DashboardView = 'closers' | 'sdrs' | 'visao-geral' | 'retencao' | 'financeiro-resumo' | 'fluxo-caixa' | 'growth-visao-geral';
+
+const ALL_DASHBOARD_VIEWS: DashboardView[] = ['closers', 'sdrs', 'visao-geral', 'retencao', 'financeiro-resumo', 'fluxo-caixa', 'growth-visao-geral'];
 
 interface PresentationConfig {
   dashboards: string[];
@@ -114,10 +122,13 @@ export default function PresentationMode() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [currentView, setCurrentView] = useState<DashboardView>('closers');
+  const [currentViewIndex, setCurrentViewIndex] = useState(0);
   const [showControls, setShowControls] = useState(true);
   const [countdown, setCountdown] = useState(30);
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  const activeDashboards = config.dashboards.filter(d => ALL_DASHBOARD_VIEWS.includes(d as DashboardView)) as DashboardView[];
+  const currentView = activeDashboards[currentViewIndex] || 'closers';
 
   const hoje = new Date();
   const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
@@ -356,10 +367,10 @@ export default function PresentationMode() {
   }, []);
 
   useEffect(() => {
-    if (isPaused) return;
+    if (isPaused || activeDashboards.length <= 1) return;
 
     const rotationTimer = setInterval(() => {
-      setCurrentView(prev => prev === 'closers' ? 'sdrs' : 'closers');
+      setCurrentViewIndex(prev => (prev + 1) % activeDashboards.length);
       setCountdown(config.interval / 1000);
     }, config.interval);
 
@@ -371,7 +382,7 @@ export default function PresentationMode() {
       clearInterval(rotationTimer);
       clearInterval(countdownTimer);
     };
-  }, [isPaused, config.interval]);
+  }, [isPaused, config.interval, activeDashboards.length]);
 
   useEffect(() => {
     let hideTimer: NodeJS.Timeout;
@@ -405,11 +416,11 @@ export default function PresentationMode() {
         setIsPaused(p => !p);
       }
       if (e.key === 'ArrowLeft') {
-        setCurrentView('closers');
+        setCurrentViewIndex(prev => (prev - 1 + activeDashboards.length) % activeDashboards.length);
         setCountdown(config.interval / 1000);
       }
       if (e.key === 'ArrowRight') {
-        setCurrentView('sdrs');
+        setCurrentViewIndex(prev => (prev + 1) % activeDashboards.length);
         setCountdown(config.interval / 1000);
       }
       if (e.key === 'f' || e.key === 'F') {
@@ -473,15 +484,41 @@ export default function PresentationMode() {
                 variant="ghost"
                 size="icon"
                 onClick={() => {
-                  setCurrentView('closers');
+                  setCurrentViewIndex(prev => (prev - 1 + activeDashboards.length) % activeDashboards.length);
                   setCountdown(config.interval / 1000);
                 }}
-                className={`h-8 w-8 ${currentView === 'closers' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                data-testid="button-view-closers"
+                className="h-8 w-8 text-slate-400 hover:text-white"
+                data-testid="button-view-prev"
               >
-                <Handshake className="w-4 h-4" />
+                <ChevronDown className="w-4 h-4 rotate-90" />
               </Button>
               
+              <div className="flex items-center gap-1.5 px-2">
+                {activeDashboards.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setCurrentViewIndex(idx);
+                      setCountdown(config.interval / 1000);
+                    }}
+                    className={`w-2 h-2 rounded-full transition-all ${idx === currentViewIndex ? 'bg-white scale-125' : 'bg-slate-600 hover:bg-slate-400'}`}
+                  />
+                ))}
+              </div>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setCurrentViewIndex(prev => (prev + 1) % activeDashboards.length);
+                  setCountdown(config.interval / 1000);
+                }}
+                className="h-8 w-8 text-slate-400 hover:text-white"
+                data-testid="button-view-next"
+              >
+                <ChevronUp className="w-4 h-4 rotate-90" />
+              </Button>
+
               <div className="w-px h-5 bg-slate-700" />
               
               <Button
@@ -495,21 +532,6 @@ export default function PresentationMode() {
               </Button>
               
               <span className="text-sm text-slate-400 w-8 text-center font-mono">{countdown}s</span>
-              
-              <div className="w-px h-5 bg-slate-700" />
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setCurrentView('sdrs');
-                  setCountdown(config.interval / 1000);
-                }}
-                className={`h-8 w-8 ${currentView === 'sdrs' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                data-testid="button-view-sdrs"
-              >
-                <Headphones className="w-4 h-4" />
-              </Button>
 
               <div className="w-px h-5 bg-slate-700" />
 
@@ -539,7 +561,7 @@ export default function PresentationMode() {
 
       <div className="relative z-10 flex-1 flex flex-col p-4 lg:p-5 overflow-hidden">
         <AnimatePresence mode="wait">
-          {currentView === 'closers' ? (
+          {currentView === 'closers' && (
             <motion.div
               key="closers"
               initial={{ opacity: 0, x: 50 }}
@@ -1136,7 +1158,8 @@ export default function PresentationMode() {
                 </div>
               </motion.div>
             </motion.div>
-          ) : (
+          )}
+          {currentView === 'sdrs' && (
             <motion.div
               key="sdrs"
               initial={{ opacity: 0, x: 50 }}
@@ -1630,6 +1653,326 @@ export default function PresentationMode() {
                   </div>
                 </div>
               </motion.div>
+            </motion.div>
+          )}
+
+          {currentView === 'visao-geral' && (
+            <motion.div
+              key="visao-geral"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.4 }}
+              className="h-full flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <motion.div 
+                    className="relative"
+                    animate={{ rotate: [0, 5, -5, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                  >
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 shadow-2xl shadow-indigo-600/30">
+                      <BarChart3 className="w-10 h-10 text-white" />
+                    </div>
+                    <motion.div
+                      className="absolute -top-1 -right-1"
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <Sparkles className="w-5 h-5 text-yellow-400" />
+                    </motion.div>
+                  </motion.div>
+                  <div>
+                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent">
+                      Visão Geral da Operação
+                    </h1>
+                    <p className="text-slate-400 text-lg mt-1 capitalize">
+                      {mesAtual}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-2xl font-mono font-bold text-white">
+                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                  <div className="text-slate-400 text-xs">
+                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 flex items-center justify-center">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-center"
+                >
+                  <div className="p-6 rounded-2xl bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm">
+                    <Construction className="w-16 h-16 text-indigo-400 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-2">Dashboard em construção</h2>
+                    <p className="text-slate-400">Em breve, dados completos da operação estarão disponíveis aqui.</p>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          )}
+
+          {currentView === 'retencao' && (
+            <motion.div
+              key="retencao"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.4 }}
+              className="h-full flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <motion.div 
+                    className="relative"
+                    animate={{ rotate: [0, 5, -5, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                  >
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-600 to-emerald-700 shadow-2xl shadow-teal-600/30">
+                      <Shield className="w-10 h-10 text-white" />
+                    </div>
+                    <motion.div
+                      className="absolute -top-1 -right-1"
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <Sparkles className="w-5 h-5 text-yellow-400" />
+                    </motion.div>
+                  </motion.div>
+                  <div>
+                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-teal-200 to-teal-400 bg-clip-text text-transparent">
+                      Análise de Retenção
+                    </h1>
+                    <p className="text-slate-400 text-lg mt-1 capitalize">
+                      {mesAtual}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-2xl font-mono font-bold text-white">
+                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                  <div className="text-slate-400 text-xs">
+                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 flex items-center justify-center">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-center"
+                >
+                  <div className="p-6 rounded-2xl bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm">
+                    <Construction className="w-16 h-16 text-teal-400 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-2">Dashboard em construção</h2>
+                    <p className="text-slate-400">Em breve, métricas de retenção estarão disponíveis aqui.</p>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          )}
+
+          {currentView === 'financeiro-resumo' && (
+            <motion.div
+              key="financeiro-resumo"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.4 }}
+              className="h-full flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <motion.div 
+                    className="relative"
+                    animate={{ rotate: [0, 5, -5, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                  >
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-600 to-orange-700 shadow-2xl shadow-amber-600/30">
+                      <Wallet className="w-10 h-10 text-white" />
+                    </div>
+                    <motion.div
+                      className="absolute -top-1 -right-1"
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <Sparkles className="w-5 h-5 text-yellow-400" />
+                    </motion.div>
+                  </motion.div>
+                  <div>
+                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-amber-200 to-amber-400 bg-clip-text text-transparent">
+                      Resumo Financeiro
+                    </h1>
+                    <p className="text-slate-400 text-lg mt-1 capitalize">
+                      {mesAtual}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-2xl font-mono font-bold text-white">
+                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                  <div className="text-slate-400 text-xs">
+                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 flex items-center justify-center">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-center"
+                >
+                  <div className="p-6 rounded-2xl bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm">
+                    <Construction className="w-16 h-16 text-amber-400 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-2">Dashboard em construção</h2>
+                    <p className="text-slate-400">Em breve, o resumo financeiro estará disponível aqui.</p>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          )}
+
+          {currentView === 'fluxo-caixa' && (
+            <motion.div
+              key="fluxo-caixa"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.4 }}
+              className="h-full flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <motion.div 
+                    className="relative"
+                    animate={{ rotate: [0, 5, -5, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                  >
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-600 to-sky-700 shadow-2xl shadow-blue-600/30">
+                      <ArrowLeftRight className="w-10 h-10 text-white" />
+                    </div>
+                    <motion.div
+                      className="absolute -top-1 -right-1"
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <Sparkles className="w-5 h-5 text-yellow-400" />
+                    </motion.div>
+                  </motion.div>
+                  <div>
+                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-blue-200 to-blue-400 bg-clip-text text-transparent">
+                      Fluxo de Caixa
+                    </h1>
+                    <p className="text-slate-400 text-lg mt-1 capitalize">
+                      {mesAtual}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-2xl font-mono font-bold text-white">
+                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                  <div className="text-slate-400 text-xs">
+                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 flex items-center justify-center">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-center"
+                >
+                  <div className="p-6 rounded-2xl bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm">
+                    <Construction className="w-16 h-16 text-blue-400 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-2">Dashboard em construção</h2>
+                    <p className="text-slate-400">Em breve, o fluxo de caixa estará disponível aqui.</p>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          )}
+
+          {currentView === 'growth-visao-geral' && (
+            <motion.div
+              key="growth-visao-geral"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.4 }}
+              className="h-full flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <motion.div 
+                    className="relative"
+                    animate={{ rotate: [0, 5, -5, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                  >
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-rose-600 to-pink-700 shadow-2xl shadow-rose-600/30">
+                      <Megaphone className="w-10 h-10 text-white" />
+                    </div>
+                    <motion.div
+                      className="absolute -top-1 -right-1"
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <Sparkles className="w-5 h-5 text-yellow-400" />
+                    </motion.div>
+                  </motion.div>
+                  <div>
+                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-rose-200 to-rose-400 bg-clip-text text-transparent">
+                      Performance Marketing
+                    </h1>
+                    <p className="text-slate-400 text-lg mt-1 capitalize">
+                      {mesAtual}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-2xl font-mono font-bold text-white">
+                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                  <div className="text-slate-400 text-xs">
+                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 flex items-center justify-center">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-center"
+                >
+                  <div className="p-6 rounded-2xl bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm">
+                    <Construction className="w-16 h-16 text-rose-400 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-2">Dashboard em construção</h2>
+                    <p className="text-slate-400">Em breve, métricas de performance de marketing estarão disponíveis aqui.</p>
+                  </div>
+                </motion.div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

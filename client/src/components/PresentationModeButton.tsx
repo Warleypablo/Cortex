@@ -79,7 +79,8 @@ export default function PresentationModeButton() {
     if (allSelected) {
       setSelectedDashboards(selectedDashboards.filter(id => !categoryDashboardIds.includes(id)));
     } else {
-      setSelectedDashboards([...new Set([...selectedDashboards, ...categoryDashboardIds])]);
+      const combined = [...selectedDashboards, ...categoryDashboardIds];
+      setSelectedDashboards(combined.filter((id, index) => combined.indexOf(id) === index));
     }
   };
 
@@ -120,9 +121,8 @@ export default function PresentationModeButton() {
                 
                 return (
                   <div key={category.id} className="space-y-2">
-                    <div 
+                    <label 
                       className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 rounded-md p-1.5 -ml-1.5"
-                      onClick={() => toggleCategory(category.id)}
                     >
                       <Checkbox
                         checked={isFullySelected || (isPartiallySelected ? "indeterminate" : false)}
@@ -131,22 +131,14 @@ export default function PresentationModeButton() {
                       />
                       <Icon className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm font-semibold">{category.label}</span>
-                    </div>
+                    </label>
                     <div className="ml-7 space-y-1.5">
                       {category.dashboards.map(d => (
-                        <div 
+                        <label 
                           key={d.id} 
                           className="flex items-start gap-2 cursor-pointer hover:bg-accent/30 rounded-md p-1.5 -ml-1.5"
-                          onClick={() => {
-                            if (selectedDashboards.includes(d.id)) {
-                              setSelectedDashboards(selectedDashboards.filter(id => id !== d.id));
-                            } else {
-                              setSelectedDashboards([...selectedDashboards, d.id]);
-                            }
-                          }}
                         >
                           <Checkbox
-                            id={`dashboard-${d.id}`}
                             checked={selectedDashboards.includes(d.id)}
                             onCheckedChange={(checked) => {
                               if (checked) {
@@ -158,12 +150,12 @@ export default function PresentationModeButton() {
                             data-testid={`checkbox-dashboard-${d.id}`}
                           />
                           <div className="grid gap-0.5 leading-none">
-                            <label htmlFor={`dashboard-${d.id}`} className="text-sm font-medium cursor-pointer">
+                            <span className="text-sm font-medium">
                               {d.label}
-                            </label>
+                            </span>
                             <p className="text-xs text-muted-foreground">{d.description}</p>
                           </div>
-                        </div>
+                        </label>
                       ))}
                     </div>
                   </div>
