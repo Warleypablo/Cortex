@@ -211,7 +211,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Dashboards</SidebarGroupLabel>
+          <SidebarGroupLabel>Setores</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {dashboardCategories.map((category) => {
