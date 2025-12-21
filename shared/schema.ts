@@ -1052,3 +1052,24 @@ export const juridicoClientes = pgTable("juridico_clientes", {
 export const insertJuridicoClienteSchema = createInsertSchema(juridicoClientes).omit({ id: true });
 export type JuridicoCliente = typeof juridicoClientes.$inferSelect;
 export type InsertJuridicoCliente = z.infer<typeof insertJuridicoClienteSchema>;
+
+// Global Search Types
+export type SearchEntityType = 'cliente' | 'colaborador' | 'contrato' | 'cobranca' | 'projeto';
+
+export interface SearchResult {
+  id: string;
+  entity: SearchEntityType;
+  label: string;
+  description?: string;
+  route: string;
+  meta?: {
+    status?: string;
+    value?: number;
+  };
+}
+
+export interface SearchResponse {
+  results: SearchResult[];
+  query: string;
+  total: number;
+}

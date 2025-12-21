@@ -14,6 +14,7 @@ import { LogOut, User } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import ThemeToggle from "@/components/ThemeToggle";
+import GlobalSearch from "@/components/GlobalSearch";
 import { usePageInfo } from "@/contexts/PageContext";
 
 interface User {
@@ -67,6 +68,7 @@ export default function TopBar() {
       </div>
       
       <div className="flex items-center gap-2">
+        <GlobalSearch />
         <ThemeToggle />
         {user && (
           <DropdownMenu>
