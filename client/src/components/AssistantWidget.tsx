@@ -87,6 +87,11 @@ export function AssistantWidget() {
     }
   }, [location, isOpen]);
 
+  // Don't show on login or presentation mode
+  if (location === "/login" || location === "/dashboard/comercial/apresentacao") {
+    return null;
+  }
+
   const scrollToBottom = () => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -184,7 +189,7 @@ export function AssistantWidget() {
       <SheetTrigger asChild>
         <Button
           size="icon"
-          className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg"
+          className="fixed bottom-6 right-6 z-[9999] h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground"
           data-testid="button-assistant-widget"
         >
           <MessageCircle className="h-6 w-6" />
