@@ -8,8 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import type { DateRange } from "react-day-picker";
+import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
 import { 
   BarChart3,
@@ -177,7 +176,8 @@ function getSourceDisplayName(sourceId: string): string {
 
 export default function DetalhamentoVendas() {
   useSetPageInfo("Detalhamento de Vendas", "Análise técnica de negócios ganhos");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const hoje = new Date();
+  const [selectedMonth, setSelectedMonth] = useState({ month: hoje.getMonth() + 1, year: hoje.getFullYear() });
   const [source, setSource] = useState<string>("all");
   const [category, setCategory] = useState<string>("all");
   const [closer, setCloser] = useState<string>("all");
@@ -186,8 +186,9 @@ export default function DetalhamentoVendas() {
   const [orderDir, setOrderDir] = useState<string>("desc");
   const [utmType, setUtmType] = useState<string>("source");
 
-  const dataInicio = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : "";
-  const dataFim = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : "";
+  const dateObj = new Date(selectedMonth.year, selectedMonth.month - 1, 1);
+  const dataInicio = format(startOfMonth(dateObj), 'yyyy-MM-dd');
+  const dataFim = format(endOfMonth(dateObj), 'yyyy-MM-dd');
 
   const queryParamsObj = {
     dataInicio,
@@ -234,23 +235,19 @@ export default function DetalhamentoVendas() {
   });
 
   const resetFilters = () => {
-    setDateRange(undefined);
+    const hoje = new Date();
+    setSelectedMonth({ month: hoje.getMonth() + 1, year: hoje.getFullYear() });
     setSource("all");
     setCategory("all");
     setCloser("all");
   };
 
   const navegarMes = (direcao: 'anterior' | 'proximo') => {
-    const hoje = new Date();
-    const dataAtual = dateRange?.from || hoje;
-    const novoMes = direcao === 'anterior' 
-      ? subMonths(dataAtual, 1)
-      : addMonths(dataAtual, 1);
+    const novoMes = direcao === 'anterior' ? selectedMonth.month - 1 : selectedMonth.month + 1;
+    const novoAno = selectedMonth.year + (novoMes > 12 ? 1 : novoMes < 1 ? -1 : 0);
+    const mesFinal = novoMes > 12 ? 1 : novoMes < 1 ? 12 : novoMes;
     
-    setDateRange({
-      from: startOfMonth(novoMes),
-      to: endOfMonth(novoMes)
-    });
+    setSelectedMonth({ month: mesFinal, year: novoAno });
   };
 
   const toggleSort = (column: string) => {
@@ -315,12 +312,11 @@ export default function DetalhamentoVendas() {
           <Card className="bg-slate-900 border-slate-800">
             <CardContent className="p-4">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                <div className="space-y-1 col-span-2">
+                <div className="space-y-1">
                   <Label className="text-xs text-slate-400">Período</Label>
-                  <DateRangePicker
-                    value={dateRange}
-                    onChange={setDateRange}
-                    placeholder="Selecione o período"
+                  <MonthYearPicker
+                    value={selectedMonth}
+                    onChange={setSelectedMonth}
                     triggerClassName="bg-slate-800 border-slate-700 text-sm h-9 w-full"
                   />
                 </div>
