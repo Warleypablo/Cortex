@@ -6,11 +6,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { motion, AnimatePresence } from "framer-motion";
+import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import { 
   Handshake, 
   DollarSign, 
@@ -83,15 +85,12 @@ export default function DashboardClosers() {
   useSetPageInfo("Arena dos Closers", "Quem será o campeão de vendas?");
   const [, navigate] = useLocation();
   const hoje = new Date();
-  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
-  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
 
-  const [dataReuniaoInicio, setDataReuniaoInicio] = useState<string>(inicioMes);
-  const [dataReuniaoFim, setDataReuniaoFim] = useState<string>(fimMes);
-  const [dataFechamentoInicio, setDataFechamentoInicio] = useState<string>(inicioMes);
-  const [dataFechamentoFim, setDataFechamentoFim] = useState<string>(fimMes);
-  const [dataLeadInicio, setDataLeadInicio] = useState<string>(inicioMes);
-  const [dataLeadFim, setDataLeadFim] = useState<string>(fimMes);
+  const [dataReuniaoRange, setDataReuniaoRange] = useState<DateRange | undefined>({ from: inicioMes, to: fimMes });
+  const [dataFechamentoRange, setDataFechamentoRange] = useState<DateRange | undefined>({ from: inicioMes, to: fimMes });
+  const [dataLeadRange, setDataLeadRange] = useState<DateRange | undefined>({ from: inicioMes, to: fimMes });
   const [source, setSource] = useState<string>("all");
   const [pipeline, setPipeline] = useState<string>("all");
   const [closerId, setCloserId] = useState<string>("all");
@@ -107,45 +106,41 @@ export default function DashboardClosers() {
   }, []);
 
   const navegarMes = (direcao: 'anterior' | 'proximo') => {
-    const dataAtual = new Date(dataFechamentoInicio + 'T00:00:00');
+    const dataAtual = dataFechamentoRange?.from || new Date();
     const novoMes = direcao === 'anterior' 
       ? new Date(dataAtual.getFullYear(), dataAtual.getMonth() - 1, 1)
       : new Date(dataAtual.getFullYear(), dataAtual.getMonth() + 1, 1);
     
-    const inicioNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth(), 1).toISOString().split('T')[0];
-    const fimNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth() + 1, 0).toISOString().split('T')[0];
+    const inicioNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth(), 1);
+    const fimNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth() + 1, 0);
     
-    setDataReuniaoInicio(inicioNovoMes);
-    setDataReuniaoFim(fimNovoMes);
-    setDataFechamentoInicio(inicioNovoMes);
-    setDataFechamentoFim(fimNovoMes);
-    setDataLeadInicio(inicioNovoMes);
-    setDataLeadFim(fimNovoMes);
+    const novoRange: DateRange = { from: inicioNovoMes, to: fimNovoMes };
+    setDataReuniaoRange(novoRange);
+    setDataFechamentoRange(novoRange);
+    setDataLeadRange(novoRange);
     setMesAtual(novoMes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   };
 
   const irParaMesAtual = () => {
     const agora = new Date();
-    const inicioMesAtual = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0];
-    const fimMesAtual = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0];
+    const inicioMesAtual = new Date(agora.getFullYear(), agora.getMonth(), 1);
+    const fimMesAtual = new Date(agora.getFullYear(), agora.getMonth() + 1, 0);
     
-    setDataReuniaoInicio(inicioMesAtual);
-    setDataReuniaoFim(fimMesAtual);
-    setDataFechamentoInicio(inicioMesAtual);
-    setDataFechamentoFim(fimMesAtual);
-    setDataLeadInicio(inicioMesAtual);
-    setDataLeadFim(fimMesAtual);
+    const novoRange: DateRange = { from: inicioMesAtual, to: fimMesAtual };
+    setDataReuniaoRange(novoRange);
+    setDataFechamentoRange(novoRange);
+    setDataLeadRange(novoRange);
     setMesAtual(agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   };
 
   const buildQueryParams = () => {
     const params = new URLSearchParams();
-    if (dataReuniaoInicio) params.append("dataReuniaoInicio", dataReuniaoInicio);
-    if (dataReuniaoFim) params.append("dataReuniaoFim", dataReuniaoFim);
-    if (dataFechamentoInicio) params.append("dataFechamentoInicio", dataFechamentoInicio);
-    if (dataFechamentoFim) params.append("dataFechamentoFim", dataFechamentoFim);
-    if (dataLeadInicio) params.append("dataLeadInicio", dataLeadInicio);
-    if (dataLeadFim) params.append("dataLeadFim", dataLeadFim);
+    if (dataReuniaoRange?.from) params.append("dataReuniaoInicio", format(dataReuniaoRange.from, "yyyy-MM-dd"));
+    if (dataReuniaoRange?.to) params.append("dataReuniaoFim", format(dataReuniaoRange.to, "yyyy-MM-dd"));
+    if (dataFechamentoRange?.from) params.append("dataFechamentoInicio", format(dataFechamentoRange.from, "yyyy-MM-dd"));
+    if (dataFechamentoRange?.to) params.append("dataFechamentoFim", format(dataFechamentoRange.to, "yyyy-MM-dd"));
+    if (dataLeadRange?.from) params.append("dataLeadInicio", format(dataLeadRange.from, "yyyy-MM-dd"));
+    if (dataLeadRange?.to) params.append("dataLeadFim", format(dataLeadRange.to, "yyyy-MM-dd"));
     if (source && source !== "all") params.append("source", source);
     if (pipeline && pipeline !== "all") params.append("pipeline", pipeline);
     if (closerId && closerId !== "all") params.append("closerId", closerId);
@@ -195,15 +190,12 @@ export default function DashboardClosers() {
 
   const clearFilters = () => {
     const agora = new Date();
-    const inicioMesAtual = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0];
-    const fimMesAtual = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0];
+    const inicioMesAtual = new Date(agora.getFullYear(), agora.getMonth(), 1);
+    const fimMesAtual = new Date(agora.getFullYear(), agora.getMonth() + 1, 0);
     
-    setDataReuniaoInicio("");
-    setDataReuniaoFim("");
-    setDataFechamentoInicio(inicioMesAtual);
-    setDataFechamentoFim(fimMesAtual);
-    setDataLeadInicio("");
-    setDataLeadFim("");
+    setDataReuniaoRange(undefined);
+    setDataFechamentoRange({ from: inicioMesAtual, to: fimMesAtual });
+    setDataLeadRange(undefined);
     setSource("all");
     setPipeline("all");
     setCloserId("all");
@@ -309,8 +301,8 @@ export default function DashboardClosers() {
 
   const isLoading = isLoadingMetrics || isLoadingChart1 || isLoadingChart2;
 
-  const hasActiveFilters = dataReuniaoInicio || dataReuniaoFim || 
-    dataLeadInicio || dataLeadFim ||
+  const hasActiveFilters = dataReuniaoRange?.from || dataReuniaoRange?.to || 
+    dataLeadRange?.from || dataLeadRange?.to ||
     (source && source !== "all") || 
     (pipeline && pipeline !== "all") || (closerId && closerId !== "all");
 
@@ -464,28 +456,13 @@ export default function DashboardClosers() {
                         <div className="text-xs font-medium text-violet-300 mb-2 flex items-center gap-1">
                           <Handshake className="w-3 h-3" /> Reuniões Realizadas
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <Label className="text-xs text-slate-400">Início</Label>
-                            <Input
-                              type="date"
-                              value={dataReuniaoInicio}
-                              onChange={(e) => setDataReuniaoInicio(e.target.value)}
-                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                              data-testid="input-data-reuniao-inicio"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs text-slate-400">Fim</Label>
-                            <Input
-                              type="date"
-                              value={dataReuniaoFim}
-                              onChange={(e) => setDataReuniaoFim(e.target.value)}
-                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                              data-testid="input-data-reuniao-fim"
-                            />
-                          </div>
-                        </div>
+                        <DateRangePicker
+                          value={dataReuniaoRange}
+                          onChange={setDataReuniaoRange}
+                          placeholder="Selecione o período"
+                          triggerClassName="h-8 bg-slate-800 border-slate-700 text-white text-sm w-full min-w-0"
+                          numberOfMonths={1}
+                        />
                       </div>
 
                       {/* Negócios Fechados filter */}
@@ -493,28 +470,13 @@ export default function DashboardClosers() {
                         <div className="text-xs font-medium text-emerald-300 mb-2 flex items-center gap-1">
                           <Target className="w-3 h-3" /> Negócios Fechados / MRR / Pontual
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <Label className="text-xs text-slate-400">Início</Label>
-                            <Input
-                              type="date"
-                              value={dataFechamentoInicio}
-                              onChange={(e) => setDataFechamentoInicio(e.target.value)}
-                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                              data-testid="input-data-fechamento-inicio"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs text-slate-400">Fim</Label>
-                            <Input
-                              type="date"
-                              value={dataFechamentoFim}
-                              onChange={(e) => setDataFechamentoFim(e.target.value)}
-                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                              data-testid="input-data-fechamento-fim"
-                            />
-                          </div>
-                        </div>
+                        <DateRangePicker
+                          value={dataFechamentoRange}
+                          onChange={setDataFechamentoRange}
+                          placeholder="Selecione o período"
+                          triggerClassName="h-8 bg-slate-800 border-slate-700 text-white text-sm w-full min-w-0"
+                          numberOfMonths={1}
+                        />
                       </div>
 
                       {/* Leads Criados filter */}
@@ -522,28 +484,13 @@ export default function DashboardClosers() {
                         <div className="text-xs font-medium text-blue-300 mb-2 flex items-center gap-1">
                           <Users className="w-3 h-3" /> Leads Criados
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <Label className="text-xs text-slate-400">Início</Label>
-                            <Input
-                              type="date"
-                              value={dataLeadInicio}
-                              onChange={(e) => setDataLeadInicio(e.target.value)}
-                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                              data-testid="input-data-lead-inicio"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs text-slate-400">Fim</Label>
-                            <Input
-                              type="date"
-                              value={dataLeadFim}
-                              onChange={(e) => setDataLeadFim(e.target.value)}
-                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                              data-testid="input-data-lead-fim"
-                            />
-                          </div>
-                        </div>
+                        <DateRangePicker
+                          value={dataLeadRange}
+                          onChange={setDataLeadRange}
+                          placeholder="Selecione o período"
+                          triggerClassName="h-8 bg-slate-800 border-slate-700 text-white text-sm w-full min-w-0"
+                          numberOfMonths={1}
+                        />
                       </div>
                     </div>
 

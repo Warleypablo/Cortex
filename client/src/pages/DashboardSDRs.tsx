@@ -6,11 +6,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { motion, AnimatePresence } from "framer-motion";
+import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import { 
   Phone, 
   CalendarCheck, 
@@ -85,13 +87,14 @@ export default function DashboardSDRs() {
   useSetPageInfo("Arena dos SDRs", "Quem agendará mais reuniões?");
   const [, navigate] = useLocation();
   const hoje = new Date();
-  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
-  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
 
-  const [dataReuniaoInicio, setDataReuniaoInicio] = useState<string>(inicioMes);
-  const [dataReuniaoFim, setDataReuniaoFim] = useState<string>(fimMes);
-  const [dataLeadInicio, setDataLeadInicio] = useState<string>("");
-  const [dataLeadFim, setDataLeadFim] = useState<string>("");
+  const [dateRangeReuniao, setDateRangeReuniao] = useState<DateRange | undefined>({
+    from: inicioMes,
+    to: fimMes,
+  });
+  const [dateRangeLead, setDateRangeLead] = useState<DateRange | undefined>(undefined);
   const [source, setSource] = useState<string>("all");
   const [pipeline, setPipeline] = useState<string>("all");
   const [sdrId, setSdrId] = useState<string>("all");
@@ -109,35 +112,33 @@ export default function DashboardSDRs() {
   }, []);
 
   const navegarMes = (direcao: 'anterior' | 'proximo') => {
-    const dataAtual = new Date(dataReuniaoInicio + 'T00:00:00');
+    const dataAtual = dateRangeReuniao?.from || new Date();
     const novoMes = direcao === 'anterior' 
       ? new Date(dataAtual.getFullYear(), dataAtual.getMonth() - 1, 1)
       : new Date(dataAtual.getFullYear(), dataAtual.getMonth() + 1, 1);
     
-    const inicioNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth(), 1).toISOString().split('T')[0];
-    const fimNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth() + 1, 0).toISOString().split('T')[0];
+    const inicioNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth(), 1);
+    const fimNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth() + 1, 0);
     
-    setDataReuniaoInicio(inicioNovoMes);
-    setDataReuniaoFim(fimNovoMes);
+    setDateRangeReuniao({ from: inicioNovoMes, to: fimNovoMes });
     setMesAtual(novoMes.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   };
 
   const irParaMesAtual = () => {
     const agora = new Date();
-    const inicioMesAtual = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0];
-    const fimMesAtual = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0];
+    const inicioMesAtual = new Date(agora.getFullYear(), agora.getMonth(), 1);
+    const fimMesAtual = new Date(agora.getFullYear(), agora.getMonth() + 1, 0);
     
-    setDataReuniaoInicio(inicioMesAtual);
-    setDataReuniaoFim(fimMesAtual);
+    setDateRangeReuniao({ from: inicioMesAtual, to: fimMesAtual });
     setMesAtual(agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   };
 
   const buildQueryParams = () => {
     const params = new URLSearchParams();
-    if (dataReuniaoInicio) params.append("dataReuniaoInicio", dataReuniaoInicio);
-    if (dataReuniaoFim) params.append("dataReuniaoFim", dataReuniaoFim);
-    if (dataLeadInicio) params.append("dataLeadInicio", dataLeadInicio);
-    if (dataLeadFim) params.append("dataLeadFim", dataLeadFim);
+    if (dateRangeReuniao?.from) params.append("dataReuniaoInicio", format(dateRangeReuniao.from, "yyyy-MM-dd"));
+    if (dateRangeReuniao?.to) params.append("dataReuniaoFim", format(dateRangeReuniao.to, "yyyy-MM-dd"));
+    if (dateRangeLead?.from) params.append("dataLeadInicio", format(dateRangeLead.from, "yyyy-MM-dd"));
+    if (dateRangeLead?.to) params.append("dataLeadFim", format(dateRangeLead.to, "yyyy-MM-dd"));
     if (source && source !== "all") params.append("source", source);
     if (pipeline && pipeline !== "all") params.append("pipeline", pipeline);
     if (sdrId && sdrId !== "all") params.append("sdrId", sdrId);
@@ -177,8 +178,8 @@ export default function DashboardSDRs() {
   });
 
   const mrrQueryParams = new URLSearchParams();
-  if (dataReuniaoInicio) mrrQueryParams.append("dataInicio", dataReuniaoInicio);
-  if (dataReuniaoFim) mrrQueryParams.append("dataFim", dataReuniaoFim);
+  if (dateRangeReuniao?.from) mrrQueryParams.append("dataInicio", format(dateRangeReuniao.from, "yyyy-MM-dd"));
+  if (dateRangeReuniao?.to) mrrQueryParams.append("dataFim", format(dateRangeReuniao.to, "yyyy-MM-dd"));
   if (source && source !== "all") mrrQueryParams.append("source", source);
   if (pipeline && pipeline !== "all") mrrQueryParams.append("pipeline", pipeline);
 
@@ -193,13 +194,11 @@ export default function DashboardSDRs() {
 
   const clearFilters = () => {
     const agora = new Date();
-    const inicioMesAtual = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0];
-    const fimMesAtual = new Date(agora.getFullYear(), agora.getMonth() + 1, 0).toISOString().split('T')[0];
+    const inicioMesAtual = new Date(agora.getFullYear(), agora.getMonth(), 1);
+    const fimMesAtual = new Date(agora.getFullYear(), agora.getMonth() + 1, 0);
     
-    setDataReuniaoInicio(inicioMesAtual);
-    setDataReuniaoFim(fimMesAtual);
-    setDataLeadInicio("");
-    setDataLeadFim("");
+    setDateRangeReuniao({ from: inicioMesAtual, to: fimMesAtual });
+    setDateRangeLead(undefined);
     setSource("all");
     setPipeline("all");
     setSdrId("all");
@@ -431,28 +430,13 @@ export default function DashboardSDRs() {
                         <div className="text-xs font-medium text-cyan-300 mb-2 flex items-center gap-1">
                           <CalendarCheck className="w-3 h-3" /> Reuniões Realizadas
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <Label className="text-xs text-slate-400">Início</Label>
-                            <Input
-                              type="date"
-                              value={dataReuniaoInicio}
-                              onChange={(e) => setDataReuniaoInicio(e.target.value)}
-                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                              data-testid="input-data-reuniao-inicio"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs text-slate-400">Fim</Label>
-                            <Input
-                              type="date"
-                              value={dataReuniaoFim}
-                              onChange={(e) => setDataReuniaoFim(e.target.value)}
-                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                              data-testid="input-data-reuniao-fim"
-                            />
-                          </div>
-                        </div>
+                        <DateRangePicker
+                          value={dateRangeReuniao}
+                          onChange={setDateRangeReuniao}
+                          triggerClassName="h-8 bg-slate-800 border-slate-700 text-white text-sm w-full"
+                          placeholder="Selecione o período"
+                          numberOfMonths={2}
+                        />
                       </div>
 
                       {/* Leads Criados filter */}
@@ -460,28 +444,13 @@ export default function DashboardSDRs() {
                         <div className="text-xs font-medium text-blue-300 mb-2 flex items-center gap-1">
                           <Users className="w-3 h-3" /> Leads Criados
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <Label className="text-xs text-slate-400">Início</Label>
-                            <Input
-                              type="date"
-                              value={dataLeadInicio}
-                              onChange={(e) => setDataLeadInicio(e.target.value)}
-                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                              data-testid="input-data-lead-inicio"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs text-slate-400">Fim</Label>
-                            <Input
-                              type="date"
-                              value={dataLeadFim}
-                              onChange={(e) => setDataLeadFim(e.target.value)}
-                              className="h-8 bg-slate-800 border-slate-700 text-white text-sm"
-                              data-testid="input-data-lead-fim"
-                            />
-                          </div>
-                        </div>
+                        <DateRangePicker
+                          value={dateRangeLead}
+                          onChange={setDateRangeLead}
+                          triggerClassName="h-8 bg-slate-800 border-slate-700 text-white text-sm w-full"
+                          placeholder="Selecione o período"
+                          numberOfMonths={2}
+                        />
                       </div>
                     </div>
 
