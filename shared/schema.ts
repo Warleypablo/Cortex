@@ -1073,3 +1073,29 @@ export interface SearchResponse {
   query: string;
   total: number;
 }
+
+// Unified Assistant Types
+export type AssistantContext = 'geral' | 'financeiro' | 'cases' | 'clientes';
+
+export interface UnifiedAssistantMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
+export interface UnifiedAssistantRequest {
+  message: string;
+  context: AssistantContext;
+  historico?: { role: 'user' | 'assistant'; content: string }[];
+  metadata?: {
+    dataInicio?: string;
+    dataFim?: string;
+    pageContext?: string;
+  };
+}
+
+export interface UnifiedAssistantResponse {
+  resposta: string;
+  context: AssistantContext;
+  dadosReferenciados?: any;
+}

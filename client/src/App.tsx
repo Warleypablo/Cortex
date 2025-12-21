@@ -50,6 +50,7 @@ import RevenueGoals from "@/pages/RevenueGoals";
 import CasesChat from "@/pages/CasesChat";
 import JuridicoClientes from "@/pages/JuridicoClientes";
 import InvestorsReport from "@/pages/InvestorsReport";
+import { AssistantWidget } from "@/components/AssistantWidget";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -223,6 +224,7 @@ function App() {
         <TooltipProvider>
           <AppLayout />
           <Toaster />
+          <AssistantWidget />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
