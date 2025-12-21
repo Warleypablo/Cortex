@@ -1,15 +1,19 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { DollarSign, TrendingUp, TrendingDown, Users, PauseCircle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 
 export default function VisaoGeral() {
-  const [mesVisaoGeral, setMesVisaoGeral] = useState<string>(() => {
+  const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return { month: now.getMonth() + 1, year: now.getFullYear() };
   });
+
+  const mesVisaoGeral = useMemo(() => {
+    return `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}`;
+  }, [selectedMonth]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -117,16 +121,11 @@ export default function VisaoGeral() {
               <h2 className="text-xl font-semibold">Período de Análise</h2>
               <p className="text-sm text-muted-foreground mt-1">Selecione o mês para visualizar as métricas</p>
             </div>
-            <Select value={mesVisaoGeral} onValueChange={setMesVisaoGeral}>
-              <SelectTrigger className="w-[200px]" data-testid="select-mes-visao-geral">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {getMesesDesdeNovembro2025().map(m => (
-                  <SelectItem key={m.valor} value={m.valor}>{m.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MonthYearPicker
+              value={selectedMonth}
+              onChange={setSelectedMonth}
+              minYear={2025}
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
