@@ -1131,3 +1131,65 @@ export const authLogs = pgTable("auth_logs", {
 
 export type AuthLog = typeof authLogs.$inferSelect;
 export type InsertAuthLog = typeof authLogs.$inferInsert;
+
+// Sync Logs - Tracking integration synchronizations
+export const syncLogs = pgTable("sync_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  integration: varchar("integration", { length: 50 }).notNull(), // conta_azul, clickup, bitrix, meta_ads, google_ads
+  operation: varchar("operation", { length: 50 }).notNull(), // full_sync, incremental, manual
+  status: varchar("status", { length: 20 }).notNull(), // running, success, failed, partial
+  startedAt: timestamp("started_at").notNull(),
+  completedAt: timestamp("completed_at"),
+  recordsProcessed: integer("records_processed").default(0),
+  recordsCreated: integer("records_created").default(0),
+  recordsUpdated: integer("records_updated").default(0),
+  recordsFailed: integer("records_failed").default(0),
+  errorMessage: text("error_message"),
+  errorDetails: text("error_details"),
+  triggeredBy: varchar("triggered_by", { length: 100 }), // system, user_email, scheduler
+  durationMs: integer("duration_ms"),
+});
+
+export type SyncLog = typeof syncLogs.$inferSelect;
+export type InsertSyncLog = typeof syncLogs.$inferInsert;
+
+// Data Reconciliation - Tracking discrepancies between systems
+export const dataReconciliation = pgTable("data_reconciliation", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  entityType: varchar("entity_type", { length: 50 }).notNull(), // cliente, contrato, cobranca, parcela
+  sourceSystem: varchar("source_system", { length: 50 }).notNull(), // conta_azul, clickup, cortex
+  targetSystem: varchar("target_system", { length: 50 }).notNull(),
+  discrepancyType: varchar("discrepancy_type", { length: 50 }).notNull(), // missing, value_mismatch, status_mismatch
+  sourceId: varchar("source_id", { length: 100 }),
+  targetId: varchar("target_id", { length: 100 }),
+  entityName: text("entity_name"),
+  fieldName: varchar("field_name", { length: 100 }),
+  sourceValue: text("source_value"),
+  targetValue: text("target_value"),
+  severity: varchar("severity", { length: 20 }).notNull().default("medium"), // low, medium, high, critical
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // pending, resolved, ignored
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by", { length: 255 }),
+  notes: text("notes"),
+});
+
+export type DataReconciliation = typeof dataReconciliation.$inferSelect;
+export type InsertDataReconciliation = typeof dataReconciliation.$inferInsert;
+
+// Integration Health - Track health metrics over time
+export const integrationHealth = pgTable("integration_health", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  integration: varchar("integration", { length: 50 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull(), // healthy, degraded, down
+  lastSuccessfulSync: timestamp("last_successful_sync"),
+  consecutiveFailures: integer("consecutive_failures").default(0),
+  avgSyncDurationMs: integer("avg_sync_duration_ms"),
+  totalRecordsToday: integer("total_records_today").default(0),
+  errorRatePercent: decimal("error_rate_percent"),
+});
+
+export type IntegrationHealth = typeof integrationHealth.$inferSelect;
+export type InsertIntegrationHealth = typeof integrationHealth.$inferInsert;
