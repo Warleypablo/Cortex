@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +50,8 @@ type VisibleItem =
   | { type: 'parcela'; parcela: DfcParcela; parentNode: DfcNode };
 
 export default function DashboardDFC() {
+  useSetPageInfo("DFC - Demonstração de Fluxo de Caixa", "Análise hierárquica de receitas e despesas");
+  
   const [filterDataInicio, setFilterDataInicio] = useState<string>("2025-01-01");
   const [filterDataFim, setFilterDataFim] = useState<string>("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['RECEITAS', 'DESPESAS']));
@@ -314,14 +317,6 @@ export default function DashboardDFC() {
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20">
               <BarChart3 className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">
-                Fluxo de Caixa
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Demonstração detalhada de entradas e saídas
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">

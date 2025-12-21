@@ -8,6 +8,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon, TrendingUp, TrendingDown, Target, DollarSign, Users, ShoppingCart, BarChart3, Rocket, Percent, Trophy, CircleDollarSign, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { format, subDays, subMonths, eachDayOfInterval, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
@@ -556,19 +557,11 @@ export default function GrowthVisaoGeral() {
     };
   }, [visaoGeralData?.mqlPorCanal]);
 
+  useSetPageInfo("Marketing", "Visão Geral de Performance");
+
   return (
     <div className="flex flex-col h-full overflow-auto">
-      <div className="flex items-center justify-between p-4 border-b bg-card sticky top-0 z-20">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-green-500/10">
-            <Rocket className="w-6 h-6 text-green-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Marketing</h1>
-            <p className="text-sm text-muted-foreground">Visão Geral de Performance</p>
-          </div>
-        </div>
-        
+      <div className="flex items-center justify-end p-4 border-b bg-card sticky top-0 z-20">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Canal:</span>

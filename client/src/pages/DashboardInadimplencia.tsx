@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import {
   Table,
   TableBody,
@@ -177,6 +178,8 @@ function ErrorDisplay({ message }: { message: string }) {
 }
 
 export default function DashboardInadimplencia() {
+  useSetPageInfo("Inadimplência", "Gestão de cobranças e inadimplência");
+  
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("visao-geral");
   const [dataInicio, setDataInicio] = useState<string>("");
@@ -1699,14 +1702,8 @@ export default function DashboardInadimplencia() {
   return (
     <div className="p-6 space-y-6" data-testid="page-inadimplencia">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="title-inadimplencia">
-            <AlertTriangle className="h-6 w-6 text-red-500" />
-            Inadimplência
-          </h1>
-          <p className="text-muted-foreground">
-            Análise detalhada de clientes com pagamentos em atraso
-          </p>
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-6 w-6 text-red-500" />
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -152,6 +153,7 @@ const getDeadlineStatus = (days: number | null): { color: string; label: string;
 };
 
 export default function DashboardTech() {
+  useSetPageInfo("Tech - Visão Geral", "Dashboard visual do pipeline de entregas");
   const { data: metricas, isLoading: isLoadingMetricas } = useQuery<TechMetricas>({
     queryKey: ['/api/tech/metricas'],
   });
@@ -219,10 +221,6 @@ export default function DashboardTech() {
       <div className="container mx-auto px-4 py-6 max-w-7xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold" data-testid="text-title">Tech - Visão Geral</h1>
-            <p className="text-muted-foreground text-sm">Dashboard visual do pipeline de entregas</p>
-          </div>
           {velocidade && !isLoadingVelocidade && (
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 bg-green-500/10 px-4 py-2 rounded-lg border border-green-500/20">

@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -167,6 +168,7 @@ const getTempoColor = (dias: number): string => {
 };
 
 export default function TechProjetos() {
+  useSetPageInfo("Tech - Projetos", "Análise técnica detalhada e métricas de performance");
   const [activeTab, setActiveTab] = useState<'abertos' | 'fechados'>('abertos');
   const [responsavelFilter, setResponsavelFilter] = useState<string>('todos');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
@@ -323,11 +325,6 @@ export default function TechProjetos() {
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold" data-testid="text-title">Tech - Projetos</h1>
-          <p className="text-muted-foreground text-sm">Análise técnica detalhada e métricas de performance</p>
-        </div>
 
         {/* Card de Análise com Filtros */}
         <Card className="mb-6">

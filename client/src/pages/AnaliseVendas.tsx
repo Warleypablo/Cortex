@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -152,6 +153,8 @@ function FloatingParticles() {
 
 
 export default function AnaliseVendas() {
+  useSetPageInfo("Análise de Vendas", "Métricas de performance comercial em tempo real");
+  
   const hoje = new Date();
   const inicioAno = new Date(hoje.getFullYear(), 0, 1).toISOString().split('T')[0];
   const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -347,76 +350,53 @@ export default function AnaliseVendas() {
       <FloatingParticles />
 
       <div className="relative z-10 p-6 lg:p-8 space-y-6">
-        {/* Premium Header */}
+        {/* Filters Row */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4"
+          className="flex items-center justify-end gap-4"
         >
-          <div className="flex items-center gap-5">
-            <motion.div 
-              whileHover={{ scale: 1.05, rotate: 5 }}
-              className="relative"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-blue-600 rounded-2xl blur-xl opacity-60 animate-pulse" />
-              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 via-blue-500 to-indigo-600 flex items-center justify-center shadow-2xl shadow-violet-500/30">
-                <BarChart3 className="w-8 h-8 text-white" />
-              </div>
-            </motion.div>
-            <div>
-              <h1 className="text-3xl lg:text-4xl font-black bg-gradient-to-r from-white via-violet-200 to-blue-200 bg-clip-text text-transparent">
-                Análise de Vendas
-              </h1>
-              <p className="text-slate-400 text-sm mt-1 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-violet-400" />
-                Métricas de performance comercial em tempo real
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className="relative group"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 to-blue-600/20 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative bg-slate-900/80 backdrop-blur-xl rounded-xl border border-violet-500/20 px-4 py-2">
+              <p className="text-xs text-slate-500">Atualizado em</p>
+              <p className="text-xl font-mono font-bold bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">
+                {currentTime.toLocaleTimeString('pt-BR')}
               </p>
             </div>
-          </div>
+          </motion.div>
           
-          <div className="flex items-center gap-4">
-            <motion.div 
-              whileHover={{ scale: 1.02 }}
-              className="relative group"
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className="bg-violet-500/10 border-violet-500/30 text-violet-300 hover:bg-violet-500/20 hover:border-violet-400/50 backdrop-blur-xl"
+              data-testid="button-toggle-filters"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 to-blue-600/20 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative bg-slate-900/80 backdrop-blur-xl rounded-xl border border-violet-500/20 px-4 py-2">
-                <p className="text-xs text-slate-500">Atualizado em</p>
-                <p className="text-xl font-mono font-bold bg-gradient-to-r from-violet-400 to-blue-400 bg-clip-text text-transparent">
-                  {currentTime.toLocaleTimeString('pt-BR')}
-                </p>
-              </div>
-            </motion.div>
-            
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-                className="bg-violet-500/10 border-violet-500/30 text-violet-300 hover:bg-violet-500/20 hover:border-violet-400/50 backdrop-blur-xl"
-                data-testid="button-toggle-filters"
-              >
-                <Filter className="w-4 h-4 mr-2" />
-                Filtros
-                {(pipeline || source) && (
-                  <Badge className="ml-2 bg-violet-500 text-white border-0">
-                    {[pipeline, source].filter(Boolean).length}
-                  </Badge>
-                )}
-              </Button>
-            </motion.div>
-            
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                variant="ghost"
-                onClick={resetFilters}
-                className="text-slate-400 hover:text-white hover:bg-slate-800/50"
-                data-testid="button-reset-filters"
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Limpar
-              </Button>
-            </motion.div>
-          </div>
+              <Filter className="w-4 h-4 mr-2" />
+              Filtros
+              {(pipeline || source) && (
+                <Badge className="ml-2 bg-violet-500 text-white border-0">
+                  {[pipeline, source].filter(Boolean).length}
+                </Badge>
+              )}
+            </Button>
+          </motion.div>
+          
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              variant="ghost"
+              onClick={resetFilters}
+              className="text-slate-400 hover:text-white hover:bg-slate-800/50"
+              data-testid="button-reset-filters"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Limpar
+            </Button>
+          </motion.div>
         </motion.div>
 
         {/* Filters Panel */}
