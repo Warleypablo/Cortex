@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Tv, Sparkles, Image, Trophy, Layers, Scale, Gavel } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Tv, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogoLight from "@assets/Logo_(12)_1766085175718.png";
 import turboLogoDark from "@assets/Logo_(11)_1766084062617.png";
@@ -65,12 +65,12 @@ const menuItems = [
   {
     title: "GPTurbo",
     url: "/cases/chat",
-    icon: Trophy,
+    icon: Sparkles,
   },
   {
     title: "Acessos",
     url: "/acessos",
-    icon: Shield,
+    icon: Key,
   },
   {
     title: "Conhecimento",
@@ -80,7 +80,7 @@ const menuItems = [
   {
     title: "Clube Benefícios",
     url: "/clube-beneficios",
-    icon: Sparkles,
+    icon: Gift,
   },
 ];
 
