@@ -15,6 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import ThemeToggle from "@/components/ThemeToggle";
 import GlobalSearch from "@/components/GlobalSearch";
+import PresentationModeButton from "@/components/PresentationModeButton";
 import { usePageInfo } from "@/contexts/PageContext";
 
 interface User {
@@ -69,6 +70,7 @@ export default function TopBar() {
       
       <div className="flex items-center gap-2">
         <GlobalSearch />
+        <PresentationModeButton />
         <ThemeToggle />
         {user && (
           <DropdownMenu>
