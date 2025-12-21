@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import {
   Dialog,
   DialogContent,
@@ -94,34 +94,20 @@ export default function FluxoCaixa() {
   useSetPageInfo("Fluxo de Caixa", "Análise de entradas e saídas do período");
   
   const hoje = new Date();
-  const [mesAno, setMesAno] = useState(`${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`);
+  const [selectedMonth, setSelectedMonth] = useState({ month: hoje.getMonth() + 1, year: hoje.getFullYear() });
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
   
   const dataInicio = useMemo(() => {
-    const [ano, mes] = mesAno.split('-').map(Number);
-    return new Date(ano, mes - 1, 1).toISOString().split('T')[0];
-  }, [mesAno]);
+    return new Date(selectedMonth.year, selectedMonth.month - 1, 1).toISOString().split('T')[0];
+  }, [selectedMonth]);
   
   const dataFim = useMemo(() => {
-    const [ano, mes] = mesAno.split('-').map(Number);
-    return new Date(ano, mes, 0).toISOString().split('T')[0];
-  }, [mesAno]);
+    return new Date(selectedMonth.year, selectedMonth.month, 0).toISOString().split('T')[0];
+  }, [selectedMonth]);
 
   const periodoLabel = useMemo(() => {
-    const [ano, mes] = mesAno.split('-').map(Number);
-    return getMesNome(mes - 1, ano);
-  }, [mesAno]);
-
-  const mesesDisponiveis = useMemo(() => {
-    const meses = [];
-    for (let i = -6; i <= 6; i++) {
-      const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
-      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = getMesNome(d.getMonth(), d.getFullYear());
-      meses.push({ value, label });
-    }
-    return meses;
-  }, []);
+    return getMesNome(selectedMonth.month - 1, selectedMonth.year);
+  }, [selectedMonth]);
 
   const { data: insightsPeriodo, isLoading: isLoadingInsights } = useQuery<FluxoCaixaInsightsPeriodo>({
     queryKey: ['/api/fluxo-caixa/insights-periodo', { dataInicio, dataFim }],
@@ -202,28 +188,11 @@ export default function FluxoCaixa() {
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-6 max-w-7xl">
         {/* Seletor de Mês */}
-        <div className="mb-6 flex items-center gap-3">
-          <CalendarDays className="w-5 h-5 text-muted-foreground" />
-          <Select value={mesAno} onValueChange={setMesAno}>
-            <SelectTrigger className="w-[200px]" data-testid="select-mes">
-              <SelectValue placeholder="Selecione o mês" />
-            </SelectTrigger>
-            <SelectContent>
-              {mesesDisponiveis.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Período Selecionado Badge */}
         <div className="mb-6">
-          <Badge variant="secondary" className="text-sm px-4 py-2">
-            <Calendar className="w-4 h-4 mr-2" />
-            Período: {periodoLabel}
-          </Badge>
+          <MonthYearPicker
+            value={selectedMonth}
+            onChange={setSelectedMonth}
+          />
         </div>
 
         {/* KPIs Principais */}
