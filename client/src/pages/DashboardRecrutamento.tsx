@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { 
   Users, UserPlus, UserCheck, Target, Briefcase, TrendingUp, TrendingDown,
   Filter, BarChart3, PieChart as PieChartIcon, Activity, Clock, Search,
@@ -36,6 +37,8 @@ const FONTE_LABELS: Record<string, string> = {
 };
 
 export default function DashboardRecrutamento() {
+  useSetPageInfo("Dashboard de Recrutamento", "Análise de funil, fontes e métricas de contratação");
+  
   const [activeTab, setActiveTab] = useState("visao-geral");
   const [periodoMeses, setPeriodoMeses] = useState(6);
   const [areaFilter, setAreaFilter] = useState("todos");
@@ -232,27 +235,17 @@ export default function DashboardRecrutamento() {
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold mb-2" data-testid="text-title">
-              Dashboard de Recrutamento
-            </h1>
-            <p className="text-muted-foreground">
-              Análise de funil, fontes e métricas de contratação
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Select value={periodoMeses.toString()} onValueChange={(v) => setPeriodoMeses(parseInt(v))}>
-              <SelectTrigger className="w-[140px]" data-testid="select-periodo">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="3">3 meses</SelectItem>
-                <SelectItem value="6">6 meses</SelectItem>
-                <SelectItem value="12">12 meses</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="mb-8 flex justify-end">
+          <Select value={periodoMeses.toString()} onValueChange={(v) => setPeriodoMeses(parseInt(v))}>
+            <SelectTrigger className="w-[140px]" data-testid="select-periodo">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="3">3 meses</SelectItem>
+              <SelectItem value="6">6 meses</SelectItem>
+              <SelectItem value="12">12 meses</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

@@ -4,8 +4,10 @@ import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { DollarSign, TrendingUp, TrendingDown, Users, PauseCircle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useQuery } from "@tanstack/react-query";
+import { useSetPageInfo } from "@/contexts/PageContext";
 
 export default function VisaoGeral() {
+  useSetPageInfo("Visão Geral", "Métricas de MRR e performance");
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return { month: now.getMonth() + 1, year: now.getFullYear() };
@@ -110,11 +112,6 @@ export default function VisaoGeral() {
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold mb-2" data-testid="text-title">Visão Geral</h1>
-          <p className="text-muted-foreground">Métricas de MRR e performance</p>
-        </div>
-
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <div>

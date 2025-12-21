@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, TrendingUp, UserPlus, UserMinus, Clock, Cake, Award, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building } from "lucide-react";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, ComposedChart, PieChart, Pie, Cell } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -124,6 +125,8 @@ const CHART_COLORS = [
 ];
 
 export default function DashboardGeG() {
+  useSetPageInfo("Dashboard GEG", "Gestão Estratégica de Pessoas");
+  
   const [periodo, setPeriodo] = useState("trimestre");
   const [squad, setSquad] = useState("todos");
   const [setor, setSetor] = useState("todos");
@@ -202,11 +205,6 @@ export default function DashboardGeG() {
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold mb-2" data-testid="text-title">Dashboard GEG</h1>
-          <p className="text-muted-foreground">Gestão Estratégica de Pessoas</p>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div>
             <label className="text-sm font-medium mb-2 block">Período</label>

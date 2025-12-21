@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { usePageInfo } from "@/contexts/PageContext";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ interface RevenueData {
 }
 
 export default function ClientDetail() {
+  const { setPageInfo } = usePageInfo();
   const [, params] = useRoute("/cliente/:id");
   const clientId = params?.id || "";
   const [receitasCurrentPage, setReceitasCurrentPage] = useState(1);
@@ -170,6 +172,14 @@ export default function ClientDetail() {
     }
   }, [receitasTotalPages, receitasCurrentPage]);
 
+  useEffect(() => {
+    if (cliente?.nome) {
+      setPageInfo(cliente.nome, `CNPJ: ${cliente.cnpj || "N/A"}`);
+    } else {
+      setPageInfo("Detalhes do Cliente", "Carregando...");
+    }
+  }, [cliente, setPageInfo]);
+
   const isLoading = isLoadingCliente;
 
   if (isLoading) {
@@ -294,7 +304,6 @@ export default function ClientDetail() {
           
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-3xl font-semibold mb-2">{cliente.nome}</h1>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span>CNPJ: {cliente.cnpj || "N/A"}</span>
                 {cliente.endereco && (

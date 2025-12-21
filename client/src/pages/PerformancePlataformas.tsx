@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,6 +70,7 @@ const formatDecimal = (value: number | null): string => {
 };
 
 export default function PerformancePlataformas() {
+  useSetPageInfo("Performance por Plataforma", "Análise hierárquica: Plataforma → Campanha → Conjunto → Anúncio");
   const [dateRange, setDateRange] = useState({
     from: subDays(new Date(), 30),
     to: new Date()
@@ -244,10 +246,6 @@ export default function PerformancePlataformas() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Performance por Plataforma</h1>
-          <p className="text-muted-foreground">Análise hierárquica: Plataforma → Campanha → Conjunto → Anúncio</p>
-        </div>
         <Badge variant="secondary" className="text-sm" data-testid="badge-total-platforms">
           {platforms.length} plataformas
         </Badge>

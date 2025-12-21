@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -173,6 +174,7 @@ function getSourceDisplayName(sourceId: string): string {
 }
 
 export default function DetalhamentoVendas() {
+  useSetPageInfo("Detalhamento de Vendas", "Análise técnica de negócios ganhos");
   const [dataInicio, setDataInicio] = useState<string>("");
   const [dataFim, setDataFim] = useState<string>("");
   const [source, setSource] = useState<string>("all");
@@ -262,14 +264,8 @@ export default function DetalhamentoVendas() {
     <div className="min-h-screen bg-slate-950 text-white p-6">
       <div className="max-w-[1600px] mx-auto space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <BarChart3 className="w-6 h-6 text-blue-400" />
-              Detalhamento de Vendas
-            </h1>
-            <p className="text-sm text-slate-400 mt-1">
-              Análise técnica de negócios ganhos
-            </p>
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-6 h-6 text-blue-400" />
           </div>
 
           <div className="flex items-center gap-2">

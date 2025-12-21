@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
+import { useEffect } from "react";
+import { usePageInfo } from "@/contexts/PageContext";
 import { ArrowLeft, Package, User, DollarSign, Info, FileText, Mail, Phone, Briefcase, Calendar, Check, ChevronsUpDown, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,6 +65,7 @@ interface ColaboradorDropdown {
 }
 
 export default function PatrimonioDetail() {
+  const { setPageInfo } = usePageInfo();
   const params = useParams();
   const [, setLocation] = useLocation();
   const patrimonioId = params.id;
@@ -109,6 +112,16 @@ export default function PatrimonioDetail() {
       });
     },
   });
+
+  useEffect(() => {
+    if (patrimonio) {
+      const title = patrimonio.ativo ? `${patrimonio.ativo}` : "Detalhes do Patrimônio";
+      const subtitle = patrimonio.numeroAtivo ? `Patrimônio #${patrimonio.numeroAtivo}` : "Gestão de ativos";
+      setPageInfo(title, subtitle);
+    } else {
+      setPageInfo("Detalhes do Patrimônio", "Carregando...");
+    }
+  }, [patrimonio, setPageInfo]);
 
   const handleSelectResponsavel = (nome: string) => {
     if (nome === patrimonio?.responsavelAtual) {
@@ -213,9 +226,6 @@ export default function PatrimonioDetail() {
                 <span>/</span>
                 <span className="text-foreground">Detalhes do patrimônio</span>
               </div>
-              <h1 className="text-3xl font-bold tracking-tight" data-testid="title-patrimonio-detail">
-                Detalhes do Patrimônio
-              </h1>
             </div>
             <Package className="w-8 h-8 text-primary" />
           </div>

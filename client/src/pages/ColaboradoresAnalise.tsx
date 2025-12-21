@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +73,7 @@ const squadColors: Record<string, string> = {
 };
 
 export default function ColaboradoresAnalise() {
+  useSetPageInfo("Análise de Colaboradores", "Dashboard com métricas e indicadores de recursos humanos");
   const { data, isLoading } = useQuery<DashboardAnaliseData>({
     queryKey: ["/api/colaboradores/analise"],
   });
@@ -105,10 +107,6 @@ export default function ColaboradoresAnalise() {
               Voltar para Colaboradores
             </Button>
           </Link>
-          <h1 className="text-3xl font-semibold mb-2">Análise de Colaboradores</h1>
-          <p className="text-muted-foreground">
-            Dashboard com métricas e indicadores de recursos humanos
-          </p>
         </div>
 
         <div className="space-y-6">

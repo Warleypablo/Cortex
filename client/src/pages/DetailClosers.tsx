@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { usePageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -223,6 +224,7 @@ function FloatingParticles() {
 }
 
 export default function DetailClosers() {
+  const { setPageInfo } = usePageInfo();
   const hoje = new Date();
   const inicioAno = new Date(hoje.getFullYear(), 0, 1).toISOString().split('T')[0];
   const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -307,6 +309,14 @@ export default function DetailClosers() {
     setDataFim(fimMes);
   };
 
+  useEffect(() => {
+    if (metrics?.closerName) {
+      setPageInfo(metrics.closerName, "Análise individual de performance em tempo real");
+    } else {
+      setPageInfo("Detalhamento de Closers", "Selecione um closer para ver detalhes");
+    }
+  }, [metrics?.closerName, setPageInfo]);
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -361,15 +371,6 @@ export default function DetailClosers() {
                 <User className="w-8 h-8 text-white" />
               </div>
             </motion.div>
-            <div>
-              <h1 className="text-3xl lg:text-4xl font-black bg-gradient-to-r from-white via-violet-200 to-purple-200 bg-clip-text text-transparent">
-                Detalhamento de Closers
-              </h1>
-              <p className="text-slate-400 text-sm mt-1 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-violet-400" />
-                Análise individual de performance em tempo real
-              </p>
-            </div>
           </div>
           
           <div className="flex items-center gap-4">

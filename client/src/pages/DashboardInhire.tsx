@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Users, TrendingUp, UserCheck, FileText, Target, Award } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, FunnelChart, Funnel, LabelList } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSetPageInfo } from "@/contexts/PageContext";
 
 interface InhireMetrics {
   totalCandidaturas: number;
@@ -61,6 +62,8 @@ const COLORS = {
 };
 
 export default function DashboardInhire() {
+  useSetPageInfo("Dashboard Inhire", "Análise de recrutamento e seleção");
+  
   const { data: metrics, isLoading: isLoadingMetrics } = useQuery<InhireMetrics>({
     queryKey: ['/api/inhire/metrics'],
   });
@@ -87,13 +90,6 @@ export default function DashboardInhire() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold" data-testid="text-page-title">Dashboard Inhire</h1>
-        <p className="text-muted-foreground" data-testid="text-page-description">
-          Análise de recrutamento e seleção
-        </p>
-      </div>
-
       {/* KPIs principais */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card data-testid="card-total-candidaturas">

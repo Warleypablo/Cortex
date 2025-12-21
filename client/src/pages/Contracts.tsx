@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ const mapSquadCodeToName = (code: string | null): string => {
 };
 
 export default function Contracts() {
+  useSetPageInfo("Contratos", "Gerencie contratos e acompanhe status de serviços");
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [servicoFilter, setServicoFilter] = useState<string>("all");
@@ -208,7 +210,6 @@ export default function Contracts() {
       <div className="bg-background">
         <div className="container mx-auto px-4 py-8 max-w-7xl">
           <div className="mb-8">
-            <h1 className="text-3xl font-semibold mb-2">Contratos</h1>
             <p className="text-muted-foreground">Carregando contratos...</p>
           </div>
         </div>
@@ -221,7 +222,6 @@ export default function Contracts() {
       <div className="bg-background">
         <div className="container mx-auto px-4 py-8 max-w-7xl">
           <div className="mb-8">
-            <h1 className="text-3xl font-semibold mb-2">Contratos</h1>
             <p className="text-red-500">Erro ao carregar contratos. Tente novamente mais tarde.</p>
           </div>
         </div>
@@ -232,10 +232,6 @@ export default function Contracts() {
   return (
     <div className="bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold mb-2">Contratos</h1>
-          <p className="text-muted-foreground">Gerencie contratos e acompanhe status de serviços</p>
-        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card data-testid="card-total-contratos">

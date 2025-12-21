@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, User, Loader2, Trophy } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useSetPageInfo } from "@/contexts/PageContext";
 
 interface Message {
   id: string;
@@ -15,6 +16,8 @@ interface Message {
 }
 
 export default function CasesChat() {
+  useSetPageInfo("Cases de Sucesso", "Converse sobre cases de sucesso da agência");
+  
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -102,21 +105,7 @@ export default function CasesChat() {
 
   return (
     <div className="flex-1 p-6 overflow-auto" data-testid="cases-chat-page">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
-          <Trophy className="w-6 h-6 text-amber-500" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">
-            Cases de Sucesso
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Converse sobre cases de sucesso da agência
-          </p>
-        </div>
-      </div>
-
-      <Card className="h-[calc(100vh-180px)] flex flex-col">
+      <Card className="h-[calc(100vh-120px)] flex flex-col">
         <CardHeader className="border-b py-4">
           <CardTitle className="text-lg flex items-center gap-2">
             <Bot className="w-5 h-5 text-primary" />

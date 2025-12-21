@@ -6,6 +6,7 @@ import { Loader2, Users, TrendingDown, TrendingUp, Calendar, DollarSign, Chevron
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import {
   HoverCard,
   HoverCardContent,
@@ -48,6 +49,8 @@ type ViewMode = "clientes" | "valor" | "contratos";
 type ViewModeChurn = "quantidade" | "valorTotal" | "percentual";
 
 export default function DashboardRetencao() {
+  useSetPageInfo("Análise de Retenção", "Análise de coorte de clientes por mês de início do contrato");
+  
   const [filterSquad, setFilterSquad] = useState<string>("todos");
   const [filterServicos, setFilterServicos] = useState<string[]>([]);
   const [filterMesInicio, setFilterMesInicio] = useState<string>("");
@@ -240,15 +243,6 @@ export default function DashboardRetencao() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 border-b bg-background px-6 py-4">
-        <div>
-          <h1 className="text-2xl font-semibold" data-testid="text-page-title">Análise de Retenção</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Análise de coorte de clientes por mês de início do contrato
-          </p>
-        </div>
-      </div>
-
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-[1600px] mx-auto space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

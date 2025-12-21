@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { Users, Database, Key, Shield, Edit, UserCog, ShieldCheck, ShieldOff } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useSetPageInfo } from "@/contexts/PageContext";
 
 interface User {
   id: string;
@@ -203,6 +204,8 @@ function EditPermissionsDialog({ user, open, onOpenChange }: {
 }
 
 export default function AdminUsuarios() {
+  useSetPageInfo("Gerenciar Usuários", "Controle de acesso e permissões de usuários");
+  
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const { toast } = useToast();
 
@@ -238,13 +241,6 @@ export default function AdminUsuarios() {
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-semibold">Gerenciar Usuários</h1>
-          <p className="text-muted-foreground mt-2">
-            Visualize todos os usuários cadastrados no sistema
-          </p>
-        </div>
-
         <div className="grid gap-4 md:grid-cols-3">
           {[1, 2, 3].map((i) => (
             <Card key={i}>
@@ -288,15 +284,6 @@ export default function AdminUsuarios() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold" data-testid="text-page-title">
-          Gerenciar Usuários
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Controle de acesso e permissões de usuários
-        </p>
-      </div>
-
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

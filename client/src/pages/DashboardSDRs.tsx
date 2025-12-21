@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -81,6 +82,7 @@ interface RankingSDR {
 }
 
 export default function DashboardSDRs() {
+  useSetPageInfo("Arena dos SDRs", "Quem agendará mais reuniões?");
   const [, navigate] = useLocation();
   const hoje = new Date();
   const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
@@ -307,9 +309,9 @@ export default function DashboardSDRs() {
               </motion.div>
             </motion.div>
             <div>
-              <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-cyan-200 to-cyan-400 bg-clip-text text-transparent" data-testid="text-page-title">
+              <span className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-cyan-200 to-cyan-400 bg-clip-text text-transparent">
                 ARENA DOS SDRs
-              </h1>
+              </span>
               <p className="text-slate-400 text-lg mt-1">
                 Quem agendará mais reuniões?
               </p>

@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from "react";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -181,6 +182,7 @@ const YEAR_PRESETS: PresetConfig[] = [
 const ALL_PRESETS = [...PERIOD_PRESETS, ...YEAR_PRESETS];
 
 export default function InvestorsReport() {
+  useSetPageInfo("Investors Report", "Métricas financeiras consolidadas • 2022-2025");
   const [selectedPreset, setSelectedPreset] = useState<PeriodPreset>('all');
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
     start: new Date('2022-01-01'),
@@ -452,16 +454,11 @@ export default function InvestorsReport() {
         <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-500/20 via-blue-600/10 to-transparent border border-blue-500/20 p-6">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent" />
           <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold flex items-center gap-3 text-white" data-testid="page-title">
-                <div className="p-2 bg-blue-500/20 rounded-lg">
-                  <Building2 className="h-7 w-7 text-blue-400" />
-                </div>
-                Investors Report
-              </h1>
-              <p className="text-slate-400 mt-2 text-lg">
-                Métricas financeiras consolidadas • 2022-2025
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <Building2 className="h-7 w-7 text-blue-400" />
+              </div>
+              <span className="text-3xl font-bold text-white">Investors Report</span>
             </div>
             <div className="flex items-center gap-3">
               <Badge variant="outline" className="border-blue-500/50 text-blue-400 px-3 py-1">
