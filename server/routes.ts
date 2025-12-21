@@ -465,6 +465,233 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch integrations status" });
     }
   });
+
+  app.get("/api/admin/sync-logs", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 50;
+      const offset = (page - 1) * pageSize;
+      const integration = req.query.integration as string | undefined;
+      const status = req.query.status as string | undefined;
+      
+      let whereClause = sql`1=1`;
+      if (integration) {
+        whereClause = sql`${whereClause} AND integration = ${integration}`;
+      }
+      if (status) {
+        whereClause = sql`${whereClause} AND status = ${status}`;
+      }
+      
+      const result = await db.execute(sql`
+        SELECT * FROM sync_logs 
+        WHERE ${whereClause}
+        ORDER BY started_at DESC 
+        LIMIT ${pageSize} OFFSET ${offset}
+      `);
+      
+      const countResult = await db.execute(sql`
+        SELECT COUNT(*) as total FROM sync_logs WHERE ${whereClause}
+      `);
+      const total = parseInt((countResult.rows[0] as any)?.total || '0');
+      
+      res.json({
+        items: result.rows,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize)
+      });
+    } catch (error) {
+      console.error("[api] Error fetching sync logs:", error);
+      res.status(500).json({ error: "Failed to fetch sync logs" });
+    }
+  });
+
+  app.get("/api/admin/sync-logs/summary", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          integration,
+          MAX(started_at) as last_sync,
+          COUNT(*) as total_syncs,
+          SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful_syncs,
+          ROUND(
+            (SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0)) * 100, 
+            2
+          ) as success_rate,
+          ROUND(AVG(EXTRACT(EPOCH FROM (ended_at - started_at)))::numeric, 2) as avg_duration_seconds
+        FROM sync_logs
+        GROUP BY integration
+        ORDER BY integration
+      `);
+      
+      res.json({ summary: result.rows });
+    } catch (error) {
+      console.error("[api] Error fetching sync logs summary:", error);
+      res.status(500).json({ error: "Failed to fetch sync logs summary" });
+    }
+  });
+
+  app.get("/api/admin/reconciliation", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 50;
+      const offset = (page - 1) * pageSize;
+      const entityType = req.query.entityType as string | undefined;
+      const status = req.query.status as string | undefined;
+      const severity = req.query.severity as string | undefined;
+      
+      let whereClause = sql`1=1`;
+      if (entityType) {
+        whereClause = sql`${whereClause} AND entity_type = ${entityType}`;
+      }
+      if (status) {
+        whereClause = sql`${whereClause} AND status = ${status}`;
+      }
+      if (severity) {
+        whereClause = sql`${whereClause} AND severity = ${severity}`;
+      }
+      
+      const result = await db.execute(sql`
+        SELECT * FROM data_reconciliation 
+        WHERE ${whereClause}
+        ORDER BY detected_at DESC 
+        LIMIT ${pageSize} OFFSET ${offset}
+      `);
+      
+      const countResult = await db.execute(sql`
+        SELECT COUNT(*) as total FROM data_reconciliation WHERE ${whereClause}
+      `);
+      const total = parseInt((countResult.rows[0] as any)?.total || '0');
+      
+      res.json({
+        items: result.rows,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize)
+      });
+    } catch (error) {
+      console.error("[api] Error fetching reconciliation data:", error);
+      res.status(500).json({ error: "Failed to fetch reconciliation data" });
+    }
+  });
+
+  app.post("/api/admin/reconciliation/:id/resolve", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { notes } = req.body;
+      const resolvedBy = (req.user as any)?.email || (req.user as any)?.name || 'admin';
+      
+      const result = await db.execute(sql`
+        UPDATE data_reconciliation 
+        SET 
+          status = 'resolved',
+          resolved_at = NOW(),
+          resolved_by = ${resolvedBy},
+          resolution_notes = ${notes || null}
+        WHERE id = ${parseInt(id)}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Reconciliation record not found" });
+      }
+      
+      res.json({ success: true, item: result.rows[0] });
+    } catch (error) {
+      console.error("[api] Error resolving reconciliation:", error);
+      res.status(500).json({ error: "Failed to resolve reconciliation" });
+    }
+  });
+
+  app.get("/api/admin/integration-health", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM integration_health 
+        ORDER BY integration, checked_at DESC
+      `);
+      
+      res.json({ health: result.rows });
+    } catch (error) {
+      console.error("[api] Error fetching integration health:", error);
+      res.status(500).json({ error: "Failed to fetch integration health" });
+    }
+  });
+
+  app.post("/api/admin/run-reconciliation", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const discrepancies: any[] = [];
+      const runId = Date.now().toString();
+      
+      const contaAzulClientes = await db.execute(sql`SELECT COUNT(*) as count FROM caz_clientes`);
+      const clickupClientes = await db.execute(sql`SELECT COUNT(*) as count FROM cup_clientes`);
+      
+      const cazCount = parseInt((contaAzulClientes.rows[0] as any)?.count || '0');
+      const cupCount = parseInt((clickupClientes.rows[0] as any)?.count || '0');
+      
+      if (cazCount !== cupCount) {
+        const diff = Math.abs(cazCount - cupCount);
+        const severity = diff > 50 ? 'high' : diff > 10 ? 'medium' : 'low';
+        
+        discrepancies.push({
+          entity_type: 'clientes',
+          source_system: 'conta_azul',
+          target_system: 'clickup',
+          source_count: cazCount,
+          target_count: cupCount,
+          difference: diff,
+          severity,
+          description: `Cliente count mismatch: ContaAzul has ${cazCount}, ClickUp has ${cupCount}`
+        });
+      }
+      
+      const contaAzulContratos = await db.execute(sql`SELECT COUNT(*) as count FROM caz_receber`);
+      const clickupContratos = await db.execute(sql`SELECT COUNT(*) as count FROM cup_contratos`);
+      
+      const cazContratosCount = parseInt((contaAzulContratos.rows[0] as any)?.count || '0');
+      const cupContratosCount = parseInt((clickupContratos.rows[0] as any)?.count || '0');
+      
+      if (cazContratosCount !== cupContratosCount) {
+        const diff = Math.abs(cazContratosCount - cupContratosCount);
+        const severity = diff > 100 ? 'high' : diff > 20 ? 'medium' : 'low';
+        
+        discrepancies.push({
+          entity_type: 'contratos',
+          source_system: 'conta_azul',
+          target_system: 'clickup',
+          source_count: cazContratosCount,
+          target_count: cupContratosCount,
+          difference: diff,
+          severity,
+          description: `Contract/Receivable count mismatch: ContaAzul receivables ${cazContratosCount}, ClickUp contracts ${cupContratosCount}`
+        });
+      }
+      
+      for (const d of discrepancies) {
+        await db.execute(sql`
+          INSERT INTO data_reconciliation (
+            entity_type, source_system, target_system, source_count, target_count,
+            difference, severity, description, status, detected_at, run_id
+          ) VALUES (
+            ${d.entity_type}, ${d.source_system}, ${d.target_system}, ${d.source_count}, 
+            ${d.target_count}, ${d.difference}, ${d.severity}, ${d.description}, 
+            'pending', NOW(), ${runId}
+          )
+        `);
+      }
+      
+      res.json({
+        success: true,
+        runId,
+        discrepanciesFound: discrepancies.length,
+        discrepancies
+      });
+    } catch (error) {
+      console.error("[api] Error running reconciliation:", error);
+      res.status(500).json({ error: "Failed to run reconciliation" });
+    }
+  });
   
   app.get("/api/clientes", async (req, res) => {
     try {
