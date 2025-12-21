@@ -10,7 +10,6 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import {
   Select,
@@ -185,17 +184,17 @@ export function AssistantWidget() {
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
-        <Button
-          size="icon"
-          className="fixed bottom-6 right-6 z-[9999] h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground"
-          data-testid="button-assistant-widget"
-        >
-          <MessageCircle className="h-6 w-6" />
-        </Button>
-      </SheetTrigger>
-      <SheetContent
+    <>
+      <Button
+        size="icon"
+        onClick={() => setIsOpen(true)}
+        className="fixed bottom-6 right-6 z-[9999] h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground"
+        data-testid="button-assistant-widget"
+      >
+        <MessageCircle className="h-6 w-6" />
+      </Button>
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetContent
         side="right"
         className="w-full sm:max-w-md flex flex-col p-0"
         data-testid="sheet-assistant"
@@ -330,6 +329,7 @@ export function AssistantWidget() {
           </div>
         </div>
       </SheetContent>
-    </Sheet>
+      </Sheet>
+    </>
   );
 }
