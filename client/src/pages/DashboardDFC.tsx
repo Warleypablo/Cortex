@@ -21,6 +21,9 @@ import {
   Sparkles, BrainCircuit, Send, MessageCircle, Bot, User, Minus, LayoutGrid, Table2,
   RotateCcw
 } from "lucide-react";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import type { DateRange } from "react-day-picker";
+import { format, startOfYear } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -52,9 +55,14 @@ type VisibleItem =
 export default function DashboardDFC() {
   useSetPageInfo("DFC - Demonstração de Fluxo de Caixa", "Análise hierárquica de receitas e despesas");
   
-  const [filterDataInicio, setFilterDataInicio] = useState<string>("2025-01-01");
-  const [filterDataFim, setFilterDataFim] = useState<string>("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfYear(new Date()),
+    to: undefined
+  });
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['RECEITAS', 'DESPESAS']));
+  
+  const filterDataInicio = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+  const filterDataFim = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -759,96 +767,33 @@ export default function DashboardDFC() {
                   </div>
                 </div>
                 
-                {/* Premium Date Selector */}
+                {/* Date Range Selector */}
                 <div className="bg-gradient-to-r from-slate-50 to-slate-100/50 dark:from-slate-900/50 dark:to-slate-800/30 rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
-                  <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                    {/* Preset Buttons */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="flex-1">
                       <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
-                        Período Rápido
+                        Período
                       </label>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { label: "Ano Atual", inicio: `${new Date().getFullYear()}-01-01`, fim: "" },
-                          { label: "Último Trimestre", inicio: (() => { const d = new Date(); d.setMonth(d.getMonth() - 3); return d.toISOString().split('T')[0]; })(), fim: "" },
-                          { label: "Últimos 6 Meses", inicio: (() => { const d = new Date(); d.setMonth(d.getMonth() - 6); return d.toISOString().split('T')[0]; })(), fim: "" },
-                          { label: "Último Ano", inicio: (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d.toISOString().split('T')[0]; })(), fim: "" },
-                          { label: "Tudo", inicio: "", fim: "" },
-                        ].map((preset) => {
-                          const isActive = filterDataInicio === preset.inicio && filterDataFim === preset.fim;
-                          return (
-                            <Button
-                              key={preset.label}
-                              variant={isActive ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => {
-                                setFilterDataInicio(preset.inicio);
-                                setFilterDataFim(preset.fim);
-                              }}
-                              className={`h-8 text-xs font-medium transition-all ${
-                                isActive 
-                                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 border-0' 
-                                  : 'hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
-                              }`}
-                              data-testid={`btn-preset-${preset.label.toLowerCase().replace(/\s/g, '-')}`}
-                            >
-                              {preset.label}
-                            </Button>
-                          );
-                        })}
+                      <div className="flex items-center gap-3">
+                        <DateRangePicker
+                          value={dateRange}
+                          onChange={setDateRange}
+                          placeholder="Selecione o período"
+                          data-testid="date-range-picker-dfc"
+                        />
+                        {dateRange && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDateRange(undefined)}
+                            className="h-9 px-4 border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 dark:hover:bg-rose-950/30 dark:hover:border-rose-800 dark:hover:text-rose-400 transition-all"
+                            data-testid="button-clear-dates"
+                          >
+                            <RotateCcw className="w-4 h-4 mr-1.5" />
+                            Limpar
+                          </Button>
+                        )}
                       </div>
-                    </div>
-                    
-                    {/* Custom Date Range */}
-                    <div className="flex items-end gap-3 pl-0 lg:pl-4 lg:border-l border-slate-200 dark:border-slate-700">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                          <Calendar className="w-3 h-3" />
-                          De
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="date"
-                            value={filterDataInicio}
-                            onChange={(e) => setFilterDataInicio(e.target.value)}
-                            className="h-10 w-40 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-sm font-medium shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all cursor-pointer hover:border-emerald-400"
-                            data-testid="input-data-inicio"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center h-10 px-2">
-                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                          <Calendar className="w-3 h-3" />
-                          Até
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="date"
-                            value={filterDataFim}
-                            onChange={(e) => setFilterDataFim(e.target.value)}
-                            className="h-10 w-40 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-sm font-medium shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all cursor-pointer hover:border-emerald-400"
-                            data-testid="input-data-fim"
-                          />
-                        </div>
-                      </div>
-                      {(filterDataInicio || filterDataFim) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setFilterDataInicio("");
-                            setFilterDataFim("");
-                          }}
-                          className="h-10 px-4 border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 dark:hover:bg-rose-950/30 dark:hover:border-rose-800 dark:hover:text-rose-400 transition-all"
-                          data-testid="button-clear-dates"
-                        >
-                          <RotateCcw className="w-4 h-4 mr-1.5" />
-                          Limpar
-                        </Button>
-                      )}
                     </div>
                   </div>
                 </div>
