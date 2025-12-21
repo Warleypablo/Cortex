@@ -185,14 +185,14 @@ export function AssistantWidget() {
 
   return (
     <>
-      <Button
-        size="icon"
+      <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-[9999] h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground"
+        className="fixed bottom-6 right-6 z-[9999] h-14 w-14 rounded-full shadow-2xl bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center transition-transform hover:scale-105 active:scale-95"
         data-testid="button-assistant-widget"
+        style={{ position: 'fixed', bottom: '24px', right: '24px' }}
       >
-        <MessageCircle className="h-6 w-6" />
-      </Button>
+        <Bot className="h-7 w-7" />
+      </button>
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetContent
         side="right"

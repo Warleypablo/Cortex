@@ -212,8 +212,8 @@ function AppLayout() {
             </main>
           </div>
         </div>
-        <AssistantWidget />
       </SidebarProvider>
+      <AssistantWidget />
     </PageProvider>
   );
 }
