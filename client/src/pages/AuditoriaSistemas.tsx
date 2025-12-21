@@ -22,12 +22,14 @@ import {
   ArrowUp,
   ArrowDown
 } from "lucide-react";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import type { AuditoriaSistemas } from "@shared/schema";
 
 type SortField = 'nomeCliente' | 'cnpj' | 'valorClickUp' | 'valorContaAzul' | 'diferenca' | 'status';
 type SortOrder = 'asc' | 'desc';
 
 export default function AuditoriaSistemasPage() {
+  useSetPageInfo("Auditoria de Sistemas", "Comparação de valores entre ClickUp e Conta Azul");
   const [mesAno, setMesAno] = useState<string>(new Date().toISOString().slice(0, 7));
   const [squad, setSquad] = useState<string>('todos');
   const [statusDivergencia, setStatusDivergencia] = useState<string>('todos');
@@ -178,20 +180,6 @@ export default function AuditoriaSistemasPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 border-b bg-background px-6 py-4">
-        <div className="flex items-center gap-2">
-          <ShieldAlert className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-2xl font-semibold" data-testid="text-page-title">
-              Auditoria de Sistemas
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Comparação de valores entre ClickUp e Conta Azul
-            </p>
-          </div>
-        </div>
-      </div>
-
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-[1600px] mx-auto space-y-6">
           <Card data-testid="card-filtros">

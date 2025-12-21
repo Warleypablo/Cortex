@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -145,6 +146,7 @@ const STATUS_JURIDICO = [
 ];
 
 export default function JuridicoClientes() {
+  useSetPageInfo("Cobrança Jurídica", "Gestão de clientes inadimplentes");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
@@ -402,9 +404,6 @@ export default function JuridicoClientes() {
               <Scale className="w-7 h-7 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-800" data-testid="text-page-title">
-                Cobrança Jurídica
-              </h1>
               <p className="text-slate-500">
                 {totals.count} cliente{totals.count !== 1 && 's'} • {formatCurrency(totals.total)} em aberto
               </p>
