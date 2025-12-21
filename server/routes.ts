@@ -474,24 +474,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const integration = req.query.integration as string | undefined;
       const status = req.query.status as string | undefined;
       
-      let whereClause = sql`1=1`;
+      // Build conditions array for proper parameterized queries
+      const conditions: any[] = [];
+      const params: any = { limit: pageSize, offset };
+      
+      let baseQuery = `SELECT * FROM sync_logs WHERE 1=1`;
+      let countQuery = `SELECT COUNT(*) as total FROM sync_logs WHERE 1=1`;
+      
       if (integration) {
-        whereClause = sql`${whereClause} AND integration = ${integration}`;
+        baseQuery += ` AND integration = $integration`;
+        countQuery += ` AND integration = $integration`;
+        params.integration = integration;
       }
       if (status) {
-        whereClause = sql`${whereClause} AND status = ${status}`;
+        baseQuery += ` AND status = $status`;
+        countQuery += ` AND status = $status`;
+        params.status = status;
       }
       
-      const result = await db.execute(sql`
-        SELECT * FROM sync_logs 
-        WHERE ${whereClause}
-        ORDER BY started_at DESC 
-        LIMIT ${pageSize} OFFSET ${offset}
-      `);
+      baseQuery += ` ORDER BY started_at DESC LIMIT $limit OFFSET $offset`;
       
-      const countResult = await db.execute(sql`
-        SELECT COUNT(*) as total FROM sync_logs WHERE ${whereClause}
-      `);
+      // Execute with proper parameterization using sql template
+      let result;
+      let countResult;
+      
+      if (integration && status) {
+        result = await db.execute(sql`
+          SELECT * FROM sync_logs 
+          WHERE integration = ${integration} AND status = ${status}
+          ORDER BY started_at DESC 
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+        countResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM sync_logs 
+          WHERE integration = ${integration} AND status = ${status}
+        `);
+      } else if (integration) {
+        result = await db.execute(sql`
+          SELECT * FROM sync_logs 
+          WHERE integration = ${integration}
+          ORDER BY started_at DESC 
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+        countResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM sync_logs 
+          WHERE integration = ${integration}
+        `);
+      } else if (status) {
+        result = await db.execute(sql`
+          SELECT * FROM sync_logs 
+          WHERE status = ${status}
+          ORDER BY started_at DESC 
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+        countResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM sync_logs 
+          WHERE status = ${status}
+        `);
+      } else {
+        result = await db.execute(sql`
+          SELECT * FROM sync_logs 
+          ORDER BY started_at DESC 
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+        countResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM sync_logs
+        `);
+      }
+      
       const total = parseInt((countResult.rows[0] as any)?.total || '0');
       
       res.json({
@@ -525,7 +575,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY integration
       `);
       
-      res.json({ summary: result.rows });
+      res.json({ summaries: result.rows });
     } catch (error) {
       console.error("[api] Error fetching sync logs summary:", error);
       res.status(500).json({ error: "Failed to fetch sync logs summary" });
@@ -538,38 +588,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pageSize = parseInt(req.query.pageSize as string) || 50;
       const offset = (page - 1) * pageSize;
       const entityType = req.query.entityType as string | undefined;
-      const status = req.query.status as string | undefined;
+      const statusFilter = req.query.status as string | undefined;
       const severity = req.query.severity as string | undefined;
       
-      let whereClause = sql`1=1`;
-      if (entityType) {
-        whereClause = sql`${whereClause} AND entity_type = ${entityType}`;
-      }
-      if (status) {
-        whereClause = sql`${whereClause} AND status = ${status}`;
-      }
-      if (severity) {
-        whereClause = sql`${whereClause} AND severity = ${severity}`;
+      // Build filter combinations for proper parameterized queries
+      const hasEntityType = !!entityType;
+      const hasStatus = !!statusFilter;
+      const hasSeverity = !!severity;
+      
+      let result;
+      let countResult;
+      
+      // Handle all filter combinations
+      if (hasEntityType && hasStatus && hasSeverity) {
+        result = await db.execute(sql`
+          SELECT * FROM data_reconciliation 
+          WHERE entity_type = ${entityType} AND status = ${statusFilter} AND severity = ${severity}
+          ORDER BY detected_at DESC 
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+        countResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM data_reconciliation 
+          WHERE entity_type = ${entityType} AND status = ${statusFilter} AND severity = ${severity}
+        `);
+      } else if (hasEntityType && hasStatus) {
+        result = await db.execute(sql`
+          SELECT * FROM data_reconciliation 
+          WHERE entity_type = ${entityType} AND status = ${statusFilter}
+          ORDER BY detected_at DESC 
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+        countResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM data_reconciliation 
+          WHERE entity_type = ${entityType} AND status = ${statusFilter}
+        `);
+      } else if (hasEntityType && hasSeverity) {
+        result = await db.execute(sql`
+          SELECT * FROM data_reconciliation 
+          WHERE entity_type = ${entityType} AND severity = ${severity}
+          ORDER BY detected_at DESC 
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+        countResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM data_reconciliation 
+          WHERE entity_type = ${entityType} AND severity = ${severity}
+        `);
+      } else if (hasStatus && hasSeverity) {
+        result = await db.execute(sql`
+          SELECT * FROM data_reconciliation 
+          WHERE status = ${statusFilter} AND severity = ${severity}
+          ORDER BY detected_at DESC 
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+        countResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM data_reconciliation 
+          WHERE status = ${statusFilter} AND severity = ${severity}
+        `);
+      } else if (hasEntityType) {
+        result = await db.execute(sql`
+          SELECT * FROM data_reconciliation 
+          WHERE entity_type = ${entityType}
+          ORDER BY detected_at DESC 
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+        countResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM data_reconciliation 
+          WHERE entity_type = ${entityType}
+        `);
+      } else if (hasStatus) {
+        result = await db.execute(sql`
+          SELECT * FROM data_reconciliation 
+          WHERE status = ${statusFilter}
+          ORDER BY detected_at DESC 
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+        countResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM data_reconciliation 
+          WHERE status = ${statusFilter}
+        `);
+      } else if (hasSeverity) {
+        result = await db.execute(sql`
+          SELECT * FROM data_reconciliation 
+          WHERE severity = ${severity}
+          ORDER BY detected_at DESC 
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+        countResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM data_reconciliation 
+          WHERE severity = ${severity}
+        `);
+      } else {
+        result = await db.execute(sql`
+          SELECT * FROM data_reconciliation 
+          ORDER BY detected_at DESC 
+          LIMIT ${pageSize} OFFSET ${offset}
+        `);
+        countResult = await db.execute(sql`
+          SELECT COUNT(*) as total FROM data_reconciliation
+        `);
       }
       
-      const result = await db.execute(sql`
-        SELECT * FROM data_reconciliation 
-        WHERE ${whereClause}
-        ORDER BY detected_at DESC 
-        LIMIT ${pageSize} OFFSET ${offset}
-      `);
-      
-      const countResult = await db.execute(sql`
-        SELECT COUNT(*) as total FROM data_reconciliation WHERE ${whereClause}
-      `);
       const total = parseInt((countResult.rows[0] as any)?.total || '0');
+      
+      // Get summary counts
+      const summaryResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+          SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved
+        FROM data_reconciliation
+      `);
+      
+      const summaryRow = summaryResult.rows[0] as any;
+      const summary = {
+        total: parseInt(summaryRow?.total || '0'),
+        pending: parseInt(summaryRow?.pending || '0'),
+        resolved: parseInt(summaryRow?.resolved || '0')
+      };
       
       res.json({
         items: result.rows,
         total,
         page,
         pageSize,
-        totalPages: Math.ceil(total / pageSize)
+        totalPages: Math.ceil(total / pageSize),
+        summary
       });
     } catch (error) {
       console.error("[api] Error fetching reconciliation data:", error);
@@ -620,65 +763,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/admin/run-reconciliation", isAuthenticated, isAdmin, async (req, res) => {
+    const discrepancies: any[] = [];
+    const runId = Date.now().toString();
+    
     try {
-      const discrepancies: any[] = [];
-      const runId = Date.now().toString();
+      // Helper function to safely get table count
+      const safeTableCount = async (tableName: string): Promise<number | null> => {
+        try {
+          const result = await db.execute(sql.raw(`SELECT COUNT(*) as count FROM ${tableName}`));
+          return parseInt((result.rows[0] as any)?.count || '0');
+        } catch (error: any) {
+          // Table doesn't exist or other error
+          console.warn(`[reconciliation] Could not query table ${tableName}:`, error.message);
+          return null;
+        }
+      };
       
-      const contaAzulClientes = await db.execute(sql`SELECT COUNT(*) as count FROM caz_clientes`);
-      const clickupClientes = await db.execute(sql`SELECT COUNT(*) as count FROM cup_clientes`);
+      // Check clientes between ContaAzul and ClickUp
+      const cazClientesCount = await safeTableCount('caz_clientes');
+      const cupClientesCount = await safeTableCount('cup_clientes');
       
-      const cazCount = parseInt((contaAzulClientes.rows[0] as any)?.count || '0');
-      const cupCount = parseInt((clickupClientes.rows[0] as any)?.count || '0');
-      
-      if (cazCount !== cupCount) {
-        const diff = Math.abs(cazCount - cupCount);
-        const severity = diff > 50 ? 'high' : diff > 10 ? 'medium' : 'low';
-        
-        discrepancies.push({
-          entity_type: 'clientes',
-          source_system: 'conta_azul',
-          target_system: 'clickup',
-          source_count: cazCount,
-          target_count: cupCount,
-          difference: diff,
-          severity,
-          description: `Cliente count mismatch: ContaAzul has ${cazCount}, ClickUp has ${cupCount}`
-        });
+      if (cazClientesCount !== null && cupClientesCount !== null) {
+        const diff = Math.abs(cazClientesCount - cupClientesCount);
+        // Only create discrepancy if there's an actual difference
+        if (diff > 0) {
+          const severity = diff > 50 ? 'high' : diff > 10 ? 'medium' : 'low';
+          
+          discrepancies.push({
+            entity_type: 'clientes',
+            source_system: 'conta_azul',
+            target_system: 'clickup',
+            source_count: cazClientesCount,
+            target_count: cupClientesCount,
+            difference: diff,
+            severity,
+            description: `Cliente count mismatch: ContaAzul has ${cazClientesCount}, ClickUp has ${cupClientesCount}`
+          });
+        }
       }
       
-      const contaAzulContratos = await db.execute(sql`SELECT COUNT(*) as count FROM caz_receber`);
-      const clickupContratos = await db.execute(sql`SELECT COUNT(*) as count FROM cup_contratos`);
+      // Check contratos/receivables between ContaAzul and ClickUp
+      const cazReceberCount = await safeTableCount('caz_receber');
+      const cupContratosCount = await safeTableCount('cup_contratos');
       
-      const cazContratosCount = parseInt((contaAzulContratos.rows[0] as any)?.count || '0');
-      const cupContratosCount = parseInt((clickupContratos.rows[0] as any)?.count || '0');
-      
-      if (cazContratosCount !== cupContratosCount) {
-        const diff = Math.abs(cazContratosCount - cupContratosCount);
-        const severity = diff > 100 ? 'high' : diff > 20 ? 'medium' : 'low';
-        
-        discrepancies.push({
-          entity_type: 'contratos',
-          source_system: 'conta_azul',
-          target_system: 'clickup',
-          source_count: cazContratosCount,
-          target_count: cupContratosCount,
-          difference: diff,
-          severity,
-          description: `Contract/Receivable count mismatch: ContaAzul receivables ${cazContratosCount}, ClickUp contracts ${cupContratosCount}`
-        });
+      if (cazReceberCount !== null && cupContratosCount !== null) {
+        const diff = Math.abs(cazReceberCount - cupContratosCount);
+        // Only create discrepancy if there's an actual difference
+        if (diff > 0) {
+          const severity = diff > 100 ? 'high' : diff > 20 ? 'medium' : 'low';
+          
+          discrepancies.push({
+            entity_type: 'contratos',
+            source_system: 'conta_azul',
+            target_system: 'clickup',
+            source_count: cazReceberCount,
+            target_count: cupContratosCount,
+            difference: diff,
+            severity,
+            description: `Contract/Receivable count mismatch: ContaAzul receivables ${cazReceberCount}, ClickUp contracts ${cupContratosCount}`
+          });
+        }
       }
       
+      // Insert discrepancies into database
       for (const d of discrepancies) {
-        await db.execute(sql`
-          INSERT INTO data_reconciliation (
-            entity_type, source_system, target_system, source_count, target_count,
-            difference, severity, description, status, detected_at, run_id
-          ) VALUES (
-            ${d.entity_type}, ${d.source_system}, ${d.target_system}, ${d.source_count}, 
-            ${d.target_count}, ${d.difference}, ${d.severity}, ${d.description}, 
-            'pending', NOW(), ${runId}
-          )
-        `);
+        try {
+          await db.execute(sql`
+            INSERT INTO data_reconciliation (
+              entity_type, source_system, target_system, source_count, target_count,
+              difference, severity, description, status, detected_at, run_id
+            ) VALUES (
+              ${d.entity_type}, ${d.source_system}, ${d.target_system}, ${d.source_count}, 
+              ${d.target_count}, ${d.difference}, ${d.severity}, ${d.description}, 
+              'pending', NOW(), ${runId}
+            )
+          `);
+        } catch (insertError) {
+          console.error("[api] Error inserting discrepancy:", insertError);
+          // Continue with other discrepancies
+        }
       }
       
       res.json({
@@ -689,7 +852,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("[api] Error running reconciliation:", error);
-      res.status(500).json({ error: "Failed to run reconciliation" });
+      res.status(500).json({ 
+        success: false,
+        error: "Failed to run reconciliation",
+        runId,
+        discrepanciesFound: discrepancies.length,
+        discrepancies
+      });
     }
   });
   
