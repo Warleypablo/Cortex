@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Loader2, Search, Package, ArrowDownNarrowWide, ArrowUpNarrowWide, ArrowDownAZ, ArrowUpZA } from "lucide-react";
+import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -39,6 +40,8 @@ type SortNumericType = "asc" | "desc";
 type SortAlphaType = "none" | "asc" | "desc";
 
 export default function Patrimonio() {
+  useSetPageInfo("Patrimônio", "Gerencie os bens e ativos da empresa");
+  
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -182,16 +185,6 @@ export default function Patrimonio() {
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       <div className="flex-1 overflow-y-auto">
         <div className="container mx-auto p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h1 className="text-3xl font-bold tracking-tight" data-testid="title-patrimonio">Patrimônio</h1>
-              <p className="text-muted-foreground">
-                Gerencie os bens e ativos da empresa
-              </p>
-            </div>
-            <Package className="w-8 h-8 text-primary" />
-          </div>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <div className="space-y-1">

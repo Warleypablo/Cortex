@@ -1,15 +1,12 @@
 import { MessageSquare, Zap } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useSetPageInfo } from "@/contexts/PageContext";
 
 export default function TurboZap() {
+  useSetPageInfo("TurboZap", "Central de cobranças via WhatsApp");
+  
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="text-turbozap-title">TurboZap</h1>
-        <p className="text-muted-foreground" data-testid="text-turbozap-subtitle">
-          Central de cobranças via WhatsApp
-        </p>
-      </div>
 
       <Card className="border-2 border-dashed" data-testid="card-turbozap-placeholder">
         <CardHeader className="text-center pb-4">
