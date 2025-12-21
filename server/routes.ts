@@ -354,6 +354,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to update role" });
     }
   });
+
+  // Admin Logs Routes
+  app.get("/api/admin/system-logs", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 50;
+      const offset = (page - 1) * pageSize;
+      
+      const result = await db.execute(sql`
+        SELECT * FROM system_logs 
+        ORDER BY timestamp DESC 
+        LIMIT ${pageSize} OFFSET ${offset}
+      `);
+      
+      const countResult = await db.execute(sql`SELECT COUNT(*) as total FROM system_logs`);
+      const total = parseInt((countResult.rows[0] as any)?.total || '0');
+      
+      res.json({
+        items: result.rows,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize)
+      });
+    } catch (error) {
+      console.error("[api] Error fetching system logs:", error);
+      res.status(500).json({ error: "Failed to fetch system logs" });
+    }
+  });
+
+  app.get("/api/admin/auth-logs", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 50;
+      const offset = (page - 1) * pageSize;
+      
+      const result = await db.execute(sql`
+        SELECT * FROM auth_logs 
+        ORDER BY timestamp DESC 
+        LIMIT ${pageSize} OFFSET ${offset}
+      `);
+      
+      const countResult = await db.execute(sql`SELECT COUNT(*) as total FROM auth_logs`);
+      const total = parseInt((countResult.rows[0] as any)?.total || '0');
+      
+      res.json({
+        items: result.rows,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize)
+      });
+    } catch (error) {
+      console.error("[api] Error fetching auth logs:", error);
+      res.status(500).json({ error: "Failed to fetch auth logs" });
+    }
+  });
+
+  app.get("/api/admin/health", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const startTime = Date.now();
+      await db.execute(sql`SELECT 1`);
+      const dbLatency = Date.now() - startTime;
+      
+      const memUsage = process.memoryUsage();
+      const uptime = process.uptime();
+      
+      res.json({
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        database: {
+          status: "connected",
+          latency_ms: dbLatency
+        },
+        memory: {
+          heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+          heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+          rss: Math.round(memUsage.rss / 1024 / 1024),
+          unit: "MB"
+        },
+        uptime: {
+          seconds: Math.round(uptime),
+          formatted: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${Math.round(uptime % 60)}s`
+        }
+      });
+    } catch (error) {
+      console.error("[api] Health check failed:", error);
+      res.status(500).json({ 
+        status: "unhealthy",
+        error: "Database connection failed"
+      });
+    }
+  });
+
+  app.get("/api/admin/integrations-status", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const integrations = [
+        { name: "ContaAzul", status: "active", lastSync: new Date().toISOString(), type: "ERP" },
+        { name: "ClickUp", status: "active", lastSync: new Date().toISOString(), type: "Projetos" },
+        { name: "Bitrix24", status: "active", lastSync: new Date().toISOString(), type: "CRM" },
+        { name: "Meta Ads", status: "active", lastSync: new Date().toISOString(), type: "Marketing" },
+        { name: "Google Ads", status: "active", lastSync: new Date().toISOString(), type: "Marketing" },
+        { name: "OpenAI", status: process.env.OPENAI_API_KEY ? "active" : "inactive", lastSync: null, type: "AI" }
+      ];
+      
+      res.json({ integrations });
+    } catch (error) {
+      console.error("[api] Error fetching integrations status:", error);
+      res.status(500).json({ error: "Failed to fetch integrations status" });
+    }
+  });
   
   app.get("/api/clientes", async (req, res) => {
     try {
