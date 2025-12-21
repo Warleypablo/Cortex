@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExternalLink, BarChart3, Key, MessageSquare, FileText, Activity } from "lucide-react";
+import { useSetPageInfo } from "@/contexts/PageContext";
 
 interface Ferramenta {
   id: string;
@@ -48,6 +49,8 @@ const ferramentas: Ferramenta[] = [
 ];
 
 export default function Ferramentas() {
+  useSetPageInfo("Ferramentas", "Acesse as ferramentas e sistemas da Turbo Partners");
+  
   const handleFerramentaClick = (url: string) => {
     if (url !== "#") {
       window.open(url, "_blank", "noopener,noreferrer");
@@ -57,13 +60,6 @@ export default function Ferramentas() {
   return (
     <div className="bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold mb-2">Ferramentas</h1>
-          <p className="text-muted-foreground">
-            Acesse as ferramentas e sistemas da Turbo Partners
-          </p>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {ferramentas.map((ferramenta) => {
             const IconComponent = ferramenta.icon;
