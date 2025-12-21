@@ -1099,3 +1099,35 @@ export interface UnifiedAssistantResponse {
   context: AssistantContext;
   dadosReferenciados?: any;
 }
+
+// System Logs Tables
+export const systemLogs = pgTable("system_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  method: varchar("method", { length: 10 }).notNull(),
+  endpoint: text("endpoint").notNull(),
+  statusCode: integer("status_code"),
+  responseTimeMs: integer("response_time_ms"),
+  userId: varchar("user_id", { length: 100 }),
+  userEmail: varchar("user_email", { length: 255 }),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+});
+
+export type SystemLog = typeof systemLogs.$inferSelect;
+export type InsertSystemLog = typeof systemLogs.$inferInsert;
+
+export const authLogs = pgTable("auth_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  userId: varchar("user_id", { length: 100 }),
+  userEmail: varchar("user_email", { length: 255 }),
+  userName: varchar("user_name", { length: 255 }),
+  action: varchar("action", { length: 20 }).notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  success: text("success").default("true"),
+});
+
+export type AuthLog = typeof authLogs.$inferSelect;
+export type InsertAuthLog = typeof authLogs.$inferInsert;
