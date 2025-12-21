@@ -35,12 +35,8 @@ interface User {
 const menuItems = [
   {
     title: "Clientes & Contratos",
-    url: "/",
+    url: "/clientes",
     icon: Users,
-    subItems: [
-      { title: "Clientes", url: "/", icon: Users },
-      { title: "Contratos", url: "/contratos", icon: FileText },
-    ],
   },
   {
     title: "Colaboradores",
@@ -198,28 +194,8 @@ export function AppSidebar() {
     return user.role === 'admin' || (user.allowedRoutes && user.allowedRoutes.includes(path));
   };
 
-  const visibleMenuItems = menuItems.filter((item) => {
-    if (item.subItems) {
-      return item.subItems.some(sub => hasAccess(sub.url));
-    }
-    return hasAccess(item.url);
-  });
+  const visibleMenuItems = menuItems.filter((item) => hasAccess(item.url));
   const visibleAdminItems = adminItems.filter((item) => hasAccess(item.url));
-  
-  const [openMenuItems, setOpenMenuItems] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    menuItems.forEach(item => {
-      if (item.subItems) {
-        const isActive = item.subItems.some(sub => location === sub.url);
-        initial[item.title] = isActive;
-      }
-    });
-    return initial;
-  });
-  
-  const toggleMenuItem = (title: string) => {
-    setOpenMenuItems(prev => ({ ...prev, [title]: !prev[title] }));
-  };
 
   const toggleCategory = (title: string) => {
     setOpenCategories(prev => ({ ...prev, [title]: !prev[title] }));
@@ -293,70 +269,20 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleMenuItems.map((item) => {
-                if (item.subItems) {
-                  const visibleSubItems = item.subItems.filter(sub => hasAccess(sub.url));
-                  if (visibleSubItems.length === 0) return null;
-                  
-                  const isOpen = openMenuItems[item.title] || false;
-                  const isActive = item.subItems.some(sub => location === sub.url);
-
-                  return (
-                    <Collapsible
-                      key={item.title}
-                      open={isOpen}
-                      onOpenChange={() => toggleMenuItem(item.title)}
-                      className="group/collapsible"
-                    >
-                      <SidebarMenuItem>
-                        <CollapsibleTrigger asChild>
-                          <SidebarMenuButton 
-                            data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                            className={isActive ? "bg-sidebar-accent" : ""}
-                          >
-                            <item.icon />
-                            <span>{item.title}</span>
-                            <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
-                          </SidebarMenuButton>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <SidebarMenuSub>
-                            {visibleSubItems.map((subItem) => (
-                              <SidebarMenuSubItem key={subItem.url}>
-                                <SidebarMenuSubButton
-                                  asChild
-                                  isActive={location === subItem.url}
-                                  data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}-${subItem.title.toLowerCase().replace(/\s+/g, '-')}`}
-                                >
-                                  <Link href={subItem.url}>
-                                    <subItem.icon className="w-4 h-4" />
-                                    <span>{subItem.title}</span>
-                                  </Link>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            ))}
-                          </SidebarMenuSub>
-                        </CollapsibleContent>
-                      </SidebarMenuItem>
-                    </Collapsible>
-                  );
-                }
-                
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={location === item.url}
-                      data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                      <Link href={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              {visibleMenuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === item.url || (item.url === "/clientes" && (location === "/" || location === "/contratos"))}
+                    data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <Link href={item.url}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
