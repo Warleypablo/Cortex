@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Tv, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogoLight from "@assets/Logo_(12)_1766085175718.png";
 import turboLogoDark from "@assets/Logo_(11)_1766084062617.png";
@@ -133,7 +133,6 @@ const dashboardCategories = [
       { title: "Detalhamento SDRs", url: "/dashboard/comercial/detalhamento-sdrs", icon: UserSearch },
       { title: "Detalhamento Vendas", url: "/dashboard/comercial/detalhamento-vendas", icon: BarChart3 },
       { title: "Análise de Vendas", url: "/dashboard/comercial/analise-vendas", icon: LineChart },
-      { title: "Modo Apresentação", url: "/dashboard/comercial/apresentacao", icon: Tv },
     ],
   },
   {

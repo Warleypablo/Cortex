@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSetPageInfo } from "@/contexts/PageContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Maximize2,
@@ -101,17 +100,23 @@ interface RankingSDR {
 
 type DashboardView = 'closers' | 'sdrs';
 
-const ROTATION_INTERVAL = 30000;
+interface PresentationConfig {
+  dashboards: string[];
+  interval: number;
+}
 
 export default function PresentationMode() {
-  useSetPageInfo("Modo Apresentação", "Dashboard comercial para TV");
   const [, navigate] = useLocation();
+  const [config, setConfig] = useState<PresentationConfig>({
+    dashboards: ['closers', 'sdrs'],
+    interval: 30000
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentView, setCurrentView] = useState<DashboardView>('closers');
   const [showControls, setShowControls] = useState(true);
-  const [countdown, setCountdown] = useState(ROTATION_INTERVAL / 1000);
+  const [countdown, setCountdown] = useState(30);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const hoje = new Date();
@@ -333,6 +338,19 @@ export default function PresentationMode() {
   const isLoadingSDRs = isLoadingSDRMetrics || isLoadingChartSDR || isLoadingSDRMrr;
 
   useEffect(() => {
+    const stored = sessionStorage.getItem("presentationConfig");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setConfig(parsed);
+        setCountdown(parsed.interval / 1000);
+      } catch (e) {
+        console.error("Failed to parse presentation config", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -342,18 +360,18 @@ export default function PresentationMode() {
 
     const rotationTimer = setInterval(() => {
       setCurrentView(prev => prev === 'closers' ? 'sdrs' : 'closers');
-      setCountdown(ROTATION_INTERVAL / 1000);
-    }, ROTATION_INTERVAL);
+      setCountdown(config.interval / 1000);
+    }, config.interval);
 
     const countdownTimer = setInterval(() => {
-      setCountdown(prev => prev > 0 ? prev - 1 : ROTATION_INTERVAL / 1000);
+      setCountdown(prev => prev > 0 ? prev - 1 : config.interval / 1000);
     }, 1000);
 
     return () => {
       clearInterval(rotationTimer);
       clearInterval(countdownTimer);
     };
-  }, [isPaused]);
+  }, [isPaused, config.interval]);
 
   useEffect(() => {
     let hideTimer: NodeJS.Timeout;
@@ -388,11 +406,11 @@ export default function PresentationMode() {
       }
       if (e.key === 'ArrowLeft') {
         setCurrentView('closers');
-        setCountdown(ROTATION_INTERVAL / 1000);
+        setCountdown(config.interval / 1000);
       }
       if (e.key === 'ArrowRight') {
         setCurrentView('sdrs');
-        setCountdown(ROTATION_INTERVAL / 1000);
+        setCountdown(config.interval / 1000);
       }
       if (e.key === 'f' || e.key === 'F') {
         toggleFullscreen();
@@ -456,7 +474,7 @@ export default function PresentationMode() {
                 size="icon"
                 onClick={() => {
                   setCurrentView('closers');
-                  setCountdown(ROTATION_INTERVAL / 1000);
+                  setCountdown(config.interval / 1000);
                 }}
                 className={`h-8 w-8 ${currentView === 'closers' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}
                 data-testid="button-view-closers"
@@ -485,7 +503,7 @@ export default function PresentationMode() {
                 size="icon"
                 onClick={() => {
                   setCurrentView('sdrs');
-                  setCountdown(ROTATION_INTERVAL / 1000);
+                  setCountdown(config.interval / 1000);
                 }}
                 className={`h-8 w-8 ${currentView === 'sdrs' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'}`}
                 data-testid="button-view-sdrs"
