@@ -1075,7 +1075,7 @@ export interface SearchResponse {
 }
 
 // Unified Assistant Types
-export type AssistantContext = 'geral' | 'financeiro' | 'cases' | 'clientes';
+export type AssistantContext = 'geral' | 'financeiro' | 'cases' | 'clientes' | 'auto';
 
 export interface UnifiedAssistantMessage {
   role: 'user' | 'assistant';

@@ -5,20 +5,14 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { MessageCircle, Send, Bot, User, Loader2, X } from "lucide-react";
+import { MessageCircle, Send, Bot, User, Loader2, X, Sparkles } from "lucide-react";
 import type { AssistantContext } from "@shared/schema";
 
 interface Message {
@@ -26,57 +20,28 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  detectedContext?: AssistantContext;
 }
 
-const CONTEXT_OPTIONS: { value: AssistantContext; label: string }[] = [
-  { value: "geral", label: "Geral" },
-  { value: "financeiro", label: "Financeiro" },
-  { value: "cases", label: "Cases" },
-  { value: "clientes", label: "Clientes" },
-];
-
-const SUGGESTIONS: Record<AssistantContext, string[]> = {
-  geral: [
-    "O que é a Turbo Partners?",
-    "Quais serviços a agência oferece?",
-    "Como funciona o Turbo Cortex?",
-  ],
-  financeiro: [
-    "Qual foi o resultado do último mês?",
-    "Quais são as principais despesas?",
-    "Como está a margem de lucro?",
-  ],
-  cases: [
-    "Quais foram os melhores cases?",
-    "Me conte sobre um case de sucesso",
-    "Quais estratégias funcionam melhor?",
-  ],
-  clientes: [
-    "Quantos clientes ativos temos?",
-    "Qual o perfil dos nossos clientes?",
-    "Como está a retenção de clientes?",
-  ],
+const CONTEXT_LABELS: Record<string, string> = {
+  geral: "Geral",
+  financeiro: "Financeiro",
+  cases: "Cases",
+  clientes: "Clientes",
 };
 
-function getInitialContextFromPath(path: string): AssistantContext {
-  if (path.includes("financeiro") || path.includes("dfc") || path.includes("fluxo-caixa") || path.includes("inadimplencia")) {
-    return "financeiro";
-  }
-  if (path.includes("cases")) {
-    return "cases";
-  }
-  if (path.includes("cliente") || path.includes("contrato")) {
-    return "clientes";
-  }
-  return "geral";
-}
+const SUGGESTIONS = [
+  "Qual foi o resultado financeiro deste mês?",
+  "Quantos clientes ativos temos?",
+  "Me conte sobre um case de sucesso",
+  "Quais serviços a agência oferece?",
+];
 
 export function AssistantWidget() {
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [context, setContext] = useState<AssistantContext>(() => getInitialContextFromPath(location));
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -88,12 +53,6 @@ export function AssistantWidget() {
       }
     }
   };
-
-  useEffect(() => {
-    if (!isOpen) {
-      setContext(getInitialContextFromPath(location));
-    }
-  }, [location, isOpen]);
 
   useEffect(() => {
     scrollToBottom();
@@ -114,7 +73,7 @@ export function AssistantWidget() {
 
       const response = await apiRequest("POST", "/api/assistants/chat", {
         message,
-        context,
+        context: "auto",
         historico,
         metadata: {
           pageContext: location,
@@ -128,6 +87,7 @@ export function AssistantWidget() {
         role: "assistant",
         content: data.resposta || "Sem resposta do servidor.",
         timestamp: new Date(),
+        detectedContext: data.context,
       };
       setMessages((prev) => [...prev, assistantMessage]);
     },
@@ -142,7 +102,6 @@ export function AssistantWidget() {
     },
   });
 
-  // Don't show on login or presentation mode
   if (location === "/login" || location === "/dashboard/comercial/apresentacao") {
     return null;
   }
@@ -178,11 +137,6 @@ export function AssistantWidget() {
     });
   };
 
-  const handleContextChange = (value: AssistantContext) => {
-    setContext(value);
-    setMessages([]);
-  };
-
   return (
     <>
       <button
@@ -205,18 +159,10 @@ export function AssistantWidget() {
               <Bot className="h-5 w-5 text-primary" />
               GPTurbo
             </SheetTitle>
-            <Select value={context} onValueChange={handleContextChange}>
-              <SelectTrigger className="w-32" data-testid="select-context">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CONTEXT_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Badge variant="outline" className="flex items-center gap-1 text-xs">
+              <Sparkles className="h-3 w-3" />
+              Auto
+            </Badge>
           </div>
         </SheetHeader>
 
@@ -230,10 +176,10 @@ export function AssistantWidget() {
                 Olá! Como posso ajudar?
               </h3>
               <p className="text-sm text-muted-foreground mb-6 max-w-[280px]">
-                Selecione um contexto e faça sua pergunta, ou escolha uma sugestão abaixo.
+                Pergunte o que quiser - eu identifico automaticamente o melhor contexto para responder.
               </p>
               <div className="flex flex-col gap-2 w-full max-w-[280px]">
-                {SUGGESTIONS[context].map((suggestion, index) => (
+                {SUGGESTIONS.map((suggestion, index) => (
                   <Button
                     key={index}
                     variant="outline"
@@ -276,15 +222,22 @@ export function AssistantWidget() {
                     }`}
                   >
                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    <span
-                      className={`text-[10px] mt-1 block ${
-                        message.role === "user"
-                          ? "text-primary-foreground/70"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {formatTime(message.timestamp)}
-                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span
+                        className={`text-[10px] ${
+                          message.role === "user"
+                            ? "text-primary-foreground/70"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {formatTime(message.timestamp)}
+                      </span>
+                      {message.role === "assistant" && message.detectedContext && message.detectedContext !== "auto" && (
+                        <Badge variant="outline" className="text-[10px] h-4 px-1.5 py-0 bg-background/50">
+                          {CONTEXT_LABELS[message.detectedContext] || message.detectedContext}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
