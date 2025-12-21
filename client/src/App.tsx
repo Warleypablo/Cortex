@@ -212,6 +212,7 @@ function AppLayout() {
             </main>
           </div>
         </div>
+        <AssistantWidget />
       </SidebarProvider>
     </PageProvider>
   );
@@ -224,7 +225,6 @@ function App() {
         <TooltipProvider>
           <AppLayout />
           <Toaster />
-          <AssistantWidget />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
