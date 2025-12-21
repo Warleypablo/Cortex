@@ -149,8 +149,13 @@ export function AssistantWidget() {
     },
   });
 
-  // Don't show on login, presentation mode, or if not authenticated
-  if (location === "/login" || location === "/dashboard/comercial/apresentacao" || isLoadingUser || !user) {
+  // Don't show on login or presentation mode
+  if (location === "/login" || location === "/dashboard/comercial/apresentacao") {
+    return null;
+  }
+
+  // Don't show while loading or if not authenticated
+  if (isLoadingUser || !user) {
     return null;
   }
 
@@ -210,7 +215,7 @@ export function AssistantWidget() {
           <div className="flex items-center justify-between gap-2">
             <SheetTitle className="flex items-center gap-2 text-base">
               <Bot className="h-5 w-5 text-primary" />
-              Assistente Turbo
+              GPTurbo
             </SheetTitle>
             <Select value={context} onValueChange={handleContextChange}>
               <SelectTrigger className="w-32" data-testid="select-context">
