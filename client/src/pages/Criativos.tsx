@@ -6,13 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Search, X, ArrowUpDown, TrendingUp, Rocket, ExternalLink, Loader2, Settings, Plus, Trash2 } from "lucide-react";
-import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfQuarter, endOfQuarter, startOfYear } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { Search, X, ArrowUpDown, TrendingUp, Rocket, ExternalLink, Loader2, Settings, Plus, Trash2 } from "lucide-react";
+import { format, startOfMonth } from "date-fns";
 import { getMetricColor, getColorClasses, COLOR_TOKENS, AVAILABLE_METRICS, type MetricColor } from "@/lib/metricFormatting";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MetricRulesetWithThresholds } from "@shared/schema";
@@ -66,15 +64,6 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 };
 
-const datePresets = [
-  { label: 'Hoje', getRange: () => ({ from: new Date(), to: new Date() }) },
-  { label: 'Últimos 7 dias', getRange: () => ({ from: subDays(new Date(), 7), to: new Date() }) },
-  { label: 'Últimos 30 dias', getRange: () => ({ from: subDays(new Date(), 30), to: new Date() }) },
-  { label: 'Mês Atual', getRange: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }) },
-  { label: 'Mês Anterior', getRange: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) }) },
-  { label: 'Trimestre Atual', getRange: () => ({ from: startOfQuarter(new Date()), to: endOfQuarter(new Date()) }) },
-  { label: 'Ano Atual', getRange: () => ({ from: startOfYear(new Date()), to: new Date() }) },
-];
 
 function formatCurrency(value: number | null): string {
   if (value === null) return '-';
@@ -343,44 +332,15 @@ export default function Criativos() {
             </SelectContent>
           </Select>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="gap-2" data-testid="button-date-range">
-                <CalendarIcon className="w-4 h-4" />
-                {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })}
-                {" - "}
-                {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <div className="flex">
-                <div className="border-r p-2 space-y-1">
-                  {datePresets.map((preset) => (
-                    <Button
-                      key={preset.label}
-                      variant="ghost"
-                      size="sm"
-                      className="w-full justify-start text-xs"
-                      onClick={() => setDateRange(preset.getRange())}
-                    >
-                      {preset.label}
-                    </Button>
-                  ))}
-                </div>
-                <Calendar
-                  mode="range"
-                  selected={{ from: dateRange.from, to: dateRange.to }}
-                  onSelect={(range) => {
-                    if (range?.from && range?.to) {
-                      setDateRange({ from: range.from, to: range.to });
-                    }
-                  }}
-                  locale={ptBR}
-                  numberOfMonths={2}
-                />
-              </div>
-            </PopoverContent>
-          </Popover>
+          <DateRangePicker
+            value={dateRange}
+            onChange={(range) => {
+              if (range?.from) {
+                setDateRange({ from: range.from, to: range.to || range.from });
+              }
+            }}
+            align="end"
+          />
         </div>
       </div>
 
