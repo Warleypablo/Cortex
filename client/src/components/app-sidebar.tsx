@@ -196,7 +196,7 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border px-6 py-5">
         <div className="flex flex-col items-start gap-1">
           <img src={turboLogo} alt="Turbo" className="h-6 w-auto" />
-          <span className="text-sm font-medium text-muted-foreground">Turbo Cortex</span>
+          <span className="text-sm font-medium text-muted-foreground">Cortex</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
