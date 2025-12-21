@@ -16,7 +16,7 @@ interface Message {
 }
 
 export default function CasesChat() {
-  useSetPageInfo("Cases de Sucesso", "Converse sobre cases de sucesso da agência");
+  useSetPageInfo("Assistente IA", "Faça perguntas sobre a agência, cases de sucesso e estratégias");
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
