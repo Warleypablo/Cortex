@@ -87,17 +87,6 @@ export function AssistantWidget() {
     retry: false,
   });
 
-  useEffect(() => {
-    if (!isOpen) {
-      setContext(getInitialContextFromPath(location));
-    }
-  }, [location, isOpen]);
-
-  // Don't show on login, presentation mode, or if not authenticated
-  if (location === "/login" || location === "/dashboard/comercial/apresentacao" || isLoadingUser || !user) {
-    return null;
-  }
-
   const scrollToBottom = () => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -106,6 +95,12 @@ export function AssistantWidget() {
       }
     }
   };
+
+  useEffect(() => {
+    if (!isOpen) {
+      setContext(getInitialContextFromPath(location));
+    }
+  }, [location, isOpen]);
 
   useEffect(() => {
     scrollToBottom();
@@ -153,6 +148,11 @@ export function AssistantWidget() {
       setMessages((prev) => [...prev, errorMessage]);
     },
   });
+
+  // Don't show on login, presentation mode, or if not authenticated
+  if (location === "/login" || location === "/dashboard/comercial/apresentacao" || isLoadingUser || !user) {
+    return null;
+  }
 
   const handleSendMessage = (messageText?: string) => {
     const text = messageText || inputValue;
