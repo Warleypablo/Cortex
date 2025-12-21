@@ -1615,12 +1615,6 @@ export default function DashboardInadimplencia() {
 
   return (
     <div className="p-6 space-y-6" data-testid="page-inadimplencia">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-6 w-6 text-red-500" />
-        </div>
-      </div>
-
       {renderFiltros()}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
