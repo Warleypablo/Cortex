@@ -332,7 +332,7 @@ export default function DetalhamentoVendas() {
                     </SelectTrigger>
                     <SelectContent className="bg-slate-800 border-slate-700">
                       <SelectItem value="all">Todas</SelectItem>
-                      {filtros?.sources?.map((s) => (
+                      {filtros?.sources?.filter(s => s && s.trim() !== '').map((s) => (
                         <SelectItem key={s} value={s}>{getSourceDisplayName(s)}</SelectItem>
                       ))}
                     </SelectContent>
@@ -346,7 +346,7 @@ export default function DetalhamentoVendas() {
                     </SelectTrigger>
                     <SelectContent className="bg-slate-800 border-slate-700">
                       <SelectItem value="all">Todas</SelectItem>
-                      {filtros?.categories?.map((c) => (
+                      {filtros?.categories?.filter(c => c && c.trim() !== '').map((c) => (
                         <SelectItem key={c} value={c}>{c}</SelectItem>
                       ))}
                     </SelectContent>
@@ -360,7 +360,7 @@ export default function DetalhamentoVendas() {
                     </SelectTrigger>
                     <SelectContent className="bg-slate-800 border-slate-700">
                       <SelectItem value="all">Todos</SelectItem>
-                      {filtros?.closers?.map((c) => (
+                      {filtros?.closers?.filter(c => c && c.trim() !== '').map((c) => (
                         <SelectItem key={c} value={c}>{c}</SelectItem>
                       ))}
                     </SelectContent>
