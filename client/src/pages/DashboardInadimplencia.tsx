@@ -67,8 +67,6 @@ import {
   X,
   AlertCircle,
   CreditCard,
-  Calendar,
-  ChevronRight,
   RotateCcw,
   ExternalLink,
   FileText,
@@ -78,9 +76,11 @@ import {
   Pause,
   XCircle,
 } from "lucide-react";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import type { DateRange } from "react-day-picker";
 
 interface InadimplenciaResumo {
   totalInadimplente: number;
@@ -192,9 +192,7 @@ export default function DashboardInadimplencia() {
     const { title, subtitle } = TAB_TITLES[activeTab] || TAB_TITLES["visao-geral"];
     setPageInfo(title, subtitle);
   }, [activeTab, setPageInfo]);
-  const [dataInicio, setDataInicio] = useState<string>("");
-  const [dataFim, setDataFim] = useState<string>("");
-  const [activePreset, setActivePreset] = useState<string>("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [ordenarPor, setOrdenarPor] = useState<"valor" | "diasAtraso" | "nome">("valor");
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteInadimplente | null>(null);
   const [busca, setBusca] = useState("");
@@ -211,7 +209,10 @@ export default function DashboardInadimplencia() {
 
   useEffect(() => {
     setClienteSelecionado(null);
-  }, [dataInicio, dataFim]);
+  }, [dateRange]);
+
+  const dataInicio = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+  const dataFim = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
 
   const resumoParams = {
     ...(dataInicio && { dataInicio }),
@@ -474,9 +475,7 @@ export default function DashboardInadimplencia() {
   };
 
   const limparFiltros = () => {
-    setDataInicio("");
-    setDataFim("");
-    setActivePreset("");
+    setDateRange(undefined);
     setBusca("");
     setStatusFiltro("todos");
     setResponsavelFiltro("todos");
@@ -669,29 +668,6 @@ export default function DashboardInadimplencia() {
     );
   };
 
-  const presetPeriodos = [
-    { label: "15 dias", dias: 15, id: "15d" },
-    { label: "30 dias", dias: 30, id: "30d" },
-    { label: "45 dias", dias: 45, id: "45d" },
-    { label: "60 dias", dias: 60, id: "60d" },
-    { label: "90 dias", dias: 90, id: "90d" },
-    { label: "180 dias", dias: 180, id: "180d" },
-    { label: "Tudo", dias: 0, id: "all" },
-  ];
-
-  const aplicarPreset = (preset: typeof presetPeriodos[0]) => {
-    if (preset.dias === 0) {
-      setDataInicio("");
-      setDataFim("");
-    } else {
-      const hoje = new Date();
-      const inicio = subDays(hoje, preset.dias);
-      setDataInicio(format(inicio, "yyyy-MM-dd"));
-      setDataFim(format(hoje, "yyyy-MM-dd"));
-    }
-    setActivePreset(preset.id);
-  };
-
   const renderFiltros = () => (
     <Card className="mb-6 border-0 shadow-lg overflow-hidden" data-testid="card-filtros">
       <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-red-50 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-red-950/30 p-5">
@@ -768,87 +744,15 @@ export default function DashboardInadimplencia() {
             </div>
           </div>
 
-          {/* Filters Row */}
-          <div className="flex flex-col xl:flex-row xl:items-end gap-5">
-            {/* Preset Buttons */}
-            <div className="flex-1">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 block">
-                Período Rápido
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {presetPeriodos.map((preset) => {
-                  const isActive = activePreset === preset.id;
-                  return (
-                    <Button
-                      key={preset.id}
-                      variant={isActive ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => aplicarPreset(preset)}
-                      className={`h-9 text-sm font-medium transition-all ${
-                        isActive 
-                          ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg shadow-amber-500/30 border-0' 
-                          : 'bg-white/80 dark:bg-slate-900/80 hover:bg-amber-100 dark:hover:bg-amber-950/50 border-amber-200 dark:border-amber-800/50 hover:border-amber-400 dark:hover:border-amber-700'
-                      }`}
-                      data-testid={`btn-preset-${preset.id}`}
-                    >
-                      {preset.label}
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-            
-            {/* Custom Date Range */}
-            <div className="flex items-end gap-3 xl:pl-5 xl:border-l border-amber-200 dark:border-amber-800/50">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Calendar className="w-3 h-3" />
-                  Data Inicial
-                </label>
-                <Input
-                  type="date"
-                  value={dataInicio}
-                  onChange={(e) => {
-                    setDataInicio(e.target.value);
-                    setActivePreset("");
-                  }}
-                  className="h-10 w-44 bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-800/50 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer hover:border-amber-400"
-                  data-testid="input-data-inicio"
-                />
-              </div>
-              <div className="flex items-center h-10 px-1">
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Calendar className="w-3 h-3" />
-                  Data Final
-                </label>
-                <Input
-                  type="date"
-                  value={dataFim}
-                  onChange={(e) => {
-                    setDataFim(e.target.value);
-                    setActivePreset("");
-                  }}
-                  className="h-10 w-44 bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-800/50 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all cursor-pointer hover:border-amber-400"
-                  data-testid="input-data-fim"
-                />
-              </div>
-            </div>
+          {/* Date Range Picker */}
+          <div className="flex items-center gap-3">
+            <DateRangePicker
+              value={dateRange}
+              onChange={setDateRange}
+              placeholder="Selecione o período"
+              triggerClassName="h-10 bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-800/50 hover:border-amber-400"
+            />
           </div>
-
-          {/* Active Filter Badge */}
-          {(dataInicio || dataFim) && (
-            <div className="flex items-center gap-2 pt-1">
-              <span className="text-xs text-muted-foreground">Período selecionado:</span>
-              <Badge variant="secondary" className="bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
-                {dataInicio ? format(new Date(dataInicio + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR }) : 'Início'} 
-                {' → '}
-                {dataFim ? format(new Date(dataFim + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR }) : 'Hoje'}
-              </Badge>
-            </div>
-          )}
         </div>
       </div>
     </Card>
