@@ -11,6 +11,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { Loader2 } from "lucide-react";
 import Clients from "@/pages/Clients";
 import Contracts from "@/pages/Contracts";
+import ClientesContratos from "@/pages/ClientesContratos";
 import ClientDetail from "@/pages/ClientDetail";
 import Colaboradores from "@/pages/Colaboradores";
 import ColaboradoresAnalise from "@/pages/ColaboradoresAnalise";
@@ -121,8 +122,9 @@ function ProtectedRouter() {
 
   return (
     <Switch>
-      <Route path="/">{() => <ProtectedRoute path="/" component={Clients} />}</Route>
-      <Route path="/contratos">{() => <ProtectedRoute path="/contratos" component={Contracts} />}</Route>
+      <Route path="/">{() => <ProtectedRoute path="/clientes" component={ClientesContratos} />}</Route>
+      <Route path="/clientes">{() => <ProtectedRoute path="/clientes" component={ClientesContratos} />}</Route>
+      <Route path="/contratos">{() => <ProtectedRoute path="/clientes" component={ClientesContratos} />}</Route>
       <Route path="/colaboradores">{() => <ProtectedRoute path="/colaboradores" component={Colaboradores} />}</Route>
       <Route path="/colaboradores/analise">{() => <ProtectedRoute path="/colaboradores/analise" component={ColaboradoresAnalise} />}</Route>
       <Route path="/patrimonio/:id">{() => <ProtectedRoute path="/patrimonio" component={PatrimonioDetail} />}</Route>
