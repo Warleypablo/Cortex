@@ -378,7 +378,7 @@ export default function JuridicoClientes() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
+      <div className="p-6 space-y-6 min-h-screen">
         <Skeleton className="h-12 w-80" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Skeleton className="h-28" />
@@ -395,16 +395,16 @@ export default function JuridicoClientes() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen">
       {/* Header Simples */}
-      <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
+      <div className="bg-card border-b sticky top-0 z-10 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-primary/10 rounded-xl">
               <Scale className="w-7 h-7 text-primary" />
             </div>
             <div>
-              <p className="text-slate-500">
+              <p className="text-muted-foreground">
                 {totals.count} cliente{totals.count !== 1 && 's'} • {formatCurrency(totals.total)} em aberto
               </p>
             </div>
@@ -415,7 +415,7 @@ export default function JuridicoClientes() {
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
         
         <Tabs defaultValue="ativos" className="space-y-6">
-          <TabsList className="bg-white shadow-sm border p-1 h-auto">
+          <TabsList className="bg-card shadow-sm border p-1 h-auto">
             <TabsTrigger 
               value="ativos" 
               className="data-[state=active]:bg-primary data-[state=active]:text-white px-6 py-3 text-base"
@@ -481,38 +481,38 @@ export default function JuridicoClientes() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white shadow-sm border dark:bg-slate-800 dark:border-slate-700">
+              <Card className="shadow-sm">
                 <CardContent className="pt-5 pb-4">
                   <div className="flex items-center justify-between mb-2">
-                    <Receipt className="h-5 w-5 text-slate-400" />
+                    <Receipt className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wide">Ticket Médio</p>
-                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-200 mt-1" data-testid="text-ticket-medio">
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Ticket Médio</p>
+                  <p className="text-2xl font-bold mt-1" data-testid="text-ticket-medio">
                     {formatCurrency(totals.ticketMedio)}
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white shadow-sm border dark:bg-slate-800 dark:border-slate-700">
+              <Card className="shadow-sm">
                 <CardContent className="pt-5 pb-4">
                   <div className="flex items-center justify-between mb-2">
-                    <Timer className="h-5 w-5 text-slate-400" />
+                    <Timer className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wide">Dias Médio</p>
-                  <p className="text-3xl font-bold text-slate-700 dark:text-slate-200 mt-1" data-testid="text-dias-medio">
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Dias Médio</p>
+                  <p className="text-3xl font-bold mt-1" data-testid="text-dias-medio">
                     {Math.round(totals.diasMedio)}
-                    <span className="text-sm font-normal text-slate-400 ml-1">dias</span>
+                    <span className="text-sm font-normal text-muted-foreground ml-1">dias</span>
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white shadow-sm border dark:bg-slate-800 dark:border-slate-700">
+              <Card className="shadow-sm">
                 <CardContent className="pt-5 pb-4">
                   <div className="flex items-center justify-between mb-2">
-                    <Users className="h-5 w-5 text-slate-400" />
+                    <Users className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wide">Total Casos</p>
-                  <p className="text-3xl font-bold text-slate-700 dark:text-slate-200 mt-1" data-testid="text-total-casos">
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Total Casos</p>
+                  <p className="text-3xl font-bold mt-1" data-testid="text-total-casos">
                     {totals.count}
                   </p>
                 </CardContent>
@@ -522,10 +522,10 @@ export default function JuridicoClientes() {
             {/* Gráficos e Distribuição */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Gráfico de Urgência */}
-              <Card className="bg-white shadow-sm">
+              <Card className="shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-slate-400" />
+                    <BarChart3 className="h-5 w-5 text-muted-foreground" />
                     Distribuição por Urgência
                   </CardTitle>
                 </CardHeader>
@@ -542,7 +542,7 @@ export default function JuridicoClientes() {
                             outerRadius={50}
                             dataKey="value"
                             strokeWidth={2}
-                            stroke="#fff"
+                            stroke="hsl(var(--card))"
                           >
                             {totals.distribuicaoUrgencia.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={entry.color} />
@@ -556,9 +556,9 @@ export default function JuridicoClientes() {
                         <div key={item.name} className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                            <span className="text-sm text-slate-600">{item.name}</span>
+                            <span className="text-sm text-muted-foreground">{item.name}</span>
                           </div>
-                          <span className="font-semibold text-slate-700">{item.value}</span>
+                          <span className="font-semibold">{item.value}</span>
                         </div>
                       ))}
                     </div>
@@ -567,10 +567,10 @@ export default function JuridicoClientes() {
               </Card>
 
               {/* Gráfico de Procedimentos */}
-              <Card className="bg-white shadow-sm">
+              <Card className="shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <PieChart className="h-5 w-5 text-slate-400" />
+                    <PieChart className="h-5 w-5 text-muted-foreground" />
                     Distribuição por Ação
                   </CardTitle>
                 </CardHeader>
@@ -587,7 +587,7 @@ export default function JuridicoClientes() {
                             outerRadius={50}
                             dataKey="value"
                             strokeWidth={2}
-                            stroke="#fff"
+                            stroke="hsl(var(--card))"
                           >
                             {totals.distribuicaoProcedimento.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={entry.color} />
@@ -601,9 +601,9 @@ export default function JuridicoClientes() {
                         <div key={item.name} className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                            <span className="text-sm text-slate-600">{item.name}</span>
+                            <span className="text-sm text-muted-foreground">{item.name}</span>
                           </div>
-                          <span className="font-semibold text-slate-700">{item.value}</span>
+                          <span className="font-semibold">{item.value}</span>
                         </div>
                       ))}
                     </div>
@@ -613,13 +613,13 @@ export default function JuridicoClientes() {
             </div>
 
             {/* Barra de Progresso Visual - Urgência */}
-            <Card className="bg-white shadow-sm">
+            <Card className="shadow-sm">
               <CardContent className="py-4">
                 <div className="flex items-center gap-4 mb-3">
-                  <Activity className="h-5 w-5 text-slate-400" />
-                  <span className="font-medium text-slate-700">Panorama de Urgência</span>
+                  <Activity className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">Panorama de Urgência</span>
                 </div>
-                <div className="flex h-4 rounded-full overflow-hidden bg-slate-100">
+                <div className="flex h-4 rounded-full overflow-hidden bg-muted">
                   {totals.urgentes > 0 && (
                     <div 
                       className="bg-red-500 flex items-center justify-center text-[10px] font-bold text-white"
@@ -643,13 +643,13 @@ export default function JuridicoClientes() {
                   )}
                   {totals.recente > 0 && (
                     <div 
-                      className="bg-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-600"
+                      className="bg-slate-400 dark:bg-slate-500 flex items-center justify-center text-[10px] font-bold text-slate-800 dark:text-slate-100"
                       style={{ width: `${(totals.recente / totals.count) * 100}%` }}
                       title={`Recente: ${totals.recente}`}
                     />
                   )}
                 </div>
-                <div className="flex justify-between mt-2 text-xs text-slate-500">
+                <div className="flex justify-between mt-2 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <div className="w-2 h-2 bg-red-500 rounded-full" />
                     <span>Urgente ({totals.urgentes})</span>
@@ -663,7 +663,7 @@ export default function JuridicoClientes() {
                     <span>Moderado ({totals.moderado})</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-slate-300 rounded-full" />
+                    <div className="w-2 h-2 bg-slate-400 dark:bg-slate-500 rounded-full" />
                     <span>Recente ({totals.recente})</span>
                   </div>
                 </div>
@@ -671,24 +671,24 @@ export default function JuridicoClientes() {
             </Card>
 
             {/* Filtros */}
-            <Card className="bg-white shadow-sm">
+            <Card className="shadow-sm">
               <CardContent className="py-4">
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       placeholder="Buscar por nome ou empresa..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 h-12 text-base bg-slate-50 border-slate-200"
+                      className="pl-10 h-12 text-base"
                       data-testid="input-search"
                     />
                   </div>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full md:w-[220px] h-12 bg-slate-50 border-slate-200" data-testid="filter-status">
+                    <SelectTrigger className="w-full md:w-[220px] h-12" data-testid="filter-status">
                       <SelectValue placeholder="Filtrar por ação" />
                     </SelectTrigger>
-                    <SelectContent className="bg-white">
+                    <SelectContent>
                       <SelectItem value="all">Todos os casos</SelectItem>
                       <SelectItem value="pendente">Sem ação definida</SelectItem>
                       {PROCEDIMENTOS.map((p) => (
@@ -702,11 +702,11 @@ export default function JuridicoClientes() {
 
             {/* Lista de Clientes - Cards Grandes */}
             {sortedClientes.length === 0 ? (
-              <Card className="bg-white shadow-sm">
+              <Card className="shadow-sm">
                 <CardContent className="py-16 text-center">
-                  <Scale className="h-16 w-16 mx-auto text-slate-200 mb-4" />
-                  <p className="text-xl font-medium text-slate-600">Nenhum caso encontrado</p>
-                  <p className="text-slate-400 mt-1">Tente mudar os filtros de busca</p>
+                  <Scale className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
+                  <p className="text-xl font-medium">Nenhum caso encontrado</p>
+                  <p className="text-muted-foreground mt-1">Tente mudar os filtros de busca</p>
                 </CardContent>
               </Card>
             ) : (
@@ -722,7 +722,7 @@ export default function JuridicoClientes() {
               return (
                 <Card 
                   key={item.cliente.idCliente} 
-                  className={`bg-white shadow-sm hover:shadow-md transition-all ${
+                  className={`shadow-sm hover:shadow-md transition-all ${
                     item.cliente.diasAtrasoMax > 90 ? 'border-l-4 border-l-red-500' : 
                     item.cliente.diasAtrasoMax > 60 ? 'border-l-4 border-l-orange-400' : ''
                   }`}
@@ -739,10 +739,10 @@ export default function JuridicoClientes() {
                             {urgency.level}
                           </Badge>
                           <div className="min-w-0">
-                            <h3 className="text-lg font-semibold text-slate-800 truncate" data-testid={`text-client-name-${index}`}>
+                            <h3 className="text-lg font-semibold truncate" data-testid={`text-client-name-${index}`}>
                               {item.cliente.nomeCliente}
                             </h3>
-                            <p className="text-slate-500 text-sm truncate">
+                            <p className="text-muted-foreground text-sm truncate">
                               {item.cliente.empresa}
                             </p>
                           </div>
@@ -752,10 +752,10 @@ export default function JuridicoClientes() {
                       {/* Valor e Dias */}
                       <div className="flex items-center gap-6 lg:gap-8">
                         <div className="text-center">
-                          <p className="text-2xl font-bold text-red-600" data-testid={`text-value-${index}`}>
+                          <p className="text-2xl font-bold text-red-500" data-testid={`text-value-${index}`}>
                             {formatCurrency(item.cliente.valorTotal)}
                           </p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-muted-foreground">
                             {item.cliente.quantidadeParcelas} parcela{item.cliente.quantidadeParcelas !== 1 && 's'}
                           </p>
                         </div>
@@ -768,10 +768,10 @@ export default function JuridicoClientes() {
                           </div>
                         )}
                         <div className="text-center min-w-[80px]">
-                          <p className="text-2xl font-bold text-slate-700">
+                          <p className="text-2xl font-bold">
                             {item.cliente.diasAtrasoMax}
                           </p>
-                          <p className="text-xs text-slate-400">dias atraso</p>
+                          <p className="text-xs text-muted-foreground">dias atraso</p>
                         </div>
                       </div>
 
@@ -817,41 +817,41 @@ export default function JuridicoClientes() {
 
                     {/* Área Expandida */}
                     {isExpanded && (
-                      <div className="mt-6 pt-6 border-t border-slate-100 space-y-6">
+                      <div className="mt-6 pt-6 border-t border-border space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           
                           {/* Informações do Cliente */}
-                          <div className="bg-slate-50 rounded-xl p-4">
-                            <h4 className="font-semibold text-slate-700 flex items-center gap-2 mb-3">
+                          <div className="bg-muted rounded-xl p-4">
+                            <h4 className="font-semibold flex items-center gap-2 mb-3">
                               <Building2 className="h-4 w-4" />
                               Dados do Cliente
                             </h4>
                             <div className="space-y-2 text-sm">
                               {item.cliente.telefone && (
-                                <div className="flex items-center gap-2 text-slate-600">
-                                  <Phone className="h-4 w-4 text-slate-400" />
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <Phone className="h-4 w-4" />
                                   <span>{item.cliente.telefone}</span>
                                 </div>
                               )}
                               {item.cliente.responsavel && (
-                                <div className="flex items-center gap-2 text-slate-600">
-                                  <Users className="h-4 w-4 text-slate-400" />
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <Users className="h-4 w-4" />
                                   <span>Responsável: {item.cliente.responsavel}</span>
                                 </div>
                               )}
                               {item.cliente.cnpj && (
-                                <p className="text-slate-500">CNPJ: {item.cliente.cnpj}</p>
+                                <p className="text-muted-foreground">CNPJ: {item.cliente.cnpj}</p>
                               )}
                             </div>
                           </div>
 
                           {/* Contexto do CS */}
-                          <div className="bg-amber-50 rounded-xl p-4">
-                            <h4 className="font-semibold text-amber-800 flex items-center gap-2 mb-3">
+                          <div className="bg-amber-500/10 dark:bg-amber-500/20 rounded-xl p-4">
+                            <h4 className="font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-2 mb-3">
                               <AlertTriangle className="h-4 w-4" />
                               Observações do CS
                             </h4>
-                            <p className="text-sm text-amber-900/80 leading-relaxed">
+                            <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
                               {item.contexto?.contexto || "Sem observações registradas"}
                             </p>
                           </div>
@@ -864,17 +864,17 @@ export default function JuridicoClientes() {
                             </h4>
                             {item.contexto?.contextoJuridico ? (
                               <>
-                                <p className="text-sm text-slate-600 leading-relaxed">
+                                <p className="text-sm text-muted-foreground leading-relaxed">
                                   {item.contexto.contextoJuridico}
                                 </p>
                                 {item.contexto.atualizadoJuridicoPor && (
-                                  <p className="text-xs text-slate-400 mt-3 pt-2 border-t border-slate-200">
+                                  <p className="text-xs text-muted-foreground mt-3 pt-2 border-t border-border">
                                     Por {item.contexto.atualizadoJuridicoPor} em {formatDate(item.contexto.atualizadoJuridicoEm)}
                                   </p>
                                 )}
                               </>
                             ) : (
-                              <p className="text-sm text-slate-400 italic">
+                              <p className="text-sm text-muted-foreground italic">
                                 Nenhuma anotação ainda
                               </p>
                             )}
@@ -882,9 +882,9 @@ export default function JuridicoClientes() {
                         </div>
 
                         {/* Parcelas */}
-                        <div className="bg-white rounded-xl border border-slate-200">
-                          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                            <h4 className="font-semibold text-slate-700 flex items-center gap-2">
+                        <div className="bg-card rounded-xl border border-border">
+                          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                            <h4 className="font-semibold flex items-center gap-2">
                               <FileText className="h-4 w-4" />
                               Parcelas em Atraso
                             </h4>
@@ -894,12 +894,12 @@ export default function JuridicoClientes() {
                             {item.parcelas.map((parcela, pIndex) => (
                               <div 
                                 key={parcela.id}
-                                className="px-4 py-3 border-b border-slate-50 last:border-0 flex items-center justify-between hover:bg-slate-50"
+                                className="px-4 py-3 border-b border-border last:border-0 flex items-center justify-between hover:bg-muted/50"
                                 data-testid={`row-parcela-${index}-${pIndex}`}
                               >
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-slate-700 truncate">{parcela.descricao}</p>
-                                  <p className="text-sm text-slate-400">
+                                  <p className="font-medium truncate">{parcela.descricao}</p>
+                                  <p className="text-sm text-muted-foreground">
                                     Venceu em {formatDate(parcela.dataVencimento)}
                                   </p>
                                 </div>
@@ -910,7 +910,7 @@ export default function JuridicoClientes() {
                                   >
                                     {parcela.diasAtraso}d
                                   </Badge>
-                                  <p className="font-bold text-red-600 min-w-[100px] text-right">
+                                  <p className="font-bold text-red-500 min-w-[100px] text-right">
                                     {formatCurrency(parcela.naoPago)}
                                   </p>
                                   {parcela.urlCobranca && (
@@ -941,15 +941,15 @@ export default function JuridicoClientes() {
           <TabsContent value="recuperados" className="space-y-6 mt-0">
             {/* Cards de Métricas de Recuperação */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+              <Card className="shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-4">
-                    <div className="p-4 bg-green-50 rounded-2xl">
-                      <Trophy className="h-8 w-8 text-green-600" />
+                    <div className="p-4 bg-green-500/10 dark:bg-green-500/20 rounded-2xl">
+                      <Trophy className="h-8 w-8 text-green-600 dark:text-green-500" />
                     </div>
                     <div>
-                      <p className="text-slate-500 text-sm font-medium">Clientes Recuperados</p>
-                      <p className="text-3xl font-bold text-green-600" data-testid="text-clientes-recuperados">
+                      <p className="text-muted-foreground text-sm font-medium">Clientes Recuperados</p>
+                      <p className="text-3xl font-bold text-green-600 dark:text-green-500" data-testid="text-clientes-recuperados">
                         {recuperadosStats.clientesRecuperados}
                       </p>
                     </div>
@@ -957,15 +957,15 @@ export default function JuridicoClientes() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+              <Card className="shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-4">
-                    <div className="p-4 bg-emerald-50 rounded-2xl">
-                      <Wallet className="h-8 w-8 text-emerald-600" />
+                    <div className="p-4 bg-emerald-500/10 dark:bg-emerald-500/20 rounded-2xl">
+                      <Wallet className="h-8 w-8 text-emerald-600 dark:text-emerald-500" />
                     </div>
                     <div>
-                      <p className="text-slate-500 text-sm font-medium">Valor Recuperado</p>
-                      <p className="text-2xl font-bold text-emerald-600" data-testid="text-valor-recuperado">
+                      <p className="text-muted-foreground text-sm font-medium">Valor Recuperado</p>
+                      <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-500" data-testid="text-valor-recuperado">
                         {formatCurrency(recuperadosStats.valorNegociado)}
                       </p>
                     </div>
@@ -973,15 +973,15 @@ export default function JuridicoClientes() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+              <Card className="shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-4">
-                    <div className="p-4 bg-blue-50 rounded-2xl">
-                      <Target className="h-8 w-8 text-blue-600" />
+                    <div className="p-4 bg-blue-500/10 dark:bg-blue-500/20 rounded-2xl">
+                      <Target className="h-8 w-8 text-blue-600 dark:text-blue-500" />
                     </div>
                     <div>
-                      <p className="text-slate-500 text-sm font-medium">Valor Original</p>
-                      <p className="text-2xl font-bold text-blue-600" data-testid="text-valor-original">
+                      <p className="text-muted-foreground text-sm font-medium">Valor Original</p>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-500" data-testid="text-valor-original">
                         {formatCurrency(recuperadosStats.valorOriginal)}
                       </p>
                     </div>
@@ -989,15 +989,15 @@ export default function JuridicoClientes() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+              <Card className="shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-4">
-                    <div className="p-4 bg-purple-50 rounded-2xl">
-                      <TrendingUp className="h-8 w-8 text-purple-600" />
+                    <div className="p-4 bg-purple-500/10 dark:bg-purple-500/20 rounded-2xl">
+                      <TrendingUp className="h-8 w-8 text-purple-600 dark:text-purple-500" />
                     </div>
                     <div>
-                      <p className="text-slate-500 text-sm font-medium">Taxa de Recuperação</p>
-                      <p className="text-3xl font-bold text-purple-600" data-testid="text-taxa-recuperacao">
+                      <p className="text-muted-foreground text-sm font-medium">Taxa de Recuperação</p>
+                      <p className="text-3xl font-bold text-purple-600 dark:text-purple-500" data-testid="text-taxa-recuperacao">
                         {recuperadosStats.taxaRecuperacao.toFixed(1)}%
                       </p>
                     </div>
@@ -1008,38 +1008,38 @@ export default function JuridicoClientes() {
 
             {/* Breakdown por Tipo */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="bg-white shadow-sm">
+              <Card className="shadow-sm">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-3 bg-green-50 rounded-xl">
-                        <Handshake className="h-6 w-6 text-green-600" />
+                      <div className="p-3 bg-green-500/10 dark:bg-green-500/20 rounded-xl">
+                        <Handshake className="h-6 w-6 text-green-600 dark:text-green-500" />
                       </div>
                       <div>
-                        <p className="text-slate-500 text-sm">Acordos Fechados</p>
-                        <p className="text-2xl font-bold text-green-600">{recuperadosStats.porProcedimento.acordo}</p>
+                        <p className="text-muted-foreground text-sm">Acordos Fechados</p>
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-500">{recuperadosStats.porProcedimento.acordo}</p>
                       </div>
                     </div>
-                    <Badge className="bg-green-100 text-green-700 border-green-200 text-lg px-4 py-1">
+                    <Badge className="bg-green-500/10 dark:bg-green-500/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-700 text-lg px-4 py-1">
                       Acordo
                     </Badge>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white shadow-sm">
+              <Card className="shadow-sm">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-3 bg-gray-50 rounded-xl">
-                        <XCircle className="h-6 w-6 text-gray-500" />
+                      <div className="p-3 bg-muted rounded-xl">
+                        <XCircle className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <div>
-                        <p className="text-slate-500 text-sm">Baixas Realizadas</p>
-                        <p className="text-2xl font-bold text-gray-600">{recuperadosStats.porProcedimento.baixa}</p>
+                        <p className="text-muted-foreground text-sm">Baixas Realizadas</p>
+                        <p className="text-2xl font-bold">{recuperadosStats.porProcedimento.baixa}</p>
                       </div>
                     </div>
-                    <Badge className="bg-gray-100 text-gray-600 border-gray-200 text-lg px-4 py-1">
+                    <Badge variant="secondary" className="text-lg px-4 py-1">
                       Baixa
                     </Badge>
                   </div>
@@ -1048,10 +1048,10 @@ export default function JuridicoClientes() {
             </div>
 
             {/* Lista de Clientes Recuperados */}
-            <Card className="bg-white shadow-sm">
+            <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
                   Clientes Recuperados
                 </CardTitle>
               </CardHeader>
@@ -1063,16 +1063,16 @@ export default function JuridicoClientes() {
                     return (
                       <div 
                         key={item.cliente.idCliente}
-                        className="flex items-center justify-between p-4 bg-green-50/50 rounded-xl border border-green-100"
+                        className="flex items-center justify-between p-4 bg-green-500/10 dark:bg-green-500/20 rounded-xl border border-green-200 dark:border-green-800"
                         data-testid={`row-recuperado-${index}`}
                       >
                         <div className="flex items-center gap-4">
-                          <div className="p-2 bg-green-100 rounded-lg">
-                            <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          <div className="p-2 bg-green-500/20 dark:bg-green-500/30 rounded-lg">
+                            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-800">{item.cliente.nomeCliente}</p>
-                            <p className="text-sm text-slate-500">{item.cliente.empresa}</p>
+                            <p className="font-semibold">{item.cliente.nomeCliente}</p>
+                            <p className="text-sm text-muted-foreground">{item.cliente.empresa}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-6 flex-wrap">
@@ -1082,12 +1082,12 @@ export default function JuridicoClientes() {
                             </Badge>
                           )}
                           <div className="text-right">
-                            <p className="text-sm text-slate-500">Valor Original</p>
-                            <p className="font-medium text-slate-600">{formatCurrency(item.cliente.valorTotal)}</p>
+                            <p className="text-sm text-muted-foreground">Valor Original</p>
+                            <p className="font-medium">{formatCurrency(item.cliente.valorTotal)}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm text-slate-500">Valor Recuperado</p>
-                            <p className="font-bold text-green-600">{formatCurrency(item.contexto?.valorAcordado || 0)}</p>
+                            <p className="text-sm text-muted-foreground">Valor Recuperado</p>
+                            <p className="font-bold text-green-600 dark:text-green-500">{formatCurrency(item.contexto?.valorAcordado || 0)}</p>
                           </div>
                         </div>
                       </div>
@@ -1098,29 +1098,29 @@ export default function JuridicoClientes() {
                   {recuperadosStats.listaPreNegociados.map((item, index) => (
                     <div 
                       key={`pre-${index}`}
-                      className="flex items-center justify-between p-4 bg-emerald-50/50 rounded-xl border border-emerald-100"
+                      className="flex items-center justify-between p-4 bg-emerald-500/10 dark:bg-emerald-500/20 rounded-xl border border-emerald-200 dark:border-emerald-800"
                       data-testid={`row-pre-negociado-${index}`}
                     >
                       <div className="flex items-center gap-4">
-                        <div className="p-2 bg-emerald-100 rounded-lg">
-                          <Handshake className="h-5 w-5 text-emerald-600" />
+                        <div className="p-2 bg-emerald-500/20 dark:bg-emerald-500/30 rounded-lg">
+                          <Handshake className="h-5 w-5 text-emerald-600 dark:text-emerald-500" />
                         </div>
                         <div>
-                          <p className="font-semibold text-slate-800">{item.nome}</p>
-                          <p className="text-xs text-emerald-600">Negociado antes do registro</p>
+                          <p className="font-semibold">{item.nome}</p>
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400">Negociado antes do registro</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-6 flex-wrap">
-                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+                        <Badge className="bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700">
                           Acordo
                         </Badge>
                         <div className="text-right">
-                          <p className="text-sm text-slate-500">Valor Original</p>
-                          <p className="font-medium text-slate-600">{formatCurrency(item.valorOriginal)}</p>
+                          <p className="text-sm text-muted-foreground">Valor Original</p>
+                          <p className="font-medium">{formatCurrency(item.valorOriginal)}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm text-slate-500">Valor Recuperado</p>
-                          <p className="font-bold text-emerald-600">{formatCurrency(item.valorRecuperado)}</p>
+                          <p className="text-sm text-muted-foreground">Valor Recuperado</p>
+                          <p className="font-bold text-emerald-600 dark:text-emerald-500">{formatCurrency(item.valorRecuperado)}</p>
                         </div>
                       </div>
                     </div>
@@ -1152,7 +1152,7 @@ export default function JuridicoClientes() {
           <div className="space-y-6 py-4">
             {/* Tipo de Ação */}
             <div className="space-y-3">
-              <label className="text-base font-semibold text-slate-700">
+              <label className="text-base font-semibold">
                 Qual ação está sendo tomada?
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -1164,7 +1164,7 @@ export default function JuridicoClientes() {
                       key={proc.value}
                       type="button"
                       variant={isSelected ? "default" : "outline"}
-                      className={`h-auto py-3 justify-start ${isSelected ? '' : 'hover:bg-slate-50'}`}
+                      className="h-auto py-3 justify-start"
                       onClick={() => setEditForm({ ...editForm, procedimentoJuridico: proc.value })}
                       data-testid={`button-proc-${proc.value}`}
                     >
@@ -1178,7 +1178,7 @@ export default function JuridicoClientes() {
 
             {/* Status */}
             <div className="space-y-3">
-              <label className="text-base font-semibold text-slate-700">
+              <label className="text-base font-semibold">
                 Qual o status atual?
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -1190,7 +1190,7 @@ export default function JuridicoClientes() {
                       key={status.value}
                       type="button"
                       variant={isSelected ? "default" : "outline"}
-                      className={`h-auto py-3 justify-start ${isSelected ? '' : 'hover:bg-slate-50'}`}
+                      className="h-auto py-3 justify-start"
                       onClick={() => setEditForm({ ...editForm, statusJuridico: status.value })}
                       data-testid={`button-status-${status.value}`}
                     >
@@ -1204,11 +1204,11 @@ export default function JuridicoClientes() {
 
             {/* Valor Recebido */}
             <div className="space-y-3">
-              <label className="text-base font-semibold text-slate-700">
+              <label className="text-base font-semibold">
                 Valor pago pelo cliente (após negociação)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">R$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">R$</span>
                 <Input
                   type="text"
                   placeholder="0,00"
@@ -1218,14 +1218,14 @@ export default function JuridicoClientes() {
                   data-testid="input-valor-acordado"
                 />
               </div>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-muted-foreground">
                 Deixe em branco se ainda não houve pagamento
               </p>
             </div>
 
             {/* Anotações */}
             <div className="space-y-3">
-              <label className="text-base font-semibold text-slate-700">
+              <label className="text-base font-semibold">
                 Anotações e observações
               </label>
               <Textarea
@@ -1238,7 +1238,7 @@ export default function JuridicoClientes() {
             </div>
 
             {editingCliente?.contexto?.atualizadoJuridicoPor && (
-              <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-50 p-3 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted p-3 rounded-lg">
                 <Calendar className="h-4 w-4" />
                 Última atualização por {editingCliente.contexto.atualizadoJuridicoPor} em{" "}
                 {formatDate(editingCliente.contexto.atualizadoJuridicoEm)}
