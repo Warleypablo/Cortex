@@ -213,7 +213,7 @@ export default function RevenueGoals() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5" />
-                Recebimentos por Dia - {mesesNomes[mes - 1]} {ano}
+                Recebimentos por Dia - {mesesNomes[selectedMonth.month - 1]} {selectedMonth.year}
               </CardTitle>
             </CardHeader>
             <CardContent>
