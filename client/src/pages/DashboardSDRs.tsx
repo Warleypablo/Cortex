@@ -464,7 +464,7 @@ export default function DashboardSDRs() {
                           </SelectTrigger>
                           <SelectContent className="bg-slate-800 border-slate-700">
                             <SelectItem value="all">Todas</SelectItem>
-                            {sources?.map((s) => (
+                            {sources?.filter(s => s && s.trim() !== '').map((s) => (
                               <SelectItem key={s} value={s}>{s}</SelectItem>
                             ))}
                           </SelectContent>
@@ -478,7 +478,7 @@ export default function DashboardSDRs() {
                           </SelectTrigger>
                           <SelectContent className="bg-slate-800 border-slate-700">
                             <SelectItem value="all">Todas</SelectItem>
-                            {pipelines?.map((p) => (
+                            {pipelines?.filter(p => p && p.trim() !== '').map((p) => (
                               <SelectItem key={p} value={p}>{p}</SelectItem>
                             ))}
                           </SelectContent>
