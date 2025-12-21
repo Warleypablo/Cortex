@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import type { DateRange } from "react-day-picker";
+import { format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
 import { 
   BarChart3,
   TrendingUp,
@@ -175,8 +177,7 @@ function getSourceDisplayName(sourceId: string): string {
 
 export default function DetalhamentoVendas() {
   useSetPageInfo("Detalhamento de Vendas", "Análise técnica de negócios ganhos");
-  const [dataInicio, setDataInicio] = useState<string>("");
-  const [dataFim, setDataFim] = useState<string>("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [source, setSource] = useState<string>("all");
   const [category, setCategory] = useState<string>("all");
   const [closer, setCloser] = useState<string>("all");
@@ -184,6 +185,9 @@ export default function DetalhamentoVendas() {
   const [orderBy, setOrderBy] = useState<string>("close_date");
   const [orderDir, setOrderDir] = useState<string>("desc");
   const [utmType, setUtmType] = useState<string>("source");
+
+  const dataInicio = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : "";
+  const dataFim = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : "";
 
   const queryParamsObj = {
     dataInicio,
@@ -230,8 +234,7 @@ export default function DetalhamentoVendas() {
   });
 
   const resetFilters = () => {
-    setDataInicio("");
-    setDataFim("");
+    setDateRange(undefined);
     setSource("all");
     setCategory("all");
     setCloser("all");
@@ -239,16 +242,15 @@ export default function DetalhamentoVendas() {
 
   const navegarMes = (direcao: 'anterior' | 'proximo') => {
     const hoje = new Date();
-    const dataAtual = dataInicio ? new Date(dataInicio + 'T00:00:00') : hoje;
+    const dataAtual = dateRange?.from || hoje;
     const novoMes = direcao === 'anterior' 
-      ? new Date(dataAtual.getFullYear(), dataAtual.getMonth() - 1, 1)
-      : new Date(dataAtual.getFullYear(), dataAtual.getMonth() + 1, 1);
+      ? subMonths(dataAtual, 1)
+      : addMonths(dataAtual, 1);
     
-    const inicioNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth(), 1).toISOString().split('T')[0];
-    const fimNovoMes = new Date(novoMes.getFullYear(), novoMes.getMonth() + 1, 0).toISOString().split('T')[0];
-    
-    setDataInicio(inicioNovoMes);
-    setDataFim(fimNovoMes);
+    setDateRange({
+      from: startOfMonth(novoMes),
+      to: endOfMonth(novoMes)
+    });
   };
 
   const toggleSort = (column: string) => {
@@ -312,25 +314,14 @@ export default function DetalhamentoVendas() {
         {showFilters && (
           <Card className="bg-slate-900 border-slate-800">
             <CardContent className="p-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-xs text-slate-400">Data Início</Label>
-                  <Input
-                    type="date"
-                    value={dataInicio}
-                    onChange={(e) => setDataInicio(e.target.value)}
-                    className="bg-slate-800 border-slate-700 text-sm h-9"
-                    data-testid="input-data-inicio"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-slate-400">Data Fim</Label>
-                  <Input
-                    type="date"
-                    value={dataFim}
-                    onChange={(e) => setDataFim(e.target.value)}
-                    className="bg-slate-800 border-slate-700 text-sm h-9"
-                    data-testid="input-data-fim"
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="space-y-1 col-span-2">
+                  <Label className="text-xs text-slate-400">Período</Label>
+                  <DateRangePicker
+                    value={dateRange}
+                    onChange={setDateRange}
+                    placeholder="Selecione o período"
+                    triggerClassName="bg-slate-800 border-slate-700 text-sm h-9 w-full"
                   />
                 </div>
                 <div className="space-y-1">

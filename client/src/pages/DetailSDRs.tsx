@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { motion, AnimatePresence } from "framer-motion";
+import { format, startOfYear, endOfMonth } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import { 
   User,
   Users, 
@@ -229,12 +231,12 @@ function FloatingParticles() {
 export default function DetailSDRs() {
   const { setPageInfo } = usePageInfo();
   const now = new Date();
-  const inicioAno = `${now.getFullYear()}-01-01`;
-  const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
   
   const [sdrId, setSdrId] = useState<string>("");
-  const [dataInicio, setDataInicio] = useState<string>(inicioAno);
-  const [dataFim, setDataFim] = useState<string>(fimMes);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfYear(now),
+    to: endOfMonth(now),
+  });
 
   const { data: sdrs, isLoading: isLoadingSDRs } = useQuery<SDR[]>({
     queryKey: ["/api/sdrs/list"],
@@ -243,8 +245,8 @@ export default function DetailSDRs() {
   const buildQueryParams = () => {
     const params = new URLSearchParams();
     if (sdrId) params.append("sdrId", sdrId);
-    if (dataInicio) params.append("dataInicio", dataInicio);
-    if (dataFim) params.append("dataFim", dataFim);
+    if (dateRange?.from) params.append("dataInicio", format(dateRange.from, 'yyyy-MM-dd'));
+    if (dateRange?.to) params.append("dataFim", format(dateRange.to, 'yyyy-MM-dd'));
     return params.toString();
   };
 
@@ -328,8 +330,10 @@ export default function DetailSDRs() {
   };
 
   const limparFiltros = () => {
-    setDataInicio(inicioAno);
-    setDataFim(fimMes);
+    setDateRange({
+      from: startOfYear(now),
+      to: endOfMonth(now),
+    });
   };
 
   const COLORS = ['#06b6d4', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#3b82f6'];
@@ -409,31 +413,16 @@ export default function DetailSDRs() {
                   </Select>
                 </div>
 
-                <div className="min-w-[150px]" data-testid="filter-data-inicio">
+                <div className="min-w-[280px]" data-testid="filter-date-range">
                   <Label className="text-slate-300 mb-2 block">
                     <CalendarDays className="h-4 w-4 inline mr-2" />
-                    Data Início
+                    Período
                   </Label>
-                  <Input
-                    type="date"
-                    value={dataInicio}
-                    onChange={(e) => setDataInicio(e.target.value)}
-                    className="bg-slate-700 border-slate-600 text-white"
-                    data-testid="input-data-inicio"
-                  />
-                </div>
-
-                <div className="min-w-[150px]" data-testid="filter-data-fim">
-                  <Label className="text-slate-300 mb-2 block">
-                    <CalendarDays className="h-4 w-4 inline mr-2" />
-                    Data Fim
-                  </Label>
-                  <Input
-                    type="date"
-                    value={dataFim}
-                    onChange={(e) => setDataFim(e.target.value)}
-                    className="bg-slate-700 border-slate-600 text-white"
-                    data-testid="input-data-fim"
+                  <DateRangePicker
+                    value={dateRange}
+                    onChange={setDateRange}
+                    triggerClassName="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                    placeholder="Selecione o período"
                   />
                 </div>
 

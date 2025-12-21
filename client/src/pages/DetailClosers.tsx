@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   User,
@@ -226,12 +228,14 @@ function FloatingParticles() {
 export default function DetailClosers() {
   const { setPageInfo } = usePageInfo();
   const hoje = new Date();
-  const inicioAno = new Date(hoje.getFullYear(), 0, 1).toISOString().split('T')[0];
-  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
+  const inicioAno = new Date(hoje.getFullYear(), 0, 1);
+  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
 
   const [closerId, setCloserId] = useState<string>("");
-  const [dataInicio, setDataInicio] = useState<string>(inicioAno);
-  const [dataFim, setDataFim] = useState<string>(fimMes);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: inicioAno,
+    to: fimMes,
+  });
   const [showFilters, setShowFilters] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -247,8 +251,8 @@ export default function DetailClosers() {
   const buildQueryParams = () => {
     const params = new URLSearchParams();
     if (closerId) params.append("closerId", closerId);
-    if (dataInicio) params.append("dataInicio", dataInicio);
-    if (dataFim) params.append("dataFim", dataFim);
+    if (dateRange?.from) params.append("dataInicio", format(dateRange.from, 'yyyy-MM-dd'));
+    if (dateRange?.to) params.append("dataFim", format(dateRange.to, 'yyyy-MM-dd'));
     return params.toString();
   };
 
@@ -305,8 +309,10 @@ export default function DetailClosers() {
   });
 
   const resetFilters = () => {
-    setDataInicio(inicioAno);
-    setDataFim(fimMes);
+    setDateRange({
+      from: inicioAno,
+      to: fimMes,
+    });
   };
 
   useEffect(() => {
@@ -456,38 +462,25 @@ export default function DetailClosers() {
                 <Card className="relative bg-slate-900/80 border-slate-700/50 backdrop-blur-xl rounded-2xl overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500" />
                   <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="flex flex-wrap items-end gap-4">
                       <div>
-                        <Label className="text-slate-300 text-sm font-medium mb-2 block">Data Início</Label>
-                        <Input
-                          type="date"
-                          value={dataInicio}
-                          onChange={(e) => setDataInicio(e.target.value)}
-                          className="bg-slate-800/50 border-slate-700 text-white rounded-xl"
-                          data-testid="input-data-inicio"
+                        <Label className="text-slate-300 text-sm font-medium mb-2 block">Período</Label>
+                        <DateRangePicker
+                          value={dateRange}
+                          onChange={setDateRange}
+                          triggerClassName="bg-slate-800/50 border-slate-700 text-white rounded-xl hover:bg-slate-700/50"
+                          className="bg-slate-900 border-slate-700"
                         />
                       </div>
-                      <div>
-                        <Label className="text-slate-300 text-sm font-medium mb-2 block">Data Fim</Label>
-                        <Input
-                          type="date"
-                          value={dataFim}
-                          onChange={(e) => setDataFim(e.target.value)}
-                          className="bg-slate-800/50 border-slate-700 text-white rounded-xl"
-                          data-testid="input-data-fim"
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <Button 
-                          variant="outline" 
-                          onClick={resetFilters}
-                          className="border-slate-600 text-slate-300 hover:bg-slate-700/50 rounded-xl"
-                          data-testid="button-reset-filters"
-                        >
-                          <RotateCcw className="w-4 h-4 mr-2" />
-                          Resetar Filtros
-                        </Button>
-                      </div>
+                      <Button 
+                        variant="outline" 
+                        onClick={resetFilters}
+                        className="border-slate-600 text-slate-300 hover:bg-slate-700/50 rounded-xl"
+                        data-testid="button-reset-filters"
+                      >
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                        Resetar Filtros
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
