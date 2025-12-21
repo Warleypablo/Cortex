@@ -59,7 +59,7 @@ const menuItems = [
     icon: MessageSquare,
   },
   {
-    title: "Assistente IA",
+    title: "GPTurbo",
     url: "/cases/chat",
     icon: Sparkles,
   },
