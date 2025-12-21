@@ -1,11 +1,26 @@
 import OpenAI from "openai";
-import type { UnifiedAssistantRequest, UnifiedAssistantResponse, DfcHierarchicalResponse } from "@shared/schema";
+import type { UnifiedAssistantRequest, UnifiedAssistantResponse, AssistantContext, DfcHierarchicalResponse } from "@shared/schema";
 import { chatWithDfc } from "./dfcAnalysis";
 import { storage } from "../storage";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const N8N_CASES_WEBHOOK_URL = process.env.N8N_CASES_WEBHOOK_URL || "https://n8n.turbopartners.com.br/webhook/assistente-cases";
+
+const CONTEXT_DETECTION_PROMPT = `Você é um classificador de contexto para o GPTurbo, assistente virtual da Turbo Partners.
+
+Analise a mensagem do usuário e determine qual contexto é mais apropriado para respondê-la.
+
+Contextos disponíveis:
+- "financeiro": Perguntas sobre DFC, fluxo de caixa, receitas, despesas, lucros, margens, resultados financeiros, faturamento, inadimplência
+- "cases": Perguntas sobre cases de sucesso, projetos realizados, estratégias de marketing implementadas, resultados de campanhas
+- "clientes": Perguntas sobre clientes específicos, contratos, retenção, churm, LTV, quantidade de clientes
+- "geral": Perguntas gerais sobre a Turbo Partners, serviços oferecidos, equipe, processos internos, ou qualquer outra coisa
+
+Também considere o contexto da página atual do usuário (se fornecido).
+
+Responda APENAS com o nome do contexto em minúsculas: "financeiro", "cases", "clientes" ou "geral".
+Não adicione explicações, apenas a palavra do contexto.`;
 
 const TURBO_PARTNERS_SYSTEM_PROMPT = `Você é o assistente virtual da Turbo Partners, uma agência de marketing digital especializada em performance e growth hacking.
 
@@ -168,18 +183,65 @@ async function chatCases(request: UnifiedAssistantRequest): Promise<UnifiedAssis
   }
 }
 
-export async function chat(request: UnifiedAssistantRequest): Promise<UnifiedAssistantResponse> {
-  console.log(`[UnifiedAssistant] Processing request with context: ${request.context}`);
+async function detectContext(message: string, pageContext?: string): Promise<AssistantContext> {
+  try {
+    const userMessage = pageContext 
+      ? `Página atual: ${pageContext}\n\nMensagem do usuário: ${message}`
+      : message;
 
-  switch (request.context) {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: CONTEXT_DETECTION_PROMPT },
+        { role: "user", content: userMessage }
+      ],
+      max_tokens: 20,
+      temperature: 0,
+    });
+
+    const detected = response.choices[0].message.content?.toLowerCase().trim() || "geral";
+    
+    if (["financeiro", "cases", "clientes", "geral"].includes(detected)) {
+      console.log(`[UnifiedAssistant] Auto-detected context: ${detected}`);
+      return detected as AssistantContext;
+    }
+    
+    return "geral";
+  } catch (error) {
+    console.error("[UnifiedAssistant] Error detecting context:", error);
+    return "geral";
+  }
+}
+
+export async function chat(request: UnifiedAssistantRequest): Promise<UnifiedAssistantResponse> {
+  let effectiveContext = request.context;
+  
+  if (!request.context || request.context === "auto") {
+    effectiveContext = await detectContext(request.message, request.metadata?.pageContext);
+  }
+  
+  console.log(`[UnifiedAssistant] Processing request with context: ${effectiveContext}`);
+
+  let response: UnifiedAssistantResponse;
+  
+  switch (effectiveContext) {
     case "financeiro":
-      return chatFinanceiro(request);
+      response = await chatFinanceiro({ ...request, context: effectiveContext });
+      break;
     case "cases":
-      return chatCases(request);
+      response = await chatCases({ ...request, context: effectiveContext });
+      break;
     case "clientes":
-      return chatClientes(request);
+      response = await chatClientes({ ...request, context: effectiveContext });
+      break;
     case "geral":
     default:
-      return chatGeral(request);
+      response = await chatGeral({ ...request, context: effectiveContext });
+      break;
   }
+  
+  return {
+    ...response,
+    context: effectiveContext,
+  };
 }
