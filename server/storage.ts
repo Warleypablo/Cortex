@@ -1157,6 +1157,7 @@ export class DbStorage implements IStorage {
   }
 
   async getClienteById(id: string): Promise<ClienteCompleto | undefined> {
+    // First try to find via cup_clientes join
     const result = await db
       .select({
         id: sql<number>`COALESCE(${schema.cazClientes.id}, ('x' || substr(md5(${schema.cupClientes.taskId}), 1, 8))::bit(32)::int)`,
@@ -1232,7 +1233,52 @@ export class DbStorage implements IStorage {
       )
       .limit(1);
 
-    return result[0];
+    if (result[0]) {
+      return result[0];
+    }
+
+    // Fallback: search directly in caz_clientes for clients not linked to ClickUp
+    const cazResult = await db.execute(sql`
+      SELECT 
+        id,
+        nome,
+        cnpj,
+        endereco,
+        ativo,
+        created_at as "createdAt",
+        empresa,
+        COALESCE(ids, id::text) as ids,
+        NULL as "nomeClickup",
+        NULL as "statusClickup",
+        NULL as telefone,
+        NULL as responsavel,
+        NULL as cluster,
+        cnpj as "cnpjCliente",
+        NULL as servicos,
+        NULL as "dataInicio",
+        COALESCE((
+          SELECT COUNT(DISTINCT TO_CHAR(
+            COALESCE(data_vencimento, data_criacao), 
+            'YYYY-MM'
+          ))::double precision
+          FROM caz_receber
+          WHERE cliente_id = COALESCE(caz_clientes.ids, caz_clientes.id::text)
+            AND UPPER(status) IN ('PAGO', 'ACQUITTED')
+            AND COALESCE(data_vencimento, data_criacao) IS NOT NULL
+        ), 0) as "ltMeses",
+        0 as "ltDias",
+        0 as "totalRecorrente",
+        0 as "totalPontual"
+      FROM caz_clientes
+      WHERE id::text = ${id} OR ids = ${id}
+      LIMIT 1
+    `);
+
+    if (cazResult.rows.length > 0) {
+      return cazResult.rows[0] as ClienteCompleto;
+    }
+
+    return undefined;
   }
 
   async getClienteByCnpj(cnpj: string): Promise<Cliente | undefined> {
