@@ -6621,7 +6621,7 @@ export class DbStorage implements IStorage {
           entity: 'cliente',
           label: r.nome || 'Cliente sem nome',
           description: r.cnpj || undefined,
-          route: `/clientes/${r.id}`,
+          route: `/cliente/${r.id}`,
         });
       }
     } catch (e) {
