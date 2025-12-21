@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageInfo } from "@/contexts/PageContext";
 import {
   Table,
   TableBody,
@@ -177,11 +177,21 @@ function ErrorDisplay({ message }: { message: string }) {
   );
 }
 
+const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
+  "visao-geral": { title: "Inadimplência - Visão Geral", subtitle: "Análise geral de inadimplência e métricas" },
+  "clientes": { title: "Inadimplência - Clientes", subtitle: "Lista de clientes inadimplentes" },
+  "empresas": { title: "Inadimplência - Por Empresa", subtitle: "Inadimplência agrupada por empresa" },
+};
+
 export default function DashboardInadimplencia() {
-  useSetPageInfo("Inadimplência", "Gestão de cobranças e inadimplência");
-  
+  const { setPageInfo } = usePageInfo();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("visao-geral");
+
+  useEffect(() => {
+    const { title, subtitle } = TAB_TITLES[activeTab] || TAB_TITLES["visao-geral"];
+    setPageInfo(title, subtitle);
+  }, [activeTab, setPageInfo]);
   const [dataInicio, setDataInicio] = useState<string>("");
   const [dataFim, setDataFim] = useState<string>("");
   const [activePreset, setActivePreset] = useState<string>("");

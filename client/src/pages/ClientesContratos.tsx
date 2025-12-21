@@ -1,13 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Users, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { usePageInfo } from "@/contexts/PageContext";
 import Clients from "./Clients";
 import Contracts from "./Contracts";
 
 type Tab = "clientes" | "contratos";
 
+const TAB_TITLES: Record<Tab, { title: string; subtitle: string }> = {
+  clientes: { title: "Clientes", subtitle: "Gestão de clientes ativos" },
+  contratos: { title: "Contratos", subtitle: "Acompanhamento de contratos e serviços" },
+};
+
 export default function ClientesContratos() {
+  const { setPageInfo } = usePageInfo();
   const [activeTab, setActiveTab] = useState<Tab>("clientes");
+  
+  useEffect(() => {
+    const { title, subtitle } = TAB_TITLES[activeTab];
+    setPageInfo(title, subtitle);
+  }, [activeTab, setPageInfo]);
 
   const tabs = [
     { id: "clientes" as Tab, label: "Clientes", icon: Users },

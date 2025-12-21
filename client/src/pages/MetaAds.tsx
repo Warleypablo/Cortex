@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,7 +10,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { DollarSign, Eye, MousePointer, Users, TrendingUp, Target, Smartphone, Filter, X, CalendarIcon } from "lucide-react";
-import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageInfo } from "@/contexts/PageContext";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, FunnelChart, Funnel, LabelList } from "recharts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MetaOverview, CampaignPerformance, AdsetPerformance, AdPerformance, ConversionFunnel, MetaLeadFilters } from "@shared/schema";
@@ -18,9 +18,14 @@ import type { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
+  "campaigns": { title: "Meta Ads - Campanhas", subtitle: "Performance de campanhas Meta" },
+  "adsets": { title: "Meta Ads - Conjuntos de Anúncios", subtitle: "Performance de conjuntos de anúncios" },
+  "ads": { title: "Meta Ads - Anúncios", subtitle: "Performance de anúncios individuais" },
+};
+
 export default function MetaAds() {
-  useSetPageInfo("Meta Ads Analytics", "Análise de performance de campanhas Meta integrada com conversões reais do CRM");
-  
+  const { setPageInfo } = usePageInfo();
   const queryClient = useQueryClient();
   
   const [periodo, setPeriodo] = useState<string>("30");
@@ -37,6 +42,11 @@ export default function MetaAds() {
   const [drilldownCampaignName, setDrilldownCampaignName] = useState<string | null>(null);
   const [drilldownAdsetId, setDrilldownAdsetId] = useState<string | null>(null);
   const [drilldownAdsetName, setDrilldownAdsetName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const { title, subtitle } = TAB_TITLES[activeTab] || TAB_TITLES["campaigns"];
+    setPageInfo(title, subtitle);
+  }, [activeTab, setPageInfo]);
 
   // Busca o range de datas disponível no banco
   const { data: dataRange } = useQuery<{ minDate: string; maxDate: string }>({

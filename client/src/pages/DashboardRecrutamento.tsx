@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageInfo } from "@/contexts/PageContext";
 import { 
   Users, UserPlus, UserCheck, Target, Briefcase, TrendingUp, TrendingDown,
   Filter, BarChart3, PieChart as PieChartIcon, Activity, Clock, Search,
@@ -36,13 +36,25 @@ const FONTE_LABELS: Record<string, string> = {
   'manual': 'Hunting (Manual)',
 };
 
+const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
+  "visao-geral": { title: "Recrutamento - Visão Geral", subtitle: "Panorama de candidaturas e fontes" },
+  "insights": { title: "Recrutamento - Insights", subtitle: "Análise de tempo e entrevistas" },
+  "funil": { title: "Recrutamento - Funil", subtitle: "Conversão por etapas do processo" },
+  "vagas": { title: "Recrutamento - Vagas", subtitle: "Detalhamento de vagas abertas" },
+  "conversao": { title: "Recrutamento - Conversão", subtitle: "Taxas de conversão por vaga" },
+};
+
 export default function DashboardRecrutamento() {
-  useSetPageInfo("Dashboard de Recrutamento", "Análise de funil, fontes e métricas de contratação");
-  
+  const { setPageInfo } = usePageInfo();
   const [activeTab, setActiveTab] = useState("visao-geral");
   const [periodoMeses, setPeriodoMeses] = useState(6);
   const [areaFilter, setAreaFilter] = useState("todos");
   const [statusFilter, setStatusFilter] = useState("todos");
+
+  useEffect(() => {
+    const { title, subtitle } = TAB_TITLES[activeTab] || TAB_TITLES["visao-geral"];
+    setPageInfo(title, subtitle);
+  }, [activeTab, setPageInfo]);
 
   const { data: kpis, isLoading: isLoadingKpis } = useQuery<RecrutamentoKPIs>({
     queryKey: ["/api/recrutamento/kpis"],

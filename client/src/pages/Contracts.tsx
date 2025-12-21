@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useSetPageInfo } from "@/contexts/PageContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,7 +38,6 @@ const mapSquadCodeToName = (code: string | null): string => {
 };
 
 export default function Contracts() {
-  useSetPageInfo("Contratos", "Gerencie contratos e acompanhe status de serviços");
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [servicoFilter, setServicoFilter] = useState<string>("all");

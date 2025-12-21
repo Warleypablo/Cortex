@@ -13,14 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useSetPageInfo } from "@/contexts/PageContext";
 import type { ClienteCompleto } from "../../../server/storage";
 
 type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
 type SortDirection = "asc" | "desc";
 
 export default function Clients() {
-  useSetPageInfo("Clientes & Contratos", "Gestão de clientes e contratos ativos");
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [servicoFilter, setServicoFilter] = useState<string>("all");
