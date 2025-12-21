@@ -7271,6 +7271,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Global Search endpoint
+  app.get("/api/search", async (req, res) => {
+    try {
+      const query = req.query.query as string;
+      if (!query || query.length < 2) {
+        return res.json({ results: [], query: query || '', total: 0 });
+      }
+      
+      const results = await storage.searchAllEntities(query);
+      res.json({
+        results,
+        query,
+        total: results.length,
+      });
+    } catch (error) {
+      console.error("[api] Error searching:", error);
+      res.status(500).json({ error: "Failed to search" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);

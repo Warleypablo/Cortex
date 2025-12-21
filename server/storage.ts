@@ -6601,6 +6601,138 @@ export class DbStorage implements IStorage {
   async deleteMetricThresholdsByRuleset(rulesetId: number): Promise<void> {
     await db.execute(sql.raw(`DELETE FROM metric_thresholds WHERE ruleset_id = ${rulesetId}`));
   }
+
+  async searchAllEntities(query: string): Promise<import("@shared/schema").SearchResult[]> {
+    const searchTerm = `%${query.replace(/'/g, "''")}%`;
+    const results: import("@shared/schema").SearchResult[] = [];
+
+    // Search clientes
+    try {
+      const clientesResult = await db.execute(sql`
+        SELECT id::text, nome, cnpj
+        FROM caz_clientes
+        WHERE nome ILIKE ${searchTerm} OR cnpj ILIKE ${searchTerm}
+        LIMIT 20
+      `);
+      for (const row of clientesResult.rows) {
+        const r = row as any;
+        results.push({
+          id: r.id,
+          entity: 'cliente',
+          label: r.nome || 'Cliente sem nome',
+          description: r.cnpj || undefined,
+          route: `/clientes/${r.id}`,
+        });
+      }
+    } catch (e) {
+      console.error('[search] Error searching clientes:', e);
+    }
+
+    // Search colaboradores
+    try {
+      const colaboradoresResult = await db.execute(sql`
+        SELECT id::text, nome, email_turbo, cargo, status
+        FROM rh_pessoal
+        WHERE nome ILIKE ${searchTerm} OR email_turbo ILIKE ${searchTerm}
+        LIMIT 20
+      `);
+      for (const row of colaboradoresResult.rows) {
+        const r = row as any;
+        results.push({
+          id: r.id,
+          entity: 'colaborador',
+          label: r.nome,
+          description: r.cargo || r.email_turbo || undefined,
+          route: '/colaboradores',
+          meta: {
+            status: r.status || undefined,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('[search] Error searching colaboradores:', e);
+    }
+
+    // Search contratos
+    try {
+      const contratosResult = await db.execute(sql`
+        SELECT c.id_subtask as id, c.servico, c.status, c.valorr, cc.nome as cliente_nome
+        FROM cup_contratos c
+        LEFT JOIN cup_clientes cc ON c.id_task = cc.task_id
+        WHERE c.servico ILIKE ${searchTerm}
+        LIMIT 20
+      `);
+      for (const row of contratosResult.rows) {
+        const r = row as any;
+        results.push({
+          id: r.id,
+          entity: 'contrato',
+          label: r.servico || 'Contrato',
+          description: r.cliente_nome || undefined,
+          route: '/contratos',
+          meta: {
+            status: r.status || undefined,
+            value: r.valorr ? parseFloat(r.valorr) : undefined,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('[search] Error searching contratos:', e);
+    }
+
+    // Search cobranças (caz_receber)
+    try {
+      const cobrancasResult = await db.execute(sql`
+        SELECT id::text, descricao, cliente_nome, status, total
+        FROM caz_receber
+        WHERE descricao ILIKE ${searchTerm} OR cliente_nome ILIKE ${searchTerm}
+        LIMIT 20
+      `);
+      for (const row of cobrancasResult.rows) {
+        const r = row as any;
+        results.push({
+          id: r.id,
+          entity: 'cobranca',
+          label: r.descricao || 'Cobrança',
+          description: r.cliente_nome || undefined,
+          route: '/inadimplencia',
+          meta: {
+            status: r.status || undefined,
+            value: r.total ? parseFloat(r.total) : undefined,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('[search] Error searching cobranças:', e);
+    }
+
+    // Search projetos (cup_tech_tasks)
+    try {
+      const projetosResult = await db.execute(sql`
+        SELECT clickup_task_id as id, task_name, status_projeto, responsavel
+        FROM staging.cup_projetos_tech
+        WHERE task_name ILIKE ${searchTerm} OR status_projeto ILIKE ${searchTerm}
+        LIMIT 20
+      `);
+      for (const row of projetosResult.rows) {
+        const r = row as any;
+        results.push({
+          id: r.id,
+          entity: 'projeto',
+          label: r.task_name || 'Projeto',
+          description: r.responsavel || undefined,
+          route: '/tech/projetos',
+          meta: {
+            status: r.status_projeto || undefined,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('[search] Error searching projetos:', e);
+    }
+
+    return results;
+  }
 }
 
 export const storage = new DbStorage();
