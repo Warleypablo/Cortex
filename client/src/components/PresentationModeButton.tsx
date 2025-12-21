@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tv, Play, Handshake, Headphones, BarChart3, RefreshCcw, DollarSign, TrendingUp } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Tv, Play, Handshake, BarChart3, DollarSign, TrendingUp } from "lucide-react";
 import { useLocation } from "wouter";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -69,7 +70,8 @@ export default function PresentationModeButton() {
     setLocation("/dashboard/comercial/apresentacao");
   };
 
-  const toggleCategory = (categoryId: string) => {
+  const toggleCategory = (categoryId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     const category = DASHBOARD_CATEGORIES.find(c => c.id === categoryId);
     if (!category) return;
     
@@ -97,6 +99,12 @@ export default function PresentationModeButton() {
     return selected.length > 0 && selected.length < category.dashboards.length;
   };
 
+  const getSelectedCount = (categoryId: string) => {
+    const category = DASHBOARD_CATEGORIES.find(c => c.id === categoryId);
+    if (!category) return 0;
+    return category.dashboards.filter(d => selectedDashboards.includes(d.id)).length;
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -113,55 +121,64 @@ export default function PresentationModeButton() {
         </DialogHeader>
         <div className="space-y-4">
           <ScrollArea className="h-[300px] pr-3">
-            <div className="space-y-4">
+            <Accordion type="multiple" defaultValue={["comercial"]} className="w-full">
               {DASHBOARD_CATEGORIES.map(category => {
                 const Icon = category.icon;
                 const isFullySelected = isCategoryFullySelected(category.id);
                 const isPartiallySelected = isCategoryPartiallySelected(category.id);
+                const selectedCount = getSelectedCount(category.id);
                 
                 return (
-                  <div key={category.id} className="space-y-2">
-                    <label 
-                      className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 rounded-md p-1.5 -ml-1.5"
-                    >
-                      <Checkbox
-                        checked={isFullySelected || (isPartiallySelected ? "indeterminate" : false)}
-                        onCheckedChange={() => toggleCategory(category.id)}
-                        data-testid={`checkbox-category-${category.id}`}
-                      />
-                      <Icon className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-semibold">{category.label}</span>
-                    </label>
-                    <div className="ml-7 space-y-1.5">
-                      {category.dashboards.map(d => (
-                        <label 
-                          key={d.id} 
-                          className="flex items-start gap-2 cursor-pointer hover:bg-accent/30 rounded-md p-1.5 -ml-1.5"
-                        >
-                          <Checkbox
-                            checked={selectedDashboards.includes(d.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedDashboards([...selectedDashboards, d.id]);
-                              } else {
-                                setSelectedDashboards(selectedDashboards.filter(id => id !== d.id));
-                              }
-                            }}
-                            data-testid={`checkbox-dashboard-${d.id}`}
-                          />
-                          <div className="grid gap-0.5 leading-none">
-                            <span className="text-sm font-medium">
-                              {d.label}
-                            </span>
-                            <p className="text-xs text-muted-foreground">{d.description}</p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+                  <AccordionItem key={category.id} value={category.id} className="border-b">
+                    <AccordionTrigger className="hover:no-underline py-3">
+                      <div className="flex items-center gap-3 flex-1">
+                        <Checkbox
+                          checked={isFullySelected || (isPartiallySelected ? "indeterminate" : false)}
+                          onCheckedChange={() => {}}
+                          onClick={(e) => toggleCategory(category.id, e)}
+                          data-testid={`checkbox-category-${category.id}`}
+                        />
+                        <Icon className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-semibold">{category.label}</span>
+                        {selectedCount > 0 && (
+                          <span className="text-xs text-muted-foreground ml-auto mr-2">
+                            {selectedCount}/{category.dashboards.length}
+                          </span>
+                        )}
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="ml-7 space-y-1.5 pb-2">
+                        {category.dashboards.map(d => (
+                          <label 
+                            key={d.id} 
+                            className="flex items-start gap-2 cursor-pointer hover:bg-accent/30 rounded-md p-1.5"
+                          >
+                            <Checkbox
+                              checked={selectedDashboards.includes(d.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedDashboards([...selectedDashboards, d.id]);
+                                } else {
+                                  setSelectedDashboards(selectedDashboards.filter(id => id !== d.id));
+                                }
+                              }}
+                              data-testid={`checkbox-dashboard-${d.id}`}
+                            />
+                            <div className="grid gap-0.5 leading-none">
+                              <span className="text-sm font-medium">
+                                {d.label}
+                              </span>
+                              <p className="text-xs text-muted-foreground">{d.description}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
                 );
               })}
-            </div>
+            </Accordion>
           </ScrollArea>
           
           <div className="space-y-2 pt-2 border-t">
