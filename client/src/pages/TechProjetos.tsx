@@ -7,6 +7,9 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { format, subDays } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import { 
   FolderOpen, 
   FolderCheck, 
@@ -176,15 +179,15 @@ export default function TechProjetos() {
   const [sortBy, setSortBy] = useState<'data' | 'valor' | 'prazo'>('data');
   
   // Filtros de período - padrão últimos 90 dias
-  const [startDate, setStartDate] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 90);
-    return d.toISOString().split('T')[0];
-  });
-  const [endDate, setEndDate] = useState<string>(() => {
-    return new Date().toISOString().split('T')[0];
-  });
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => ({
+    from: subDays(new Date(), 90),
+    to: new Date()
+  }));
   const [statsResponsavelFilter, setStatsResponsavelFilter] = useState<string>('todos');
+
+  // Derivar strings para API
+  const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+  const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
 
   const { data: tempoResponsavel, isLoading: isLoadingTempo } = useQuery<TechTempoResponsavel[]>({
     queryKey: ['/api/tech/tempo-responsavel', startDate, endDate, statsResponsavelFilter],
@@ -340,24 +343,11 @@ export default function TechProjetos() {
               
               {/* Barra de Filtros */}
               <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-[140px] h-9"
-                    data-testid="input-start-date"
-                  />
-                  <span className="text-muted-foreground">até</span>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-[140px] h-9"
-                    data-testid="input-end-date"
-                  />
-                </div>
+                <DateRangePicker
+                  value={dateRange}
+                  onChange={setDateRange}
+                  triggerClassName="h-9"
+                />
                 
                 <Select value={statsResponsavelFilter} onValueChange={setStatsResponsavelFilter}>
                   <SelectTrigger className="w-[160px] h-9" data-testid="select-stats-responsavel">
