@@ -5,6 +5,7 @@ import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package } from "lucide-react";
 import { Link } from "wouter";
+import { useSetPageInfo } from "@/contexts/PageContext";
 
 type ColaboradorComPatrimonios = Colaborador & {
   patrimonios: { id: number; numeroAtivo: string | null; descricao: string | null }[];
@@ -880,6 +881,8 @@ function DeleteConfirmDialog({ colaborador, open, onOpenChange }: { colaborador:
 }
 
 export default function Colaboradores() {
+  useSetPageInfo("Colaboradores", "Gerencie os colaboradores da sua equipe");
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [squadFilter, setSquadFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -947,13 +950,6 @@ export default function Colaboradores() {
   return (
     <div className="bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold mb-2">Colaboradores</h1>
-          <p className="text-muted-foreground">
-            Gerencie os colaboradores da sua equipe ({colaboradores.length} total)
-          </p>
-        </div>
-
         <div className="space-y-6">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="relative flex-1 min-w-[300px] max-w-md">
