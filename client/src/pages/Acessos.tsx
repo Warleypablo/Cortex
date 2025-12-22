@@ -1426,6 +1426,10 @@ function ClientsTab() {
     }
   };
 
+  const isTurboClient = (name: string | null | undefined) => {
+    return name?.toLowerCase().includes('turbo') || false;
+  };
+
   const sortedAndFilteredClients = useMemo(() => {
     let filtered = clients;
     if (searchQuery) {
@@ -1438,6 +1442,12 @@ function ClientsTab() {
     }
     
     return [...filtered].sort((a, b) => {
+      const aIsTurbo = isTurboClient(a.name);
+      const bIsTurbo = isTurboClient(b.name);
+      
+      if (aIsTurbo && !bIsTurbo) return -1;
+      if (!aIsTurbo && bIsTurbo) return 1;
+      
       let aVal: any;
       let bVal: any;
       
@@ -1545,7 +1555,10 @@ function ClientsTab() {
               {sortedAndFilteredClients.map((client) => (
                 <Fragment key={client.id}>
                   <TableRow 
-                    className="cursor-pointer hover-elevate"
+                    className={cn(
+                      "cursor-pointer hover-elevate",
+                      isTurboClient(client.name) && "bg-primary/5 border-l-2 border-l-primary"
+                    )}
                     onClick={() => toggleExpand(client.id)}
                     data-testid={`row-client-${client.id}`}
                   >
@@ -1558,7 +1571,16 @@ function ClientsTab() {
                         )}
                       </Button>
                     </TableCell>
-                    <TableCell className="font-medium">{client.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {client.name}
+                        {isTurboClient(client.name) && (
+                          <Badge variant="default" className="text-xs">
+                            Turbo
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge 
                         variant={client.status === 'cancelado' ? 'destructive' : 'outline'}
