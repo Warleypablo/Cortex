@@ -1465,8 +1465,9 @@ function ClientCredentialsSection({
 interface AIMatch {
   acessosId: string;
   acessosName: string;
-  cupCnpj: string;
-  cupNome: string;
+  cazId?: number;
+  cazCnpj: string;
+  cazNome: string;
   confidence: 'high' | 'medium' | 'low';
   reason: string;
 }
@@ -1495,8 +1496,8 @@ function AIMatchDialog({ onSuccess }: { onSuccess?: () => void }) {
   });
 
   const applyMatchMutation = useMutation({
-    mutationFn: async ({ acessosId, cupCnpj }: { acessosId: string; cupCnpj: string }) => {
-      const response = await apiRequest("POST", "/api/acessos/apply-match", { acessosId, cupCnpj });
+    mutationFn: async ({ acessosId, cazCnpj }: { acessosId: string; cazCnpj: string }) => {
+      const response = await apiRequest("POST", "/api/acessos/apply-match", { acessosId, cazCnpj });
       return await response.json();
     },
     onSuccess: (_data, variables) => {
@@ -1552,7 +1553,7 @@ function AIMatchDialog({ onSuccess }: { onSuccess?: () => void }) {
             Vincular Clientes por IA
           </DialogTitle>
           <DialogDescription>
-            Matches sugeridos pela IA entre clientes de Acessos e CRM
+            Matches sugeridos pela IA entre clientes de Acessos e Conta Azul
           </DialogDescription>
         </DialogHeader>
 
@@ -1584,7 +1585,7 @@ function AIMatchDialog({ onSuccess }: { onSuccess?: () => void }) {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium">{match.acessosName}</span>
                             <Link2 className="w-4 h-4 text-muted-foreground" />
-                            <span className="font-medium text-primary">{match.cupNome}</span>
+                            <span className="font-medium text-primary">{match.cazNome}</span>
                             {getConfidenceBadge(match.confidence)}
                           </div>
                           <p className="text-sm text-muted-foreground">{match.reason}</p>
@@ -1594,7 +1595,7 @@ function AIMatchDialog({ onSuccess }: { onSuccess?: () => void }) {
                           disabled={isApplied || applyMatchMutation.isPending}
                           onClick={() => applyMatchMutation.mutate({ 
                             acessosId: match.acessosId, 
-                            cupCnpj: match.cupCnpj 
+                            cazCnpj: match.cazCnpj 
                           })}
                           data-testid={`button-apply-match-${match.acessosId}`}
                         >
