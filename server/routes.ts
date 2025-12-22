@@ -8328,17 +8328,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (search) {
         const searchPattern = `%${search}%`;
         result = await db.execute(sql`
-          SELECT id, nome, cnpj, ativo 
-          FROM caz_clientes 
-          WHERE LOWER(nome) LIKE LOWER(${searchPattern}) OR LOWER(cnpj) LIKE LOWER(${searchPattern})
-          ORDER BY nome ASC
+          SELECT 
+            caz.id, 
+            caz.nome, 
+            caz.cnpj, 
+            caz.ativo,
+            CASE WHEN cl.id IS NOT NULL THEN true ELSE false END as has_credentials
+          FROM caz_clientes caz
+          LEFT JOIN clients cl ON LOWER(caz.nome) = LOWER(cl.name)
+          WHERE LOWER(caz.nome) LIKE LOWER(${searchPattern}) OR LOWER(caz.cnpj) LIKE LOWER(${searchPattern})
+          ORDER BY caz.nome ASC
           LIMIT 50
         `);
       } else {
         result = await db.execute(sql`
-          SELECT id, nome, cnpj, ativo 
-          FROM caz_clientes 
-          ORDER BY nome ASC
+          SELECT 
+            caz.id, 
+            caz.nome, 
+            caz.cnpj, 
+            caz.ativo,
+            CASE WHEN cl.id IS NOT NULL THEN true ELSE false END as has_credentials
+          FROM caz_clientes caz
+          LEFT JOIN clients cl ON LOWER(caz.nome) = LOWER(cl.name)
+          ORDER BY caz.nome ASC
           LIMIT 50
         `);
       }
@@ -8349,6 +8361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: row.nome,
         cnpj: row.cnpj,
         status: row.ativo === 'Ativo' ? 'ativo' : 'cancelado',
+        hasCredentials: row.has_credentials === true || row.has_credentials === 't' || row.has_credentials === 'true',
       }));
       
       res.json(mapped);
