@@ -52,6 +52,9 @@ import RevenueGoals from "@/pages/RevenueGoals";
 import CasesChat from "@/pages/CasesChat";
 import JuridicoClientes from "@/pages/JuridicoClientes";
 import InvestorsReport from "@/pages/InvestorsReport";
+import Acessos from "@/pages/Acessos";
+import Conhecimentos from "@/pages/Conhecimentos";
+import Beneficios from "@/pages/Beneficios";
 import { AssistantWidget } from "@/components/AssistantWidget";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -165,6 +168,9 @@ function ProtectedRouter() {
       <Route path="/cases/chat">{() => <ProtectedRoute path="/cases/chat" component={CasesChat} />}</Route>
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/admin/logs">{() => <ProtectedRoute path="/admin/logs" component={AdminLogs} />}</Route>
+      <Route path="/acessos">{() => <ProtectedRoute path="/acessos" component={Acessos} />}</Route>
+      <Route path="/conhecimentos">{() => <ProtectedRoute path="/conhecimentos" component={Conhecimentos} />}</Route>
+      <Route path="/beneficios">{() => <ProtectedRoute path="/beneficios" component={Beneficios} />}</Route>
       <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>
       <Route>
         {() => (
