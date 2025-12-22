@@ -1043,25 +1043,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const row = result.rows[0] as any;
       
-      // Fetch promotion history
-      const promocoesResult = await db.execute(sql`
-        SELECT 
-          id, 
-          colaborador_id as "colaboradorId",
-          data_promocao as "dataPromocao",
-          cargo_anterior as "cargoAnterior",
-          cargo_novo as "cargoNovo",
-          nivel_anterior as "nivelAnterior",
-          nivel_novo as "nivelNovo",
-          salario_anterior as "salarioAnterior",
-          salario_novo as "salarioNovo",
-          observacoes,
-          criado_em as "criadoEm",
-          criado_por as "criadoPor"
-        FROM rh_promocoes 
-        WHERE colaborador_id = ${id}
-        ORDER BY data_promocao DESC
-      `);
+      // Fetch promotion history (gracefully handle missing table)
+      let promocoesResult = { rows: [] as any[] };
+      try {
+        promocoesResult = await db.execute(sql`
+          SELECT 
+            id, 
+            colaborador_id as "colaboradorId",
+            data_promocao as "dataPromocao",
+            cargo_anterior as "cargoAnterior",
+            cargo_novo as "cargoNovo",
+            nivel_anterior as "nivelAnterior",
+            nivel_novo as "nivelNovo",
+            salario_anterior as "salarioAnterior",
+            salario_novo as "salarioNovo",
+            observacoes,
+            criado_em as "criadoEm",
+            criado_por as "criadoPor"
+          FROM rh_promocoes 
+          WHERE colaborador_id = ${id}
+          ORDER BY data_promocao DESC
+        `);
+      } catch (promoError: any) {
+        // Table doesn't exist - continue with empty array
+        if (promoError?.code !== '42P01') {
+          console.error("[api] Error fetching promocoes:", promoError);
+        }
+      }
       
       // Fetch linked user info if user_id exists
       let linkedUser = null;
@@ -1264,7 +1272,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY nome
       `);
       res.json(result.rows);
-    } catch (error) {
+    } catch (error: any) {
+      // Return empty array if table doesn't exist
+      if (error?.code === '42P01') {
+        return res.json([]);
+      }
       console.error("[api] Error fetching cargos:", error);
       res.status(500).json({ error: "Failed to fetch cargos" });
     }
@@ -1315,7 +1327,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY ordem, nome
       `);
       res.json(result.rows);
-    } catch (error) {
+    } catch (error: any) {
+      // Return empty array if table doesn't exist
+      if (error?.code === '42P01') {
+        return res.json([]);
+      }
       console.error("[api] Error fetching niveis:", error);
       res.status(500).json({ error: "Failed to fetch niveis" });
     }
@@ -1366,7 +1382,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY nome
       `);
       res.json(result.rows);
-    } catch (error) {
+    } catch (error: any) {
+      // Return empty array if table doesn't exist
+      if (error?.code === '42P01') {
+        return res.json([]);
+      }
       console.error("[api] Error fetching squads:", error);
       res.status(500).json({ error: "Failed to fetch squads" });
     }
