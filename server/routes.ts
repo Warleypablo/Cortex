@@ -8307,7 +8307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const search = req.query.search as string;
       
-      // First get the turbo_tools count for Turbo clients
+      // First get the turbo_tools count for Turbo Partners specifically
       const turboToolsCount = await db.execute(sql`SELECT COUNT(*) as count FROM turbo_tools`);
       const turboCount = parseInt((turboToolsCount.rows[0] as any)?.count) || 0;
       
@@ -8317,7 +8317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         result = await db.execute(sql`
           SELECT c.*, 
             CASE 
-              WHEN LOWER(c.name) LIKE '%turbo%' THEN ${turboCount}
+              WHEN LOWER(TRIM(c.name)) = 'turbo partners' THEN ${turboCount}
               ELSE (SELECT COUNT(*) FROM credentials cr WHERE cr.client_id = c.id)
             END as credential_count 
           FROM clients c 
@@ -8328,7 +8328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         result = await db.execute(sql`
           SELECT c.*, 
             CASE 
-              WHEN LOWER(c.name) LIKE '%turbo%' THEN ${turboCount}
+              WHEN LOWER(TRIM(c.name)) = 'turbo partners' THEN ${turboCount}
               ELSE (SELECT COUNT(*) FROM credentials cr WHERE cr.client_id = c.id)
             END as credential_count 
           FROM clients c 
