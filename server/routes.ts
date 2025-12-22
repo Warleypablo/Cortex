@@ -8696,54 +8696,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         unmatchedAcessos.push(acessos);
       }
       
-      // Second pass: AI matching for unmatched clients (batch processing)
-      if (unmatchedAcessos.length > 0 && cazList.length > 0) {
-        // Process in batches of 20 to avoid token limits
-        const batchSize = 20;
-        for (let i = 0; i < unmatchedAcessos.length; i += batchSize) {
-          const batch = unmatchedAcessos.slice(i, i + batchSize);
-          
-          const prompt = `Você é um especialista em vincular empresas entre dois sistemas diferentes.
-
-TAREFA: Para cada empresa da Lista A, encontre a correspondência mais provável na Lista B, baseando-se APENAS na SIMILARIDADE DO NOME.
-
-LISTA A (Empresas a vincular - módulo Acessos):
-${batch.map(a => `- ID: ${a.id} | Nome: "${a.name}"`).join('\n')}
-
-LISTA B (Clientes do Conta Azul - escolha daqui):
-${cazList.map(c => `- ID: ${c.id} | CNPJ: ${c.cnpj} | Nome: "${c.nome}"`).join('\n')}
-
-REGRAS DE MATCHING POR NOME:
-1. ALTA confiança: Nome praticamente idêntico (ex: "Lojas ABC" = "LOJAS ABC LTDA")
-2. MÉDIA confiança: Nome principal igual com variações (ex: "ABC Store" = "ABC Store Brasil")  
-3. BAIXA confiança: Apenas parte do nome corresponde (ex: "ABC" parcialmente em "ABC Comercio")
-4. Se não houver match claro, NÃO inclua
-
-RETORNE um JSON array com objetos neste formato EXATO:
-[{"acessosId":"id da Lista A","acessosName":"nome da Lista A","cazId":"id da Lista B","cazCnpj":"cnpj da Lista B","cazNome":"nome da Lista B","confidence":"high|medium|low","reason":"explicação breve"}]
-
-Retorne APENAS o JSON, sem markdown ou texto adicional.`;
-
-          try {
-            const response = await openai.chat.completions.create({
-              model: "gpt-4o",
-              messages: [{ role: "user", content: prompt }],
-              temperature: 0.1,
-              max_tokens: 4000,
-            });
-
-            const content = response.choices[0].message.content || "[]";
-            
-            // Parse JSON from response
-            const jsonMatch = content.match(/\[[\s\S]*?\]/);
-            if (jsonMatch) {
-              const batchMatches = JSON.parse(jsonMatch[0]);
-              // Include all confidence levels (high, medium, low)
-              matches.push(...batchMatches);
-            }
-          } catch (parseError) {
-            console.error("[api] Error in AI batch matching:", parseError);
+      // Fourth pass: Add LOW confidence matches for remaining unmatched (50-79% similarity)
+      for (const acessos of unmatchedAcessos) {
+        let bestMatch = null;
+        let bestSimilarity = 0;
+        for (const caz of cazList) {
+          const sim = similarity(acessos.core, caz.core);
+          if (sim > bestSimilarity && sim >= 0.5 && sim < 0.8) {
+            bestSimilarity = sim;
+            bestMatch = caz;
           }
+        }
+        
+        if (bestMatch && bestSimilarity >= 0.5) {
+          matches.push({
+            acessosId: acessos.id,
+            acessosName: acessos.name,
+            cazId: bestMatch.id,
+            cazCnpj: bestMatch.cnpj,
+            cazNome: bestMatch.nome,
+            confidence: "low",
+            reason: `Similaridade parcial (${Math.round(bestSimilarity * 100)}%)`
+          });
         }
       }
       
