@@ -8261,6 +8261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     cnpj: row.cnpj,
     status: row.status || 'ativo',
     additionalInfo: row.additional_info,
+    linkedClientCnpj: row.linked_client_cnpj,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -8441,7 +8442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/acessos/clients/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, cnpj, status, additionalInfo } = req.body;
+      const { name, cnpj, status, additionalInfo, linkedClientCnpj } = req.body;
       
       const result = await db.execute(sql`
         UPDATE clients 
@@ -8449,6 +8450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             cnpj = COALESCE(${cnpj}, cnpj),
             status = COALESCE(${status}, status),
             additional_info = COALESCE(${additionalInfo}, additional_info),
+            linked_client_cnpj = ${linkedClientCnpj ?? null},
             updated_at = NOW()
         WHERE id = ${id}
         RETURNING *
@@ -8462,6 +8464,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error updating client:", error);
       res.status(500).json({ error: "Failed to update client" });
+    }
+  });
+
+  // GET cupClientes list for linking
+  app.get("/api/acessos/cup-clientes", async (req, res) => {
+    try {
+      const search = req.query.search as string;
+      
+      let result;
+      if (search) {
+        const searchPattern = `%${search}%`;
+        result = await db.execute(sql`
+          SELECT nome, cnpj, status 
+          FROM cup_clientes 
+          WHERE (nome ILIKE ${searchPattern} OR cnpj ILIKE ${searchPattern})
+          AND status = 'Ativo'
+          ORDER BY nome
+          LIMIT 50
+        `);
+      } else {
+        result = await db.execute(sql`
+          SELECT nome, cnpj, status 
+          FROM cup_clientes 
+          WHERE status = 'Ativo'
+          ORDER BY nome
+          LIMIT 100
+        `);
+      }
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching cup_clientes:", error);
+      res.status(500).json({ error: "Failed to fetch cup_clientes" });
+    }
+  });
+
+  // POST AI matching for client linking
+  app.post("/api/acessos/ai-match-clients", async (req, res) => {
+    try {
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      
+      // Get unlinked acessos clients
+      const acessosClients = await db.execute(sql`
+        SELECT id, name, cnpj FROM clients WHERE linked_client_cnpj IS NULL
+      `);
+      
+      // Get active cup_clientes
+      const cupClientes = await db.execute(sql`
+        SELECT nome, cnpj FROM cup_clientes WHERE status = 'Ativo'
+      `);
+      
+      if (acessosClients.rows.length === 0 || cupClientes.rows.length === 0) {
+        return res.json({ matches: [], message: "No unlinked clients or no active clients to match" });
+      }
+      
+      const acessosList = acessosClients.rows.map((r: any) => ({ id: r.id, name: r.name, cnpj: r.cnpj }));
+      const cupList = cupClientes.rows.map((r: any) => ({ nome: r.nome, cnpj: r.cnpj }));
+      
+      const prompt = `Você é um assistente que ajuda a vincular clientes entre dois sistemas.
+
+Sistema A (Acessos - credenciais):
+${JSON.stringify(acessosList, null, 2)}
+
+Sistema B (CRM - clientes ativos):
+${JSON.stringify(cupList, null, 2)}
+
+Analise os nomes e CNPJs e encontre correspondências prováveis entre os dois sistemas.
+Para cada match encontrado, retorne um JSON array com objetos no formato:
+{
+  "acessosId": "id do cliente no Sistema A",
+  "acessosName": "nome no Sistema A",
+  "cupCnpj": "cnpj do cliente no Sistema B",
+  "cupNome": "nome no Sistema B",
+  "confidence": "high" | "medium" | "low",
+  "reason": "razão do match"
+}
+
+Considere:
+- Match exato de CNPJ = confidence high
+- Nomes muito similares = confidence medium/high
+- Nomes parcialmente similares = confidence low
+
+Retorne APENAS o JSON array, sem explicações adicionais.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.2,
+      });
+
+      const content = response.choices[0].message.content || "[]";
+      let matches = [];
+      
+      try {
+        // Try to parse JSON from the response
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          matches = JSON.parse(jsonMatch[0]);
+        }
+      } catch (parseError) {
+        console.error("[api] Error parsing AI response:", parseError);
+      }
+      
+      res.json({ matches });
+    } catch (error) {
+      console.error("[api] Error in AI matching:", error);
+      res.status(500).json({ error: "Failed to run AI matching" });
+    }
+  });
+
+  // POST apply AI match - link a single client
+  app.post("/api/acessos/apply-match", async (req, res) => {
+    try {
+      const { acessosId, cupCnpj } = req.body;
+      
+      if (!acessosId || !cupCnpj) {
+        return res.status(400).json({ error: "acessosId and cupCnpj are required" });
+      }
+      
+      const result = await db.execute(sql`
+        UPDATE clients 
+        SET linked_client_cnpj = ${cupCnpj},
+            updated_at = NOW()
+        WHERE id = ${acessosId}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      res.json({ success: true, client: mapClient(result.rows[0]) });
+    } catch (error) {
+      console.error("[api] Error applying match:", error);
+      res.status(500).json({ error: "Failed to apply match" });
+    }
+  });
+
+  // GET credentials by linked client CNPJ (for client detail page)
+  app.get("/api/acessos/credentials-by-cnpj/:cnpj", async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      
+      const result = await db.execute(sql`
+        SELECT c.*, cr.*
+        FROM clients c
+        INNER JOIN credentials cr ON c.id = cr.client_id
+        WHERE c.linked_client_cnpj = ${cnpj}
+        ORDER BY cr.platform
+      `);
+      
+      const grouped: { [key: string]: any } = {};
+      
+      for (const row of result.rows as any[]) {
+        const clientId = row.id;
+        if (!grouped[clientId]) {
+          grouped[clientId] = {
+            id: row.id,
+            name: row.name,
+            credentials: []
+          };
+        }
+        if (row.client_id) {
+          grouped[clientId].credentials.push({
+            id: row.id,
+            platform: row.platform,
+            username: row.username,
+            password: row.password,
+            accessUrl: row.access_url,
+            observations: row.observations
+          });
+        }
+      }
+      
+      res.json(Object.values(grouped));
+    } catch (error) {
+      console.error("[api] Error fetching credentials by CNPJ:", error);
+      res.status(500).json({ error: "Failed to fetch credentials" });
     }
   });
 
