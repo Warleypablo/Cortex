@@ -1,10 +1,17 @@
 import { useState, useMemo, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { Client, Credential, InsertClient, InsertCredential, AccessLog } from "@shared/schema";
+import type { Client, Credential, InsertClient, InsertCredential, AccessLog, ClientStatus } from "@shared/schema";
 import { insertClientSchema, insertCredentialSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Key, Lock, Loader2, ChevronDown, ChevronRight, Building2, History } from "lucide-react";
+import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Key, Lock, Loader2, ChevronDown, ChevronRight, Building2, History, ArrowUpDown } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -133,6 +140,7 @@ function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }
     defaultValues: {
       name: "",
       cnpj: "",
+      status: "ativo",
       additionalInfo: "",
     },
   });
@@ -219,6 +227,28 @@ function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }
 
             <FormField
               control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value || "ativo"}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-client-status">
+                        <SelectValue placeholder="Selecione o status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="cancelado">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="additionalInfo"
               render={({ field }) => (
                 <FormItem>
@@ -286,6 +316,7 @@ function EditClientDialog({
     defaultValues: {
       name: client.name || "",
       cnpj: client.cnpj || "",
+      status: (client.status as ClientStatus) || "ativo",
       additionalInfo: client.additionalInfo || "",
     },
   });
@@ -357,6 +388,28 @@ function EditClientDialog({
                   <FormControl>
                     <Input {...field} value={field.value || ""} data-testid="input-edit-client-cnpj" />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value || "ativo"}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-edit-client-status">
+                        <SelectValue placeholder="Selecione o status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="cancelado">Cancelado</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -1115,11 +1168,16 @@ function LogsTab() {
   );
 }
 
+type SortField = 'name' | 'status' | 'credential_count' | 'createdAt';
+type SortDirection = 'asc' | 'desc';
+
 function ClientsTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const { toast } = useToast();
   const createLog = useCreateLog();
 
@@ -1157,19 +1215,73 @@ function ClientsTab() {
     },
   });
 
-  const filteredClients = useMemo(() => {
-    if (!searchQuery) return clients;
-    const query = searchQuery.toLowerCase();
-    return clients.filter(
-      (client) =>
-        client.name?.toLowerCase().includes(query) ||
-        client.cnpj?.toLowerCase().includes(query)
-    );
-  }, [clients, searchQuery]);
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedAndFilteredClients = useMemo(() => {
+    let filtered = clients;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = clients.filter(
+        (client) =>
+          client.name?.toLowerCase().includes(query) ||
+          client.cnpj?.toLowerCase().includes(query)
+      );
+    }
+    
+    return [...filtered].sort((a, b) => {
+      let aVal: any;
+      let bVal: any;
+      
+      switch (sortField) {
+        case 'name':
+          aVal = a.name?.toLowerCase() || '';
+          bVal = b.name?.toLowerCase() || '';
+          break;
+        case 'status':
+          aVal = a.status || 'ativo';
+          bVal = b.status || 'ativo';
+          break;
+        case 'credential_count':
+          aVal = a.credential_count || 0;
+          bVal = b.credential_count || 0;
+          break;
+        case 'createdAt':
+          aVal = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          bVal = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [clients, searchQuery, sortField, sortDirection]);
 
   const toggleExpand = (clientId: string) => {
     setExpandedClient(expandedClient === clientId ? null : clientId);
   };
+
+  const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-8 px-2 -ml-2 font-medium"
+      onClick={() => handleSort(field)}
+      data-testid={`sort-${field}`}
+    >
+      {children}
+      <ArrowUpDown className={`ml-1 h-3 w-3 ${sortField === field ? 'opacity-100' : 'opacity-50'}`} />
+    </Button>
+  );
 
   if (isLoading) {
     return (
@@ -1185,7 +1297,7 @@ function ClientsTab() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Buscar por nome ou CNPJ..."
+            placeholder="Buscar por empresa..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -1194,7 +1306,7 @@ function ClientsTab() {
         </div>
       </div>
 
-      {filteredClients.length === 0 ? (
+      {sortedAndFilteredClients.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Building2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium">
@@ -1212,15 +1324,23 @@ function ClientsTab() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[40px]"></TableHead>
-                <TableHead>Nome</TableHead>
-                <TableHead>CNPJ</TableHead>
-                <TableHead className="text-center">Credenciais</TableHead>
-                <TableHead>Data Criação</TableHead>
+                <TableHead>
+                  <SortableHeader field="name">Empresa</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader field="status">Status</SortableHeader>
+                </TableHead>
+                <TableHead className="text-center">
+                  <SortableHeader field="credential_count">Credenciais</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader field="createdAt">Data Criação</SortableHeader>
+                </TableHead>
                 <TableHead className="w-[100px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredClients.map((client) => (
+              {sortedAndFilteredClients.map((client) => (
                 <Fragment key={client.id}>
                   <TableRow 
                     className="cursor-pointer hover-elevate"
@@ -1237,7 +1357,14 @@ function ClientsTab() {
                       </Button>
                     </TableCell>
                     <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell>{formatCNPJ(client.cnpj)}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        variant={client.status === 'cancelado' ? 'destructive' : 'outline'}
+                        className={client.status !== 'cancelado' ? 'border-green-500 text-green-600 dark:text-green-400' : ''}
+                      >
+                        {client.status === 'cancelado' ? 'Cancelado' : 'Ativo'}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="secondary">
                         {client.credential_count || 0}
