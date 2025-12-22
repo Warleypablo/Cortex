@@ -177,6 +177,7 @@ export const rhPessoal = pgTable("rh_pessoal", {
   mesesDeTurbo: integer("meses_de_turbo"),
   ultimoAumento: date("ultimo_aumento"),
   mesesUltAumento: integer("meses_ult_aumento"),
+  salario: decimal("salario"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
