@@ -1114,7 +1114,7 @@ export type JuridicoCliente = typeof juridicoClientes.$inferSelect;
 export type InsertJuridicoCliente = z.infer<typeof insertJuridicoClienteSchema>;
 
 // Global Search Types
-export type SearchEntityType = 'cliente' | 'colaborador' | 'contrato' | 'cobranca' | 'projeto';
+export type SearchEntityType = 'cliente' | 'colaborador' | 'contrato' | 'cobranca' | 'projeto' | 'acesso' | 'credencial' | 'conhecimento' | 'ferramenta' | 'patrimonio' | 'beneficio';
 
 export interface SearchResult {
   id: string;
