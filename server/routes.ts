@@ -8419,6 +8419,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST initialize Turbo Partners with internal tools credentials
+  app.post("/api/acessos/init-turbo-tools", async (req, res) => {
+    try {
+      const createdBy = (req as any).user?.email || null;
+      
+      // Check if Turbo Partners already exists
+      let turboClient = await db.execute(sql`
+        SELECT * FROM clients WHERE LOWER(name) LIKE '%turbo partners%' LIMIT 1
+      `);
+      
+      let clientId: string;
+      
+      if (turboClient.rows.length === 0) {
+        // Create Turbo Partners client
+        const newClient = await db.execute(sql`
+          INSERT INTO clients (name, cnpj, status, additional_info, created_by)
+          VALUES ('Turbo Partners', '00.000.000/0001-00', 'ativo', 'Empresa matriz - Turbo Partners', ${createdBy})
+          RETURNING *
+        `);
+        clientId = (newClient.rows[0] as any).id;
+      } else {
+        clientId = (turboClient.rows[0] as any).id;
+      }
+      
+      // Define Turbo Tools
+      const turboTools = [
+        { platform: "Moniturbo", url: "https://moniturbo.turbopartners.com.br/", observations: "Sistema de monitoramento e análise de performance" },
+        { platform: "Sistema de Contratos", url: "https://contratos.turbopartners.com.br", observations: "Gestão completa de contratos e documentos" },
+        { platform: "Turbo Commerce", url: "https://app.turbodash.com.br/", observations: "Dashboard de métricas e KPIs de e-commerce" },
+        { platform: "UGC Hub", url: "#", observations: "Central de conteúdo gerado por usuários" },
+        { platform: "Sistema de Acessos", url: "#", observations: "Gerenciamento de permissões e autenticação" },
+      ];
+      
+      // Insert credentials that don't exist yet
+      for (const tool of turboTools) {
+        const existing = await db.execute(sql`
+          SELECT id FROM credentials 
+          WHERE client_id = ${clientId} AND LOWER(platform) = LOWER(${tool.platform})
+        `);
+        
+        if (existing.rows.length === 0) {
+          await db.execute(sql`
+            INSERT INTO credentials (client_id, platform, access_url, observations, created_by)
+            VALUES (${clientId}, ${tool.platform}, ${tool.url}, ${tool.observations}, ${createdBy})
+          `);
+        }
+      }
+      
+      res.json({ success: true, message: "Turbo Tools initialized successfully", clientId });
+    } catch (error) {
+      console.error("[api] Error initializing Turbo Tools:", error);
+      res.status(500).json({ error: "Failed to initialize Turbo Tools" });
+    }
+  });
+
   // PATCH update client
   app.patch("/api/acessos/clients/:id", async (req, res) => {
     try {

@@ -1383,6 +1383,12 @@ function ClientsTab() {
   const { toast } = useToast();
   const createLog = useCreateLog();
 
+  useEffect(() => {
+    fetch("/api/acessos/init-turbo-tools", { method: "POST" })
+      .then(() => queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients"] }))
+      .catch(() => {});
+  }, []);
+
   const { data: clients = [], isLoading } = useQuery<ClientWithCredentialCount[]>({
     queryKey: ["/api/acessos/clients"],
   });
