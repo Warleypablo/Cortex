@@ -1263,6 +1263,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============ RH Cargos Endpoints ============
+  // Default options when table is empty or doesn't exist
+  const defaultCargos = [
+    { id: 1, nome: "Estagiário", descricao: null, ativo: "true" },
+    { id: 2, nome: "Assistente", descricao: null, ativo: "true" },
+    { id: 3, nome: "Analista", descricao: null, ativo: "true" },
+    { id: 4, nome: "Especialista", descricao: null, ativo: "true" },
+    { id: 5, nome: "Coordenador", descricao: null, ativo: "true" },
+    { id: 6, nome: "Gerente", descricao: null, ativo: "true" },
+    { id: 7, nome: "Diretor", descricao: null, ativo: "true" },
+  ];
+  
+  const defaultNiveis = [
+    { id: 1, nome: "Júnior", ordem: 1, ativo: "true" },
+    { id: 2, nome: "Pleno", ordem: 2, ativo: "true" },
+    { id: 3, nome: "Sênior", ordem: 3, ativo: "true" },
+    { id: 4, nome: "Especialista", ordem: 4, ativo: "true" },
+    { id: 5, nome: "Lead", ordem: 5, ativo: "true" },
+  ];
+  
+  const defaultSquads = [
+    { id: 1, nome: "Financeiro", descricao: null, ativo: "true" },
+    { id: 2, nome: "G&G", descricao: null, ativo: "true" },
+    { id: 3, nome: "Operação", descricao: null, ativo: "true" },
+    { id: 4, nome: "Tech", descricao: null, ativo: "true" },
+    { id: 5, nome: "Comercial", descricao: null, ativo: "true" },
+    { id: 6, nome: "Growth", descricao: null, ativo: "true" },
+    { id: 7, nome: "Jurídico", descricao: null, ativo: "true" },
+    { id: 8, nome: "Vendas", descricao: null, ativo: "true" },
+  ];
+
   app.get("/api/rh/cargos", async (req, res) => {
     try {
       const result = await db.execute(sql`
@@ -1271,11 +1301,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE ativo = 'true' 
         ORDER BY nome
       `);
+      // Return defaults if table is empty
+      if (result.rows.length === 0) {
+        return res.json(defaultCargos);
+      }
       res.json(result.rows);
     } catch (error: any) {
-      // Return empty array if table doesn't exist
+      // Return default options if table doesn't exist
       if (error?.code === '42P01') {
-        return res.json([]);
+        return res.json(defaultCargos);
       }
       console.error("[api] Error fetching cargos:", error);
       res.status(500).json({ error: "Failed to fetch cargos" });
@@ -1326,11 +1360,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE ativo = 'true' 
         ORDER BY ordem, nome
       `);
+      // Return defaults if table is empty
+      if (result.rows.length === 0) {
+        return res.json(defaultNiveis);
+      }
       res.json(result.rows);
     } catch (error: any) {
-      // Return empty array if table doesn't exist
+      // Return default options if table doesn't exist
       if (error?.code === '42P01') {
-        return res.json([]);
+        return res.json(defaultNiveis);
       }
       console.error("[api] Error fetching niveis:", error);
       res.status(500).json({ error: "Failed to fetch niveis" });
@@ -1381,11 +1419,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE ativo = 'true' 
         ORDER BY nome
       `);
+      // Return defaults if table is empty
+      if (result.rows.length === 0) {
+        return res.json(defaultSquads);
+      }
       res.json(result.rows);
     } catch (error: any) {
-      // Return empty array if table doesn't exist
+      // Return default options if table doesn't exist
       if (error?.code === '42P01') {
-        return res.json([]);
+        return res.json(defaultSquads);
       }
       console.error("[api] Error fetching squads:", error);
       res.status(500).json({ error: "Failed to fetch squads" });
@@ -1470,6 +1512,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid data", details: validation.error });
       }
       const { dataPromocao, cargoAnterior, cargoNovo, nivelAnterior, nivelNovo, salarioAnterior, salarioNovo, observacoes, criadoPor } = validation.data;
+      
+      // Insert the promotion record
       const result = await db.execute(sql`
         INSERT INTO rh_promocoes (colaborador_id, data_promocao, cargo_anterior, cargo_novo, nivel_anterior, nivel_novo, salario_anterior, salario_novo, observacoes, criado_por)
         VALUES (${colaboradorId}, ${dataPromocao}, ${cargoAnterior || null}, ${cargoNovo || null}, ${nivelAnterior || null}, ${nivelNovo || null}, ${salarioAnterior || null}, ${salarioNovo || null}, ${observacoes || null}, ${criadoPor || null})
@@ -1487,6 +1531,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           criado_em as "criadoEm",
           criado_por as "criadoPor"
       `);
+      
+      // Also update the colaborador with new values
+      try {
+        await db.execute(sql`
+          UPDATE rh_pessoal 
+          SET 
+            cargo = COALESCE(${cargoNovo || null}, cargo),
+            nivel = COALESCE(${nivelNovo || null}, nivel),
+            salario = COALESCE(${salarioNovo || null}, salario),
+            ultimo_aumento = ${dataPromocao}
+          WHERE id = ${colaboradorId}
+        `);
+      } catch (updateError) {
+        console.error("[api] Error updating colaborador after promotion:", updateError);
+        // Don't fail the request if update fails
+      }
+      
       res.status(201).json(result.rows[0]);
     } catch (error) {
       console.error("[api] Error creating promocao:", error);
