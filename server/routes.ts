@@ -8267,6 +8267,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to map credential snake_case to camelCase
+  const mapCredential = (row: any) => ({
+    id: row.id,
+    clientId: row.client_id,
+    platform: row.platform,
+    username: row.username,
+    password: row.password,
+    accessUrl: row.access_url,
+    observations: row.observations,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  });
+
   // GET single client with credentials
   app.get("/api/acessos/clients/:id", async (req, res) => {
     try {
@@ -8281,9 +8295,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT * FROM credentials WHERE client_id = ${id} ORDER BY platform
       `);
       
+      const client = clientResult.rows[0] as any;
       res.json({
-        ...clientResult.rows[0],
-        credentials: credentialsResult.rows
+        id: client.id,
+        name: client.name,
+        cnpj: client.cnpj,
+        additionalInfo: client.additional_info,
+        createdBy: client.created_by,
+        createdAt: client.created_at,
+        updatedAt: client.updated_at,
+        credentials: credentialsResult.rows.map(mapCredential)
       });
     } catch (error) {
       console.error("[api] Error fetching client:", error);
@@ -8374,7 +8395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.execute(sql`
         SELECT * FROM credentials WHERE client_id = ${clientId} ORDER BY platform
       `);
-      res.json(result.rows);
+      res.json(result.rows.map(mapCredential));
     } catch (error) {
       console.error("[api] Error fetching credentials:", error);
       res.status(500).json({ error: "Failed to fetch credentials" });
@@ -8397,7 +8418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         RETURNING *
       `);
       
-      res.status(201).json(result.rows[0]);
+      res.status(201).json(mapCredential(result.rows[0]));
     } catch (error) {
       console.error("[api] Error creating credential:", error);
       res.status(500).json({ error: "Failed to create credential" });
@@ -8426,7 +8447,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Credential not found" });
       }
       
-      res.json(result.rows[0]);
+      res.json(mapCredential(result.rows[0]));
     } catch (error) {
       console.error("[api] Error updating credential:", error);
       res.status(500).json({ error: "Failed to update credential" });
