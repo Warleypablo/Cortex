@@ -1,0 +1,103 @@
+## Importar Dados de Courses, Benefits e Turbo Tools
+
+Preciso importar dados de cursos, beneficios e ferramentas Turbo de arquivos CSV para o PostgreSQL (via DB_HOST).
+
+### 1. Criar ENUMs
+
+-- Status do curso
+CREATE TYPE course_status AS ENUM ('ativo', 'vitalicio', 'cancelado', 'sem_status');
+
+-- Segmento de beneficio
+CREATE TYPE benefit_segment AS ENUM ('alimentos', 'beleza_cosmeticos', 'casa_cozinha', 'tecnologia', 'pet', 'plantas_agro', 'suplementacao', 'moda');
+
+-- Recorrencia de pagamento
+CREATE TYPE recorrencia AS ENUM ('Mensal', 'Anual');
+
+### 2. Criar Tabelas
+
+-- Tabela de Cursos (Conhecimentos)
+CREATE TABLE IF NOT EXISTS courses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome TEXT NOT NULL,
+    status course_status NOT NULL DEFAULT 'sem_status',
+    tema_principal TEXT NOT NULL,
+    plataforma TEXT NOT NULL,
+    url TEXT,
+    login TEXT,
+    senha TEXT,
+    created_by UUID,
+    created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS courses_nome_idx ON courses(nome);
+CREATE INDEX IF NOT EXISTS courses_status_idx ON courses(status);
+CREATE INDEX IF NOT EXISTS courses_tema_principal_idx ON courses(tema_principal);
+CREATE INDEX IF NOT EXISTS courses_plataforma_idx ON courses(plataforma);
+
+-- Tabela de Beneficios (Clube de Beneficios)
+CREATE TABLE IF NOT EXISTS benefits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    empresa TEXT NOT NULL,
+    cupom TEXT NOT NULL,
+    desconto TEXT NOT NULL,
+    site TEXT NOT NULL,
+    segmento benefit_segment NOT NULL,
+    created_by UUID,
+    created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS benefits_empresa_idx ON benefits(empresa);
+CREATE INDEX IF NOT EXISTS benefits_segmento_idx ON benefits(segmento);
+CREATE INDEX IF NOT EXISTS benefits_cupom_idx ON benefits(cupom);
+
+-- Tabela de Ferramentas Turbo (Turbo Acessos)
+CREATE TABLE IF NOT EXISTS turbo_tools (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    login TEXT,
+    password TEXT,
+    site TEXT,
+    observations TEXT,
+    valor TEXT,
+    recorrencia recorrencia,
+    data_primeiro_pagamento TIMESTAMP,
+    created_by UUID,
+    created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS turbo_tools_name_idx ON turbo_tools(name);
+
+### 3. Colunas dos CSV
+
+**courses_data.csv:**
+id, nome, status, tema_principal, plataforma, url, login, senha, created_by, created_at, updated_at
+
+**benefits_data.csv:**
+id, empresa, cupom, desconto, site, segmento, created_by, created_at, updated_at
+
+**turbo_tools_data.csv:**
+id, name, login, password, site, observations, created_by, created_at, updated_at, valor, recorrencia, data_primeiro_pagamento
+
+### 4. Importar Dados
+
+Ordem de importacao:
+1. courses (independente)
+2. benefits (independente)
+3. turbo_tools (independente)
+
+Comandos psql:
+\COPY courses FROM 'courses_data.csv' WITH CSV HEADER;
+\COPY benefits FROM 'benefits_data.csv' WITH CSV HEADER;
+\COPY turbo_tools FROM 'turbo_tools_data.csv' WITH CSV HEADER;
+
+Ou crie um script Node.js que:
+1. Leia os arquivos CSV
+2. Faca INSERT em lote no banco de dados
+3. Use ON CONFLICT DO NOTHING para evitar duplicatas
+
+### Conexao com Google Cloud
+
+A conexao deve usar a variavel de ambiente DATABASE_URL ou DB_HOST que ja esta configurada no projeto.
