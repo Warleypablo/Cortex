@@ -178,7 +178,6 @@ export const rhPessoal = pgTable("rh_pessoal", {
   ultimoAumento: date("ultimo_aumento"),
   mesesUltAumento: integer("meses_ult_aumento"),
   salario: decimal("salario"),
-  userId: varchar("user_id", { length: 100 }),
 });
 
 // Tabela de cargos disponíveis
