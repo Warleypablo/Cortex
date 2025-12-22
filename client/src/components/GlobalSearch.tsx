@@ -10,7 +10,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Search, Users, UserCircle, FileText, Receipt, FolderKanban, Loader2 } from "lucide-react";
+import { Search, Users, UserCircle, FileText, Receipt, FolderKanban, Loader2, Key, Lock, GraduationCap, Wrench, Building2, Gift } from "lucide-react";
 import type { SearchResponse, SearchResult, SearchEntityType } from "@shared/schema";
 
 const ENTITY_CONFIG: Record<SearchEntityType, { label: string; icon: typeof Users }> = {
@@ -19,6 +19,12 @@ const ENTITY_CONFIG: Record<SearchEntityType, { label: string; icon: typeof User
   contrato: { label: "Contratos", icon: FileText },
   cobranca: { label: "Cobranças", icon: Receipt },
   projeto: { label: "Projetos", icon: FolderKanban },
+  acesso: { label: "Acessos", icon: Key },
+  credencial: { label: "Credenciais", icon: Lock },
+  conhecimento: { label: "Conhecimentos", icon: GraduationCap },
+  ferramenta: { label: "Ferramentas", icon: Wrench },
+  patrimonio: { label: "Patrimônio", icon: Building2 },
+  beneficio: { label: "Benefícios", icon: Gift },
 };
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -105,7 +111,7 @@ export default function GlobalSearch() {
 
       <CommandDialog open={open} onOpenChange={setOpen}>
         <CommandInput
-          placeholder="Pesquisar clientes, colaboradores, contratos..."
+          placeholder="Pesquisar clientes, acessos, conhecimentos, ferramentas..."
           value={inputValue}
           onValueChange={setInputValue}
           data-testid="input-global-search"
