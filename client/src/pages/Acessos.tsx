@@ -1,14 +1,15 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import type { Client, Credential, InsertClient, InsertCredential } from "@shared/schema";
+import type { Client, Credential, InsertClient, InsertCredential, AccessLog } from "@shared/schema";
 import { insertClientSchema, insertCredentialSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Key, Lock, Loader2, ChevronDown, ChevronRight, Building2 } from "lucide-react";
+import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Key, Lock, Loader2, ChevronDown, ChevronRight, Building2, History } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,10 +53,53 @@ import { useToast } from "@/hooks/use-toast";
 type ClientWithCredentialCount = Client & { credential_count: number };
 type ClientWithCredentials = Client & { credentials: Credential[] };
 
+type LogActionType = 'view_password' | 'copy_password' | 'add_credential' | 'edit_credential' | 'delete_credential' | 'add_client' | 'edit_client' | 'delete_client';
+
+interface CreateLogParams {
+  action: LogActionType;
+  entityType: string;
+  entityId?: string;
+  entityName?: string;
+  clientId?: string;
+  clientName?: string;
+  details?: string;
+}
+
+const ACTION_LABELS: Record<LogActionType, string> = {
+  view_password: "visualizou senha",
+  copy_password: "copiou senha",
+  add_credential: "adicionou credencial",
+  edit_credential: "editou credencial",
+  delete_credential: "removeu credencial",
+  add_client: "adicionou cliente",
+  edit_client: "editou cliente",
+  delete_client: "removeu cliente",
+};
+
+const ACTION_BADGE_VARIANTS: Record<LogActionType, "default" | "secondary" | "destructive" | "outline"> = {
+  view_password: "outline",
+  copy_password: "secondary",
+  add_credential: "default",
+  edit_credential: "secondary",
+  delete_credential: "destructive",
+  add_client: "default",
+  edit_client: "secondary",
+  delete_client: "destructive",
+};
+
 function formatDate(date: string | Date | null | undefined) {
   if (!date) return "-";
   try {
     return new Date(date).toLocaleDateString("pt-BR");
+  } catch {
+    return "-";
+  }
+}
+
+function formatDateTime(date: string | Date | null | undefined) {
+  if (!date) return "-";
+  try {
+    return new Date(date).toLocaleString("pt-BR");
   } catch {
     return "-";
   }
@@ -71,9 +115,18 @@ function formatCNPJ(cnpj: string | null | undefined) {
   );
 }
 
-function AddClientDialog() {
+function useCreateLog() {
+  return useMutation({
+    mutationFn: async (params: CreateLogParams) => {
+      await apiRequest("POST", "/api/acessos/logs", params);
+    },
+  });
+}
+
+function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const createLog = useCreateLog();
 
   const form = useForm<InsertClient>({
     resolver: zodResolver(insertClientSchema),
@@ -89,14 +142,22 @@ function AddClientDialog() {
       const response = await apiRequest("POST", "/api/acessos/clients", data);
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (client: Client) => {
       queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/acessos/logs"] });
+      createLog.mutate({
+        action: "add_client",
+        entityType: "client",
+        entityId: client.id,
+        entityName: client.name,
+      });
       toast({
         title: "Cliente adicionado",
         description: "O cliente foi adicionado com sucesso.",
       });
       setOpen(false);
       form.reset();
+      onSuccess?.(client);
     },
     onError: (error: Error) => {
       toast({
@@ -218,6 +279,7 @@ function EditClientDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { toast } = useToast();
+  const createLog = useCreateLog();
 
   const form = useForm<InsertClient>({
     resolver: zodResolver(insertClientSchema),
@@ -235,6 +297,13 @@ function EditClientDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/acessos/logs"] });
+      createLog.mutate({
+        action: "edit_client",
+        entityType: "client",
+        entityId: client.id,
+        entityName: client.name,
+      });
       toast({
         title: "Cliente atualizado",
         description: "O cliente foi atualizado com sucesso.",
@@ -356,6 +425,7 @@ function AddCredentialDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { toast } = useToast();
+  const createLog = useCreateLog();
 
   const form = useForm<InsertCredential>({
     resolver: zodResolver(insertCredentialSchema),
@@ -374,9 +444,18 @@ function AddCredentialDialog({
       const response = await apiRequest("POST", "/api/acessos/credentials", data);
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (credential: Credential) => {
       queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/acessos/logs"] });
+      createLog.mutate({
+        action: "add_credential",
+        entityType: "credential",
+        entityId: credential.id,
+        entityName: credential.platform,
+        clientId,
+        clientName,
+      });
       toast({
         title: "Credencial adicionada",
         description: "A credencial foi adicionada com sucesso.",
@@ -519,15 +598,18 @@ function AddCredentialDialog({
 function EditCredentialDialog({ 
   credential,
   clientId,
+  clientName,
   open, 
   onOpenChange 
 }: { 
   credential: Credential;
   clientId: string;
+  clientName: string;
   open: boolean; 
   onOpenChange: (open: boolean) => void;
 }) {
   const { toast } = useToast();
+  const createLog = useCreateLog();
 
   const form = useForm<InsertCredential>({
     resolver: zodResolver(insertCredentialSchema),
@@ -549,6 +631,15 @@ function EditCredentialDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/acessos/logs"] });
+      createLog.mutate({
+        action: "edit_credential",
+        entityType: "credential",
+        entityId: credential.id,
+        entityName: credential.platform,
+        clientId,
+        clientName,
+      });
       toast({
         title: "Credencial atualizada",
         description: "A credencial foi atualizada com sucesso.",
@@ -689,19 +780,44 @@ function EditCredentialDialog({
 function CredentialRow({ 
   credential, 
   clientId,
+  clientName,
   onEdit, 
   onDelete 
 }: { 
   credential: Credential;
   clientId: string;
+  clientName: string;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+  const createLog = useCreateLog();
+
+  const handleTogglePassword = () => {
+    if (!showPassword) {
+      createLog.mutate({
+        action: "view_password",
+        entityType: "credential",
+        entityId: credential.id,
+        entityName: credential.platform,
+        clientId,
+        clientName,
+      });
+    }
+    setShowPassword(!showPassword);
+  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
+    createLog.mutate({
+      action: "copy_password",
+      entityType: "credential",
+      entityId: credential.id,
+      entityName: credential.platform,
+      clientId,
+      clientName,
+    });
     toast({ 
       title: "Copiado!", 
       description: "Senha copiada para a área de transferência" 
@@ -725,7 +841,7 @@ function CredentialRow({
           <Button
             size="icon"
             variant="ghost"
-            onClick={() => setShowPassword(!showPassword)}
+            onClick={handleTogglePassword}
             data-testid={`button-toggle-password-${credential.id}`}
           >
             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -792,6 +908,7 @@ function ClientCredentialsSection({
   const [editingCredential, setEditingCredential] = useState<Credential | null>(null);
   const [deletingCredential, setDeletingCredential] = useState<Credential | null>(null);
   const { toast } = useToast();
+  const createLog = useCreateLog();
 
   const { data: clientWithCredentials, isLoading } = useQuery<ClientWithCredentials>({
     queryKey: ["/api/acessos/clients", clientId],
@@ -804,6 +921,17 @@ function ClientCredentialsSection({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/acessos/logs"] });
+      if (deletingCredential) {
+        createLog.mutate({
+          action: "delete_credential",
+          entityType: "credential",
+          entityId: deletingCredential.id,
+          entityName: deletingCredential.platform,
+          clientId,
+          clientName,
+        });
+      }
       toast({
         title: "Credencial removida",
         description: "A credencial foi removida com sucesso.",
@@ -869,6 +997,7 @@ function ClientCredentialsSection({
                 key={credential.id}
                 credential={credential}
                 clientId={clientId}
+                clientName={clientName}
                 onEdit={() => setEditingCredential(credential)}
                 onDelete={() => setDeletingCredential(credential)}
               />
@@ -888,6 +1017,7 @@ function ClientCredentialsSection({
         <EditCredentialDialog
           credential={editingCredential}
           clientId={clientId}
+          clientName={clientName}
           open={!!editingCredential}
           onOpenChange={(open) => !open && setEditingCredential(null)}
         />
@@ -928,14 +1058,70 @@ function ClientCredentialsSection({
   );
 }
 
-export default function Acessos() {
+function LogsTab() {
+  const { data: logs = [], isLoading } = useQuery<AccessLog[]>({
+    queryKey: ["/api/acessos/logs"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (logs.length === 0) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
+        <p className="text-lg font-medium">Nenhum log registrado</p>
+        <p className="text-sm">Os logs de atividade aparecerão aqui</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Data/Hora</TableHead>
+            <TableHead>Usuário</TableHead>
+            <TableHead>Ação</TableHead>
+            <TableHead>Cliente</TableHead>
+            <TableHead>Credencial</TableHead>
+            <TableHead>Detalhes</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {logs.map((log) => (
+            <TableRow key={log.id} data-testid={`row-log-${log.id}`}>
+              <TableCell className="text-sm">{formatDateTime(log.createdAt)}</TableCell>
+              <TableCell className="text-sm">{log.userName || log.userEmail || "-"}</TableCell>
+              <TableCell>
+                <Badge variant={ACTION_BADGE_VARIANTS[log.action as LogActionType] || "default"}>
+                  {ACTION_LABELS[log.action as LogActionType] || log.action}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-sm">{log.clientName || "-"}</TableCell>
+              <TableCell className="text-sm">{log.entityType === "credential" ? log.entityName : "-"}</TableCell>
+              <TableCell className="text-sm text-muted-foreground">{log.details || "-"}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function ClientsTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
   const { toast } = useToast();
-
-  useSetPageInfo("Acessos", "Gerenciamento de credenciais de clientes");
+  const createLog = useCreateLog();
 
   const { data: clients = [], isLoading } = useQuery<ClientWithCredentialCount[]>({
     queryKey: ["/api/acessos/clients"],
@@ -947,6 +1133,15 @@ export default function Acessos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/acessos/logs"] });
+      if (deletingClient) {
+        createLog.mutate({
+          action: "delete_client",
+          entityType: "client",
+          entityId: deletingClient.id,
+          entityName: deletingClient.name,
+        });
+      }
       toast({
         title: "Cliente removido",
         description: "O cliente e suas credenciais foram removidos com sucesso.",
@@ -978,133 +1173,114 @@ export default function Acessos() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full" data-testid="loading-acessos">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="w-5 h-5" />
-                Clientes e Credenciais
-              </CardTitle>
-              <CardDescription>
-                Gerencie os acessos e credenciais dos clientes
-              </CardDescription>
-            </div>
-            <AddClientDialog />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Buscar por nome ou CNPJ..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-clients"
-              />
-            </div>
-          </div>
+    <>
+      <div className="mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Input
+            placeholder="Buscar por nome ou CNPJ..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-clients"
+          />
+        </div>
+      </div>
 
-          {filteredClients.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Building2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">
-                {searchQuery ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
-              </p>
-              <p className="text-sm">
-                {searchQuery 
-                  ? "Tente buscar por outro termo" 
-                  : "Adicione seu primeiro cliente clicando no botão acima"}
-              </p>
-            </div>
-          ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40px]"></TableHead>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>CNPJ</TableHead>
-                    <TableHead className="text-center">Credenciais</TableHead>
-                    <TableHead>Data Criação</TableHead>
-                    <TableHead className="w-[100px]">Ações</TableHead>
+      {filteredClients.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Building2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <p className="text-lg font-medium">
+            {searchQuery ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
+          </p>
+          <p className="text-sm">
+            {searchQuery 
+              ? "Tente buscar por outro termo" 
+              : "Adicione seu primeiro cliente clicando no botão acima"}
+          </p>
+        </div>
+      ) : (
+        <div className="border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40px]"></TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>CNPJ</TableHead>
+                <TableHead className="text-center">Credenciais</TableHead>
+                <TableHead>Data Criação</TableHead>
+                <TableHead className="w-[100px]">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredClients.map((client) => (
+                <Fragment key={client.id}>
+                  <TableRow 
+                    className="cursor-pointer hover-elevate"
+                    onClick={() => toggleExpand(client.id)}
+                    data-testid={`row-client-${client.id}`}
+                  >
+                    <TableCell>
+                      <Button size="icon" variant="ghost" className="h-6 w-6">
+                        {expandedClient === client.id ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </TableCell>
+                    <TableCell className="font-medium">{client.name}</TableCell>
+                    <TableCell>{formatCNPJ(client.cnpj)}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="secondary">
+                        {client.credential_count || 0}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{formatDate(client.createdAt)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setEditingClient(client)}
+                          data-testid={`button-edit-client-${client.id}`}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setDeletingClient(client)}
+                          data-testid={`button-delete-client-${client.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredClients.map((client) => (
-                    <>
-                      <TableRow 
-                        key={client.id} 
-                        className="cursor-pointer hover-elevate"
-                        onClick={() => toggleExpand(client.id)}
-                        data-testid={`row-client-${client.id}`}
-                      >
-                        <TableCell>
-                          <Button size="icon" variant="ghost" className="h-6 w-6">
-                            {expandedClient === client.id ? (
-                              <ChevronDown className="w-4 h-4" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4" />
-                            )}
-                          </Button>
-                        </TableCell>
-                        <TableCell className="font-medium">{client.name}</TableCell>
-                        <TableCell>{formatCNPJ(client.cnpj)}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="secondary">
-                            {client.credential_count || 0}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{formatDate(client.createdAt)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setEditingClient(client)}
-                              data-testid={`button-edit-client-${client.id}`}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeletingClient(client)}
-                              data-testid={`button-delete-client-${client.id}`}
-                            >
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      {expandedClient === client.id && (
-                        <TableRow key={`${client.id}-credentials`}>
-                          <TableCell colSpan={6} className="p-0">
-                            <ClientCredentialsSection 
-                              clientId={client.id} 
-                              clientName={client.name}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  {expandedClient === client.id && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="p-0">
+                        <ClientCredentialsSection 
+                          clientId={client.id} 
+                          clientName={client.name}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {editingClient && (
         <EditClientDialog
@@ -1145,6 +1321,51 @@ export default function Acessos() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </>
+  );
+}
+
+export default function Acessos() {
+  useSetPageInfo("Acessos", "Gerenciamento de credenciais de clientes");
+
+  return (
+    <div className="p-6 space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="w-5 h-5" />
+                Clientes e Credenciais
+              </CardTitle>
+              <CardDescription>
+                Gerencie os acessos e credenciais dos clientes
+              </CardDescription>
+            </div>
+            <AddClientDialog />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="clientes">
+            <TabsList className="mb-4">
+              <TabsTrigger value="clientes" data-testid="tab-clientes">
+                <Building2 className="w-4 h-4 mr-2" />
+                Clientes
+              </TabsTrigger>
+              <TabsTrigger value="logs" data-testid="tab-logs">
+                <History className="w-4 h-4 mr-2" />
+                Logs
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="clientes">
+              <ClientsTab />
+            </TabsContent>
+            <TabsContent value="logs">
+              <LogsTab />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }

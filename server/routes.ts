@@ -8451,6 +8451,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // Access Logs API
+  // ============================================
+
+  // POST create access log
+  app.post("/api/acessos/logs", async (req, res) => {
+    try {
+      const { action, entityType, entityId, entityName, clientId, clientName, details } = req.body;
+      const user = (req as any).user;
+      const userEmail = user?.email || null;
+      const userName = user?.name || null;
+      
+      if (!action || !entityType) {
+        return res.status(400).json({ error: "action and entityType are required" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO access_logs (action, entity_type, entity_id, entity_name, client_id, client_name, details, user_email, user_name)
+        VALUES (${action}, ${entityType}, ${entityId || null}, ${entityName || null}, ${clientId || null}, ${clientName || null}, ${details || null}, ${userEmail}, ${userName})
+        RETURNING *
+      `);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating access log:", error);
+      res.status(500).json({ error: "Failed to create access log" });
+    }
+  });
+
+  // GET access logs with filters
+  app.get("/api/acessos/logs", async (req, res) => {
+    try {
+      const { action, entityType, clientId, limit = '100' } = req.query;
+      
+      const conditions: ReturnType<typeof sql>[] = [];
+      
+      if (action) {
+        conditions.push(sql`action = ${action}`);
+      }
+      
+      if (entityType) {
+        conditions.push(sql`entity_type = ${entityType}`);
+      }
+      
+      if (clientId) {
+        conditions.push(sql`client_id = ${clientId}`);
+      }
+      
+      const limitNum = Math.min(parseInt(limit as string) || 100, 500);
+      
+      let result;
+      if (conditions.length > 0) {
+        const whereClause = sql.join(conditions, sql` AND `);
+        result = await db.execute(sql`SELECT * FROM access_logs WHERE ${whereClause} ORDER BY created_at DESC LIMIT ${limitNum}`);
+      } else {
+        result = await db.execute(sql`SELECT * FROM access_logs ORDER BY created_at DESC LIMIT ${limitNum}`);
+      }
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching access logs:", error);
+      res.status(500).json({ error: "Failed to fetch access logs" });
+    }
+  });
+
+  // ============================================
   // Conhecimentos Module - Courses API
   // ============================================
 
