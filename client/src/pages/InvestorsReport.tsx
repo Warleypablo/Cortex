@@ -1,15 +1,12 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { useQuery } from "@tanstack/react-query";
-import { format, subMonths, startOfMonth, endOfMonth, startOfYear, subYears, startOfQuarter, subQuarters, endOfQuarter } from "date-fns";
+import { format, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
   Users, 
@@ -31,8 +28,7 @@ import {
   Target,
   Percent,
   Activity,
-  CalendarRange,
-  ChevronDown
+  CalendarRange
 } from "lucide-react";
 import {
   LineChart,
@@ -111,125 +107,24 @@ const formatPercent = (value: number) => {
 
 const COLORS = ['#1978D5', '#041F60', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'];
 
-type PeriodPreset = 'ytd' | 'ultimo-mes' | 'ultimo-trimestre' | 'ultimo-semestre' | 'ultimo-ano' | '2025' | '2024' | '2023' | '2022' | 'custom' | 'all';
-
-interface PresetConfig {
-  value: PeriodPreset;
-  label: string;
-  description?: string;
-  getRange: () => { start: Date; end: Date };
-}
-
-const PERIOD_PRESETS: PresetConfig[] = [
-  { 
-    value: 'all', 
-    label: 'Todo Período',
-    description: 'Desde 2022',
-    getRange: () => ({ start: new Date('2022-01-01'), end: new Date() })
-  },
-  { 
-    value: 'ytd', 
-    label: 'Ano Atual (YTD)',
-    description: `Jan/${new Date().getFullYear()} até hoje`,
-    getRange: () => ({ start: startOfYear(new Date()), end: new Date() })
-  },
-  { 
-    value: 'ultimo-ano', 
-    label: 'Últimos 12 Meses',
-    description: 'Rolling 12 months',
-    getRange: () => ({ start: startOfMonth(subMonths(new Date(), 12)), end: new Date() })
-  },
-  { 
-    value: 'ultimo-semestre', 
-    label: 'Últimos 6 Meses',
-    getRange: () => ({ start: startOfMonth(subMonths(new Date(), 6)), end: new Date() })
-  },
-  { 
-    value: 'ultimo-trimestre', 
-    label: 'Último Trimestre',
-    getRange: () => ({ start: startOfQuarter(subQuarters(new Date(), 1)), end: endOfQuarter(subQuarters(new Date(), 1)) })
-  },
-  { 
-    value: 'ultimo-mes', 
-    label: 'Último Mês',
-    getRange: () => ({ start: startOfMonth(subMonths(new Date(), 1)), end: endOfMonth(subMonths(new Date(), 1)) })
-  },
-];
-
-const YEAR_PRESETS: PresetConfig[] = [
-  { 
-    value: '2025', 
-    label: '2025',
-    getRange: () => ({ start: new Date('2025-01-01'), end: new Date('2025-12-31') })
-  },
-  { 
-    value: '2024', 
-    label: '2024',
-    getRange: () => ({ start: new Date('2024-01-01'), end: new Date('2024-12-31') })
-  },
-  { 
-    value: '2023', 
-    label: '2023',
-    getRange: () => ({ start: new Date('2023-01-01'), end: new Date('2023-12-31') })
-  },
-  { 
-    value: '2022', 
-    label: '2022',
-    getRange: () => ({ start: new Date('2022-01-01'), end: new Date('2022-12-31') })
-  },
-];
-
-const ALL_PRESETS = [...PERIOD_PRESETS, ...YEAR_PRESETS];
-
 export default function InvestorsReport() {
   useSetPageInfo("Investors Report", "Métricas financeiras consolidadas • 2022-2025");
-  const [selectedPreset, setSelectedPreset] = useState<PeriodPreset>('all');
+  
+  const [startPeriod, setStartPeriod] = useState({ month: 1, year: 2022 });
+  const [endPeriod, setEndPeriod] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() });
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
     start: new Date('2022-01-01'),
     end: new Date()
   });
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const [selectingStart, setSelectingStart] = useState(true);
   const [isCapturing, setIsCapturing] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
   
-  const handlePresetChange = (preset: PeriodPreset) => {
-    setSelectedPreset(preset);
-    if (preset !== 'custom') {
-      const presetConfig = ALL_PRESETS.find(p => p.value === preset);
-      if (presetConfig) {
-        setDateRange(presetConfig.getRange());
-      }
-    }
-  };
-  
-  const handleDateSelect = (date: Date | undefined) => {
-    if (!date) return;
-    if (selectingStart) {
-      setDateRange(prev => ({ ...prev, start: date }));
-      setSelectingStart(false);
-    } else {
-      // Ensure end date is after start date - swap if needed
-      const newEnd = date;
-      const newStart = dateRange.start;
-      if (newEnd < newStart) {
-        setDateRange({ start: newEnd, end: newStart });
-      } else {
-        setDateRange(prev => ({ ...prev, end: date }));
-      }
-      setCalendarOpen(false);
-      setSelectingStart(true);
-      setSelectedPreset('custom');
-    }
-  };
-  
-  const handleCalendarOpenChange = (open: boolean) => {
-    setCalendarOpen(open);
-    // Reset to start selection if closing without completing
-    if (!open && !selectingStart) {
-      setSelectingStart(true);
-    }
-  };
+  useEffect(() => {
+    setDateRange({
+      start: new Date(startPeriod.year, startPeriod.month - 1, 1),
+      end: endOfMonth(new Date(endPeriod.year, endPeriod.month - 1, 1))
+    });
+  }, [startPeriod, endPeriod]);
   
   const { data, isLoading, error } = useQuery<InvestorsReportData>({
     queryKey: ['/api/investors-report'],
@@ -286,7 +181,6 @@ export default function InvestorsReport() {
       }));
   }, [filteredData]);
 
-  // Calcula resumo anual com TODOS os dados (não filtrados) para YoY
   const fullAnnualSummary = useMemo(() => {
     if (!data?.evolucaoFaturamento) return {};
     const byYear: Record<string, { faturamento: number; despesas: number; geracaoCaixa: number; meses: number }> = {};
@@ -306,19 +200,16 @@ export default function InvestorsReport() {
   }, [data?.evolucaoFaturamento]);
 
   const yoyGrowth = useMemo(() => {
-    // Se há dados filtrados, pegar o ano mais recente dos dados filtrados
     if (annualSummary.length === 0) return null;
     
     const currentYearData = annualSummary[0];
     const currentYear = currentYearData.year;
     const previousYear = String(parseInt(currentYear) - 1);
     
-    // Buscar dados do ano anterior nos dados completos
     const previousYearData = fullAnnualSummary[previousYear];
     
     if (!previousYearData || previousYearData.faturamento === 0) return null;
     
-    // Ajustar proporcionalmente se o ano atual não tem 12 meses
     const adjustedPrevious = (previousYearData.faturamento / previousYearData.meses) * currentYearData.meses;
     const growth = ((currentYearData.faturamento - adjustedPrevious) / adjustedPrevious) * 100;
     
@@ -447,7 +338,7 @@ export default function InvestorsReport() {
   ] : [];
 
   return (
-    <div ref={pageRef} className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6" data-testid="investors-report-page">
+    <div ref={pageRef} className="min-h-screen bg-background p-6" data-testid="investors-report-page">
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* Hero Header */}
@@ -479,6 +370,39 @@ export default function InvestorsReport() {
           </div>
         </div>
 
+        {/* Date Range Filter - Simplified with MonthYearPicker */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-muted/50 rounded-lg p-4 border border-border">
+          <div className="flex items-center gap-3">
+            <CalendarRange className="h-5 w-5 text-blue-400" />
+            <span className="text-foreground font-medium">Período</span>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground text-sm">De:</span>
+              <MonthYearPicker
+                value={startPeriod}
+                onChange={setStartPeriod}
+                minYear={2022}
+                maxYear={new Date().getFullYear()}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground text-sm">Até:</span>
+              <MonthYearPicker
+                value={endPeriod}
+                onChange={setEndPeriod}
+                minYear={2022}
+                maxYear={new Date().getFullYear()}
+              />
+            </div>
+            
+            <Badge variant="secondary">
+              {chartDataWithMetrics.length} meses • {format(dateRange.start, 'MMM/yy', { locale: ptBR })} - {format(dateRange.end, 'MMM/yy', { locale: ptBR })}
+            </Badge>
+          </div>
+        </div>
+
         {error && (
           <Card className="border-red-500/50 bg-red-500/10">
             <CardContent className="pt-6">
@@ -492,7 +416,7 @@ export default function InvestorsReport() {
 
         {/* KPIs Row 1 */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card className="bg-slate-900/50 border-slate-700/50 hover:border-blue-500/30 transition-colors">
+          <Card className="bg-card border-border hover:border-blue-500/30 transition-colors">
             <CardContent className="pt-5 pb-4">
               {isLoading ? (
                 <Skeleton className="h-16 w-full" />
@@ -502,12 +426,12 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-blue-500/20 rounded">
                       <Users className="h-4 w-4 text-blue-400" />
                     </div>
-                    <span className="text-slate-400 text-sm">Clientes Ativos</span>
+                    <span className="text-muted-foreground text-sm">Clientes Ativos</span>
                   </div>
-                  <div className="text-3xl font-bold text-white" data-testid="kpi-clientes">
+                  <div className="text-3xl font-bold text-foreground" data-testid="kpi-clientes">
                     {data?.clientes.ativos || 0}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-muted-foreground">
                     de {data?.clientes.total || 0} cadastrados
                   </div>
                 </div>
@@ -515,7 +439,7 @@ export default function InvestorsReport() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-700/50 hover:border-blue-500/30 transition-colors">
+          <Card className="bg-card border-border hover:border-blue-500/30 transition-colors">
             <CardContent className="pt-5 pb-4">
               {isLoading ? (
                 <Skeleton className="h-16 w-full" />
@@ -525,12 +449,12 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-blue-500/20 rounded">
                       <FileText className="h-4 w-4 text-blue-400" />
                     </div>
-                    <span className="text-slate-400 text-sm">Contratos Rec.</span>
+                    <span className="text-muted-foreground text-sm">Contratos Rec.</span>
                   </div>
-                  <div className="text-3xl font-bold text-white" data-testid="kpi-recorrentes">
+                  <div className="text-3xl font-bold text-foreground" data-testid="kpi-recorrentes">
                     {data?.contratos.recorrentes || 0}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-muted-foreground">
                     {data?.contratos.pontuais || 0} pontuais
                   </div>
                 </div>
@@ -538,7 +462,7 @@ export default function InvestorsReport() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-700/50 hover:border-purple-500/30 transition-colors">
+          <Card className="bg-card border-border hover:border-purple-500/30 transition-colors">
             <CardContent className="pt-5 pb-4">
               {isLoading ? (
                 <Skeleton className="h-16 w-full" />
@@ -548,12 +472,12 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-purple-500/20 rounded">
                       <DollarSign className="h-4 w-4 text-purple-400" />
                     </div>
-                    <span className="text-slate-400 text-sm">MRR Ativo</span>
+                    <span className="text-muted-foreground text-sm">MRR Ativo</span>
                   </div>
-                  <div className="text-3xl font-bold text-white" data-testid="kpi-mrr">
+                  <div className="text-3xl font-bold text-foreground" data-testid="kpi-mrr">
                     {formatCurrencyShort(data?.receita.mrrAtivo || 0)}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-muted-foreground">
                     AOV: {formatCurrency(data?.receita.aovRecorrente || 0)}
                   </div>
                 </div>
@@ -561,7 +485,7 @@ export default function InvestorsReport() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-700/50 hover:border-emerald-500/30 transition-colors">
+          <Card className="bg-card border-border hover:border-emerald-500/30 transition-colors">
             <CardContent className="pt-5 pb-4">
               {isLoading ? (
                 <Skeleton className="h-16 w-full" />
@@ -571,12 +495,12 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-emerald-500/20 rounded">
                       <Briefcase className="h-4 w-4 text-emerald-400" />
                     </div>
-                    <span className="text-slate-400 text-sm">Fat. Mês Atual</span>
+                    <span className="text-muted-foreground text-sm">Fat. Mês Atual</span>
                   </div>
-                  <div className="text-3xl font-bold text-white" data-testid="kpi-faturamento">
+                  <div className="text-3xl font-bold text-foreground" data-testid="kpi-faturamento">
                     {formatCurrencyShort(data?.receita.faturamentoMes || 0)}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-muted-foreground">
                     Realizado ERP
                   </div>
                 </div>
@@ -584,7 +508,7 @@ export default function InvestorsReport() {
             </CardContent>
           </Card>
 
-          <Card className={`bg-slate-900/50 border-slate-700/50 hover:border-green-500/30 transition-colors`}>
+          <Card className="bg-card border-border hover:border-green-500/30 transition-colors">
             <CardContent className="pt-5 pb-4">
               {isLoading ? (
                 <Skeleton className="h-16 w-full" />
@@ -598,12 +522,12 @@ export default function InvestorsReport() {
                         <ArrowDownRight className="h-4 w-4 text-red-400" />
                       )}
                     </div>
-                    <span className="text-slate-400 text-sm">Cresc. YoY</span>
+                    <span className="text-muted-foreground text-sm">Cresc. YoY</span>
                   </div>
                   <div className={`text-3xl font-bold ${yoyGrowth && yoyGrowth.growth >= 0 ? 'text-green-400' : 'text-red-400'}`} data-testid="kpi-yoy">
                     {yoyGrowth ? formatPercent(yoyGrowth.growth) : 'N/A'}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-muted-foreground">
                     {yoyGrowth ? `${yoyGrowth.previousYear} → ${yoyGrowth.currentYear}` : 'Dados insuf.'}
                   </div>
                 </div>
@@ -614,7 +538,7 @@ export default function InvestorsReport() {
 
         {/* KPIs Row 2 */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="bg-slate-900/50 border-slate-700/50">
+          <Card className="bg-card border-border">
             <CardContent className="pt-5 pb-4">
               {isLoading ? (
                 <Skeleton className="h-14 w-full" />
@@ -624,7 +548,7 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-red-500/20 rounded">
                       <AlertTriangle className="h-4 w-4 text-red-400" />
                     </div>
-                    <span className="text-slate-400 text-sm">Inadimplência</span>
+                    <span className="text-muted-foreground text-sm">Inadimplência</span>
                   </div>
                   <div className="text-2xl font-bold text-red-400" data-testid="kpi-inadimplencia">
                     {data?.receita.taxaInadimplencia?.toFixed(1) || '0.0'}%
@@ -634,7 +558,7 @@ export default function InvestorsReport() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-700/50">
+          <Card className="bg-card border-border">
             <CardContent className="pt-5 pb-4">
               {isLoading ? (
                 <Skeleton className="h-14 w-full" />
@@ -644,17 +568,17 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-cyan-500/20 rounded">
                       <UserCheck className="h-4 w-4 text-cyan-400" />
                     </div>
-                    <span className="text-slate-400 text-sm">Headcount</span>
+                    <span className="text-muted-foreground text-sm">Headcount</span>
                   </div>
-                  <div className="text-2xl font-bold text-white" data-testid="kpi-headcount">
-                    {data?.equipe.headcount || 0} <span className="text-sm text-slate-500 font-normal">pessoas</span>
+                  <div className="text-2xl font-bold text-foreground" data-testid="kpi-headcount">
+                    {data?.equipe.headcount || 0} <span className="text-sm text-muted-foreground font-normal">pessoas</span>
                   </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-700/50">
+          <Card className="bg-card border-border">
             <CardContent className="pt-5 pb-4">
               {isLoading ? (
                 <Skeleton className="h-14 w-full" />
@@ -664,9 +588,9 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-pink-500/20 rounded">
                       <DollarSign className="h-4 w-4 text-pink-400" />
                     </div>
-                    <span className="text-slate-400 text-sm">Receita/Cabeça</span>
+                    <span className="text-muted-foreground text-sm">Receita/Cabeça</span>
                   </div>
-                  <div className="text-2xl font-bold text-white" data-testid="kpi-receita-cabeca">
+                  <div className="text-2xl font-bold text-foreground" data-testid="kpi-receita-cabeca">
                     {formatCurrency(data?.equipe.receitaPorCabeca || 0)}
                   </div>
                 </div>
@@ -674,7 +598,7 @@ export default function InvestorsReport() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-700/50">
+          <Card className="bg-card border-border">
             <CardContent className="pt-5 pb-4">
               {isLoading ? (
                 <Skeleton className="h-14 w-full" />
@@ -684,7 +608,7 @@ export default function InvestorsReport() {
                     <div className={`p-1.5 rounded ${avgMargem >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
                       <Percent className="h-4 w-4" style={{ color: avgMargem >= 0 ? '#4ade80' : '#f87171' }} />
                     </div>
-                    <span className="text-slate-400 text-sm">Margem Média</span>
+                    <span className="text-muted-foreground text-sm">Margem Média</span>
                   </div>
                   <div className={`text-2xl font-bold ${avgMargem >= 0 ? 'text-green-400' : 'text-red-400'}`} data-testid="kpi-margem">
                     {avgMargem.toFixed(1)}%
@@ -695,124 +619,22 @@ export default function InvestorsReport() {
           </Card>
         </div>
 
-        {/* Date Range Filter - Simplified */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-slate-900/30 rounded-lg p-4 border border-slate-700/30">
-          <div className="flex items-center gap-3">
-            <CalendarRange className="h-5 w-5 text-blue-400" />
-            <span className="text-white font-medium">Período</span>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Period Selector Dropdown */}
-            <Select 
-              value={selectedPreset} 
-              onValueChange={(value) => handlePresetChange(value as PeriodPreset)}
-            >
-              <SelectTrigger 
-                className="w-[200px] bg-slate-800/50 border-slate-600 text-white"
-                data-testid="select-period"
-              >
-                <SelectValue placeholder="Selecione o período" />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-900 border-slate-700">
-                <SelectGroup>
-                  <SelectLabel className="text-blue-400 text-xs uppercase tracking-wider">Períodos</SelectLabel>
-                  {PERIOD_PRESETS.map((preset) => (
-                    <SelectItem 
-                      key={preset.value} 
-                      value={preset.value}
-                      className="text-white hover:bg-slate-800 focus:bg-slate-800"
-                    >
-                      {preset.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-                <SelectGroup>
-                  <SelectLabel className="text-blue-400 text-xs uppercase tracking-wider mt-2">Anos</SelectLabel>
-                  {YEAR_PRESETS.map((preset) => (
-                    <SelectItem 
-                      key={preset.value} 
-                      value={preset.value}
-                      className="text-white hover:bg-slate-800 focus:bg-slate-800"
-                    >
-                      {preset.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-                <SelectGroup>
-                  <SelectLabel className="text-blue-400 text-xs uppercase tracking-wider mt-2">Customizado</SelectLabel>
-                  <SelectItem 
-                    value="custom"
-                    className="text-white hover:bg-slate-800 focus:bg-slate-800"
-                  >
-                    Período Personalizado
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            
-            {/* Custom Date Picker - Only visible when custom is selected */}
-            {selectedPreset === 'custom' && (
-              <Popover open={calendarOpen} onOpenChange={handleCalendarOpenChange}>
-                <PopoverTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
-                    data-testid="filter-custom-calendar"
-                  >
-                    <Calendar className="h-4 w-4 mr-2" />
-                    {format(dateRange.start, 'dd/MM/yy', { locale: ptBR })} - {format(dateRange.end, 'dd/MM/yy', { locale: ptBR })}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-4 bg-slate-900 border-slate-700" align="start">
-                  <div className="space-y-4">
-                    <div className="text-sm font-medium text-white">
-                      {selectingStart ? '1. Selecione a data inicial' : '2. Selecione a data final'}
-                    </div>
-                    <CalendarComponent
-                      mode="single"
-                      selected={selectingStart ? dateRange.start : dateRange.end}
-                      onSelect={handleDateSelect}
-                      defaultMonth={selectingStart ? dateRange.start : dateRange.end}
-                      disabled={(date) => date > new Date() || date < new Date('2022-01-01')}
-                    />
-                    <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-700">
-                      <span className="text-slate-400">
-                        De: <span className="text-white font-medium">{format(dateRange.start, 'dd/MM/yyyy', { locale: ptBR })}</span>
-                      </span>
-                      <span className="text-slate-400">
-                        Até: <span className="text-white font-medium">{format(dateRange.end, 'dd/MM/yyyy', { locale: ptBR })}</span>
-                      </span>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
-            
-            {/* Period Info Badge */}
-            <Badge variant="secondary" className="bg-slate-700/50 text-slate-300 border border-slate-600">
-              {chartDataWithMetrics.length} meses • {format(dateRange.start, 'MMM/yy', { locale: ptBR })} - {format(dateRange.end, 'MMM/yy', { locale: ptBR })}
-            </Badge>
-          </div>
-        </div>
-
         {/* Charts Row 1: Faturamento Evolution + Margem */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Evolução do Faturamento */}
-          <Card className="bg-slate-900/50 border-slate-700/50">
+          <Card className="bg-card border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium flex items-center gap-2 text-white">
+              <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
                 <TrendingUp className="h-5 w-5 text-emerald-400" />
                 Evolução do Faturamento
               </CardTitle>
-              <CardDescription className="text-slate-400">Receita mensal ao longo do tempo</CardDescription>
+              <CardDescription className="text-muted-foreground">Receita mensal ao longo do tempo</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[280px] w-full" />
               ) : !chartDataWithMetrics.length ? (
-                <div className="flex items-center justify-center h-[280px] text-slate-500">
+                <div className="flex items-center justify-center h-[280px] text-muted-foreground">
                   Nenhum dado no período
                 </div>
               ) : (
@@ -841,19 +663,19 @@ export default function InvestorsReport() {
           </Card>
 
           {/* Evolução da Margem */}
-          <Card className="bg-slate-900/50 border-slate-700/50">
+          <Card className="bg-card border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium flex items-center gap-2 text-white">
+              <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
                 <Percent className="h-5 w-5 text-blue-400" />
                 Evolução da Margem
               </CardTitle>
-              <CardDescription className="text-slate-400">Margem operacional mensal (%)</CardDescription>
+              <CardDescription className="text-muted-foreground">Margem operacional mensal (%)</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[280px] w-full" />
               ) : !chartDataWithMetrics.length ? (
-                <div className="flex items-center justify-center h-[280px] text-slate-500">
+                <div className="flex items-center justify-center h-[280px] text-muted-foreground">
                   Nenhum dado no período
                 </div>
               ) : (
@@ -887,19 +709,19 @@ export default function InvestorsReport() {
         {/* Charts Row 2: Receita vs Despesas + Caixa Acumulado */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Receita vs Despesas */}
-          <Card className="bg-slate-900/50 border-slate-700/50">
+          <Card className="bg-card border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium flex items-center gap-2 text-white">
+              <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
                 <BarChart3 className="h-5 w-5 text-blue-400" />
                 Receita vs Despesas
               </CardTitle>
-              <CardDescription className="text-slate-400">Comparativo mensal</CardDescription>
+              <CardDescription className="text-muted-foreground">Comparativo mensal</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[280px] w-full" />
               ) : !chartDataWithMetrics.length ? (
-                <div className="flex items-center justify-center h-[280px] text-slate-500">
+                <div className="flex items-center justify-center h-[280px] text-muted-foreground">
                   Nenhum dado no período
                 </div>
               ) : (
@@ -924,19 +746,19 @@ export default function InvestorsReport() {
           </Card>
 
           {/* Caixa Acumulado */}
-          <Card className="bg-slate-900/50 border-slate-700/50">
+          <Card className="bg-card border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium flex items-center gap-2 text-white">
+              <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
                 <TrendingUp className="h-5 w-5 text-purple-400" />
                 Geração de Caixa Acumulada
               </CardTitle>
-              <CardDescription className="text-slate-400">Evolução do caixa no período</CardDescription>
+              <CardDescription className="text-muted-foreground">Evolução do caixa no período</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[280px] w-full" />
               ) : !chartDataWithMetrics.length ? (
-                <div className="flex items-center justify-center h-[280px] text-slate-500">
+                <div className="flex items-center justify-center h-[280px] text-muted-foreground">
                   Nenhum dado no período
                 </div>
               ) : (
@@ -952,12 +774,13 @@ export default function InvestorsReport() {
                     <XAxis dataKey="mesLabel" tick={{ fontSize: 10, fill: '#94a3b8' }} />
                     <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => formatCurrencyShort(v)} />
                     <Tooltip 
-                      formatter={(value: number) => [formatCurrency(value), 'Caixa Acumulado']}
+                      formatter={(value: number, name: string) => [formatCurrency(value), name]}
                       contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                       labelStyle={{ color: '#f8fafc' }}
                     />
                     <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} />
-                    <Area type="monotone" dataKey="caixaAcumulado" stroke="#8b5cf6" fill="url(#gradientCaixa)" strokeWidth={2.5} />
+                    <Area type="monotone" dataKey="caixaAcumulado" stroke="#8b5cf6" fill="url(#gradientCaixa)" strokeWidth={0} name="Caixa Acumulado" />
+                    <Line type="monotone" dataKey="caixaAcumulado" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3, fill: '#8b5cf6' }} activeDot={{ r: 5 }} name="Caixa Acumulado" />
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
@@ -965,21 +788,21 @@ export default function InvestorsReport() {
           </Card>
         </div>
 
-        {/* Charts Row 3: Mix Contratos + Headcount */}
+        {/* Charts Row 3: Pie Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="bg-slate-900/50 border-slate-700/50">
+          <Card className="bg-card border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium flex items-center gap-2 text-white">
+              <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
                 <PieChartIcon className="h-5 w-5 text-blue-400" />
-                Mix de Contratos
+                Tipos de Contrato
               </CardTitle>
-              <CardDescription className="text-slate-400">Recorrentes vs Pontuais</CardDescription>
+              <CardDescription className="text-muted-foreground">Recorrentes vs Pontuais</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[250px] w-full" />
               ) : pieData.every(d => d.value === 0) ? (
-                <div className="flex items-center justify-center h-[250px] text-slate-500">
+                <div className="flex items-center justify-center h-[250px] text-muted-foreground">
                   Nenhum dado encontrado
                 </div>
               ) : (
@@ -1007,19 +830,19 @@ export default function InvestorsReport() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-700/50">
+          <Card className="bg-card border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium flex items-center gap-2 text-white">
+              <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
                 <Users className="h-5 w-5 text-cyan-400" />
                 Headcount por Setor
               </CardTitle>
-              <CardDescription className="text-slate-400">Distribuição da equipe</CardDescription>
+              <CardDescription className="text-muted-foreground">Distribuição da equipe</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[250px] w-full" />
               ) : !data?.distribuicaoSetor?.length ? (
-                <div className="flex items-center justify-center h-[250px] text-slate-500">
+                <div className="flex items-center justify-center h-[250px] text-muted-foreground">
                   Nenhum dado encontrado
                 </div>
               ) : (
@@ -1038,26 +861,26 @@ export default function InvestorsReport() {
         </div>
 
         {/* Resumo Anual */}
-        <Card className="bg-slate-900/50 border-slate-700/50">
+        <Card className="bg-card border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2 text-white">
+            <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
               <Calendar className="h-5 w-5 text-blue-400" />
               Resumo por Ano
             </CardTitle>
-            <CardDescription className="text-slate-400">Totais consolidados</CardDescription>
+            <CardDescription className="text-muted-foreground">Totais consolidados</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-[120px] w-full" />
             ) : !annualSummary.length ? (
-              <div className="flex items-center justify-center h-[120px] text-slate-500">
+              <div className="flex items-center justify-center h-[120px] text-muted-foreground">
                 Nenhum dado no período
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="border-b border-slate-700">
-                    <tr className="text-slate-400">
+                  <thead className="border-b border-border">
+                    <tr className="text-muted-foreground">
                       <th className="text-left py-3 px-4 font-medium">Ano</th>
                       <th className="text-center py-3 px-4 font-medium">Meses</th>
                       <th className="text-right py-3 px-4 font-medium">Faturamento</th>
@@ -1066,12 +889,12 @@ export default function InvestorsReport() {
                       <th className="text-right py-3 px-4 font-medium">Margem</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-border">
                     {annualSummary.map((item) => (
-                      <tr key={item.year} className="hover:bg-slate-800/50 transition-colors" data-testid={`resumo-anual-${item.year}`}>
-                        <td className="py-3 px-4 font-bold text-xl text-white">{item.year}</td>
+                      <tr key={item.year} className="hover:bg-muted/50 transition-colors" data-testid={`resumo-anual-${item.year}`}>
+                        <td className="py-3 px-4 font-bold text-xl text-foreground">{item.year}</td>
                         <td className="py-3 px-4 text-center">
-                          <Badge variant="secondary" className="bg-slate-700">{item.meses}</Badge>
+                          <Badge variant="secondary">{item.meses}</Badge>
                         </td>
                         <td className="py-3 px-4 text-right text-emerald-400 font-medium">{formatCurrency(item.faturamento)}</td>
                         <td className="py-3 px-4 text-right text-red-400 font-medium">{formatCurrency(item.despesas)}</td>
@@ -1091,13 +914,13 @@ export default function InvestorsReport() {
         </Card>
 
         {/* Histórico Mensal */}
-        <Card className="bg-slate-900/50 border-slate-700/50">
+        <Card className="bg-card border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium flex items-center gap-2 text-white">
+            <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
               <BarChart3 className="h-5 w-5 text-blue-400" />
               Histórico Mensal Detalhado
             </CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardDescription className="text-muted-foreground">
               {chartDataWithMetrics.length} meses • Total: {formatCurrency(totals.faturamento)}
             </CardDescription>
           </CardHeader>
@@ -1105,14 +928,14 @@ export default function InvestorsReport() {
             {isLoading ? (
               <Skeleton className="h-[300px] w-full" />
             ) : !chartDataWithMetrics.length ? (
-              <div className="flex items-center justify-center h-[300px] text-slate-500">
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
                 Nenhum dado no período
               </div>
             ) : (
               <div className="overflow-x-auto max-h-[320px]">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-slate-900 border-b border-slate-700 z-10">
-                    <tr className="text-slate-400">
+                  <thead className="sticky top-0 bg-card border-b border-border z-10">
+                    <tr className="text-muted-foreground">
                       <th className="text-left py-2 px-3 font-medium">Mês</th>
                       <th className="text-right py-2 px-3 font-medium">Faturamento</th>
                       <th className="text-right py-2 px-3 font-medium">Despesas</th>
@@ -1121,10 +944,10 @@ export default function InvestorsReport() {
                       <th className="text-right py-2 px-3 font-medium">Acumulado</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-border">
                     {chartDataWithMetrics.slice().reverse().map((item, index) => (
-                      <tr key={item.mes} className="hover:bg-slate-800/50" data-testid={`historico-${index}`}>
-                        <td className="py-2 px-3 font-medium text-white">{item.mesLabel}</td>
+                      <tr key={item.mes} className="hover:bg-muted/50" data-testid={`historico-${index}`}>
+                        <td className="py-2 px-3 font-medium text-foreground">{item.mesLabel}</td>
                         <td className="py-2 px-3 text-right text-emerald-400">{formatCurrencyShort(item.faturamento)}</td>
                         <td className="py-2 px-3 text-right text-red-400">{formatCurrencyShort(item.despesas)}</td>
                         <td className={`py-2 px-3 text-right font-semibold ${item.geracaoCaixa >= 0 ? 'text-blue-400' : 'text-red-500'}`}>
@@ -1138,8 +961,8 @@ export default function InvestorsReport() {
                         </td>
                       </tr>
                     ))}
-                    <tr className="bg-slate-800/70 font-bold border-t-2 border-blue-500/30">
-                      <td className="py-3 px-3 text-white">TOTAL</td>
+                    <tr className="bg-muted/70 font-bold border-t-2 border-blue-500/30">
+                      <td className="py-3 px-3 text-foreground">TOTAL</td>
                       <td className="py-3 px-3 text-right text-emerald-400">{formatCurrency(totals.faturamento)}</td>
                       <td className="py-3 px-3 text-right text-red-400">{formatCurrency(totals.despesas)}</td>
                       <td className={`py-3 px-3 text-right ${totals.geracaoCaixa >= 0 ? 'text-blue-400' : 'text-red-500'}`}>
@@ -1148,7 +971,7 @@ export default function InvestorsReport() {
                       <td className={`py-3 px-3 text-right ${totals.faturamento > 0 && (totals.geracaoCaixa / totals.faturamento) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {totals.faturamento > 0 ? ((totals.geracaoCaixa / totals.faturamento) * 100).toFixed(1) : '0.0'}%
                       </td>
-                      <td className="py-3 px-3 text-right text-slate-500">—</td>
+                      <td className="py-3 px-3 text-right text-muted-foreground">—</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1160,7 +983,7 @@ export default function InvestorsReport() {
         {/* Footer Quote */}
         <Card className="bg-gradient-to-r from-blue-500/10 via-blue-600/5 to-transparent border-blue-500/20">
           <CardContent className="py-6">
-            <blockquote className="text-center italic text-slate-400 text-lg">
+            <blockquote className="text-center italic text-muted-foreground text-lg">
               "Tornamos a vida de quem vende online mais fácil e rentável, usando desse know how, para construir as marcas da próxima geração"
             </blockquote>
             <p className="text-center text-sm font-semibold mt-3 text-blue-400">— Turbo Partners</p>

@@ -113,7 +113,7 @@ interface DataReconciliation {
 
 export default function AdminLogs() {
   useSetPageInfo("Logs do Sistema", "Monitore acessos, chamadas de API e status das integrações");
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const [systemLogsPage, setSystemLogsPage] = useState(1);
   const [authLogsPage, setAuthLogsPage] = useState(1);
   const [syncLogsPage, setSyncLogsPage] = useState(1);
