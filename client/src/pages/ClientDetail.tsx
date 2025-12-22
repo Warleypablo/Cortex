@@ -722,115 +722,104 @@ export default function ClientDetail() {
               <div className="flex items-center justify-center py-8" data-testid="loading-credenciais">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
               </div>
-            ) : credenciais && credenciais.length > 0 ? (
-              <div className="divide-y">
-                {credenciais.map((group) => (
-                  <div key={group.id} className="p-4">
-                    <h3 className="font-semibold text-lg mb-4" data-testid={`credential-group-${group.id}`}>
-                      {group.name}
-                    </h3>
-                    {group.credentials.length > 0 ? (
-                      <div className="max-h-[400px] overflow-y-auto">
-                        <Table>
-                          <TableHeader className="sticky top-0 z-20 shadow-sm">
-                            <TableRow className="bg-background border-b">
-                              <TableHead className="bg-background">Plataforma</TableHead>
-                              <TableHead className="bg-background">Login</TableHead>
-                              <TableHead className="bg-background">Senha</TableHead>
-                              <TableHead className="bg-background">URL</TableHead>
-                              <TableHead className="bg-background">Observações</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {group.credentials.map((cred) => (
-                              <TableRow key={cred.id} data-testid={`credential-row-${cred.id}`}>
-                                <TableCell className="font-medium" data-testid={`text-platform-${cred.id}`}>
-                                  {cred.platform || "-"}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <span data-testid={`text-username-${cred.id}`}>{cred.username || "-"}</span>
-                                    {cred.username && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7"
-                                        onClick={() => copyToClipboard(cred.username, "Login")}
-                                        data-testid={`button-copy-username-${cred.id}`}
-                                      >
-                                        <Copy className="w-3.5 h-3.5" />
-                                      </Button>
+            ) : credenciais && credenciais.length > 0 && credenciais.some(g => g.credentials.length > 0) ? (
+              <div className="max-h-[500px] overflow-y-auto">
+                <Table>
+                  <TableHeader className="sticky top-0 z-20 shadow-sm">
+                    <TableRow className="bg-background border-b">
+                      <TableHead className="bg-background">Plataforma</TableHead>
+                      <TableHead className="bg-background">Login</TableHead>
+                      <TableHead className="bg-background">Senha</TableHead>
+                      <TableHead className="bg-background">URL</TableHead>
+                      <TableHead className="bg-background">Observações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {credenciais.flatMap((group) => 
+                      group.credentials.map((cred) => (
+                        <TableRow key={cred.id} data-testid={`credential-row-${cred.id}`}>
+                          <TableCell className="font-medium" data-testid={`text-platform-${cred.id}`}>
+                            {cred.platform || "-"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span data-testid={`text-username-${cred.id}`}>{cred.username || "-"}</span>
+                              {cred.username && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => copyToClipboard(cred.username, "Login")}
+                                  data-testid={`button-copy-username-${cred.id}`}
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span 
+                                className="font-mono" 
+                                data-testid={`text-password-${cred.id}`}
+                              >
+                                {visiblePasswords.has(cred.id) 
+                                  ? (cred.password || "-")
+                                  : cred.password ? "••••••••" : "-"
+                                }
+                              </span>
+                              {cred.password && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => togglePasswordVisibility(cred.id)}
+                                    data-testid={`button-toggle-password-${cred.id}`}
+                                  >
+                                    {visiblePasswords.has(cred.id) ? (
+                                      <EyeOff className="w-3.5 h-3.5" />
+                                    ) : (
+                                      <Eye className="w-3.5 h-3.5" />
                                     )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <span 
-                                      className="font-mono" 
-                                      data-testid={`text-password-${cred.id}`}
-                                    >
-                                      {visiblePasswords.has(cred.id) 
-                                        ? (cred.password || "-")
-                                        : cred.password ? "••••••••" : "-"
-                                      }
-                                    </span>
-                                    {cred.password && (
-                                      <>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-7 w-7"
-                                          onClick={() => togglePasswordVisibility(cred.id)}
-                                          data-testid={`button-toggle-password-${cred.id}`}
-                                        >
-                                          {visiblePasswords.has(cred.id) ? (
-                                            <EyeOff className="w-3.5 h-3.5" />
-                                          ) : (
-                                            <Eye className="w-3.5 h-3.5" />
-                                          )}
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-7 w-7"
-                                          onClick={() => copyToClipboard(cred.password, "Senha")}
-                                          data-testid={`button-copy-password-${cred.id}`}
-                                        >
-                                          <Copy className="w-3.5 h-3.5" />
-                                        </Button>
-                                      </>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  {cred.accessUrl ? (
-                                    <a
-                                      href={cred.accessUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 text-primary hover:underline"
-                                      data-testid={`link-url-${cred.id}`}
-                                    >
-                                      Acessar
-                                      <ExternalLink className="w-3 h-3" />
-                                    </a>
-                                  ) : (
-                                    <span className="text-muted-foreground text-sm" data-testid={`text-no-url-${cred.id}`}>-</span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-muted-foreground max-w-[200px] truncate" data-testid={`text-observations-${cred.id}`}>
-                                  {cred.observations || "-"}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    ) : (
-                      <p className="text-muted-foreground text-sm">Nenhuma credencial neste grupo</p>
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => copyToClipboard(cred.password, "Senha")}
+                                    data-testid={`button-copy-password-${cred.id}`}
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {cred.accessUrl ? (
+                              <a
+                                href={cred.accessUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-primary hover:underline"
+                                data-testid={`link-url-${cred.id}`}
+                              >
+                                Acessar
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground text-sm" data-testid={`text-no-url-${cred.id}`}>-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground max-w-[200px] truncate" data-testid={`text-observations-${cred.id}`}>
+                            {cred.observations || "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))
                     )}
-                  </div>
-                ))}
+                  </TableBody>
+                </Table>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-8 text-center" data-testid="no-credentials">
