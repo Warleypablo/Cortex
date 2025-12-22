@@ -8501,7 +8501,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         RETURNING *
       `);
       
-      res.status(201).json(result.rows[0]);
+      const row = result.rows[0] as any;
+      const log = {
+        id: row.id,
+        action: row.action,
+        entityType: row.entity_type,
+        entityId: row.entity_id,
+        entityName: row.entity_name,
+        clientId: row.client_id,
+        clientName: row.client_name,
+        details: row.details,
+        userEmail: row.user_email,
+        userName: row.user_name,
+        createdAt: row.created_at,
+      };
+      
+      res.status(201).json(log);
     } catch (error) {
       console.error("[api] Error creating access log:", error);
       res.status(500).json({ error: "Failed to create access log" });
@@ -8539,7 +8554,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         result = await db.execute(sql`SELECT * FROM access_logs ORDER BY created_at DESC LIMIT ${limitNum}`);
       }
       
-      res.json(result.rows);
+      // Map snake_case to camelCase for frontend compatibility
+      const logs = result.rows.map((row: any) => ({
+        id: row.id,
+        action: row.action,
+        entityType: row.entity_type,
+        entityId: row.entity_id,
+        entityName: row.entity_name,
+        clientId: row.client_id,
+        clientName: row.client_name,
+        details: row.details,
+        userEmail: row.user_email,
+        userName: row.user_name,
+        createdAt: row.created_at,
+      }));
+      
+      res.json(logs);
     } catch (error) {
       console.error("[api] Error fetching access logs:", error);
       res.status(500).json({ error: "Failed to fetch access logs" });
