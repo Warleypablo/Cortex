@@ -4,7 +4,12 @@ import type { Client, Credential, InsertClient, InsertCredential, AccessLog, Cli
 import { insertClientSchema, insertCredentialSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Key, Lock, Loader2, ChevronDown, ChevronRight, Building2, History, ArrowUpDown, Check, ChevronsUpDown, UserPlus } from "lucide-react";
+import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Key, Lock, Loader2, ChevronDown, ChevronRight, Building2, History, ArrowUpDown, Check, ChevronsUpDown, UserPlus, Wand2, Link2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Command,
   CommandEmpty,
@@ -1457,6 +1462,172 @@ function ClientCredentialsSection({
   );
 }
 
+interface AIMatch {
+  acessosId: string;
+  acessosName: string;
+  cupCnpj: string;
+  cupNome: string;
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+function AIMatchDialog({ onSuccess }: { onSuccess?: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [matches, setMatches] = useState<AIMatch[]>([]);
+  const [appliedMatches, setAppliedMatches] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
+
+  const fetchMatchesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/acessos/ai-match-clients");
+      return await response.json();
+    },
+    onSuccess: (data: { matches: AIMatch[] }) => {
+      setMatches(data.matches || []);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao buscar matches",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const applyMatchMutation = useMutation({
+    mutationFn: async ({ acessosId, cupCnpj }: { acessosId: string; cupCnpj: string }) => {
+      const response = await apiRequest("POST", "/api/acessos/apply-match", { acessosId, cupCnpj });
+      return await response.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients"] });
+      setAppliedMatches(prev => new Set([...Array.from(prev), variables.acessosId]));
+      toast({
+        title: "Match aplicado",
+        description: "O cliente foi vinculado com sucesso.",
+      });
+      onSuccess?.();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao aplicar match",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleOpen = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen) {
+      setMatches([]);
+      setAppliedMatches(new Set());
+      fetchMatchesMutation.mutate();
+    }
+  };
+
+  const getConfidenceBadge = (confidence: 'high' | 'medium' | 'low') => {
+    switch (confidence) {
+      case 'high':
+        return <Badge className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30">Alta</Badge>;
+      case 'medium':
+        return <Badge className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30">Média</Badge>;
+      case 'low':
+        return <Badge className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30">Baixa</Badge>;
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" data-testid="button-ai-match">
+          <Wand2 className="w-4 h-4 mr-2" />
+          Vincular Clientes por IA
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Wand2 className="w-5 h-5" />
+            Vincular Clientes por IA
+          </DialogTitle>
+          <DialogDescription>
+            Matches sugeridos pela IA entre clientes de Acessos e CRM
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-auto">
+          {fetchMatchesMutation.isPending ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-muted-foreground">Analisando clientes com IA...</p>
+            </div>
+          ) : matches.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Link2 className="w-12 h-12 mb-4 opacity-50" />
+              <p className="font-medium">Nenhum match encontrado</p>
+              <p className="text-sm">Todos os clientes já estão vinculados ou não há correspondências</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {matches.map((match) => {
+                const isApplied = appliedMatches.has(match.acessosId);
+                return (
+                  <Card 
+                    key={match.acessosId} 
+                    className={cn(isApplied && "opacity-60")}
+                    data-testid={`match-card-${match.acessosId}`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{match.acessosName}</span>
+                            <Link2 className="w-4 h-4 text-muted-foreground" />
+                            <span className="font-medium text-primary">{match.cupNome}</span>
+                            {getConfidenceBadge(match.confidence)}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{match.reason}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          disabled={isApplied || applyMatchMutation.isPending}
+                          onClick={() => applyMatchMutation.mutate({ 
+                            acessosId: match.acessosId, 
+                            cupCnpj: match.cupCnpj 
+                          })}
+                          data-testid={`button-apply-match-${match.acessosId}`}
+                        >
+                          {isApplied ? (
+                            <>
+                              <Check className="w-4 h-4 mr-1" />
+                              Aplicado
+                            </>
+                          ) : applyMatchMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            "Aplicar"
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} data-testid="button-close-ai-match">
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function LogsTab() {
   const { data: logs = [], isLoading } = useQuery<AccessLog[]>({
     queryKey: ["/api/acessos/logs"],
@@ -1517,6 +1688,11 @@ function LogsTab() {
 type SortField = 'name' | 'status' | 'credential_count' | 'createdAt';
 type SortDirection = 'asc' | 'desc';
 
+interface CupCliente {
+  cnpj: string;
+  nome: string;
+}
+
 function ClientsTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
@@ -1530,6 +1706,16 @@ function ClientsTab() {
   const { data: clients = [], isLoading } = useQuery<ClientWithCredentialCount[]>({
     queryKey: ["/api/acessos/clients"],
   });
+
+  const { data: cupClientes = [] } = useQuery<CupCliente[]>({
+    queryKey: ["/api/acessos/cup-clientes"],
+  });
+
+  const getCupClienteName = (cnpj: string | null) => {
+    if (!cnpj) return null;
+    const cupClient = cupClientes.find(c => c.cnpj === cnpj);
+    return cupClient?.nome || cnpj;
+  };
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -1741,6 +1927,18 @@ function ClientsTab() {
                             Turbo
                           </Badge>
                         )}
+                        {client.linkedClientCnpj && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex">
+                                <Link2 className="w-4 h-4 text-primary" data-testid={`icon-linked-${client.id}`} />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Vinculado ao CRM: {getCupClienteName(client.linkedClientCnpj)}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -1859,7 +2057,10 @@ export default function Acessos() {
                 Gerencie os acessos e credenciais dos clientes
               </CardDescription>
             </div>
-            <AddClientDialog />
+            <div className="flex items-center gap-2">
+              <AIMatchDialog />
+              <AddClientDialog />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
