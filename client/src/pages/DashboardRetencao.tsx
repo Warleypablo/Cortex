@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { formatPercent, formatCurrency } from "@/lib/utils";
 import {
   HoverCard,
   HoverCardContent,
@@ -286,7 +287,7 @@ export default function DashboardRetencao() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-retention-month3">
-                  {kpis.avgRetentionMonth3.toFixed(1)}%
+                  {formatPercent(kpis.avgRetentionMonth3)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Taxa média de retenção
@@ -301,7 +302,7 @@ export default function DashboardRetencao() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-retention-month6">
-                  {kpis.avgRetentionMonth6.toFixed(1)}%
+                  {formatPercent(kpis.avgRetentionMonth6)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Taxa média de retenção
@@ -316,7 +317,7 @@ export default function DashboardRetencao() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-churn-rate">
-                  {kpis.avgChurnRate.toFixed(1)}%
+                  {formatPercent(kpis.avgChurnRate)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Perda média (Mês 3)
@@ -537,7 +538,7 @@ export default function DashboardRetencao() {
                                       variant="outline"
                                       className={`${getRetentionColor(rate)} font-semibold min-w-[70px]`}
                                     >
-                                      {rate.toFixed(0)}%
+                                      {formatPercent(rate, 0)}
                                     </Badge>
                                     <span className="text-xs text-muted-foreground">
                                       {viewMode === "clientes" 
@@ -698,8 +699,8 @@ export default function DashboardRetencao() {
                                         {churnViewMode === "quantidade" 
                                           ? valor
                                           : churnViewMode === "valorTotal"
-                                          ? `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                                          : `${valor.toFixed(1)}%`
+                                          ? formatCurrency(valor)
+                                          : formatPercent(valor)
                                         }
                                       </span>
                                     </HoverCardTrigger>
@@ -715,15 +716,15 @@ export default function DashboardRetencao() {
                                           </p>
                                           <p className="flex justify-between">
                                             <span className="text-muted-foreground">Valor:</span>
-                                            <span className="font-medium">R$ {data.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                            <span className="font-medium">{formatCurrency(data.valorTotal)}</span>
                                           </p>
                                           <p className="flex justify-between">
                                             <span className="text-muted-foreground">% Churn:</span>
-                                            <span className="font-medium">{data.percentualChurn.toFixed(1)}%</span>
+                                            <span className="font-medium">{formatPercent(data.percentualChurn)}</span>
                                           </p>
                                           <p className="flex justify-between">
                                             <span className="text-muted-foreground">Valor ativo mês:</span>
-                                            <span className="font-medium">R$ {data.valorAtivoMes.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                            <span className="font-medium">{formatCurrency(data.valorAtivoMes)}</span>
                                           </p>
                                         </div>
                                       </div>
@@ -767,8 +768,8 @@ export default function DashboardRetencao() {
                           const displayValue = churnViewMode === "quantidade" 
                             ? totalQuantidade
                             : churnViewMode === "valorTotal"
-                            ? `R$ ${totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                            : `${avgPercentual.toFixed(1)}%`;
+                            ? formatCurrency(totalValor)
+                            : formatPercent(avgPercentual);
 
                           return (
                             <td key={mes} className="p-3 text-center" data-testid={`cell-churn-total-${mes}`}>
@@ -790,15 +791,15 @@ export default function DashboardRetencao() {
                                       </p>
                                       <p className="flex justify-between">
                                         <span className="text-muted-foreground">Valor:</span>
-                                        <span className="font-medium">R$ {totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                        <span className="font-medium">{formatCurrency(totalValor)}</span>
                                       </p>
                                       <p className="flex justify-between">
                                         <span className="text-muted-foreground">% Churn:</span>
-                                        <span className="font-medium">{avgPercentual.toFixed(1)}%</span>
+                                        <span className="font-medium">{formatPercent(avgPercentual)}</span>
                                       </p>
                                       <p className="flex justify-between">
                                         <span className="text-muted-foreground">Valor ativo mês:</span>
-                                        <span className="font-medium">R$ {totalValorAtivoMes.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+                                        <span className="font-medium">{formatCurrency(totalValorAtivoMes)}</span>
                                       </p>
                                     </div>
                                   </div>
@@ -933,17 +934,17 @@ export default function DashboardRetencao() {
                                   <p className="flex justify-between gap-4">
                                     <span className="text-muted-foreground">Valor Total:</span>
                                     <span className="font-medium">
-                                      R$ {data.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                      {formatCurrency(data.valorTotal)}
                                     </span>
                                   </p>
                                   <p className="flex justify-between gap-4">
                                     <span className="text-muted-foreground">% Churn:</span>
-                                    <span className="font-medium">{data.percentualChurn.toFixed(1)}%</span>
+                                    <span className="font-medium">{formatPercent(data.percentualChurn)}</span>
                                   </p>
                                   <p className="flex justify-between gap-4">
                                     <span className="text-muted-foreground">Valor Ativo:</span>
                                     <span className="font-medium">
-                                      R$ {data.valorAtivoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                      {formatCurrency(data.valorAtivoTotal)}
                                     </span>
                                   </p>
                                 </div>

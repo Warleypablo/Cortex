@@ -17,6 +17,7 @@ import type { MetaOverview, CampaignPerformance, AdsetPerformance, AdPerformance
 import type { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { formatCurrency, formatDecimal, formatPercent } from "@/lib/utils";
 
 const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
   "campaigns": { title: "Meta Ads - Campanhas", subtitle: "Performance de campanhas Meta" },
@@ -238,21 +239,8 @@ export default function MetaAds() {
     },
   });
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
-  };
-
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat('pt-BR').format(value);
-  };
-
-  const formatPercent = (value: number) => {
-    return `${value.toFixed(2)}%`;
   };
 
   const funnelData = funnel ? [
@@ -702,7 +690,7 @@ export default function MetaAds() {
               <Target className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">{isLoadingOverview ? "..." : (overview?.roas || 0).toFixed(2)}x</div>
+              <div className="text-2xl font-bold text-primary">{isLoadingOverview ? "..." : formatDecimal(overview?.roas || 0)}x</div>
               <p className="text-xs text-muted-foreground mt-1">Retorno sobre investimento</p>
             </CardContent>
           </Card>
@@ -897,7 +885,7 @@ export default function MetaAds() {
                             <TableCell className="text-right">{formatNumber(campaign.leads)}</TableCell>
                             <TableCell className="text-right font-medium">{formatNumber(campaign.won)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(campaign.wonValue)}</TableCell>
-                            <TableCell className="text-right font-bold text-primary">{campaign.roas.toFixed(2)}x</TableCell>
+                            <TableCell className="text-right font-bold text-primary">{formatDecimal(campaign.roas)}x</TableCell>
                             <TableCell className="text-right">{formatPercent(campaign.conversionRate)}</TableCell>
                           </TableRow>
                         ))}
@@ -956,7 +944,7 @@ export default function MetaAds() {
                             <TableCell className="text-right">{formatPercent(adset.ctr)}</TableCell>
                             <TableCell className="text-right">{formatNumber(adset.leads)}</TableCell>
                             <TableCell className="text-right font-medium">{formatNumber(adset.won)}</TableCell>
-                            <TableCell className="text-right font-bold text-primary">{adset.roas.toFixed(2)}x</TableCell>
+                            <TableCell className="text-right font-bold text-primary">{formatDecimal(adset.roas)}x</TableCell>
                             <TableCell className="text-right">{formatPercent(adset.conversionRate)}</TableCell>
                           </TableRow>
                         ))}
@@ -1015,7 +1003,7 @@ export default function MetaAds() {
                             <TableCell className="text-right">{formatPercent(ad.ctr)}</TableCell>
                             <TableCell className="text-right">{formatNumber(ad.leads)}</TableCell>
                             <TableCell className="text-right font-medium">{formatNumber(ad.won)}</TableCell>
-                            <TableCell className="text-right font-bold text-primary">{ad.roas.toFixed(2)}x</TableCell>
+                            <TableCell className="text-right font-bold text-primary">{formatDecimal(ad.roas)}x</TableCell>
                             <TableCell className="text-right">{formatPercent(ad.conversionRate)}</TableCell>
                           </TableRow>
                         ))}

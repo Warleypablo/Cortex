@@ -14,6 +14,7 @@ import { ptBR } from "date-fns/locale";
 import { Activity, Database, Shield, Zap, RefreshCw, CheckCircle2, XCircle, AlertCircle, Server, HardDrive, Clock, ArrowDownUp, GitCompare, Play } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatDecimal } from "@/lib/utils";
 
 interface SystemLog {
   id: string;
@@ -684,14 +685,14 @@ export default function AdminLogs() {
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Taxa de sucesso:</span>
                         <Badge className={summary.success_rate >= 90 ? "bg-green-500/20 text-green-400 border-green-500/30" : summary.success_rate >= 70 ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" : "bg-red-500/20 text-red-400 border-red-500/30"}>
-                          {summary.success_rate.toFixed(1)}%
+                          {formatDecimal(summary.success_rate)}%
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {summary.successful_syncs}/{summary.total_syncs} sincronizações
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Duração média: {summary.avg_duration_seconds.toFixed(1)}s
+                        Duração média: {formatDecimal(summary.avg_duration_seconds)}s
                       </p>
                       {summary.last_sync && (
                         <p className="text-xs text-muted-foreground">
@@ -763,7 +764,7 @@ export default function AdminLogs() {
                             <span className="text-muted-foreground text-xs ml-1">({log.records_processed} total)</span>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {log.duration_ms ? `${(log.duration_ms / 1000).toFixed(2)}s` : '-'}
+                            {log.duration_ms ? `${formatDecimal(log.duration_ms / 1000)}s` : '-'}
                           </TableCell>
                         </TableRow>
                       ))}

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Cake, Briefcase, TrendingUp, Clock, Users, Loader2 } from "lucide-react";
 import { Link } from "wouter";
+import { formatDecimal } from "@/lib/utils";
 
 interface AniversariantesMes {
   id: number;
@@ -121,7 +122,7 @@ export default function ColaboradoresAnalise() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {tempoMedioPromocao.tempoMedioMeses.toFixed(1)} meses
+                  {formatDecimal(tempoMedioPromocao.tempoMedioMeses)} meses
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {tempoMedioPromocao.totalColaboradores} colaboradores com histórico
@@ -138,7 +139,7 @@ export default function ColaboradoresAnalise() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {tempoPermanencia.tempoPermanenciaAtivos.toFixed(1)} meses
+                  {formatDecimal(tempoPermanencia.tempoPermanenciaAtivos)} meses
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {tempoPermanencia.totalAtivos} colaboradores ativos
@@ -155,7 +156,7 @@ export default function ColaboradoresAnalise() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {tempoPermanencia.tempoPermanenciaDesligados.toFixed(1)} meses
+                  {formatDecimal(tempoPermanencia.tempoPermanenciaDesligados)} meses
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {tempoPermanencia.totalDesligados} colaboradores desligados

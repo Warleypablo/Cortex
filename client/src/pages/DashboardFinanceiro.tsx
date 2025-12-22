@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { formatDecimal, formatPercent, formatCurrency, formatCurrencyCompact } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -166,23 +167,6 @@ export default function DashboardFinanceiro() {
     [categoriasData]
   );
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatCurrencyCompact = (value: number) => {
-    if (value >= 1000000) return `R$ ${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `R$ ${(value / 1000).toFixed(0)}K`;
-    return formatCurrency(value);
-  };
-
-  const formatPercent = (value: number) => `${value.toFixed(1)}%`;
-
   const handleBarClick = (data: any) => {
     if (data && data.payload && data.payload.mes) {
       const [mes, ano] = data.payload.mes.split('/').map(Number);
@@ -309,7 +293,7 @@ export default function DashboardFinanceiro() {
           icon={TrendingUp}
           variant="success"
           trend={kpisCompletos?.variacaoReceita && kpisCompletos.variacaoReceita > 0 ? 'up' : kpisCompletos?.variacaoReceita && kpisCompletos.variacaoReceita < 0 ? 'down' : 'neutral'}
-          trendValue={kpisCompletos?.variacaoReceita ? `${kpisCompletos.variacaoReceita.toFixed(1)}%` : undefined}
+          trendValue={kpisCompletos?.variacaoReceita ? formatPercent(kpisCompletos.variacaoReceita) : undefined}
           subtitle="vs mês anterior"
           loading={isLoadingKpisCompletos}
         />
@@ -319,7 +303,7 @@ export default function DashboardFinanceiro() {
           icon={TrendingDown}
           variant="danger"
           trend={kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa > 0 ? 'up' : kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa < 0 ? 'down' : 'neutral'}
-          trendValue={kpisCompletos?.variacaoDespesa ? `${kpisCompletos.variacaoDespesa.toFixed(1)}%` : undefined}
+          trendValue={kpisCompletos?.variacaoDespesa ? formatPercent(kpisCompletos.variacaoDespesa) : undefined}
           subtitle="vs mês anterior"
           loading={isLoadingKpisCompletos}
         />
@@ -332,7 +316,7 @@ export default function DashboardFinanceiro() {
         />
         <KPICard
           title="Margem do Mês"
-          value={`${(kpisCompletos?.margemMesAtual || 0).toFixed(1)}%`}
+          value={formatPercent(kpisCompletos?.margemMesAtual || 0)}
           icon={PieChart}
           variant={(kpisCompletos?.margemMesAtual || 0) >= 20 ? 'success' : (kpisCompletos?.margemMesAtual || 0) >= 0 ? 'warning' : 'danger'}
           subtitle="Receita - Despesa / Receita"
@@ -421,7 +405,7 @@ export default function DashboardFinanceiro() {
                   <XAxis dataKey="mesLabel" tick={{ fill: 'currentColor', fontSize: 11 }} />
                   <YAxis tick={{ fill: 'currentColor' }} tickFormatter={(v) => `${v.toFixed(0)}%`} />
                   <Tooltip 
-                    formatter={(value: number) => `${value.toFixed(1)}%`}
+                    formatter={(value: number) => formatPercent(value)}
                     contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
                   />
                   <Line 
@@ -507,7 +491,7 @@ export default function DashboardFinanceiro() {
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
-                      label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                      label={({ percent }) => formatPercent(percent * 100)}
                     >
                       {metodosData.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

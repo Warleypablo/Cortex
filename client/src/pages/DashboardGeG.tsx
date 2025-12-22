@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { formatDecimal } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, TrendingUp, UserPlus, UserMinus, Clock, Cake, Award, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building } from "lucide-react";
@@ -333,13 +334,13 @@ export default function DashboardGeG() {
                 <div className="space-y-2">
                   <div>
                     <div className="text-xl font-bold" data-testid="text-tempo-ativos">
-                      {tempoPermanencia?.tempoMedioAtivos ? tempoPermanencia.tempoMedioAtivos.toFixed(1) : '0'} meses
+                      {tempoPermanencia?.tempoMedioAtivos ? formatDecimal(tempoPermanencia.tempoMedioAtivos) : '0'} meses
                     </div>
                     <p className="text-xs text-muted-foreground">Ativos</p>
                   </div>
                   <div>
                     <div className="text-xl font-bold text-muted-foreground" data-testid="text-tempo-desligados">
-                      {tempoPermanencia?.tempoMedioDesligados ? tempoPermanencia.tempoMedioDesligados.toFixed(1) : '0'} meses
+                      {tempoPermanencia?.tempoMedioDesligados ? formatDecimal(tempoPermanencia.tempoMedioDesligados) : '0'} meses
                     </div>
                     <p className="text-xs text-muted-foreground">Desligados</p>
                   </div>
