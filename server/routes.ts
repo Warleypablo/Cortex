@@ -8301,6 +8301,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET caz_clientes (main database clients) for selection
+  app.get("/api/acessos/caz-clientes", async (req, res) => {
+    try {
+      const search = req.query.search as string;
+      
+      let result;
+      if (search) {
+        const searchPattern = `%${search}%`;
+        result = await db.execute(sql`
+          SELECT id, nome, cnpj, ativo 
+          FROM caz_clientes 
+          WHERE LOWER(nome) LIKE LOWER(${searchPattern}) OR LOWER(cnpj) LIKE LOWER(${searchPattern})
+          ORDER BY nome ASC
+          LIMIT 50
+        `);
+      } else {
+        result = await db.execute(sql`
+          SELECT id, nome, cnpj, ativo 
+          FROM caz_clientes 
+          ORDER BY nome ASC
+          LIMIT 50
+        `);
+      }
+      
+      // Map to standard format
+      const mapped = result.rows.map((row: any) => ({
+        id: row.id,
+        name: row.nome,
+        cnpj: row.cnpj,
+        status: row.ativo === 'Ativo' ? 'ativo' : 'cancelado',
+      }));
+      
+      res.json(mapped);
+    } catch (error) {
+      console.error("[api] Error fetching caz_clientes:", error);
+      res.status(500).json({ error: "Failed to fetch caz_clientes" });
+    }
+  });
+
   // GET single client with credentials
   app.get("/api/acessos/clients/:id", async (req, res) => {
     try {
