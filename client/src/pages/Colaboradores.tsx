@@ -69,6 +69,34 @@ const squadColors: Record<string, string> = {
   "Commerce": "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
 };
 
+const statusOptions = ["Vai Começar", "Ativo", "Dispensado", "Em Desligamento"];
+
+interface CargoOption {
+  id: number;
+  nome: string;
+}
+
+interface NivelOption {
+  id: number;
+  nome: string;
+}
+
+interface SquadOption {
+  id: number;
+  nome: string;
+  emoji: string | null;
+}
+
+interface EstadoOption {
+  sigla: string;
+  nome: string;
+}
+
+interface CidadeOption {
+  id: number;
+  nome: string;
+}
+
 function getInitials(nome: string) {
   if (!nome) return "??";
   return nome
@@ -92,8 +120,28 @@ function AddColaboradorDialog() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
 
-  const form = useForm<InsertColaborador>({
-    resolver: zodResolver(insertColaboradorSchema),
+  const { data: cargos = [], isLoading: cargosLoading } = useQuery<CargoOption[]>({
+    queryKey: ["/api/rh/cargos"],
+  });
+
+  const { data: niveis = [], isLoading: niveisLoading } = useQuery<NivelOption[]>({
+    queryKey: ["/api/rh/niveis"],
+  });
+
+  const { data: squads = [], isLoading: squadsLoading } = useQuery<SquadOption[]>({
+    queryKey: ["/api/rh/squads"],
+  });
+
+  const { data: estados = [], isLoading: estadosLoading } = useQuery<EstadoOption[]>({
+    queryKey: ["/api/geo/estados"],
+  });
+
+  const addColaboradorSchema = insertColaboradorSchema.extend({
+    cidade: z.string().optional(),
+  });
+
+  const form = useForm<InsertColaborador & { cidade?: string }>({
+    resolver: zodResolver(addColaboradorSchema),
     defaultValues: {
       nome: "",
       status: "Ativo",
@@ -107,12 +155,24 @@ function AddColaboradorDialog() {
       setor: "",
       endereco: "",
       estado: "",
+      cidade: "",
       pix: "",
       cnpj: "",
       aniversario: undefined,
       admissao: undefined,
     },
   });
+
+  const estado = form.watch("estado");
+
+  const { data: cidades = [], isLoading: cidadesLoading } = useQuery<CidadeOption[]>({
+    queryKey: ["/api/geo/cidades", estado],
+    enabled: !!estado,
+  });
+
+  useEffect(() => {
+    form.setValue("cidade", "", { shouldValidate: false });
+  }, [estado, form]);
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertColaborador) => {
@@ -186,8 +246,11 @@ function AddColaboradorDialog() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Ativo">Ativo</SelectItem>
-                        <SelectItem value="Inativo">Inativo</SelectItem>
+                        {statusOptions.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {status}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -201,9 +264,20 @@ function AddColaboradorDialog() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cargo</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-cargo" placeholder="Ex: Desenvolvedor" />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-cargo">
+                          <SelectValue placeholder={cargosLoading ? "Carregando..." : "Selecione o cargo"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cargos.map((cargo) => (
+                          <SelectItem key={cargo.id} value={cargo.nome}>
+                            {cargo.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -215,9 +289,20 @@ function AddColaboradorDialog() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nível</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-nivel" placeholder="Ex: Pleno" />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-nivel">
+                          <SelectValue placeholder={niveisLoading ? "Carregando..." : "Selecione o nível"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {niveis.map((nivel) => (
+                          <SelectItem key={nivel.id} value={nivel.nome}>
+                            {nivel.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -229,9 +314,20 @@ function AddColaboradorDialog() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Squad</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-squad" placeholder="Ex: Tech" />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-squad">
+                          <SelectValue placeholder={squadsLoading ? "Carregando..." : "Selecione o squad"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {squads.map((squad) => (
+                          <SelectItem key={squad.id} value={squad.nome}>
+                            {squad.emoji ? `${squad.emoji} ${squad.nome}` : squad.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -341,9 +437,55 @@ function AddColaboradorDialog() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Estado</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-estado" placeholder="SP" maxLength={2} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-estado">
+                          <SelectValue placeholder={estadosLoading ? "Carregando..." : "Selecione o estado"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {estados.map((est) => (
+                          <SelectItem key={est.sigla} value={est.sigla}>
+                            {est.sigla} - {est.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="cidade"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cidade</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value || undefined}
+                      disabled={!estado || cidadesLoading}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-cidade">
+                          <SelectValue placeholder={
+                            !estado 
+                              ? "Selecione um estado primeiro" 
+                              : cidadesLoading 
+                                ? "Carregando cidades..." 
+                                : "Selecione a cidade"
+                          } />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cidades.map((cidade) => (
+                          <SelectItem key={cidade.id} value={cidade.nome}>
+                            {cidade.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -436,8 +578,25 @@ function AddColaboradorDialog() {
 function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborador: Colaborador; open: boolean; onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
 
+  const { data: cargos = [], isLoading: cargosLoading } = useQuery<CargoOption[]>({
+    queryKey: ["/api/rh/cargos"],
+  });
+
+  const { data: niveis = [], isLoading: niveisLoading } = useQuery<NivelOption[]>({
+    queryKey: ["/api/rh/niveis"],
+  });
+
+  const { data: squads = [], isLoading: squadsLoading } = useQuery<SquadOption[]>({
+    queryKey: ["/api/rh/squads"],
+  });
+
+  const { data: estados = [], isLoading: estadosLoading } = useQuery<EstadoOption[]>({
+    queryKey: ["/api/geo/estados"],
+  });
+
   const editColaboradorSchema = insertColaboradorSchema.extend({
     demissao: z.string().optional(),
+    cidade: z.string().optional(),
   }).refine(
     (data) => {
       if (data.status === "Dispensado") {
@@ -451,7 +610,7 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
     }
   );
 
-  const form = useForm<InsertColaborador & { demissao?: string }>({
+  const form = useForm<InsertColaborador & { demissao?: string; cidade?: string }>({
     resolver: zodResolver(editColaboradorSchema),
     defaultValues: {
       nome: colaborador.nome || "",
@@ -466,6 +625,7 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
       setor: colaborador.setor || "",
       endereco: colaborador.endereco || "",
       estado: colaborador.estado || "",
+      cidade: (colaborador as any).cidade || "",
       pix: colaborador.pix || "",
       cnpj: colaborador.cnpj || "",
       aniversario: colaborador.aniversario ? new Date(colaborador.aniversario).toISOString().split('T')[0] : undefined,
@@ -475,12 +635,24 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
   });
 
   const status = form.watch("status");
+  const estado = form.watch("estado");
+
+  const { data: cidades = [], isLoading: cidadesLoading } = useQuery<CidadeOption[]>({
+    queryKey: ["/api/geo/cidades", estado],
+    enabled: !!estado,
+  });
 
   useEffect(() => {
     if (status !== "Dispensado") {
       form.setValue("demissao", undefined, { shouldValidate: true });
     }
   }, [status, form]);
+
+  useEffect(() => {
+    if (estado !== colaborador.estado) {
+      form.setValue("cidade", "", { shouldValidate: false });
+    }
+  }, [estado, colaborador.estado, form]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertColaborador) => {
@@ -546,9 +718,11 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Ativo">Ativo</SelectItem>
-                        <SelectItem value="Inativo">Inativo</SelectItem>
-                        <SelectItem value="Dispensado">Dispensado</SelectItem>
+                        {statusOptions.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {status}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -622,9 +796,20 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cargo</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-edit-cargo" />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-cargo">
+                          <SelectValue placeholder={cargosLoading ? "Carregando..." : "Selecione o cargo"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cargos.map((cargo) => (
+                          <SelectItem key={cargo.id} value={cargo.nome}>
+                            {cargo.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -635,9 +820,20 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nível</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-edit-nivel" />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-nivel">
+                          <SelectValue placeholder={niveisLoading ? "Carregando..." : "Selecione o nível"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {niveis.map((nivel) => (
+                          <SelectItem key={nivel.id} value={nivel.nome}>
+                            {nivel.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -663,9 +859,20 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Squad</FormLabel>
-                  <FormControl>
-                    <Input {...field} value={field.value || ""} data-testid="input-edit-squad" />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-edit-squad">
+                        <SelectValue placeholder={squadsLoading ? "Carregando..." : "Selecione o squad"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {squads.map((squad) => (
+                        <SelectItem key={squad.id} value={squad.nome}>
+                          {squad.emoji ? `${squad.emoji} ${squad.nome}` : squad.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -674,31 +881,77 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="endereco"
+                name="estado"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Endereço</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-edit-endereco" />
-                    </FormControl>
+                    <FormLabel>Estado</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-estado">
+                          <SelectValue placeholder={estadosLoading ? "Carregando..." : "Selecione o estado"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {estados.map((est) => (
+                          <SelectItem key={est.sigla} value={est.sigla}>
+                            {est.sigla} - {est.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <FormField
                 control={form.control}
-                name="estado"
+                name="cidade"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Estado</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} maxLength={2} data-testid="input-edit-estado" />
-                    </FormControl>
+                    <FormLabel>Cidade</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value || undefined}
+                      disabled={!estado || cidadesLoading}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-cidade">
+                          <SelectValue placeholder={
+                            !estado 
+                              ? "Selecione um estado primeiro" 
+                              : cidadesLoading 
+                                ? "Carregando cidades..." 
+                                : "Selecione a cidade"
+                          } />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cidades.map((cidade) => (
+                          <SelectItem key={cidade.id} value={cidade.nome}>
+                            {cidade.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="endereco"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Endereço</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ""} data-testid="input-edit-endereco" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
