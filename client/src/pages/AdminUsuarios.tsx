@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
-import { Users, Database, Key, Shield, Edit, UserCog, ShieldCheck, ShieldOff } from "lucide-react";
+import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSetPageInfo } from "@/contexts/PageContext";
@@ -67,10 +69,88 @@ const AVAILABLE_ROUTES = [
   { path: '/admin/usuarios', label: 'Gerenciar Usuários', category: 'Administração' },
 ];
 
-function EditPermissionsDialog({ user, open, onOpenChange }: {
+// Pre-defined role presets with access to specific pages
+const ROLE_PRESETS: { id: string; label: string; description: string; routes: string[] }[] = [
+  {
+    id: 'financeiro',
+    label: 'Financeiro',
+    description: 'Acesso a dashboards financeiros, DFC, fluxo de caixa e inadimplência',
+    routes: [
+      '/', '/contratos', '/cases/chat',
+      '/dashboard/financeiro', '/dashboard/dfc', '/dashboard/fluxo-caixa',
+      '/dashboard/revenue-goals', '/dashboard/inadimplencia', '/dashboard/auditoria-sistemas'
+    ]
+  },
+  {
+    id: 'comercial',
+    label: 'Comercial',
+    description: 'Acesso a dashboards de vendas, closers e SDRs',
+    routes: [
+      '/', '/contratos', '/cases/chat',
+      '/dashboard/comercial/closers', '/dashboard/comercial/sdrs',
+      '/dashboard/comercial/detalhamento-closers', '/dashboard/comercial/detalhamento-vendas',
+      '/dashboard/comercial/analise-vendas', '/dashboard/comercial/apresentacao'
+    ]
+  },
+  {
+    id: 'growth',
+    label: 'Growth',
+    description: 'Acesso a dashboards de Growth, criativos e performance',
+    routes: [
+      '/', '/contratos', '/cases/chat',
+      '/growth/visao-geral', '/growth/criativos', '/growth/performance-plataformas',
+      '/dashboard/meta-ads'
+    ]
+  },
+  {
+    id: 'operacao',
+    label: 'Operação',
+    description: 'Acesso a visão geral operacional e retenção',
+    routes: [
+      '/', '/contratos', '/colaboradores', '/cases/chat',
+      '/visao-geral', '/dashboard/retencao'
+    ]
+  },
+  {
+    id: 'rh',
+    label: 'RH / G&G',
+    description: 'Acesso a gestão de pessoas e recrutamento',
+    routes: [
+      '/', '/colaboradores', '/cases/chat',
+      '/dashboard/geg', '/dashboard/recrutamento'
+    ]
+  },
+  {
+    id: 'tech',
+    label: 'Tech',
+    description: 'Acesso a dashboards de tecnologia e projetos',
+    routes: [
+      '/', '/ferramentas', '/cases/chat',
+      '/dashboard/tech', '/tech/projetos'
+    ]
+  },
+  {
+    id: 'juridico',
+    label: 'Jurídico',
+    description: 'Acesso a módulo jurídico e cobrança',
+    routes: [
+      '/', '/contratos', '/cases/chat',
+      '/juridico/clientes', '/dashboard/inadimplencia'
+    ]
+  },
+  {
+    id: 'visualizador',
+    label: 'Visualizador Básico',
+    description: 'Acesso apenas a clientes e contratos',
+    routes: ['/', '/contratos', '/cases/chat']
+  },
+];
+
+function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
   user: User;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onToggleRole: (user: User) => void;
 }) {
   const { toast } = useToast();
   const [selectedRoutes, setSelectedRoutes] = useState<string[]>(user.allowedRoutes || []);
@@ -112,8 +192,24 @@ function EditPermissionsDialog({ user, open, onOpenChange }: {
     setSelectedRoutes([]);
   };
 
+  const handleApplyPreset = (presetId: string) => {
+    const preset = ROLE_PRESETS.find(p => p.id === presetId);
+    if (preset) {
+      setSelectedRoutes(preset.routes);
+      toast({
+        title: "Perfil aplicado",
+        description: `Perfil "${preset.label}" aplicado. Clique em Salvar para confirmar.`,
+      });
+    }
+  };
+
   const handleSave = () => {
     updatePermissionsMutation.mutate(selectedRoutes);
+  };
+
+  const handlePromoteToAdmin = () => {
+    onToggleRole(user);
+    onOpenChange(false);
   };
 
   return (
@@ -127,59 +223,132 @@ function EditPermissionsDialog({ user, open, onOpenChange }: {
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSelectAll}
-              data-testid="button-select-all"
-            >
-              Selecionar Todas
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDeselectAll}
-              data-testid="button-deselect-all"
-            >
-              Desmarcar Todas
-            </Button>
-            <div className="ml-auto text-sm text-muted-foreground">
-              {selectedRoutes.length} de {AVAILABLE_ROUTES.length} selecionadas
+          {/* Admin toggle section */}
+          <div className="p-4 rounded-lg border bg-muted/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${user.role === 'admin' ? 'bg-primary/10' : 'bg-muted'}`}>
+                  {user.role === 'admin' ? (
+                    <ShieldCheck className="h-5 w-5 text-primary" />
+                  ) : (
+                    <Shield className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+                <div>
+                  <p className="font-medium">Função do Usuário</p>
+                  <p className="text-sm text-muted-foreground">
+                    {user.role === 'admin' 
+                      ? 'Administrador com acesso total ao sistema' 
+                      : 'Usuário comum com acesso limitado'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant={user.role === 'admin' ? 'outline' : 'default'}
+                size="sm"
+                onClick={handlePromoteToAdmin}
+                data-testid="button-toggle-admin"
+              >
+                {user.role === 'admin' ? (
+                  <>
+                    <ShieldOff className="h-4 w-4 mr-2" />
+                    Remover Admin
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="h-4 w-4 mr-2" />
+                    Tornar Admin
+                  </>
+                )}
+              </Button>
             </div>
           </div>
 
-          <div className="space-y-6">
-            {Object.entries(
-              AVAILABLE_ROUTES.reduce((acc, route) => {
-                if (!acc[route.category]) acc[route.category] = [];
-                acc[route.category].push(route);
-                return acc;
-              }, {} as Record<string, typeof AVAILABLE_ROUTES>)
-            ).map(([category, routes]) => (
-              <div key={category}>
-                <h4 className="text-sm font-semibold text-muted-foreground mb-3">{category}</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  {routes.map((route) => (
-                    <div key={route.path} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`route-${route.path}`}
-                        checked={selectedRoutes.includes(route.path)}
-                        onCheckedChange={() => handleToggleRoute(route.path)}
-                        data-testid={`checkbox-${route.path}`}
-                      />
-                      <Label
-                        htmlFor={`route-${route.path}`}
-                        className="text-sm font-normal cursor-pointer"
-                      >
-                        {route.label}
-                      </Label>
-                    </div>
-                  ))}
+          {user.role !== 'admin' && (
+            <>
+              <Separator />
+
+              {/* Role presets section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium">Aplicar Perfil de Acesso</Label>
+                </div>
+                <Select onValueChange={handleApplyPreset}>
+                  <SelectTrigger data-testid="select-role-preset">
+                    <SelectValue placeholder="Selecione um perfil para aplicar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLE_PRESETS.map((preset) => (
+                      <SelectItem key={preset.id} value={preset.id} data-testid={`preset-${preset.id}`}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{preset.label}</span>
+                          <span className="text-xs text-muted-foreground">{preset.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Separator />
+
+              {/* Manual selection */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  data-testid="button-select-all"
+                >
+                  Selecionar Todas
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDeselectAll}
+                  data-testid="button-deselect-all"
+                >
+                  Desmarcar Todas
+                </Button>
+                <div className="ml-auto text-sm text-muted-foreground">
+                  {selectedRoutes.length} de {AVAILABLE_ROUTES.length} selecionadas
                 </div>
               </div>
-            ))}
-          </div>
+
+              <div className="space-y-6">
+                {Object.entries(
+                  AVAILABLE_ROUTES.reduce((acc, route) => {
+                    if (!acc[route.category]) acc[route.category] = [];
+                    acc[route.category].push(route);
+                    return acc;
+                  }, {} as Record<string, typeof AVAILABLE_ROUTES>)
+                ).map(([category, routes]) => (
+                  <div key={category}>
+                    <h4 className="text-sm font-semibold text-muted-foreground mb-3">{category}</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {routes.map((route) => (
+                        <div key={route.path} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`route-${route.path}`}
+                            checked={selectedRoutes.includes(route.path)}
+                            onCheckedChange={() => handleToggleRoute(route.path)}
+                            data-testid={`checkbox-${route.path}`}
+                          />
+                          <Label
+                            htmlFor={`route-${route.path}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {route.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         <DialogFooter>
@@ -190,13 +359,15 @@ function EditPermissionsDialog({ user, open, onOpenChange }: {
           >
             Cancelar
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={updatePermissionsMutation.isPending}
-            data-testid="button-save"
-          >
-            {updatePermissionsMutation.isPending ? "Salvando..." : "Salvar"}
-          </Button>
+          {user.role !== 'admin' && (
+            <Button
+              onClick={handleSave}
+              disabled={updatePermissionsMutation.isPending}
+              data-testid="button-save"
+            >
+              {updatePermissionsMutation.isPending ? "Salvando..." : "Salvar Permissões"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -370,13 +541,8 @@ export default function AdminUsuarios() {
                             {user.name.split(' ').map(n => n[0]).join('')}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <div className="font-medium" data-testid={`text-name-${user.id}`}>
-                            {user.name}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            ID: {user.id}
-                          </div>
+                        <div className="font-medium" data-testid={`text-name-${user.id}`}>
+                          {user.name}
                         </div>
                       </div>
                     </TableCell>
@@ -411,38 +577,15 @@ export default function AdminUsuarios() {
                       })()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {user.role !== 'admin' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingUser(user)}
-                            data-testid={`button-edit-${user.id}`}
-                          >
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar Permissões
-                          </Button>
-                        )}
-                        <Button
-                          variant={user.role === 'admin' ? 'outline' : 'default'}
-                          size="sm"
-                          onClick={() => handleToggleRole(user)}
-                          disabled={toggleRoleMutation.isPending}
-                          data-testid={`button-toggle-role-${user.id}`}
-                        >
-                          {user.role === 'admin' ? (
-                            <>
-                              <ShieldOff className="h-4 w-4 mr-2" />
-                              Remover Admin
-                            </>
-                          ) : (
-                            <>
-                              <ShieldCheck className="h-4 w-4 mr-2" />
-                              Tornar Admin
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingUser(user)}
+                        data-testid={`button-edit-${user.id}`}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar Permissões
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -457,6 +600,7 @@ export default function AdminUsuarios() {
           user={editingUser}
           open={!!editingUser}
           onOpenChange={(open) => !open && setEditingUser(null)}
+          onToggleRole={handleToggleRole}
         />
       )}
     </div>
