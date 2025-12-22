@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -87,21 +88,6 @@ interface TechProjetoTipo {
   quantidade: number;
   valorTotal: number;
 }
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-};
-
-const formatCurrencyShort = (value: number) => {
-  if (value >= 1000000) return `R$${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `R$${(value / 1000).toFixed(0)}K`;
-  return `R$${value}`;
-};
 
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return '-';
@@ -458,7 +444,7 @@ export default function TechProjetos() {
                     <Skeleton className="h-7 w-14 mt-1" />
                   ) : (
                     <p className="text-2xl font-bold text-emerald-600">
-                      {stats.avgTaxa > 0 ? `${stats.avgTaxa.toFixed(0)}%` : '-'}
+                      {stats.avgTaxa > 0 ? formatPercent(stats.avgTaxa) : '-'}
                     </p>
                   )}
                 </div>
@@ -477,7 +463,7 @@ export default function TechProjetos() {
                   {isLoadingTempo ? (
                     <Skeleton className="h-7 w-20 mt-1" />
                   ) : (
-                    <p className="text-xl font-bold text-purple-600">{formatCurrencyShort(stats.totalValor)}</p>
+                    <p className="text-xl font-bold text-purple-600">{formatCurrencyCompact(stats.totalValor)}</p>
                   )}
                 </div>
               </div>
@@ -495,7 +481,7 @@ export default function TechProjetos() {
                   {isLoadingTempo ? (
                     <Skeleton className="h-7 w-20 mt-1" />
                   ) : (
-                    <p className="text-xl font-bold text-amber-600">{formatCurrencyShort(stats.valorAtivos)}</p>
+                    <p className="text-xl font-bold text-amber-600">{formatCurrencyCompact(stats.valorAtivos)}</p>
                   )}
                 </div>
               </div>
@@ -513,7 +499,7 @@ export default function TechProjetos() {
                   {isLoadingTempo ? (
                     <Skeleton className="h-7 w-20 mt-1" />
                   ) : (
-                    <p className="text-xl font-bold text-cyan-600">{formatCurrencyShort(stats.ticketMedio)}</p>
+                    <p className="text-xl font-bold text-cyan-600">{formatCurrencyCompact(stats.ticketMedio)}</p>
                   )}
                 </div>
               </div>
@@ -649,7 +635,7 @@ export default function TechProjetos() {
                           <span style={{ color: tempoColor }}>
                             {Math.round(r.tempoEmAberto || 0)}d em aberto
                           </span>
-                          <span>{formatCurrencyShort(r.valorAtivos || 0)}</span>
+                          <span>{formatCurrencyCompact(r.valorAtivos || 0)}</span>
                         </div>
                       </div>
                     );
@@ -749,13 +735,13 @@ export default function TechProjetos() {
                         <div className="text-center">
                           <span className="text-xs text-muted-foreground">Valor Ativos</span>
                           <p className="font-semibold text-sm text-blue-600">
-                            {formatCurrencyShort(resp.valorAtivos || 0)}
+                            {formatCurrencyCompact(resp.valorAtivos || 0)}
                           </p>
                         </div>
                         <div className="text-center">
                           <span className="text-xs text-muted-foreground">Valor Entregue</span>
                           <p className="font-semibold text-sm text-green-600">
-                            {formatCurrencyShort(resp.valorTotalEntregue)}
+                            {formatCurrencyCompact(resp.valorTotalEntregue)}
                           </p>
                         </div>
                       </div>
@@ -996,7 +982,7 @@ export default function TechProjetos() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right text-sm font-medium">
-                              {projeto.valorP ? formatCurrencyShort(projeto.valorP) : '-'}
+                              {projeto.valorP ? formatCurrencyCompact(projeto.valorP) : '-'}
                             </TableCell>
                             
                             {activeTab === 'abertos' ? (

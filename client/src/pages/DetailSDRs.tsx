@@ -69,6 +69,7 @@ import {
   RadialBarChart,
   RadialBar
 } from "recharts";
+import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
 
 interface SDR {
   id: number;
@@ -310,24 +311,6 @@ export default function DetailSDRs() {
     }
   }, [metrics?.sdrName, setPageInfo]);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatCurrencyCompact = (value: number) => {
-    if (value >= 1000000) {
-      return `R$ ${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `R$ ${(value / 1000).toFixed(0)}k`;
-    }
-    return `R$ ${value.toFixed(0)}`;
-  };
 
   const limparFiltros = () => {
     setDateRange({
@@ -594,7 +577,7 @@ export default function DetailSDRs() {
                       <span className="text-muted-foreground">Taxa Reunião → Venda</span>
                     </div>
                     <div className="text-3xl font-bold text-foreground" data-testid="value-taxa-reuniao-venda">
-                      {metrics.taxaReuniaoVenda.toFixed(1)}%
+                      {formatPercent(metrics.taxaReuniaoVenda)}
                     </div>
                   </CardContent>
                 </Card>
@@ -608,7 +591,7 @@ export default function DetailSDRs() {
                       <span className="text-muted-foreground">Taxa Lead → Venda</span>
                     </div>
                     <div className="text-3xl font-bold text-foreground" data-testid="value-taxa-lead-venda">
-                      {metrics.taxaLeadVenda.toFixed(1)}%
+                      {formatPercent(metrics.taxaLeadVenda)}
                     </div>
                   </CardContent>
                 </Card>
@@ -790,7 +773,7 @@ export default function DetailSDRs() {
                                 cx="50%"
                                 cy="50%"
                                 outerRadius={100}
-                                label={({ name, percentage }) => `${percentage?.toFixed(0)}%`}
+                                label={({ percentage }) => formatPercent(percentage || 0)}
                               >
                                 {sourceChartData.map((entry, index) => (
                                   <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -903,7 +886,7 @@ export default function DetailSDRs() {
                                 cx="50%"
                                 cy="50%"
                                 outerRadius={100}
-                                label={({ percentage }) => `${percentage?.toFixed(0)}%`}
+                                label={({ percentage }) => formatPercent(percentage || 0)}
                               >
                                 {stageChartData.map((entry, index) => (
                                   <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -928,7 +911,7 @@ export default function DetailSDRs() {
                                 </div>
                                 <div className="flex items-center gap-4">
                                   <span className="text-foreground font-semibold">{item.value}</span>
-                                  <span className="text-muted-foreground text-sm">({item.percentage?.toFixed(1)}%)</span>
+                                  <span className="text-muted-foreground text-sm">({formatPercent(item.percentage || 0)})</span>
                                 </div>
                               </div>
                             ))}

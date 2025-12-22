@@ -36,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { DealCelebration } from "@/components/DealCelebration";
+import { formatCurrency, formatCurrencyCompact, formatDecimal, formatPercent } from "@/lib/utils";
 
 interface CloserMetrics {
   mrrObtido: number;
@@ -227,25 +228,6 @@ export default function PresentationMode() {
     },
     refetchInterval: 300000,
   });
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatCurrencyCompact = (value: number) => {
-    if (value >= 1000000) {
-      return `R$ ${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `R$ ${(value / 1000).toFixed(0)}k`;
-    }
-    return formatCurrency(value);
-  };
 
   const closerRanking: RankingCloser[] = (chartReceita || [])
     .map((c, idx) => {
@@ -724,7 +706,7 @@ export default function PresentationMode() {
                       animate={{ scale: 1, opacity: 1 }}
                       key={closerMetrics?.taxaConversao}
                     >
-                      {(closerMetrics?.taxaConversao || 0).toFixed(1)}%
+                      {formatPercent(closerMetrics?.taxaConversao || 0)}
                     </motion.div>
                   )}
                 </motion.div>
@@ -853,7 +835,7 @@ export default function PresentationMode() {
                                     <div className="text-[9px] text-slate-400 uppercase">Fechados</div>
                                   </div>
                                   <div>
-                                    <div className="text-base font-bold text-white">{closer.taxa.toFixed(0)}%</div>
+                                    <div className="text-base font-bold text-white">{formatPercent(closer.taxa)}</div>
                                     <div className="text-[9px] text-slate-400 uppercase">Taxa</div>
                                   </div>
                                 </div>
@@ -947,7 +929,7 @@ export default function PresentationMode() {
                                 closer.taxa >= 15 ? 'bg-amber-500/20 text-amber-400' :
                                 'bg-slate-700/50 text-slate-400'
                               }`}>
-                                {closer.taxa.toFixed(0)}%
+                                {formatPercent(closer.taxa)}
                               </span>
                             </div>
                           </motion.div>
@@ -1088,7 +1070,7 @@ export default function PresentationMode() {
                                 animate={{ scale: 1 }}
                                 transition={{ delay: 1.5, type: "spring", stiffness: 200 }}
                               >
-                                {percentual.toFixed(1)}%
+                                {formatPercent(percentual)}
                               </motion.span>
                             </div>
                           </div>
@@ -1386,7 +1368,7 @@ export default function PresentationMode() {
                                     <div className="text-[9px] text-slate-400 uppercase">Contratos</div>
                                   </div>
                                   <div>
-                                    <div className="text-base font-bold text-white">{sdr.conversao.toFixed(0)}%</div>
+                                    <div className="text-base font-bold text-white">{formatPercent(sdr.conversao)}</div>
                                     <div className="text-[9px] text-slate-400 uppercase">Conv.</div>
                                   </div>
                                 </div>
@@ -1472,7 +1454,7 @@ export default function PresentationMode() {
                                   'bg-slate-700/50 text-slate-400'
                                 }`}
                               >
-                                {convRRLead.toFixed(0)}%
+                                {formatPercent(convRRLead)}
                               </Badge>
                             </div>
                             <div className="col-span-1 text-right text-violet-400 text-xs font-semibold">
@@ -1487,7 +1469,7 @@ export default function PresentationMode() {
                                   'bg-slate-700/50 text-slate-400'
                                 }`}
                               >
-                                {convVRR.toFixed(0)}%
+                                {formatPercent(convVRR)}
                               </Badge>
                             </div>
                             <div className="col-span-2 text-right font-semibold text-emerald-400 text-xs">
@@ -1576,7 +1558,7 @@ export default function PresentationMode() {
                                 animate={{ scale: 1 }}
                                 transition={{ delay: 1.5, type: "spring", stiffness: 200 }}
                               >
-                                {percentual.toFixed(1)}%
+                                {formatPercent(percentual)}
                               </motion.span>
                             </div>
 

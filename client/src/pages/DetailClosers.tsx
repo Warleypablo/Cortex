@@ -68,6 +68,7 @@ import {
   RadialBarChart,
   RadialBar
 } from "recharts";
+import { formatCurrency, formatCurrencyCompact, formatPercent, formatDecimal } from "@/lib/utils";
 
 interface Closer {
   id: number;
@@ -323,18 +324,6 @@ export default function DetailClosers() {
     }
   }, [metrics?.closerName, setPageInfo]);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value);
-  };
-
-  const formatPercent = (value: number) => {
-    return `${value.toFixed(1)}%`;
-  };
 
   const selectedCloser = closers?.find(c => c.id.toString() === closerId);
 
@@ -683,7 +672,7 @@ export default function DetailClosers() {
               />
               <PremiumMetricCard
                 title="Média Contratos/Mês"
-                value={parseFloat(metrics.mediaContratosPorMes.toFixed(1))}
+                value={parseFloat(formatDecimal(metrics.mediaContratosPorMes))}
                 icon={TrendingUp}
                 color="pink"
                 subtitle={`${metrics.lt} meses ativos`}
@@ -717,25 +706,25 @@ export default function DetailClosers() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                           <div className="text-center p-4 bg-muted/50 rounded-xl border border-border/30">
                             <div className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                              {leadTimeData.leadTimeMedio.toFixed(1)}
+                              {formatDecimal(leadTimeData.leadTimeMedio)}
                             </div>
                             <div className="text-sm text-muted-foreground mt-1">Média (dias)</div>
                           </div>
                           <div className="text-center p-4 bg-muted/50 rounded-xl border border-border/30">
                             <div className="text-3xl font-bold text-emerald-400">
-                              {leadTimeData.leadTimeMin.toFixed(1)}
+                              {formatDecimal(leadTimeData.leadTimeMin)}
                             </div>
                             <div className="text-sm text-muted-foreground mt-1">Mínimo (dias)</div>
                           </div>
                           <div className="text-center p-4 bg-muted/50 rounded-xl border border-border/30">
                             <div className="text-3xl font-bold text-amber-400">
-                              {leadTimeData.leadTimeMax.toFixed(1)}
+                              {formatDecimal(leadTimeData.leadTimeMax)}
                             </div>
                             <div className="text-sm text-muted-foreground mt-1">Máximo (dias)</div>
                           </div>
                           <div className="text-center p-4 bg-muted/50 rounded-xl border border-border/30">
                             <div className="text-3xl font-bold text-violet-400">
-                              {leadTimeData.leadTimeMediana.toFixed(1)}
+                              {formatDecimal(leadTimeData.leadTimeMediana)}
                             </div>
                             <div className="text-sm text-muted-foreground mt-1">Mediana (dias)</div>
                           </div>
