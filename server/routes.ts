@@ -8454,9 +8454,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Access Logs API
   // ============================================
 
+  // Initialize access_logs table on first use
+  let accessLogsTableInitialized = false;
+  async function ensureAccessLogsTable() {
+    if (accessLogsTableInitialized) return;
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS access_logs (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          action TEXT NOT NULL,
+          entity_type VARCHAR(50) NOT NULL,
+          entity_id VARCHAR(100),
+          entity_name TEXT,
+          client_id VARCHAR(100),
+          client_name TEXT,
+          details TEXT,
+          user_email VARCHAR(255),
+          user_name VARCHAR(255),
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      accessLogsTableInitialized = true;
+      console.log("[api] access_logs table initialized");
+    } catch (error) {
+      console.error("[api] Error initializing access_logs table:", error);
+    }
+  }
+
   // POST create access log
   app.post("/api/acessos/logs", async (req, res) => {
     try {
+      await ensureAccessLogsTable();
+      
       const { action, entityType, entityId, entityName, clientId, clientName, details } = req.body;
       const user = (req as any).user;
       const userEmail = user?.email || null;
@@ -8482,6 +8511,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET access logs with filters
   app.get("/api/acessos/logs", async (req, res) => {
     try {
+      await ensureAccessLogsTable();
+      
       const { action, entityType, clientId, limit = '100' } = req.query;
       
       const conditions: ReturnType<typeof sql>[] = [];
