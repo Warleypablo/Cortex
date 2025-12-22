@@ -108,9 +108,13 @@ export default function PresentationModeButton() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" data-testid="button-presentation-mode">
-          <Tv className="h-5 w-5" />
-        </Button>
+        <button
+          className="flex items-center justify-center h-10 w-10 rounded-full border border-border bg-background hover:bg-muted transition-colors"
+          data-testid="button-presentation-mode"
+          aria-label="Modo Apresentação"
+        >
+          <Tv className="h-4 w-4 text-muted-foreground" />
+        </button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>

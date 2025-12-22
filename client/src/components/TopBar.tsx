@@ -1,6 +1,5 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,8 +8,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useQuery } from "@tanstack/react-query";
-import { LogOut, User } from "lucide-react";
+import { LogOut, Bell, Settings } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -70,14 +74,60 @@ export default function TopBar() {
       
       <div className="flex items-center gap-2">
         <GlobalSearch />
-        <PresentationModeButton />
-        <ThemeToggle />
+        
+        <div className="flex items-center gap-1.5 bg-muted/50 dark:bg-muted/30 rounded-full p-1 border border-border">
+          <ThemeToggle />
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="flex items-center justify-center h-10 w-10 rounded-full border border-border bg-background hover:bg-muted transition-colors"
+                data-testid="button-notifications"
+                aria-label="Notificações"
+              >
+                <Bell className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Notificações</TooltipContent>
+          </Tooltip>
+          
+          <PresentationModeButton />
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="flex items-center justify-center h-10 w-10 rounded-full border border-border bg-background hover:bg-muted transition-colors"
+                data-testid="button-settings"
+                aria-label="Configurações"
+              >
+                <Settings className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Configurações</TooltipContent>
+          </Tooltip>
+          
+          {user && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center justify-center h-10 w-10 rounded-full border border-destructive/50 bg-background hover:bg-destructive/10 transition-colors"
+                  data-testid="button-logout"
+                  aria-label="Sair"
+                >
+                  <LogOut className="h-4 w-4 text-destructive" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Sair</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+        
         {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                className="gap-2 h-auto p-1.5 hover-elevate"
+              <button
+                className="flex items-center gap-2 p-1.5 rounded-full hover:bg-muted transition-colors"
                 data-testid="button-user-menu"
               >
                 <Avatar className="h-8 w-8">
@@ -87,7 +137,7 @@ export default function TopBar() {
                 <span className="text-sm font-medium hidden sm:inline-block">
                   {user.name}
                 </span>
-              </Button>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
@@ -97,7 +147,7 @@ export default function TopBar() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} data-testid="button-logout">
+              <DropdownMenuItem onClick={handleLogout} data-testid="button-logout-menu">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Sair</span>
               </DropdownMenuItem>
