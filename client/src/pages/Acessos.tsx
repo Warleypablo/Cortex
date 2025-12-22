@@ -4,7 +4,7 @@ import type { Client, Credential, InsertClient, InsertCredential, AccessLog, Cli
 import { insertClientSchema, insertCredentialSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Key, Lock, Loader2, ChevronDown, ChevronRight, Building2, History, ArrowUpDown, Check, ChevronsUpDown, UserPlus, Wand2, Link2 } from "lucide-react";
+import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Key, Lock, Loader2, ChevronDown, ChevronRight, Building2, History, ArrowUpDown, Check, ChevronsUpDown, UserPlus, Wand2, Link2, X } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -36,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -515,8 +516,24 @@ function EditClientDialog({
   open: boolean; 
   onOpenChange: (open: boolean) => void;
 }) {
+  const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCazClient, setSelectedCazClient] = useState<CazCliente | null>(null);
   const { toast } = useToast();
   const createLog = useCreateLog();
+
+  const { data: cazClientes = [], isLoading: isLoadingCaz } = useQuery<CazCliente[]>({
+    queryKey: ["/api/acessos/caz-clientes", searchQuery],
+    queryFn: async () => {
+      const url = searchQuery 
+        ? `/api/acessos/caz-clientes?search=${encodeURIComponent(searchQuery)}`
+        : "/api/acessos/caz-clientes";
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch clients");
+      return response.json();
+    },
+    enabled: open,
+  });
 
   const form = useForm<InsertClient>({
     resolver: zodResolver(insertClientSchema),
@@ -525,8 +542,34 @@ function EditClientDialog({
       cnpj: client.cnpj || "",
       status: (client.status as ClientStatus) || "ativo",
       additionalInfo: client.additionalInfo || "",
+      linkedClientCnpj: client.linkedClientCnpj || "",
     },
   });
+
+  // Reset form when client changes or dialog opens
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        name: client.name || "",
+        cnpj: client.cnpj || "",
+        status: (client.status as ClientStatus) || "ativo",
+        additionalInfo: client.additionalInfo || "",
+        linkedClientCnpj: client.linkedClientCnpj || "",
+      });
+      // If client is already linked, try to find the linked client
+      if (client.linkedClientCnpj) {
+        setSelectedCazClient({
+          id: 0,
+          name: client.name,
+          cnpj: client.linkedClientCnpj,
+          status: client.status as ClientStatus,
+          hasCredentials: true,
+        });
+      } else {
+        setSelectedCazClient(null);
+      }
+    }
+  }, [open, client, form]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
@@ -546,7 +589,7 @@ function EditClientDialog({
         title: "Cliente atualizado",
         description: "O cliente foi atualizado com sucesso.",
       });
-      onOpenChange(false);
+      handleClose();
     },
     onError: (error: Error) => {
       toast({
@@ -557,21 +600,119 @@ function EditClientDialog({
     },
   });
 
+  const handleClose = () => {
+    onOpenChange(false);
+    setSelectedCazClient(null);
+    setSearchQuery("");
+  };
+
+  const handleSelectClient = (cazClient: CazCliente) => {
+    setSelectedCazClient(cazClient);
+    setComboboxOpen(false);
+    // Update form with linked client CNPJ
+    form.setValue("linkedClientCnpj", cazClient.cnpj || "");
+  };
+
+  const handleUnlinkClient = () => {
+    setSelectedCazClient(null);
+    form.setValue("linkedClientCnpj", "");
+  };
+
   const onSubmit = (data: InsertClient) => {
     updateMutation.mutate(data);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(isOpen) => isOpen ? onOpenChange(true) : handleClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Editar Cliente</DialogTitle>
           <DialogDescription>
-            Atualize as informações do cliente {client.name}
+            Atualize as informações do cliente ou vincule a um cliente do Conta Azul.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Link to Conta Azul Client Section */}
+            <div className="space-y-2">
+              <FormLabel className="flex items-center gap-2">
+                <Link2 className="w-4 h-4" />
+                Vincular ao Conta Azul
+              </FormLabel>
+              {selectedCazClient ? (
+                <div className="flex items-center justify-between p-3 rounded-md border bg-muted/50">
+                  <div className="flex flex-col">
+                    <span className="font-medium text-sm">{selectedCazClient.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatCNPJ(selectedCazClient.cnpj || "")}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleUnlinkClient}
+                    data-testid="button-unlink-client"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={comboboxOpen}
+                      className="w-full justify-between"
+                      data-testid="combobox-link-client"
+                    >
+                      Selecione um cliente para vincular...
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[350px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Buscar cliente..." 
+                        value={searchQuery}
+                        onValueChange={setSearchQuery}
+                        data-testid="input-search-link-client"
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {isLoadingCaz ? "Carregando..." : "Nenhum cliente encontrado."}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {cazClientes.map((cazClient) => (
+                            <CommandItem
+                              key={cazClient.id}
+                              value={cazClient.name}
+                              onSelect={() => handleSelectClient(cazClient)}
+                              className="cursor-pointer"
+                              data-testid={`option-link-client-${cazClient.id}`}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium">{cazClient.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatCNPJ(cazClient.cnpj || "")}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Vincular permite associar este cliente aos dados do Conta Azul para relatórios integrados.
+              </p>
+            </div>
+
+            <Separator />
+
             <FormField
               control={form.control}
               name="name"
@@ -646,7 +787,7 @@ function EditClientDialog({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                onClick={handleClose}
                 data-testid="button-cancel-edit-client"
               >
                 Cancelar
