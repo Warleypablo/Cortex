@@ -8479,7 +8479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT nome, cnpj, status 
           FROM cup_clientes 
           WHERE (nome ILIKE ${searchPattern} OR cnpj ILIKE ${searchPattern})
-          AND status = 'Ativo'
+          AND LOWER(status) = 'ativo'
           ORDER BY nome
           LIMIT 50
         `);
@@ -8487,7 +8487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         result = await db.execute(sql`
           SELECT nome, cnpj, status 
           FROM cup_clientes 
-          WHERE status = 'Ativo'
+          WHERE LOWER(status) = 'ativo'
           ORDER BY nome
           LIMIT 100
         `);
@@ -8511,9 +8511,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT id, name, cnpj FROM clients WHERE linked_client_cnpj IS NULL
       `);
       
-      // Get active cup_clientes
+      // Get active cup_clientes (case-insensitive status check)
       const cupClientes = await db.execute(sql`
-        SELECT nome, cnpj FROM cup_clientes WHERE status = 'Ativo'
+        SELECT nome, cnpj FROM cup_clientes WHERE LOWER(status) = 'ativo'
       `);
       
       if (acessosClients.rows.length === 0 || cupClientes.rows.length === 0) {
