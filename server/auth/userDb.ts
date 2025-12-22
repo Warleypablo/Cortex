@@ -135,13 +135,17 @@ export async function createExternalUser(email: string): Promise<User> {
 }
 
 const ALL_ROUTES = [
-  '/',
+  '/clientes',
   '/contratos',
   '/colaboradores',
   '/colaboradores/analise',
   '/patrimonio',
   '/ferramentas',
   '/turbozap',
+  '/acessos',
+  '/conhecimentos',
+  '/beneficios',
+  '/cases/chat',
   '/visao-geral',
   '/dashboard/financeiro',
   '/dashboard/geg',
@@ -159,6 +163,7 @@ const ALL_ROUTES = [
   '/dashboard/comercial/closers',
   '/dashboard/comercial/sdrs',
   '/dashboard/comercial/detalhamento-closers',
+  '/dashboard/comercial/detalhamento-sdrs',
   '/dashboard/comercial/detalhamento-vendas',
   '/dashboard/comercial/analise-vendas',
   '/dashboard/comercial/apresentacao',
@@ -166,10 +171,20 @@ const ALL_ROUTES = [
   '/growth/criativos',
   '/growth/performance-plataformas',
   '/juridico/clientes',
-  '/admin/usuarios'
+  '/investors-report',
+  '/admin/usuarios',
+  '/admin/logs'
 ];
 
 const DEFAULT_USER_ROUTES = ['/ferramentas'];
+
+// Migra permissões antigas ("/" -> "/clientes") automaticamente
+function migrateAllowedRoutes(routes: string[] | null): string[] {
+  if (!routes) return DEFAULT_USER_ROUTES;
+  
+  // Substituir "/" por "/clientes" para manter compatibilidade
+  return routes.map(route => route === '/' ? '/clientes' : route);
+}
 
 function dbUserToUser(dbUser: typeof authUsers.$inferSelect): User {
   return {
@@ -180,7 +195,7 @@ function dbUserToUser(dbUser: typeof authUsers.$inferSelect): User {
     picture: dbUser.picture || '',
     createdAt: dbUser.createdAt?.toISOString() || new Date().toISOString(),
     role: dbUser.role as 'admin' | 'user',
-    allowedRoutes: dbUser.allowedRoutes || DEFAULT_USER_ROUTES,
+    allowedRoutes: migrateAllowedRoutes(dbUser.allowedRoutes),
   };
 }
 
