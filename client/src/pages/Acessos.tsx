@@ -1163,11 +1163,17 @@ interface TurboTool {
 
 function TurboToolsSection() {
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
   const { data: tools = [], isLoading } = useQuery<TurboTool[]>({
     queryKey: ["/api/acessos/turbo-tools"],
   });
+
+  const filteredTools = tools.filter(tool => 
+    tool.platform.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (tool.username && tool.username.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   const togglePassword = (id: string) => {
     setVisiblePasswords(prev => {
@@ -1199,17 +1205,27 @@ function TurboToolsSection() {
 
   return (
     <div className="p-4 bg-muted/30">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-4">
         <div className="flex items-center gap-2">
           <Lock className="w-4 h-4 text-primary" />
-          <span className="font-medium">Turbo Tools ({tools.length})</span>
+          <span className="font-medium">Turbo Tools ({filteredTools.length}/{tools.length})</span>
+        </div>
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar ferramenta..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="input-search-turbo-tools"
+          />
         </div>
       </div>
 
-      {tools.length === 0 ? (
+      {filteredTools.length === 0 ? (
         <div className="text-center py-6 text-muted-foreground">
           <Key className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          <p>Nenhuma ferramenta cadastrada</p>
+          <p>{searchQuery ? "Nenhuma ferramenta encontrada" : "Nenhuma ferramenta cadastrada"}</p>
         </div>
       ) : (
         <Table>
@@ -1222,7 +1238,7 @@ function TurboToolsSection() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {tools.map((tool) => (
+            {filteredTools.map((tool) => (
               <TableRow key={tool.id} data-testid={`row-turbo-tool-${tool.id}`}>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
