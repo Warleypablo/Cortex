@@ -1000,6 +1000,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/colaboradores/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid ID" });
+      }
+      
+      const result = await db.execute(sql`
+        SELECT 
+          c.*,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id', p.id,
+                'numeroAtivo', p.numero_ativo,
+                'descricao', p.descricao,
+                'status', p.status
+              )
+            ) FILTER (WHERE p.id IS NOT NULL),
+            '[]'
+          ) as patrimonios
+        FROM rh_pessoal c
+        LEFT JOIN rh_patrimonio p ON p.responsavel_id = c.id
+        WHERE c.id = ${id}
+        GROUP BY c.id
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Colaborador not found" });
+      }
+      
+      const row = result.rows[0] as any;
+      const colaborador = {
+        id: row.id,
+        status: row.status,
+        nome: row.nome,
+        cpf: row.cpf,
+        endereco: row.endereco,
+        estado: row.estado,
+        telefone: row.telefone,
+        aniversario: row.aniversario,
+        admissao: row.admissao,
+        demissao: row.demissao,
+        tipoDemissao: row.tipo_demissao,
+        motivoDemissao: row.motivo_demissao,
+        proporcional: row.proporcional,
+        proporcionalCaju: row.proporcional_caju,
+        setor: row.setor,
+        squad: row.squad,
+        cargo: row.cargo,
+        nivel: row.nivel,
+        pix: row.pix,
+        cnpj: row.cnpj,
+        emailTurbo: row.email_turbo,
+        emailPessoal: row.email_pessoal,
+        mesesDeTurbo: row.meses_de_turbo,
+        ultimoAumento: row.ultimo_aumento,
+        mesesUltAumento: row.meses_ult_aumento,
+        patrimonios: row.patrimonios || [],
+      };
+      
+      res.json(colaborador);
+    } catch (error) {
+      console.error("[api] Error fetching colaborador by id:", error);
+      res.status(500).json({ error: "Failed to fetch colaborador" });
+    }
+  });
+
   app.post("/api/colaboradores", async (req, res) => {
     try {
       const validation = insertColaboradorSchema.safeParse(req.body);
