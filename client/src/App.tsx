@@ -111,7 +111,7 @@ function ProtectedRouter() {
 
   useEffect(() => {
     if (!isLoading && user && location === '/') {
-      if (user.role !== 'admin' && (!user.allowedRoutes || !user.allowedRoutes.includes('/'))) {
+      if (user.role !== 'admin' && (!user.allowedRoutes || !user.allowedRoutes.includes('/clientes'))) {
         if (user.allowedRoutes && user.allowedRoutes.length > 0) {
           setLocation(user.allowedRoutes[0]);
         }
@@ -129,11 +129,11 @@ function ProtectedRouter() {
 
   return (
     <Switch>
-      {/* Menu Principal - Clientes/Contratos herdam permissão "/" */}
-      <Route path="/">{() => <ProtectedRoute path="/" component={ClientesContratos} />}</Route>
-      <Route path="/clientes">{() => <ProtectedRoute path="/" component={ClientesContratos} />}</Route>
+      {/* Menu Principal - Clientes/Contratos */}
+      <Route path="/">{() => <ProtectedRoute path="/clientes" component={ClientesContratos} />}</Route>
+      <Route path="/clientes">{() => <ProtectedRoute path="/clientes" component={ClientesContratos} />}</Route>
       <Route path="/contratos">{() => <ProtectedRoute path="/contratos" component={ClientesContratos} />}</Route>
-      <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>
+      <Route path="/cliente/:id">{() => <ProtectedRoute path="/clientes" component={ClientDetail} />}</Route>
       
       {/* Colaboradores */}
       <Route path="/colaboradores">{() => <ProtectedRoute path="/colaboradores" component={Colaboradores} />}</Route>
