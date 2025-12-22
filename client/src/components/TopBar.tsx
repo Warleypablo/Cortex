@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -9,18 +10,128 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
-import { LogOut, Bell, Settings } from "lucide-react";
+import { LogOut, Bell, Info, AlertTriangle, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import ThemeToggle from "@/components/ThemeToggle";
 import GlobalSearch from "@/components/GlobalSearch";
 import PresentationModeButton from "@/components/PresentationModeButton";
 import { usePageInfo } from "@/contexts/PageContext";
+
+interface Aviso {
+  id: string;
+  type: 'info' | 'warning' | 'success';
+  title: string;
+  message: string;
+  date: string;
+}
+
+const AVISOS_MOCK: Aviso[] = [
+  {
+    id: "1",
+    type: "info",
+    title: "Bem-vindo ao Turbo Cortex",
+    message: "Explore todas as funcionalidades da plataforma para gerenciar seus clientes e contratos.",
+    date: "2025-12-22"
+  },
+  {
+    id: "2", 
+    type: "warning",
+    title: "Atualização de Dados",
+    message: "Os dados do Conta Azul serão sincronizados automaticamente a cada hora.",
+    date: "2025-12-21"
+  },
+  {
+    id: "3",
+    type: "success",
+    title: "Sincronização Concluída",
+    message: "Todos os contratos foram atualizados com sucesso.",
+    date: "2025-12-20"
+  }
+];
+
+function AvisosModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const getIcon = (type: Aviso['type']) => {
+    switch (type) {
+      case 'info':
+        return <Info className="h-5 w-5 text-blue-500" />;
+      case 'warning':
+        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
+      case 'success':
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Avisos
+          </DialogTitle>
+          <DialogDescription>
+            Notificações e atualizações do sistema
+          </DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="max-h-[400px] pr-4">
+          <div className="space-y-3">
+            {AVISOS_MOCK.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Bell className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>Nenhum aviso no momento</p>
+              </div>
+            ) : (
+              AVISOS_MOCK.map((aviso) => (
+                <div 
+                  key={aviso.id}
+                  className="flex gap-3 p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors"
+                  data-testid={`aviso-${aviso.id}`}
+                >
+                  <div className="flex-shrink-0 mt-0.5">
+                    {getIcon(aviso.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-medium text-sm">{aviso.title}</h4>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {formatDate(aviso.date)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {aviso.message}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 interface User {
   id: string;
@@ -33,6 +144,7 @@ interface User {
 
 export default function TopBar() {
   const [, setLocation] = useLocation();
+  const [avisosOpen, setAvisosOpen] = useState(false);
   const { title, subtitle } = usePageInfo();
   
   const { data: user } = useQuery<User>({
@@ -81,30 +193,18 @@ export default function TopBar() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                onClick={() => setAvisosOpen(true)}
                 className="flex items-center justify-center h-10 w-10 rounded-full border border-border bg-background hover:bg-muted transition-colors"
                 data-testid="button-notifications"
-                aria-label="Notificações"
+                aria-label="Avisos"
               >
                 <Bell className="h-4 w-4 text-muted-foreground" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>Notificações</TooltipContent>
+            <TooltipContent>Avisos</TooltipContent>
           </Tooltip>
           
           <PresentationModeButton />
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                className="flex items-center justify-center h-10 w-10 rounded-full border border-border bg-background hover:bg-muted transition-colors"
-                data-testid="button-settings"
-                aria-label="Configurações"
-              >
-                <Settings className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Configurações</TooltipContent>
-          </Tooltip>
           
           {user && (
             <Tooltip>
@@ -155,6 +255,8 @@ export default function TopBar() {
           </DropdownMenu>
         )}
       </div>
+      
+      <AvisosModal open={avisosOpen} onOpenChange={setAvisosOpen} />
     </header>
   );
 }
