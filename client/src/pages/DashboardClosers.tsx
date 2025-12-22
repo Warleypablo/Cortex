@@ -287,7 +287,7 @@ export default function DashboardClosers() {
       case 1: return "border-yellow-500/50 shadow-yellow-500/20";
       case 2: return "border-gray-400/50 shadow-gray-400/20";
       case 3: return "border-amber-600/50 shadow-amber-600/20";
-      default: return "border-slate-700/50";
+      default: return "border-border/50";
     }
   };
 
@@ -295,7 +295,7 @@ export default function DashboardClosers() {
     switch (trend) {
       case 'up': return <ChevronUp className="w-4 h-4 text-emerald-400" />;
       case 'down': return <ChevronDown className="w-4 h-4 text-rose-400" />;
-      default: return <Minus className="w-4 h-4 text-slate-400" />;
+      default: return <Minus className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -307,8 +307,8 @@ export default function DashboardClosers() {
     (pipeline && pipeline !== "all") || (closerId && closerId !== "all");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="min-h-screen bg-background text-foreground overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none dark:block hidden">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-600/5 rounded-full blur-3xl" />
@@ -323,7 +323,7 @@ export default function DashboardClosers() {
               transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
             >
               <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 shadow-2xl shadow-violet-600/30">
-                <Trophy className="w-10 h-10 text-white" />
+                <Trophy className="w-10 h-10 text-foreground" />
               </div>
               <motion.div
                 className="absolute -top-1 -right-1"
@@ -337,19 +337,19 @@ export default function DashboardClosers() {
               <span className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-transparent">
                 ARENA DOS CLOSERS
               </span>
-              <p className="text-slate-400 text-lg mt-1">
+              <p className="text-muted-foreground text-lg mt-1">
                 Quem será o campeão de vendas?
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-xl px-2 py-1">
+            <div className="flex items-center gap-2 bg-card border border-border rounded-xl px-2 py-1">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navegarMes('anterior')}
-                className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
                 data-testid="button-mes-anterior"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -357,7 +357,7 @@ export default function DashboardClosers() {
               
               <div className="flex items-center gap-2 px-3 min-w-[180px] justify-center">
                 <Calendar className="w-4 h-4 text-violet-400" />
-                <span className="text-white font-semibold capitalize" data-testid="text-mes-atual">
+                <span className="text-foreground font-semibold capitalize" data-testid="text-mes-atual">
                   {mesAtual}
                 </span>
               </div>
@@ -366,7 +366,7 @@ export default function DashboardClosers() {
                 variant="ghost"
                 size="icon"
                 onClick={() => navegarMes('proximo')}
-                className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
                 data-testid="button-mes-proximo"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -376,7 +376,7 @@ export default function DashboardClosers() {
                 variant="ghost"
                 size="sm"
                 onClick={irParaMesAtual}
-                className="text-xs text-violet-400 hover:text-violet-300 hover:bg-slate-700 ml-1"
+                className="text-xs text-violet-400 hover:text-violet-300 hover:bg-muted ml-1"
                 data-testid="button-mes-atual"
               >
                 Hoje
@@ -384,10 +384,10 @@ export default function DashboardClosers() {
             </div>
 
             <div className="text-right">
-              <div className="text-2xl font-mono font-bold text-white">
+              <div className="text-2xl font-mono font-bold text-foreground">
                 {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
               </div>
-              <div className="text-slate-400 text-xs">
+              <div className="text-muted-foreground text-xs">
                 {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric" })}
               </div>
             </div>
@@ -413,7 +413,7 @@ export default function DashboardClosers() {
               variant="outline"
               size="icon"
               onClick={() => setShowFilters(!showFilters)}
-              className={`relative border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 ${hasActiveFilters ? 'border-violet-500' : ''}`}
+              className={`relative border-border bg-muted/50 hover:bg-muted/50 ${hasActiveFilters ? 'border-violet-500' : ''}`}
               data-testid="button-toggle-filters"
             >
               <Filter className="w-5 h-5" />
@@ -432,17 +432,17 @@ export default function DashboardClosers() {
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <Card className="bg-slate-900/80 border-slate-700/50 backdrop-blur-sm" data-testid="card-filters">
+              <Card className="bg-card border-border/50 backdrop-blur-sm" data-testid="card-filters">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <Filter className="w-4 h-4" /> Filtros Independentes
                     </span>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowFilters(false)}
-                      className="text-slate-400 hover:text-white"
+                      className="text-muted-foreground hover:text-foreground"
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -460,7 +460,7 @@ export default function DashboardClosers() {
                           value={dataReuniaoRange}
                           onChange={setDataReuniaoRange}
                           placeholder="Selecione o período"
-                          triggerClassName="h-8 bg-slate-800 border-slate-700 text-white text-sm w-full min-w-0"
+                          triggerClassName="h-8 bg-muted border-border text-foreground text-sm w-full min-w-0"
                           numberOfMonths={1}
                         />
                       </div>
@@ -474,7 +474,7 @@ export default function DashboardClosers() {
                           value={dataFechamentoRange}
                           onChange={setDataFechamentoRange}
                           placeholder="Selecione o período"
-                          triggerClassName="h-8 bg-slate-800 border-slate-700 text-white text-sm w-full min-w-0"
+                          triggerClassName="h-8 bg-muted border-border text-foreground text-sm w-full min-w-0"
                           numberOfMonths={1}
                         />
                       </div>
@@ -488,7 +488,7 @@ export default function DashboardClosers() {
                           value={dataLeadRange}
                           onChange={setDataLeadRange}
                           placeholder="Selecione o período"
-                          triggerClassName="h-8 bg-slate-800 border-slate-700 text-white text-sm w-full min-w-0"
+                          triggerClassName="h-8 bg-muted border-border text-foreground text-sm w-full min-w-0"
                           numberOfMonths={1}
                         />
                       </div>
@@ -497,12 +497,12 @@ export default function DashboardClosers() {
                     {/* Other filters */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-xs text-slate-400">Fonte</Label>
+                        <Label className="text-xs text-muted-foreground">Fonte</Label>
                         <Select value={source} onValueChange={setSource}>
-                          <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-source">
+                          <SelectTrigger className="h-8 bg-muted border-border text-foreground text-sm" data-testid="select-source">
                             <SelectValue placeholder="Todas" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectContent className="bg-muted border-border">
                             <SelectItem value="all">Todas</SelectItem>
                             {sources?.filter(s => s && s.trim() !== '').map((s) => (
                               <SelectItem key={s} value={s}>{s}</SelectItem>
@@ -511,12 +511,12 @@ export default function DashboardClosers() {
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-slate-400">Pipeline</Label>
+                        <Label className="text-xs text-muted-foreground">Pipeline</Label>
                         <Select value={pipeline} onValueChange={setPipeline}>
-                          <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-pipeline">
+                          <SelectTrigger className="h-8 bg-muted border-border text-foreground text-sm" data-testid="select-pipeline">
                             <SelectValue placeholder="Todos" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectContent className="bg-muted border-border">
                             <SelectItem value="all">Todos</SelectItem>
                             {pipelines?.filter(p => p && p.trim() !== '').map((p) => (
                               <SelectItem key={p} value={p}>{p}</SelectItem>
@@ -525,12 +525,12 @@ export default function DashboardClosers() {
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-slate-400">Closer</Label>
+                        <Label className="text-xs text-muted-foreground">Closer</Label>
                         <Select value={closerId} onValueChange={setCloserId}>
-                          <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-closer">
+                          <SelectTrigger className="h-8 bg-muted border-border text-foreground text-sm" data-testid="select-closer">
                             <SelectValue placeholder="Todos" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectContent className="bg-muted border-border">
                             <SelectItem value="all">Todos</SelectItem>
                             {closers?.filter(c => c && c.name && c.name.trim() !== '').map((c) => (
                               <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
@@ -543,7 +543,7 @@ export default function DashboardClosers() {
                           variant="outline" 
                           size="sm"
                           onClick={clearFilters}
-                          className="w-full h-8 border-slate-700 bg-slate-800 hover:bg-slate-700 text-white"
+                          className="w-full h-8 border-border bg-muted hover:bg-muted text-foreground"
                           data-testid="button-clear-filters"
                         >
                           <RotateCcw className="w-3 h-3 mr-1" />
@@ -573,10 +573,10 @@ export default function DashboardClosers() {
                 <span className="text-sm font-medium text-emerald-300">MRR Obtido</span>
               </div>
               {isLoading ? (
-                <Skeleton className="h-10 w-32 bg-slate-700" />
+                <Skeleton className="h-10 w-32" />
               ) : (
                 <motion.div 
-                  className="text-3xl lg:text-4xl font-black text-white"
+                  className="text-3xl lg:text-4xl font-black text-foreground"
                   initial={{ scale: 0.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   key={metrics?.mrrObtido}
@@ -601,10 +601,10 @@ export default function DashboardClosers() {
                 <span className="text-sm font-medium text-blue-300">Pontual Obtido</span>
               </div>
               {isLoading ? (
-                <Skeleton className="h-10 w-32 bg-slate-700" />
+                <Skeleton className="h-10 w-32" />
               ) : (
                 <motion.div 
-                  className="text-3xl lg:text-4xl font-black text-white"
+                  className="text-3xl lg:text-4xl font-black text-foreground"
                   initial={{ scale: 0.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   key={metrics?.pontualObtido}
@@ -629,10 +629,10 @@ export default function DashboardClosers() {
                 <span className="text-sm font-medium text-violet-300">Reuniões</span>
               </div>
               {isLoading ? (
-                <Skeleton className="h-10 w-20 bg-slate-700" />
+                <Skeleton className="h-10 w-20" />
               ) : (
                 <motion.div 
-                  className="text-3xl lg:text-4xl font-black text-white"
+                  className="text-3xl lg:text-4xl font-black text-foreground"
                   initial={{ scale: 0.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   key={metrics?.reunioesRealizadas}
@@ -657,10 +657,10 @@ export default function DashboardClosers() {
                 <span className="text-sm font-medium text-amber-300">Negócios</span>
               </div>
               {isLoading ? (
-                <Skeleton className="h-10 w-20 bg-slate-700" />
+                <Skeleton className="h-10 w-20" />
               ) : (
                 <motion.div 
-                  className="text-3xl lg:text-4xl font-black text-white"
+                  className="text-3xl lg:text-4xl font-black text-foreground"
                   initial={{ scale: 0.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   key={metrics?.negociosGanhos}
@@ -685,10 +685,10 @@ export default function DashboardClosers() {
                 <span className="text-sm font-medium text-rose-300">Conversão</span>
               </div>
               {isLoading ? (
-                <Skeleton className="h-10 w-20 bg-slate-700" />
+                <Skeleton className="h-10 w-20" />
               ) : (
                 <motion.div 
-                  className="text-3xl lg:text-4xl font-black text-white"
+                  className="text-3xl lg:text-4xl font-black text-foreground"
                   initial={{ scale: 0.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   key={metrics?.taxaConversao}
@@ -704,7 +704,7 @@ export default function DashboardClosers() {
           <div className="lg:col-span-2">
             <div className="mb-4 flex items-center gap-2">
               <Trophy className="w-6 h-6 text-yellow-400" />
-              <h2 className="text-2xl font-bold text-white">Pódio dos Campeões</h2>
+              <h2 className="text-2xl font-bold text-foreground">Pódio dos Campeões</h2>
               <motion.div
                 animate={{ rotate: [0, 10, -10, 0] }}
                 transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
@@ -716,7 +716,7 @@ export default function DashboardClosers() {
             {isLoading ? (
               <div className="grid grid-cols-3 gap-4">
                 {[0, 1, 2].map(i => (
-                  <Skeleton key={i} className="h-64 bg-slate-800 rounded-2xl" />
+                  <Skeleton key={i} className="h-64 bg-muted rounded-2xl" />
                 ))}
               </div>
             ) : top3.length > 0 ? (
@@ -768,25 +768,25 @@ export default function DashboardClosers() {
                               {closer.position === 1 ? 'CAMPEÃO' : 
                                closer.position === 2 ? 'VICE' : 'BRONZE'}
                             </div>
-                            <h3 className="text-xl lg:text-2xl font-bold text-white truncate mb-3">
+                            <h3 className="text-xl lg:text-2xl font-bold text-foreground truncate mb-3">
                               {closer.name}
                             </h3>
 
                             <div className="space-y-2">
                               <div className="flex justify-between items-center">
-                                <span className="text-xs text-slate-400">Total</span>
-                                <span className="text-lg font-bold text-white">
+                                <span className="text-xs text-muted-foreground">Total</span>
+                                <span className="text-lg font-bold text-foreground">
                                   {formatCurrencyCompact(closer.total)}
                                 </span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-xs text-slate-400">MRR</span>
+                                <span className="text-xs text-muted-foreground">MRR</span>
                                 <span className="text-sm font-semibold text-emerald-400">
                                   {formatCurrencyCompact(closer.mrr)}
                                 </span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-xs text-slate-400">Pontual</span>
+                                <span className="text-xs text-muted-foreground">Pontual</span>
                                 <span className="text-sm font-semibold text-blue-400">
                                   {formatCurrencyCompact(closer.pontual)}
                                 </span>
@@ -794,18 +794,18 @@ export default function DashboardClosers() {
                             </div>
                           </div>
 
-                          <div className="mt-4 pt-4 border-t border-slate-700/50 grid grid-cols-3 gap-2 text-center">
+                          <div className="mt-4 pt-4 border-t border-border/50 grid grid-cols-3 gap-2 text-center">
                             <div>
-                              <div className="text-lg font-bold text-white">{closer.reunioes}</div>
-                              <div className="text-[10px] text-slate-400 uppercase">Reuniões</div>
+                              <div className="text-lg font-bold text-foreground">{closer.reunioes}</div>
+                              <div className="text-[10px] text-muted-foreground uppercase">Reuniões</div>
                             </div>
                             <div>
-                              <div className="text-lg font-bold text-white">{closer.negocios}</div>
-                              <div className="text-[10px] text-slate-400 uppercase">Fechados</div>
+                              <div className="text-lg font-bold text-foreground">{closer.negocios}</div>
+                              <div className="text-[10px] text-muted-foreground uppercase">Fechados</div>
                             </div>
                             <div>
-                              <div className="text-lg font-bold text-white">{closer.taxa.toFixed(0)}%</div>
-                              <div className="text-[10px] text-slate-400 uppercase">Taxa</div>
+                              <div className="text-lg font-bold text-foreground">{closer.taxa.toFixed(0)}%</div>
+                              <div className="text-[10px] text-muted-foreground uppercase">Taxa</div>
                             </div>
                           </div>
                         </div>
@@ -815,8 +815,8 @@ export default function DashboardClosers() {
                 })}
               </div>
             ) : (
-              <div className="flex items-center justify-center h-64 rounded-2xl bg-slate-900/50 border border-slate-800">
-                <p className="text-slate-400">Nenhum dado disponível</p>
+              <div className="flex items-center justify-center h-64 rounded-2xl bg-card/50 border border-border">
+                <p className="text-muted-foreground">Nenhum dado disponível</p>
               </div>
             )}
           </div>
@@ -824,11 +824,11 @@ export default function DashboardClosers() {
           <div>
             <div className="mb-4 flex items-center gap-2">
               <Zap className="w-5 h-5 text-violet-400" />
-              <h2 className="text-xl font-bold text-white">Ranking Completo</h2>
+              <h2 className="text-xl font-bold text-foreground">Ranking Completo</h2>
             </div>
 
-            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
-              <div className="grid grid-cols-12 gap-1 p-3 bg-slate-800/50 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+            <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl overflow-hidden">
+              <div className="grid grid-cols-12 gap-1 p-3 bg-muted/50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-1">#</div>
                 <div className="col-span-3">Closer</div>
                 <div className="col-span-2 text-right">MRR</div>
@@ -837,11 +837,11 @@ export default function DashboardClosers() {
                 <div className="col-span-2 text-right">Reuniões</div>
               </div>
 
-              <div className="divide-y divide-slate-800/50 max-h-[400px] overflow-y-auto">
+              <div className="divide-y divide-border max-h-[400px] overflow-y-auto">
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="p-3">
-                      <Skeleton className="h-8 bg-slate-800" />
+                      <Skeleton className="h-8 bg-muted" />
                     </div>
                   ))
                 ) : ranking.length > 0 ? (
@@ -851,7 +851,7 @@ export default function DashboardClosers() {
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.05 * index }}
-                      className={`grid grid-cols-12 gap-1 p-3 items-center hover:bg-slate-800/30 transition-colors ${
+                      className={`grid grid-cols-12 gap-1 p-3 items-center hover:bg-muted/30 transition-colors ${
                         closer.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(closer.position) : ''
                       }`}
                       data-testid={`ranking-row-${index}`}
@@ -864,10 +864,10 @@ export default function DashboardClosers() {
                             {closer.position === 3 && <Medal className="w-3 h-3 text-amber-600" />}
                           </div>
                         ) : (
-                          <span className="text-slate-500 font-mono text-xs">{closer.position}</span>
+                          <span className="text-muted-foreground font-mono text-xs">{closer.position}</span>
                         )}
                       </div>
-                      <div className="col-span-3 font-medium text-white truncate text-sm">
+                      <div className="col-span-3 font-medium text-foreground truncate text-sm">
                         {closer.name}
                       </div>
                       <div className="col-span-2 text-right font-bold text-emerald-400 text-sm">
@@ -876,7 +876,7 @@ export default function DashboardClosers() {
                       <div className="col-span-2 text-right font-semibold text-blue-400 text-sm">
                         {formatCurrencyCompact(closer.pontual)}
                       </div>
-                      <div className="col-span-2 text-right font-bold text-white text-sm">
+                      <div className="col-span-2 text-right font-bold text-foreground text-sm">
                         {formatCurrencyCompact(closer.total)}
                       </div>
                       <div className="col-span-2 text-right text-cyan-400 text-sm">
@@ -885,7 +885,7 @@ export default function DashboardClosers() {
                     </motion.div>
                   ))
                 ) : (
-                  <div className="p-8 text-center text-slate-400">
+                  <div className="p-8 text-center text-muted-foreground">
                     Nenhum closer encontrado
                   </div>
                 )}
@@ -903,19 +903,19 @@ export default function DashboardClosers() {
         >
           <div className="mb-3 flex items-center gap-2">
             <Star className="w-5 h-5 text-blue-400" />
-            <h2 className="text-xl font-bold text-white">Destaque Pontual</h2>
+            <h2 className="text-xl font-bold text-foreground">Destaque Pontual</h2>
             <Badge className="bg-blue-500/20 text-blue-400 text-xs">Top Vendas Pontuais</Badge>
           </div>
 
-          <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
+          <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl overflow-hidden">
             {isLoading ? (
               <div className="p-4 flex gap-4">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-16 flex-1 bg-slate-800 rounded-xl" />
+                  <Skeleton key={i} className="h-16 flex-1 bg-muted rounded-xl" />
                 ))}
               </div>
             ) : top3Pontual.length > 0 ? (
-              <div className="flex divide-x divide-slate-800/50">
+              <div className="flex divide-x divide-border">
                 {top3Pontual.map((closer, index) => (
                   <motion.div
                     key={closer.name}
@@ -928,7 +928,7 @@ export default function DashboardClosers() {
                   >
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                       index === 0 ? 'bg-blue-500/30' :
-                      index === 1 ? 'bg-slate-600/30' :
+                      index === 1 ? 'bg-muted/30' :
                       'bg-amber-600/30'
                     }`}>
                       {index === 0 && <Crown className="w-5 h-5 text-blue-400" />}
@@ -936,8 +936,8 @@ export default function DashboardClosers() {
                       {index === 2 && <Medal className="w-4 h-4 text-amber-600" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-white truncate text-sm">{closer.name}</div>
-                      <div className="text-xs text-slate-400">{closer.negocios} neg. pontuais</div>
+                      <div className="font-semibold text-foreground truncate text-sm">{closer.name}</div>
+                      <div className="text-xs text-muted-foreground">{closer.negocios} neg. pontuais</div>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <div className="text-lg font-bold text-blue-400">{formatCurrencyCompact(closer.pontual)}</div>
@@ -946,7 +946,7 @@ export default function DashboardClosers() {
                 ))}
               </div>
             ) : (
-              <div className="p-6 text-center text-slate-400">
+              <div className="p-6 text-center text-muted-foreground">
                 Nenhuma venda pontual no período
               </div>
             )}
@@ -960,7 +960,7 @@ export default function DashboardClosers() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.6 }}
         >
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/50 p-8">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-card via-muted to-card border border-border/50 p-8">
             {/* Background effects */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
               <div className="absolute -top-20 -left-20 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl" />
@@ -992,17 +992,17 @@ export default function DashboardClosers() {
                     animate={{ scale: [1, 1.05, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}
                   >
-                    <Target className="w-8 h-8 text-white" />
+                    <Target className="w-8 h-8 text-foreground" />
                   </motion.div>
                   <div>
-                    <h2 className="text-3xl font-black text-white">META DO MÊS</h2>
-                    <p className="text-slate-400 text-lg">Receita Recorrente (MRR)</p>
+                    <h2 className="text-3xl font-black text-foreground">META DO MÊS</h2>
+                    <p className="text-muted-foreground text-lg">Receita Recorrente (MRR)</p>
                   </div>
                 </div>
                 
                 <div className="text-right">
-                  <div className="text-sm text-slate-400 uppercase tracking-wider mb-1">Meta</div>
-                  <div className="text-4xl font-black text-white">R$ 180k</div>
+                  <div className="text-sm text-muted-foreground uppercase tracking-wider mb-1">Meta</div>
+                  <div className="text-4xl font-black text-foreground">R$ 180k</div>
                 </div>
               </div>
 
@@ -1016,7 +1016,7 @@ export default function DashboardClosers() {
                 
                 return (
                   <>
-                    <div className="relative h-16 bg-slate-800/80 rounded-2xl overflow-hidden border border-slate-700/50">
+                    <div className="relative h-16 bg-muted/80 rounded-2xl overflow-hidden border border-border/50">
                       {/* Progress fill */}
                       <motion.div
                         className={`absolute inset-y-0 left-0 rounded-2xl ${
@@ -1043,7 +1043,7 @@ export default function DashboardClosers() {
                       {/* Percentage display in bar */}
                       <div className="absolute inset-0 flex items-center justify-center">
                         <motion.span 
-                          className="text-3xl font-black text-white drop-shadow-lg"
+                          className="text-3xl font-black text-foreground drop-shadow-lg"
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
                           transition={{ delay: 1.5, type: "spring", stiffness: 200 }}
@@ -1056,7 +1056,7 @@ export default function DashboardClosers() {
                       {[25, 50, 75, 100].map((milestone) => (
                         <div
                           key={milestone}
-                          className="absolute top-0 bottom-0 w-px bg-slate-600/50"
+                          className="absolute top-0 bottom-0 w-px bg-border/50"
                           style={{ left: `${milestone}%` }}
                         />
                       ))}
@@ -1066,7 +1066,7 @@ export default function DashboardClosers() {
                     <div className="flex items-center justify-between mt-6">
                       <div className="flex items-center gap-8">
                         <div>
-                          <div className="text-sm text-slate-400 uppercase tracking-wider mb-1">Conquistado</div>
+                          <div className="text-sm text-muted-foreground uppercase tracking-wider mb-1">Conquistado</div>
                           <motion.div 
                             className="text-4xl font-black text-emerald-400"
                             initial={{ opacity: 0 }}
@@ -1079,7 +1079,7 @@ export default function DashboardClosers() {
                         
                         {!atingida && (
                           <div>
-                            <div className="text-sm text-slate-400 uppercase tracking-wider mb-1">Faltam</div>
+                            <div className="text-sm text-muted-foreground uppercase tracking-wider mb-1">Faltam</div>
                             <motion.div 
                               className="text-4xl font-black text-amber-400"
                               initial={{ opacity: 0 }}
@@ -1140,7 +1140,7 @@ export default function DashboardClosers() {
 
           {/* Footer */}
           <div className="text-center mt-4">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Atualizado automaticamente a cada minuto
             </p>
           </div>
