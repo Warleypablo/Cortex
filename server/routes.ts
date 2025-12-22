@@ -8422,20 +8422,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST initialize Turbo Partners with internal tools credentials
   app.post("/api/acessos/init-turbo-tools", async (req, res) => {
     try {
-      const createdBy = (req as any).user?.email || null;
-      
-      // Check if Turbo Partners already exists
+      // Check if Turbo Partners already exists (check for "Turbo" name)
       let turboClient = await db.execute(sql`
-        SELECT * FROM clients WHERE LOWER(name) LIKE '%turbo partners%' LIMIT 1
+        SELECT * FROM clients WHERE LOWER(name) = 'turbo' OR LOWER(name) LIKE '%turbo partners%' LIMIT 1
       `);
       
       let clientId: string;
       
       if (turboClient.rows.length === 0) {
-        // Create Turbo Partners client
+        // Create Turbo client
         const newClient = await db.execute(sql`
-          INSERT INTO clients (name, cnpj, status, additional_info, created_by)
-          VALUES ('Turbo Partners', '00.000.000/0001-00', 'ativo', 'Empresa matriz - Turbo Partners', ${createdBy})
+          INSERT INTO clients (name, cnpj, status, additional_info)
+          VALUES ('Turbo', '00.000.000/0001-00', 'ativo', 'Empresa matriz - Turbo Partners')
           RETURNING *
         `);
         clientId = (newClient.rows[0] as any).id;
@@ -8461,8 +8459,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (existing.rows.length === 0) {
           await db.execute(sql`
-            INSERT INTO credentials (client_id, platform, access_url, observations, created_by)
-            VALUES (${clientId}, ${tool.platform}, ${tool.url}, ${tool.observations}, ${createdBy})
+            INSERT INTO credentials (client_id, platform, access_url, observations)
+            VALUES (${clientId}, ${tool.platform}, ${tool.url}, ${tool.observations})
           `);
         }
       }
