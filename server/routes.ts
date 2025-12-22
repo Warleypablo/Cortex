@@ -304,7 +304,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const users = await getAllUsers();
       const allKeys = await listAllKeys();
-      res.json({ users, allKeys, count: users.length, totalKeys: allKeys.length });
+      
+      // Fetch all colaboradores to link by email
+      const colaboradores = await storage.getColaboradores();
+      
+      // Create a map of email to colaborador for quick lookup
+      const emailToColaborador = new Map<string, { id: number; nome: string; setor: string | null; cargo: string | null; squad: string | null; status: string | null }>();
+      for (const c of colaboradores) {
+        if (c.emailTurbo) {
+          emailToColaborador.set(c.emailTurbo.toLowerCase(), {
+            id: c.id,
+            nome: c.nome,
+            setor: c.setor,
+            cargo: c.cargo,
+            squad: c.squad,
+            status: c.status
+          });
+        }
+      }
+      
+      // Link users to colaboradores by email
+      const usersWithColaborador = users.map(user => {
+        const colaborador = emailToColaborador.get(user.email?.toLowerCase() || '');
+        return {
+          ...user,
+          colaborador: colaborador || null
+        };
+      });
+      
+      res.json({ users: usersWithColaborador, allKeys, count: users.length, totalKeys: allKeys.length });
     } catch (error) {
       console.error("[api] Error fetching debug info:", error);
       res.status(500).json({ error: "Failed to fetch debug info" });
