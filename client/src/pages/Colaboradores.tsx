@@ -4,7 +4,7 @@ import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useSetPageInfo } from "@/contexts/PageContext";
 
 type ColaboradorComPatrimonios = Colaborador & {
@@ -882,6 +882,7 @@ function DeleteConfirmDialog({ colaborador, open, onOpenChange }: { colaborador:
 
 export default function Colaboradores() {
   useSetPageInfo("Colaboradores", "Gerencie os colaboradores da sua equipe");
+  const [, setLocation] = useLocation();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [squadFilter, setSquadFilter] = useState<string>("all");
@@ -1045,6 +1046,13 @@ export default function Colaboradores() {
                     <TableRow
                       key={colaborador.id}
                       className="hover-elevate cursor-pointer"
+                      onClick={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('button') || target.closest('[role="button"]')) {
+                          return;
+                        }
+                        setLocation(`/colaborador/${colaborador.id}`);
+                      }}
                       data-testid={`row-colaborador-${colaborador.id}`}
                     >
                       <TableCell>
