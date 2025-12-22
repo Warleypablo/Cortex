@@ -3,10 +3,22 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Course, InsertCourse } from "@shared/schema";
 import { insertCourseSchema, courseStatusEnum } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Loader2, ChevronDown, ChevronRight, GraduationCap, BookOpen } from "lucide-react";
+import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Loader2, ChevronDown, ChevronRight, GraduationCap, BookOpen, LayoutGrid, Table2, ArrowUpDown } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+
+type SortField = 'nome' | 'status' | 'temaPrincipal' | 'plataforma';
+type SortDirection = 'asc' | 'desc';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   AlertDialog,
@@ -632,6 +644,11 @@ export default function Conhecimentos() {
   const [plataformaFilter, setPlataformaFilter] = useState<string>("all");
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [deletingCourse, setDeletingCourse] = useState<Course | null>(null);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [sortField, setSortField] = useState<SortField>('nome');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
 
   const { toast } = useToast();
 
@@ -686,6 +703,68 @@ export default function Conhecimentos() {
       return matchesSearch && matchesStatus && matchesTema && matchesPlataforma;
     });
   }, [courses, search, statusFilter, temaFilter, plataformaFilter]);
+
+  const sortedCourses = useMemo(() => {
+    return [...filteredCourses].sort((a, b) => {
+      let aVal = a[sortField] || '';
+      let bVal = b[sortField] || '';
+      
+      if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+      if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+      
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredCourses, sortField, sortDirection]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const toggleRowExpand = (id: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const togglePasswordVisibility = (id: string) => {
+    setVisiblePasswords(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copiado!",
+      description: `${label} copiado para a área de transferência`,
+    });
+  };
+
+  const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-8 px-2 -ml-2 font-medium"
+      onClick={() => handleSort(field)}
+      data-testid={`sort-${field}`}
+    >
+      {children}
+      <ArrowUpDown className={`ml-1 h-3 w-3 ${sortField === field ? 'opacity-100' : 'opacity-50'}`} />
+    </Button>
+  );
 
   if (isLoading) {
     return (
@@ -753,10 +832,30 @@ export default function Conhecimentos() {
           </Select>
         </div>
 
-        <AddCourseDialog />
+        <div className="flex items-center gap-2">
+          <div className="flex border rounded-md">
+            <Button
+              variant={viewMode === 'cards' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('cards')}
+              data-testid="button-view-cards"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              data-testid="button-view-table"
+            >
+              <Table2 className="w-4 h-4" />
+            </Button>
+          </div>
+          <AddCourseDialog />
+        </div>
       </div>
 
-      {filteredCourses.length === 0 ? (
+      {sortedCourses.length === 0 ? (
         <div className="text-center py-12" data-testid="empty-courses">
           <GraduationCap className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium text-muted-foreground">Nenhum curso encontrado</h3>
@@ -766,9 +865,9 @@ export default function Conhecimentos() {
               : "Adicione seu primeiro curso clicando no botão acima"}
           </p>
         </div>
-      ) : (
+      ) : viewMode === 'cards' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredCourses.map((course) => (
+          {sortedCourses.map((course) => (
             <CourseCard
               key={course.id}
               course={course}
@@ -776,6 +875,183 @@ export default function Conhecimentos() {
               onDelete={() => setDeletingCourse(course)}
             />
           ))}
+        </div>
+      ) : (
+        <div className="rounded-md border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40px]"></TableHead>
+                <TableHead>
+                  <SortableHeader field="nome">Nome</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader field="status">Status</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader field="temaPrincipal">Tema</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader field="plataforma">Plataforma</SortableHeader>
+                </TableHead>
+                <TableHead className="w-[100px]">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedCourses.map((course) => {
+                const isExpanded = expandedRows.has(course.id);
+                const isPasswordVisible = visiblePasswords.has(course.id);
+                
+                return (
+                  <>
+                    <TableRow 
+                      key={course.id}
+                      className={cn(
+                        "cursor-pointer hover-elevate",
+                        isExpanded && "bg-muted/50"
+                      )}
+                      onClick={() => toggleRowExpand(course.id)}
+                      data-testid={`row-course-${course.id}`}
+                    >
+                      <TableCell>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <GraduationCap className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <span className="font-medium">{course.nome}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={statusColors[course.status || "sem_status"]} variant="secondary">
+                          {statusLabels[course.status || "sem_status"]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {course.temaPrincipal ? (
+                          <span className="text-sm">{course.temaPrincipal}</span>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {course.plataforma ? (
+                          <Badge variant="outline" className="text-xs">
+                            {course.plataforma}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">Não informada</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setEditingCourse(course)}
+                            data-testid={`button-edit-table-${course.id}`}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setDeletingCourse(course)}
+                            data-testid={`button-delete-table-${course.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow key={`${course.id}-credentials`} className="bg-muted/30">
+                        <TableCell colSpan={6} className="py-3">
+                          <div className="pl-10 space-y-2">
+                            <div className="text-sm font-medium text-muted-foreground mb-2">Credenciais de Acesso</div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {course.url && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground text-sm">URL:</span>
+                                  <a
+                                    href={course.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary hover:underline text-sm flex items-center gap-1"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Acessar <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                </div>
+                              )}
+                              {course.login && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground text-sm">Login:</span>
+                                  <span className="text-sm">{course.login}</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      copyToClipboard(course.login!, "Login");
+                                    }}
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              )}
+                              {course.senha && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground text-sm">Senha:</span>
+                                  <span className="text-sm font-mono">
+                                    {isPasswordVisible ? course.senha : "••••••••"}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      togglePasswordVisibility(course.id);
+                                    }}
+                                  >
+                                    {isPasswordVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      copyToClipboard(course.senha!, "Senha");
+                                    }}
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              )}
+                              {!course.url && !course.login && !course.senha && (
+                                <span className="text-muted-foreground text-sm">Nenhuma credencial cadastrada</span>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
 
