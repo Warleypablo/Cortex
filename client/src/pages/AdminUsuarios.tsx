@@ -47,7 +47,7 @@ interface DebugData {
 
 const AVAILABLE_ROUTES = [
   // Menu Principal
-  { path: '/', label: 'Clientes', category: 'Menu Principal' },
+  { path: '/clientes', label: 'Clientes', category: 'Menu Principal' },
   { path: '/contratos', label: 'Contratos', category: 'Menu Principal' },
   { path: '/colaboradores', label: 'Colaboradores', category: 'Menu Principal' },
   { path: '/colaboradores/analise', label: 'Análise Colaboradores', category: 'Menu Principal' },
@@ -104,7 +104,7 @@ const ROLE_PRESETS: { id: string; label: string; description: string; routes: st
     label: 'Financeiro',
     description: 'Acesso a dashboards financeiros, DFC, fluxo de caixa e inadimplência',
     routes: [
-      '/', '/contratos', '/cases/chat',
+      '/clientes', '/contratos', '/cases/chat',
       '/dashboard/financeiro', '/dashboard/dfc', '/dashboard/fluxo-caixa',
       '/dashboard/revenue-goals', '/dashboard/inadimplencia', '/dashboard/auditoria-sistemas'
     ]
@@ -114,7 +114,7 @@ const ROLE_PRESETS: { id: string; label: string; description: string; routes: st
     label: 'Comercial',
     description: 'Acesso a dashboards de vendas, closers e SDRs',
     routes: [
-      '/', '/contratos', '/cases/chat',
+      '/clientes', '/contratos', '/cases/chat',
       '/dashboard/comercial/closers', '/dashboard/comercial/sdrs',
       '/dashboard/comercial/detalhamento-closers', '/dashboard/comercial/detalhamento-sdrs',
       '/dashboard/comercial/detalhamento-vendas', '/dashboard/comercial/analise-vendas',
@@ -126,7 +126,7 @@ const ROLE_PRESETS: { id: string; label: string; description: string; routes: st
     label: 'Growth',
     description: 'Acesso a dashboards de Growth, criativos e performance',
     routes: [
-      '/', '/contratos', '/cases/chat',
+      '/clientes', '/contratos', '/cases/chat',
       '/growth/visao-geral', '/growth/criativos', '/growth/performance-plataformas',
       '/dashboard/meta-ads'
     ]
@@ -136,7 +136,7 @@ const ROLE_PRESETS: { id: string; label: string; description: string; routes: st
     label: 'Operação',
     description: 'Acesso a visão geral operacional e retenção',
     routes: [
-      '/', '/contratos', '/colaboradores', '/cases/chat',
+      '/clientes', '/contratos', '/colaboradores', '/cases/chat',
       '/visao-geral', '/dashboard/retencao'
     ]
   },
@@ -145,7 +145,7 @@ const ROLE_PRESETS: { id: string; label: string; description: string; routes: st
     label: 'RH / G&G',
     description: 'Acesso a gestão de pessoas e recrutamento',
     routes: [
-      '/', '/colaboradores', '/colaboradores/analise', '/cases/chat',
+      '/clientes', '/colaboradores', '/colaboradores/analise', '/cases/chat',
       '/dashboard/geg', '/dashboard/inhire', '/dashboard/recrutamento'
     ]
   },
@@ -154,7 +154,7 @@ const ROLE_PRESETS: { id: string; label: string; description: string; routes: st
     label: 'Tech',
     description: 'Acesso a dashboards de tecnologia e projetos',
     routes: [
-      '/', '/ferramentas', '/acessos', '/cases/chat',
+      '/clientes', '/ferramentas', '/acessos', '/cases/chat',
       '/dashboard/tech', '/tech/projetos'
     ]
   },
@@ -163,7 +163,7 @@ const ROLE_PRESETS: { id: string; label: string; description: string; routes: st
     label: 'Jurídico',
     description: 'Acesso a módulo jurídico e cobrança',
     routes: [
-      '/', '/contratos', '/cases/chat',
+      '/clientes', '/contratos', '/cases/chat',
       '/juridico/clientes', '/dashboard/inadimplencia'
     ]
   },
@@ -177,7 +177,7 @@ const ROLE_PRESETS: { id: string; label: string; description: string; routes: st
     id: 'visualizador',
     label: 'Visualizador Básico',
     description: 'Acesso apenas a clientes e contratos',
-    routes: ['/', '/contratos', '/cases/chat']
+    routes: ['/clientes', '/contratos', '/cases/chat']
   },
 ];
 
