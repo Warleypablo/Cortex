@@ -1617,6 +1617,8 @@ function AIMatchDialog({ onSuccess }: { onSuccess?: () => void }) {
   const [open, setOpen] = useState(false);
   const [matches, setMatches] = useState<AIMatch[]>([]);
   const [appliedMatches, setAppliedMatches] = useState<Set<string>>(new Set());
+  const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+  const [applyingAll, setApplyingAll] = useState(false);
   const { toast } = useToast();
 
   const fetchMatchesMutation = useMutation({
@@ -1664,6 +1666,7 @@ function AIMatchDialog({ onSuccess }: { onSuccess?: () => void }) {
     if (isOpen) {
       setMatches([]);
       setAppliedMatches(new Set());
+      setConfidenceFilter('all');
       fetchMatchesMutation.mutate();
     }
   };
@@ -1679,6 +1682,58 @@ function AIMatchDialog({ onSuccess }: { onSuccess?: () => void }) {
     }
   };
 
+  // Filter matches by confidence
+  const filteredMatches = matches.filter(m => {
+    if (confidenceFilter === 'all') return true;
+    return m.confidence === confidenceFilter;
+  });
+
+  // Count matches by confidence
+  const highCount = matches.filter(m => m.confidence === 'high' && !appliedMatches.has(m.acessosId)).length;
+  const mediumCount = matches.filter(m => m.confidence === 'medium' && !appliedMatches.has(m.acessosId)).length;
+  const lowCount = matches.filter(m => m.confidence === 'low' && !appliedMatches.has(m.acessosId)).length;
+
+  // Apply all matches of a specific confidence level
+  const handleApplyAll = async (confidence: 'high' | 'medium' | 'low') => {
+    const matchesToApply = matches.filter(
+      m => m.confidence === confidence && !appliedMatches.has(m.acessosId)
+    );
+    
+    if (matchesToApply.length === 0) {
+      toast({
+        title: "Nenhum match para aplicar",
+        description: `Não há matches de confiança ${confidence === 'high' ? 'alta' : confidence === 'medium' ? 'média' : 'baixa'} pendentes.`,
+      });
+      return;
+    }
+
+    setApplyingAll(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const match of matchesToApply) {
+      try {
+        await apiRequest("POST", "/api/acessos/apply-match", { 
+          acessosId: match.acessosId, 
+          cazCnpj: match.cazCnpj 
+        });
+        setAppliedMatches(prev => new Set([...Array.from(prev), match.acessosId]));
+        successCount++;
+      } catch {
+        errorCount++;
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients"] });
+    setApplyingAll(false);
+
+    toast({
+      title: "Matches aplicados em lote",
+      description: `${successCount} vinculados com sucesso${errorCount > 0 ? `, ${errorCount} com erro` : ''}.`,
+    });
+    onSuccess?.();
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
@@ -1687,22 +1742,105 @@ function AIMatchDialog({ onSuccess }: { onSuccess?: () => void }) {
           Vincular Clientes por IA
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wand2 className="w-5 h-5" />
             Vincular Clientes por IA
           </DialogTitle>
           <DialogDescription>
-            Matches sugeridos pela IA entre clientes de Acessos e Conta Azul
+            Matches sugeridos pela IA entre clientes de Acessos e Conta Azul. Filtre por nível de confiança e aplique individualmente ou em lote.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Confidence Filter Tabs */}
+        {!fetchMatchesMutation.isPending && matches.length > 0 && (
+          <div className="flex flex-col gap-3 pb-2 border-b">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium text-muted-foreground">Filtrar:</span>
+              <Button
+                size="sm"
+                variant={confidenceFilter === 'all' ? 'default' : 'outline'}
+                onClick={() => setConfidenceFilter('all')}
+                data-testid="filter-all"
+              >
+                Todos ({matches.filter(m => !appliedMatches.has(m.acessosId)).length})
+              </Button>
+              <Button
+                size="sm"
+                variant={confidenceFilter === 'high' ? 'default' : 'outline'}
+                onClick={() => setConfidenceFilter('high')}
+                className={confidenceFilter !== 'high' ? "border-green-500/50 text-green-600 dark:text-green-400 hover:bg-green-500/10" : "bg-green-600 hover:bg-green-700"}
+                data-testid="filter-high"
+              >
+                Alta ({highCount})
+              </Button>
+              <Button
+                size="sm"
+                variant={confidenceFilter === 'medium' ? 'default' : 'outline'}
+                onClick={() => setConfidenceFilter('medium')}
+                className={confidenceFilter !== 'medium' ? "border-yellow-500/50 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/10" : "bg-yellow-600 hover:bg-yellow-700"}
+                data-testid="filter-medium"
+              >
+                Média ({mediumCount})
+              </Button>
+              <Button
+                size="sm"
+                variant={confidenceFilter === 'low' ? 'default' : 'outline'}
+                onClick={() => setConfidenceFilter('low')}
+                className={confidenceFilter !== 'low' ? "border-red-500/50 text-red-600 dark:text-red-400 hover:bg-red-500/10" : "bg-red-600 hover:bg-red-700"}
+                data-testid="filter-low"
+              >
+                Baixa ({lowCount})
+              </Button>
+            </div>
+
+            {/* Bulk Apply Buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium text-muted-foreground">Vincular em lote:</span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleApplyAll('high')}
+                disabled={applyingAll || highCount === 0}
+                className="border-green-500/50 text-green-600 dark:text-green-400 hover:bg-green-500/10"
+                data-testid="apply-all-high"
+              >
+                {applyingAll ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />}
+                Alta ({highCount})
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleApplyAll('medium')}
+                disabled={applyingAll || mediumCount === 0}
+                className="border-yellow-500/50 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/10"
+                data-testid="apply-all-medium"
+              >
+                {applyingAll ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />}
+                Média ({mediumCount})
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleApplyAll('low')}
+                disabled={applyingAll || lowCount === 0}
+                className="border-red-500/50 text-red-600 dark:text-red-400 hover:bg-red-500/10"
+                data-testid="apply-all-low"
+              >
+                {applyingAll ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />}
+                Baixa ({lowCount})
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-auto">
           {fetchMatchesMutation.isPending ? (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
               <p className="text-muted-foreground">Analisando clientes com IA...</p>
+              <p className="text-xs text-muted-foreground">Isso pode levar alguns segundos...</p>
             </div>
           ) : matches.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -1710,9 +1848,15 @@ function AIMatchDialog({ onSuccess }: { onSuccess?: () => void }) {
               <p className="font-medium">Nenhum match encontrado</p>
               <p className="text-sm">Todos os clientes já estão vinculados ou não há correspondências</p>
             </div>
+          ) : filteredMatches.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Search className="w-12 h-12 mb-4 opacity-50" />
+              <p className="font-medium">Nenhum match com essa confiança</p>
+              <p className="text-sm">Tente outro filtro ou todos os matches dessa categoria já foram aplicados</p>
+            </div>
           ) : (
-            <div className="space-y-3">
-              {matches.map((match) => {
+            <div className="space-y-3 py-2">
+              {filteredMatches.map((match) => {
                 const isApplied = appliedMatches.has(match.acessosId);
                 return (
                   <Card 
@@ -1733,7 +1877,7 @@ function AIMatchDialog({ onSuccess }: { onSuccess?: () => void }) {
                         </div>
                         <Button
                           size="sm"
-                          disabled={isApplied || applyMatchMutation.isPending}
+                          disabled={isApplied || applyMatchMutation.isPending || applyingAll}
                           onClick={() => applyMatchMutation.mutate({ 
                             acessosId: match.acessosId, 
                             cazCnpj: match.cazCnpj 
