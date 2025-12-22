@@ -39,6 +39,7 @@ import {
   Calendar,
   Monitor
 } from "lucide-react";
+import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
 
 interface CloserMetrics {
   mrrObtido: number;
@@ -202,24 +203,6 @@ export default function DashboardClosers() {
     setMesAtual(agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatCurrencyCompact = (value: number) => {
-    if (value >= 1000000) {
-      return `R$ ${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `R$ ${(value / 1000).toFixed(0)}k`;
-    }
-    return formatCurrency(value);
-  };
 
   const trends: Array<'up' | 'down' | 'stable'> = ['up', 'down', 'stable'];
   
@@ -693,7 +676,7 @@ export default function DashboardClosers() {
                   animate={{ scale: 1, opacity: 1 }}
                   key={metrics?.taxaConversao}
                 >
-                  {(metrics?.taxaConversao || 0).toFixed(1)}%
+                  {formatPercent(metrics?.taxaConversao || 0)}
                 </motion.div>
               )}
             </div>
@@ -804,7 +787,7 @@ export default function DashboardClosers() {
                               <div className="text-[10px] text-muted-foreground uppercase">Fechados</div>
                             </div>
                             <div>
-                              <div className="text-lg font-bold text-foreground">{closer.taxa.toFixed(0)}%</div>
+                              <div className="text-lg font-bold text-foreground">{formatPercent(closer.taxa)}</div>
                               <div className="text-[10px] text-muted-foreground uppercase">Taxa</div>
                             </div>
                           </div>
@@ -1048,7 +1031,7 @@ export default function DashboardClosers() {
                           animate={{ scale: 1 }}
                           transition={{ delay: 1.5, type: "spring", stiffness: 200 }}
                         >
-                          {percentual.toFixed(1)}%
+                          {formatPercent(percentual)}
                         </motion.span>
                       </div>
 

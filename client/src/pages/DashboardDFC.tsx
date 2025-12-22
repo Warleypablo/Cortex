@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { formatDecimal, formatPercent, formatCurrency, formatCurrencyCompact } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -280,20 +281,6 @@ export default function DashboardDFC() {
       };
     });
   }, [dfcData]);
-
-  const formatCurrency = (value: number) => {
-    return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
-  const formatCurrencyCompact = (value: number) => {
-    if (Math.abs(value) >= 1000000) {
-      return `R$ ${(value / 1000000).toFixed(1)}M`;
-    }
-    if (Math.abs(value) >= 1000) {
-      return `R$ ${(value / 1000).toFixed(0)}k`;
-    }
-    return `R$ ${value.toFixed(0)}`;
-  };
 
   const isReceita = (categoriaId: string) => {
     if (categoriaId === 'RECEITAS') return true;
@@ -599,7 +586,7 @@ export default function DashboardDFC() {
                       kpis.margemMedia >= 20 ? 'text-violet-700 dark:text-violet-300' : 
                       kpis.margemMedia >= 0 ? 'text-amber-700 dark:text-amber-300' : 'text-red-700 dark:text-red-300'
                     }`}>
-                      {kpis.margemMedia.toFixed(1)}%
+                      {formatPercent(kpis.margemMedia)}
                     </p>
                     <p className={`text-xs mt-1 ${
                       kpis.margemMedia >= 20 ? 'text-violet-600/70 dark:text-violet-400/70' : 
@@ -726,7 +713,7 @@ export default function DashboardDFC() {
                       <Tooltip 
                         formatter={(value: number, name: string) => {
                           if (name === 'saldo') return [formatCurrency(value), 'Resultado'];
-                          return [`${value.toFixed(1)}%`, 'Margem'];
+                          return [formatPercent(value), 'Margem'];
                         }}
                         contentStyle={{ 
                           backgroundColor: 'hsl(var(--background))', 
@@ -1145,7 +1132,7 @@ export default function DashboardDFC() {
                           data-testid={`dfc-cell-margem-${mes}`}
                         >
                           <span className={`font-bold text-sm tabular-nums ${colorClass}`}>
-                            {margem.toFixed(1)}%
+                            {formatPercent(margem)}
                           </span>
                         </div>
                       );

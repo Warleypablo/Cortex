@@ -4,6 +4,7 @@ import { Users, TrendingUp, UserCheck, FileText, Target, Award } from "lucide-re
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, FunnelChart, Funnel, LabelList } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { formatDecimal, formatPercent } from "@/lib/utils";
 
 interface InhireMetrics {
   totalCandidaturas: number;
@@ -166,7 +167,7 @@ export default function DashboardInhire() {
               <Skeleton className="h-8 w-24" data-testid="skeleton-taxa-conversao" />
             ) : (
               <div className="text-2xl font-bold" data-testid="text-taxa-conversao">
-                {(metrics?.taxaConversao ?? 0).toFixed(1)}%
+                {formatPercent(metrics?.taxaConversao ?? 0)}
               </div>
             )}
           </CardContent>
@@ -182,7 +183,7 @@ export default function DashboardInhire() {
               <Skeleton className="h-8 w-24" data-testid="skeleton-tempo-medio" />
             ) : (
               <div className="text-2xl font-bold" data-testid="text-tempo-medio">
-                {(metrics?.tempoMedioContratacao ?? 0).toFixed(0)} dias
+                {formatDecimal(metrics?.tempoMedioContratacao ?? 0, 0)} dias
               </div>
             )}
           </CardContent>

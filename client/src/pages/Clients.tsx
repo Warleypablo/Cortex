@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { formatCurrency, formatDecimal, formatPercent } from "@/lib/utils";
 import type { ClienteCompleto } from "../../../server/storage";
 
 type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
@@ -212,10 +213,6 @@ export default function Clients() {
     );
   }
 
-  const formatCurrency = (value: number) => {
-    return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
   return (
     <div className="bg-background h-full">
       <div className="container mx-auto px-4 py-4 max-w-7xl h-full flex flex-col">
@@ -245,7 +242,7 @@ export default function Clients() {
                 {kpis.clientesAtivos}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {kpis.totalClientes > 0 ? `${((kpis.clientesAtivos / kpis.totalClientes) * 100).toFixed(1)}% do total` : '0% do total'}
+                {kpis.totalClientes > 0 ? `${formatPercent((kpis.clientesAtivos / kpis.totalClientes) * 100)} do total` : '0% do total'}
               </p>
             </CardContent>
           </Card>
@@ -272,7 +269,7 @@ export default function Clients() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-lt-medio">
-                {kpis.ltMedio.toFixed(1)} meses
+                {formatDecimal(kpis.ltMedio)} meses
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Meses ativos (com pagamento)

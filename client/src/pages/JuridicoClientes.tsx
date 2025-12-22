@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -115,11 +116,6 @@ interface ClienteJuridico {
   parcelas: Parcela[];
 }
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
 
 const formatDate = (date: string | null) => {
   if (!date) return "-";
@@ -457,7 +453,7 @@ export default function JuridicoClientes() {
                   <div className="text-white">
                     <div className="flex items-center justify-between mb-2">
                       <AlertTriangle className="h-5 w-5 opacity-80" />
-                      <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{totals.percentUrgente.toFixed(0)}%</span>
+                      <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{formatPercent(totals.percentUrgente, 0)}</span>
                     </div>
                     <p className="text-orange-100 text-xs font-medium uppercase tracking-wide">Urgentes (+90d)</p>
                     <p className="text-3xl font-bold mt-1" data-testid="text-urgent-cases">
@@ -998,7 +994,7 @@ export default function JuridicoClientes() {
                     <div>
                       <p className="text-muted-foreground text-sm font-medium">Taxa de Recuperação</p>
                       <p className="text-3xl font-bold text-purple-600 dark:text-purple-500" data-testid="text-taxa-recuperacao">
-                        {recuperadosStats.taxaRecuperacao.toFixed(1)}%
+                        {formatPercent(recuperadosStats.taxaRecuperacao)}
                       </p>
                     </div>
                   </div>

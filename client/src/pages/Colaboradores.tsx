@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { formatCurrency } from "@/lib/utils";
 
 type ColaboradorComPatrimonios = Colaborador & {
   patrimonios: { id: number; numeroAtivo: string | null; descricao: string | null }[];
@@ -1481,12 +1482,12 @@ export default function Colaboradores() {
                             <>
                               {colaborador.proporcional && (
                                 <div className="text-sm text-muted-foreground" data-testid={`text-proporcional-${colaborador.id}`}>
-                                  R$ {Number(colaborador.proporcional).toFixed(2)}
+                                  {formatCurrency(Number(colaborador.proporcional))}
                                 </div>
                               )}
                               {colaborador.proporcionalCaju && (
                                 <div className="text-xs text-muted-foreground" data-testid={`text-proporcional-caju-${colaborador.id}`}>
-                                  Caju: R$ {Number(colaborador.proporcionalCaju).toFixed(2)}
+                                  Caju: {formatCurrency(Number(colaborador.proporcionalCaju))}
                                 </div>
                               )}
                             </>

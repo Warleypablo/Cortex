@@ -12,6 +12,7 @@ import { useSetPageInfo } from "@/contexts/PageContext";
 import { format, subDays, subMonths, eachDayOfInterval, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { formatCurrency, formatDecimal, formatPercent } from "@/lib/utils";
 
 interface KPICardProps {
   title: string;
@@ -47,7 +48,7 @@ function KPICard({ title, value, meta, metaPercent, vsLM, subtitle, icon, trend 
                 <span className="text-xs text-muted-foreground">vs. LM</span>
                 <span className={`text-xs font-medium flex items-center gap-0.5 ${vsLM >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                   {vsLM >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {Math.abs(vsLM).toFixed(1)}%
+                  {formatPercent(Math.abs(vsLM))}
                 </span>
               </div>
             )}
@@ -183,16 +184,6 @@ const mockTotals = {
   valorVendas: 14509270,
   tm: 14169,
 };
-
-function formatCurrency(value: number | null): string {
-  if (value === null) return '-';
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat("pt-BR").format(value);
@@ -669,7 +660,7 @@ export default function GrowthVisaoGeral() {
           <KPICard
             title="Impressões"
             value={visaoGeralLoading ? "..." : formatNumber(visaoGeralData?.resumo?.impressions || 0)}
-            subtitle={visaoGeralData?.resumo?.ctr ? `CTR: ${visaoGeralData.resumo.ctr.toFixed(2)}%` : undefined}
+            subtitle={visaoGeralData?.resumo?.ctr ? `CTR: ${formatPercent(visaoGeralData.resumo.ctr)}` : undefined}
             icon={<Users className="w-5 h-5" />}
             trend="neutral"
           />
@@ -704,7 +695,7 @@ export default function GrowthVisaoGeral() {
           />
           <KPICard
             title="ROI"
-            value={visaoGeralLoading ? "..." : visaoGeralData?.resumo?.roi ? `${visaoGeralData.resumo.roi.toFixed(0)}%` : "-"}
+            value={visaoGeralLoading ? "..." : visaoGeralData?.resumo?.roi ? `${formatDecimal(visaoGeralData.resumo.roi, 0)}%` : "-"}
             subtitle="Retorno sobre Investimento"
             icon={<Percent className="w-5 h-5" />}
             trend={(visaoGeralData?.resumo?.roi || 0) > 0 ? "up" : "down"}
@@ -713,7 +704,7 @@ export default function GrowthVisaoGeral() {
             title="ROAS"
             value={visaoGeralLoading ? "..." : 
               (visaoGeralData?.resumo?.investimento && visaoGeralData.resumo.investimento > 0) ? 
-                (visaoGeralData.resumo.valorVendas / visaoGeralData.resumo.investimento).toFixed(2) : "-"}
+                formatDecimal(visaoGeralData.resumo.valorVendas / visaoGeralData.resumo.investimento) : "-"}
             subtitle="Return on Ad Spend"
             icon={<BarChart3 className="w-5 h-5" />}
             trend={(visaoGeralData?.resumo?.valorVendas || 0) > (visaoGeralData?.resumo?.investimento || 0) ? "up" : "down"}

@@ -41,6 +41,7 @@ import {
   Monitor
 } from "lucide-react";
 import { DealCelebration, useDealCelebrationTrigger } from "@/components/DealCelebration";
+import { formatPercent } from "@/lib/utils";
 
 interface SDRMetrics {
   leadsTotais: number;
@@ -539,7 +540,7 @@ export default function DashboardSDRs() {
               value: metrics?.taxaConversao || 0, 
               icon: TrendingUp,
               gradient: "from-emerald-600 to-green-600",
-              format: (v: number) => `${v.toFixed(1)}%`
+              format: (v: number) => formatPercent(v)
             },
           ].map((kpi, index) => (
             <motion.div
@@ -740,7 +741,7 @@ export default function DashboardSDRs() {
                             'bg-muted/50 text-muted-foreground'
                           }`}
                         >
-                          {sdr.conversaoVendas.toFixed(0)}%
+                          {formatPercent(sdr.conversaoVendas)}
                         </Badge>
                       </div>
                       <div className="col-span-1 text-right text-muted-foreground text-xs">
@@ -852,7 +853,7 @@ export default function DashboardSDRs() {
                           animate={{ scale: 1 }}
                           transition={{ delay: 1.5, type: "spring", stiffness: 200 }}
                         >
-                          {percentual.toFixed(1)}%
+                          {formatPercent(percentual)}
                         </motion.span>
                       </div>
 

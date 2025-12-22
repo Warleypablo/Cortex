@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,12 +53,6 @@ export default function AuditoriaSistemasPage() {
       return res.json();
     },
   });
-
-  const formatMoney = (value: number) => 
-    new Intl.NumberFormat('pt-BR', { 
-      style: 'currency', 
-      currency: 'BRL' 
-    }).format(value);
 
   const filteredAndSortedData = useMemo(() => {
     if (!data) return [];
@@ -318,7 +313,7 @@ export default function AuditoriaSistemasPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-divergencia-total">
-                  {formatMoney(kpis.divergenciaTotal)}
+                  {formatCurrency(kpis.divergenciaTotal)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Soma absoluta das diferenças
@@ -333,7 +328,7 @@ export default function AuditoriaSistemasPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-taxa-problematica">
-                  {kpis.taxaProblematica.toFixed(1)}%
+                  {formatPercent(kpis.taxaProblematica)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Percentual com divergência
@@ -452,16 +447,16 @@ export default function AuditoriaSistemasPage() {
                             {item.cnpj}
                           </TableCell>
                           <TableCell className="text-right" data-testid={`cell-clickup-${item.cnpj}`}>
-                            {formatMoney(item.valorClickUp)}
+                            {formatCurrency(item.valorClickUp)}
                           </TableCell>
                           <TableCell className="text-right" data-testid={`cell-conta-azul-${item.cnpj}`}>
-                            {formatMoney(item.valorContaAzul)}
+                            {formatCurrency(item.valorContaAzul)}
                           </TableCell>
                           <TableCell 
                             className={`text-right font-medium ${getDiferencaColor(item.diferenca)}`}
                             data-testid={`cell-diferenca-${item.cnpj}`}
                           >
-                            {formatMoney(item.diferenca)}
+                            {formatCurrency(item.diferenca)}
                           </TableCell>
                           <TableCell data-testid={`cell-status-${item.cnpj}`}>
                             {getStatusBadge(item.status)}

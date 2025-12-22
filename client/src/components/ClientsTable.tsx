@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ServiceIcons } from "@/components/ServiceIcons";
+import { formatCurrency, formatDecimal } from "@/lib/utils";
 import type { ClienteCompleto } from "../../../server/storage";
 
 type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
@@ -39,10 +40,6 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
       return cleaned.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
     }
     return cnpj;
-  };
-
-  const formatCurrency = (value: number) => {
-    return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   return (
@@ -153,7 +150,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
                 {ltv > 0 ? formatCurrency(ltv) : "-"}
               </div>
               <div className="px-4 py-3 font-medium text-sm" data-testid={`text-lt-${client.ids || client.id}`}>
-                {ltMeses > 0 ? `${ltMeses.toFixed(1)} m` : "-"}
+                {ltMeses > 0 ? `${formatDecimal(ltMeses)} m` : "-"}
               </div>
               <div className="px-4 py-3 text-sm" data-testid={`text-status-${client.ids || client.id}`}>
                 <Badge className={`${getStatusColor(client.statusClickup)}`} variant="outline">

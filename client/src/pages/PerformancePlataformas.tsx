@@ -14,6 +14,7 @@ import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getMetricColor, getColorClasses } from "@/lib/metricFormatting";
 import type { MetricRulesetWithThresholds } from "@shared/schema";
+import { formatCurrency as formatCurrencyUtil, formatDecimal as formatDecimalUtil, formatPercent as formatPercentUtil } from "@/lib/utils";
 
 type NodeType = 'platform' | 'campaign' | 'adset' | 'ad';
 
@@ -49,11 +50,6 @@ interface PerformanceNode {
 }
 
 
-const formatCurrency = (value: number | null): string => {
-  if (value === null || value === undefined) return "-";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 }).format(value);
-};
-
 const formatNumber = (value: number | null): string => {
   if (value === null || value === undefined) return "-";
   return new Intl.NumberFormat("pt-BR").format(value);
@@ -61,12 +57,17 @@ const formatNumber = (value: number | null): string => {
 
 const formatPercent = (value: number | null): string => {
   if (value === null || value === undefined) return "-";
-  return `${value}%`;
+  return formatPercentUtil(value);
 };
 
 const formatDecimal = (value: number | null): string => {
   if (value === null || value === undefined) return "-";
-  return value.toFixed(2);
+  return formatDecimalUtil(value);
+};
+
+const formatCurrency = (value: number | null): string => {
+  if (value === null || value === undefined) return "-";
+  return formatCurrencyUtil(value);
 };
 
 export default function PerformancePlataformas() {
