@@ -129,30 +129,52 @@ function ProtectedRouter() {
 
   return (
     <Switch>
-      <Route path="/">{() => <ProtectedRoute path="/clientes" component={ClientesContratos} />}</Route>
-      <Route path="/clientes">{() => <ProtectedRoute path="/clientes" component={ClientesContratos} />}</Route>
-      <Route path="/contratos">{() => <ProtectedRoute path="/clientes" component={ClientesContratos} />}</Route>
+      {/* Menu Principal - Clientes/Contratos herdam permissão "/" */}
+      <Route path="/">{() => <ProtectedRoute path="/" component={ClientesContratos} />}</Route>
+      <Route path="/clientes">{() => <ProtectedRoute path="/" component={ClientesContratos} />}</Route>
+      <Route path="/contratos">{() => <ProtectedRoute path="/contratos" component={ClientesContratos} />}</Route>
+      <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>
+      
+      {/* Colaboradores */}
       <Route path="/colaboradores">{() => <ProtectedRoute path="/colaboradores" component={Colaboradores} />}</Route>
       <Route path="/colaboradores/analise">{() => <ProtectedRoute path="/colaboradores/analise" component={ColaboradoresAnalise} />}</Route>
       <Route path="/colaborador/:id">{() => <ProtectedRoute path="/colaboradores" component={DetailColaborador} />}</Route>
-      <Route path="/patrimonio/:id">{() => <ProtectedRoute path="/patrimonio" component={PatrimonioDetail} />}</Route>
+      
+      {/* Patrimônio */}
       <Route path="/patrimonio">{() => <ProtectedRoute path="/patrimonio" component={Patrimonio} />}</Route>
+      <Route path="/patrimonio/:id">{() => <ProtectedRoute path="/patrimonio" component={PatrimonioDetail} />}</Route>
+      
+      {/* Menu Principal - Outros */}
       <Route path="/ferramentas">{() => <ProtectedRoute path="/ferramentas" component={Ferramentas} />}</Route>
       <Route path="/turbozap">{() => <ProtectedRoute path="/turbozap" component={TurboZap} />}</Route>
+      <Route path="/acessos">{() => <ProtectedRoute path="/acessos" component={Acessos} />}</Route>
+      <Route path="/conhecimentos">{() => <ProtectedRoute path="/conhecimentos" component={Conhecimentos} />}</Route>
+      <Route path="/beneficios">{() => <ProtectedRoute path="/beneficios" component={Beneficios} />}</Route>
+      <Route path="/cases/chat">{() => <ProtectedRoute path="/cases/chat" component={CasesChat} />}</Route>
+      
+      {/* Operação */}
       <Route path="/visao-geral">{() => <ProtectedRoute path="/visao-geral" component={VisaoGeral} />}</Route>
-      <Route path="/dashboard/financeiro">{() => <ProtectedRoute path="/dashboard/financeiro" component={DashboardFinanceiro} />}</Route>
-      <Route path="/dashboard/geg">{() => <ProtectedRoute path="/dashboard/geg" component={DashboardGeG} />}</Route>
       <Route path="/dashboard/retencao">{() => <ProtectedRoute path="/dashboard/retencao" component={DashboardRetencao} />}</Route>
+      <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
+      
+      {/* Financeiro */}
+      <Route path="/dashboard/financeiro">{() => <ProtectedRoute path="/dashboard/financeiro" component={DashboardFinanceiro} />}</Route>
       <Route path="/dashboard/dfc">{() => <ProtectedRoute path="/dashboard/dfc" component={DashboardDFC} />}</Route>
-      <Route path="/dashboard/inadimplencia">{() => <ProtectedRoute path="/dashboard/inadimplencia" component={DashboardInadimplencia} />}</Route>
       <Route path="/dashboard/fluxo-caixa">{() => <ProtectedRoute path="/dashboard/fluxo-caixa" component={FluxoCaixa} />}</Route>
       <Route path="/dashboard/revenue-goals">{() => <ProtectedRoute path="/dashboard/revenue-goals" component={RevenueGoals} />}</Route>
+      <Route path="/dashboard/inadimplencia">{() => <ProtectedRoute path="/dashboard/inadimplencia" component={DashboardInadimplencia} />}</Route>
       <Route path="/dashboard/auditoria-sistemas">{() => <ProtectedRoute path="/dashboard/auditoria-sistemas" component={AuditoriaSistemas} />}</Route>
+      
+      {/* G&G */}
+      <Route path="/dashboard/geg">{() => <ProtectedRoute path="/dashboard/geg" component={DashboardGeG} />}</Route>
       <Route path="/dashboard/inhire">{() => <ProtectedRoute path="/dashboard/inhire" component={DashboardInhire} />}</Route>
       <Route path="/dashboard/recrutamento">{() => <ProtectedRoute path="/dashboard/recrutamento" component={DashboardRecrutamento} />}</Route>
+      
+      {/* Tech */}
       <Route path="/dashboard/tech">{() => <ProtectedRoute path="/dashboard/tech" component={DashboardTech} />}</Route>
       <Route path="/tech/projetos">{() => <ProtectedRoute path="/tech/projetos" component={TechProjetos} />}</Route>
-      <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
+      
+      {/* Comercial */}
       <Route path="/dashboard/comercial/closers">{() => <ProtectedRoute path="/dashboard/comercial/closers" component={DashboardClosers} />}</Route>
       <Route path="/dashboard/comercial/sdrs">{() => <ProtectedRoute path="/dashboard/comercial/sdrs" component={DashboardSDRs} />}</Route>
       <Route path="/dashboard/comercial/detalhamento-closers">{() => <ProtectedRoute path="/dashboard/comercial/detalhamento-closers" component={DetailClosers} />}</Route>
@@ -160,18 +182,22 @@ function ProtectedRouter() {
       <Route path="/dashboard/comercial/analise-vendas">{() => <ProtectedRoute path="/dashboard/comercial/analise-vendas" component={AnaliseVendas} />}</Route>
       <Route path="/dashboard/comercial/detalhamento-vendas">{() => <ProtectedRoute path="/dashboard/comercial/detalhamento-vendas" component={DetalhamentoVendas} />}</Route>
       <Route path="/dashboard/comercial/apresentacao">{() => <ProtectedRoute path="/dashboard/comercial/apresentacao" component={PresentationMode} />}</Route>
-      <Route path="/growth/criativos">{() => <ProtectedRoute path="/growth/criativos" component={Criativos} />}</Route>
+      
+      {/* Growth */}
       <Route path="/growth/visao-geral">{() => <ProtectedRoute path="/growth/visao-geral" component={GrowthVisaoGeral} />}</Route>
+      <Route path="/growth/criativos">{() => <ProtectedRoute path="/growth/criativos" component={Criativos} />}</Route>
       <Route path="/growth/performance-plataformas">{() => <ProtectedRoute path="/growth/performance-plataformas" component={PerformancePlataformas} />}</Route>
+      
+      {/* Jurídico */}
       <Route path="/juridico/clientes">{() => <ProtectedRoute path="/juridico/clientes" component={JuridicoClientes} />}</Route>
+      
+      {/* Investidores */}
       <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
-      <Route path="/cases/chat">{() => <ProtectedRoute path="/cases/chat" component={CasesChat} />}</Route>
+      
+      {/* Admin */}
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/admin/logs">{() => <ProtectedRoute path="/admin/logs" component={AdminLogs} />}</Route>
-      <Route path="/acessos">{() => <ProtectedRoute path="/acessos" component={Acessos} />}</Route>
-      <Route path="/conhecimentos">{() => <ProtectedRoute path="/conhecimentos" component={Conhecimentos} />}</Route>
-      <Route path="/beneficios">{() => <ProtectedRoute path="/beneficios" component={Beneficios} />}</Route>
-      <Route path="/cliente/:id">{() => <ProtectedRoute path="/" component={ClientDetail} />}</Route>
+      
       <Route>
         {() => (
           <Suspense fallback={<PageLoader />}>

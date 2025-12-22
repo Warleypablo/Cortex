@@ -46,37 +46,55 @@ interface DebugData {
 }
 
 const AVAILABLE_ROUTES = [
+  // Menu Principal
   { path: '/', label: 'Clientes', category: 'Menu Principal' },
   { path: '/contratos', label: 'Contratos', category: 'Menu Principal' },
   { path: '/colaboradores', label: 'Colaboradores', category: 'Menu Principal' },
+  { path: '/colaboradores/analise', label: 'Análise Colaboradores', category: 'Menu Principal' },
   { path: '/patrimonio', label: 'Patrimônio', category: 'Menu Principal' },
   { path: '/ferramentas', label: 'Ferramentas', category: 'Menu Principal' },
   { path: '/turbozap', label: 'TurboZap', category: 'Menu Principal' },
+  { path: '/acessos', label: 'Acessos', category: 'Menu Principal' },
+  { path: '/conhecimentos', label: 'Conhecimentos', category: 'Menu Principal' },
+  { path: '/beneficios', label: 'Benefícios', category: 'Menu Principal' },
   { path: '/cases/chat', label: 'Assistente IA', category: 'Menu Principal' },
+  // Financeiro
   { path: '/dashboard/financeiro', label: 'Visão Geral', category: 'Financeiro' },
   { path: '/dashboard/dfc', label: 'DFC', category: 'Financeiro' },
   { path: '/dashboard/fluxo-caixa', label: 'Fluxo de Caixa', category: 'Financeiro' },
   { path: '/dashboard/revenue-goals', label: 'Revenue Goals', category: 'Financeiro' },
   { path: '/dashboard/inadimplencia', label: 'Inadimplência', category: 'Financeiro' },
   { path: '/dashboard/auditoria-sistemas', label: 'Auditoria de Sistemas', category: 'Financeiro' },
+  // G&G
   { path: '/dashboard/geg', label: 'Visão Geral', category: 'G&G' },
+  { path: '/dashboard/inhire', label: 'Inhire', category: 'G&G' },
   { path: '/dashboard/recrutamento', label: 'Recrutamento', category: 'G&G' },
+  // Operação
   { path: '/visao-geral', label: 'Visão Geral', category: 'Operação' },
   { path: '/dashboard/retencao', label: 'Análise de Retenção', category: 'Operação' },
   { path: '/dashboard/meta-ads', label: 'Meta Ads', category: 'Operação' },
+  // Tech
   { path: '/dashboard/tech', label: 'Visão Geral', category: 'Tech' },
   { path: '/tech/projetos', label: 'Projetos', category: 'Tech' },
+  // Comercial
   { path: '/dashboard/comercial/closers', label: 'Closers', category: 'Comercial' },
   { path: '/dashboard/comercial/sdrs', label: 'SDRs', category: 'Comercial' },
   { path: '/dashboard/comercial/detalhamento-closers', label: 'Detalhamento Closers', category: 'Comercial' },
+  { path: '/dashboard/comercial/detalhamento-sdrs', label: 'Detalhamento SDRs', category: 'Comercial' },
   { path: '/dashboard/comercial/detalhamento-vendas', label: 'Detalhamento Vendas', category: 'Comercial' },
   { path: '/dashboard/comercial/analise-vendas', label: 'Análise de Vendas', category: 'Comercial' },
   { path: '/dashboard/comercial/apresentacao', label: 'Modo Apresentação', category: 'Comercial' },
+  // Growth
   { path: '/growth/visao-geral', label: 'Visão Geral', category: 'Growth' },
   { path: '/growth/criativos', label: 'Criativos', category: 'Growth' },
   { path: '/growth/performance-plataformas', label: 'Por Plataforma', category: 'Growth' },
+  // Jurídico
   { path: '/juridico/clientes', label: 'Clientes Cobrança', category: 'Jurídico' },
+  // Investidores
+  { path: '/investors-report', label: 'Relatório Investidores', category: 'Investidores' },
+  // Administração
   { path: '/admin/usuarios', label: 'Gerenciar Usuários', category: 'Administração' },
+  { path: '/admin/logs', label: 'Logs do Sistema', category: 'Administração' },
 ];
 
 // Pre-defined role presets with access to specific pages
@@ -98,8 +116,9 @@ const ROLE_PRESETS: { id: string; label: string; description: string; routes: st
     routes: [
       '/', '/contratos', '/cases/chat',
       '/dashboard/comercial/closers', '/dashboard/comercial/sdrs',
-      '/dashboard/comercial/detalhamento-closers', '/dashboard/comercial/detalhamento-vendas',
-      '/dashboard/comercial/analise-vendas', '/dashboard/comercial/apresentacao'
+      '/dashboard/comercial/detalhamento-closers', '/dashboard/comercial/detalhamento-sdrs',
+      '/dashboard/comercial/detalhamento-vendas', '/dashboard/comercial/analise-vendas',
+      '/dashboard/comercial/apresentacao'
     ]
   },
   {
@@ -126,8 +145,8 @@ const ROLE_PRESETS: { id: string; label: string; description: string; routes: st
     label: 'RH / G&G',
     description: 'Acesso a gestão de pessoas e recrutamento',
     routes: [
-      '/', '/colaboradores', '/cases/chat',
-      '/dashboard/geg', '/dashboard/recrutamento'
+      '/', '/colaboradores', '/colaboradores/analise', '/cases/chat',
+      '/dashboard/geg', '/dashboard/inhire', '/dashboard/recrutamento'
     ]
   },
   {
@@ -135,7 +154,7 @@ const ROLE_PRESETS: { id: string; label: string; description: string; routes: st
     label: 'Tech',
     description: 'Acesso a dashboards de tecnologia e projetos',
     routes: [
-      '/', '/ferramentas', '/cases/chat',
+      '/', '/ferramentas', '/acessos', '/cases/chat',
       '/dashboard/tech', '/tech/projetos'
     ]
   },
@@ -147,6 +166,12 @@ const ROLE_PRESETS: { id: string; label: string; description: string; routes: st
       '/', '/contratos', '/cases/chat',
       '/juridico/clientes', '/dashboard/inadimplencia'
     ]
+  },
+  {
+    id: 'investidor',
+    label: 'Investidor',
+    description: 'Acesso apenas ao relatório de investidores',
+    routes: ['/investors-report']
   },
   {
     id: 'visualizador',
