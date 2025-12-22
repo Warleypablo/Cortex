@@ -8419,56 +8419,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST initialize Turbo Partners with internal tools credentials
-  app.post("/api/acessos/init-turbo-tools", async (req, res) => {
+  // GET turbo_tools data for display in Acessos
+  app.get("/api/acessos/turbo-tools", async (req, res) => {
     try {
-      // Check if Turbo Partners already exists (check for "Turbo" name)
-      let turboClient = await db.execute(sql`
-        SELECT * FROM clients WHERE LOWER(name) = 'turbo' OR LOWER(name) LIKE '%turbo partners%' LIMIT 1
+      const result = await db.execute(sql`
+        SELECT id, name, login, password, site, observations
+        FROM turbo_tools
+        ORDER BY name ASC
       `);
       
-      let clientId: string;
+      // Map to credential-like format for display
+      const tools = result.rows.map((row: any) => ({
+        id: row.id,
+        platform: row.name,
+        username: row.login,
+        password: row.password,
+        accessUrl: row.site,
+        observations: row.observations,
+      }));
       
-      if (turboClient.rows.length === 0) {
-        // Create Turbo client
-        const newClient = await db.execute(sql`
-          INSERT INTO clients (name, cnpj, status, additional_info)
-          VALUES ('Turbo', '00.000.000/0001-00', 'ativo', 'Empresa matriz - Turbo Partners')
-          RETURNING *
-        `);
-        clientId = (newClient.rows[0] as any).id;
-      } else {
-        clientId = (turboClient.rows[0] as any).id;
-      }
-      
-      // Define Turbo Tools
-      const turboTools = [
-        { platform: "Moniturbo", url: "https://moniturbo.turbopartners.com.br/", observations: "Sistema de monitoramento e análise de performance" },
-        { platform: "Sistema de Contratos", url: "https://contratos.turbopartners.com.br", observations: "Gestão completa de contratos e documentos" },
-        { platform: "Turbo Commerce", url: "https://app.turbodash.com.br/", observations: "Dashboard de métricas e KPIs de e-commerce" },
-        { platform: "UGC Hub", url: "#", observations: "Central de conteúdo gerado por usuários" },
-        { platform: "Sistema de Acessos", url: "#", observations: "Gerenciamento de permissões e autenticação" },
-      ];
-      
-      // Insert credentials that don't exist yet
-      for (const tool of turboTools) {
-        const existing = await db.execute(sql`
-          SELECT id FROM credentials 
-          WHERE client_id = ${clientId} AND LOWER(platform) = LOWER(${tool.platform})
-        `);
-        
-        if (existing.rows.length === 0) {
-          await db.execute(sql`
-            INSERT INTO credentials (client_id, platform, access_url, observations)
-            VALUES (${clientId}, ${tool.platform}, ${tool.url}, ${tool.observations})
-          `);
-        }
-      }
-      
-      res.json({ success: true, message: "Turbo Tools initialized successfully", clientId });
+      res.json(tools);
     } catch (error) {
-      console.error("[api] Error initializing Turbo Tools:", error);
-      res.status(500).json({ error: "Failed to initialize Turbo Tools" });
+      console.error("[api] Error fetching turbo_tools:", error);
+      res.status(500).json({ error: "Failed to fetch turbo_tools" });
     }
   });
 

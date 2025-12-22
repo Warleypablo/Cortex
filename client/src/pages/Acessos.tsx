@@ -1152,6 +1152,134 @@ function CredentialRow({
   );
 }
 
+interface TurboTool {
+  id: string;
+  platform: string;
+  username: string | null;
+  password: string | null;
+  accessUrl: string | null;
+  observations: string | null;
+}
+
+function TurboToolsSection() {
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
+
+  const { data: tools = [], isLoading } = useQuery<TurboTool[]>({
+    queryKey: ["/api/acessos/turbo-tools"],
+  });
+
+  const togglePassword = (id: string) => {
+    setVisiblePasswords(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ 
+      title: "Copiado!", 
+      description: "Senha copiada para a área de transferência" 
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 bg-muted/30">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Lock className="w-4 h-4 text-primary" />
+          <span className="font-medium">Turbo Tools ({tools.length})</span>
+        </div>
+      </div>
+
+      {tools.length === 0 ? (
+        <div className="text-center py-6 text-muted-foreground">
+          <Key className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p>Nenhuma ferramenta cadastrada</p>
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Plataforma</TableHead>
+              <TableHead>Usuário</TableHead>
+              <TableHead>Senha</TableHead>
+              <TableHead>URL</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tools.map((tool) => (
+              <TableRow key={tool.id} data-testid={`row-turbo-tool-${tool.id}`}>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    <Key className="w-4 h-4 text-muted-foreground" />
+                    {tool.platform}
+                  </div>
+                </TableCell>
+                <TableCell>{tool.username || "-"}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm">
+                      {visiblePasswords.has(tool.id) ? tool.password : "••••••••"}
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => togglePassword(tool.id)}
+                      data-testid={`button-toggle-password-turbo-${tool.id}`}
+                    >
+                      {visiblePasswords.has(tool.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                    {tool.password && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => copyToClipboard(tool.password || "")}
+                        data-testid={`button-copy-password-turbo-${tool.id}`}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {tool.accessUrl && tool.accessUrl !== "#" ? (
+                    <a
+                      href={tool.accessUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-primary hover:underline"
+                      data-testid={`link-url-turbo-${tool.id}`}
+                    >
+                      Acessar <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : (
+                    "-"
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}
+
 function ClientCredentialsSection({ 
   clientId, 
   clientName 
@@ -1382,12 +1510,6 @@ function ClientsTab() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const { toast } = useToast();
   const createLog = useCreateLog();
-
-  useEffect(() => {
-    fetch("/api/acessos/init-turbo-tools", { method: "POST" })
-      .then(() => queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients"] }))
-      .catch(() => {});
-  }, []);
 
   const { data: clients = [], isLoading } = useQuery<ClientWithCredentialCount[]>({
     queryKey: ["/api/acessos/clients"],
@@ -1625,10 +1747,14 @@ function ClientsTab() {
                   {expandedClient === client.id && (
                     <TableRow>
                       <TableCell colSpan={6} className="p-0">
-                        <ClientCredentialsSection 
-                          clientId={client.id} 
-                          clientName={client.name}
-                        />
+                        {isTurboClient(client.name) ? (
+                          <TurboToolsSection />
+                        ) : (
+                          <ClientCredentialsSection 
+                            clientId={client.id} 
+                            clientName={client.name}
+                          />
+                        )}
                       </TableCell>
                     </TableRow>
                   )}
