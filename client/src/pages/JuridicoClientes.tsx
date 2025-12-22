@@ -285,6 +285,8 @@ export default function JuridicoClientes() {
     { nome: "100% CIFRAS", valorOriginal: 882.83, valorRecuperado: 882.83 },
     { nome: "VOLTA VIBE", valorOriginal: 1000.00, valorRecuperado: 1000.00 },
     { nome: "CHOCOLATERIA BRASIL", valorOriginal: 6987.59, valorRecuperado: 6987.59 },
+    { nome: "MALOCA", valorOriginal: 2510.89, valorRecuperado: 2510.89 },
+    { nome: "AYURVÈDIKA", valorOriginal: 4000.00, valorRecuperado: 4000.00 },
   ], []);
 
   const recuperadosStats = useMemo(() => {
