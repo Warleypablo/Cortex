@@ -149,6 +149,7 @@ interface CazCliente {
   name: string;
   cnpj: string | null;
   status: ClientStatus;
+  hasCredentials: boolean;
 }
 
 function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }) {
@@ -339,7 +340,9 @@ function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }
                               <CommandItem
                                 key={client.id}
                                 value={client.id.toString()}
-                                onSelect={() => handleSelectClient(client)}
+                                onSelect={() => !client.hasCredentials && handleSelectClient(client)}
+                                disabled={client.hasCredentials}
+                                className={cn(client.hasCredentials && "opacity-50 cursor-not-allowed")}
                                 data-testid={`item-caz-client-${client.id}`}
                               >
                                 <Check
@@ -348,13 +351,27 @@ function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }
                                     selectedCazClient?.id === client.id ? "opacity-100" : "opacity-0"
                                   )}
                                 />
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{client.name}</span>
-                                  {client.cnpj && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {formatCNPJ(client.cnpj)}
+                                <div className="flex flex-col flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{client.name}</span>
+                                    {client.hasCredentials && (
+                                      <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                                        <Key className="w-3 h-3 mr-1" />
+                                        Cadastrado
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    {client.cnpj && <span>{formatCNPJ(client.cnpj)}</span>}
+                                    <span className={cn(
+                                      "px-1.5 py-0.5 rounded text-xs",
+                                      client.status === 'ativo' 
+                                        ? "bg-green-500/10 text-green-600 dark:text-green-400" 
+                                        : "bg-red-500/10 text-red-600 dark:text-red-400"
+                                    )}>
+                                      {client.status === 'ativo' ? 'Ativo' : 'Cancelado'}
                                     </span>
-                                  )}
+                                  </div>
                                 </div>
                               </CommandItem>
                             ))}
