@@ -1258,10 +1258,14 @@ export type InsertIntegrationHealth = typeof integrationHealth.$inferInsert;
 // Acessos Module - Clients & Credentials
 // ============================================
 
+export const clientStatusEnum = ['ativo', 'cancelado'] as const;
+export type ClientStatus = typeof clientStatusEnum[number];
+
 export const clients = pgTable("clients", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   cnpj: text("cnpj"),
+  status: text("status").$type<ClientStatus>().default('ativo'),
   additionalInfo: text("additional_info"),
   createdBy: varchar("created_by", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow(),
