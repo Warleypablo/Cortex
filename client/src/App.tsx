@@ -16,6 +16,7 @@ import ClientesContratos from "@/pages/ClientesContratos";
 import ClientDetail from "@/pages/ClientDetail";
 import Colaboradores from "@/pages/Colaboradores";
 import ColaboradoresAnalise from "@/pages/ColaboradoresAnalise";
+import DetailColaborador from "@/pages/DetailColaborador";
 import Patrimonio from "@/pages/Patrimonio";
 import PatrimonioDetail from "@/pages/PatrimonioDetail";
 import Ferramentas from "@/pages/Ferramentas";
@@ -130,6 +131,7 @@ function ProtectedRouter() {
       <Route path="/contratos">{() => <ProtectedRoute path="/clientes" component={ClientesContratos} />}</Route>
       <Route path="/colaboradores">{() => <ProtectedRoute path="/colaboradores" component={Colaboradores} />}</Route>
       <Route path="/colaboradores/analise">{() => <ProtectedRoute path="/colaboradores/analise" component={ColaboradoresAnalise} />}</Route>
+      <Route path="/colaborador/:id">{() => <ProtectedRoute path="/colaboradores" component={DetailColaborador} />}</Route>
       <Route path="/patrimonio/:id">{() => <ProtectedRoute path="/patrimonio" component={PatrimonioDetail} />}</Route>
       <Route path="/patrimonio">{() => <ProtectedRoute path="/patrimonio" component={Patrimonio} />}</Route>
       <Route path="/ferramentas">{() => <ProtectedRoute path="/ferramentas" component={Ferramentas} />}</Route>
