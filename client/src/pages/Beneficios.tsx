@@ -3,11 +3,23 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Benefit, InsertBenefit } from "@shared/schema";
 import { insertBenefitSchema, benefitSegmentEnum } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, Copy, Edit, Trash2, ExternalLink, Loader2, ChevronDown, ChevronRight, Gift, Tag, Percent } from "lucide-react";
+import { Search, Plus, Copy, Edit, Trash2, ExternalLink, Loader2, ChevronDown, ChevronRight, Gift, Tag, Percent, LayoutGrid, Table2, ArrowUpDown } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+
+type SortField = 'empresa' | 'cupom' | 'desconto' | 'segmento';
+type SortDirection = 'asc' | 'desc';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -568,6 +580,10 @@ export default function Beneficios() {
   const [segmentoFilter, setSegmentoFilter] = useState<string>("all");
   const [editingBenefit, setEditingBenefit] = useState<Benefit | null>(null);
   const [deletingBenefit, setDeletingBenefit] = useState<Benefit | null>(null);
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [sortField, setSortField] = useState<SortField>('empresa');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const { toast } = useToast();
 
@@ -611,6 +627,59 @@ export default function Beneficios() {
     });
   }, [benefits, search, segmentoFilter]);
 
+  const sortedBenefits = useMemo(() => {
+    return [...filteredBenefits].sort((a, b) => {
+      let aVal = a[sortField] || '';
+      let bVal = b[sortField] || '';
+      
+      if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+      if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+      
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredBenefits, sortField, sortDirection]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const toggleRowExpand = (id: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copiado!",
+      description: `${label} copiado para a área de transferência`,
+    });
+  };
+
+  const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-8 px-2 -ml-2 font-medium"
+      onClick={() => handleSort(field)}
+      data-testid={`sort-${field}`}
+    >
+      {children}
+      <ArrowUpDown className={`ml-1 h-3 w-3 ${sortField === field ? 'opacity-100' : 'opacity-50'}`} />
+    </Button>
+  );
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64" data-testid="loading-benefits">
@@ -649,10 +718,30 @@ export default function Beneficios() {
           </Select>
         </div>
 
-        <AddBenefitDialog />
+        <div className="flex items-center gap-2">
+          <div className="flex border rounded-md">
+            <Button
+              variant={viewMode === 'cards' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('cards')}
+              data-testid="button-view-cards"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              data-testid="button-view-table"
+            >
+              <Table2 className="w-4 h-4" />
+            </Button>
+          </div>
+          <AddBenefitDialog />
+        </div>
       </div>
 
-      {filteredBenefits.length === 0 ? (
+      {sortedBenefits.length === 0 ? (
         <div className="text-center py-12" data-testid="empty-benefits">
           <Gift className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium text-muted-foreground">Nenhum benefício encontrado</h3>
@@ -662,9 +751,9 @@ export default function Beneficios() {
               : "Adicione seu primeiro benefício clicando no botão acima"}
           </p>
         </div>
-      ) : (
+      ) : viewMode === 'cards' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredBenefits.map((benefit) => (
+          {sortedBenefits.map((benefit) => (
             <BenefitCard
               key={benefit.id}
               benefit={benefit}
@@ -672,6 +761,160 @@ export default function Beneficios() {
               onDelete={() => setDeletingBenefit(benefit)}
             />
           ))}
+        </div>
+      ) : (
+        <div className="rounded-md border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40px]"></TableHead>
+                <TableHead>
+                  <SortableHeader field="empresa">Empresa</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader field="cupom">Cupom</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader field="desconto">Desconto</SortableHeader>
+                </TableHead>
+                <TableHead>
+                  <SortableHeader field="segmento">Segmento</SortableHeader>
+                </TableHead>
+                <TableHead className="w-[100px]">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedBenefits.map((benefit) => {
+                const isExpanded = expandedRows.has(benefit.id);
+                
+                return (
+                  <>
+                    <TableRow 
+                      key={benefit.id}
+                      className={cn(
+                        "cursor-pointer hover-elevate",
+                        isExpanded && "bg-muted/50"
+                      )}
+                      onClick={() => toggleRowExpand(benefit.id)}
+                      data-testid={`row-benefit-${benefit.id}`}
+                    >
+                      <TableCell>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Gift className="w-4 h-4 text-muted-foreground shrink-0" />
+                          <span className="font-medium">{benefit.empresa}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {benefit.cupom ? (
+                          <div className="flex items-center gap-1">
+                            <Tag className="w-3 h-3 text-muted-foreground" />
+                            <code className="text-sm bg-muted px-1.5 py-0.5 rounded">{benefit.cupom}</code>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyToClipboard(benefit.cupom!, "Cupom");
+                              }}
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {benefit.desconto ? (
+                          <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            <Percent className="w-3 h-3 mr-1" />
+                            {benefit.desconto}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {benefit.segmento ? (
+                          <Badge className={segmentColors[benefit.segmento]} variant="secondary">
+                            {segmentIcons[benefit.segmento]}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setEditingBenefit(benefit)}
+                            data-testid={`button-edit-table-${benefit.id}`}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setDeletingBenefit(benefit)}
+                            data-testid={`button-delete-table-${benefit.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow key={`${benefit.id}-details`} className="bg-muted/30">
+                        <TableCell colSpan={6} className="py-3">
+                          <div className="pl-10 space-y-2">
+                            <div className="text-sm font-medium text-muted-foreground mb-2">Detalhes do Benefício</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {benefit.segmento && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground text-sm">Segmento:</span>
+                                  <span className="text-sm">{segmentLabels[benefit.segmento]}</span>
+                                </div>
+                              )}
+                              {benefit.site && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground text-sm">Site:</span>
+                                  <a
+                                    href={benefit.site.startsWith("http") ? benefit.site : `https://${benefit.site}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary hover:underline text-sm flex items-center gap-1"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Acessar <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                </div>
+                              )}
+                              {!benefit.segmento && !benefit.site && (
+                                <span className="text-muted-foreground text-sm">Nenhum detalhe adicional</span>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
 
