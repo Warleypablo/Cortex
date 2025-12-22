@@ -8540,6 +8540,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ matches: [], message: "Não há clientes para vincular ou não há clientes no Conta Azul" });
       }
       
+      // Common company suffixes to remove for better matching
+      const companySuffixes = [
+        'ltda', 'me', 'mei', 'eireli', 'epp', 'sa', 's a', 's/a',
+        'comercio', 'comercial', 'servicos', 'solucoes', 'industria',
+        'brasil', 'br', 'do brasil', 'group', 'grupo', 'holding',
+        'assessoria', 'consultoria', 'tecnologia', 'digital',
+        'marketing', 'agencia', 'studio', 'estudio', 'lab', 'labs'
+      ];
+      
       // Normalize function for name comparison
       const normalizeName = (name: string): string => {
         return name
@@ -8551,29 +8560,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .trim();
       };
       
-      const acessosList = acessosClients.rows.map((r: any) => ({ 
-        id: r.id, 
-        name: r.name,
-        normalized: normalizeName(r.name || '')
-      }));
+      // Remove common suffixes for deeper comparison
+      const removeCompanySuffixes = (normalized: string): string => {
+        let result = normalized;
+        for (const suffix of companySuffixes) {
+          const regex = new RegExp(`\\b${suffix}\\b`, 'g');
+          result = result.replace(regex, '');
+        }
+        return result.replace(/\s+/g, ' ').trim();
+      };
       
-      const cazList = cazClientes.rows.map((r: any) => ({ 
-        id: r.id,
-        nome: r.nome, 
-        cnpj: r.cnpj,
-        normalized: normalizeName(r.nome || '')
-      }));
+      // Simple Levenshtein distance for similarity calculation
+      const levenshteinDistance = (a: string, b: string): number => {
+        if (a.length === 0) return b.length;
+        if (b.length === 0) return a.length;
+        const matrix: number[][] = [];
+        for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+        for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+        for (let i = 1; i <= b.length; i++) {
+          for (let j = 1; j <= a.length; j++) {
+            const cost = a[j - 1] === b[i - 1] ? 0 : 1;
+            matrix[i][j] = Math.min(
+              matrix[i - 1][j] + 1,
+              matrix[i][j - 1] + 1,
+              matrix[i - 1][j - 1] + cost
+            );
+          }
+        }
+        return matrix[b.length][a.length];
+      };
       
-      // Create a lookup map for caz_clientes by normalized name
+      const similarity = (a: string, b: string): number => {
+        const maxLen = Math.max(a.length, b.length);
+        if (maxLen === 0) return 1;
+        return 1 - levenshteinDistance(a, b) / maxLen;
+      };
+      
+      const acessosList = acessosClients.rows.map((r: any) => {
+        const normalized = normalizeName(r.name || '');
+        return { 
+          id: r.id, 
+          name: r.name,
+          normalized,
+          core: removeCompanySuffixes(normalized)
+        };
+      });
+      
+      const cazList = cazClientes.rows.map((r: any) => {
+        const normalized = normalizeName(r.nome || '');
+        return { 
+          id: r.id,
+          nome: r.nome, 
+          cnpj: r.cnpj,
+          normalized,
+          core: removeCompanySuffixes(normalized)
+        };
+      });
+      
+      // Create lookup maps
       const cazByNormalized = new Map<string, any>();
+      const cazByCore = new Map<string, any>();
       cazList.forEach(c => {
         if (c.normalized) cazByNormalized.set(c.normalized, c);
+        if (c.core && c.core.length >= 3) cazByCore.set(c.core, c);
       });
       
       const matches: any[] = [];
       const unmatchedAcessos: any[] = [];
       
-      // First pass: exact normalized name match
+      // First pass: exact normalized name match (HIGH confidence)
       for (const acessos of acessosList) {
         const exactMatch = cazByNormalized.get(acessos.normalized);
         if (exactMatch) {
@@ -8586,9 +8641,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
             confidence: "high",
             reason: "Nome idêntico (match exato)"
           });
-        } else {
-          unmatchedAcessos.push(acessos);
+          continue;
         }
+        
+        // Second pass: core name match after removing suffixes (HIGH confidence)
+        const coreMatch = cazByCore.get(acessos.core);
+        if (coreMatch && acessos.core.length >= 3) {
+          matches.push({
+            acessosId: acessos.id,
+            acessosName: acessos.name,
+            cazId: coreMatch.id,
+            cazCnpj: coreMatch.cnpj,
+            cazNome: coreMatch.nome,
+            confidence: "high",
+            reason: "Nome principal idêntico (sem sufixos empresariais)"
+          });
+          continue;
+        }
+        
+        // Third pass: high similarity match (MEDIUM confidence) 
+        let bestMatch = null;
+        let bestSimilarity = 0;
+        for (const caz of cazList) {
+          const sim = similarity(acessos.core, caz.core);
+          if (sim > bestSimilarity && sim >= 0.8) {
+            bestSimilarity = sim;
+            bestMatch = caz;
+          }
+        }
+        
+        if (bestMatch && bestSimilarity >= 0.8) {
+          matches.push({
+            acessosId: acessos.id,
+            acessosName: acessos.name,
+            cazId: bestMatch.id,
+            cazCnpj: bestMatch.cnpj,
+            cazNome: bestMatch.nome,
+            confidence: "medium",
+            reason: `Similaridade alta (${Math.round(bestSimilarity * 100)}%)`
+          });
+          continue;
+        }
+        
+        unmatchedAcessos.push(acessos);
       }
       
       // Second pass: AI matching for unmatched clients (batch processing)
@@ -8633,11 +8728,8 @@ Retorne APENAS o JSON, sem markdown ou texto adicional.`;
             const jsonMatch = content.match(/\[[\s\S]*?\]/);
             if (jsonMatch) {
               const batchMatches = JSON.parse(jsonMatch[0]);
-              // Only add matches with medium or high confidence
-              const validMatches = batchMatches.filter((m: any) => 
-                m.confidence === 'high' || m.confidence === 'medium'
-              );
-              matches.push(...validMatches);
+              // Include all confidence levels (high, medium, low)
+              matches.push(...batchMatches);
             }
           } catch (parseError) {
             console.error("[api] Error in AI batch matching:", parseError);
