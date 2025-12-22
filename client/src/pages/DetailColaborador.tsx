@@ -6,12 +6,15 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign } from "lucide-react";
-import type { Colaborador, InsertColaborador } from "@shared/schema";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, UserCircle, ExternalLink } from "lucide-react";
+import type { Colaborador, InsertColaborador, RhPromocao } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { z } from "zod";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Dialog,
   DialogContent,
@@ -45,10 +48,45 @@ interface PatrimonioItem {
   numeroAtivo: string | null;
   descricao: string | null;
   status: string | null;
+  ativo: string | null;
+  marca: string | null;
+}
+
+interface PromocaoItem {
+  id: number;
+  colaboradorId: number;
+  dataPromocao: string | Date;
+  cargoAnterior: string | null;
+  cargoNovo: string | null;
+  nivelAnterior: string | null;
+  nivelNovo: string | null;
+  salarioAnterior: string | null;
+  salarioNovo: string | null;
+  observacoes: string | null;
+  criadoEm: string | Date | null;
+  criadoPor: string | null;
+}
+
+interface LinkedUser {
+  id: string;
+  email: string;
+  name: string;
+  picture: string | null;
+  role: string;
+}
+
+interface SystemUser {
+  id: string;
+  email: string;
+  name: string;
+  picture: string | null;
+  role: string;
 }
 
 type ColaboradorDetail = Colaborador & {
   patrimonios: PatrimonioItem[];
+  promocoes?: PromocaoItem[];
+  linkedUser?: LinkedUser | null;
 };
 
 const squadColors: Record<string, string> = {
@@ -78,11 +116,395 @@ function formatDate(date: string | Date | null | undefined) {
   }
 }
 
-function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborador: Colaborador; open: boolean; onOpenChange: (open: boolean) => void }) {
+function formatDateFns(date: string | Date | null | undefined) {
+  if (!date) return "-";
+  try {
+    return format(new Date(date), "dd/MM/yyyy", { locale: ptBR });
+  } catch {
+    return "-";
+  }
+}
+
+function formatCurrency(value: string | number | null | undefined) {
+  if (!value) return "-";
+  try {
+    const numValue = typeof value === "string" ? parseFloat(value) : value;
+    return `R$ ${numValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+  } catch {
+    return "-";
+  }
+}
+
+const statusOptions = ["Vai Começar", "Ativo", "Dispensado", "Em Desligamento"];
+
+interface CargoOption {
+  id: number;
+  nome: string;
+}
+
+interface NivelOption {
+  id: number;
+  nome: string;
+}
+
+interface SquadOption {
+  id: number;
+  nome: string;
+  emoji: string | null;
+}
+
+interface EstadoOption {
+  sigla: string;
+  nome: string;
+}
+
+interface CidadeOption {
+  id: number;
+  nome: string;
+}
+
+const addPromocaoSchema = z.object({
+  dataPromocao: z.string().min(1, "Data é obrigatória"),
+  salarioAnterior: z.string().optional(),
+  salarioNovo: z.string().optional(),
+  cargoAnterior: z.string().optional(),
+  cargoNovo: z.string().optional(),
+  nivelAnterior: z.string().optional(),
+  nivelNovo: z.string().optional(),
+  observacoes: z.string().optional(),
+});
+
+type AddPromocaoForm = z.infer<typeof addPromocaoSchema>;
+
+function AddPromocaoDialog({ 
+  colaborador, 
+  open, 
+  onOpenChange 
+}: { 
+  colaborador: ColaboradorDetail; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void 
+}) {
   const { toast } = useToast();
+
+  const { data: cargos = [] } = useQuery<CargoOption[]>({
+    queryKey: ["/api/rh/cargos"],
+  });
+
+  const { data: niveis = [] } = useQuery<NivelOption[]>({
+    queryKey: ["/api/rh/niveis"],
+  });
+
+  const form = useForm<AddPromocaoForm>({
+    resolver: zodResolver(addPromocaoSchema),
+    defaultValues: {
+      dataPromocao: new Date().toISOString().split("T")[0],
+      salarioAnterior: colaborador.salario || "",
+      salarioNovo: "",
+      cargoAnterior: colaborador.cargo || "",
+      cargoNovo: "",
+      nivelAnterior: colaborador.nivel || "",
+      nivelNovo: "",
+      observacoes: "",
+    },
+  });
+
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        dataPromocao: new Date().toISOString().split("T")[0],
+        salarioAnterior: colaborador.salario || "",
+        salarioNovo: "",
+        cargoAnterior: colaborador.cargo || "",
+        cargoNovo: "",
+        nivelAnterior: colaborador.nivel || "",
+        nivelNovo: "",
+        observacoes: "",
+      });
+    }
+  }, [open, colaborador, form]);
+
+  const addPromocaoMutation = useMutation({
+    mutationFn: async (data: AddPromocaoForm) => {
+      const response = await apiRequest("POST", `/api/colaboradores/${colaborador.id}/promocoes`, {
+        dataPromocao: data.dataPromocao,
+        salarioAnterior: data.salarioAnterior || null,
+        salarioNovo: data.salarioNovo || null,
+        cargoAnterior: data.cargoAnterior || null,
+        cargoNovo: data.cargoNovo || null,
+        nivelAnterior: data.nivelAnterior || null,
+        nivelNovo: data.nivelNovo || null,
+        observacoes: data.observacoes || null,
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaborador.id.toString()] });
+      toast({
+        title: "Promoção registrada",
+        description: "O histórico de promoção foi adicionado com sucesso.",
+      });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao registrar promoção",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: AddPromocaoForm) => {
+    addPromocaoMutation.mutate(data);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Registrar Promoção</DialogTitle>
+          <DialogDescription>
+            Adicione um registro de promoção ou alteração para {colaborador.nome}
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="dataPromocao"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Data da Promoção *</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} data-testid="input-promocao-data" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="salarioAnterior"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Salário Anterior</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0.00" 
+                        {...field} 
+                        data-testid="input-promocao-salario-anterior" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="salarioNovo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Salário Novo</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0.00" 
+                        {...field} 
+                        data-testid="input-promocao-salario-novo" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="cargoAnterior"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cargo Anterior</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-promocao-cargo-anterior">
+                          <SelectValue placeholder="Selecione o cargo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cargos.map((cargo) => (
+                          <SelectItem key={cargo.id} value={cargo.nome}>
+                            {cargo.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="cargoNovo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cargo Novo</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-promocao-cargo-novo">
+                          <SelectValue placeholder="Selecione o cargo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cargos.map((cargo) => (
+                          <SelectItem key={cargo.id} value={cargo.nome}>
+                            {cargo.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="nivelAnterior"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nível Anterior</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-promocao-nivel-anterior">
+                          <SelectValue placeholder="Selecione o nível" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {niveis.map((nivel) => (
+                          <SelectItem key={nivel.id} value={nivel.nome}>
+                            {nivel.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="nivelNovo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nível Novo</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-promocao-nivel-novo">
+                          <SelectValue placeholder="Selecione o nível" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {niveis.map((nivel) => (
+                          <SelectItem key={nivel.id} value={nivel.nome}>
+                            {nivel.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="observacoes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Motivo / Observações</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Descreva o motivo da promoção ou observações relevantes..."
+                      className="resize-none"
+                      rows={3}
+                      {...field} 
+                      data-testid="textarea-promocao-observacoes" 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                data-testid="button-promocao-cancel"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={addPromocaoMutation.isPending}
+                data-testid="button-promocao-submit"
+              >
+                {addPromocaoMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Registrar Promoção"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborador: ColaboradorDetail; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+
+  const { data: cargos = [], isLoading: cargosLoading } = useQuery<CargoOption[]>({
+    queryKey: ["/api/rh/cargos"],
+  });
+
+  const { data: niveis = [], isLoading: niveisLoading } = useQuery<NivelOption[]>({
+    queryKey: ["/api/rh/niveis"],
+  });
+
+  const { data: squads = [], isLoading: squadsLoading } = useQuery<SquadOption[]>({
+    queryKey: ["/api/rh/squads"],
+  });
+
+  const { data: estados = [], isLoading: estadosLoading } = useQuery<EstadoOption[]>({
+    queryKey: ["/api/geo/estados"],
+  });
+
+  const { data: systemUsers = [], isLoading: usersLoading } = useQuery<SystemUser[]>({
+    queryKey: ["/api/admin/users"],
+  });
 
   const editColaboradorSchema = insertColaboradorSchema.extend({
     demissao: z.string().optional(),
+    cidade: z.string().optional(),
+    userId: z.string().optional().nullable(),
   }).refine(
     (data) => {
       if (data.status === "Dispensado") {
@@ -96,7 +518,7 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
     }
   );
 
-  const form = useForm<InsertColaborador & { demissao?: string }>({
+  const form = useForm<InsertColaborador & { demissao?: string; cidade?: string; userId?: string | null }>({
     resolver: zodResolver(editColaboradorSchema),
     defaultValues: {
       nome: colaborador.nome || "",
@@ -111,16 +533,24 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
       setor: colaborador.setor || "",
       endereco: colaborador.endereco || "",
       estado: colaborador.estado || "",
+      cidade: (colaborador as any).cidade || "",
       pix: colaborador.pix || "",
       cnpj: colaborador.cnpj || "",
       salario: colaborador.salario || "",
       aniversario: colaborador.aniversario ? new Date(colaborador.aniversario).toISOString().split('T')[0] : undefined,
       admissao: colaborador.admissao ? new Date(colaborador.admissao).toISOString().split('T')[0] : undefined,
       demissao: colaborador.demissao ? new Date(colaborador.demissao).toISOString().split('T')[0] : undefined,
+      userId: colaborador.userId || null,
     },
   });
 
   const status = form.watch("status");
+  const estado = form.watch("estado");
+
+  const { data: cidades = [], isLoading: cidadesLoading } = useQuery<CidadeOption[]>({
+    queryKey: ["/api/geo/cidades", estado],
+    enabled: !!estado,
+  });
 
   useEffect(() => {
     if (status !== "Dispensado") {
@@ -128,8 +558,14 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
     }
   }, [status, form]);
 
+  useEffect(() => {
+    if (estado !== colaborador.estado) {
+      form.setValue("cidade", "", { shouldValidate: false });
+    }
+  }, [estado, colaborador.estado, form]);
+
   const updateMutation = useMutation({
-    mutationFn: async (data: InsertColaborador) => {
+    mutationFn: async (data: InsertColaborador & { userId?: string | null }) => {
       const response = await apiRequest("PATCH", `/api/colaboradores/${colaborador.id}`, data);
       return await response.json();
     },
@@ -151,7 +587,7 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
     },
   });
 
-  const onSubmit = (data: InsertColaborador) => {
+  const onSubmit = (data: InsertColaborador & { userId?: string | null }) => {
     updateMutation.mutate(data);
   };
 
@@ -193,9 +629,11 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Ativo">Ativo</SelectItem>
-                        <SelectItem value="Inativo">Inativo</SelectItem>
-                        <SelectItem value="Dispensado">Dispensado</SelectItem>
+                        {statusOptions.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {status}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -203,6 +641,35 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="userId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Vincular Usuário do Sistema</FormLabel>
+                  <Select 
+                    onValueChange={(value) => field.onChange(value === "__none__" ? null : value)} 
+                    value={field.value || "__none__"}
+                  >
+                    <FormControl>
+                      <SelectTrigger data-testid="select-edit-user">
+                        <SelectValue placeholder={usersLoading ? "Carregando..." : "Selecione um usuário"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="__none__">Nenhum usuário vinculado</SelectItem>
+                      {systemUsers.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.name} ({user.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -269,9 +736,20 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cargo</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-edit-cargo" />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-cargo">
+                          <SelectValue placeholder={cargosLoading ? "Carregando..." : "Selecione o cargo"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cargos.map((cargo) => (
+                          <SelectItem key={cargo.id} value={cargo.nome}>
+                            {cargo.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -282,9 +760,20 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nível</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-edit-nivel" />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-nivel">
+                          <SelectValue placeholder={niveisLoading ? "Carregando..." : "Selecione o nível"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {niveis.map((nivel) => (
+                          <SelectItem key={nivel.id} value={nivel.nome}>
+                            {nivel.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -311,9 +800,20 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Squad</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-edit-squad" />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-squad">
+                          <SelectValue placeholder={squadsLoading ? "Carregando..." : "Selecione o squad"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {squads.map((squad) => (
+                          <SelectItem key={squad.id} value={squad.nome}>
+                            {squad.emoji ? `${squad.emoji} ${squad.nome}` : squad.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -376,9 +876,54 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Estado</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-edit-estado" maxLength={2} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-estado">
+                          <SelectValue placeholder={estadosLoading ? "Carregando..." : "Selecione o estado"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {estados.map((est) => (
+                          <SelectItem key={est.sigla} value={est.sigla}>
+                            {est.sigla} - {est.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="cidade"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cidade</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value || undefined}
+                      disabled={!estado || cidadesLoading}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-cidade">
+                          <SelectValue placeholder={
+                            !estado 
+                              ? "Selecione um estado primeiro" 
+                              : cidadesLoading 
+                                ? "Carregando cidades..." 
+                                : "Selecione a cidade"
+                          } />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cidades.map((cidade) => (
+                          <SelectItem key={cidade.id} value={cidade.nome}>
+                            {cidade.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -509,6 +1054,7 @@ export default function DetailColaborador() {
   const [, params] = useRoute("/colaborador/:id");
   const colaboradorId = params?.id || "";
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addPromocaoDialogOpen, setAddPromocaoDialogOpen] = useState(false);
 
   const { data: colaborador, isLoading, error } = useQuery<ColaboradorDetail>({
     queryKey: ["/api/colaboradores", colaboradorId],
@@ -584,6 +1130,9 @@ export default function DetailColaborador() {
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
               <Avatar className="w-16 h-16">
+                {colaborador.linkedUser?.picture ? (
+                  <AvatarImage src={colaborador.linkedUser.picture} alt={colaborador.nome} />
+                ) : null}
                 <AvatarFallback className="text-xl">{getInitials(colaborador.nome)}</AvatarFallback>
               </Avatar>
               <div>
@@ -643,6 +1192,35 @@ export default function DetailColaborador() {
             value={colaborador.nivel} 
           />
         </div>
+
+        {colaborador.linkedUser && (
+          <Card className="p-6 mb-8">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <UserCircle className="w-5 h-5" />
+              Usuário Vinculado ao Sistema
+            </h2>
+            <div className="flex items-center gap-4">
+              <Avatar className="w-12 h-12">
+                {colaborador.linkedUser.picture ? (
+                  <AvatarImage src={colaborador.linkedUser.picture} alt={colaborador.linkedUser.name} />
+                ) : null}
+                <AvatarFallback>{getInitials(colaborador.linkedUser.name)}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <p className="font-medium text-foreground" data-testid="text-linked-user-name">
+                  {colaborador.linkedUser.name}
+                </p>
+                <p className="text-sm text-muted-foreground flex items-center gap-2" data-testid="text-linked-user-email">
+                  <Mail className="w-4 h-4" />
+                  {colaborador.linkedUser.email}
+                </p>
+              </div>
+              <Badge variant="outline" data-testid="badge-linked-user-role">
+                {colaborador.linkedUser.role}
+              </Badge>
+            </div>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card className="p-6">
@@ -793,6 +1371,75 @@ export default function DetailColaborador() {
         </div>
 
         <Card className="p-6 mb-8">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Histórico de Promoções
+            </h2>
+            <Button 
+              size="sm" 
+              onClick={() => setAddPromocaoDialogOpen(true)}
+              data-testid="button-add-promocao"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Adicionar Promoção
+            </Button>
+          </div>
+          {colaborador.promocoes && colaborador.promocoes.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Salário Anterior</TableHead>
+                    <TableHead>Salário Novo</TableHead>
+                    <TableHead>Cargo Anterior</TableHead>
+                    <TableHead>Cargo Novo</TableHead>
+                    <TableHead>Nível Anterior</TableHead>
+                    <TableHead>Nível Novo</TableHead>
+                    <TableHead>Motivo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {colaborador.promocoes.map((promocao) => (
+                    <TableRow key={promocao.id} data-testid={`row-promocao-${promocao.id}`}>
+                      <TableCell data-testid={`text-promocao-data-${promocao.id}`}>
+                        {formatDateFns(promocao.dataPromocao)}
+                      </TableCell>
+                      <TableCell className="font-mono" data-testid={`text-promocao-salario-anterior-${promocao.id}`}>
+                        {formatCurrency(promocao.salarioAnterior)}
+                      </TableCell>
+                      <TableCell className="font-mono text-green-600 dark:text-green-400" data-testid={`text-promocao-salario-novo-${promocao.id}`}>
+                        {formatCurrency(promocao.salarioNovo)}
+                      </TableCell>
+                      <TableCell data-testid={`text-promocao-cargo-anterior-${promocao.id}`}>
+                        {promocao.cargoAnterior || "-"}
+                      </TableCell>
+                      <TableCell data-testid={`text-promocao-cargo-novo-${promocao.id}`}>
+                        {promocao.cargoNovo || "-"}
+                      </TableCell>
+                      <TableCell data-testid={`text-promocao-nivel-anterior-${promocao.id}`}>
+                        {promocao.nivelAnterior || "-"}
+                      </TableCell>
+                      <TableCell data-testid={`text-promocao-nivel-novo-${promocao.id}`}>
+                        {promocao.nivelNovo || "-"}
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate" title={promocao.observacoes || undefined} data-testid={`text-promocao-observacoes-${promocao.id}`}>
+                        {promocao.observacoes || "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8" data-testid="text-no-promocoes">
+              Nenhum histórico de promoção registrado
+            </p>
+          )}
+        </Card>
+
+        <Card className="p-6 mb-8">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Package className="w-5 h-5" />
             Ativos / Patrimônios
@@ -804,7 +1451,8 @@ export default function DetailColaborador() {
                   <TableRow>
                     <TableHead>ID</TableHead>
                     <TableHead>Número Ativo</TableHead>
-                    <TableHead>Descrição</TableHead>
+                    <TableHead>Equipamento</TableHead>
+                    <TableHead>Marca</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
@@ -818,8 +1466,11 @@ export default function DetailColaborador() {
                       <TableCell className="font-mono" data-testid={`text-patrimonio-numero-${patrimonio.id}`}>
                         {patrimonio.numeroAtivo || "-"}
                       </TableCell>
-                      <TableCell data-testid={`text-patrimonio-descricao-${patrimonio.id}`}>
-                        {patrimonio.descricao || "-"}
+                      <TableCell data-testid={`text-patrimonio-ativo-${patrimonio.id}`}>
+                        {patrimonio.ativo || patrimonio.descricao || "-"}
+                      </TableCell>
+                      <TableCell data-testid={`text-patrimonio-marca-${patrimonio.id}`}>
+                        {patrimonio.marca || "-"}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" data-testid={`badge-patrimonio-status-${patrimonio.id}`}>
@@ -829,6 +1480,7 @@ export default function DetailColaborador() {
                       <TableCell>
                         <Link href={`/patrimonio/${patrimonio.id}`}>
                           <Button variant="ghost" size="sm" data-testid={`button-view-patrimonio-${patrimonio.id}`}>
+                            <ExternalLink className="w-4 h-4 mr-2" />
                             Ver detalhes
                           </Button>
                         </Link>
@@ -849,6 +1501,12 @@ export default function DetailColaborador() {
           colaborador={colaborador} 
           open={editDialogOpen} 
           onOpenChange={setEditDialogOpen} 
+        />
+
+        <AddPromocaoDialog
+          colaborador={colaborador}
+          open={addPromocaoDialogOpen}
+          onOpenChange={setAddPromocaoDialogOpen}
         />
       </div>
     </div>
