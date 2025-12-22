@@ -6792,7 +6792,7 @@ export class DbStorage implements IStorage {
           entity: 'acesso',
           label: r.name || 'Cliente',
           description: r.cnpj || undefined,
-          route: '/acessos',
+          route: `/acessos?client=${r.id}`,
         });
       }
     } catch (e) {
@@ -6802,7 +6802,7 @@ export class DbStorage implements IStorage {
     // Search credenciais (credentials table)
     try {
       const credenciaisResult = await db.execute(sql`
-        SELECT cr.id::text, cr.platform, cr.username, c.name as client_name
+        SELECT cr.id::text, cr.platform, cr.username, c.name as client_name, cr.client_id::text
         FROM credentials cr
         LEFT JOIN clients c ON cr.client_id = c.id
         WHERE cr.platform ILIKE ${searchTerm} OR cr.username ILIKE ${searchTerm} OR c.name ILIKE ${searchTerm}
@@ -6815,7 +6815,7 @@ export class DbStorage implements IStorage {
           entity: 'credencial',
           label: r.platform || 'Credencial',
           description: r.client_name ? `${r.username} - ${r.client_name}` : r.username || undefined,
-          route: '/acessos',
+          route: r.client_id ? `/acessos?client=${r.client_id}&credential=${r.id}` : '/acessos',
         });
       }
     } catch (e) {

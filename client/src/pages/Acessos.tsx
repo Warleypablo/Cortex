@@ -1531,6 +1531,24 @@ function ClientsTab() {
     queryKey: ["/api/acessos/clients"],
   });
 
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const clientId = urlParams.get('client');
+    if (clientId && clients.length > 0) {
+      const clientExists = clients.some(c => c.id === clientId);
+      if (clientExists) {
+        setExpandedClient(clientId);
+        setTimeout(() => {
+          const element = document.querySelector(`[data-testid="row-client-${clientId}"]`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+        window.history.replaceState({}, '', '/acessos');
+      }
+    }
+  }, [clients]);
+
   const deleteClientMutation = useMutation({
     mutationFn: async (clientId: string) => {
       await apiRequest("DELETE", `/api/acessos/clients/${clientId}`);
