@@ -1058,6 +1058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mesesDeTurbo: row.meses_de_turbo,
         ultimoAumento: row.ultimo_aumento,
         mesesUltAumento: row.meses_ult_aumento,
+        salario: row.salario,
         patrimonios: row.patrimonios || [],
       };
       

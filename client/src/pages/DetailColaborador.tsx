@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign } from "lucide-react";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { z } from "zod";
@@ -113,6 +113,7 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
       estado: colaborador.estado || "",
       pix: colaborador.pix || "",
       cnpj: colaborador.cnpj || "",
+      salario: colaborador.salario || "",
       aniversario: colaborador.aniversario ? new Date(colaborador.aniversario).toISOString().split('T')[0] : undefined,
       admissao: colaborador.admissao ? new Date(colaborador.admissao).toISOString().split('T')[0] : undefined,
       demissao: colaborador.demissao ? new Date(colaborador.demissao).toISOString().split('T')[0] : undefined,
@@ -335,6 +336,26 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
+                name="salario"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Salário</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        value={field.value || ""} 
+                        data-testid="input-edit-salario" 
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
                 name="cnpj"
                 render={({ field }) => (
                   <FormItem>
@@ -346,6 +367,9 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                   </FormItem>
                 )}
               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="estado"
@@ -747,9 +771,18 @@ export default function DetailColaborador() {
               )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <p className="text-sm text-muted-foreground">Salário</p>
+                  <p className="font-medium flex items-center gap-2" data-testid="text-prof-salario">
+                    <DollarSign className="w-4 h-4 text-green-500" />
+                    {colaborador.salario ? `R$ ${parseFloat(colaborador.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
+                  </p>
+                </div>
+                <div>
                   <p className="text-sm text-muted-foreground">Último Aumento</p>
                   <p className="font-medium" data-testid="text-prof-ultimo-aumento">{formatDate(colaborador.ultimoAumento)}</p>
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">CNPJ</p>
                   <p className="font-medium font-mono" data-testid="text-prof-cnpj">{colaborador.cnpj || "-"}</p>
