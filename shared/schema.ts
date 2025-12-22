@@ -158,6 +158,7 @@ export const rhPessoal = pgTable("rh_pessoal", {
   cpf: varchar("cpf", { length: 14 }),
   endereco: text("endereco"),
   estado: varchar("estado", { length: 2 }),
+  cidade: varchar("cidade", { length: 100 }),
   telefone: varchar("telefone", { length: 20 }),
   aniversario: date("aniversario"),
   admissao: date("admissao"),
@@ -178,7 +179,65 @@ export const rhPessoal = pgTable("rh_pessoal", {
   ultimoAumento: date("ultimo_aumento"),
   mesesUltAumento: integer("meses_ult_aumento"),
   salario: decimal("salario"),
+  userId: varchar("user_id", { length: 100 }),
 });
+
+// Tabela de cargos disponíveis
+export const rhCargos = pgTable("rh_cargos", {
+  id: integer("id").primaryKey(),
+  nome: varchar("nome", { length: 100 }).notNull(),
+  descricao: text("descricao"),
+  ativo: text("ativo").default("true"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+// Tabela de níveis disponíveis
+export const rhNiveis = pgTable("rh_niveis", {
+  id: integer("id").primaryKey(),
+  nome: varchar("nome", { length: 50 }).notNull(),
+  ordem: integer("ordem").default(0),
+  ativo: text("ativo").default("true"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+// Tabela de squads disponíveis
+export const rhSquads = pgTable("rh_squads", {
+  id: integer("id").primaryKey(),
+  nome: varchar("nome", { length: 100 }).notNull(),
+  descricao: text("descricao"),
+  ativo: text("ativo").default("true"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+// Tabela de histórico de promoções
+export const rhPromocoes = pgTable("rh_promocoes", {
+  id: integer("id").primaryKey(),
+  colaboradorId: integer("colaborador_id").notNull(),
+  dataPromocao: date("data_promocao").notNull(),
+  cargoAnterior: varchar("cargo_anterior", { length: 100 }),
+  cargoNovo: varchar("cargo_novo", { length: 100 }),
+  nivelAnterior: varchar("nivel_anterior", { length: 50 }),
+  nivelNovo: varchar("nivel_novo", { length: 50 }),
+  salarioAnterior: decimal("salario_anterior"),
+  salarioNovo: decimal("salario_novo"),
+  observacoes: text("observacoes"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  criadoPor: varchar("criado_por", { length: 100 }),
+});
+
+export const insertRhCargoSchema = createInsertSchema(rhCargos).omit({ id: true, criadoEm: true });
+export const insertRhNivelSchema = createInsertSchema(rhNiveis).omit({ id: true, criadoEm: true });
+export const insertRhSquadSchema = createInsertSchema(rhSquads).omit({ id: true, criadoEm: true });
+export const insertRhPromocaoSchema = createInsertSchema(rhPromocoes).omit({ id: true, criadoEm: true });
+
+export type RhCargo = typeof rhCargos.$inferSelect;
+export type InsertRhCargo = z.infer<typeof insertRhCargoSchema>;
+export type RhNivel = typeof rhNiveis.$inferSelect;
+export type InsertRhNivel = z.infer<typeof insertRhNivelSchema>;
+export type RhSquad = typeof rhSquads.$inferSelect;
+export type InsertRhSquad = z.infer<typeof insertRhSquadSchema>;
+export type RhPromocao = typeof rhPromocoes.$inferSelect;
+export type InsertRhPromocao = z.infer<typeof insertRhPromocaoSchema>;
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
