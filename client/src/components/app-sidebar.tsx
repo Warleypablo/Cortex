@@ -70,12 +70,12 @@ const menuItems = [
   },
   {
     title: "Conhecimento",
-    url: "/conhecimento",
+    url: "/conhecimentos",
     icon: Layers,
   },
   {
     title: "Clube Benefícios",
-    url: "/clube-beneficios",
+    url: "/beneficios",
     icon: Gift,
   },
 ];
