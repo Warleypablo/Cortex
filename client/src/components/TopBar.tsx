@@ -2,14 +2,6 @@ import { useState } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -151,6 +143,11 @@ export default function TopBar() {
     queryKey: ["/api/auth/me"],
   });
 
+  const { data: colaboradorData } = useQuery<{ colaboradorId: number }>({
+    queryKey: ["/api/colaboradores/by-user", user?.id],
+    enabled: !!user?.id,
+  });
+
   const handleLogout = async () => {
     try {
       await apiRequest("POST", "/auth/logout");
@@ -158,6 +155,12 @@ export default function TopBar() {
       window.location.reload();
     } catch (error) {
       console.error("Logout error:", error);
+    }
+  };
+
+  const handleUserClick = () => {
+    if (colaboradorData?.colaboradorId) {
+      setLocation(`/colaborador/${colaboradorData.colaboradorId}`);
     }
   };
 
@@ -224,35 +227,29 @@ export default function TopBar() {
         </div>
         
         {user && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <Tooltip>
+            <TooltipTrigger asChild>
               <button
-                className="flex items-center gap-2 p-1.5 rounded-full hover:bg-muted transition-colors"
-                data-testid="button-user-menu"
+                onClick={handleUserClick}
+                className={`flex items-center gap-2 p-1.5 rounded-full border border-border bg-background hover:bg-muted transition-colors ${
+                  colaboradorData?.colaboradorId ? 'cursor-pointer' : 'cursor-default'
+                }`}
+                data-testid="button-user-profile"
+                aria-label="Meu perfil"
               >
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user.picture} alt={user.name} />
                   <AvatarFallback>{getUserInitials(user.name)}</AvatarFallback>
                 </Avatar>
-                <span className="text-sm font-medium hidden sm:inline-block">
+                <span className="text-sm font-medium hidden sm:inline-block pr-1">
                   {user.name}
                 </span>
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">{user.name}</p>
-                  <p className="text-xs text-muted-foreground">{user.email}</p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} data-testid="button-logout-menu">
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Sair</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </TooltipTrigger>
+            <TooltipContent>
+              {colaboradorData?.colaboradorId ? 'Ver meu perfil' : user.name}
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
       
