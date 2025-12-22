@@ -15,21 +15,21 @@ const ferramentas: Ferramenta[] = [
     id: "1",
     nome: "Moniturbo",
     descricao: "Sistema de monitoramento e análise de performance",
-    url: "#", // Placeholder - será atualizado depois com URL real
+    url: "https://moniturbo.turbopartners.com.br/",
     icon: Activity,
   },
   {
     id: "2",
     nome: "Sistema de Acessos",
     descricao: "Gerenciamento de permissões e autenticação",
-    url: "#", // Placeholder - será atualizado depois com URL real
+    url: "#",
     icon: Key,
   },
   {
     id: "3",
     nome: "UGC Hub",
     descricao: "Central de conteúdo gerado por usuários",
-    url: "#", // Placeholder - será atualizado depois com URL real
+    url: "#",
     icon: MessageSquare,
   },
   {
@@ -41,9 +41,9 @@ const ferramentas: Ferramenta[] = [
   },
   {
     id: "5",
-    nome: "Turbo Dash",
-    descricao: "Dashboard de métricas e KPIs",
-    url: "#", // Placeholder - será atualizado depois com URL real
+    nome: "Turbo Commerce",
+    descricao: "Dashboard de métricas e KPIs de e-commerce",
+    url: "https://app.turbodash.com.br/",
     icon: BarChart3,
   },
 ];
