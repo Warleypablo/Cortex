@@ -263,7 +263,7 @@ export default function DashboardSDRs() {
       case 1: return "border-yellow-500/50 shadow-yellow-500/20";
       case 2: return "border-gray-400/50 shadow-gray-400/20";
       case 3: return "border-amber-600/50 shadow-amber-600/20";
-      default: return "border-slate-700/50";
+      default: return "border-border/50";
     }
   };
 
@@ -271,7 +271,7 @@ export default function DashboardSDRs() {
     switch (trend) {
       case 'up': return <ChevronUp className="w-4 h-4 text-emerald-400" />;
       case 'down': return <ChevronDown className="w-4 h-4 text-rose-400" />;
-      default: return <Minus className="w-4 h-4 text-slate-400" />;
+      default: return <Minus className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -281,8 +281,8 @@ export default function DashboardSDRs() {
     (pipeline && pipeline !== "all") || (sdrId && sdrId !== "all");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="min-h-screen bg-background text-foreground overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none dark:block hidden">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-teal-600/5 rounded-full blur-3xl" />
@@ -297,7 +297,7 @@ export default function DashboardSDRs() {
               transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
             >
               <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-600 to-teal-700 shadow-2xl shadow-cyan-600/30">
-                <Headphones className="w-10 h-10 text-white" />
+                <Headphones className="w-10 h-10 text-foreground" />
               </div>
               <motion.div
                 className="absolute -top-1 -right-1"
@@ -311,19 +311,19 @@ export default function DashboardSDRs() {
               <span className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-cyan-200 to-cyan-400 bg-clip-text text-transparent">
                 ARENA DOS SDRs
               </span>
-              <p className="text-slate-400 text-lg mt-1">
+              <p className="text-muted-foreground text-lg mt-1">
                 Quem agendará mais reuniões?
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-xl px-2 py-1">
+            <div className="flex items-center gap-2 bg-card border border-border rounded-xl px-2 py-1">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navegarMes('anterior')}
-                className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
                 data-testid="button-mes-anterior"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -331,7 +331,7 @@ export default function DashboardSDRs() {
               
               <div className="flex items-center gap-2 px-3 min-w-[180px] justify-center">
                 <Calendar className="w-4 h-4 text-cyan-400" />
-                <span className="text-white font-semibold capitalize" data-testid="text-mes-atual">
+                <span className="text-foreground font-semibold capitalize" data-testid="text-mes-atual">
                   {mesAtual}
                 </span>
               </div>
@@ -340,7 +340,7 @@ export default function DashboardSDRs() {
                 variant="ghost"
                 size="icon"
                 onClick={() => navegarMes('proximo')}
-                className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
                 data-testid="button-mes-proximo"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -350,7 +350,7 @@ export default function DashboardSDRs() {
                 variant="ghost"
                 size="sm"
                 onClick={irParaMesAtual}
-                className="text-xs text-cyan-400 hover:text-cyan-300 hover:bg-slate-700 ml-1"
+                className="text-xs text-cyan-400 hover:text-cyan-300 hover:bg-muted ml-1"
                 data-testid="button-mes-atual"
               >
                 Hoje
@@ -358,10 +358,10 @@ export default function DashboardSDRs() {
             </div>
 
             <div className="text-right">
-              <div className="text-2xl font-mono font-bold text-white">
+              <div className="text-2xl font-mono font-bold text-foreground">
                 {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
               </div>
-              <div className="text-slate-400 text-xs">
+              <div className="text-muted-foreground text-xs">
                 {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric" })}
               </div>
             </div>
@@ -387,7 +387,7 @@ export default function DashboardSDRs() {
               variant="outline"
               size="icon"
               onClick={() => setShowFilters(!showFilters)}
-              className={`relative border-slate-700 bg-slate-800/50 hover:bg-slate-700/50 ${hasActiveFilters ? 'border-cyan-500' : ''}`}
+              className={`relative border-border bg-muted/50 hover:bg-muted/50 ${hasActiveFilters ? 'border-cyan-500' : ''}`}
               data-testid="button-toggle-filters"
             >
               <Filter className="w-5 h-5" />
@@ -406,17 +406,17 @@ export default function DashboardSDRs() {
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <Card className="bg-slate-900/80 border-slate-700/50 backdrop-blur-sm" data-testid="card-filters">
+              <Card className="bg-card border-border/50 backdrop-blur-sm" data-testid="card-filters">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <Filter className="w-4 h-4" /> Filtros Independentes
                     </span>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowFilters(false)}
-                      className="text-slate-400 hover:text-white"
+                      className="text-muted-foreground hover:text-foreground"
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -433,7 +433,7 @@ export default function DashboardSDRs() {
                         <DateRangePicker
                           value={dateRangeReuniao}
                           onChange={setDateRangeReuniao}
-                          triggerClassName="h-8 bg-slate-800 border-slate-700 text-white text-sm w-full"
+                          triggerClassName="h-8 bg-muted border-border text-foreground text-sm w-full"
                           placeholder="Selecione o período"
                           numberOfMonths={2}
                         />
@@ -447,7 +447,7 @@ export default function DashboardSDRs() {
                         <DateRangePicker
                           value={dateRangeLead}
                           onChange={setDateRangeLead}
-                          triggerClassName="h-8 bg-slate-800 border-slate-700 text-white text-sm w-full"
+                          triggerClassName="h-8 bg-muted border-border text-foreground text-sm w-full"
                           placeholder="Selecione o período"
                           numberOfMonths={2}
                         />
@@ -457,12 +457,12 @@ export default function DashboardSDRs() {
                     {/* Other filters */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-xs text-slate-400">Origem</Label>
+                        <Label className="text-xs text-muted-foreground">Origem</Label>
                         <Select value={source} onValueChange={setSource}>
-                          <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-source">
+                          <SelectTrigger className="h-8 bg-muted border-border text-foreground text-sm" data-testid="select-source">
                             <SelectValue placeholder="Todas" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectContent className="bg-muted border-border">
                             <SelectItem value="all">Todas</SelectItem>
                             {sources?.filter(s => s && s.trim() !== '').map((s) => (
                               <SelectItem key={s} value={s}>{s}</SelectItem>
@@ -471,12 +471,12 @@ export default function DashboardSDRs() {
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-slate-400">Pipeline</Label>
+                        <Label className="text-xs text-muted-foreground">Pipeline</Label>
                         <Select value={pipeline} onValueChange={setPipeline}>
-                          <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-pipeline">
+                          <SelectTrigger className="h-8 bg-muted border-border text-foreground text-sm" data-testid="select-pipeline">
                             <SelectValue placeholder="Todas" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectContent className="bg-muted border-border">
                             <SelectItem value="all">Todas</SelectItem>
                             {pipelines?.filter(p => p && p.trim() !== '').map((p) => (
                               <SelectItem key={p} value={p}>{p}</SelectItem>
@@ -485,12 +485,12 @@ export default function DashboardSDRs() {
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-slate-400">SDR</Label>
+                        <Label className="text-xs text-muted-foreground">SDR</Label>
                         <Select value={sdrId} onValueChange={setSdrId}>
-                          <SelectTrigger className="h-8 bg-slate-800 border-slate-700 text-white text-sm" data-testid="select-sdr">
+                          <SelectTrigger className="h-8 bg-muted border-border text-foreground text-sm" data-testid="select-sdr">
                             <SelectValue placeholder="Todos" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectContent className="bg-muted border-border">
                             <SelectItem value="all">Todos</SelectItem>
                             {sdrs?.filter(s => s.active).map((s) => (
                               <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
@@ -503,7 +503,7 @@ export default function DashboardSDRs() {
                           variant="outline"
                           size="sm"
                           onClick={clearFilters}
-                          className="h-8 border-slate-700 text-slate-300 hover:bg-slate-700 w-full"
+                          className="h-8 border-border text-muted-foreground hover:bg-muted w-full"
                           data-testid="button-clear-filters"
                         >
                           <RotateCcw className="w-3 h-3 mr-1" />
@@ -548,22 +548,22 @@ export default function DashboardSDRs() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 * index }}
             >
-              <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 backdrop-blur-sm border border-slate-800 p-5">
+              <div className="relative overflow-hidden rounded-2xl bg-card/60 backdrop-blur-sm border border-border p-5">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-10 rounded-full -translate-y-1/2 translate-x-1/2"
                      style={{ backgroundImage: `linear-gradient(to bottom right, var(--tw-gradient-stops))` }} />
                 
                 <div className="flex items-center gap-3 mb-3">
                   <div className={`p-2.5 rounded-xl bg-gradient-to-br ${kpi.gradient} shadow-lg`}>
-                    <kpi.icon className="w-5 h-5 text-white" />
+                    <kpi.icon className="w-5 h-5 text-foreground" />
                   </div>
-                  <span className="text-sm font-medium text-slate-400">{kpi.label}</span>
+                  <span className="text-sm font-medium text-muted-foreground">{kpi.label}</span>
                 </div>
                 
                 {isLoading ? (
-                  <Skeleton className="h-10 w-32 bg-slate-800" />
+                  <Skeleton className="h-10 w-32 bg-muted" />
                 ) : (
                   <motion.div
-                    className="text-4xl font-black text-white"
+                    className="text-4xl font-black text-foreground"
                     initial={{ scale: 0.5 }}
                     animate={{ scale: 1 }}
                     transition={{ type: "spring", stiffness: 200, delay: 0.2 + 0.1 * index }}
@@ -581,7 +581,7 @@ export default function DashboardSDRs() {
           <div>
             <div className="mb-4 flex items-center gap-2">
               <Trophy className="w-5 h-5 text-yellow-500" />
-              <h2 className="text-xl font-bold text-white">Pódio dos Campeões</h2>
+              <h2 className="text-xl font-bold text-foreground">Pódio dos Campeões</h2>
               <motion.div
                 animate={{ rotate: [0, 15, -15, 0] }}
                 transition={{ duration: 1, repeat: Infinity, repeatDelay: 2 }}
@@ -593,7 +593,7 @@ export default function DashboardSDRs() {
             {isLoading ? (
               <div className="grid grid-cols-3 gap-4">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-64 rounded-2xl bg-slate-800" />
+                  <Skeleton key={i} className="h-64 rounded-2xl bg-muted" />
                 ))}
               </div>
             ) : top3.length > 0 ? (
@@ -627,30 +627,30 @@ export default function DashboardSDRs() {
                             </motion.div>
                           )}
                           
-                          <Badge className={`${badgeColors[visualIndex]} text-white text-xs mb-2 font-bold`}>
+                          <Badge className={`${badgeColors[visualIndex]} text-foreground text-xs mb-2 font-bold`}>
                             {badges[visualIndex]}
                           </Badge>
                           
-                          <h3 className={`${sizes[visualIndex]} font-black text-white mb-1 leading-tight`}>
+                          <h3 className={`${sizes[visualIndex]} font-black text-foreground mb-1 leading-tight`}>
                             {sdr.name.split(' ').slice(0, 2).join(' ')}
                           </h3>
                         </div>
                         
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
-                            <span className="text-slate-400 text-sm">Reuniões</span>
+                            <span className="text-muted-foreground text-sm">Reuniões</span>
                             <span className="text-2xl font-black text-cyan-400">
                               {sdr.reunioesRealizadas}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-slate-400 text-xs">MRR</span>
+                            <span className="text-muted-foreground text-xs">MRR</span>
                             <span className="text-sm font-semibold text-emerald-400">
                               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(sdr.mrr)}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-slate-400 text-xs">Leads</span>
+                            <span className="text-muted-foreground text-xs">Leads</span>
                             <span className="text-sm font-semibold text-blue-400">
                               {sdr.leads}
                             </span>
@@ -662,8 +662,8 @@ export default function DashboardSDRs() {
                 })}
               </div>
             ) : (
-              <div className="flex items-center justify-center h-64 rounded-2xl bg-slate-900/50 border border-slate-800">
-                <p className="text-slate-400">Nenhum dado disponível</p>
+              <div className="flex items-center justify-center h-64 rounded-2xl bg-card/50 border border-border">
+                <p className="text-muted-foreground">Nenhum dado disponível</p>
               </div>
             )}
           </div>
@@ -671,11 +671,11 @@ export default function DashboardSDRs() {
           <div>
             <div className="mb-4 flex items-center gap-2">
               <Zap className="w-5 h-5 text-cyan-400" />
-              <h2 className="text-xl font-bold text-white">Ranking Completo</h2>
+              <h2 className="text-xl font-bold text-foreground">Ranking Completo</h2>
             </div>
 
-            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden">
-              <div className="grid grid-cols-12 gap-1 p-3 bg-slate-800/50 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
+            <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl overflow-hidden">
+              <div className="grid grid-cols-12 gap-1 p-3 bg-muted/50 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-1">#</div>
                 <div className="col-span-2">SDR</div>
                 <div className="col-span-2 text-right text-cyan-400">Reuniões</div>
@@ -686,11 +686,11 @@ export default function DashboardSDRs() {
                 <div className="col-span-1 text-right">Leads</div>
               </div>
 
-              <div className="divide-y divide-slate-800/50 max-h-[400px] overflow-y-auto">
+              <div className="divide-y divide-border max-h-[400px] overflow-y-auto">
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="p-3">
-                      <Skeleton className="h-8 bg-slate-800" />
+                      <Skeleton className="h-8 bg-muted" />
                     </div>
                   ))
                 ) : ranking.length > 0 ? (
@@ -700,7 +700,7 @@ export default function DashboardSDRs() {
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.05 * index }}
-                      className={`grid grid-cols-12 gap-1 p-2 items-center hover:bg-slate-800/30 transition-colors ${
+                      className={`grid grid-cols-12 gap-1 p-2 items-center hover:bg-muted/30 transition-colors ${
                         sdr.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(sdr.position) : ''
                       }`}
                       data-testid={`ranking-row-${index}`}
@@ -713,10 +713,10 @@ export default function DashboardSDRs() {
                             {sdr.position === 3 && <Medal className="w-3 h-3 text-amber-600" />}
                           </div>
                         ) : (
-                          <span className="text-slate-500 font-mono text-xs">{sdr.position}</span>
+                          <span className="text-muted-foreground font-mono text-xs">{sdr.position}</span>
                         )}
                       </div>
-                      <div className="col-span-2 font-medium text-white truncate text-xs">
+                      <div className="col-span-2 font-medium text-foreground truncate text-xs">
                         {sdr.name}
                       </div>
                       <div className="col-span-2 text-right font-black text-cyan-400 text-sm">
@@ -737,19 +737,19 @@ export default function DashboardSDRs() {
                           className={`text-[10px] border-0 px-1 ${
                             sdr.conversaoVendas >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
                             sdr.conversaoVendas >= 15 ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-slate-700/50 text-slate-400'
+                            'bg-muted/50 text-muted-foreground'
                           }`}
                         >
                           {sdr.conversaoVendas.toFixed(0)}%
                         </Badge>
                       </div>
-                      <div className="col-span-1 text-right text-slate-300 text-xs">
+                      <div className="col-span-1 text-right text-muted-foreground text-xs">
                         {sdr.leads}
                       </div>
                     </motion.div>
                   ))
                 ) : (
-                  <div className="p-8 text-center text-slate-400">
+                  <div className="p-8 text-center text-muted-foreground">
                     Nenhum SDR encontrado
                   </div>
                 )}
@@ -766,7 +766,7 @@ export default function DashboardSDRs() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.6 }}
         >
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/50 p-8">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-card via-muted to-card border border-border/50 p-8">
             {/* Background effects */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
               <div className="absolute -top-20 -left-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl" />
@@ -797,17 +797,17 @@ export default function DashboardSDRs() {
                     animate={{ scale: [1, 1.05, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}
                   >
-                    <Target className="w-8 h-8 text-white" />
+                    <Target className="w-8 h-8 text-foreground" />
                   </motion.div>
                   <div>
-                    <h2 className="text-3xl font-black text-white">META DO MÊS</h2>
-                    <p className="text-slate-400 text-lg">Reuniões Realizadas</p>
+                    <h2 className="text-3xl font-black text-foreground">META DO MÊS</h2>
+                    <p className="text-muted-foreground text-lg">Reuniões Realizadas</p>
                   </div>
                 </div>
                 
                 <div className="text-right">
-                  <div className="text-sm text-slate-400 uppercase tracking-wider mb-1">Meta</div>
-                  <div className="text-4xl font-black text-white">{META_REUNIOES} reuniões</div>
+                  <div className="text-sm text-muted-foreground uppercase tracking-wider mb-1">Meta</div>
+                  <div className="text-4xl font-black text-foreground">{META_REUNIOES} reuniões</div>
                 </div>
               </div>
 
@@ -820,7 +820,7 @@ export default function DashboardSDRs() {
                 
                 return (
                   <>
-                    <div className="relative h-16 bg-slate-800/80 rounded-2xl overflow-hidden border border-slate-700/50">
+                    <div className="relative h-16 bg-muted/80 rounded-2xl overflow-hidden border border-border/50">
                       {/* Progress fill */}
                       <motion.div
                         className={`absolute inset-y-0 left-0 rounded-2xl ${
@@ -847,7 +847,7 @@ export default function DashboardSDRs() {
                       {/* Percentage display in bar */}
                       <div className="absolute inset-0 flex items-center justify-center">
                         <motion.span 
-                          className="text-3xl font-black text-white drop-shadow-lg"
+                          className="text-3xl font-black text-foreground drop-shadow-lg"
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
                           transition={{ delay: 1.5, type: "spring", stiffness: 200 }}
@@ -860,7 +860,7 @@ export default function DashboardSDRs() {
                       {[25, 50, 75, 100].map((milestone) => (
                         <div
                           key={milestone}
-                          className="absolute top-0 bottom-0 w-px bg-slate-600/50"
+                          className="absolute top-0 bottom-0 w-px bg-border/50"
                           style={{ left: `${milestone}%` }}
                         />
                       ))}
@@ -870,7 +870,7 @@ export default function DashboardSDRs() {
                     <div className="flex items-center justify-between mt-6">
                       <div className="flex items-center gap-8">
                         <div>
-                          <div className="text-sm text-slate-400 uppercase tracking-wider mb-1">Conquistado</div>
+                          <div className="text-sm text-muted-foreground uppercase tracking-wider mb-1">Conquistado</div>
                           <motion.div 
                             className="text-4xl font-black text-cyan-400"
                             initial={{ opacity: 0 }}
@@ -883,7 +883,7 @@ export default function DashboardSDRs() {
                         
                         {!atingida && (
                           <div>
-                            <div className="text-sm text-slate-400 uppercase tracking-wider mb-1">Faltam</div>
+                            <div className="text-sm text-muted-foreground uppercase tracking-wider mb-1">Faltam</div>
                             <motion.div 
                               className="text-4xl font-black text-amber-400"
                               initial={{ opacity: 0 }}
@@ -944,14 +944,14 @@ export default function DashboardSDRs() {
 
           {/* Footer */}
           <div className="flex items-center justify-center gap-4 mt-4">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               Atualizado automaticamente a cada minuto
             </p>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => triggerTest()}
-              className="text-slate-500 hover:text-cyan-400 gap-1"
+              className="text-muted-foreground hover:text-cyan-400 gap-1"
               data-testid="button-test-celebration"
             >
               <Bell className="w-4 h-4" />

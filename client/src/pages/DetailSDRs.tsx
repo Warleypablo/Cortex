@@ -365,7 +365,7 @@ export default function DetailSDRs() {
   })) || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white relative overflow-hidden" data-testid="page-detail-sdrs">
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden" data-testid="page-detail-sdrs">
       <FloatingParticles />
 
       <div className="relative z-10 p-6 lg:p-8">
@@ -376,7 +376,7 @@ export default function DetailSDRs() {
         >
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500">
-              <Users className="h-6 w-6 text-white" />
+              <Users className="h-6 w-6 text-foreground" />
             </div>
           </div>
         </motion.div>
@@ -387,16 +387,16 @@ export default function DetailSDRs() {
           transition={{ delay: 0.1 }}
           className="mb-8"
         >
-          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-xl" data-testid="card-filters">
+          <Card className="bg-muted/50 border-border backdrop-blur-xl" data-testid="card-filters">
             <CardContent className="p-6">
               <div className="flex flex-wrap items-end gap-4">
                 <div className="flex-1 min-w-[200px]" data-testid="filter-sdr">
-                  <Label className="text-slate-300 mb-2 block">
+                  <Label className="text-muted-foreground mb-2 block">
                     <User className="h-4 w-4 inline mr-2" />
                     SDR
                   </Label>
                   <Select value={sdrId} onValueChange={setSdrId}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="select-sdr">
+                    <SelectTrigger className="bg-muted border-border text-foreground" data-testid="select-sdr">
                       <SelectValue placeholder="Selecione um SDR" />
                     </SelectTrigger>
                     <SelectContent>
@@ -414,14 +414,14 @@ export default function DetailSDRs() {
                 </div>
 
                 <div className="min-w-[280px]" data-testid="filter-date-range">
-                  <Label className="text-slate-300 mb-2 block">
+                  <Label className="text-muted-foreground mb-2 block">
                     <CalendarDays className="h-4 w-4 inline mr-2" />
                     Período
                   </Label>
                   <DateRangePicker
                     value={dateRange}
                     onChange={setDateRange}
-                    triggerClassName="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                    triggerClassName="bg-muted border-border text-foreground hover:bg-muted"
                     placeholder="Selecione o período"
                   />
                 </div>
@@ -429,7 +429,7 @@ export default function DetailSDRs() {
                 <Button
                   variant="outline"
                   onClick={limparFiltros}
-                  className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                  className="border-border text-muted-foreground hover:bg-muted"
                   data-testid="button-limpar-filtros"
                 >
                   <RotateCcw className="h-4 w-4 mr-2" />
@@ -446,17 +446,17 @@ export default function DetailSDRs() {
             animate={{ opacity: 1 }}
             className="flex flex-col items-center justify-center py-20"
           >
-            <div className="p-6 rounded-full bg-slate-800/50 mb-6">
-              <Users className="h-16 w-16 text-slate-500" />
+            <div className="p-6 rounded-full bg-muted/50 mb-6">
+              <Users className="h-16 w-16 text-muted-foreground" />
             </div>
-            <h2 className="text-2xl font-semibold text-slate-400 mb-2" data-testid="text-select-sdr">Selecione um SDR</h2>
-            <p className="text-slate-500">Escolha um SDR acima para visualizar suas métricas detalhadas</p>
+            <h2 className="text-2xl font-semibold text-muted-foreground mb-2" data-testid="text-select-sdr">Selecione um SDR</h2>
+            <p className="text-muted-foreground">Escolha um SDR acima para visualizar suas métricas detalhadas</p>
           </motion.div>
         ) : isLoadingMetrics ? (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-40 bg-slate-800" />
+                <Skeleton key={i} className="h-40 bg-muted" />
               ))}
             </div>
           </div>
@@ -474,14 +474,14 @@ export default function DetailSDRs() {
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-2xl font-bold shadow-lg shadow-cyan-500/30">
                     {metrics.sdrName?.charAt(0).toUpperCase() || "?"}
                   </div>
-                  <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-slate-900 flex items-center justify-center">
-                    <Zap className="h-3 w-3 text-white" />
+                  <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-background flex items-center justify-center">
+                    <Zap className="h-3 w-3 text-foreground" />
                   </div>
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-white" data-testid="text-sdr-name">{metrics.sdrName}</h2>
+                  <h2 className="text-2xl font-bold text-foreground" data-testid="text-sdr-name">{metrics.sdrName}</h2>
                   {metrics.sdrEmail && (
-                    <p className="text-slate-400" data-testid="text-sdr-email">{metrics.sdrEmail}</p>
+                    <p className="text-muted-foreground" data-testid="text-sdr-email">{metrics.sdrEmail}</p>
                   )}
                 </div>
               </div>
@@ -492,7 +492,7 @@ export default function DetailSDRs() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
                 >
-                  <Card className="relative overflow-hidden bg-slate-800/50 border-slate-700 backdrop-blur-xl" data-testid="card-leads">
+                  <Card className="relative overflow-hidden bg-muted/50 border-border backdrop-blur-xl" data-testid="card-leads">
                     <GlowingBorder color="cyan" />
                     <CardContent className="relative z-10 p-6">
                       <div className="flex items-center justify-between mb-4">
@@ -503,10 +503,10 @@ export default function DetailSDRs() {
                           Leads
                         </Badge>
                       </div>
-                      <div className="text-4xl font-bold text-white mb-1" data-testid="value-leads">
+                      <div className="text-4xl font-bold text-foreground mb-1" data-testid="value-leads">
                         <AnimatedCounter value={metrics.leadsTotais} />
                       </div>
-                      <p className="text-slate-400 text-sm">Leads gerados</p>
+                      <p className="text-muted-foreground text-sm">Leads gerados</p>
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -516,7 +516,7 @@ export default function DetailSDRs() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
                 >
-                  <Card className="relative overflow-hidden bg-slate-800/50 border-slate-700 backdrop-blur-xl" data-testid="card-reunioes">
+                  <Card className="relative overflow-hidden bg-muted/50 border-border backdrop-blur-xl" data-testid="card-reunioes">
                     <GlowingBorder color="green" />
                     <CardContent className="relative z-10 p-6">
                       <div className="flex items-center justify-between mb-4">
@@ -527,10 +527,10 @@ export default function DetailSDRs() {
                           Reuniões
                         </Badge>
                       </div>
-                      <div className="text-4xl font-bold text-white mb-1" data-testid="value-reunioes">
+                      <div className="text-4xl font-bold text-foreground mb-1" data-testid="value-reunioes">
                         <AnimatedCounter value={metrics.reunioesRealizadas} />
                       </div>
-                      <p className="text-slate-400 text-sm">Reuniões realizadas</p>
+                      <p className="text-muted-foreground text-sm">Reuniões realizadas</p>
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -540,7 +540,7 @@ export default function DetailSDRs() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                 >
-                  <Card className="relative overflow-hidden bg-slate-800/50 border-slate-700 backdrop-blur-xl" data-testid="card-taxa-conversao">
+                  <Card className="relative overflow-hidden bg-muted/50 border-border backdrop-blur-xl" data-testid="card-taxa-conversao">
                     <GlowingBorder color="violet" />
                     <CardContent className="relative z-10 p-6">
                       <div className="flex items-center justify-between mb-4">
@@ -551,10 +551,10 @@ export default function DetailSDRs() {
                           Taxa
                         </Badge>
                       </div>
-                      <div className="text-4xl font-bold text-white mb-1" data-testid="value-taxa-lead-reuniao">
+                      <div className="text-4xl font-bold text-foreground mb-1" data-testid="value-taxa-lead-reuniao">
                         <AnimatedCounter value={Math.round(metrics.taxaLeadReuniao)} suffix="%" />
                       </div>
-                      <p className="text-slate-400 text-sm">Lead → Reunião</p>
+                      <p className="text-muted-foreground text-sm">Lead → Reunião</p>
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -564,7 +564,7 @@ export default function DetailSDRs() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
                 >
-                  <Card className="relative overflow-hidden bg-slate-800/50 border-slate-700 backdrop-blur-xl" data-testid="card-vendas">
+                  <Card className="relative overflow-hidden bg-muted/50 border-border backdrop-blur-xl" data-testid="card-vendas">
                     <GlowingBorder color="amber" />
                     <CardContent className="relative z-10 p-6">
                       <div className="flex items-center justify-between mb-4">
@@ -575,53 +575,53 @@ export default function DetailSDRs() {
                           Vendas
                         </Badge>
                       </div>
-                      <div className="text-4xl font-bold text-white mb-1" data-testid="value-vendas">
+                      <div className="text-4xl font-bold text-foreground mb-1" data-testid="value-vendas">
                         <AnimatedCounter value={metrics.negociosGanhos} />
                       </div>
-                      <p className="text-slate-400 text-sm">Negócios fechados</p>
+                      <p className="text-muted-foreground text-sm">Negócios fechados</p>
                     </CardContent>
                   </Card>
                 </motion.div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <Card className="bg-slate-800/50 border-slate-700" data-testid="card-taxa-reuniao-venda">
+                <Card className="bg-muted/50 border-border" data-testid="card-taxa-reuniao-venda">
                   <CardContent className="p-6">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="p-2 rounded-lg bg-teal-500/20">
                         <TrendingUp className="h-5 w-5 text-teal-400" />
                       </div>
-                      <span className="text-slate-400">Taxa Reunião → Venda</span>
+                      <span className="text-muted-foreground">Taxa Reunião → Venda</span>
                     </div>
-                    <div className="text-3xl font-bold text-white" data-testid="value-taxa-reuniao-venda">
+                    <div className="text-3xl font-bold text-foreground" data-testid="value-taxa-reuniao-venda">
                       {metrics.taxaReuniaoVenda.toFixed(1)}%
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-slate-800/50 border-slate-700" data-testid="card-taxa-lead-venda">
+                <Card className="bg-muted/50 border-border" data-testid="card-taxa-lead-venda">
                   <CardContent className="p-6">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="p-2 rounded-lg bg-rose-500/20">
                         <Target className="h-5 w-5 text-rose-400" />
                       </div>
-                      <span className="text-slate-400">Taxa Lead → Venda</span>
+                      <span className="text-muted-foreground">Taxa Lead → Venda</span>
                     </div>
-                    <div className="text-3xl font-bold text-white" data-testid="value-taxa-lead-venda">
+                    <div className="text-3xl font-bold text-foreground" data-testid="value-taxa-lead-venda">
                       {metrics.taxaLeadVenda.toFixed(1)}%
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-slate-800/50 border-slate-700" data-testid="card-mrr-gerado">
+                <Card className="bg-muted/50 border-border" data-testid="card-mrr-gerado">
                   <CardContent className="p-6">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="p-2 rounded-lg bg-green-500/20">
                         <DollarSign className="h-5 w-5 text-green-400" />
                       </div>
-                      <span className="text-slate-400">MRR Gerado</span>
+                      <span className="text-muted-foreground">MRR Gerado</span>
                     </div>
-                    <div className="text-3xl font-bold text-white" data-testid="value-mrr-gerado">
+                    <div className="text-3xl font-bold text-foreground" data-testid="value-mrr-gerado">
                       {formatCurrencyCompact(metrics.valorRecorrente)}
                     </div>
                   </CardContent>
@@ -629,45 +629,45 @@ export default function DetailSDRs() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
-                <Card className="bg-slate-800/50 border-slate-700" data-testid="card-negocios-em-andamento">
+                <Card className="bg-muted/50 border-border" data-testid="card-negocios-em-andamento">
                   <CardContent className="p-4 flex items-center gap-4">
                     <div className="p-3 rounded-xl bg-blue-500/20">
                       <Activity className="h-6 w-6 text-blue-400" />
                     </div>
                     <div>
-                      <p className="text-slate-400 text-sm">Em Andamento</p>
-                      <p className="text-2xl font-bold text-white" data-testid="value-em-andamento">{metrics.negociosEmAndamento}</p>
+                      <p className="text-muted-foreground text-sm">Em Andamento</p>
+                      <p className="text-2xl font-bold text-foreground" data-testid="value-em-andamento">{metrics.negociosEmAndamento}</p>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-slate-800/50 border-slate-700" data-testid="card-negocios-perdidos">
+                <Card className="bg-muted/50 border-border" data-testid="card-negocios-perdidos">
                   <CardContent className="p-4 flex items-center gap-4">
                     <div className="p-3 rounded-xl bg-red-500/20">
                       <XCircle className="h-6 w-6 text-red-400" />
                     </div>
                     <div>
-                      <p className="text-slate-400 text-sm">Perdidos</p>
-                      <p className="text-2xl font-bold text-white" data-testid="value-perdidos">{metrics.negociosPerdidos}</p>
+                      <p className="text-muted-foreground text-sm">Perdidos</p>
+                      <p className="text-2xl font-bold text-foreground" data-testid="value-perdidos">{metrics.negociosPerdidos}</p>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-slate-800/50 border-slate-700" data-testid="card-ticket-medio">
+                <Card className="bg-muted/50 border-border" data-testid="card-ticket-medio">
                   <CardContent className="p-4 flex items-center gap-4">
                     <div className="p-3 rounded-xl bg-amber-500/20">
                       <Briefcase className="h-6 w-6 text-amber-400" />
                     </div>
                     <div>
-                      <p className="text-slate-400 text-sm">Ticket Médio</p>
-                      <p className="text-2xl font-bold text-white" data-testid="value-ticket-medio">{formatCurrency(metrics.ticketMedio)}</p>
+                      <p className="text-muted-foreground text-sm">Ticket Médio</p>
+                      <p className="text-2xl font-bold text-foreground" data-testid="value-ticket-medio">{formatCurrency(metrics.ticketMedio)}</p>
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
               <Tabs defaultValue="evolucao" className="mb-8">
-                <TabsList className="bg-slate-800 border-slate-700">
+                <TabsList className="bg-muted border-border">
                   <TabsTrigger value="evolucao" className="data-[state=active]:bg-cyan-600" data-testid="tab-evolucao">
                     <BarChart3 className="h-4 w-4 mr-2" />
                     Evolução
@@ -687,16 +687,16 @@ export default function DetailSDRs() {
                 </TabsList>
 
                 <TabsContent value="evolucao" className="mt-6">
-                  <Card className="bg-slate-800/50 border-slate-700" data-testid="card-chart-evolucao">
+                  <Card className="bg-muted/50 border-border" data-testid="card-chart-evolucao">
                     <CardHeader>
-                      <CardTitle className="text-white flex items-center gap-2">
+                      <CardTitle className="text-foreground flex items-center gap-2">
                         <TrendingUp className="h-5 w-5 text-cyan-400" />
                         Evolução Mensal
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       {isLoadingMonthly ? (
-                        <Skeleton className="h-80 bg-slate-700" />
+                        <Skeleton className="h-80 bg-muted" />
                       ) : monthlyData && monthlyData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={350}>
                           <AreaChart data={monthlyData}>
@@ -760,7 +760,7 @@ export default function DetailSDRs() {
                           </AreaChart>
                         </ResponsiveContainer>
                       ) : (
-                        <div className="h-80 flex items-center justify-center text-slate-400">
+                        <div className="h-80 flex items-center justify-center text-muted-foreground">
                           Sem dados para exibir
                         </div>
                       )}
@@ -769,16 +769,16 @@ export default function DetailSDRs() {
                 </TabsContent>
 
                 <TabsContent value="fontes" className="mt-6">
-                  <Card className="bg-slate-800/50 border-slate-700" data-testid="card-chart-fontes">
+                  <Card className="bg-muted/50 border-border" data-testid="card-chart-fontes">
                     <CardHeader>
-                      <CardTitle className="text-white flex items-center gap-2">
+                      <CardTitle className="text-foreground flex items-center gap-2">
                         <Target className="h-5 w-5 text-cyan-400" />
                         Distribuição por Fonte
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       {isLoadingSource ? (
-                        <Skeleton className="h-80 bg-slate-700" />
+                        <Skeleton className="h-80 bg-muted" />
                       ) : sourceData && sourceData.length > 0 ? (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           <ResponsiveContainer width="100%" height={300}>
@@ -808,10 +808,10 @@ export default function DetailSDRs() {
                           </ResponsiveContainer>
                           <div className="space-y-3">
                             {sourceChartData.slice(0, 8).map((item, index) => (
-                              <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
+                              <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                                 <div className="flex items-center gap-3">
                                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }} />
-                                  <span className="text-slate-300 text-sm">{item.name}</span>
+                                  <span className="text-muted-foreground text-sm">{item.name}</span>
                                 </div>
                                 <div className="flex items-center gap-4 text-sm">
                                   <span className="text-cyan-400">{item.leads} leads</span>
@@ -823,7 +823,7 @@ export default function DetailSDRs() {
                           </div>
                         </div>
                       ) : (
-                        <div className="h-80 flex items-center justify-center text-slate-400">
+                        <div className="h-80 flex items-center justify-center text-muted-foreground">
                           Sem dados para exibir
                         </div>
                       )}
@@ -832,16 +832,16 @@ export default function DetailSDRs() {
                 </TabsContent>
 
                 <TabsContent value="pipelines" className="mt-6">
-                  <Card className="bg-slate-800/50 border-slate-700" data-testid="card-chart-pipelines">
+                  <Card className="bg-muted/50 border-border" data-testid="card-chart-pipelines">
                     <CardHeader>
-                      <CardTitle className="text-white flex items-center gap-2">
+                      <CardTitle className="text-foreground flex items-center gap-2">
                         <Briefcase className="h-5 w-5 text-cyan-400" />
                         Distribuição por Pipeline
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       {isLoadingPipeline ? (
-                        <Skeleton className="h-80 bg-slate-700" />
+                        <Skeleton className="h-80 bg-muted" />
                       ) : pipelineData && pipelineData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={350}>
                           <BarChart data={pipelineChartData} layout="vertical">
@@ -873,7 +873,7 @@ export default function DetailSDRs() {
                           </BarChart>
                         </ResponsiveContainer>
                       ) : (
-                        <div className="h-80 flex items-center justify-center text-slate-400">
+                        <div className="h-80 flex items-center justify-center text-muted-foreground">
                           Sem dados para exibir
                         </div>
                       )}
@@ -882,16 +882,16 @@ export default function DetailSDRs() {
                 </TabsContent>
 
                 <TabsContent value="funil" className="mt-6">
-                  <Card className="bg-slate-800/50 border-slate-700" data-testid="card-chart-funil">
+                  <Card className="bg-muted/50 border-border" data-testid="card-chart-funil">
                     <CardHeader>
-                      <CardTitle className="text-white flex items-center gap-2">
+                      <CardTitle className="text-foreground flex items-center gap-2">
                         <Activity className="h-5 w-5 text-cyan-400" />
                         Distribuição por Estágio
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       {isLoadingStage ? (
-                        <Skeleton className="h-80 bg-slate-700" />
+                        <Skeleton className="h-80 bg-muted" />
                       ) : stageData && stageData.length > 0 ? (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           <ResponsiveContainer width="100%" height={300}>
@@ -921,21 +921,21 @@ export default function DetailSDRs() {
                           </ResponsiveContainer>
                           <div className="space-y-3">
                             {stageChartData.map((item, index) => (
-                              <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-slate-700/50">
+                              <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                                 <div className="flex items-center gap-3">
                                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }} />
-                                  <span className="text-slate-300">{item.name}</span>
+                                  <span className="text-muted-foreground">{item.name}</span>
                                 </div>
                                 <div className="flex items-center gap-4">
-                                  <span className="text-white font-semibold">{item.value}</span>
-                                  <span className="text-slate-400 text-sm">({item.percentage?.toFixed(1)}%)</span>
+                                  <span className="text-foreground font-semibold">{item.value}</span>
+                                  <span className="text-muted-foreground text-sm">({item.percentage?.toFixed(1)}%)</span>
                                 </div>
                               </div>
                             ))}
                           </div>
                         </div>
                       ) : (
-                        <div className="h-80 flex items-center justify-center text-slate-400">
+                        <div className="h-80 flex items-center justify-center text-muted-foreground">
                           Sem dados para exibir
                         </div>
                       )}

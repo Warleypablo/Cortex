@@ -349,7 +349,7 @@ export default function DetailClosers() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] relative overflow-hidden">
+    <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-violet-600/20 rounded-full blur-[150px] animate-pulse" />
@@ -374,7 +374,7 @@ export default function DetailClosers() {
             >
               <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl blur-xl opacity-60 animate-pulse" />
               <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 flex items-center justify-center shadow-2xl shadow-violet-500/30">
-                <User className="w-8 h-8 text-white" />
+                <User className="w-8 h-8 text-foreground" />
               </div>
             </motion.div>
           </div>
@@ -385,8 +385,8 @@ export default function DetailClosers() {
               className="relative group"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 to-purple-600/20 rounded-xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative bg-slate-900/80 backdrop-blur-xl rounded-xl border border-violet-500/20 px-4 py-2">
-                <p className="text-xs text-slate-500">Atualizado em</p>
+              <div className="relative bg-card/80 backdrop-blur-xl rounded-xl border border-violet-500/20 px-4 py-2">
+                <p className="text-xs text-muted-foreground">Atualizado em</p>
                 <p className="text-xl font-mono font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
                   {currentTime.toLocaleTimeString('pt-BR')}
                 </p>
@@ -415,24 +415,24 @@ export default function DetailClosers() {
         >
           <div className="relative max-w-lg">
             <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl blur-lg opacity-30" />
-            <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-xl border border-violet-500/30 p-4">
+            <div className="relative bg-card/90 backdrop-blur-xl rounded-xl border border-violet-500/30 p-4">
               <Label className="text-violet-300 mb-3 block flex items-center gap-2 text-sm font-medium">
                 <Crown className="w-4 h-4 text-amber-400" />
                 Selecione o Closer
               </Label>
               <Select value={closerId} onValueChange={setCloserId}>
                 <SelectTrigger 
-                  className="w-full bg-slate-800/50 border-slate-700/50 text-white text-lg py-6 rounded-xl focus:ring-violet-500/50 focus:border-violet-500/50"
+                  className="w-full bg-muted/50 border-border/50 text-foreground text-lg py-6 rounded-xl focus:ring-violet-500/50 focus:border-violet-500/50"
                   data-testid="select-closer"
                 >
                   <SelectValue placeholder="Escolha um closer para analisar..." />
                 </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-700 rounded-xl">
+                <SelectContent className="bg-card border-border rounded-xl">
                   {closers?.map(closer => (
                     <SelectItem 
                       key={closer.id} 
                       value={closer.id.toString()}
-                      className="text-white hover:bg-violet-500/20 focus:bg-violet-500/20 cursor-pointer py-3"
+                      className="text-foreground hover:bg-violet-500/20 focus:bg-violet-500/20 cursor-pointer py-3"
                     >
                       <span className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-xs font-bold">
@@ -459,23 +459,23 @@ export default function DetailClosers() {
             >
               <div className="relative">
                 <div className="absolute -inset-1 bg-gradient-to-r from-violet-600/20 to-purple-600/20 rounded-2xl blur-lg" />
-                <Card className="relative bg-slate-900/80 border-slate-700/50 backdrop-blur-xl rounded-2xl overflow-hidden">
+                <Card className="relative bg-card/80 border-border/50 backdrop-blur-xl rounded-2xl overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500" />
                   <CardContent className="p-6">
                     <div className="flex flex-wrap items-end gap-4">
                       <div>
-                        <Label className="text-slate-300 text-sm font-medium mb-2 block">Período</Label>
+                        <Label className="text-muted-foreground text-sm font-medium mb-2 block">Período</Label>
                         <DateRangePicker
                           value={dateRange}
                           onChange={setDateRange}
-                          triggerClassName="bg-slate-800/50 border-slate-700 text-white rounded-xl hover:bg-slate-700/50"
-                          className="bg-slate-900 border-slate-700"
+                          triggerClassName="bg-muted/50 border-border text-foreground rounded-xl hover:bg-muted/50"
+                          className="bg-card border-border"
                         />
                       </div>
                       <Button 
                         variant="outline" 
                         onClick={resetFilters}
-                        className="border-slate-600 text-slate-300 hover:bg-slate-700/50 rounded-xl"
+                        className="border-border text-muted-foreground hover:bg-muted/50 rounded-xl"
                         data-testid="button-reset-filters"
                       >
                         <RotateCcw className="w-4 h-4 mr-2" />
@@ -509,8 +509,8 @@ export default function DetailClosers() {
                 <Users className="w-16 h-16 text-violet-400" />
               </motion.div>
             </div>
-            <h2 className="text-2xl font-bold text-white mt-8 mb-3">Selecione um Closer</h2>
-            <p className="text-slate-400 text-center max-w-md">
+            <h2 className="text-2xl font-bold text-foreground mt-8 mb-3">Selecione um Closer</h2>
+            <p className="text-muted-foreground text-center max-w-md">
               Escolha um closer no menu acima para visualizar suas métricas detalhadas de performance.
             </p>
           </motion.div>
@@ -523,7 +523,7 @@ export default function DetailClosers() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
               >
-                <Skeleton className="h-36 bg-slate-800/50 rounded-2xl" />
+                <Skeleton className="h-36 bg-muted/50 rounded-2xl" />
               </motion.div>
             ))}
           </div>
@@ -548,11 +548,11 @@ export default function DetailClosers() {
                       >
                         <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl blur-xl opacity-60" />
                         <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500 flex items-center justify-center shadow-2xl">
-                          <span className="text-4xl font-black text-white">
+                          <span className="text-4xl font-black text-foreground">
                             {metrics.closerName.charAt(0)}
                           </span>
                           <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
-                            <Trophy className="w-4 h-4 text-white" />
+                            <Trophy className="w-4 h-4 text-foreground" />
                           </div>
                         </div>
                       </motion.div>
@@ -576,7 +576,7 @@ export default function DetailClosers() {
                             {formatPercent(metrics.taxaConversao)} conversão
                           </Badge>
                           {metrics.primeiroNegocio && (
-                            <span className="text-sm text-slate-400 flex items-center gap-1">
+                            <span className="text-sm text-muted-foreground flex items-center gap-1">
                               <CalendarDays className="w-4 h-4" />
                               Desde {new Date(metrics.primeiroNegocio).toLocaleDateString('pt-BR')}
                             </span>
@@ -586,7 +586,7 @@ export default function DetailClosers() {
 
                       {/* Total Value */}
                       <div className="text-right">
-                        <p className="text-sm text-slate-400 mb-1">Valor Total Gerado</p>
+                        <p className="text-sm text-muted-foreground mb-1">Valor Total Gerado</p>
                         <motion.div
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
@@ -702,11 +702,11 @@ export default function DetailClosers() {
                 >
                   <div className="relative group">
                     <div className="absolute -inset-1 bg-gradient-to-r from-blue-600/30 to-cyan-600/30 rounded-2xl blur-xl opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
-                    <Card className="relative bg-slate-900/80 border-slate-700/50 backdrop-blur-xl rounded-2xl overflow-hidden">
+                    <Card className="relative bg-card/80 border-border/50 backdrop-blur-xl rounded-2xl overflow-hidden">
                       <CardHeader className="pb-2">
-                        <CardTitle className="flex items-center gap-3 text-white">
+                        <CardTitle className="flex items-center gap-3 text-foreground">
                           <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg shadow-blue-500/25">
-                            <Timer className="w-6 h-6 text-white" />
+                            <Timer className="w-6 h-6 text-foreground" />
                           </div>
                           <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
                             Lead Time (Tempo de Fechamento)
@@ -715,32 +715,32 @@ export default function DetailClosers() {
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                          <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
+                          <div className="text-center p-4 bg-muted/50 rounded-xl border border-border/30">
                             <div className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
                               {leadTimeData.leadTimeMedio.toFixed(1)}
                             </div>
-                            <div className="text-sm text-slate-400 mt-1">Média (dias)</div>
+                            <div className="text-sm text-muted-foreground mt-1">Média (dias)</div>
                           </div>
-                          <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
+                          <div className="text-center p-4 bg-muted/50 rounded-xl border border-border/30">
                             <div className="text-3xl font-bold text-emerald-400">
                               {leadTimeData.leadTimeMin.toFixed(1)}
                             </div>
-                            <div className="text-sm text-slate-400 mt-1">Mínimo (dias)</div>
+                            <div className="text-sm text-muted-foreground mt-1">Mínimo (dias)</div>
                           </div>
-                          <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
+                          <div className="text-center p-4 bg-muted/50 rounded-xl border border-border/30">
                             <div className="text-3xl font-bold text-amber-400">
                               {leadTimeData.leadTimeMax.toFixed(1)}
                             </div>
-                            <div className="text-sm text-slate-400 mt-1">Máximo (dias)</div>
+                            <div className="text-sm text-muted-foreground mt-1">Máximo (dias)</div>
                           </div>
-                          <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
+                          <div className="text-center p-4 bg-muted/50 rounded-xl border border-border/30">
                             <div className="text-3xl font-bold text-violet-400">
                               {leadTimeData.leadTimeMediana.toFixed(1)}
                             </div>
-                            <div className="text-sm text-slate-400 mt-1">Mediana (dias)</div>
+                            <div className="text-sm text-muted-foreground mt-1">Mediana (dias)</div>
                           </div>
                         </div>
-                        <div className="mt-4 text-center text-slate-500 text-sm">
+                        <div className="mt-4 text-center text-muted-foreground text-sm">
                           Baseado em {leadTimeData.totalNegocios} negócios ganhos no período
                         </div>
                       </CardContent>
@@ -759,10 +759,10 @@ export default function DetailClosers() {
               <Tabs defaultValue="evolucao" className="space-y-6">
                 <div className="relative">
                   <div className="absolute -inset-1 bg-gradient-to-r from-violet-600/20 to-purple-600/20 rounded-2xl blur-lg" />
-                  <TabsList className="relative bg-slate-900/90 border border-slate-700/50 p-1.5 rounded-2xl backdrop-blur-xl">
+                  <TabsList className="relative bg-card/90 border border-border/50 p-1.5 rounded-2xl backdrop-blur-xl">
                     <TabsTrigger 
                       value="evolucao" 
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-xl px-6 py-3 transition-all duration-300"
+                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-purple-600 data-[state=active]:text-foreground rounded-xl px-6 py-3 transition-all duration-300"
                       data-testid="tab-evolucao"
                     >
                       <BarChart3 className="w-4 h-4 mr-2" />
@@ -770,7 +770,7 @@ export default function DetailClosers() {
                     </TabsTrigger>
                     <TabsTrigger 
                       value="funil" 
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-xl px-6 py-3 transition-all duration-300"
+                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-purple-600 data-[state=active]:text-foreground rounded-xl px-6 py-3 transition-all duration-300"
                       data-testid="tab-funil"
                     >
                       <Target className="w-4 h-4 mr-2" />
@@ -778,7 +778,7 @@ export default function DetailClosers() {
                     </TabsTrigger>
                     <TabsTrigger 
                       value="fontes" 
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-purple-600 data-[state=active]:text-white rounded-xl px-6 py-3 transition-all duration-300"
+                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-purple-600 data-[state=active]:text-foreground rounded-xl px-6 py-3 transition-all duration-300"
                       data-testid="tab-fontes"
                     >
                       <Users className="w-4 h-4 mr-2" />
@@ -795,7 +795,7 @@ export default function DetailClosers() {
                       iconColor="text-emerald-400"
                     >
                       {isLoadingMonthly ? (
-                        <Skeleton className="h-72 bg-slate-800/50 rounded-xl" />
+                        <Skeleton className="h-72 bg-muted/50 rounded-xl" />
                       ) : monthlyData && monthlyData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={300}>
                           <BarChart data={monthlyData} barGap={8}>
@@ -864,7 +864,7 @@ export default function DetailClosers() {
                       iconColor="text-violet-400"
                     >
                       {isLoadingMonthly ? (
-                        <Skeleton className="h-72 bg-slate-800/50 rounded-xl" />
+                        <Skeleton className="h-72 bg-muted/50 rounded-xl" />
                       ) : monthlyData && monthlyData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={300}>
                           <AreaChart data={monthlyData}>
@@ -936,7 +936,7 @@ export default function DetailClosers() {
                       iconColor="text-violet-400"
                     >
                       {isLoadingStage ? (
-                        <Skeleton className="h-72 bg-slate-800/50 rounded-xl" />
+                        <Skeleton className="h-72 bg-muted/50 rounded-xl" />
                       ) : stageData && stageData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={300}>
                           <PieChart>
@@ -988,7 +988,7 @@ export default function DetailClosers() {
                       iconColor="text-purple-400"
                     >
                       {isLoadingStage ? (
-                        <Skeleton className="h-72 bg-slate-800/50 rounded-xl" />
+                        <Skeleton className="h-72 bg-muted/50 rounded-xl" />
                       ) : stageData && stageData.length > 0 ? (
                         <div className="space-y-4 max-h-72 overflow-y-auto pr-2 scrollbar-thin scrollbar-track-slate-800 scrollbar-thumb-violet-600">
                           {stageData.map((stage, index) => (
@@ -999,7 +999,7 @@ export default function DetailClosers() {
                               transition={{ delay: index * 0.1 }}
                               className="group"
                             >
-                              <div className="flex items-center gap-4 p-3 rounded-xl bg-slate-800/30 hover:bg-slate-800/50 transition-colors">
+                              <div className="flex items-center gap-4 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors">
                                 <div 
                                   className="w-4 h-4 rounded-full shadow-lg" 
                                   style={{ 
@@ -1007,12 +1007,12 @@ export default function DetailClosers() {
                                     boxShadow: `0 0 20px ${GRADIENT_COLORS[index % GRADIENT_COLORS.length][0]}40`
                                   }}
                                 />
-                                <span className="flex-1 text-slate-200 text-sm font-medium truncate">{stage.stage}</span>
-                                <Badge className="bg-slate-700/50 text-white border-0 font-bold px-3">
+                                <span className="flex-1 text-foreground text-sm font-medium truncate">{stage.stage}</span>
+                                <Badge className="bg-muted/50 text-foreground border-0 font-bold px-3">
                                   {stage.count}
                                 </Badge>
                                 <div className="w-20">
-                                  <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                                  <div className="h-2 bg-muted/50 rounded-full overflow-hidden">
                                     <motion.div 
                                       initial={{ width: 0 }}
                                       animate={{ width: `${stage.percentage}%` }}
@@ -1023,7 +1023,7 @@ export default function DetailClosers() {
                                       }}
                                     />
                                   </div>
-                                  <span className="text-xs text-slate-500 mt-1 block text-right">
+                                  <span className="text-xs text-muted-foreground mt-1 block text-right">
                                     {formatPercent(stage.percentage)}
                                   </span>
                                 </div>
@@ -1046,7 +1046,7 @@ export default function DetailClosers() {
                       iconColor="text-cyan-400"
                     >
                       {isLoadingSource ? (
-                        <Skeleton className="h-72 bg-slate-800/50 rounded-xl" />
+                        <Skeleton className="h-72 bg-muted/50 rounded-xl" />
                       ) : sourceData && sourceData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={300}>
                           <BarChart data={sourceData.slice(0, 8).map(s => ({ ...s, source: getSourceDisplayName(s.source) }))} layout="vertical" barSize={20}>
@@ -1098,7 +1098,7 @@ export default function DetailClosers() {
                       iconColor="text-amber-400"
                     >
                       {isLoadingSource ? (
-                        <Skeleton className="h-72 bg-slate-800/50 rounded-xl" />
+                        <Skeleton className="h-72 bg-muted/50 rounded-xl" />
                       ) : sourceData && sourceData.length > 0 ? (
                         <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
                           {sourceData.slice(0, 10).map((source, index) => (
@@ -1107,18 +1107,18 @@ export default function DetailClosers() {
                               initial={{ opacity: 0, x: 20 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: index * 0.1 }}
-                              className="flex items-center gap-4 p-3 rounded-xl bg-slate-800/30 hover:bg-slate-800/50 transition-colors group"
+                              className="flex items-center gap-4 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors group"
                             >
                               <div className={`
                                 w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black
-                                ${index === 0 ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-500/30' : 
-                                  index === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-slate-800' :
-                                  index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700 text-white' :
-                                  'bg-slate-700/50 text-slate-400'}
+                                ${index === 0 ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-foreground shadow-lg shadow-amber-500/30' : 
+                                  index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-foreground' :
+                                  index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700 text-foreground' :
+                                  'bg-muted/50 text-muted-foreground'}
                               `}>
                                 {index === 0 ? <Crown className="w-5 h-5" /> : index + 1}
                               </div>
-                              <span className="flex-1 text-slate-200 text-sm font-medium truncate">
+                              <span className="flex-1 text-foreground text-sm font-medium truncate">
                                 {getSourceDisplayName(source.source)}
                               </span>
                               <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 font-bold px-3 py-1">
@@ -1249,8 +1249,8 @@ function PremiumMetricCard({
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <p className="text-slate-400 text-sm font-medium mb-1">{title}</p>
-                <p className="text-3xl font-black text-white">
+                <p className="text-muted-foreground text-sm font-medium mb-1">{title}</p>
+                <p className="text-3xl font-black text-foreground">
                   {isCurrency ? (
                     <AnimatedCounter value={value} prefix="R$ " />
                   ) : isPercentage ? (
@@ -1259,14 +1259,14 @@ function PremiumMetricCard({
                     <AnimatedCounter value={value} />
                   )}
                 </p>
-                {subtitle && <p className="text-xs text-slate-500 mt-2">{subtitle}</p>}
+                {subtitle && <p className="text-xs text-muted-foreground mt-2">{subtitle}</p>}
                 {extraBadge && <div className="mt-2">{extraBadge}</div>}
               </div>
               <motion.div 
                 whileHover={{ rotate: 10, scale: 1.1 }}
                 className={`w-12 h-12 rounded-xl bg-gradient-to-br ${config.icon} flex items-center justify-center shadow-lg ${config.shadow}`}
               >
-                <Icon className="w-6 h-6 text-white" />
+                <Icon className="w-6 h-6 text-foreground" />
               </motion.div>
             </div>
           </CardContent>
@@ -1287,11 +1287,11 @@ function PremiumChartCard({ title, icon: Icon, iconColor, children }: PremiumCha
   return (
     <div className="relative group">
       <div className="absolute -inset-1 bg-gradient-to-r from-violet-600/10 to-purple-600/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      <Card className="relative bg-slate-900/80 border-slate-700/50 backdrop-blur-xl rounded-2xl overflow-hidden">
+      <Card className="relative bg-card/80 border-border/50 backdrop-blur-xl rounded-2xl overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent" />
         <CardHeader className="pb-2">
-          <CardTitle className="text-white flex items-center gap-3 text-lg">
-            <div className="w-10 h-10 rounded-xl bg-slate-800/80 flex items-center justify-center">
+          <CardTitle className="text-foreground flex items-center gap-3 text-lg">
+            <div className="w-10 h-10 rounded-xl bg-muted/80 flex items-center justify-center">
               <Icon className={`w-5 h-5 ${iconColor}`} />
             </div>
             {title}
@@ -1307,9 +1307,9 @@ function PremiumChartCard({ title, icon: Icon, iconColor, children }: PremiumCha
 
 function EmptyChartState() {
   return (
-    <div className="h-72 flex flex-col items-center justify-center text-slate-500">
-      <div className="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center mb-4">
-        <BarChart3 className="w-8 h-8 text-slate-600" />
+    <div className="h-72 flex flex-col items-center justify-center text-muted-foreground">
+      <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+        <BarChart3 className="w-8 h-8 text-muted-foreground" />
       </div>
       <p className="text-sm">Sem dados para o período</p>
     </div>
