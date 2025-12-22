@@ -15,10 +15,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 function createSessionStore() {
-  if (process.env.DATABASE_URL) {
+  // Use Google Cloud SQL for sessions if available
+  if (process.env.DB_HOST && process.env.DB_NAME && process.env.DB_USER && process.env.DB_PASSWORD) {
     const PgSession = connectPgSimple(session);
     const sessionPool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      host: process.env.DB_HOST,
+      port: 5432,
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
       ssl: { rejectUnauthorized: false }
     });
     return new PgSession({
@@ -27,7 +32,7 @@ function createSessionStore() {
       createTableIfMissing: true,
     });
   }
-  console.log("DATABASE_URL not set, using memory session store");
+  console.log("DB credentials not set, using memory session store");
   return undefined;
 }
 
