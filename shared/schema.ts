@@ -1387,3 +1387,32 @@ export const insertTurboToolSchema = createInsertSchema(turboTools).omit({
 
 export type TurboTool = typeof turboTools.$inferSelect;
 export type InsertTurboTool = z.infer<typeof insertTurboToolSchema>;
+
+// ============================================
+// Access Logs Module - Audit Trail
+// ============================================
+
+export const accessLogActionEnum = ['view_password', 'copy_password', 'add_credential', 'edit_credential', 'delete_credential', 'add_client', 'edit_client', 'delete_client'] as const;
+export type AccessLogAction = typeof accessLogActionEnum[number];
+
+export const accessLogs = pgTable("access_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  action: text("action").$type<AccessLogAction>().notNull(),
+  entityType: varchar("entity_type", { length: 50 }).notNull(),
+  entityId: varchar("entity_id", { length: 100 }),
+  entityName: text("entity_name"),
+  clientId: varchar("client_id", { length: 100 }),
+  clientName: text("client_name"),
+  details: text("details"),
+  userEmail: varchar("user_email", { length: 255 }),
+  userName: varchar("user_name", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAccessLogSchema = createInsertSchema(accessLogs).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
+export type AccessLog = typeof accessLogs.$inferSelect;
+export type InsertAccessLog = z.infer<typeof insertAccessLogSchema>;
