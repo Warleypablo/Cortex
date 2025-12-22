@@ -191,7 +191,7 @@ export default function AdminLogs() {
 
   const runReconciliationMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('/api/admin/run-reconciliation', { method: 'POST' });
+      return apiRequest('POST', '/api/admin/run-reconciliation');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/reconciliation'] });
