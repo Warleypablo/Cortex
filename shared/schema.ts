@@ -1253,3 +1253,137 @@ export const integrationHealth = pgTable("integration_health", {
 
 export type IntegrationHealth = typeof integrationHealth.$inferSelect;
 export type InsertIntegrationHealth = typeof integrationHealth.$inferInsert;
+
+// ============================================
+// Acessos Module - Clients & Credentials
+// ============================================
+
+export const clients = pgTable("clients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  cnpj: text("cnpj"),
+  additionalInfo: text("additional_info"),
+  createdBy: varchar("created_by", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertClientSchema = createInsertSchema(clients).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export type Client = typeof clients.$inferSelect;
+export type InsertClient = z.infer<typeof insertClientSchema>;
+
+export const credentials = pgTable("credentials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id", { length: 100 }).notNull(),
+  platform: text("platform").notNull(),
+  username: text("username"),
+  password: text("password"),
+  accessUrl: text("access_url"),
+  observations: text("observations"),
+  createdBy: varchar("created_by", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCredentialSchema = createInsertSchema(credentials).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export type Credential = typeof credentials.$inferSelect;
+export type InsertCredential = z.infer<typeof insertCredentialSchema>;
+
+// ============================================
+// Conhecimentos Module - Courses
+// ============================================
+
+export const courseStatusEnum = ['ativo', 'vitalicio', 'cancelado', 'sem_status'] as const;
+export type CourseStatus = typeof courseStatusEnum[number];
+
+export const courses = pgTable("courses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nome: text("nome").notNull(),
+  status: text("status").$type<CourseStatus>().default('sem_status'),
+  temaPrincipal: text("tema_principal"),
+  plataforma: text("plataforma"),
+  url: text("url"),
+  login: text("login"),
+  senha: text("senha"),
+  createdBy: varchar("created_by", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCourseSchema = createInsertSchema(courses).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export type Course = typeof courses.$inferSelect;
+export type InsertCourse = z.infer<typeof insertCourseSchema>;
+
+// ============================================
+// Benefícios Module - Benefits
+// ============================================
+
+export const benefitSegmentEnum = ['alimentos', 'beleza_cosmeticos', 'casa_cozinha', 'tecnologia', 'pet', 'plantas_agro', 'suplementacao', 'moda'] as const;
+export type BenefitSegment = typeof benefitSegmentEnum[number];
+
+export const benefits = pgTable("benefits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  empresa: text("empresa").notNull(),
+  cupom: text("cupom"),
+  desconto: text("desconto"),
+  site: text("site"),
+  segmento: text("segmento").$type<BenefitSegment>(),
+  createdBy: varchar("created_by", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBenefitSchema = createInsertSchema(benefits).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export type Benefit = typeof benefits.$inferSelect;
+export type InsertBenefit = z.infer<typeof insertBenefitSchema>;
+
+// ============================================
+// Ferramentas Module - Turbo Tools
+// ============================================
+
+export const recorrenciaEnum = ['Mensal', 'Anual'] as const;
+export type Recorrencia = typeof recorrenciaEnum[number];
+
+export const turboTools = pgTable("turbo_tools", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  login: text("login"),
+  password: text("password"),
+  site: text("site"),
+  observations: text("observations"),
+  valor: decimal("valor"),
+  recorrencia: text("recorrencia").$type<Recorrencia>(),
+  dataPrimeiroPagamento: date("data_primeiro_pagamento"),
+  createdBy: varchar("created_by", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTurboToolSchema = createInsertSchema(turboTools).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export type TurboTool = typeof turboTools.$inferSelect;
+export type InsertTurboTool = z.infer<typeof insertTurboToolSchema>;

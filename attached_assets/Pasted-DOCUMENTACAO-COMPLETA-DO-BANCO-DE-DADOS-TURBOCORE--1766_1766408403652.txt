@@ -1,0 +1,496 @@
+DOCUMENTACAO COMPLETA DO BANCO DE DADOS - TURBOCORE
+====================================================
+
+VISAO GERAL
+-----------
+O TurboCore e uma aplicacao SaaS interna para gerenciamento de credenciais de clientes, ferramentas internas, clube de beneficios e base de conhecimento. Este documento descreve a estrutura completa do banco de dados com 5 tabelas principais.
+
+
+DIAGRAMA DE RELACIONAMENTOS
+---------------------------
+
+                    USERS (usuarios)
+                          |
+        +-----------------+-----------------+-----------------+
+        | created_by      | created_by      | created_by      |
+        v                 v                 v                 v
+    CLIENTS          COURSES          BENEFITS         TURBO_TOOLS
+   (clientes)        (cursos)       (beneficios)      (ferramentas)
+        |
+        | client_id (1:N)
+        v
+   CREDENTIALS
+  (credenciais)
+
+Legenda:
+- 1:N = Um para Muitos (um cliente tem varias credenciais)
+- created_by = Referencia ao usuario que criou o registro
+
+
+TIPOS ENUM (criar antes das tabelas)
+------------------------------------
+
+ENUM: course_status
+Valores: ativo, vitalicio, cancelado, sem_status
+Uso: Status do curso na tabela courses
+
+ENUM: benefit_segment  
+Valores: alimentos, beleza_cosmeticos, casa_cozinha, tecnologia, pet, plantas_agro, suplementacao, moda
+Uso: Segmento do beneficio na tabela benefits
+
+ENUM: recorrencia
+Valores: Mensal, Anual
+Uso: Frequencia de pagamento na tabela turbo_tools
+
+
+========================================
+TABELA: CLIENTS (Clientes)
+========================================
+
+Descricao: Armazena informacoes dos clientes da Turbo Partners. Cada cliente pode ter multiplas credenciais de acesso a diferentes plataformas.
+
+Total de registros: 386
+
+COLUNAS:
+
+id
+- Tipo: UUID
+- Obrigatorio: Sim
+- Padrao: gen_random_uuid()
+- Descricao: Identificador unico do cliente
+
+name
+- Tipo: TEXT
+- Obrigatorio: Sim
+- Descricao: Nome do cliente ou empresa
+
+cnpj
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: CNPJ do cliente (formato livre)
+
+additional_info
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: Informacoes adicionais ou observacoes
+
+created_by
+- Tipo: UUID
+- Obrigatorio: Sim
+- Descricao: ID do usuario que cadastrou o cliente (FK para users)
+
+created_at
+- Tipo: TIMESTAMP
+- Obrigatorio: Sim
+- Padrao: now()
+- Descricao: Data e hora de criacao do registro
+
+updated_at
+- Tipo: TIMESTAMP
+- Obrigatorio: Sim
+- Padrao: now()
+- Descricao: Data e hora da ultima atualizacao
+
+INDICES:
+- clients_pkey: Chave primaria (id)
+
+RELACIONAMENTOS:
+- created_by referencia users.id
+- clients.id e referenciado por credentials.client_id (um cliente tem N credenciais)
+
+
+========================================
+TABELA: CREDENTIALS (Credenciais)
+========================================
+
+Descricao: Armazena as credenciais de acesso (login/senha) dos clientes para diferentes plataformas e sistemas. Cada credencial pertence a um unico cliente.
+
+Total de registros: 1.151
+
+COLUNAS:
+
+id
+- Tipo: UUID
+- Obrigatorio: Sim
+- Padrao: gen_random_uuid()
+- Descricao: Identificador unico da credencial
+
+client_id
+- Tipo: UUID
+- Obrigatorio: Sim
+- Descricao: ID do cliente dono da credencial (CHAVE ESTRANGEIRA para clients.id)
+
+platform
+- Tipo: TEXT
+- Obrigatorio: Sim
+- Descricao: Nome da plataforma (ex: Instagram, iFood, Google Ads)
+
+username
+- Tipo: TEXT
+- Obrigatorio: Sim
+- Descricao: Usuario, email ou login de acesso
+
+password
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: Senha de acesso
+
+access_url
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: URL de acesso a plataforma
+
+observations
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: Observacoes ou instrucoes especiais
+
+created_by
+- Tipo: UUID
+- Obrigatorio: Sim
+- Descricao: ID do usuario que cadastrou (FK para users)
+
+created_at
+- Tipo: TIMESTAMP
+- Obrigatorio: Sim
+- Padrao: now()
+- Descricao: Data e hora de criacao
+
+updated_at
+- Tipo: TIMESTAMP
+- Obrigatorio: Sim
+- Padrao: now()
+- Descricao: Data e hora da ultima atualizacao
+
+INDICES:
+- credentials_pkey: Chave primaria (id)
+- idx_credentials_client_id: Indice para busca por cliente
+
+RELACIONAMENTOS:
+- client_id referencia clients.id com ON DELETE CASCADE (quando cliente e excluido, credenciais sao excluidas)
+- created_by referencia users.id
+
+
+========================================
+TABELA: COURSES (Conhecimentos/Cursos)
+========================================
+
+Descricao: Base de conhecimento da empresa contendo cursos, treinamentos e materiais educacionais com suas credenciais de acesso.
+
+Total de registros: 84
+
+COLUNAS:
+
+id
+- Tipo: UUID
+- Obrigatorio: Sim
+- Padrao: gen_random_uuid()
+- Descricao: Identificador unico do curso
+
+nome
+- Tipo: TEXT
+- Obrigatorio: Sim
+- Descricao: Nome do curso ou treinamento
+
+status
+- Tipo: course_status (ENUM)
+- Obrigatorio: Sim
+- Padrao: sem_status
+- Valores possiveis: ativo, vitalicio, cancelado, sem_status
+- Descricao: Status atual do acesso ao curso
+
+tema_principal
+- Tipo: TEXT
+- Obrigatorio: Sim
+- Descricao: Categoria ou tema do curso
+
+plataforma
+- Tipo: TEXT
+- Obrigatorio: Sim
+- Descricao: Plataforma onde o curso esta hospedado (Hotmart, Udemy, Kiwify, etc)
+
+url
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: Link de acesso ao curso
+
+login
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: Email ou usuario de acesso
+
+senha
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: Senha de acesso
+
+created_by
+- Tipo: UUID
+- Obrigatorio: Sim
+- Descricao: ID do usuario que cadastrou (FK para users)
+
+created_at
+- Tipo: TIMESTAMP
+- Obrigatorio: Sim
+- Padrao: now()
+- Descricao: Data e hora de criacao
+
+updated_at
+- Tipo: TIMESTAMP
+- Obrigatorio: Sim
+- Padrao: now()
+- Descricao: Data e hora da ultima atualizacao
+
+INDICES:
+- courses_pkey: Chave primaria (id)
+- courses_nome_idx: Busca por nome
+- courses_status_idx: Filtro por status
+- courses_tema_principal_idx: Filtro por tema
+- courses_plataforma_idx: Filtro por plataforma
+
+RELACIONAMENTOS:
+- created_by referencia users.id
+
+
+========================================
+TABELA: BENEFITS (Clube de Beneficios)
+========================================
+
+Descricao: Catalogo de beneficios e cupons de desconto disponiveis para colaboradores da Turbo Partners em diversas empresas parceiras.
+
+Total de registros: 34
+
+COLUNAS:
+
+id
+- Tipo: UUID
+- Obrigatorio: Sim
+- Padrao: gen_random_uuid()
+- Descricao: Identificador unico do beneficio
+
+empresa
+- Tipo: TEXT
+- Obrigatorio: Sim
+- Descricao: Nome da empresa parceira
+
+cupom
+- Tipo: TEXT
+- Obrigatorio: Sim
+- Descricao: Codigo do cupom de desconto
+
+desconto
+- Tipo: TEXT
+- Obrigatorio: Sim
+- Descricao: Valor ou percentual do desconto (ex: "10% off", "R$ 50")
+
+site
+- Tipo: TEXT
+- Obrigatorio: Sim
+- Descricao: URL do site da empresa
+
+segmento
+- Tipo: benefit_segment (ENUM)
+- Obrigatorio: Sim
+- Valores possiveis: alimentos, beleza_cosmeticos, casa_cozinha, tecnologia, pet, plantas_agro, suplementacao, moda
+- Descricao: Categoria do beneficio
+
+created_by
+- Tipo: UUID
+- Obrigatorio: Sim
+- Descricao: ID do usuario que cadastrou (FK para users)
+
+created_at
+- Tipo: TIMESTAMP
+- Obrigatorio: Sim
+- Padrao: now()
+- Descricao: Data e hora de criacao
+
+updated_at
+- Tipo: TIMESTAMP
+- Obrigatorio: Sim
+- Padrao: now()
+- Descricao: Data e hora da ultima atualizacao
+
+INDICES:
+- benefits_pkey: Chave primaria (id)
+- benefits_empresa_idx: Busca por empresa
+- benefits_segmento_idx: Filtro por segmento
+- benefits_cupom_idx: Busca por cupom
+
+RELACIONAMENTOS:
+- created_by referencia users.id
+
+
+========================================
+TABELA: TURBO_TOOLS (Ferramentas Turbo)
+========================================
+
+Descricao: Catalogo de ferramentas, sistemas e servicos utilizados internamente pela Turbo Partners, incluindo informacoes de acesso e custos.
+
+Total de registros: 152
+
+COLUNAS:
+
+id
+- Tipo: UUID
+- Obrigatorio: Sim
+- Padrao: gen_random_uuid()
+- Descricao: Identificador unico da ferramenta
+
+name
+- Tipo: TEXT
+- Obrigatorio: Sim
+- Descricao: Nome da ferramenta ou servico
+
+login
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: Usuario ou email de acesso
+
+password
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: Senha de acesso
+
+site
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: URL de acesso
+
+observations
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: Observacoes ou notas
+
+valor
+- Tipo: TEXT
+- Obrigatorio: Nao
+- Descricao: Custo do servico (formato texto, ex: "99.90", "1500")
+
+recorrencia
+- Tipo: recorrencia (ENUM)
+- Obrigatorio: Nao
+- Valores possiveis: Mensal, Anual
+- Descricao: Frequencia de pagamento
+
+data_primeiro_pagamento
+- Tipo: TIMESTAMP
+- Obrigatorio: Nao
+- Descricao: Data do primeiro pagamento
+
+created_by
+- Tipo: UUID
+- Obrigatorio: Sim
+- Descricao: ID do usuario que cadastrou (FK para users)
+
+created_at
+- Tipo: TIMESTAMP
+- Obrigatorio: Sim
+- Padrao: now()
+- Descricao: Data e hora de criacao
+
+updated_at
+- Tipo: TIMESTAMP
+- Obrigatorio: Sim
+- Padrao: now()
+- Descricao: Data e hora da ultima atualizacao
+
+INDICES:
+- turbo_tools_pkey: Chave primaria (id)
+- turbo_tools_name_idx: Busca por nome
+
+RELACIONAMENTOS:
+- created_by referencia users.id
+
+
+========================================
+RESUMO DE CHAVES ESTRANGEIRAS
+========================================
+
+Tabela: credentials
+- Coluna: client_id
+- Referencia: clients.id
+- Acao ao deletar: CASCADE (exclui credenciais quando cliente e excluido)
+
+Tabela: credentials
+- Coluna: created_by
+- Referencia: users.id
+
+Tabela: clients
+- Coluna: created_by
+- Referencia: users.id
+
+Tabela: courses
+- Coluna: created_by
+- Referencia: users.id
+
+Tabela: benefits
+- Coluna: created_by
+- Referencia: users.id
+
+Tabela: turbo_tools
+- Coluna: created_by
+- Referencia: users.id
+
+
+========================================
+ORDEM DE IMPORTACAO
+========================================
+
+Para importar os dados corretamente, siga esta ordem:
+
+1. Criar ENUMs (course_status, benefit_segment, recorrencia)
+2. Tabela users (se necessario - referenciada por created_by)
+3. Tabela clients (independente, apenas referencia users)
+4. Tabela credentials (depende de clients)
+5. Tabela courses (independente, apenas referencia users)
+6. Tabela benefits (independente, apenas referencia users)
+7. Tabela turbo_tools (independente, apenas referencia users)
+
+
+========================================
+ESTATISTICAS
+========================================
+
+Tabela          | Registros
+----------------|----------
+clients         | 386
+credentials     | 1.151
+courses         | 84
+benefits        | 34
+turbo_tools     | 152
+----------------|----------
+TOTAL           | 1.807
+
+
+========================================
+OBSERVACOES DE SEGURANCA
+========================================
+
+1. SENHAS EM TEXTO: As senhas estao armazenadas em texto puro. Considere implementar criptografia no novo sistema.
+
+2. UUIDS PRESERVADOS: Os IDs originais foram mantidos para preservar os relacionamentos entre tabelas.
+
+3. CAMPO CREATED_BY: Referencia usuarios do sistema original. Ajuste conforme a estrutura de usuarios do novo sistema ou remova a restricao de FK temporariamente durante a importacao.
+
+4. AUDITORIA: O sistema original possui logs de auditoria para acoes sensiveis (visualizacao e copia de senhas). Considere implementar no novo sistema.
+
+
+========================================
+ARQUIVOS CSV DISPONIVEIS
+========================================
+
+clients_data.csv - 386 registros
+Colunas: id, name, cnpj, additional_info, created_by, created_at, updated_at
+
+credentials_data.csv - 1.151 registros
+Colunas: id, client_id, platform, username, observations, created_by, created_at, updated_at, password, access_url
+
+courses_data.csv - 84 registros
+Colunas: id, nome, status, tema_principal, plataforma, url, login, senha, created_by, created_at, updated_at
+
+benefits_data.csv - 34 registros
+Colunas: id, empresa, cupom, desconto, site, segmento, created_by, created_at, updated_at
+
+turbo_tools_data.csv - 152 registros
+Colunas: id, name, login, password, site, observations, created_by, created_at, updated_at, valor, recorrencia, data_primeiro_pagamento

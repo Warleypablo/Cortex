@@ -8233,6 +8233,592 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // Acessos Module - Clients API
+  // ============================================
+
+  // GET all clients with credential count
+  app.get("/api/acessos/clients", async (req, res) => {
+    try {
+      const search = req.query.search as string;
+      
+      let result;
+      if (search) {
+        const searchPattern = `%${search}%`;
+        result = await db.execute(sql`
+          SELECT c.*, COUNT(cr.id) as credential_count 
+          FROM clients c 
+          LEFT JOIN credentials cr ON c.id = cr.client_id
+          WHERE LOWER(c.name) LIKE LOWER(${searchPattern}) OR LOWER(c.cnpj) LIKE LOWER(${searchPattern})
+          GROUP BY c.id ORDER BY c.created_at DESC
+        `);
+      } else {
+        result = await db.execute(sql`
+          SELECT c.*, COUNT(cr.id) as credential_count 
+          FROM clients c 
+          LEFT JOIN credentials cr ON c.id = cr.client_id
+          GROUP BY c.id ORDER BY c.created_at DESC
+        `);
+      }
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching clients:", error);
+      res.status(500).json({ error: "Failed to fetch clients" });
+    }
+  });
+
+  // GET single client with credentials
+  app.get("/api/acessos/clients/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const clientResult = await db.execute(sql`SELECT * FROM clients WHERE id = ${id}`);
+      
+      if (clientResult.rows.length === 0) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      const credentialsResult = await db.execute(sql`
+        SELECT * FROM credentials WHERE client_id = ${id} ORDER BY platform
+      `);
+      
+      res.json({
+        ...clientResult.rows[0],
+        credentials: credentialsResult.rows
+      });
+    } catch (error) {
+      console.error("[api] Error fetching client:", error);
+      res.status(500).json({ error: "Failed to fetch client" });
+    }
+  });
+
+  // POST create client
+  app.post("/api/acessos/clients", async (req, res) => {
+    try {
+      const { name, cnpj, additionalInfo } = req.body;
+      const createdBy = (req as any).user?.email || null;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Name is required" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO clients (name, cnpj, additional_info, created_by)
+        VALUES (${name}, ${cnpj || null}, ${additionalInfo || null}, ${createdBy})
+        RETURNING *
+      `);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating client:", error);
+      res.status(500).json({ error: "Failed to create client" });
+    }
+  });
+
+  // PATCH update client
+  app.patch("/api/acessos/clients/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, cnpj, additionalInfo } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE clients 
+        SET name = COALESCE(${name}, name),
+            cnpj = COALESCE(${cnpj}, cnpj),
+            additional_info = COALESCE(${additionalInfo}, additional_info),
+            updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error updating client:", error);
+      res.status(500).json({ error: "Failed to update client" });
+    }
+  });
+
+  // DELETE client (cascades to credentials)
+  app.delete("/api/acessos/clients/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Delete credentials first
+      await db.execute(sql`DELETE FROM credentials WHERE client_id = ${id}`);
+      
+      // Delete client
+      const result = await db.execute(sql`DELETE FROM clients WHERE id = ${id} RETURNING id`);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting client:", error);
+      res.status(500).json({ error: "Failed to delete client" });
+    }
+  });
+
+  // ============================================
+  // Acessos Module - Credentials API
+  // ============================================
+
+  // GET credentials for a client
+  app.get("/api/acessos/credentials/:clientId", async (req, res) => {
+    try {
+      const { clientId } = req.params;
+      const result = await db.execute(sql`
+        SELECT * FROM credentials WHERE client_id = ${clientId} ORDER BY platform
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching credentials:", error);
+      res.status(500).json({ error: "Failed to fetch credentials" });
+    }
+  });
+
+  // POST create credential
+  app.post("/api/acessos/credentials", async (req, res) => {
+    try {
+      const { clientId, platform, username, password, accessUrl, observations } = req.body;
+      const createdBy = (req as any).user?.email || null;
+      
+      if (!clientId || !platform) {
+        return res.status(400).json({ error: "clientId and platform are required" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO credentials (client_id, platform, username, password, access_url, observations, created_by)
+        VALUES (${clientId}, ${platform}, ${username || null}, ${password || null}, ${accessUrl || null}, ${observations || null}, ${createdBy})
+        RETURNING *
+      `);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating credential:", error);
+      res.status(500).json({ error: "Failed to create credential" });
+    }
+  });
+
+  // PATCH update credential
+  app.patch("/api/acessos/credentials/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { platform, username, password, accessUrl, observations } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE credentials 
+        SET platform = COALESCE(${platform}, platform),
+            username = COALESCE(${username}, username),
+            password = COALESCE(${password}, password),
+            access_url = COALESCE(${accessUrl}, access_url),
+            observations = COALESCE(${observations}, observations),
+            updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Credential not found" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error updating credential:", error);
+      res.status(500).json({ error: "Failed to update credential" });
+    }
+  });
+
+  // DELETE credential
+  app.delete("/api/acessos/credentials/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await db.execute(sql`DELETE FROM credentials WHERE id = ${id} RETURNING id`);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Credential not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting credential:", error);
+      res.status(500).json({ error: "Failed to delete credential" });
+    }
+  });
+
+  // ============================================
+  // Conhecimentos Module - Courses API
+  // ============================================
+
+  // GET all courses with filters
+  app.get("/api/conhecimentos", async (req, res) => {
+    try {
+      const { search, status, tema_principal, plataforma } = req.query;
+      
+      const conditions: ReturnType<typeof sql>[] = [];
+      
+      if (search) {
+        const searchPattern = `%${search}%`;
+        conditions.push(sql`(LOWER(nome) LIKE LOWER(${searchPattern}) OR LOWER(tema_principal) LIKE LOWER(${searchPattern}) OR LOWER(plataforma) LIKE LOWER(${searchPattern}))`);
+      }
+      
+      if (status) {
+        conditions.push(sql`status = ${status}`);
+      }
+      
+      if (tema_principal) {
+        conditions.push(sql`LOWER(tema_principal) = LOWER(${tema_principal})`);
+      }
+      
+      if (plataforma) {
+        conditions.push(sql`LOWER(plataforma) = LOWER(${plataforma})`);
+      }
+      
+      let result;
+      if (conditions.length > 0) {
+        const whereClause = sql.join(conditions, sql` AND `);
+        result = await db.execute(sql`SELECT * FROM courses WHERE ${whereClause} ORDER BY created_at DESC`);
+      } else {
+        result = await db.execute(sql`SELECT * FROM courses ORDER BY created_at DESC`);
+      }
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching courses:", error);
+      res.status(500).json({ error: "Failed to fetch courses" });
+    }
+  });
+
+  // GET single course
+  app.get("/api/conhecimentos/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await db.execute(sql`SELECT * FROM courses WHERE id = ${id}`);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error fetching course:", error);
+      res.status(500).json({ error: "Failed to fetch course" });
+    }
+  });
+
+  // POST create course
+  app.post("/api/conhecimentos", async (req, res) => {
+    try {
+      const { nome, status, temaPrincipal, plataforma, url, login, senha } = req.body;
+      const createdBy = (req as any).user?.email || null;
+      
+      if (!nome) {
+        return res.status(400).json({ error: "Nome is required" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO courses (nome, status, tema_principal, plataforma, url, login, senha, created_by)
+        VALUES (${nome}, ${status || 'sem_status'}, ${temaPrincipal || null}, ${plataforma || null}, ${url || null}, ${login || null}, ${senha || null}, ${createdBy})
+        RETURNING *
+      `);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating course:", error);
+      res.status(500).json({ error: "Failed to create course" });
+    }
+  });
+
+  // PATCH update course
+  app.patch("/api/conhecimentos/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { nome, status, temaPrincipal, plataforma, url, login, senha } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE courses 
+        SET nome = COALESCE(${nome}, nome),
+            status = COALESCE(${status}, status),
+            tema_principal = COALESCE(${temaPrincipal}, tema_principal),
+            plataforma = COALESCE(${plataforma}, plataforma),
+            url = COALESCE(${url}, url),
+            login = COALESCE(${login}, login),
+            senha = COALESCE(${senha}, senha),
+            updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error updating course:", error);
+      res.status(500).json({ error: "Failed to update course" });
+    }
+  });
+
+  // DELETE course
+  app.delete("/api/conhecimentos/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await db.execute(sql`DELETE FROM courses WHERE id = ${id} RETURNING id`);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting course:", error);
+      res.status(500).json({ error: "Failed to delete course" });
+    }
+  });
+
+  // ============================================
+  // Benefícios Module - Benefits API
+  // ============================================
+
+  // GET all benefits with filters
+  app.get("/api/beneficios", async (req, res) => {
+    try {
+      const { search, segmento } = req.query;
+      
+      const conditions: ReturnType<typeof sql>[] = [];
+      
+      if (search) {
+        const searchPattern = `%${search}%`;
+        conditions.push(sql`(LOWER(empresa) LIKE LOWER(${searchPattern}) OR LOWER(cupom) LIKE LOWER(${searchPattern}) OR LOWER(site) LIKE LOWER(${searchPattern}))`);
+      }
+      
+      if (segmento) {
+        conditions.push(sql`segmento = ${segmento}`);
+      }
+      
+      let result;
+      if (conditions.length > 0) {
+        const whereClause = sql.join(conditions, sql` AND `);
+        result = await db.execute(sql`SELECT * FROM benefits WHERE ${whereClause} ORDER BY created_at DESC`);
+      } else {
+        result = await db.execute(sql`SELECT * FROM benefits ORDER BY created_at DESC`);
+      }
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching benefits:", error);
+      res.status(500).json({ error: "Failed to fetch benefits" });
+    }
+  });
+
+  // GET single benefit
+  app.get("/api/beneficios/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await db.execute(sql`SELECT * FROM benefits WHERE id = ${id}`);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Benefit not found" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error fetching benefit:", error);
+      res.status(500).json({ error: "Failed to fetch benefit" });
+    }
+  });
+
+  // POST create benefit
+  app.post("/api/beneficios", async (req, res) => {
+    try {
+      const { empresa, cupom, desconto, site, segmento } = req.body;
+      const createdBy = (req as any).user?.email || null;
+      
+      if (!empresa) {
+        return res.status(400).json({ error: "Empresa is required" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO benefits (empresa, cupom, desconto, site, segmento, created_by)
+        VALUES (${empresa}, ${cupom || null}, ${desconto || null}, ${site || null}, ${segmento || null}, ${createdBy})
+        RETURNING *
+      `);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating benefit:", error);
+      res.status(500).json({ error: "Failed to create benefit" });
+    }
+  });
+
+  // PATCH update benefit
+  app.patch("/api/beneficios/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { empresa, cupom, desconto, site, segmento } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE benefits 
+        SET empresa = COALESCE(${empresa}, empresa),
+            cupom = COALESCE(${cupom}, cupom),
+            desconto = COALESCE(${desconto}, desconto),
+            site = COALESCE(${site}, site),
+            segmento = COALESCE(${segmento}, segmento),
+            updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Benefit not found" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error updating benefit:", error);
+      res.status(500).json({ error: "Failed to update benefit" });
+    }
+  });
+
+  // DELETE benefit
+  app.delete("/api/beneficios/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await db.execute(sql`DELETE FROM benefits WHERE id = ${id} RETURNING id`);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Benefit not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting benefit:", error);
+      res.status(500).json({ error: "Failed to delete benefit" });
+    }
+  });
+
+  // ============================================
+  // Ferramentas Module - Turbo Tools API
+  // ============================================
+
+  // GET all tools
+  app.get("/api/ferramentas", async (req, res) => {
+    try {
+      const { search } = req.query;
+      
+      let result;
+      if (search) {
+        const searchPattern = `%${search}%`;
+        result = await db.execute(sql`
+          SELECT * FROM turbo_tools
+          WHERE LOWER(name) LIKE LOWER(${searchPattern}) OR LOWER(site) LIKE LOWER(${searchPattern})
+          ORDER BY created_at DESC
+        `);
+      } else {
+        result = await db.execute(sql`SELECT * FROM turbo_tools ORDER BY created_at DESC`);
+      }
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching tools:", error);
+      res.status(500).json({ error: "Failed to fetch tools" });
+    }
+  });
+
+  // GET single tool
+  app.get("/api/ferramentas/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await db.execute(sql`SELECT * FROM turbo_tools WHERE id = ${id}`);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Tool not found" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error fetching tool:", error);
+      res.status(500).json({ error: "Failed to fetch tool" });
+    }
+  });
+
+  // POST create tool
+  app.post("/api/ferramentas", async (req, res) => {
+    try {
+      const { name, login, password, site, observations, valor, recorrencia, dataPrimeiroPagamento } = req.body;
+      const createdBy = (req as any).user?.email || null;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Name is required" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO turbo_tools (name, login, password, site, observations, valor, recorrencia, data_primeiro_pagamento, created_by)
+        VALUES (${name}, ${login || null}, ${password || null}, ${site || null}, ${observations || null}, ${valor || null}, ${recorrencia || null}, ${dataPrimeiroPagamento || null}, ${createdBy})
+        RETURNING *
+      `);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating tool:", error);
+      res.status(500).json({ error: "Failed to create tool" });
+    }
+  });
+
+  // PATCH update tool
+  app.patch("/api/ferramentas/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, login, password, site, observations, valor, recorrencia, dataPrimeiroPagamento } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE turbo_tools 
+        SET name = COALESCE(${name}, name),
+            login = COALESCE(${login}, login),
+            password = COALESCE(${password}, password),
+            site = COALESCE(${site}, site),
+            observations = COALESCE(${observations}, observations),
+            valor = COALESCE(${valor}, valor),
+            recorrencia = COALESCE(${recorrencia}, recorrencia),
+            data_primeiro_pagamento = COALESCE(${dataPrimeiroPagamento}, data_primeiro_pagamento),
+            updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Tool not found" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error updating tool:", error);
+      res.status(500).json({ error: "Failed to update tool" });
+    }
+  });
+
+  // DELETE tool
+  app.delete("/api/ferramentas/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await db.execute(sql`DELETE FROM turbo_tools WHERE id = ${id} RETURNING id`);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Tool not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting tool:", error);
+      res.status(500).json({ error: "Failed to delete tool" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
