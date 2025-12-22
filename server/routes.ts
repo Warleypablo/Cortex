@@ -8511,13 +8511,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT id, name FROM clients WHERE linked_client_cnpj IS NULL
       `);
       
-      // Get active cup_clientes (from CRM)
-      const cupClientes = await db.execute(sql`
-        SELECT nome, cnpj FROM cup_clientes WHERE LOWER(status) = 'ativo'
+      // Get all caz_clientes (Conta Azul - mesma tabela da aba Clientes & Contratos)
+      const cazClientes = await db.execute(sql`
+        SELECT id, nome, cnpj FROM caz_clientes WHERE nome IS NOT NULL
       `);
       
-      if (acessosClients.rows.length === 0 || cupClientes.rows.length === 0) {
-        return res.json({ matches: [], message: "Não há clientes para vincular ou não há clientes ativos no CRM" });
+      if (acessosClients.rows.length === 0 || cazClientes.rows.length === 0) {
+        return res.json({ matches: [], message: "Não há clientes para vincular ou não há clientes no Conta Azul" });
       }
       
       // Normalize function for name comparison
@@ -8537,16 +8537,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         normalized: normalizeName(r.name || '')
       }));
       
-      const cupList = cupClientes.rows.map((r: any) => ({ 
+      const cazList = cazClientes.rows.map((r: any) => ({ 
+        id: r.id,
         nome: r.nome, 
         cnpj: r.cnpj,
         normalized: normalizeName(r.nome || '')
       }));
       
-      // Create a lookup map for cup_clientes by normalized name
-      const cupByNormalized = new Map<string, any>();
-      cupList.forEach(c => {
-        if (c.normalized) cupByNormalized.set(c.normalized, c);
+      // Create a lookup map for caz_clientes by normalized name
+      const cazByNormalized = new Map<string, any>();
+      cazList.forEach(c => {
+        if (c.normalized) cazByNormalized.set(c.normalized, c);
       });
       
       const matches: any[] = [];
@@ -8554,13 +8555,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // First pass: exact normalized name match
       for (const acessos of acessosList) {
-        const exactMatch = cupByNormalized.get(acessos.normalized);
+        const exactMatch = cazByNormalized.get(acessos.normalized);
         if (exactMatch) {
           matches.push({
             acessosId: acessos.id,
             acessosName: acessos.name,
-            cupCnpj: exactMatch.cnpj,
-            cupNome: exactMatch.nome,
+            cazId: exactMatch.id,
+            cazCnpj: exactMatch.cnpj,
+            cazNome: exactMatch.nome,
             confidence: "high",
             reason: "Nome idêntico (match exato)"
           });
@@ -8570,7 +8572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Second pass: AI matching for unmatched clients (batch processing)
-      if (unmatchedAcessos.length > 0 && cupList.length > 0) {
+      if (unmatchedAcessos.length > 0 && cazList.length > 0) {
         // Process in batches of 20 to avoid token limits
         const batchSize = 20;
         for (let i = 0; i < unmatchedAcessos.length; i += batchSize) {
@@ -8580,11 +8582,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 TAREFA: Para cada empresa da Lista A, encontre a correspondência mais provável na Lista B, baseando-se APENAS na SIMILARIDADE DO NOME.
 
-LISTA A (Empresas a vincular):
+LISTA A (Empresas a vincular - módulo Acessos):
 ${batch.map(a => `- ID: ${a.id} | Nome: "${a.name}"`).join('\n')}
 
-LISTA B (Clientes do CRM - escolha daqui):
-${cupList.map(c => `- CNPJ: ${c.cnpj} | Nome: "${c.nome}"`).join('\n')}
+LISTA B (Clientes do Conta Azul - escolha daqui):
+${cazList.map(c => `- ID: ${c.id} | CNPJ: ${c.cnpj} | Nome: "${c.nome}"`).join('\n')}
 
 REGRAS DE MATCHING POR NOME:
 1. ALTA confiança: Nome praticamente idêntico (ex: "Lojas ABC" = "LOJAS ABC LTDA")
@@ -8593,7 +8595,7 @@ REGRAS DE MATCHING POR NOME:
 4. Se não houver match claro, NÃO inclua
 
 RETORNE um JSON array com objetos neste formato EXATO:
-[{"acessosId":"id","acessosName":"nome da Lista A","cupCnpj":"cnpj da Lista B","cupNome":"nome da Lista B","confidence":"high|medium|low","reason":"explicação breve"}]
+[{"acessosId":"id da Lista A","acessosName":"nome da Lista A","cazId":"id da Lista B","cazCnpj":"cnpj da Lista B","cazNome":"nome da Lista B","confidence":"high|medium|low","reason":"explicação breve"}]
 
 Retorne APENAS o JSON, sem markdown ou texto adicional.`;
 
@@ -8640,15 +8642,16 @@ Retorne APENAS o JSON, sem markdown ou texto adicional.`;
   // POST apply AI match - link a single client
   app.post("/api/acessos/apply-match", async (req, res) => {
     try {
-      const { acessosId, cupCnpj } = req.body;
+      const { acessosId, cazCnpj, cupCnpj } = req.body;
+      const cnpjToLink = cazCnpj || cupCnpj; // Support both old and new field names
       
-      if (!acessosId || !cupCnpj) {
-        return res.status(400).json({ error: "acessosId and cupCnpj are required" });
+      if (!acessosId || !cnpjToLink) {
+        return res.status(400).json({ error: "acessosId and cazCnpj are required" });
       }
       
       const result = await db.execute(sql`
         UPDATE clients 
-        SET linked_client_cnpj = ${cupCnpj},
+        SET linked_client_cnpj = ${cnpjToLink},
             updated_at = NOW()
         WHERE id = ${acessosId}
         RETURNING *
