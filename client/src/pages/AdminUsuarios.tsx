@@ -17,6 +17,15 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSetPageInfo } from "@/contexts/PageContext";
 
+interface ColaboradorVinculado {
+  id: number;
+  nome: string;
+  setor: string | null;
+  cargo: string | null;
+  squad: string | null;
+  status: string | null;
+}
+
 interface User {
   id: string;
   googleId: string;
@@ -26,6 +35,7 @@ interface User {
   createdAt: string;
   role: 'admin' | 'user';
   allowedRoutes: string[];
+  colaborador: ColaboradorVinculado | null;
 }
 
 interface DebugData {
@@ -524,9 +534,9 @@ export default function AdminUsuarios() {
                 <TableRow>
                   <TableHead>Usuário</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Colaborador</TableHead>
                   <TableHead>Função</TableHead>
                   <TableHead>Páginas Permitidas</TableHead>
-                  <TableHead>Data de Cadastro</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -550,6 +560,29 @@ export default function AdminUsuarios() {
                       {user.email}
                     </TableCell>
                     <TableCell>
+                      {user.colaborador ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {user.colaborador.setor || 'Sem setor'}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {user.colaborador.cargo || 'Sem cargo'}
+                          </p>
+                          {user.colaborador.squad && (
+                            <p className="text-xs text-muted-foreground">
+                              Squad: {user.colaborador.squad}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">
+                          Não vinculado
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
                         {user.role === 'admin' ? 'Admin' : 'Usuário'}
                       </Badge>
@@ -564,17 +597,6 @@ export default function AdminUsuarios() {
                           </span>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell data-testid={`text-created-${user.id}`}>
-                      {(() => {
-                        try {
-                          const date = new Date(user.createdAt);
-                          if (isNaN(date.getTime())) return '-';
-                          return format(date, "dd/MM/yyyy 'às' HH:mm");
-                        } catch {
-                          return '-';
-                        }
-                      })()}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
