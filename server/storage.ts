@@ -6777,6 +6777,148 @@ export class DbStorage implements IStorage {
       console.error('[search] Error searching projetos:', e);
     }
 
+    // Search acessos (clients table)
+    try {
+      const acessosResult = await db.execute(sql`
+        SELECT id::text, name, cnpj
+        FROM clients
+        WHERE name ILIKE ${searchTerm} OR cnpj ILIKE ${searchTerm}
+        LIMIT 20
+      `);
+      for (const row of acessosResult.rows) {
+        const r = row as any;
+        results.push({
+          id: r.id,
+          entity: 'acesso',
+          label: r.name || 'Cliente',
+          description: r.cnpj || undefined,
+          route: '/acessos',
+        });
+      }
+    } catch (e) {
+      console.error('[search] Error searching acessos:', e);
+    }
+
+    // Search credenciais (credentials table)
+    try {
+      const credenciaisResult = await db.execute(sql`
+        SELECT cr.id::text, cr.platform, cr.username, c.name as client_name
+        FROM credentials cr
+        LEFT JOIN clients c ON cr.client_id = c.id
+        WHERE cr.platform ILIKE ${searchTerm} OR cr.username ILIKE ${searchTerm} OR c.name ILIKE ${searchTerm}
+        LIMIT 20
+      `);
+      for (const row of credenciaisResult.rows) {
+        const r = row as any;
+        results.push({
+          id: r.id,
+          entity: 'credencial',
+          label: r.platform || 'Credencial',
+          description: r.client_name ? `${r.username} - ${r.client_name}` : r.username || undefined,
+          route: '/acessos',
+        });
+      }
+    } catch (e) {
+      console.error('[search] Error searching credenciais:', e);
+    }
+
+    // Search conhecimentos (courses table)
+    try {
+      const conhecimentosResult = await db.execute(sql`
+        SELECT id::text, nome, tema_principal, plataforma, status
+        FROM courses
+        WHERE nome ILIKE ${searchTerm} OR tema_principal ILIKE ${searchTerm} OR plataforma ILIKE ${searchTerm}
+        LIMIT 20
+      `);
+      for (const row of conhecimentosResult.rows) {
+        const r = row as any;
+        results.push({
+          id: r.id,
+          entity: 'conhecimento',
+          label: r.nome || 'Curso',
+          description: r.tema_principal || r.plataforma || undefined,
+          route: '/conhecimentos',
+          meta: {
+            status: r.status || undefined,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('[search] Error searching conhecimentos:', e);
+    }
+
+    // Search ferramentas (turbo_tools table)
+    try {
+      const ferramentasResult = await db.execute(sql`
+        SELECT id::text, nome, categoria, status
+        FROM turbo_tools
+        WHERE nome ILIKE ${searchTerm} OR categoria ILIKE ${searchTerm}
+        LIMIT 20
+      `);
+      for (const row of ferramentasResult.rows) {
+        const r = row as any;
+        results.push({
+          id: r.id,
+          entity: 'ferramenta',
+          label: r.nome || 'Ferramenta',
+          description: r.categoria || undefined,
+          route: '/ferramentas',
+          meta: {
+            status: r.status || undefined,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('[search] Error searching ferramentas:', e);
+    }
+
+    // Search patrimônio (ativos table)
+    try {
+      const patrimonioResult = await db.execute(sql`
+        SELECT id::text, nome, tipo, status, localizacao
+        FROM ativos
+        WHERE nome ILIKE ${searchTerm} OR tipo ILIKE ${searchTerm} OR localizacao ILIKE ${searchTerm}
+        LIMIT 20
+      `);
+      for (const row of patrimonioResult.rows) {
+        const r = row as any;
+        results.push({
+          id: r.id,
+          entity: 'patrimonio',
+          label: r.nome || 'Ativo',
+          description: r.tipo || r.localizacao || undefined,
+          route: '/patrimonio',
+          meta: {
+            status: r.status || undefined,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('[search] Error searching patrimônio:', e);
+    }
+
+    // Search benefícios (benefits table)
+    try {
+      const beneficiosResult = await db.execute(sql`
+        SELECT id::text, empresa, cupom, desconto, segmento
+        FROM benefits
+        WHERE empresa ILIKE ${searchTerm} OR cupom ILIKE ${searchTerm}
+        LIMIT 20
+      `);
+      for (const row of beneficiosResult.rows) {
+        const r = row as any;
+        results.push({
+          id: r.id,
+          entity: 'beneficio',
+          label: r.empresa || 'Benefício',
+          description: r.cupom ? `Cupom: ${r.cupom}` : r.segmento || undefined,
+          route: '/beneficios',
+        });
+      }
+    } catch (e) {
+      console.error('[search] Error searching benefícios:', e);
+    }
+
     return results;
   }
 }
