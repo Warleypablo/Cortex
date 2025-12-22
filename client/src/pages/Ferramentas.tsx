@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ExternalLink, BarChart3, Key, MessageSquare, FileText, Activity } from "lucide-react";
+import { ExternalLink, BarChart3, MessageSquare, FileText, Activity } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 
 interface Ferramenta {
@@ -17,13 +17,6 @@ const ferramentas: Ferramenta[] = [
     descricao: "Sistema de monitoramento e análise de performance",
     url: "https://moniturbo.turbopartners.com.br/",
     icon: Activity,
-  },
-  {
-    id: "2",
-    nome: "Sistema de Acessos",
-    descricao: "Gerenciamento de permissões e autenticação",
-    url: "#",
-    icon: Key,
   },
   {
     id: "3",
