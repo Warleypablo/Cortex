@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertColaboradorSchema, insertPatrimonioSchema } from "@shared/schema";
+import { insertColaboradorSchema, insertPatrimonioSchema, insertRhCargoSchema, insertRhNivelSchema, insertRhSquadSchema, insertRhPromocaoSchema } from "@shared/schema";
 import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
 import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole } from "./auth/userDb";
@@ -1012,7 +1012,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           c.*,
           COALESCE(
             json_agg(
-              json_build_object(
+              DISTINCT jsonb_build_object(
                 'id', p.id,
                 'numeroAtivo', p.numero_ativo,
                 'descricao', p.descricao,
@@ -1032,6 +1032,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const row = result.rows[0] as any;
+      
+      // Fetch promotion history
+      const promocoesResult = await db.execute(sql`
+        SELECT 
+          id, 
+          colaborador_id as "colaboradorId",
+          data_promocao as "dataPromocao",
+          cargo_anterior as "cargoAnterior",
+          cargo_novo as "cargoNovo",
+          nivel_anterior as "nivelAnterior",
+          nivel_novo as "nivelNovo",
+          salario_anterior as "salarioAnterior",
+          salario_novo as "salarioNovo",
+          observacoes,
+          criado_em as "criadoEm",
+          criado_por as "criadoPor"
+        FROM rh_promocoes 
+        WHERE colaborador_id = ${id}
+        ORDER BY data_promocao DESC
+      `);
+      
+      // Fetch linked user info if user_id exists
+      let linkedUser = null;
+      if (row.user_id) {
+        const userResult = await db.execute(sql`
+          SELECT id, email, name, picture, role
+          FROM auth_users
+          WHERE id = ${row.user_id}
+        `);
+        if (userResult.rows.length > 0) {
+          linkedUser = userResult.rows[0];
+        }
+      }
+      
       const colaborador = {
         id: row.id,
         status: row.status,
@@ -1039,6 +1073,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cpf: row.cpf,
         endereco: row.endereco,
         estado: row.estado,
+        cidade: row.cidade,
         telefone: row.telefone,
         aniversario: row.aniversario,
         admissao: row.admissao,
@@ -1059,7 +1094,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ultimoAumento: row.ultimo_aumento,
         mesesUltAumento: row.meses_ult_aumento,
         salario: row.salario,
+        userId: row.user_id,
         patrimonios: row.patrimonios || [],
+        promocoes: promocoesResult.rows || [],
+        linkedUser: linkedUser,
       };
       
       res.json(colaborador);
@@ -1203,6 +1241,275 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error updating patrimonio responsavel:", error);
       res.status(500).json({ error: "Failed to update patrimonio responsavel" });
+    }
+  });
+
+  // ============ RH Cargos Endpoints ============
+  app.get("/api/rh/cargos", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, nome, descricao, ativo, criado_em as "criadoEm"
+        FROM rh_cargos 
+        WHERE ativo = 'true' 
+        ORDER BY nome
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching cargos:", error);
+      res.status(500).json({ error: "Failed to fetch cargos" });
+    }
+  });
+
+  app.post("/api/rh/cargos", isAdmin, async (req, res) => {
+    try {
+      const validation = insertRhCargoSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid data", details: validation.error });
+      }
+      const { nome, descricao, ativo } = validation.data;
+      const result = await db.execute(sql`
+        INSERT INTO rh_cargos (nome, descricao, ativo)
+        VALUES (${nome}, ${descricao || null}, ${ativo || 'true'})
+        RETURNING id, nome, descricao, ativo, criado_em as "criadoEm"
+      `);
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating cargo:", error);
+      res.status(500).json({ error: "Failed to create cargo" });
+    }
+  });
+
+  app.delete("/api/rh/cargos/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid cargo ID" });
+      }
+      await db.execute(sql`
+        UPDATE rh_cargos SET ativo = 'false' WHERE id = ${id}
+      `);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[api] Error deleting cargo:", error);
+      res.status(500).json({ error: "Failed to delete cargo" });
+    }
+  });
+
+  // ============ RH Níveis Endpoints ============
+  app.get("/api/rh/niveis", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, nome, ordem, ativo, criado_em as "criadoEm"
+        FROM rh_niveis 
+        WHERE ativo = 'true' 
+        ORDER BY ordem, nome
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching niveis:", error);
+      res.status(500).json({ error: "Failed to fetch niveis" });
+    }
+  });
+
+  app.post("/api/rh/niveis", isAdmin, async (req, res) => {
+    try {
+      const validation = insertRhNivelSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid data", details: validation.error });
+      }
+      const { nome, ordem, ativo } = validation.data;
+      const result = await db.execute(sql`
+        INSERT INTO rh_niveis (nome, ordem, ativo)
+        VALUES (${nome}, ${ordem || 0}, ${ativo || 'true'})
+        RETURNING id, nome, ordem, ativo, criado_em as "criadoEm"
+      `);
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating nivel:", error);
+      res.status(500).json({ error: "Failed to create nivel" });
+    }
+  });
+
+  app.delete("/api/rh/niveis/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid nivel ID" });
+      }
+      await db.execute(sql`
+        UPDATE rh_niveis SET ativo = 'false' WHERE id = ${id}
+      `);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[api] Error deleting nivel:", error);
+      res.status(500).json({ error: "Failed to delete nivel" });
+    }
+  });
+
+  // ============ RH Squads Endpoints ============
+  app.get("/api/rh/squads", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, nome, descricao, ativo, criado_em as "criadoEm"
+        FROM rh_squads 
+        WHERE ativo = 'true' 
+        ORDER BY nome
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching squads:", error);
+      res.status(500).json({ error: "Failed to fetch squads" });
+    }
+  });
+
+  app.post("/api/rh/squads", isAdmin, async (req, res) => {
+    try {
+      const validation = insertRhSquadSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid data", details: validation.error });
+      }
+      const { nome, descricao, ativo } = validation.data;
+      const result = await db.execute(sql`
+        INSERT INTO rh_squads (nome, descricao, ativo)
+        VALUES (${nome}, ${descricao || null}, ${ativo || 'true'})
+        RETURNING id, nome, descricao, ativo, criado_em as "criadoEm"
+      `);
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating squad:", error);
+      res.status(500).json({ error: "Failed to create squad" });
+    }
+  });
+
+  app.delete("/api/rh/squads/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid squad ID" });
+      }
+      await db.execute(sql`
+        UPDATE rh_squads SET ativo = 'false' WHERE id = ${id}
+      `);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[api] Error deleting squad:", error);
+      res.status(500).json({ error: "Failed to delete squad" });
+    }
+  });
+
+  // ============ Promoções Endpoints ============
+  app.get("/api/colaboradores/:id/promocoes", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid colaborador ID" });
+      }
+      const result = await db.execute(sql`
+        SELECT 
+          id, 
+          colaborador_id as "colaboradorId",
+          data_promocao as "dataPromocao",
+          cargo_anterior as "cargoAnterior",
+          cargo_novo as "cargoNovo",
+          nivel_anterior as "nivelAnterior",
+          nivel_novo as "nivelNovo",
+          salario_anterior as "salarioAnterior",
+          salario_novo as "salarioNovo",
+          observacoes,
+          criado_em as "criadoEm",
+          criado_por as "criadoPor"
+        FROM rh_promocoes 
+        WHERE colaborador_id = ${id}
+        ORDER BY data_promocao DESC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching promocoes:", error);
+      res.status(500).json({ error: "Failed to fetch promocoes" });
+    }
+  });
+
+  app.post("/api/colaboradores/:id/promocoes", async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.id);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "Invalid colaborador ID" });
+      }
+      const validation = insertRhPromocaoSchema.safeParse({ ...req.body, colaboradorId });
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid data", details: validation.error });
+      }
+      const { dataPromocao, cargoAnterior, cargoNovo, nivelAnterior, nivelNovo, salarioAnterior, salarioNovo, observacoes, criadoPor } = validation.data;
+      const result = await db.execute(sql`
+        INSERT INTO rh_promocoes (colaborador_id, data_promocao, cargo_anterior, cargo_novo, nivel_anterior, nivel_novo, salario_anterior, salario_novo, observacoes, criado_por)
+        VALUES (${colaboradorId}, ${dataPromocao}, ${cargoAnterior || null}, ${cargoNovo || null}, ${nivelAnterior || null}, ${nivelNovo || null}, ${salarioAnterior || null}, ${salarioNovo || null}, ${observacoes || null}, ${criadoPor || null})
+        RETURNING 
+          id, 
+          colaborador_id as "colaboradorId",
+          data_promocao as "dataPromocao",
+          cargo_anterior as "cargoAnterior",
+          cargo_novo as "cargoNovo",
+          nivel_anterior as "nivelAnterior",
+          nivel_novo as "nivelNovo",
+          salario_anterior as "salarioAnterior",
+          salario_novo as "salarioNovo",
+          observacoes,
+          criado_em as "criadoEm",
+          criado_por as "criadoPor"
+      `);
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating promocao:", error);
+      res.status(500).json({ error: "Failed to create promocao" });
+    }
+  });
+
+  // ============ Geo Endpoints (Estados e Cidades) ============
+  const estadosBrasileiros = [
+    { uf: 'AC', nome: 'Acre' }, { uf: 'AL', nome: 'Alagoas' }, { uf: 'AP', nome: 'Amapá' },
+    { uf: 'AM', nome: 'Amazonas' }, { uf: 'BA', nome: 'Bahia' }, { uf: 'CE', nome: 'Ceará' },
+    { uf: 'DF', nome: 'Distrito Federal' }, { uf: 'ES', nome: 'Espírito Santo' },
+    { uf: 'GO', nome: 'Goiás' }, { uf: 'MA', nome: 'Maranhão' }, { uf: 'MT', nome: 'Mato Grosso' },
+    { uf: 'MS', nome: 'Mato Grosso do Sul' }, { uf: 'MG', nome: 'Minas Gerais' },
+    { uf: 'PA', nome: 'Pará' }, { uf: 'PB', nome: 'Paraíba' }, { uf: 'PR', nome: 'Paraná' },
+    { uf: 'PE', nome: 'Pernambuco' }, { uf: 'PI', nome: 'Piauí' }, { uf: 'RJ', nome: 'Rio de Janeiro' },
+    { uf: 'RN', nome: 'Rio Grande do Norte' }, { uf: 'RS', nome: 'Rio Grande do Sul' },
+    { uf: 'RO', nome: 'Rondônia' }, { uf: 'RR', nome: 'Roraima' }, { uf: 'SC', nome: 'Santa Catarina' },
+    { uf: 'SP', nome: 'São Paulo' }, { uf: 'SE', nome: 'Sergipe' }, { uf: 'TO', nome: 'Tocantins' }
+  ];
+
+  app.get("/api/geo/estados", async (req, res) => {
+    try {
+      res.json(estadosBrasileiros);
+    } catch (error) {
+      console.error("[api] Error fetching estados:", error);
+      res.status(500).json({ error: "Failed to fetch estados" });
+    }
+  });
+
+  app.get("/api/geo/cidades/:uf", async (req, res) => {
+    try {
+      const { uf } = req.params;
+      if (!uf || uf.length !== 2) {
+        return res.status(400).json({ error: "Invalid UF - must be 2 characters" });
+      }
+      const estado = estadosBrasileiros.find(e => e.uf.toUpperCase() === uf.toUpperCase());
+      if (!estado) {
+        return res.status(404).json({ error: "Estado not found" });
+      }
+      const response = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf.toUpperCase()}/municipios`);
+      if (!response.ok) {
+        throw new Error(`IBGE API returned status ${response.status}`);
+      }
+      const cidades = await response.json();
+      const cidadesFormatadas = cidades.map((c: any) => ({
+        id: c.id,
+        nome: c.nome
+      })).sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+      res.json(cidadesFormatadas);
+    } catch (error) {
+      console.error("[api] Error fetching cidades:", error);
+      res.status(500).json({ error: "Failed to fetch cidades from IBGE API" });
     }
   });
 
