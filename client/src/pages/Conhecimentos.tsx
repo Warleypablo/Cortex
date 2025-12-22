@@ -977,9 +977,9 @@ export default function Conhecimentos() {
                         <TableCell colSpan={6} className="py-3">
                           <div className="pl-10 space-y-2">
                             <div className="text-sm font-medium text-muted-foreground mb-2">Credenciais de Acesso</div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="flex flex-wrap gap-x-8 gap-y-3">
                               {course.url && (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 shrink-0">
                                   <span className="text-muted-foreground text-sm">URL:</span>
                                   <a
                                     href={course.url}
@@ -993,13 +993,13 @@ export default function Conhecimentos() {
                                 </div>
                               )}
                               {course.login && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground text-sm">Login:</span>
-                                  <span className="text-sm">{course.login}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-muted-foreground text-sm whitespace-nowrap">Login:</span>
+                                  <span className="text-sm break-all">{course.login}</span>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6"
+                                    className="h-6 w-6 shrink-0"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       copyToClipboard(course.login!, "Login");
@@ -1010,15 +1010,15 @@ export default function Conhecimentos() {
                                 </div>
                               )}
                               {course.senha && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-muted-foreground text-sm">Senha:</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-muted-foreground text-sm whitespace-nowrap">Senha:</span>
                                   <span className="text-sm font-mono">
                                     {isPasswordVisible ? course.senha : "••••••••"}
                                   </span>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6"
+                                    className="h-6 w-6 shrink-0"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       togglePasswordVisibility(course.id);
@@ -1029,7 +1029,7 @@ export default function Conhecimentos() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6"
+                                    className="h-6 w-6 shrink-0"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       copyToClipboard(course.senha!, "Senha");
