@@ -8,6 +8,7 @@ import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { useQuery } from "@tanstack/react-query";
 import { format, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { formatCurrency, formatCurrencyCompact, formatDecimal } from "@/lib/utils";
 import { 
   Users, 
   FileText, 
@@ -81,28 +82,13 @@ interface InvestorsReportData {
   }>;
 }
 
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-};
-
 const formatCurrencyShort = (value: number) => {
-  if (value >= 1000000) {
-    return `R$ ${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `R$ ${(value / 1000).toFixed(0)}K`;
-  }
-  return formatCurrency(value);
+  return formatCurrencyCompact(value);
 };
 
-const formatPercent = (value: number) => {
+const formatPercentSigned = (value: number) => {
   const sign = value >= 0 ? '+' : '';
-  return `${sign}${value.toFixed(1)}%`;
+  return `${sign}${formatDecimal(value)}%`;
 };
 
 const COLORS = ['#1978D5', '#041F60', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'];
@@ -525,7 +511,7 @@ export default function InvestorsReport() {
                     <span className="text-muted-foreground text-sm">Cresc. YoY</span>
                   </div>
                   <div className={`text-3xl font-bold ${yoyGrowth && yoyGrowth.growth >= 0 ? 'text-green-400' : 'text-red-400'}`} data-testid="kpi-yoy">
-                    {yoyGrowth ? formatPercent(yoyGrowth.growth) : 'N/A'}
+                    {yoyGrowth ? formatPercentSigned(yoyGrowth.growth) : 'N/A'}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {yoyGrowth ? `${yoyGrowth.previousYear} → ${yoyGrowth.currentYear}` : 'Dados insuf.'}
@@ -551,7 +537,7 @@ export default function InvestorsReport() {
                     <span className="text-muted-foreground text-sm">Inadimplência</span>
                   </div>
                   <div className="text-2xl font-bold text-red-400" data-testid="kpi-inadimplencia">
-                    {data?.receita.taxaInadimplencia?.toFixed(1) || '0.0'}%
+                    {formatDecimal(data?.receita.taxaInadimplencia || 0)}%
                   </div>
                 </div>
               )}
@@ -611,7 +597,7 @@ export default function InvestorsReport() {
                     <span className="text-muted-foreground text-sm">Margem Média</span>
                   </div>
                   <div className={`text-2xl font-bold ${avgMargem >= 0 ? 'text-green-400' : 'text-red-400'}`} data-testid="kpi-margem">
-                    {avgMargem.toFixed(1)}%
+                    {formatDecimal(avgMargem)}%
                   </div>
                 </div>
               )}
@@ -902,7 +888,7 @@ export default function InvestorsReport() {
                           {formatCurrency(item.geracaoCaixa)}
                         </td>
                         <td className={`py-3 px-4 text-right font-medium ${item.margem >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {item.margem.toFixed(1)}%
+                          {formatDecimal(item.margem)}%
                         </td>
                       </tr>
                     ))}
@@ -969,7 +955,7 @@ export default function InvestorsReport() {
                         {formatCurrency(totals.geracaoCaixa)}
                       </td>
                       <td className={`py-3 px-3 text-right ${totals.faturamento > 0 && (totals.geracaoCaixa / totals.faturamento) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {totals.faturamento > 0 ? ((totals.geracaoCaixa / totals.faturamento) * 100).toFixed(1) : '0.0'}%
+                        {totals.faturamento > 0 ? formatDecimal((totals.geracaoCaixa / totals.faturamento) * 100) : '0'}%
                       </td>
                       <td className="py-3 px-3 text-right text-muted-foreground">—</td>
                     </tr>

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -455,24 +456,6 @@ export default function DashboardInadimplencia() {
     }));
   }, [resumoData]);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatCurrencyCompact = (value: number) => {
-    if (Math.abs(value) >= 1000000) {
-      return `R$ ${(value / 1000000).toFixed(1)}M`;
-    }
-    if (Math.abs(value) >= 1000) {
-      return `R$ ${(value / 1000).toFixed(0)}k`;
-    }
-    return `R$ ${value.toFixed(0)}`;
-  };
 
   const limparFiltros = () => {
     setDateRange(undefined);
@@ -857,7 +840,7 @@ export default function DashboardInadimplencia() {
                     style={{ backgroundColor: faixa.fill }}
                   />
                   <span className="text-muted-foreground">{faixa.name}:</span>
-                  <span className="font-medium">{faixa.percentual.toFixed(1)}%</span>
+                  <span className="font-medium">{formatPercent(faixa.percentual)}</span>
                   <span className="text-muted-foreground">({faixa.quantidade})</span>
                 </div>
               ))}
@@ -959,7 +942,7 @@ export default function DashboardInadimplencia() {
                       {formatCurrency(empresa.valorTotal)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {empresa.percentual.toFixed(1)}%
+                      {formatPercent(empresa.percentual)}
                     </p>
                   </div>
                 </div>
@@ -1007,7 +990,7 @@ export default function DashboardInadimplencia() {
                       {formatCurrency(metodo.valorTotal)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {metodo.percentual.toFixed(1)}%
+                      {formatPercent(metodo.percentual)}
                     </p>
                   </div>
                 </div>

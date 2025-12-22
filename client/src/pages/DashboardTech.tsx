@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -83,21 +84,6 @@ interface TechVelocidade {
   tempoMedioEntrega: number;
   taxaCumprimentoPrazo: number;
 }
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-};
-
-const formatCurrencyShort = (value: number) => {
-  if (value >= 1000000) return `R$${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `R$${(value / 1000).toFixed(0)}K`;
-  return `R$${value}`;
-};
 
 const STATUS_COLORS: Record<string, string> = {
   'deploy': '#22c55e',
@@ -355,7 +341,7 @@ export default function DashboardTech() {
                     <Skeleton className="h-7 w-20 mt-1" />
                   ) : (
                     <p className="text-xl font-bold text-purple-600" data-testid="text-valor-total">
-                      {formatCurrencyShort(metricas?.valorTotalProjetos || 0)}
+                      {formatCurrencyCompact(metricas?.valorTotalProjetos || 0)}
                     </p>
                   )}
                 </div>
@@ -396,7 +382,7 @@ export default function DashboardTech() {
                     <Skeleton className="h-7 w-14 mt-1" />
                   ) : (
                     <p className="text-2xl font-bold text-cyan-600" data-testid="text-taxa-prazo">
-                      {(velocidade?.taxaCumprimentoPrazo || 0).toFixed(0)}%
+                      {formatPercent(velocidade?.taxaCumprimentoPrazo || 0)}
                     </p>
                   )}
                 </div>
@@ -497,7 +483,7 @@ export default function DashboardTech() {
                       taxaPrazo >= 80 ? 'text-green-600' : 
                       taxaPrazo >= 60 ? 'text-yellow-600' : 'text-red-600'
                     }`}>
-                      {taxaPrazo.toFixed(0)}%
+                      {formatPercent(taxaPrazo)}
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">
                       {taxaPrazo >= 80 ? 'Excelente' : taxaPrazo >= 60 ? 'Atenção' : 'Crítico'}

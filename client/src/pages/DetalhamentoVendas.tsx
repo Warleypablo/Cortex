@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
+import { formatCurrency, formatCurrencyCompact, formatDecimal } from "@/lib/utils";
 import { 
   BarChart3,
   TrendingUp,
@@ -121,25 +122,6 @@ interface Filtros {
   categories: string[];
   closers: string[];
 }
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value);
-};
-
-const formatCurrencyCompact = (value: number) => {
-  if (value >= 1000000) {
-    return `R$ ${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `R$ ${(value / 1000).toFixed(0)}k`;
-  }
-  return `R$ ${value.toFixed(0)}`;
-};
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return '-';
@@ -458,7 +440,7 @@ export default function DetalhamentoVendas() {
                 <Skeleton className="h-7 w-16 bg-muted" />
               ) : (
                 <div className="text-xl font-bold text-amber-400" data-testid="text-ciclo-medio">
-                  {(metricas?.cicloMedioDias || 0).toFixed(0)}d
+                  {formatDecimal(metricas?.cicloMedioDias || 0, 0)}d
                 </div>
               )}
             </CardContent>
@@ -651,7 +633,7 @@ export default function DetalhamentoVendas() {
                                   'bg-red-500/10 text-red-400 border-red-500/30'
                                 }`}
                               >
-                                {n.cicloDias.toFixed(0)}d
+                                {formatDecimal(n.cicloDias, 0)}d
                               </Badge>
                             </td>
                             <td className="p-2">
@@ -744,7 +726,7 @@ export default function DetalhamentoVendas() {
                         <div className="flex items-center gap-3">
                           <span className="text-muted-foreground">{item.quantidade} neg.</span>
                           <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-400 border-amber-500/30">
-                            {(item.cicloMedio || 0).toFixed(0)}d
+                            {formatDecimal(item.cicloMedio || 0, 0)}d
                           </Badge>
                           <span className="text-foreground font-medium">{formatCurrency(item.total)}</span>
                         </div>

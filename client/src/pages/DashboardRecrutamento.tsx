@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePageInfo } from "@/contexts/PageContext";
+import { formatDecimal, formatPercent } from "@/lib/utils";
 import { 
   Users, UserPlus, UserCheck, Target, Briefcase, TrendingUp, TrendingDown,
   Filter, BarChart3, PieChart as PieChartIcon, Activity, Clock, Search,
@@ -120,8 +121,6 @@ export default function DashboardRecrutamento() {
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat('pt-BR').format(value);
   };
-
-  const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
   const funilData = useMemo(() => {
     if (!funil) return [];
@@ -478,7 +477,7 @@ export default function DashboardRecrutamento() {
               <KPICard
                 title="Entrevistas Finais"
                 value={formatNumber(entrevistasRealizadas?.entrevistaFinal || 0)}
-                subtitle={`Média: ${(entrevistasRealizadas?.mediaEntrevistasPorVaga || 0).toFixed(1)}/vaga`}
+                subtitle={`Média: ${formatDecimal(entrevistasRealizadas?.mediaEntrevistasPorVaga || 0)}/vaga`}
                 icon={UserCheck}
                 loading={isLoadingEntrevistas}
                 variant="success"

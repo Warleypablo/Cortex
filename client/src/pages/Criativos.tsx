@@ -16,6 +16,7 @@ import { getMetricColor, getColorClasses, COLOR_TOKENS, AVAILABLE_METRICS, type 
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MetricRulesetWithThresholds } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency as formatCurrencyUtil, formatDecimal as formatDecimalUtil, formatPercent as formatPercentUtil } from "@/lib/utils";
 
 interface CriativoData {
   id: string;
@@ -65,17 +66,6 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 };
 
-
-function formatCurrency(value: number | null): string {
-  if (value === null) return '-';
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
 function formatNumber(value: number | null): string {
   if (value === null) return '-';
   return new Intl.NumberFormat("pt-BR").format(value);
@@ -83,7 +73,12 @@ function formatNumber(value: number | null): string {
 
 function formatPercent(value: number | null): string {
   if (value === null) return '-';
-  return `${value}%`;
+  return formatPercentUtil(value);
+}
+
+function formatCurrency(value: number | null): string {
+  if (value === null) return '-';
+  return formatCurrencyUtil(value);
 }
 
 export default function Criativos() {
@@ -606,10 +601,10 @@ export default function Criativos() {
                         </TableCell>
                         <TableCell className="text-right">{formatCurrency(item.investimento)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.impressions)}</TableCell>
-                        <TableCell className={`text-right ${getCellColor(item.frequency, 'frequency')}`}>{item.frequency !== null ? item.frequency.toFixed(2) : '-'}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.frequency, 'frequency')}`}>{item.frequency !== null ? formatDecimalUtil(item.frequency) : '-'}</TableCell>
                         <TableCell className={`text-right ${getCellColor(item.videoHook, 'videoHook')}`}>{formatPercent(item.videoHook)}</TableCell>
                         <TableCell className={`text-right ${getCellColor(item.videoHold, 'videoHold')}`}>{formatPercent(item.videoHold)}</TableCell>
-                        <TableCell className={`text-right ${getCellColor(item.ctr, 'ctr')}`}>{item.ctr !== null ? `${item.ctr}%` : '-'}</TableCell>
+                        <TableCell className={`text-right ${getCellColor(item.ctr, 'ctr')}`}>{formatPercent(item.ctr)}</TableCell>
                         <TableCell className={`text-right ${getCellColor(item.cpm, 'cpm')}`}>{formatCurrency(item.cpm)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.leads)}</TableCell>
                         <TableCell className={`text-right ${getCellColor(item.cpl, 'cpl')}`}>{formatCurrency(item.cpl)}</TableCell>
