@@ -8500,73 +8500,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST AI matching for client linking
+  // POST AI matching for client linking - improved algorithm
   app.post("/api/acessos/ai-match-clients", async (req, res) => {
     try {
       const OpenAI = (await import("openai")).default;
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       
-      // Get unlinked acessos clients
+      // Get unlinked acessos clients (from clients table - module Acessos)
       const acessosClients = await db.execute(sql`
-        SELECT id, name, cnpj FROM clients WHERE linked_client_cnpj IS NULL
+        SELECT id, name FROM clients WHERE linked_client_cnpj IS NULL
       `);
       
-      // Get active cup_clientes (case-insensitive status check)
+      // Get active cup_clientes (from CRM)
       const cupClientes = await db.execute(sql`
         SELECT nome, cnpj FROM cup_clientes WHERE LOWER(status) = 'ativo'
       `);
       
       if (acessosClients.rows.length === 0 || cupClientes.rows.length === 0) {
-        return res.json({ matches: [], message: "No unlinked clients or no active clients to match" });
+        return res.json({ matches: [], message: "Não há clientes para vincular ou não há clientes ativos no CRM" });
       }
       
-      const acessosList = acessosClients.rows.map((r: any) => ({ id: r.id, name: r.name, cnpj: r.cnpj }));
-      const cupList = cupClientes.rows.map((r: any) => ({ nome: r.nome, cnpj: r.cnpj }));
+      // Normalize function for name comparison
+      const normalizeName = (name: string): string => {
+        return name
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // remove accents
+          .replace(/[^a-z0-9\s]/g, '') // remove special chars
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
       
-      const prompt = `Você é um assistente que ajuda a vincular clientes entre dois sistemas.
-
-Sistema A (Acessos - credenciais):
-${JSON.stringify(acessosList, null, 2)}
-
-Sistema B (CRM - clientes ativos):
-${JSON.stringify(cupList, null, 2)}
-
-Analise os nomes e CNPJs e encontre correspondências prováveis entre os dois sistemas.
-Para cada match encontrado, retorne um JSON array com objetos no formato:
-{
-  "acessosId": "id do cliente no Sistema A",
-  "acessosName": "nome no Sistema A",
-  "cupCnpj": "cnpj do cliente no Sistema B",
-  "cupNome": "nome no Sistema B",
-  "confidence": "high" | "medium" | "low",
-  "reason": "razão do match"
-}
-
-Considere:
-- Match exato de CNPJ = confidence high
-- Nomes muito similares = confidence medium/high
-- Nomes parcialmente similares = confidence low
-
-Retorne APENAS o JSON array, sem explicações adicionais.`;
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.2,
+      const acessosList = acessosClients.rows.map((r: any) => ({ 
+        id: r.id, 
+        name: r.name,
+        normalized: normalizeName(r.name || '')
+      }));
+      
+      const cupList = cupClientes.rows.map((r: any) => ({ 
+        nome: r.nome, 
+        cnpj: r.cnpj,
+        normalized: normalizeName(r.nome || '')
+      }));
+      
+      // Create a lookup map for cup_clientes by normalized name
+      const cupByNormalized = new Map<string, any>();
+      cupList.forEach(c => {
+        if (c.normalized) cupByNormalized.set(c.normalized, c);
       });
-
-      const content = response.choices[0].message.content || "[]";
-      let matches = [];
       
-      try {
-        // Try to parse JSON from the response
-        const jsonMatch = content.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          matches = JSON.parse(jsonMatch[0]);
+      const matches: any[] = [];
+      const unmatchedAcessos: any[] = [];
+      
+      // First pass: exact normalized name match
+      for (const acessos of acessosList) {
+        const exactMatch = cupByNormalized.get(acessos.normalized);
+        if (exactMatch) {
+          matches.push({
+            acessosId: acessos.id,
+            acessosName: acessos.name,
+            cupCnpj: exactMatch.cnpj,
+            cupNome: exactMatch.nome,
+            confidence: "high",
+            reason: "Nome idêntico (match exato)"
+          });
+        } else {
+          unmatchedAcessos.push(acessos);
         }
-      } catch (parseError) {
-        console.error("[api] Error parsing AI response:", parseError);
       }
+      
+      // Second pass: AI matching for unmatched clients (batch processing)
+      if (unmatchedAcessos.length > 0 && cupList.length > 0) {
+        // Process in batches of 20 to avoid token limits
+        const batchSize = 20;
+        for (let i = 0; i < unmatchedAcessos.length; i += batchSize) {
+          const batch = unmatchedAcessos.slice(i, i + batchSize);
+          
+          const prompt = `Você é um especialista em vincular empresas entre dois sistemas diferentes.
+
+TAREFA: Para cada empresa da Lista A, encontre a correspondência mais provável na Lista B, baseando-se APENAS na SIMILARIDADE DO NOME.
+
+LISTA A (Empresas a vincular):
+${batch.map(a => `- ID: ${a.id} | Nome: "${a.name}"`).join('\n')}
+
+LISTA B (Clientes do CRM - escolha daqui):
+${cupList.map(c => `- CNPJ: ${c.cnpj} | Nome: "${c.nome}"`).join('\n')}
+
+REGRAS DE MATCHING POR NOME:
+1. ALTA confiança: Nome praticamente idêntico (ex: "Lojas ABC" = "LOJAS ABC LTDA")
+2. MÉDIA confiança: Nome principal igual com variações (ex: "ABC Store" = "ABC Store Brasil")  
+3. BAIXA confiança: Apenas parte do nome corresponde (ex: "ABC" parcialmente em "ABC Comercio")
+4. Se não houver match claro, NÃO inclua
+
+RETORNE um JSON array com objetos neste formato EXATO:
+[{"acessosId":"id","acessosName":"nome da Lista A","cupCnpj":"cnpj da Lista B","cupNome":"nome da Lista B","confidence":"high|medium|low","reason":"explicação breve"}]
+
+Retorne APENAS o JSON, sem markdown ou texto adicional.`;
+
+          try {
+            const response = await openai.chat.completions.create({
+              model: "gpt-4o",
+              messages: [{ role: "user", content: prompt }],
+              temperature: 0.1,
+              max_tokens: 4000,
+            });
+
+            const content = response.choices[0].message.content || "[]";
+            
+            // Parse JSON from response
+            const jsonMatch = content.match(/\[[\s\S]*?\]/);
+            if (jsonMatch) {
+              const batchMatches = JSON.parse(jsonMatch[0]);
+              // Only add matches with medium or high confidence
+              const validMatches = batchMatches.filter((m: any) => 
+                m.confidence === 'high' || m.confidence === 'medium'
+              );
+              matches.push(...validMatches);
+            }
+          } catch (parseError) {
+            console.error("[api] Error in AI batch matching:", parseError);
+          }
+        }
+      }
+      
+      // Sort by confidence: high first, then medium, then low
+      const confidenceOrder = { high: 0, medium: 1, low: 2 };
+      matches.sort((a, b) => 
+        (confidenceOrder[a.confidence as keyof typeof confidenceOrder] || 2) - 
+        (confidenceOrder[b.confidence as keyof typeof confidenceOrder] || 2)
+      );
       
       res.json({ matches });
     } catch (error) {
