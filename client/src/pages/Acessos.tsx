@@ -2061,7 +2061,7 @@ function ClientsTab() {
   };
 
   const isTurboClient = (name: string | null | undefined) => {
-    return name?.toLowerCase().includes('turbo') || false;
+    return name?.toLowerCase().trim() === 'turbo partners';
   };
 
   const sortedAndFilteredClients = useMemo(() => {
