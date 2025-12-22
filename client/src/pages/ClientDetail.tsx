@@ -9,8 +9,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { ContratoCompleto } from "@shared/schema";
+
+interface CredentialGroup {
+  id: string;
+  name: string;
+  credentials: Array<{
+    id: string;
+    platform: string;
+    username: string;
+    password: string;
+    accessUrl: string;
+    observations: string;
+  }>;
+}
 
 interface ClienteDb {
   id: number;
@@ -45,12 +59,14 @@ interface RevenueData {
 
 export default function ClientDetail() {
   const { setPageInfo } = usePageInfo();
+  const { toast } = useToast();
   const [, params] = useRoute("/cliente/:id");
   const clientId = params?.id || "";
   const [receitasCurrentPage, setReceitasCurrentPage] = useState(1);
   const [receitasItemsPerPage, setReceitasItemsPerPage] = useState(10);
   const [monthsFilter, setMonthsFilter] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
 
   const { data: cliente, isLoading: isLoadingCliente, error: clienteError } = useQuery<ClienteDb>({
     queryKey: ["/api/cliente", clientId],
@@ -71,6 +87,46 @@ export default function ClientDetail() {
     queryKey: ["/api/cliente", clientId, "contratos"],
     enabled: !!clientId && !!cliente,
   });
+
+  const { data: credenciais, isLoading: isLoadingCredenciais } = useQuery<CredentialGroup[]>({
+    queryKey: ["/api/acessos/credentials-by-cnpj", cliente?.cnpj],
+    queryFn: async () => {
+      if (!cliente?.cnpj) return [];
+      const encodedCnpj = encodeURIComponent(cliente.cnpj);
+      const response = await fetch(`/api/acessos/credentials-by-cnpj/${encodedCnpj}`);
+      if (!response.ok) throw new Error("Failed to fetch credentials");
+      return response.json();
+    },
+    enabled: !!cliente?.cnpj,
+  });
+
+  const togglePasswordVisibility = (credentialId: string) => {
+    setVisiblePasswords(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(credentialId)) {
+        newSet.delete(credentialId);
+      } else {
+        newSet.add(credentialId);
+      }
+      return newSet;
+    });
+  };
+
+  const copyToClipboard = async (text: string, type: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: "Copiado!",
+        description: `${type} copiado para a área de transferência.`,
+      });
+    } catch {
+      toast({
+        title: "Erro ao copiar",
+        description: "Não foi possível copiar o texto.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const sortedReceitas = useMemo(() => {
     if (!receitas) return [];
@@ -652,6 +708,135 @@ export default function ClientDetail() {
                   </div>
                 )}
               </>
+            )}
+          </Card>
+        </div>
+
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <Key className="w-6 h-6 text-primary" />
+            <h2 className="text-2xl font-semibold">Credenciais de Acesso</h2>
+          </div>
+          <Card className="overflow-hidden">
+            {isLoadingCredenciais ? (
+              <div className="flex items-center justify-center py-8" data-testid="loading-credenciais">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : credenciais && credenciais.length > 0 ? (
+              <div className="divide-y">
+                {credenciais.map((group) => (
+                  <div key={group.id} className="p-4">
+                    <h3 className="font-semibold text-lg mb-4" data-testid={`credential-group-${group.id}`}>
+                      {group.name}
+                    </h3>
+                    {group.credentials.length > 0 ? (
+                      <div className="max-h-[400px] overflow-y-auto">
+                        <Table>
+                          <TableHeader className="sticky top-0 z-20 shadow-sm">
+                            <TableRow className="bg-background border-b">
+                              <TableHead className="bg-background">Plataforma</TableHead>
+                              <TableHead className="bg-background">Login</TableHead>
+                              <TableHead className="bg-background">Senha</TableHead>
+                              <TableHead className="bg-background">URL</TableHead>
+                              <TableHead className="bg-background">Observações</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {group.credentials.map((cred) => (
+                              <TableRow key={cred.id} data-testid={`credential-row-${cred.id}`}>
+                                <TableCell className="font-medium" data-testid={`text-platform-${cred.id}`}>
+                                  {cred.platform || "-"}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <span data-testid={`text-username-${cred.id}`}>{cred.username || "-"}</span>
+                                    {cred.username && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={() => copyToClipboard(cred.username, "Login")}
+                                        data-testid={`button-copy-username-${cred.id}`}
+                                      >
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <span 
+                                      className="font-mono" 
+                                      data-testid={`text-password-${cred.id}`}
+                                    >
+                                      {visiblePasswords.has(cred.id) 
+                                        ? (cred.password || "-")
+                                        : cred.password ? "••••••••" : "-"
+                                      }
+                                    </span>
+                                    {cred.password && (
+                                      <>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7"
+                                          onClick={() => togglePasswordVisibility(cred.id)}
+                                          data-testid={`button-toggle-password-${cred.id}`}
+                                        >
+                                          {visiblePasswords.has(cred.id) ? (
+                                            <EyeOff className="w-3.5 h-3.5" />
+                                          ) : (
+                                            <Eye className="w-3.5 h-3.5" />
+                                          )}
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7"
+                                          onClick={() => copyToClipboard(cred.password, "Senha")}
+                                          data-testid={`button-copy-password-${cred.id}`}
+                                        >
+                                          <Copy className="w-3.5 h-3.5" />
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  {cred.accessUrl ? (
+                                    <a
+                                      href={cred.accessUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                                      data-testid={`link-url-${cred.id}`}
+                                    >
+                                      Acessar
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm" data-testid={`text-no-url-${cred.id}`}>-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground max-w-[200px] truncate" data-testid={`text-observations-${cred.id}`}>
+                                  {cred.observations || "-"}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground text-sm">Nenhuma credencial neste grupo</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center" data-testid="no-credentials">
+                <Key className="w-8 h-8 text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">Nenhuma credencial vinculada a este cliente</p>
+              </div>
             )}
           </Card>
         </div>
