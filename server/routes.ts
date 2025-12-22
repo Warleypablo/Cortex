@@ -8237,6 +8237,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Acessos Module - Clients API
   // ============================================
 
+  // Ensure clients table has status column
+  try {
+    await db.execute(sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ativo'`);
+  } catch (e) {
+    // Column may already exist
+  }
+
+  // Helper function to map client snake_case to camelCase
+  const mapClient = (row: any) => ({
+    id: row.id,
+    name: row.name,
+    cnpj: row.cnpj,
+    status: row.status || 'ativo',
+    additionalInfo: row.additional_info,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    credential_count: parseInt(row.credential_count) || 0,
+  });
+
+  // Helper function to map credential snake_case to camelCase
+  const mapCredential = (row: any) => ({
+    id: row.id,
+    clientId: row.client_id,
+    platform: row.platform,
+    username: row.username,
+    password: row.password,
+    accessUrl: row.access_url,
+    observations: row.observations,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  });
+
   // GET all clients with credential count
   app.get("/api/acessos/clients", async (req, res) => {
     try {
@@ -8260,25 +8294,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           GROUP BY c.id ORDER BY c.created_at DESC
         `);
       }
-      res.json(result.rows);
+      res.json(result.rows.map(mapClient));
     } catch (error) {
       console.error("[api] Error fetching clients:", error);
       res.status(500).json({ error: "Failed to fetch clients" });
     }
-  });
-
-  // Helper function to map credential snake_case to camelCase
-  const mapCredential = (row: any) => ({
-    id: row.id,
-    clientId: row.client_id,
-    platform: row.platform,
-    username: row.username,
-    password: row.password,
-    accessUrl: row.access_url,
-    observations: row.observations,
-    createdBy: row.created_by,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
   });
 
   // GET single client with credentials
@@ -8297,13 +8317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const client = clientResult.rows[0] as any;
       res.json({
-        id: client.id,
-        name: client.name,
-        cnpj: client.cnpj,
-        additionalInfo: client.additional_info,
-        createdBy: client.created_by,
-        createdAt: client.created_at,
-        updatedAt: client.updated_at,
+        ...mapClient(client),
         credentials: credentialsResult.rows.map(mapCredential)
       });
     } catch (error) {
@@ -8315,7 +8329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST create client
   app.post("/api/acessos/clients", async (req, res) => {
     try {
-      const { name, cnpj, additionalInfo } = req.body;
+      const { name, cnpj, status, additionalInfo } = req.body;
       const createdBy = (req as any).user?.email || null;
       
       if (!name) {
@@ -8323,12 +8337,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const result = await db.execute(sql`
-        INSERT INTO clients (name, cnpj, additional_info, created_by)
-        VALUES (${name}, ${cnpj || null}, ${additionalInfo || null}, ${createdBy})
+        INSERT INTO clients (name, cnpj, status, additional_info, created_by)
+        VALUES (${name}, ${cnpj || null}, ${status || 'ativo'}, ${additionalInfo || null}, ${createdBy})
         RETURNING *
       `);
       
-      res.status(201).json(result.rows[0]);
+      res.status(201).json(mapClient(result.rows[0]));
     } catch (error) {
       console.error("[api] Error creating client:", error);
       res.status(500).json({ error: "Failed to create client" });
@@ -8339,12 +8353,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/acessos/clients/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, cnpj, additionalInfo } = req.body;
+      const { name, cnpj, status, additionalInfo } = req.body;
       
       const result = await db.execute(sql`
         UPDATE clients 
         SET name = COALESCE(${name}, name),
             cnpj = COALESCE(${cnpj}, cnpj),
+            status = COALESCE(${status}, status),
             additional_info = COALESCE(${additionalInfo}, additional_info),
             updated_at = NOW()
         WHERE id = ${id}
@@ -8355,7 +8370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Client not found" });
       }
       
-      res.json(result.rows[0]);
+      res.json(mapClient(result.rows[0]));
     } catch (error) {
       console.error("[api] Error updating client:", error);
       res.status(500).json({ error: "Failed to update client" });
