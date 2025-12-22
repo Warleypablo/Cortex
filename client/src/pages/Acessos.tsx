@@ -1,10 +1,24 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, Fragment, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Client, Credential, InsertClient, InsertCredential, AccessLog, ClientStatus } from "@shared/schema";
 import { insertClientSchema, insertCredentialSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Key, Lock, Loader2, ChevronDown, ChevronRight, Building2, History, ArrowUpDown } from "lucide-react";
+import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Key, Lock, Loader2, ChevronDown, ChevronRight, Building2, History, ArrowUpDown, Check, ChevronsUpDown, UserPlus } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -130,10 +144,33 @@ function useCreateLog() {
   });
 }
 
+interface CazCliente {
+  id: number;
+  name: string;
+  cnpj: string | null;
+  status: ClientStatus;
+}
+
 function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }) {
   const [open, setOpen] = useState(false);
+  const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCazClient, setSelectedCazClient] = useState<CazCliente | null>(null);
+  const [mode, setMode] = useState<'select' | 'manual'>('select');
   const { toast } = useToast();
   const createLog = useCreateLog();
+
+  const { data: cazClientes = [], isLoading: isLoadingCaz } = useQuery<CazCliente[]>({
+    queryKey: ["/api/acessos/caz-clientes", searchQuery],
+    queryFn: async () => {
+      const url = searchQuery 
+        ? `/api/acessos/caz-clientes?search=${encodeURIComponent(searchQuery)}`
+        : "/api/acessos/caz-clientes";
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch clients");
+      return response.json();
+    },
+  });
 
   const form = useForm<InsertClient>({
     resolver: zodResolver(insertClientSchema),
@@ -144,6 +181,14 @@ function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }
       additionalInfo: "",
     },
   });
+
+  useEffect(() => {
+    if (selectedCazClient) {
+      form.setValue("name", selectedCazClient.name);
+      form.setValue("cnpj", selectedCazClient.cnpj || "");
+      form.setValue("status", selectedCazClient.status);
+    }
+  }, [selectedCazClient, form]);
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertClient) => {
@@ -163,8 +208,7 @@ function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }
         title: "Cliente adicionado",
         description: "O cliente foi adicionado com sucesso.",
       });
-      setOpen(false);
-      form.reset();
+      handleClose();
       onSuccess?.(client);
     },
     onError: (error: Error) => {
@@ -176,12 +220,47 @@ function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }
     },
   });
 
+  const handleClose = () => {
+    setOpen(false);
+    setSelectedCazClient(null);
+    setMode('select');
+    setSearchQuery("");
+    form.reset();
+  };
+
+  const handleSelectClient = (client: CazCliente) => {
+    setSelectedCazClient(client);
+    setComboboxOpen(false);
+  };
+
+  const handleSwitchToManual = () => {
+    setMode('manual');
+    setSelectedCazClient(null);
+    form.reset({
+      name: "",
+      cnpj: "",
+      status: "ativo",
+      additionalInfo: "",
+    });
+  };
+
+  const handleSwitchToSelect = () => {
+    setMode('select');
+    setSelectedCazClient(null);
+    form.reset({
+      name: "",
+      cnpj: "",
+      status: "ativo",
+      additionalInfo: "",
+    });
+  };
+
   const onSubmit = (data: InsertClient) => {
     createMutation.mutate(data);
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => isOpen ? setOpen(true) : handleClose()}>
       <DialogTrigger asChild>
         <Button data-testid="button-add-client">
           <Plus className="w-4 h-4 mr-2" />
@@ -192,11 +271,102 @@ function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }
         <DialogHeader>
           <DialogTitle>Adicionar Novo Cliente</DialogTitle>
           <DialogDescription>
-            Preencha os dados do novo cliente. O campo Nome é obrigatório.
+            Selecione um cliente existente ou adicione um novo manualmente.
           </DialogDescription>
         </DialogHeader>
+        
+        <div className="flex gap-2 mb-4">
+          <Button
+            type="button"
+            variant={mode === 'select' ? 'default' : 'outline'}
+            size="sm"
+            onClick={handleSwitchToSelect}
+            className="flex-1"
+            data-testid="button-mode-select"
+          >
+            <Search className="w-4 h-4 mr-2" />
+            Selecionar Existente
+          </Button>
+          <Button
+            type="button"
+            variant={mode === 'manual' ? 'default' : 'outline'}
+            size="sm"
+            onClick={handleSwitchToManual}
+            className="flex-1"
+            data-testid="button-mode-manual"
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Adicionar Novo
+          </Button>
+        </div>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {mode === 'select' && (
+              <div className="space-y-2">
+                <FormLabel>Buscar Cliente</FormLabel>
+                <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={comboboxOpen}
+                      className="w-full justify-between"
+                      data-testid="combobox-select-client"
+                    >
+                      {selectedCazClient ? selectedCazClient.name : "Selecione um cliente..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[350px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Buscar cliente..." 
+                        value={searchQuery}
+                        onValueChange={setSearchQuery}
+                        data-testid="input-search-caz-client"
+                      />
+                      <CommandList>
+                        {isLoadingCaz ? (
+                          <div className="flex items-center justify-center py-6">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </div>
+                        ) : cazClientes.length === 0 ? (
+                          <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                        ) : (
+                          <CommandGroup>
+                            {cazClientes.map((client) => (
+                              <CommandItem
+                                key={client.id}
+                                value={client.id.toString()}
+                                onSelect={() => handleSelectClient(client)}
+                                data-testid={`item-caz-client-${client.id}`}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    selectedCazClient?.id === client.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{client.name}</span>
+                                  {client.cnpj && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatCNPJ(client.cnpj)}
+                                    </span>
+                                  )}
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
             <FormField
               control={form.control}
               name="name"
@@ -204,7 +374,12 @@ function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }
                 <FormItem>
                   <FormLabel>Nome *</FormLabel>
                   <FormControl>
-                    <Input {...field} data-testid="input-client-name" placeholder="Nome do cliente" />
+                    <Input 
+                      {...field} 
+                      data-testid="input-client-name" 
+                      placeholder="Nome do cliente"
+                      disabled={mode === 'select' && !!selectedCazClient}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -218,7 +393,13 @@ function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }
                 <FormItem>
                   <FormLabel>CNPJ</FormLabel>
                   <FormControl>
-                    <Input {...field} value={field.value || ""} data-testid="input-client-cnpj" placeholder="00.000.000/0000-00" />
+                    <Input 
+                      {...field} 
+                      value={field.value || ""} 
+                      data-testid="input-client-cnpj" 
+                      placeholder="00.000.000/0000-00"
+                      disabled={mode === 'select' && !!selectedCazClient}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -231,7 +412,11 @@ function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value || "ativo"}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value || "ativo"}
+                    disabled={mode === 'select' && !!selectedCazClient}
+                  >
                     <FormControl>
                       <SelectTrigger data-testid="select-client-status">
                         <SelectValue placeholder="Selecione o status" />
@@ -272,14 +457,14 @@ function AddClientDialog({ onSuccess }: { onSuccess?: (client: Client) => void }
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={handleClose}
                 data-testid="button-cancel-client"
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
-                disabled={createMutation.isPending}
+                disabled={createMutation.isPending || (mode === 'select' && !selectedCazClient)}
                 data-testid="button-submit-client"
               >
                 {createMutation.isPending ? (
