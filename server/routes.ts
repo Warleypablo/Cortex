@@ -8307,22 +8307,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const search = req.query.search as string;
       
+      // First get the turbo_tools count for Turbo clients
+      const turboToolsCount = await db.execute(sql`SELECT COUNT(*) as count FROM turbo_tools`);
+      const turboCount = parseInt((turboToolsCount.rows[0] as any)?.count) || 0;
+      
       let result;
       if (search) {
         const searchPattern = `%${search}%`;
         result = await db.execute(sql`
-          SELECT c.*, COUNT(cr.id) as credential_count 
+          SELECT c.*, 
+            CASE 
+              WHEN LOWER(c.name) LIKE '%turbo%' THEN ${turboCount}
+              ELSE (SELECT COUNT(*) FROM credentials cr WHERE cr.client_id = c.id)
+            END as credential_count 
           FROM clients c 
-          LEFT JOIN credentials cr ON c.id = cr.client_id
           WHERE LOWER(c.name) LIKE LOWER(${searchPattern}) OR LOWER(c.cnpj) LIKE LOWER(${searchPattern})
-          GROUP BY c.id ORDER BY c.created_at DESC
+          ORDER BY c.created_at DESC
         `);
       } else {
         result = await db.execute(sql`
-          SELECT c.*, COUNT(cr.id) as credential_count 
+          SELECT c.*, 
+            CASE 
+              WHEN LOWER(c.name) LIKE '%turbo%' THEN ${turboCount}
+              ELSE (SELECT COUNT(*) FROM credentials cr WHERE cr.client_id = c.id)
+            END as credential_count 
           FROM clients c 
-          LEFT JOIN credentials cr ON c.id = cr.client_id
-          GROUP BY c.id ORDER BY c.created_at DESC
+          ORDER BY c.created_at DESC
         `);
       }
       res.json(result.rows.map(mapClient));
