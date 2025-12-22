@@ -1265,6 +1265,7 @@ export const clients = pgTable("clients", {
   cnpj: text("cnpj"),
   status: text("status").$type<ClientStatus>().default('ativo'),
   additionalInfo: text("additional_info"),
+  linkedClientCnpj: text("linked_client_cnpj"),
   createdBy: varchar("created_by", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
