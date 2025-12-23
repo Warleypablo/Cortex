@@ -5779,6 +5779,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/geg/custo-folha", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const resultado = await storage.getGegCustoFolha(squad, setor);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG custo folha:", error);
+      res.status(500).json({ error: "Failed to fetch GEG custo folha" });
+    }
+  });
+
   app.get("/api/geg/patrimonio-resumo", async (req, res) => {
     try {
       const resultado = await storage.getGegPatrimonioResumo();
