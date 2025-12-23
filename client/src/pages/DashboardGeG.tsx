@@ -899,7 +899,7 @@ export default function DashboardGeG() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card data-testid="card-mas-contratacoes" className="border-amber-500/20">
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -953,9 +953,7 @@ export default function DashboardGeG() {
               )}
             </CardContent>
           </Card>
-        </div>
 
-        <div className="grid grid-cols-1 gap-6 mb-8">
           <Card data-testid="card-ultimas-promocoes">
             <CardHeader>
               <div className="flex items-center gap-2">
