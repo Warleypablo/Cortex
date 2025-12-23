@@ -23,6 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import Clients from "./Clients";
 import Contracts from "./Contracts";
 import type { ClienteCompleto } from "../../../server/storage";
+import type { ContratoCompleto } from "@shared/schema";
 
 type Tab = "clientes" | "contratos";
 
@@ -42,7 +43,18 @@ type SavedFilter = {
   };
 };
 
+type ContractSavedFilter = {
+  id: string;
+  name: string;
+  filters: {
+    servicoFilter: string[];
+    statusFilter: string[];
+    tipoContratoFilter: string;
+  };
+};
+
 const SAVED_FILTERS_KEY = "turbo-cortex-client-filters";
+const CONTRACT_SAVED_FILTERS_KEY = "turbo-cortex-contract-filters";
 
 const TAB_TITLES: Record<Tab, { title: string; subtitle: string }> = {
   clientes: { title: "Clientes", subtitle: "Gestão de clientes ativos" },
@@ -84,8 +96,26 @@ export default function ClientesContratos() {
   const [newFilterName, setNewFilterName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
 
+  const [contractSearchQuery, setContractSearchQuery] = useState("");
+  const [contractServicoFilter, setContractServicoFilter] = useState<string[]>([]);
+  const [contractStatusFilter, setContractStatusFilter] = useState<string[]>([]);
+  const [contractTipoContratoFilter, setContractTipoContratoFilter] = useState<string>("ambos");
+  
+  const [contractSavedFilters, setContractSavedFilters] = useState<ContractSavedFilter[]>(() => {
+    try {
+      const stored = localStorage.getItem(CONTRACT_SAVED_FILTERS_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+  const [contractNewFilterName, setContractNewFilterName] = useState("");
+  const [contractShowSaveInput, setContractShowSaveInput] = useState(false);
+
   const { data: clientes } = useQuery<ClienteCompleto[]>({
     queryKey: ["/api/clientes"],
+  });
+
+  const { data: contratos } = useQuery<ContratoCompleto[]>({
+    queryKey: ["/api/contratos"],
   });
 
   const servicosUnicos = useMemo(() => {
@@ -129,6 +159,29 @@ export default function ClientesContratos() {
     return Array.from(clusterSet).sort();
   }, [clientes]);
 
+  const contractServicosUnicos = useMemo(() => {
+    if (!contratos) return [];
+    const servicosSet = new Set<string>();
+    contratos.forEach(contract => {
+      const produto = contract.produto || contract.servico;
+      if (produto && produto.trim()) {
+        servicosSet.add(produto.trim());
+      }
+    });
+    return Array.from(servicosSet).sort();
+  }, [contratos]);
+
+  const contractStatusUnicos = useMemo(() => {
+    if (!contratos) return [];
+    const statusSet = new Set<string>();
+    contratos.forEach(contract => {
+      if (contract.status && contract.status !== "Desconhecido") {
+        statusSet.add(contract.status);
+      }
+    });
+    return Array.from(statusSet).sort();
+  }, [contratos]);
+
   const saveCurrentFilter = () => {
     if (!newFilterName.trim()) return;
     const newFilter: SavedFilter = {
@@ -161,6 +214,36 @@ export default function ClientesContratos() {
     localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(updated));
   };
 
+  const saveContractFilter = () => {
+    if (!contractNewFilterName.trim()) return;
+    const newFilter: ContractSavedFilter = {
+      id: Date.now().toString(),
+      name: contractNewFilterName.trim(),
+      filters: { 
+        servicoFilter: contractServicoFilter, 
+        statusFilter: contractStatusFilter, 
+        tipoContratoFilter: contractTipoContratoFilter 
+      }
+    };
+    const updated = [...contractSavedFilters, newFilter];
+    setContractSavedFilters(updated);
+    localStorage.setItem(CONTRACT_SAVED_FILTERS_KEY, JSON.stringify(updated));
+    setContractNewFilterName("");
+    setContractShowSaveInput(false);
+  };
+
+  const loadContractSavedFilter = (filter: ContractSavedFilter) => {
+    setContractServicoFilter(filter.filters.servicoFilter);
+    setContractStatusFilter(filter.filters.statusFilter);
+    setContractTipoContratoFilter(filter.filters.tipoContratoFilter);
+  };
+
+  const deleteContractSavedFilter = (id: string) => {
+    const updated = contractSavedFilters.filter(f => f.id !== id);
+    setContractSavedFilters(updated);
+    localStorage.setItem(CONTRACT_SAVED_FILTERS_KEY, JSON.stringify(updated));
+  };
+
   const hasActiveFilters = tipoContratoFilter !== "ambos" || servicoFilter.length > 0 || statusFilter.length > 0 || responsavelFilter.length > 0 || clusterFilter !== "all" || ltOperator !== "all" || aovOperator !== "all";
 
   const activeFilterCount = [
@@ -173,6 +256,14 @@ export default function ClientesContratos() {
     aovOperator !== "all"
   ].filter(Boolean).length;
 
+  const hasContractActiveFilters = contractTipoContratoFilter !== "ambos" || contractServicoFilter.length > 0 || contractStatusFilter.length > 0;
+
+  const contractActiveFilterCount = [
+    contractTipoContratoFilter !== "ambos",
+    contractServicoFilter.length > 0,
+    contractStatusFilter.length > 0,
+  ].filter(Boolean).length;
+
   const clearAllFilters = () => {
     setTipoContratoFilter("ambos");
     setServicoFilter([]);
@@ -183,6 +274,12 @@ export default function ClientesContratos() {
     setLtValue("");
     setAovOperator("all");
     setAovValue("");
+  };
+
+  const clearAllContractFilters = () => {
+    setContractTipoContratoFilter("ambos");
+    setContractServicoFilter([]);
+    setContractStatusFilter([]);
   };
 
   const toggleServicoFilter = (servico: string) => {
@@ -203,6 +300,22 @@ export default function ClientesContratos() {
 
   const toggleStatusFilter = (status: string) => {
     setStatusFilter(prev => 
+      prev.includes(status) 
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
+    );
+  };
+
+  const toggleContractServicoFilter = (servico: string) => {
+    setContractServicoFilter(prev => 
+      prev.includes(servico) 
+        ? prev.filter(s => s !== servico)
+        : [...prev, servico]
+    );
+  };
+
+  const toggleContractStatusFilter = (status: string) => {
+    setContractStatusFilter(prev => 
       prev.includes(status) 
         ? prev.filter(s => s !== status)
         : [...prev, status]
@@ -527,6 +640,189 @@ export default function ClientesContratos() {
             </Popover>
           </div>
         )}
+
+        {activeTab === "contratos" && (
+          <div className="flex items-center gap-3">
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Buscar por serviço ou cliente..."
+                value={contractSearchQuery}
+                onChange={(e) => setContractSearchQuery(e.target.value)}
+                className="pl-10 w-64"
+                data-testid="input-search-contracts"
+              />
+            </div>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="default" className="gap-2" data-testid="button-filter-contracts">
+                  <Filter className="w-4 h-4" />
+                  <span className="hidden sm:inline">Filtros</span>
+                  {hasContractActiveFilters && (
+                    <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-xs">
+                      {contractActiveFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-96 p-0 overflow-hidden" align="end">
+                <div className="flex items-center justify-between p-4 pb-2 border-b">
+                  <h4 className="font-medium text-sm">Filtros</h4>
+                  <div className="flex items-center gap-1">
+                    {hasContractActiveFilters && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 text-xs"
+                        onClick={clearAllContractFilters}
+                        data-testid="button-clear-contract-filters"
+                      >
+                        Limpar
+                      </Button>
+                    )}
+                    {hasContractActiveFilters && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7"
+                        onClick={() => setContractShowSaveInput(!contractShowSaveInput)}
+                        data-testid="button-save-contract-filter"
+                        title="Salvar filtro"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <ScrollArea className="h-[60vh]">
+                  <div className="space-y-4 p-4">
+                    {contractShowSaveInput && (
+                      <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
+                        <Input
+                          placeholder="Nome do filtro..."
+                          value={contractNewFilterName}
+                          onChange={(e) => setContractNewFilterName(e.target.value)}
+                          className="h-8 text-sm"
+                          onKeyDown={(e) => e.key === 'Enter' && saveContractFilter()}
+                          data-testid="input-contract-filter-name"
+                        />
+                        <Button size="sm" className="h-8" onClick={saveContractFilter} data-testid="button-confirm-save-contract-filter">
+                          <Check className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8" onClick={() => setContractShowSaveInput(false)}>
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                    
+                    {contractSavedFilters.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                          <Bookmark className="w-3 h-3" />
+                          Filtros Salvos
+                        </Label>
+                        <div className="border rounded-md divide-y">
+                          {contractSavedFilters.map(filter => (
+                            <div 
+                              key={filter.id} 
+                              className="flex items-center justify-between px-3 py-2 hover:bg-muted/50 group"
+                            >
+                              <button
+                                className="text-sm text-left flex-1 truncate"
+                                onClick={() => loadContractSavedFilter(filter)}
+                                data-testid={`button-load-contract-filter-${filter.id}`}
+                              >
+                                {filter.name}
+                              </button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => deleteContractSavedFilter(filter.id)}
+                                data-testid={`button-delete-contract-filter-${filter.id}`}
+                              >
+                                <Trash2 className="w-3 h-3 text-destructive" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Tipo de Contrato</Label>
+                      <Select
+                        value={contractTipoContratoFilter}
+                        onValueChange={setContractTipoContratoFilter}
+                      >
+                        <SelectTrigger className="w-full" data-testid="select-contract-filter-tipo">
+                          <SelectValue placeholder="Tipo de contrato" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ambos">Ambos</SelectItem>
+                          <SelectItem value="recorrente">Recorrente</SelectItem>
+                          <SelectItem value="pontual">Pontual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Status (múltipla seleção)</Label>
+                        {contractStatusFilter.length > 0 && (
+                          <Badge variant="secondary" className="text-xs">{contractStatusFilter.length}</Badge>
+                        )}
+                      </div>
+                      <div className="border rounded-md max-h-32 overflow-y-auto overflow-x-hidden">
+                        {contractStatusUnicos.map(status => (
+                          <label
+                            key={status}
+                            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
+                            data-testid={`checkbox-contract-status-${status}`}
+                          >
+                            <Checkbox 
+                              checked={contractStatusFilter.includes(status)} 
+                              onCheckedChange={() => toggleContractStatusFilter(status)}
+                              className="flex-shrink-0"
+                            />
+                            <span className="text-sm truncate flex-1 min-w-0">{status}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Serviço (múltipla seleção)</Label>
+                        {contractServicoFilter.length > 0 && (
+                          <Badge variant="secondary" className="text-xs">{contractServicoFilter.length}</Badge>
+                        )}
+                      </div>
+                      <div className="border rounded-md max-h-32 overflow-y-auto overflow-x-hidden">
+                        {contractServicosUnicos.map(servico => (
+                          <label
+                            key={servico}
+                            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
+                            data-testid={`checkbox-contract-servico-${servico}`}
+                          >
+                            <Checkbox 
+                              checked={contractServicoFilter.includes(servico)} 
+                              onCheckedChange={() => toggleContractServicoFilter(servico)}
+                              className="flex-shrink-0"
+                            />
+                            <span className="text-sm truncate flex-1 min-w-0">{servico}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
       </div>
       
       <div className="flex-1 overflow-auto">
@@ -544,7 +840,14 @@ export default function ClientesContratos() {
             aovValue={aovValue}
           />
         )}
-        {activeTab === "contratos" && <Contracts />}
+        {activeTab === "contratos" && (
+          <Contracts
+            searchQuery={contractSearchQuery}
+            servicoFilter={contractServicoFilter}
+            statusFilter={contractStatusFilter}
+            tipoContratoFilter={contractTipoContratoFilter}
+          />
+        )}
       </div>
     </div>
   );
