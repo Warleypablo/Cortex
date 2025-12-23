@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
@@ -135,6 +135,7 @@ export interface IStorage {
   createColaborador(colaborador: InsertColaborador): Promise<Colaborador>;
   updateColaborador(id: number, colaborador: Partial<InsertColaborador>): Promise<Colaborador>;
   deleteColaborador(id: number): Promise<void>;
+  createPromocao(promocao: InsertRhPromocao): Promise<RhPromocao>;
   getContratos(): Promise<ContratoCompleto[]>;
   getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]>;
   getPatrimonios(): Promise<Patrimonio[]>;
@@ -142,6 +143,7 @@ export interface IStorage {
   createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio>;
   getColaboradoresDropdown(): Promise<{ id: number; nome: string }[]>;
   updatePatrimonioResponsavel(id: number, responsavelNome: string | null): Promise<Patrimonio>;
+  updatePatrimonioResponsavelById(id: number, responsavelId: number, responsavelNome: string): Promise<Patrimonio>;
   getColaboradoresAnalise(): Promise<DashboardAnaliseData>;
   getSaldoAtualBancos(): Promise<SaldoBancos>;
   getFluxoCaixa(): Promise<FluxoCaixaItem[]>;
@@ -396,6 +398,10 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
+  async createPromocao(promocao: InsertRhPromocao): Promise<RhPromocao> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
   async getContratos(): Promise<ContratoCompleto[]> {
     throw new Error("Not implemented in MemStorage");
   }
@@ -421,6 +427,10 @@ export class MemStorage implements IStorage {
   }
 
   async updatePatrimonioResponsavel(id: number, responsavelNome: string | null): Promise<Patrimonio> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async updatePatrimonioResponsavelById(id: number, responsavelId: number, responsavelNome: string): Promise<Patrimonio> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1445,11 +1455,86 @@ export class DbStorage implements IStorage {
   }
 
   async updateColaborador(id: number, colaborador: Partial<InsertColaborador>): Promise<Colaborador> {
+    const [currentColaborador] = await db
+      .select()
+      .from(schema.rhPessoal)
+      .where(eq(schema.rhPessoal.id, id))
+      .limit(1);
+
+    if (!currentColaborador) {
+      throw new Error(`Colaborador with id ${id} not found`);
+    }
+
+    const updatePayload: Record<string, any> = {};
+    for (const key of Object.keys(colaborador) as (keyof typeof colaborador)[]) {
+      if (colaborador[key] !== undefined) {
+        updatePayload[key] = colaborador[key];
+      }
+    }
+
     const [updatedColaborador] = await db.update(schema.rhPessoal)
-      .set(colaborador as any)
+      .set(updatePayload)
       .where(eq(schema.rhPessoal.id, id))
       .returning();
+
+    const oldSalario = currentColaborador.salario;
+    const oldCargo = currentColaborador.cargo;
+    const oldNivel = currentColaborador.nivel;
+
+    const salarioProvided = 'salario' in colaborador && colaborador.salario !== undefined;
+    const cargoProvided = 'cargo' in colaborador && colaborador.cargo !== undefined;
+    const nivelProvided = 'nivel' in colaborador && colaborador.nivel !== undefined;
+
+    const salarioChanged = salarioProvided && String(oldSalario || '') !== String(colaborador.salario || '');
+    const cargoChanged = cargoProvided && (oldCargo || '') !== (colaborador.cargo || '');
+    const nivelChanged = nivelProvided && (oldNivel || '') !== (colaborador.nivel || '');
+
+    if (salarioChanged || cargoChanged || nivelChanged) {
+      const today = new Date().toISOString().split('T')[0];
+      
+      await this.createPromocao({
+        colaboradorId: id,
+        dataPromocao: today,
+        salarioAnterior: oldSalario || null,
+        salarioNovo: salarioChanged ? (colaborador.salario as string | null) : null,
+        cargoAnterior: oldCargo || null,
+        cargoNovo: cargoChanged ? (colaborador.cargo as string | null) : null,
+        nivelAnterior: oldNivel || null,
+        nivelNovo: nivelChanged ? (colaborador.nivel as string | null) : null,
+        observacoes: "Alteração automática via edição",
+      });
+    }
+
     return updatedColaborador;
+  }
+
+  async createPromocao(promocao: InsertRhPromocao): Promise<RhPromocao> {
+    const result = await db.execute(sql`
+      INSERT INTO rh_promocoes (
+        colaborador_id, 
+        data_promocao, 
+        salario_anterior, 
+        salario_novo, 
+        cargo_anterior, 
+        cargo_novo, 
+        nivel_anterior, 
+        nivel_novo, 
+        observacoes, 
+        criado_em
+      ) VALUES (
+        ${promocao.colaboradorId},
+        ${promocao.dataPromocao},
+        ${promocao.salarioAnterior || null},
+        ${promocao.salarioNovo || null},
+        ${promocao.cargoAnterior || null},
+        ${promocao.cargoNovo || null},
+        ${promocao.nivelAnterior || null},
+        ${promocao.nivelNovo || null},
+        ${promocao.observacoes || null},
+        NOW()
+      ) RETURNING *
+    `);
+    return result.rows[0] as RhPromocao;
   }
 
   async deleteColaborador(id: number): Promise<void> {
@@ -1592,6 +1677,23 @@ export class DbStorage implements IStorage {
     const [updated] = await db
       .update(schema.rhPatrimonio)
       .set({ responsavelAtual: responsavelNome })
+      .where(eq(schema.rhPatrimonio.id, id))
+      .returning();
+    
+    if (!updated) {
+      throw new Error("Patrimônio não encontrado");
+    }
+    
+    return updated;
+  }
+
+  async updatePatrimonioResponsavelById(id: number, responsavelId: number, responsavelNome: string): Promise<Patrimonio> {
+    const [updated] = await db
+      .update(schema.rhPatrimonio)
+      .set({ 
+        responsavelAtual: responsavelNome,
+        responsavelId: responsavelId 
+      })
       .where(eq(schema.rhPatrimonio.id, id))
       .returning();
     

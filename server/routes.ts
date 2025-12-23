@@ -1262,6 +1262,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/patrimonio/:id/atribuir", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid patrimonio ID" });
+      }
+      
+      const { responsavelId, responsavelNome } = req.body;
+      if (typeof responsavelId !== 'number' || isNaN(responsavelId)) {
+        return res.status(400).json({ error: "responsavelId deve ser um número válido" });
+      }
+      if (typeof responsavelNome !== 'string' || !responsavelNome.trim()) {
+        return res.status(400).json({ error: "responsavelNome deve ser uma string não vazia" });
+      }
+
+      const patrimonio = await storage.updatePatrimonioResponsavelById(id, responsavelId, responsavelNome.trim());
+      res.json(patrimonio);
+    } catch (error) {
+      console.error("[api] Error assigning patrimonio:", error);
+      res.status(500).json({ error: "Failed to assign patrimonio" });
+    }
+  });
+
+  app.get("/api/patrimonio/disponiveis", async (req, res) => {
+    try {
+      const patrimonios = await storage.getPatrimonios();
+      res.json(patrimonios);
+    } catch (error) {
+      console.error("[api] Error fetching available patrimonios:", error);
+      res.status(500).json({ error: "Failed to fetch available patrimonios" });
+    }
+  });
+
   // ============ RH Cargos Endpoints ============
   // Default options when table is empty or doesn't exist
   const defaultCargos = [
