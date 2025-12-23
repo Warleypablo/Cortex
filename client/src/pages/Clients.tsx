@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import ClientsTable from "@/components/ClientsTable";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Filter, Users, UserCheck, TrendingUp, Clock, DollarSign, X, Check, Save, Bookmark, Trash2 } from "lucide-react";
+import { Loader2, Search, Filter, Users, UserCheck, TrendingUp, Clock, DollarSign, X, Check, Save, Bookmark, Trash2, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import StatsCard from "@/components/StatsCard";
@@ -256,10 +256,14 @@ export default function Clients() {
 
   const kpis = useMemo(() => {
     if (!filteredClients || filteredClients.length === 0) {
-      return { totalClientes: 0, clientesAtivos: 0, ltvMedio: 0, ltMedio: 0, aov: 0 };
+      return { totalClientes: 0, clientesOperando: 0, clientesAtivos: 0, ltvMedio: 0, ltMedio: 0, aov: 0 };
     }
     
     const totalClientes = filteredClients.length;
+    const clientesOperando = filteredClients.filter(c => {
+      const status = (c.statusClickup || "").toLowerCase();
+      return status === "ativo" || status === "onboarding" || status === "triagem" || status === "em cancelamento";
+    }).length;
     const clientesAtivos = filteredClients.filter(c => {
       const status = (c.statusClickup || "").toLowerCase();
       return status === "ativo" || status === "onboarding" || status === "triagem";
@@ -291,7 +295,7 @@ export default function Clients() {
     
     const aov = ltMedio > 0 ? ltvMedio / ltMedio : 0;
     
-    return { totalClientes, clientesAtivos, ltvMedio, ltMedio, aov };
+    return { totalClientes, clientesOperando, clientesAtivos, ltvMedio, ltMedio, aov };
   }, [filteredClients, ltvMap]);
 
   const totalPages = Math.ceil(sortedClients.length / itemsPerPage);
@@ -390,12 +394,20 @@ export default function Clients() {
   return (
     <div className="bg-background h-full">
       <div className="container mx-auto px-4 py-4 max-w-7xl h-full flex flex-col">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
           <StatsCard
             title="Total de Clientes"
             value={String(kpis.totalClientes)}
             icon={Users}
             subtitle="Quantidade de clientes cadastrados no ClickUp (ativos + inativos)"
+            tooltipType="help"
+          />
+          <StatsCard
+            title="Clientes Operando"
+            value={String(kpis.clientesOperando)}
+            icon={Activity}
+            variant="info"
+            subtitle={`${kpis.totalClientes > 0 ? formatPercent((kpis.clientesOperando / kpis.totalClientes) * 100) : '0%'} dos clientes estão com status Triagem, Onboarding, Ativo ou Em Cancelamento`}
             tooltipType="help"
           />
           <StatsCard
