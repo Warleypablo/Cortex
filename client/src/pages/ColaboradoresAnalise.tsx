@@ -100,14 +100,6 @@ export default function ColaboradoresAnalise() {
     return sortDirection === "asc" ? <ArrowUp className="w-4 h-4 ml-1" /> : <ArrowDown className="w-4 h-4 ml-1" />;
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" data-testid="loading-analise" />
-      </div>
-    );
-  }
-
   const aniversariantesMes = data?.aniversariantesMes || [];
   const aniversarioEmpresaMes = data?.aniversarioEmpresaMes || [];
   const ultimasPromocoes = data?.ultimasPromocoes || [];
@@ -152,6 +144,14 @@ export default function ColaboradoresAnalise() {
     });
     return sorted;
   }, [ultimasPromocoes, sortColumn, sortDirection]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" data-testid="loading-analise" />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background">
