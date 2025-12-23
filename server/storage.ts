@@ -3660,7 +3660,8 @@ export class DbStorage implements IStorage {
     const conditions = [
       sql`status = 'Ativo'`,
       sql`salario IS NOT NULL`,
-      sql`salario > 0`
+      sql`salario != ''`,
+      sql`salario::numeric > 0`
     ];
     
     if (squad !== 'todos') {
@@ -3672,7 +3673,7 @@ export class DbStorage implements IStorage {
     
     const result = await db.execute(sql`
       SELECT 
-        AVG(salario) as valor_medio,
+        AVG(salario::numeric) as valor_medio,
         COUNT(*) as total_colaboradores
       FROM rh_pessoal
       WHERE ${sql.join(conditions, sql` AND `)}
