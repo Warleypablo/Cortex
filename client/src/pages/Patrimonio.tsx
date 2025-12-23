@@ -91,6 +91,7 @@ export default function Patrimonio() {
   const [filterTipoBem, setFilterTipoBem] = useState<string>("todos");
   const [filterEstado, setFilterEstado] = useState<string>("todos");
   const [filterMarca, setFilterMarca] = useState<string>("todos");
+  const [filterResponsavel, setFilterResponsavel] = useState<string>("todos");
   const [sortField, setSortField] = useState<SortField | "default">("default");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -146,6 +147,15 @@ export default function Patrimonio() {
       if (p.marca) marcas.add(p.marca);
     });
     return Array.from(marcas).sort();
+  }, [patrimonios]);
+
+  const uniqueResponsaveis = useMemo(() => {
+    if (!patrimonios) return [];
+    const responsaveis = new Set<string>();
+    patrimonios.forEach(p => {
+      if (p.responsavelAtual) responsaveis.add(p.responsavelAtual);
+    });
+    return Array.from(responsaveis).sort();
   }, [patrimonios]);
 
   const stats = useMemo(() => {
@@ -220,6 +230,14 @@ export default function Patrimonio() {
     if (filterMarca !== "todos") {
       result = result.filter(p => p.marca === filterMarca);
     }
+
+    if (filterResponsavel !== "todos") {
+      if (filterResponsavel === "sem_responsavel") {
+        result = result.filter(p => !p.responsavelAtual);
+      } else {
+        result = result.filter(p => p.responsavelAtual === filterResponsavel);
+      }
+    }
     
     result.sort((a, b) => {
       // Ordenação padrão: Notebooks/Computadores primeiro, depois bom estado
@@ -268,7 +286,7 @@ export default function Patrimonio() {
     });
     
     return result;
-  }, [patrimonios, searchQuery, filterTipoBem, filterEstado, filterMarca, sortField, sortDirection]);
+  }, [patrimonios, searchQuery, filterTipoBem, filterEstado, filterMarca, filterResponsavel, sortField, sortDirection]);
 
   const totalPages = Math.ceil(filteredAndSortedPatrimonios.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -493,7 +511,7 @@ export default function Patrimonio() {
     });
   };
 
-  const hasActiveFilters = filterTipoBem !== "todos" || filterEstado !== "todos" || filterMarca !== "todos" || searchQuery !== "";
+  const hasActiveFilters = filterTipoBem !== "todos" || filterEstado !== "todos" || filterMarca !== "todos" || filterResponsavel !== "todos" || searchQuery !== "";
 
   if (error) {
     return (
@@ -642,7 +660,7 @@ export default function Patrimonio() {
                       Filtros
                       {hasActiveFilters && (
                         <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                          {[filterTipoBem !== "todos", filterEstado !== "todos", filterMarca !== "todos"].filter(Boolean).length}
+                          {[filterTipoBem !== "todos", filterEstado !== "todos", filterMarca !== "todos", filterResponsavel !== "todos"].filter(Boolean).length}
                         </Badge>
                       )}
                     </Button>
@@ -725,6 +743,28 @@ export default function Patrimonio() {
                           <SelectItem value="todos">Todas</SelectItem>
                           {uniqueMarcas.map(marca => (
                             <SelectItem key={marca} value={marca}>{marca}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Responsável</label>
+                      <Select
+                        value={filterResponsavel}
+                        onValueChange={(value) => {
+                          setFilterResponsavel(value);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="w-[180px]" data-testid="select-filter-responsavel">
+                          <SelectValue placeholder="Responsável" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos</SelectItem>
+                          <SelectItem value="sem_responsavel">Sem responsável</SelectItem>
+                          {uniqueResponsaveis.map(resp => (
+                            <SelectItem key={resp} value={resp}>{resp}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
