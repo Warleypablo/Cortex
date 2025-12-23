@@ -96,15 +96,6 @@ const dashboardCategories = [
     ],
   },
   {
-    title: "G&G",
-    icon: UsersRound,
-    baseUrl: "/dashboard/geg",
-    subItems: [
-      { title: "Visão Geral", url: "/dashboard/geg", icon: UsersRound },
-      { title: "Recrutamento", url: "/dashboard/recrutamento", icon: UserPlus },
-    ],
-  },
-  {
     title: "Operação",
     icon: Briefcase,
     baseUrl: "/visao-geral",
@@ -144,6 +135,15 @@ const dashboardCategories = [
       { title: "Visão Geral", url: "/growth/visao-geral", icon: Eye },
       { title: "Por Plataforma", url: "/growth/performance-plataformas", icon: Layers },
       { title: "Criativos", url: "/growth/criativos", icon: Image },
+    ],
+  },
+  {
+    title: "G&G",
+    icon: UsersRound,
+    baseUrl: "/dashboard/geg",
+    subItems: [
+      { title: "Visão Geral", url: "/dashboard/geg", icon: UsersRound },
+      { title: "Recrutamento", url: "/dashboard/recrutamento", icon: UserPlus },
     ],
   },
   {
