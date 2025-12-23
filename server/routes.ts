@@ -1091,7 +1091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Fetch linked user info if user_id exists
+      // Fetch linked user info - first by user_id, then by emailTurbo
       let linkedUser = null;
       if (row.user_id) {
         const userResult = await db.execute(sql`
@@ -1101,6 +1101,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `);
         if (userResult.rows.length > 0) {
           linkedUser = userResult.rows[0];
+        }
+      }
+      // If no linkedUser found by user_id, try to find by emailTurbo
+      if (!linkedUser && row.email_turbo) {
+        const emailNormalized = row.email_turbo.toLowerCase().trim();
+        const userByEmailResult = await db.execute(sql`
+          SELECT id, email, name, picture, role
+          FROM auth_users
+          WHERE LOWER(TRIM(email)) = ${emailNormalized}
+        `);
+        if (userByEmailResult.rows.length > 0) {
+          linkedUser = userByEmailResult.rows[0];
         }
       }
       
