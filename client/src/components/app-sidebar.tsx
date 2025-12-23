@@ -50,6 +50,11 @@ const menuItems = [
     icon: Building2,
   },
   {
+    title: "Acessos",
+    url: "/acessos",
+    icon: Key,
+  },
+  {
     title: "Turbo Tools",
     url: "/ferramentas",
     icon: Wrench,
@@ -63,11 +68,6 @@ const menuItems = [
     title: "GPTurbo",
     url: "/cases/chat",
     icon: Sparkles,
-  },
-  {
-    title: "Acessos",
-    url: "/acessos",
-    icon: Key,
   },
   {
     title: "Conhecimento",
