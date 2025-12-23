@@ -132,7 +132,7 @@ export default function StatsCard({
               </Tooltip>
             )}
           </div>
-          <p className="text-[1.75rem] font-bold text-foreground truncate leading-tight">
+          <p className="text-xl sm:text-2xl font-bold text-foreground leading-tight break-words">
             {value}
           </p>
           {trend && (
