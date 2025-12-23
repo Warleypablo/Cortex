@@ -1,0 +1,1546 @@
+Status	Nome	CPF	Endereço	Estado	Telefone	Aniversario	Admissão	Demissão	Tipo Demissão	Motivo Demissão	Proporcional	Proporcional Caju	Setor	Squad	Cargo	Nível	Salário	Caju	Pix	CNPJ	E-mail Turbo	E-mail Pessoal	Meses de Turbo	Último Aumento	Meses de Ult Aumento
+Dispensado	Bruno Matheus Traba de Souza	147.288.647-07	Rua Dom Pedro, Colina de Laranjeiras, Serra. CEP 29167168	ES - Espírito Santo	(27) 996165833	08/08/1996	24/09/2024	25/03/2025	Pediu Demissão	Foi empreender	R$ 1.866,67		Growth Interno	-	Pré-Vendas	X II	R$ 2.000	R$ 400	14728864707	49.218.299/0001-44	brunosouza@turbopartners.com.br	brunotrabasouza@gmail.com	15,2	-	-
+Dispensado	João Vitor Nossa Carvalho	14682215744	Rua Genserico Encarnação, 185, Apt 501, Bl A, Mata da Praia, Vitória, 29.065-420	ES - Espírito Santo	27997799201	11/10/2001	15/04/2025	25/04/2025	Pediu Demissão	Broxou	R$ 2.066,67		Backoffice	-	Financeiro	X II	R$ 2.000	R$ 400	14682215744	60.389.298/0001-03	joao.carvalho@turbopartners.com.br	joaovitornossacarvalho@gmail.com			
+Ativo 	Ismael Ataide Serafim	116.139.417-65	Rua Marataizes, n 250, Valparaiso, Condominio Villaggio Laranjeiras, Apart 1005 Torre Amore	ES - Espírito Santo	(27) 99579-4319	11/10/1986	02/12/2025						Commerce	-	Líder de Squad	Gerente/Supervisor	R$ 7.500	R$ 400	(27) 99927-9222	45.935.598/0001-49		ismael@ativesuaid.com	0,7	-	-
+Dispensado	Daniel Vivas	178.811.357-86	Rua Joao da Cruz 89, apto 202	BA - Bahia	(27) 999281906	19/06/2001	22/05/2022	27/06/2025	Pediu Demissão	Foi para outra empresa	R$ 4.400,00		Commerce	⚒️ A Forja (OFF)	Designer	X IV	R$ 4.000	R$ 400	17881135786	49.707.942/0001-01	daniel.vivas@turbopartners.com.br	danielvelias@hotmail.com	43,7	nov./24	13,1
+Dispensado	Pedro Henrique Lopes Espíndola	160.584.817-40	Rua Praça Coronel Romualdo Monteiro de Barros, 128/301, 28300000, Itaperuna RJ	RJ - Rio de Janeiro	(22) 998808167	03/05/2000	25/11/2024	31/03/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.266,67		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X II	R$ 2.000	R$ 400	42.472.535/0001-05	42.472.535/0001-05	pedro.espindola@turbopartners.com.br	espindolaph@icloud.com	13,1	-	-
+Dispensado	Renan Marques Pastori	455.657.708-07	Rua Egle Moretti Belintani, 33 - Parque das Flores, Campinas - SP, 13087-620 - Bloco D ap 82	SP - São Paulo	(19) 993334242	06/12/1995	06/01/2025	26/09/2025	Pediu Demissão	Foi para outra empresa	R$ 4.266,67		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X IV	R$ 4.000	R$ 400	57807721000125	57.807.721/0001-25	renan.pastori@turbopartners.com.br	renanmpast@gmail.com	11,7	abr./25	8,1
+Dispensado	Ricardo Henrique Gusman Celestino	148.807.827-00	R. Desembargador Antonio Tápias, Jardim Camburi, Vitória - ES. 29090615	ES - Espírito Santo	(27) 999026811	16/12/1998	16/10/2024	28/02/2025	Pediu Demissão	Foi para outra empresa	R$ 2.266,67		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X II	R$ 2.000	R$ 400	14880782700	38.030.475/0001-01	ricardo.gusman@turbopartners.com.br	gusman.ricardoc@gmail.com	14,4	dez./24	12,1
+Dispensado	Anderson Pereira da Silva	342.904.538-05	Rua Líbero Carnicelli, 95 Bela Vista, Osasco / SP - 06060-190	SP - São Paulo	(11) 987098050	11/05/1988	27/03/2025	06/06/2025	Foi Demitido	Desempenho insatisfatório	R$ 1.200,00		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X III	R$ 3.000	R$ 400	43478626000110	43.478.626/0001-10	anderson.silva@turbopartners.com.br	andblaver@gmail.com	9,0	-	-
+Dispensado	André Lucas da Silva Laurindo	118.345.427-90	Rua Herman Stern, 235. Bloco D - Apto 808. Colinas de Laranjeiras, Serra - ES. CEP 29167-081	ES - Espírito Santo	21991964127	21/06/1986	26/05/2025	12/08/2025	Foi Demitido	Desempenho insatisfatório	R$ 3.900,00		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	Gerente/Supervisor	R$ 6.500	R$ 400	Telefone: 21991964127 - Itaú	43.077.008/0001-69	andre.laurindo@turbopartners.com.br	andrelslaurindo@gmail.com	7,0	-	-
+Dispensado	Bruno Augusto Martins Dantas Souza	047.877.211-43	SQPS 101, Lote 25, 409 c2, Zona Industrial (Guará), Brasília/DF, 71215-750	DF - Distrito Federal	(61) 99321-9878	09/10/2005	12/09/2024	25/10/2022	Pediu Demissão		R$ 1.000,00		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	Estágio	R$ 1.000	R$ 400	4787721143	-	bruno.dantas@turbopartners.com.br	brunoasouza68@gmail.com	15,6	-	-
+Dispensado	Bruno Eduardo Romera	463.430.468-60	Alameda França, 26 - Jardim Roseana, São José do Rio Preto - SP, 15030-125	SP - São Paulo	17 992008106	05/12/1995	18/02/2025	27/06/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.200,00		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X II	R$ 2.000	R$ 400	17992008106	59.652.570/0001-09	bruno.romera@turbopartners.com.br	bruno.romera.05@gmail.com	10,3	-	-
+Dispensado	Bruno Vinicius Miranda Moreira	134.453.149-00	Ed. Fontaine Blanc Residence - Rua Eurico Hummig, 800 - Palhano 1, Londrina - PR, 86050-464	PR - Paraná	(43) 98800-2488	10/02/2000	21/01/2025	28/01/2025	Pediu Demissão	Não se identificou com a turbo	R$ 3.400,00		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X III	R$3.000,00	R$ 400	46.985.489/0001-07	46.985.489/0001-07	bruno.moreira@turbopartners.com.br	gestaodetrafego1@gmail.com	11,2	-	-
+Dispensado	Caio Rodrigues Rabello	171.792.267.85	Rua Lumberto Maciel de Azevedo, 2, casa 22. CEP: 29090-700	ES - Espírito Santo	(27) 99278-3627	13/01/2000	01/10/2024	25/10/2024	Foi Demitido		R$ 2.000,00		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X I	R$ 2.000	R$ 400	27992783627	Está em processo de abertura	caio.rabello@turbopartners.com.br	caiorabello00@gmail.com	14,9	-	-
+Dispensado	Daniel Alves Santana	121.151.576-13	Alameda dos mandarins 500, bloco 4A, ap 02, 38407-661, Uberlândia MG	MG - Minas Gerais	34 9994-2537	28/02/1996	22/07/2024	25/07/2024	Foi Demitido		R$ 2.000,00		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X II	R$ 2.000	R$ 400	33.292.568/0001-82	33.292.568/0001-82		daniel.alves2089@gmail.com			
+Dispensado	Gabriel Milagres	160.313.927-39	R. Lúcio Bacelar, 524 - Praia da CostaVila Velha - ES, 29101-030	ES - Espírito Santo	(27) 981543779	26/04/2023	27/04/2022	05/02/2025	Foi Demitido	Incompatibilidade de valores	R$ 1.833,33		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X V	R$ 5.000	R$ 400	16031392739	45.293.364/0001-45	gabriel.milagres@turbopartners.com.br	gabrielmilagresh@gmail.com	44,5	nov./24	13,1
+Dispensado	Gustavo Amorim de Souza Meireles 	174.618.497-35	Av. Munir Hilal, 610 - Jardim Camburi, Vitória - ES, 29090-430	ES - Espírito Santo	(27) 997893505	12/02/2024	01/07/2024	02/09/2024	Pediu Demissão		R$ 400,00		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X I	R$ 1.500	R$ 400	(27) 997893505	55.752.049/0001-92	gustavo.meireles@turbopartners.com.br	gustavoameireles@gmail.com	18,0	-	-
+Dispensado	João Henryque Rodrigues	097.859.429-02	Av Jonas Ramos Martins 335 - Guarujá - Lages SC - 88521-501	SC - Santa Catarina	49998229086	20/12/1997	13/01/2025	04/04/2025	Foi Demitido	Desempenho insatisfatório	R$ 500,00		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X I	R$ 1.500	R$ 400	09785942902 - CPF - C6 Bank	57.871.895/0001-57	joao.henryque@turbopartners.com.br	joaohenryque.marketing@gmail.com	11,5	-	-
+Dispensado	João Pedro Pauletti Coutinho	199.277.657-11	Rua Luis Fernandes Reis, 233, Praia da Costa, Vila Velha, ES	ES - Espírito Santo	(27) 99605-2351	10/12/2002	26/06/2023	15/05/2025	Pediu Demissão	Broxou	R$ 2.000,00		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X III	R$ 3.000	R$ 400	19927765711	51.206.701/0001-12	Joao.pauletti@turbopartners.com.br	jpcoutinho43@hotmail.com	30,4	nov./24	13,1
+Dispensado	Luan de Oliveira Vita	470.770.368-20	Rua Geraldo Zacaria Libaldi 274. Bairro: Jd Bandeirantes - Limeira SP CEP:13486179	SP - São Paulo	(19) 99511-4445	03/03/1999	13/11/2024	28/02/2025	Pediu Demissão	Desempenho insatisfatório	R$ 2.266,67		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X II	R$ 2.000	R$ 400	470.770.368-20	47.436.157/0001- 28	luan.vita@turbopartners.com.br	luanvita.mkt@gmail.com	13,5	-	-
+Dispensado	Marco Antonio Dias Marchetto	081.171.979-01	Avenida Anisio Fernandes Coelho, 404, Jardim da Penha, cep 29060-670, Vitória-ES.	ES - Espírito Santo	(27) 997099506	13/04/1993	29/10/2024	30/09/2025	Pediu Demissão	Problemas pessoais	R$ 3.600,00		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X III	R$ 3.000	R$ 400	41325435000193	41.325.435/0001-93	marco.marchetto@turbopartners.com.br	eusoumarchetto@gmail.com	14,0	fev./25	10,0
+Dispensado	Mateus Luiz de Oliveira 	174.111.877-80	Avenida Serrana, 148, Planalto Serrano, Serra, 29178210	ES - Espírito Santo	(27) 99291-1664	09/07/1999	25/11/2024	26/01/2025	Pediu Demissão		R$ 1.600,00		Commerce	⚒️ A Forja (OFF)	Gestor de Performance	X I	R$ 1.500	R$ 400	48389065000105	48.389.065/0001-05		mateus.luizoliveira20144@gmail.com	13,1	-	-
+Dispensado	Nestor Squiba Neto	063.659.785-70	R. Luiz dos Santos Mendonça, 99 - Farolândia, Aracaju - SE, 49031-190	SE - Sergipe	79988748226	06/10/2000	18/02/2025	23/05/2025	Foi Demitido	Desempenho insatisfatório	R$ 1.400,00		Commerce	⚒️ A Forja (OFF)	Designer	X I	R$ 1.500	R$ 400	59.510.379/0001-22	59.510.379/0001-22		squibanestor@gmail.com	10,3	-	-
+Dispensado	Alexander Haubrichs de Abreu Santos Brandão	155.909.707-84	Rua Acapú, 181, Marechal Hermes, Rio de Janeiro, 21550-570.	RJ - Rio de Janeiro	(21) 980910707	25/10/1992	26/05/2025	28/11/2025			R$ 3.400,00		Commerce	⚓️ Squadra	Gestor de Performance	X III	R$ 3.000	R$ 400	15590970784	38.032.487/0001-67	alexander.brandao@turbopartners.com.br	alexandeer181@gmail.com	7,0	-	-
+Ativo 	Allan Eduardo Machado de Araujo Alencar	110.669.664-60	R. Riachuelo - Maurício de Nassau, Caruaru - PE, 55012-110	PE - Pernambuco	(81) 97908-2782	13/12/2002	23/09/2025						Commerce	⚓️ Squadra	Gestor de Performance	X III	R$ 3.000	R$ 400	56.019.983/0001-62	56.019.983/0001-62	allan.eduardo@turbopartners.com.br	allaneduardogestor@gmail.com	3,0	-	-
+Dispensado	Anna Gabriela Rauta Machado	138.987.587-37	Rua Carlos Martins, 235, apt 304, Vitória, Jardim Camburi, 29090060	ES - Espírito Santo	(27) 988165867	04/06/2002	02/06/2025	31/10/2025	Pediu Demissão	Incompatibilidade de valores	R$ 4.200,00		Commerce	⚓️ Squadra	Designer	X III	R$ 3.500	R$ 400	annagabi04@gmail.com	 61.116.201/0001-43	gabriela.rauta@turbopartners.com.br	annagabi04@gmail.com	6,8	out./25	2,0
+Dispensado	Arthur Araujo Iglesias	174.744.227-51	Av. Copacabana, 556, Morada de Laranjeiras, Serra/ES	ES - Espírito Santo	(27) 99526-2002	18/05/2002	16/10/2024	11/11/2024	Pediu Demissão		R$ 850,00		Commerce	⚓️ Squadra	Gestor de Performance	X I	R$ 1.500	R$ 400	17474422751	57.643.478/0001-57	arthur.iglesias@turbopartners.com.br	arthuraraujoiglesias@hotmail.com	14,4	-	-
+Em desligamento	Arthur Fagundes de Oliveira Siqueira 	110.868.019-46	Rua Joaquim Theodoro Portugal, 577 - Xaxim, Curitiba - PR, 81810-050	PR - Paraná	(41) 99678-4699	04/05/2004	22/07/2024	23/12/2025			R$ 3.500,00		Commerce	⚓️ Squadra	Gestor de Performance	X III	R$ 3.750	R$ 400	51.589.820/0001-00	51.589.820/0001-00	arthur.fagundes@turbopartners.com.br	arthurfagundes565@gmail.com	17,3	set./25	3,0
+Ativo 	Bernardo Soroldani Vital Campos	122.383.947-88	Rua Monte Verde, 625, Joao Monlevade, 35930-588	MG - Minas Gerais	(28) 999243232	21/04/2002	06/05/2025						Commerce	⚓️ Squadra	Designer	X II	R$ 2.750	R$ 400	12238394788	60.678.518/0001-00	bernardo.campos@turbopartners.com.br	bernardosoroldani2@gmail.com	7,7	set./25	3,0
+Dispensado	Bruna Cristina Costa Oliveira	085.082.015-40	R. Hermes Lima, 181 - Vila Praiana, Lauro de Freitas - BA, 42700-000, Residencial Santa Clara	BA - Bahia	(71) 991748979	27/06/2002	07/11/2022	03/10/2025	Pediu Demissão	Foi para outra empresa			Commerce	⚓️ Squadra	Designer	X IV	R$ 4.500	R$ 400	08508201540	48.903.083/0001-55	bruna.costa@turbopartners.com.br	bruna.fred10@gmail.com	38,1	set./25	3,0
+Dispensado	Emily Vitorio	861.568.275-52	Rua Teódulo de Albuquerque, 172, apto 102, Cabula VI, Salvador-BA. CEP: 41.181-010	BA - Bahia	(71) 99988-1046	26/08/2023	28/02/2023	25/03/2023	Foi Demitido		R$ 0,00		Commerce	⚓️ Squadra	Designer	X I			-	-	emily.christine@turbopartners.com.br		0,8	-	-
+Ativo 	Elizio José da Silva Filho	085.393.234-43	Av. Carlos de Lima Cavalcante, 3860, Olinda/Pe - 53040-125	PE - Pernambuco	(81) 988728060	24/02/2000	04/11/2025						Commerce	⚓️ Squadra	Designer	X III	R$ 3.000	R$ 400	81988728060	45.476.061/0001-68	elizio.filho@turbopartners.com.br	elizioflh@gmail.com	1,6	-	-
+Dispensado	Henrique Orlando Canani Vettorello	010.244.400-52	Rua Albino venter, 40, jardim do sol, Campo bom - RS. 93700-000	RS - Rio Grande do Sul	(51) 992533560	24/11/2002	01/08/2024	25/05/2025	Pediu Demissão	Foi para outra empresa	R$ 3.000,00		Commerce	⚓️ Squadra	Gestor de Performance	X III	R$ 3.000	R$ 400	56.034.624/0001-84	56.034.624/0001-84	Henrique.orlando@turbopartners.com.br	henriquevettorello12@gmail.com	17,0	fev./25	10,0
+Dispensado	Karolayne Vieira Calis Pereira	190.541.717.90	Rua da Liberdade; beco barro branco, Argolas, Vila Velha, ES, 29114-700	ES - Espírito Santo	(27) 996429478	18/04/2001	25/07/2024	25/09/2025	Pediu Demissão	Foi para outra empresa	R$ 2.583,33		Commerce	⚓️ Squadra	Designer	X II	R$ 2.500	R$ 400	19054171790	52.628.517/0001-23	karol.vieira@turbopartners.com.br	Karolaynevieiracalispereira@gmail.com	17,2	set./25	3,0
+Ativo 	João Lucas Negromonte Marques Mendes	063.367.304-84	R. Barão de Itamaracá, 487 - Espinheiro, Recife - PE, 52020-070	PE - Pernambuco	(81) 98888-2495	31/07/2002	11/11/2025						Commerce	⚓️ Squadra	Designer	X IV	R$ 4.000	R$ 400	81988882495	62.835.069/0001-92	joao.negromonte@turbopartners.com.br	lucasnegromonteux@gmail.com	1,4	-	-
+Ativo 	Jônatas Cavalcante da Silva 	160.803.696-05	R. João Rodrigues de Castro, 105 - Jardim Patricia, Uberlândia - MG, 38414-122	MG - Minas Gerais	(34) 99722-6971	10/04/2004	28/10/2025						Commerce	⚓️ Squadra	Gestor de Performance	X IV	R$ 4.000	R$ 400	50.411.624/0001-70	50.411.624/0001-70	jonatas.cavalcante@turbopartners.com.br	cavalcantsss@gmail.com	1,9	-	-
+Ativo 	Jordnei Gadelha da Silva	029.863.322-18	Passagem Humberto Mendes, 252 - Pratinha, Belém - PA, 66816-200	PA - Pará	(91) 99158-9613	07/04/2001	19/11/2025						Commerce	⚓️ Squadra	Gestor de Performance	X IV	R$ 4.400	R$ 400	e8c69cc2-8c30-4ceb-a809-6928a72c433e	54.201.297/0001-82	jordnei.gadelha@turbopartners.com.br	jordneig@gmail.com	1,1	-	-
+Dispensado	Luís Filipe Medeiros Barbosa	016.527.211-26	Qd 208, Lt 2/4, Bl 1A, Bairro Sul, 71926500, Condomínio All Águas Claras, Apto.1802 - Águas Claras - Brasília/DF	DF - Distrito Federal	(61) 98345-2914	21/11/1996	10/12/2024	21/03/2025	Foi Demitido	Desempenho insatisfatório	R$ 1.600,00		Commerce	⚓️ Squadra	Gestor de Performance	X II	R$ 2.000	R$ 400	47.296.753/0001-50	47.296.753/0001-50	luisfilipe.barbosa@turbopartners.com.br	filipe.14.12.17@gmail.com	12,6	-	-
+Ativo 	Leonardo Soares Ferreira	159.988.567-08	Loteamento Boa Fé, 5 - Charqueada - Alegre / ES - 29500-000	ES - Espírito Santo	(28) 999761098	10/11/1998	29/08/2024						Commerce	⚓️ Squadra	Designer	X III	R$ 3.500	R$ 400	l4soarees2@gmail.com	55.870.177/0001-30	leonardo.soares@turbopartners.com.br	l4soarees2@gmail.com	16,0	out./25	2,0
+Ativo 	Lucas Rosetti Miranda	174.731.707-16	Rua Monte Verde 625, Recanto do Paraiso, João Monlevade - 35930588	ES - Espírito Santo	(27) 998567711	20/07/2000	16/10/2024						Commerce	⚓️ Squadra	Gestor de Performance	X IV	R$ 4.500	R$ 400	57655140000115	57.655.140/0001-15	lucas.rosetti@turbopartners.com.br	lucas.rosetti121@gmail.com	14,4	set./25	3,0
+Ativo 	Renan Fortunato Silveira	129.228.407-27	Rua Doutor Antônio Basílio, 890 - Jardim da Penha, Vitória - ES	ES - Espírito Santo	(27) 99288-1834	21/03/2002	02/12/2025						Commerce	⚓️ Squadra	Gestor de Performance	X III	R$ 3.000	R$ 400	Renanfortunatosilveira@gmail.com	52.348.193/0001-49		Renanfortunatosilveira@gmail.com	0,7	-	-
+Ativo 	Rodrigo Padrão	147.564.187-75	R. Abiail do Amaral Carneiro, 85 - Enseada do Suá, Vitória - ES, 29050-535	ES - Espírito Santo	(27) 998296922	22/11/1998	08/11/2022						Commerce	⚓️ Squadra	Líder de Squad	X V	R$ 7.000	R$ 400	14756418775	44.258.003/0001-03	rodrigo.padrao@turbopartners.com.br	rodrigopadraof98@hotmail.com	38,0	set./25	3,0
+Dispensado	Yury Henrique Esteves lopes 	018.810.596-42	Rua santos 2089 Bl2 ap 102 Belo Horizonte, 30421490	MG - Minas Gerais	(31) 99412-4201	25/07/1996	21/01/2025	06/06/2025	Foi Demitido	Desempenho insatisfatório	R$ 1.200,00		Commerce	⚓️ Squadra	Gestor de Performance	X III	R$ 3.000	R$ 400	yuryorigin@outlook.com	49.328.167/0001-75	yury.henrique@turbopartners.com.br	yuryorigin@Outlook.com	11,2	-	-
+Ativo 	Thiago Andrey da Silva Marinho	161.077.974-67	Rua Expedito Gonçalves Monteiro, José Carlos de Oliveira, PE, 110, Caruaru, 55042030	PE - Pernambuco	(81) 994778995	16/02/2005	06/05/2025						Commerce	⚓️ Squadra	Gestor de Performance	X V	R$ 5.000	R$ 400	57.495.983/0001-00	57.495.983/0001-00	thiago.andrey@turbopartners.com.br	andreythiago940@gmail.com	7,7	nov./25	0,9
+Ativo 	Thiago Henrique Martins	125.251.669-06	R. Antônio Raposo Taváres, 1830 - Bandeirantes, Londrina - PR, 86187-090	PR - Paraná	(43) 988387474	09/03/2000	18/02/2025						Commerce	⚓️ Squadra	Gestor de Performance	X IV	R$ 4.500	R$ 400	thiagohenrique2000@hotmail.com	59.378.631/0001-91	thiago.martins@turbopartners.com.br	thmartins0903@gmail.com	10,3	out./25	2,0
+Ativo 	Victor Anderson Arpini Vianna	175.054.357-52	R. Santana do Iapó, 613 - Muquiçaba, Guarapari - ES, 29215-020	ES - Espírito Santo	(27) 997440848	07/02/2003	13/03/2023						Commerce	⚓️ Squadra	Gestor de Performance	X V	R$ 5.000	R$ 400	48.977.895/0001-45	48.977.895/0001-45	Victor.arpini@turbopartners.com.br	varpini@hotmail.com	33,9	set./25	3,0
+Ativo 	Victor dos Santos Matsushita	482.652.038-70	Rua Monte Verde, 625, bairro Recanto Paraiso - Cidade, João Monlevade - MG, 35930-588	MG - Minas Gerais	(12) 99137-6800	16/01/2003	19/08/2025						Commerce	⚓️ Squadra	Gestor de Performance	X III	R$ 3.000	R$ 400	48265203870	59.353.814/0001-52	victor.matsushita@turbopartners.com.br	victormatsushita@gmail.com	4,2	-	-
+Ativo 	Weverton Silva Assis	20744644798	Rua Arquiteto Décio Thevenard, 70, Jardim Camburi, Vitória, ES. CEP: 29090585	ES - Espírito Santo	(27) 995188429	19/12/2005	25/11/2025						Commerce	⚓️ Squadra	Gestor de Performance	Estágio	R$ 1.000	R$ 400	20744644798	62.385.486/0001-80	weverton.assis@turbopartners.com.br	wevertonassis571@gmail.com	0,9	-	-
+Dispensado	Bruno Prata Ferreira Luz	141.285.547-07	Rua Artacerce Brotto 116 a	ES - Espírito Santo	(27) 99811-2895	20/11/1989	25/07/2024	25/10/2024	Pediu Demissão		R$ 3.000,00		Commerce	⚡️ Solar+ (OFF)	Gestor de Performance	X III	R$ 3.000	R$ 400	27998112895	35.048.458/0001-03	bruno.luz@turbopartners.com.br	bpfluz@gmail.com	17,2	-	-
+Ativo 	Amanda Sakai dos Santos	096.175.789-21	Rua Maria Lúcia da Paz, 333 - Londrina, PR - 86050-470	PR - Paraná	(43) 99979-2594	17/10/2004	10/12/2025				R$ 1.750,00		Commerce	✨ Makers 	Designer	X III	R$ 3.500	R$ 400	096.175.789-21 (Nubank)	63.925.868/0001-12	amanda.sakai@turbopartners.com.br	amandassakai@gmail.com	0,4		
+Ativo 	Ana Luiza Lello Maria	185.621.187-88	R. Comissário Octávio Queiroz, 120 - Jardim da Penha, Vitória - ES, 29060-270, Bloco 02 Apartamento 301	ES - Espírito Santo	(61) 983111030	08/07/1999	04/12/2024						Commerce	✨ Makers 	Analista de Comunicação	X III	R$ 4.000	R$ 400	18562118788	57.722.146/0001-68	ana.lello@turbopartners.com.br	analuizalello@hotmail.com	12,8	out./25	2,0
+Ativo 	Debora Mund 	149.074.007-48	Rua Colatina - n 283, Vila Velha - ES 29102-841 	ES - Espírito Santo	(27) 996265144	27/04/2000	13/01/2025						Commerce	✨ Makers 	Analista de Comunicação	X IV	R$ 4.000	R$ 400	149.074.007-48	57.413.513/0001-41	debora.mund@turbopartners.com.br	deboramund34@gmail.com	11,5	ago./25	4,0
+Ativo 	Gabriela Viana Vasconcelos de Sousa	041.304.923-06	Rua Rocilda Lopes de Oliveira, 455, Boa Vista - Fortaleza, CE - 60864-435	CE - Ceará	(85) 98708-8270	09/07/2002	11/11/2025						Commerce	✨ Makers 	Designer	X III	R$ 3.000	R$ 400	54299550000182	54.299.550/0001-82	gabriela.viana@turbopartners.com.br	contatogabrielavasconcelos@gmail.com	1,4	-	-
+Ativo 	Geiziele Izidorio Oliveira	187.240.917-23	Avenida Rio Marinho, 221, Jardim botânico - Cariacica, 29142610	ES - Espírito Santo	(27) 99519-1218	06/11/2004	28/10/2025						Commerce	✨ Makers 	Analista de Comunicação	Estágio	R$ 1.000	R$ 400	geiziele.i.o2015@gmail.com	ESTÁGIO	geiziele.oliveira@turbopartners.com.br	geiziele.i.o2015@gmail.com	1,9	-	-
+Ativo 	Lara Grobério Miranda Carlos	149.073.787-18	R. Jahira Santos Rodrigues, 140 - Jardim da Penha, Vitória - ES, 29060-160, apto 304, Condomínio do Edifício Carlos V	ES - Espírito Santo	 (27) 999807614	14/07/2000	03/01/2024						Commerce	✨ Makers 	Analista de Comunicação	X III	R$ 5.000	R$ 400	groberiolara@hotmail.com	53.504.948/0001-40	lara.groberio@turbopartners.com.br	laragroberio.contato@gmail.com	24,0	set./25	3,0
+Ativo 	Laura Gonzaga da Silva 	502.268.108-01	Rua Victório Spinucci, 607 - jardim Promeca, várzea paulista - SP, 13223-200 (casa)	SP - São Paulo	(11) 95640-7603	01/11/2004	25/11/2025				#REF!		Commerce	✨ Makers 	Designer	X III	R$ 3.500	R$ 400	502.268.108-01	51.065.946/0001-77	laura.gonzaga@turbopartners.com.br	laura.gonzaga04@gmail.com	0,9	-	-
+Ativo 	Mariana Amaral Dalto	163.120.307-09	Rua Santa Terezinha, 205. Nova Valverde, Cariacica - ES. CEP 29151874	ES - Espírito Santo	(11) 97860-8574	24/02/1996	16/12/2025				R$ 1.200,00		Commerce	✨ Makers 	Analista de Comunicação	X IV	R$ 4.000	R$ 400	16312030709	46.488.553/0001-36	mariana.dalto@turbopartners.com.br	marianadaltoo@gmail.com	0,2		
+Ativo 	Matheus Glendel de Azevedo	181.405.927-06	R. Sanhaço, 371 - Novo Horizonte, Serra - ES, 29163-343	ES - Espírito Santo	(27) 997965942	27/10/2006	29/01/2025						Commerce	✨ Makers 	Designer	X II	R$ 2.000	R$ 400	teusgl27@gmail.com	59.369.527/0001-30	matheus.glendel@turbopartners.com.br	teusgl27@gmail.com	10,9	set./25	3,0
+Ativo 	Raquel Soares Santos Fernandes	15371618732	Rua 1 de maio, 147, Aribiri, Vila Velha, 29120260 (apartamento 602)	ES - Espírito Santo	27993164102	13/07/2000	07/10/2025				#VALUE!	#VALUE!	Commerce	✨ Makers 	Analista de Comunicação	X III	R$ 3.500	R$ 400	27993164102	36.882.943/0001-32	raquel.fernandes@turbopartners.com.br	kelsoaressantos@gmail.com	2,6	-	-
+Ativo 	Roberto Fachetti	137.059.757-65	R. Príncipe Humberto, 112 - Vila CampestreSão Bernardo do Campo - SP, 09725-200	SP - São Paulo	(27) 998001953	29/03/1996	12/08/2022						Commerce	✨ Makers 	Líder de Squad	Gerente/Supervisor	R$ 8.000	R$ 400	13705975765	42.901.669/0001-02	roberto.fachetti@turbopartners.com.br	roberto_fpj@hotmail.com	41,0	out./25	2,0
+Dispensado	João Pedro Testa Fiereck Afonso 	172.034.107-90	Av São Paulo 2730, Ed Costa de Monaco, Vila Velha Itapoa, 29101502	ES - Espírito Santo	(27)996270793	04/02/2002	10/06/2024	11/07/2025	Pediu Demissão	Foi para outra empresa	R$ 2.133,33		Ventures	⭐️ Ventures 	Gestor de Performance	X IV	R$ 4.000	R$ 400	172.034.107-90	55.292.998/0001-37	joao.testa@turbopartners.com.br	joaoceic@hotmail.com	18,7	jan./25	11,1
+Dispensado	Derick Nascimento Caliman	 152.749.047-50	Rodovia do Sol, 1528, praia de Itaparica, Vila Velha-ES	ES - Espírito Santo	(27)98823-0975	10/04/1994	13/12/2023	10/01/2024	Pediu Demissão		R$ 426,67		Commerce	🏕 Tribo (OFF)	Gestor de Performance	X I	R$ 800	R$ 200	15274904750	47923473000124	derick.caliman@turbopartners.com.br		24,7	-	-
+Dispensado	Herick Freire da Silva	131.424.127-35	Rua Petrolândia, nº 33, Jardim Marilândia. Vila Velha - ES	ES - Espírito Santo	(27) 99282-0289	27/09/2023	28/06/2023	29/09/2023	Foi Demitido		R$ 933,33		Commerce	🏕 Tribo (OFF)	Gestor de Performance	X I	R$ 800	R$ 200	27992820289	51.191.749/0001-02	herick.freire@turbopartners.com.br				
+Dispensado	João Victor Brandão Maia Gomez Perez 	155.297.177-56 	Rua major clarindo fundão, 70, apt 1101, Praia do Canto	ES - Espírito Santo	(27)992276046	04/02/2002	22/01/2023	19/07/2023	Foi Demitido		R$ 640,00		Commerce	🏕 Tribo (OFF)	Gestor de Performance	X I	R$ 800	R$ 400	155.297.177-56 	 53.560.491/0001-91 	joao.brandao@turbopartners.com.br	jvbmgperez@gmail.com	35,5	-	-
+Dispensado	Thiago Moura	143.625.137-01	Rua sabará, 68, Barcelona, Serra, 29166180	ES - Espírito Santo	(27) 99814 3276	25/09/2023	03/04/2023	20/12/2024	Pediu Demissão		R$ 2.500,00		Commerce	🏕 Tribo (OFF)	Gestor de Performance	X III	R$ 3.000	R$ 400	27998143276	36.040.713/0001-26	thiago.moura@turbopartners.com.br	Thiagomouraps@gmail.com	33,2	-	-
+Dispensado	Pedro Margon	165.075.907-03	Rua Gelu Vervloet dos Santos, nº 950 - Jardim Camburi, Vitória	ES - Espírito Santo	(27) 992617227	27/02/2003	25/04/2023	28/02/2025	Pediu Demissão	Broxou	R$ 3.400,00		Commerce	🏹 Hunters (OFF)	Gestor de Performance	X III	R$ 3.000	R$ 400	27992617227	Termo de Faculdade	pedro.lorenzoni@turbopartners.com.br	lorenzonipedro@gmail.com	32,4	nov./24	13,1
+Dispensado	Renato Azevedo Ramos Neto	078.229.495-27	Residencial Porto belo casa 21 - R. João Marques Oliveira, 30-60 - Buraquinho, Lauro de Freitas - BA, 42710-170 	BA - Bahia	(71) 98124-3355	27/01/2003	01/10/2024	23/05/2025	Pediu Demissão	Problemas de saúde	R$ 1.866,67		Commerce	🏹 Hunters (OFF)	Gestor de Performance	X II	R$ 2.000	R$ 400	(71)981243355	Estágio	renato.azevedo@turbopartners.com.br	renatoazevedoramosneto@gmail.com	14,9	mar./25	9,1
+Dispensado	Thiago Lopes Wolfgrann	705.669.361-00	Cidade Jardins, Total Ville Pitangueiras, Valparaíso de Goiás, GO, Brasil CEP: 72.878-201	GO - Goiás	61999720266	20/01/1998	11/02/2025	07/03/2025	Pediu Demissão	Foi para outra empresa	R$ 1.000,00		Commerce	🏹 Hunters (OFF)	Gestor de Performance	X III	R$ 3.000	R$ 400	45118822000100 - Chave CNPJ	45.118.822/0001-00	thiago.lopes@turbopartners.com.br	thiagoloppes201@gmail.com	10,5	-	-
+Dispensado	Vitor de Mira Honorato	493.737.898-80	Rua Josefa Rúbio Bastida, 1115 - Parque Vitoria RegiaSorocaba - SP, 18078-467	SP - São Paulo	15 991112148	12/11/2001	18/02/2025	09/05/2025	Pediu Demissão	Broxou	R$ 1.400,00		Commerce	🏹 Hunters (OFF)	Gestor de Performance	X III	R$ 3.000	R$ 400	15991112148	44.514.605/0001-76		vitormira6@gmail.com	10,3	-	-
+Dispensado	Caio Benevenuto dos Santos 	525.727.478-71	Rua Gerivatiba, 207, São Paulo, SP, Edifício River One, Apto 2601, 05501030	SP - São Paulo	(15) 981305003	16/08/2002	20/03/2025	11/07/2025	Pediu Demissão	Foi para outra empresa	R$ 480,00		Commerce	🏹 Hunters (OFF)	Gestor de Performance	Estágio	R$ 900	R$ 400	52572747871	57.912.296/0001-34	caio.benevenuto@turbopartners.com.br	cbenevenuto.ds@gmail.com	9,3	-	-
+Dispensado	Guilherme Destefane Biló	057.851.767-18	Rua Dom Pedro II, 130, Bloco 5 Apratamento 104, Colina de Laranjeiras - Serra ES	ES - Espírito Santo	(27) 999141592	05/12/1998	04/02/2025	18/07/2025	Pediu Demissão	Foi para outra empresa	R$ 2.300,00		Commerce	🏹 Hunters (OFF)	Designer	X III	R$ 3.000	R$ 400	057.851.767-18	59.247.501/0001-10	guilherme.destefane@turbopartners.com.br	guilhermedestefanebilo@gmail.com	10,7	-	-
+Dispensado	Lucas Ferreira Pinto	018.269.504.27	Rua Antonio Madruga, 1959, Capim Macio, Natal/RN , 59082-120	RN - Rio Grande do Norte	(84) 998392593	17/06/2000	06/05/2025	25/07/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.000,00		Commerce	🏹 Hunters (OFF)	Gestor de Performance	X II	R$ 2.000	R$ 400	48.857.375/0001-07	48.857.375/0001-07	lucas.ferreira@turbopartners.com.br	lucas.lfp.17@gmail.com	7,7	-	-
+Dispensado	Lucas Gabrielli de Carvalho Santos 	160.749.117-62	Rua Francisco Rocha 500 apt 202 curitiba 80420130	PR - Paraná	(22) 999076899	10/04/2003	25/04/2025	11/07/2025	Pediu Demissão	Problemas de saúde	R$ 533,33		Commerce	🏹 Hunters (OFF)	Gestor de Performance	Estágio	R$ 1.000	R$ 400	22999076899	ESTÁGIO	lucas.santos@turbopartners.com.br	lucas993311@gmail.com	8,1	-	-
+Dispensado	Marcelo Augusto Silva Messias	059.997.207-61	Rua José Goularte, 22, Bairro Nossa senhora de Fátima - Cachoeiro de Itapemirim ES	ES - Espírito Santo	(28) 99905-0908	09/08/1999	04/12/2024	11/07/2025	Foi Demitido	Desempenho insatisfatório	R$ 800,00		Commerce	🏹 Hunters (OFF)	Designer	X I	R$ 1.500	R$ 400	55.932.082/0001-02	55.932.082/0001-02	marcelo.messias@turbopartners.com.br	"tgemessias@gmail.com	"	12,8	-	-
+Dispensado	Mariano Libério de Lacerda Batista	151.591.496-86	Coronel Martinho Ferreira do Amaral - 435; apto 302, Centro, Nova Serrana - MG	MG - Minas Gerais	(37) 98814-3813	22/12/2004	21/01/2025	10/02/2025	Pediu Demissão	Foi para outra empresa	R$ 1.600,00		Commerce	🏹 Hunters (OFF)	Gestor de Performance	X III	R$ 3.000	R$ 400	49.033.464/0001-93	49.033.464/0001-93	mariano.liberio@turbopartners.com.br	marianolacerda30@gmail.com	11,2	-	-
+Dispensado	Marlon de Melo Santos	143.789.757-69	Rua Santos Titara 137, apt 107, bloco B, Méier, Rio de Janeiro, 20735-240	RJ - Rio de Janeiro	21974192972	11/05/1994	05/02/2025	14/03/2025	Pediu Demissão	Foi para outra empresa	R$ 1.700,00		Commerce	🏹 Hunters (OFF)	Gestor de Performance	X IV	R$ 3.000	R$ 400	26086624000167	26.086.624/0001-67	marlon.santos@turbopartners.com.br	marlonsan10@gmail.com	10,7	-	-
+Dispensado	Nickson Domingos Nascimento	131.495.154-83	Rua João Figueiredo, 19, centro, Fagundes - PB, 58487-000	PB - Paraíba	(83) 988681263	14/08/2000	06/03/2025	20/06/2025	Pediu Demissão	Broxou	R$ 1.733,33		Commerce	🏹 Hunters (OFF)	Gestor de Performance	X II	R$ 2.000	R$ 400	Nxo.mkt@gmail.com	46.050.119/0001-70	nickson.nascimento@turbopartners.com.br	Nxo.mkt@gmail.com	9,7	-	-
+Dispensado	Erick Henrique Sales da Silva	183.642.167-24	Rua Cento e Nove, 208. Nova Rosa da Penha - Cariacica. CEP: 29157-289	ES - Espírito Santo	(27) 99263-9760	05/07/2003	22/07/2025	13/08/2025	Pediu Demissão	Problemas pessoais	R$ 1.900,00		Commerce	👑 Supreme (OFF)	Designer	X III	R$ 3.000	R$ 400	47.172.414/0001-61	47.172.414/0001-61	erick.sales@turbopartners.com.br	sallesartdirector@gmail.com	5,1	-	-
+Dispensado	Robert da Silva Bragança	180.841.447-07	R. Cel. Alziro Viana, 383, Condomínio do Edifício Realito - Centro, Vitória - ES, 29016-300	ES - Espírito Santo	27999021023	30/07/2000	30/01/2025	25/07/2025	Foi Demitido	Desempenho insatisfatório	R$ 3.000,00		Commerce	👑 Supreme (OFF)	Designer	X III	R$ 3.000	R$ 400	45.932.528/0001-37	45.932.528/0001-37	robert.braganca@turbopartners.com.br	robert.s.braganca@gmail.com	10,9	-	-
+Dispensado	Alexandre Costa Rocha Junior	150 257 027 04	R. Dom João VI, 68 - Cristóvão Colombo, Vila Velha - ES, 29106-315	ES - Espírito Santo	(27) 988930629	27/11/2003	02/08/2023	28/11/2025			R$ 4.533,33		Commerce	👑 Supreme (OFF)	Analista de Comunicação	X III	R$ 4.000	R$ 400	alexandre.rocha2711@gmail.com	51.857.562/0001-97	alexandre.costa@turbopartners.com.br	alexandre.rocha2711@gmail.com	29,1	set./25	3,0
+Dispensado	Aliny de Souza e Frisso	188.813.647-27	Rua Manoel Bandeira, 380, Ataide, Vila Velha, 29119-210	ES - Espírito Santo	(27) 997255905	12/02/2004	26/02/2025	08/10/2025	Pediu Demissão	Foi para outra empresa	R$ 1.300,00		Commerce	👑 Supreme (OFF)	Analista de Comunicação	X III	R$ 3.000	R$ 400	18881364727	59.558.777/0001-19	aliny.frisso@turbopartners.com.br	frissoaliny@gmail.com	10,0	ago./25	4,0
+Dispensado	Amanda Vitória Pereira Teixeira	156.984.447-06	R. Alan Kardec - Divino Espírito Santo, Vila Velha - ES, 29107-240	ES - Espírito Santo	27995191353	06/01/2003	16/09/2025	03/10/2025	Foi Demitido	Desempenho insatisfatório	#REF!		Commerce	👑 Supreme (OFF)	Designer	Estágio	R$ 1.000	R$ 400	27995191353	Estágio	amanda.vitoria@turbopartners.com.br	amanda.viicky@gmail.com	3,3	-	-
+Dispensado	Bruno Marcelo Díaz Franco	064.875.197-07	Rua Celina dos Santos Machado 11, Santos Dumont, Vitória - ES  29042732	ES - Espírito Santo	27998310709	08/11/2001	07/10/2025	12/11/2025	Foi Demitido	Desempenho insatisfatório	R$ 1.800,00		Commerce	👑 Supreme (OFF)	Designer	X III	R$ 3.000	R$ 400	6487519707	59.878.855/0001-62	bruno.franco@turbopartners.com.br	bruno.dsg.graf@gmail.com	2,6	-	-
+Dispensado	Caio Vitor Da Silva de Santana	181.168.487-47	Rua Rio Iguatemi, Eldorado, 122 - Serra - 29169-570	ES - Espírito Santo	(27) 99735-6241	27/09/1998	22/07/2025	08/08/2025	Pediu Demissão	Não se identificou com a turbo	R$ 933,33		Commerce	👑 Supreme (OFF)	Designer	X II	R$ 2.000	R$ 400	Caiosantanaph@gmail.com	s	caio.santana@turbopartners.com.br	caiossantt2@gmail.com	5,1	-	-
+Dispensado	Isabelle Oliveira do Carmo 	053.800.887-32	Avenida da Praia, 150. Apt 702. Praia de Itaparica, Vila Velha/ES Cep: 29102-085	ES - Espírito Santo	(21) 97196-5952	14/12/1993	23/09/2025						Commerce	👑 Supreme (OFF)	Analista de Comunicação	X III	R$ 3.000	R$ 400	21971965952	62.836.795/0001-29	isabelle@turbopartners.com.br	isabelleodc@gmail.com	3,0	-	-
+Dispensado	João Victor Moulin Cateim	149.609.557-08	Rua ex Combatente Osvaldo Martins, centro, s/n, Jerônimo Monteiro/ES - 29550-000	ES - Espírito Santo	(28) 999995516	26/06/2003	28/08/2025	10/09/2025	Pediu Demissão	Expectativa salarial	R$ 800,00		Commerce	👑 Supreme (OFF)	Designer	X I	R$ 1.500	R$ 400	victorcateim@gmail.com	57.828.431/0001-68		jvmcateim@gmail.com	3,9	-	-
+Ativo 	Brenda Federici Vieira	154.175.297-02	Travessa Independência, 19, Ed. Platão, Apto: 202, Itapoã - Vila Velha/ES	ES - Espírito Santo	(12) 98852-3331	19/02/1993	16/12/2025				#REF!		Commerce	💠 Pulse	Analista de Comunicação	X IV	R$ 4.000	R$ 400	 55.648.447/0001-63 	55.648.447/0001-63		bfvieira01@gmail.com	0,2		
+Ativo 	Fernanda de Almeida Tobias 	158.607.307-99	Rua São Francisco, 31 - Centro, Edifício Caramuru, Vitória - ES, 29015-200	ES - Espírito Santo	(27) 99616-2883	21/01/1998	19/11/2025						Commerce	💠 Pulse	Analista de Comunicação	X III	R$ 3.000	R$ 400	158.607.307-99	59.410.999/0001-90	fernanda.almeida@turbopartners.com.br	fernandaatt@outlook.com	1,1	-	-
+Ativo 	Francisco Eduardo Lopes Lemes	027.217.432-79	Anísio Fernandes Coelho 1615, apt 202. Vitória - ES. 29060-670	ES - Espírito Santo	(27) 992475419	14/03/2001	19/05/2025						Commerce	💠 Pulse	Designer	X III	R$ 3.500	R$ 400	27992475419	60.826.081/0001-05	francisco.lemes@turbopartners.com.br	design.flopes@gmail.com	7,3	out./25	2,0
+Ativo 	Gabriela Teixeira Menezes de Souza Toledo 	19245222764	Rua Doutor Annor Silva 605, Vila Velha ES 29107355	ES - Espírito Santo	22998732836	11/05/2001	09/09/2025						Commerce	💠 Pulse	Designer	X III	R$ 3.000	R$ 400	22998732836	54.962.554/0001-07	gabriela.teixeira@turbopartners.com.br	gabiteixeira010@hotmail.com	3,5	-	-
+Ativo 	Julia Manhães Silva 	139.413.617-08	Avenida Comandante Álvaro Martins, 71 - Mata da Praia, Vitória - ES, 29066-050 (apto. 1102 bl A)	ES - Espírito Santo	(27) 999511610	11/01/2000	18/11/2024						Commerce	💠 Pulse	Analista de Comunicação	X IV	R$ 4.000	R$ 400	28.586.002/0001-23	28.586.002/0001-23	julia.manhaes@turbopartners.com.br	julia.manhaes@hotmail.com	13,3	ago./25	4,0
+Ativo 	Laura Falcão	126.874.447-66	Rua Duque de Caxias, 29, Alto Lage. Cariacica 29151-240 	ES - Espírito Santo	(27) 99264-7733	13/08/2005	19/11/2025						Commerce	💠 Pulse	Analista de Comunicação	Estágio	R$ 1.000	R$ 400	126.874.447-66	ESTÁGIO	laura.falcao@turbopartners.com.br	lauraf.contatos@gmail.com	1,1	-	-
+Ativo 	Livia de Oliveira Scalon	703.448.531-36	Rua T-64, número 186, Edifício Veredas do Araguaia, Apartamento 1203, Setor Bela Vista, 74823-350, Goiânia, Goiás	GO - Goiás	(62) 98284-5981	25/05/1997	07/10/2025						Commerce	💠 Pulse	Analista de Comunicação	X IV	R$ 4.000	R$ 400	62982845981	60.133.123/0001-22	livia.scalon@turbopartners.com.br	scalonlivia@gmail.com	2,6	-	-
+Ativo 	Maria Alice da Silva Costa 	 176.050.027-50	Av. Prof. Fernando Duarte Rabelo, 310 - GoiabeirasVitória - ES, 29072-335	ES - Espírito Santo	(27)999162851	05/08/1999	25/03/2024						Commerce	💠 Pulse	Analista de Comunicação	X IV	R$ 4.000	R$ 400	27999162851	54.194.744/0001-13	maria.costa@turbopartners.com.br	 mariaalice.scosta@hotmail.com 	21,3	ago./25	4,0
+Ativo 	Milena Gomes Vieira	141.961.757-59	Rua: Humberto Serrano, 500. Praia da Costa, Vila Velha - 29101460	ES - Espírito Santo	27998037707	16/05/2000	07/10/2025						Commerce	💠 Pulse	Analista de Comunicação	X III	R$ 3.500	R$ 400	141.961.757-59 (cpf)	63.013.922/0001-53	milena.gomes@turbopartners.com.br	milenagomesvieira.es@gmail.com	2,6	-	-
+Ativo 	Pietro Rutigliano Júnior	046.872.795-70	Porto Seguro, Bahia, Rua das Hortências, 04, Fontana 01, 45810-000	BA - Bahia	(73) 981416028	07/07/1999	12/08/2025						Commerce	💠 Pulse	Designer	X III	R$ 3.000	R$ 400	fa46f870-3214-42f1-8957-955d7d5086ca	49.647.888/0001-48	pietro.junior@turbopartners.com.br	pietrojr8956@outlook.com	4,4	-	-
+Ativo 	Victor Klein Machado	110.625.777-44	Rua Luiz Fernandes Reis 225, apartamento 302, Praia da Costa, Vila Velha - ES, 29101-120	ES - Espírito Santo	(27) 999595625	15/09/1999	04/04/2025						Commerce	💠 Pulse	Analista de Comunicação	X III	R$ 4.000	R$ 400	110.625.777-44	61.049.988/0001-78	victor.klein@turbopartners.com.br	Victorklein1999@hotmail.com	8,8	dez./25	-0,1
+Dispensado	Alanna Oliveira de Souza	198.168.287.23	R. Enseada Carioca, 100 - Coqueiral de Itaparica, Vila Velha - ES, 29102-740	ES - Espírito Santo	(27) 99242-9393	06/12/2003	23/09/2025	01/12/2025	Pediu Demissão	Problemas de saúde	R$ 600,00		Commerce	💰 Vendas	Pré-Vendas	X II	R$ 3.000	R$ 400	56.083.368/0001-15	56.083.368/0001-15	alanna.oliveira@turbopartners.com.br	alannamusiello@gmail.com	3,0	-	-
+Dispensado	Anna Laís Fagundes Duus	111.937.457-05	Rua dr João Carlos de Souza, 121, ap 903, 29058530, Barro Vermelho- Vitória ES	ES - Espírito Santo	(27) 999559100	01/09/1995	18/06/2025	15/09/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.100,00		Commerce	💰 Vendas	Pré-Vendas	X II	R$ 3.000	R$ 400	111.937.457-05 	61.386.902/0001-00	anna.duus@turbopartners.com.br	anna.fagundes.duus@hotmail.com	6,3	-	-
+Dispensado	Arthur de Pádua Machado	148.027.637-51	Rua Aurora de Aguiar Ferreira, 154, 20090310 - Jardim Camburi - Vitoria ES	ES - Espírito Santo	(27) 99815-2408	24/08/1994	24/06/2025	11/11/2025	Foi Demitido	Desempenho insatisfatório	R$ 1.933,47		Commerce	💰 Vendas	Inside Sales	X II	R$ 3.412	R$ 400	47.308.996/0001-60	47.308.996/0001-60	arthur.machado@turbopartners.com.br	arthurdepaduamachado9@gmail.com	6,1	-	-
+Ativo 	Arthur Freitas Barbosa Gama Zon	156.002.307-45	Rua Ludwik Macal, 1025 - 101 - Jardim da Penha, Condomínio do Edifício Flor da Praia, Vitória - ES, 29060-030	ES - Espírito Santo	(27) 999111888	03/07/2001	13/03/2023						Commerce	💰 Vendas	Inside Sales	X III	R$ 3.000	R$ 400	15600230745	60.911.638/0001-06	arthur.zon@turbopartners.com.br	arthurzon08@outlook.com	33,9	jan./25	11,1
+Ativo 	Daniel Basilio Giestas	105.310.327-10	Rua Desembargador João Manoel de Carvalho, 140, Vitória / ES, CEP: 29057630	ES - Espírito Santo	(27) 995242121	17/04/2000	12/11/2024						Commerce	💰 Vendas	Inside Sales	X II	R$ 4.725	R$ 400	27995242121	"	41.807.377/0001-34"	daniel.basilio@turbopartners.com.br	daniel.basilio.giestas@gmail.com	13,5	abr./25	8,1
+Ativo 	Emerson Henrique Gama da Silva	145.453.367-60	Rua Maria Ilda Pinto dos Santos, 5, lote 5, Casa A, 23040-309- Guaratiba- RJ	RJ - Rio de Janeiro	(21) 98881-7143	25/11/1992	10/12/2025				#VALUE!		Growth Interno	💰 Vendas	Videomaker	X II	R$ 2.500	R$ 400	21988817143	63.957.058/0001-48	emerson.gama@turbopartners.com.br	emersongamamkt@gmail.com	0,4		
+Ativo 	Fabiely Laurett Gums	142.359.477-02	Rua Carlos Nicoletti Madeira, 60, apto 901 torre 3, Vitória/ES, CEP: 29057-520	ES - Espírito Santo	(27) 996408430	09/10/1997	06/05/2025						Commerce	💰 Vendas	Pré-Vendas	X II	R$ 3.000	R$ 400	142.359.477-02	60.821.799/0001-09	fabiely.laurett@turbopartners.com.br	fabielylaurettgums@outlook.com	7,7	-	-
+Ativo 	Fabio Richard Salgado de Oliveira 	102.605.647-02	R. São Luiz, 123 - Jockey de Itaparica, Vila Velha - ES, 29103-890	ES - Espírito Santo	(27) 992469698	19/12/1983	06/05/2025						Commerce	💰 Vendas	Inside Sales	X II	R$ 3.850	R$ 400	27992469698	32.747.722/0001-09	fabio.richard@turbopartners.com.br	fabiorichardmkt@gmail.com	7,7	-	-
+Ativo 	Guilherme Cassemiro Pacheco Monteiro 	114.974.486-38	Rua Cabo Geraldo, n° 402, Bairro Limoeiro, Caratinga, Minas Gerais, 35300114.	ES - Espírito Santo	(33) 991203912	06/05/1998	13/05/2024						Commerce	💰 Vendas	Pré-Vendas	X II	R$ 3.000	R$ 400	33991203912	55.101.079/0001-39	guilherme.monteiro@turbopartners.com.br	gcassemiro670@gmail.com	19,6	abr./25	8,1
+Ativo 	Isabella Novaes de Souza 	192.228.937-00	Rua dez, N° 24, Vila Nova, Vila Velha - 29105100	ES - Espírito Santo	(27) 992777695	29/03/2001	25/04/2025						Commerce	💰 Vendas	Pré-Vendas	X II	R$ 3.000	R$ 400	53095392000186 - CNPJ / NUBANK	53.095.392/0001-86	isabella.novaes@turbopartners.com.br	isabellatomaznovaes@gmail.com	8,1	-	-
+Ativo 	João Guarçoni	176.161.167.44	Condomínio Edificio Ravena, R. Diógenes Malacarne, 326 - Praia da Costa, Vila Velha - ES, 29101-210	ES - Espírito Santo	(27) 997722380	12/10/1998	07/02/2023						Commerce	💰 Vendas	Inside Sales	Gerente/Supervisor	R$ 8.000	R$ 400	17616116744	29.125.851/0001-42	joao.guarconi@turbopartners.com.br	joaoguarconi@gmail.com	35,0	out./25	2,0
+Ativo 	João Pedro Lopes 	214.916.277-60	Rua Carlos Chagas, N 711, Morada da Barra, Vila Velha/ES, 29126570	ES - Espírito Santo	(27) 99614-8757	20/02/2006	11/12/2025				R$ 1.166,67		Commerce	💰 Vendas	Pré-Vendas	X II	R$ 2.500	R$ 400	27996148757	54.405.775/0001-76	joao.lopes@turbopartners.com.br	Jplopes1020@gmail.com	0,4		
+Ativo 	Kaike Matos dos Santos Pereira 	166.330.037-22	Rua Vila Velha 75, Jockey de Itaparica, Vila Velha - ES, 29103855	ES - Espírito Santo	(27) 995314630 	13/08/2005	12/03/2025						Commerce	💰 Vendas	Pré-Vendas	X I	R$ 3.000	R$ 400	16633003722	57.011.438/0001-92	kaike.pereira@turbopartners.com.br	kaikepereiramktd@gmail.com	9,5	out./25	2,0
+Ativo 	Lenize Pretti	136.114.137-98	Rua Inacio Higino, 600 - Vila Velha/ ES - 29101-933	ES - Espírito Santo	(27) 999755254	01/05/1997	11/02/2025						Commerce	💰 Vendas	Pré-Vendas	X I	R$ 3.000	R$ 400	13611413798	60.821.799/0001-09	lenize.pretti@turbopartners.com.br	lenizempretti@gmail.com	10,5	nov./25	0,9
+Ativo 	Lucas de Oliveira Pereira	061.175.877-67	R. Dr. Antônio Basílio, 1013 - 102 b - Jardim da Penha, Condomínio do Edifício Praia de Piata, Vitória - ES, 29060-390	ES - Espírito Santo	(27) 998047494	07/11/1995	06/11/2023						Commerce	💰 Vendas	Pré-Vendas	Gerente/Supervisor	R$ 7.000	R$ 400	42095310000187	42.095.310/0001-87	lucas.pereira@turbopartners.com.br	lucasopereira@gmail.com	25,9	out./25	2,0
+Ativo 	Mariah Eduarda Grippa de Sousa	176.487.787-00	Av. Jair de Andrade, 119 - ItapuãVila Velha - ES, 29101-701	ES - Espírito Santo	(27) 992467269	07/04/2006	18/06/2025						Commerce	💰 Vendas	Pré-Vendas	X II	R$ 3.000	R$ 400	176.487.787-00	59.486.808/0001-73	eduarda.grippa@turbopartners.com.br	grippaduda76@gmail.com	6,3	-	-
+Ativo 	Matheus Jann Scalfoni	146.026.247-66	Avenida Anisio Fernandes Coelho, 240, Jardim da Penha, 29060-670, Vitória-ES.	ES - Espírito Santo	(27) 998576480	21/07/1997	25/07/2024						Commerce	💰 Vendas	Inside Sales	X II	R$ 3.850	R$ 400	51550976000179	51.550.976/0001-79	matheus.scalfoni@turbopartners.com.br	scalfonijann@gmail.com	17,2	abr./25	8,1
+Ativo 	Pedro Henrique Teodoro do Amaral	131.892.247-06	Rua da Jaqueira, 100, Balneário de Carapebus, Serra-ES, 29164-833	ES - Espírito Santo	(27) 99641-8877	02/02/1999	11/11/2025						Commerce	💰 Vendas	Pré-Vendas	X II	R$ 3.000	R$ 400	(27) 99641-8877	48.659.612/0001-17	pedro.teodoro@turbopartners.com.br	pedrohenriqueamaral@hotmail.com	1,4	-	-
+Ativo 	Ramon Souza dos Reis	199.684.207-27	R. Alberto de Oliveira Santos, 731 - Soteco, Vila Velha - ES, 29106-100	ES - Espírito Santo	(27) 988486510	01/09/2000	10/12/2024						Commerce	💰 Vendas	Inside Sales	X II	R$ 3.850	R$ 400	ramonsdreis@gmail.com	50.227.475/0001-93	ramon.reis@turbopartners.com.br	ramonsdreis@gmail.com	12,6	abr./25	8,1
+Ativo 	Yan Roldi de Albuquerque 	192.761.587-90	Rua Pernambuco, 147. Ed Solar de Modena. Ap 201. Vila Velha. Cep 29101335.	ES - Espírito Santo	(27) 999638814	22/06/2000	17/06/2025						Commerce	💰 Vendas	Inside Sales	X II	R$ 3.412	R$ 400	54.802.259/0001-85	54.802.259/0001-85	yan.roldi@turbopartners.com.br	yanroldi@hotmail.com	6,3	-	-
+Ativo 	Aline de Carvalho de Souza 	142.420.117-92	Rua Gonçalves dias, 65. Parque residencial laranjeiras - Serra, ES. 29165100	ES - Espírito Santo	(27) 998477665	27/02/1998	12/08/2025						Commerce	📊 CX&CS	CXCS	X II	R$ 3.000	R$ 400	14242011792	41.140.826/0001-33	 aline.carvalho@turbopartners.com.br	souzalinec@gmail.com	4,4	nov./25	0,9
+Dispensado	Erick Pereira Ramos Ferreira Silva	162.090.997-93	Rua Azulão, 13 - Parque Res. Nova Almeida, Serra - ES, 29163-328	ES - Espírito Santo	(27) 997058506	09/11/2002	10/06/2024	15/08/2025	Pediu Demissão	Foi para outra empresa	R$ 2.100,00		Commerce	📊 CX&CS	CXCS	X II	R$ 3.000	R$ 400	16209099793	 55.445.065/0001-32	erick.ramos@turbopartners.com.br	erickperreira32@gmail.com	18,7	out./24	14,1
+Dispensado	Gabriela Maia Sena	188.849.727-01	R. Henrique Chaves - Nossa Sra. da Penha, Vila Velha - ES, 29110-210 (Cond. Spazio Vila das Conchas, AP 201)	ES - Espírito Santo	27 997693653	08/07/2000	12/08/2025	24/10/2025	Pediu Demissão	Foi para outra empresa	R$ 2.900,00		Commerce	📊 CX&CS	CXCS	X III	R$ 3.000	R$ 400	18884972701	62.109.680/0001-33	 gabriela.sena@turbopartners.com.br	senamaiagabriela8@gmai.com	4,4	-	-
+Dispensado	Guilherme Araujo dos Santtos	415.244.058-92	Rua Vitalino dos Santos Valadares, 290 AP 605 Cep 29045-360. Santa Luiza, Vitoria - ES.	ES - Espírito Santo	(11) 95356-7515	29/01/1993	15/07/2025	30/07/2025	Foi Demitido	Incompatibilidade de valores	R$ 3.500,00		Commerce	📊 CX&CS	CXCS	X II	R$ 3.000	R$ 400	41524405892	42.155.966/0001-48	guilherme.santtos@turbopartners.com.br	Guilhermeasanttos@gmail.com			
+Dispensado	Maria Clara Alves Pires	508.235.248-25	R. Oscar Rodrigues de Oliveira, 610 - Jardim da Penha, Vitória - ES, 29060-720	ES - Espírito Santo	(12) 996690281	11/06/2002	08/04/2025	29/08/2025			R$ 2.333,33		Commerce	📊 CX&CS	CXCS	X I	R$ 2.000	R$ 400		60.259.078/0001-57	maria.clarap@turbopartners.com.br	pires.clara.alves@gmail.com 	8,6	-	-
+Ativo 	Kamila Martins Hernandes Ribeiro	701.424.281-40	Rua Rosa de Piredda, Nº 390- São Conrado, Ap. 203, Cond. Ilhas Gregas, vila velha, CEP 29124076	ES - Espírito Santo	62994608604	25/04/1999	21/10/2025						Commerce	📊 CX&CS	CXCS	X II	R$ 2.500	R$ 400	62994608604	63.249.059/0001-38	kamila.ribeiro@turbopartners.com.br	kamilamartinshernandes@gmail.com	2,1	-	-
+Dispensado	Mariana Domingos Thomé Leite Souza	171.424.357-55	Avenida das garças, sn, L4 Q57, Costa Bela - Serra/ES	ES - Espírito Santo	(27) 999696084	09/10/1997	04/11/2025	07/11/2025	Pediu Demissão	Incompatibilidade de valores	R$ 1.083,33		Commerce	📊 CX&CS	CXCS	X II	R$ 2.500	R$ 400	17142435755	ESTÁGIO	mariana.thome@turbopartners.com.br	marianathomel@outlook.com	1,6	-	-
+Ativo 	Lucas Emanoel de Jesus Antunes	124.733.077-09	Rua Gustavo barroso número 401, apartamento bloco T 104; Serra - ES;  CEP: 29164370	ES - Espírito Santo	(27) 999584249	24/02/1998	16/10/2024						Commerce	📊 CX&CS	CXCS	X II	R$ 3.500	R$ 400	luqas.bee@gmail.com	57.746.696/0001-17	lucas.antunes@turbopartners.com.br	luqas.bee@gmail.com	14,4	set./25	3,0
+Ativo 	Maria Midyan De Sousa Sequeira Dias	166.152.787-66 	Rua Justino Jouguete Sarmento, 7 Solon Borges, Vitória 29072025	ES - Espírito Santo	(27) 992048109	01/04/2000	12/09/2024						Commerce	📊 CX&CS	CXCS	X II	R$ 3.500	R$ 400	mariadiasmidyan@gmail.com	57.337.331/0001-39	maria.dias@turbopartners.com.br	Mariadiasmidyan@gmail.com	15,6	set./25	3,0
+Ativo 	Pedro Paulo Cortines Barretto	142.966.427-40	Avenida Capixaba, 2030 torre 3 apartamento 1004 - CEP 29108036 - Santa Inês - Vila Velha	ES - Espírito Santo	(27) 998325809	26/04/1991	26/05/2025						Commerce	📊 CX&CS	Líder de Squad	Gerente/Supervisor	R$ 7.000	R$ 400	14296642740	60.940.051/0001-25	pedro.barretto@turbopartners.com.br	pedropcbarretto@gmail.com	7,0	-	-
+Dispensado	Bárbara Souza Silva 	120.592.657-70	Rua Arquiteto Decio Thavernard 70 - Jardim camburi (Vitória ES) - 29090-585	ES - Espírito Santo	(27) 99651-0294	05/09/1998	03/09/2024	18/11/2024	Foi Demitido		R$ 800,00		Comunicação	📸 Comunicação (OFF)	Analista de Comunicação	Estágio	R$ 1.000	R$ 400	27996510294	47.436.623/0001-75	barbara.souza@turbopartners.com.br	barbarapim5@gmail.com	15,9	-	-
+Dispensado	Daniel Correa Nunes	172.795.437-82	Av. Dr. Herwan Modenese Wanderley  55	ES - Espírito Santo	 (27) 99888-9186	22/12/2023	03/10/2023	18/11/2024	Foi Demitido		R$ 1.200,00		Comunicação	📸 Comunicação (OFF)	Designer	X I	R$ 1.500	R$ 400	danidezcorrea@gmail.com	-	daniel.correa@turbopartners.com.br	danidezcorrea@gmail.com	27,1	jun./24	18,2
+Dispensado	Gabriel Vieira Plozner	145.818.217-70	Vila Velha, Bairro Araçás, Rua Varsóvia 118, 29103-130	ES - Espírito Santo	(27) 99263-2523	11/07/2003	03/09/2024	04/09/2024	Pediu Demissão		R$ 666,67		Comunicação	📸 Comunicação (OFF)	Designer	X II	R$ 2.000	R$ 400	27992632523	-	gabriel.plozner@turbopartners.com.br	gabrielplozner@gmail.com	15,9	-	-
+Dispensado	Juliani Scaramussa	148.912.837-93	Rua Natalina Daher Carneiro, 144. Apt 2204. Jardim da Penha, Vitória/ES	ES - Espírito Santo	(28) 999885687	26/05/2023	26/09/2022	03/01/2023	Pediu Demissão		R$ 675,00		Comunicação	📸 Comunicação (OFF)	Analista de Comunicação	X II	R$ 2.250	R$ 200	148.912.837-93	48.959.486/0001-16	juliani.scaramussa@turbopartners.com.br		39,5	jul./23	29,4
+Dispensado	Lavinia Friggi Pagoto 	125.142.807-02	Av. Dante Michelini, 2255 - Mata da PraiaVitória - ES, 29060-235	ES - Espírito Santo	(27) 999571905	19/05/2024	01/07/2024	25/09/2022	Pediu Demissão		R$ 1.033,33		Comunicação	📸 Comunicação (OFF)	Analista de Comunicação	Estágio	R$ 1.000	R$ 400	125.142.807-02	-	lavinia.pagoto@turbopartners.com.br	laviniapagotto@gmail.com	18,0	-	-
+Dispensado	Matheus Souza	063.985.947-03	Rua das acaçais numero 1315	ES - Espírito Santo	(27) 995096411	16/04/2023	28/02/2023	08/08/2024	Foi Demitido		R$ 933,33		Comunicação	📸 Comunicação (OFF)	Designer	X III	R$ 2.000	R$ 400	063.985.947-03	50.079.937/0001-72	matheus.souza@turbopartners.com.br	mateusm.souzaph@gmail.com	34,3	mai./24	19,2
+Dispensado	Raphael de Freitas Fagundes	117.631.747-43	Rua Natalina Daher carneiro, 821, apt 204, 29.060-490, Jardim da Penha, Vitória-ES,	ES - Espírito Santo	(27) 99943-1628	30/10/2003	12/06/2024	06/02/2025	Foi Demitido	Incompatibilidade de valores	R$ 800,00		Comunicação	📸 Comunicação (OFF)	Designer	X II	R$ 2.000	R$ 400	27999431628	51.065.275/0001-44	raphael.fagundes@turbopartners.com.br	raphdesigner.contato@gmail.com	18,6	-	-
+Dispensado	Raphael Fagundes	117.631.747-43	Rua Natalina Daher Carneiro, 821, Apto.204	ES - Espírito Santo	(27) 999431628	30/10/2023	06/06/2023	04/09/2023	Foi Demitido		R$ 400,00		Commerce	📸 Comunicação (OFF)	Designer	X I	R$ 1.200	R$ 200	27999431628	-	raphael.fagundes@turbopartners.com.br		31,0	-	-
+Dispensado	Rodrigo de Moura Coelho	069.404.796-19	Alameda dos canários, 411 - Contagem/MG - 32146-021	MG - Minas Gerais	31982353517	18/11/1986	11/02/2025	17/04/2025	Pediu Demissão	Incompatibilidade de valores	R$ 2.300,00		Commerce	🔥 Chama (OFF)	Gestor de Performance	X III	R$ 3.000	R$ 400	45572626000100	45.572.626/0001-00	rodrigo.coelho@turbopartners.com.br	rmcoelho.moura@gmail.com	10,5	-	-
+Dispensado	Thaisa Monteiro Pereira	175.086.957-80	R. Alvim Soares Bermudes, 261, Casa 27, Morada de Camburi, Vitória-ES	ES - Espírito Santo	(27) 998165728	15/10/1998	25/09/2023	22/04/2025	Pediu Demissão	Incompatibilidade de valores	R$ 2.800,00		Commerce	🔥 Chama (OFF)	Designer	X III	R$ 3.000	R$ 400	36.407.117/0001-31	36.407.117/0001-31	thaisa.monteiro@turbopartners.com.br	thaisamro@hotmail.com	27,3	fev./25	10,0
+Dispensado	Caio Gomes Santillo	701.177.961-23	Rodovia Do Sol, 2670 Praia de Itaparica, Vila Velha, 29102-020	ES - Espírito Santo	27992464662	05/05/2002	04/04/2025	25/07/2025	Pediu Demissão	Não se identificou com a turbo	R$ 1.500,00		Commerce	🔥 Chama (OFF)	Gestor de Performance	X I	R$ 1.500	R$ 400	70117796123	-	caio.santillo@turbopartners.com.br	caiogsantillo@gmail.com	8,8	-	-
+Dispensado	Caio Gomes Uhlig	177.323.237-18	Rua Theófilo Costa, 310, Jardim Camburi, Vitória/ES. 29092-010	ES - Espírito Santo	(21) 996117435	29/07/2000	27/03/2025	29/08/2025	Pediu Demissão	Foi para outra empresa			Commerce	🔥 Chama (OFF)	Gestor de Performance	X IV	R$ 4.000	R$ 400	caiouhlig@gmail.com 	53.132.186/0001-07	caio.uhlig@turbopartners.com.br	caiouhlig@gmail.com	9,0	jun./25	6,0
+Dispensado	Enéas dos Santos Barbosa Junior 	015.635.442-02	Rua Julio Belém, 3142, Centro, Parintins, 69.151-150	AM - Amazonas	 (92) 99263-9244	11/03/1992	29/05/2025	10/10/2025	Foi Demitido	Desempenho insatisfatório	R$ 1.500,00		Commerce	🔥 Chama (OFF)	Gestor de Performance	X III	R$ 3.000	R$ 400	58089060000102	58.089.060/0001-02	 eneas.barbosa@turbopartners.com.br	eneasbarbosa75@gmail.com	6,9	-	-
+Dispensado	Gabriel Farias da Silva	090.394.759-54	Rua Professor Algacyr Munhoz Mader, 1925 - Bloco 1 Ap 31 - Cidade Industrial de Curitiba - Curitiba / PR, 81310-020	PR - Paraná	41988556517	30/01/1995	06/03/2025	06/06/2025	Foi Demitido	Desempenho insatisfatório	R$ 800,00		Commerce	🔥 Chama (OFF)	Gestor de Performance	X II	R$ 2.000	R$ 400	34763677000101	34.763.677/0001-01		dreamads.gestor@gmail.com	9,7	-	-
+Dispensado	Gabriel Martins Storer	458.050.588-39	Avenida Yervant Kissajikian, 459, Apto 166B - Vila Constancia, São Paulo - SP, 04657-000	MG - Minas Gerais	(11) 94641-2538	11/05/1998	19/05/2025	25/08/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.066,67		Commerce	🔥 Chama (OFF)	Gestor de Performance	X II	R$ 2.000	R$ 400	49316301000118	49.316.301/0001-18	gabriel.storer@turbopartners.com.br	gabrielmartinsstorer@gmail.com	7,3	-	-
+Ativo 	Anderson Matheus Silva de Moura	151.472.007-89	Rua Ismael Neri 175, Senador Vasconcelos, Rio de Janeiro, 23085-150	BA - Bahia	(84) 99831-4449	22/08/1997	25/11/2025						Tech Sites	🖥️ Tech	Desenvolvedor 	X V	R$ 8.500	R$ 400	mouramatheus.dev@gmail.com	30.121.201/0001-08	matheus.moura@turbopartners.com.br	mouramatheus.dev@gmail.com	0,9	-	-
+Ativo 	André Luís Freitas Moraes Séder	049.304.815-46	Rua Eugênio Netto 331, Praia do canto, Vitória - ES, 29055-275	ES - Espírito Santo	(27) 999962005	04/12/2005	19/05/2025						Tech Sites	🖥️ Tech	Desenvolvedor 	Estágio	R$ 1.000	R$ 400	27 999962005	ESTÁGIO	andre.seder@turbopartners.com.br	alfmseder@gmail.com	7,3	jul./25	5,0
+Dispensado	Arthur Leandro dos Anjos Nunes 	021.105.232-98	Rua Altemar Dutra, 3093 - JK1 - Porto Velho-RO, 76829-432	RO - Rondônia	(69) 993532887	16/02/1995	27/03/2025	07/04/2025	Pediu Demissão	Problemas de saúde	R$ 1.083,33		Tech Sites	🖥️ Tech	PO	X II	R$ 2.500	R$ 400	2110523298	60.011.345/0001-72		arthur.lanunes@gmail.com			
+Ativo 	Bibiana Chaves Paz	849.711.180-04	Rua Dário Pederneiras, 626, ap 104. Bairro Petrópolis - Porto Alegre/RS 90630-090	RS - Rio Grande do Sul	(51) 990120167	14/11/2000	05/11/2024						Tech Sites	🖥️ Tech	PO	X II	R$ 3.500	R$ 400	54678173000192	54.678.173/0001-92	bibiana.paz@turbopartners.com.br	bibianapaz9@gmail.com	13,8	out./25	2,0
+Dispensado	Caio Cunha Ewald	163.980.027-17	Rua Ludwik Macal 870, Vitória - ES, 29060-030, Apartamento 302.	ES - Espírito Santo	(27) 99706-9102	15/06/2000	29/08/2024	21/02/2025	Pediu Demissão	Foi para outra empresa	R$ 2.025,00		Tech Sites	🖥️ Tech	PO	X II	R$ 2.250	R$ 400	16398002717	57.076.003/0001-26	caio.ewald@turbopartners.com.br	caioewald2000@gmail.com	16,0	-	-
+Ativo 	Breno Carmo	064.457.565-28	Rua Fernando Caldas, Conj. Faz. Grande 3, Quadra A, Caminha 7, Número 8, Salvador-BA | Cep: 41343670	ES - Espírito Santo	(71) 999933135	27/07/1995	16/01/2022						Tech Sites	🖥️ Tech	Desenvolvedor 	X V	R$ 7.500	R$ 400	06745756528	-	breno.carmo@turbopartners.com.br	breno_@live.com	47,9	nov./25	0,9
+Ativo 	Daiani Silva Vieira	181.427.677-75	Rua Pedro Côgo - Santana, Cariacica - ES, 29154-044	ES - Espírito Santo	(27) 99999-4655	11/07/2000	25/09/2023						Tech Sites	🖥️ Tech	UIUX	X IV	R$ 4.500	R$ 400	2734266b-be8f-4f02-b307-4cb7e5166a7a	52.329.410/0001-84	daiani.vieira@turbopartners.com.br	Daiani.s.vieira@hotmail.com	27,3	jul./25	5,0
+Dispensado	Estevam Santiago	137.983.637-90	Rua Marechal Hermes, 142, Maruipe, Vitória - 	ES - Espírito Santo	(27) 99795-4552	23/05/2023	08/05/2023	05/08/2024	Pediu Demissão		R$ 825,00		Tech Sites	🖥️ Tech	Desenvolvedor 	X II	R$ 2.250	R$ 400	estevamtorezani@hotmail.com	47.738.068/0001-36	estevam.torezani@turbopartners.com.br	estevamtorezani@hotmail.com	32,0	jan./24	23,3
+Ativo 	Davi de Souza Ferraz Matos 	142.448.517-71	Rua Carlos Delgado Guerra pinto, Vitória ES - 29090040	ES - Espírito Santo	(27) 992419038	28/01/2003	28/08/2025						Tech Sites	🖥️ Tech	PO	X III	R$ 3.000	R$ 400	14244851771	59.198.212/0001-78	davi.ferraz@turbopartners.com.br	davi.matos@outlook.com	3,9	dez./25	-0,1
+Dispensado	Giselle de Souza Pereira	147.687.157-45	Rua Lumberto Maciel de Azevedo, 191 - Jardim Camburi	ES - Espírito Santo	(28) 999504301	18/02/1998	29/01/2024	14/11/2024	Foi Demitido		R$ 2.333,33		Tech Proprietária	🖥️ Tech	Desenvolvedor 	X III	R$ 3.500	R$ 600	147.687.157-45	53.732.330/0001-38	giselle.pereira@turbopartners.com.br	giselle18sp@gmail.com	23,1	set./24	15,1
+Dispensado	Gabriel Silva Machado	141.969.397-24	Av. Rio Branco 1675 Ap. 802, 29055-643.  Vitória-ES	ES - Espírito Santo	(27) 999237432	26/03/2001	24/02/2023	28/11/2025	Pediu Demissão	Foi para outra empresa	R$ 5.666,67		Tech Sites	🖥️ Tech	PO	X IV	R$ 5.000	R$ 400	14196939724	52.284.069/0001-98	gabriel.machado@turbopartners.com.br	gabrielmachado2603@gmail.com	34,4	jul./25	5,0
+Dispensado	Guilherme Dezan	"153.457.117-55	"	R. Sérgio Cardoso, 19 - Dom BoscoCariacica - ES, 29147-350	ES - Espírito Santo	(27) 998763446	28/10/2023	20/07/2022	15/10/2023	Pediu Demissão		R$ 2.666,67		Tech Sites	🖥️ Tech	Designer	X IV	R$ 4.000	R$ 200	27998763446	45.293.364/0001-45	guilherme.dezan@turbopartners.com.br		41,7	set./23	27,4
+Dispensado	Guilherme Martins Ribeiro Gualtieri	124.742.867-21	Av Saturnino de Brito, 1220, apto 701, 29055-180, Vitória, ES	ES - Espírito Santo	(27) 999712634	25/12/1987	15/07/2025	25/10/2025	Pediu Demissão	Foi para outra empresa	R$ 15.000,00		Tech Sites	🖥️ Tech	Líder de Squad	Gerente/Supervisor	R$ 15.000	R$ 400	12474286721	-	guilherme.gualtieri@turbopartners.com.br	guilhermegualtieri@gmail.com	5,4	-	-
+Dispensado	Igor Costa	148.059.247-13	Rua Clementina Maria Volkers Helmer, 37 - Caratoíra, Vitória	ES - Espírito Santo	(27) 99773 7840	06/01/2023	15/09/2022	14/11/2024	Foi Demitido		R$ 2.333,33		Tech Proprietária	🖥️ Tech	Desenvolvedor 	X III	R$ 3.500	R$ 400	14805924713	49.575.259/0001-50	igor.costa@turbopartners.com.br	igorncosta14@gmail.com	39,8	set./24	15,1
+Dispensado	Isabela Oliveira da Silva	174.315.547-61	Av. Copacabana, N°739, BL 1 APT.05	ES - Espírito Santo	(27) 995128199	23/03/2001	22/11/2023	26/04/2024	Foi Demitido		R$ 1.866,67		Tech Sites	🖥️ Tech	Desenvolvedor 	X I	R$ 1.750	R$ 400	51.756.159/0001-71	51.756.159/0001-71	isabela.oliveira@turbopartners.com.br	oliver.isabela2303@gmail.com	25,4	-	-
+Ativo 	Helamã Peres Janes	143.700.907-76	Av. Norte-Sul, 4148, Parque residencial Laranjeiras, 29165-010, Serra	ES - Espírito Santo	(27) 99840-2698 	04/07/2006	23/09/2025						Tech Sites	🖥️ Tech	Desenvolvedor 	Estágio	R$ 1.000	R$ 400	14370090776	ESTÁGIO	helama.janes@turbopartners.com.br	helama.p.janes@gmail.com	3,0	-	-
+Ativo 	Hiuri Carriço Liberato	166.527.877-33	R. Teixeiras, 295 - Nova Carapina II, Serra - ES, 29170-046	ES - Espírito Santo	(27) 997675796	31/12/1998	23/04/2025						Tech Sites	🖥️ Tech	PO	X III	R$ 4.000	R$ 400	27997675796	53.634.224/0001-11	hiuri.liberato@turbopartners.com.br	hiuriliberato@gmail.com	8,1	out./25	2,0
+Dispensado	Leonardo Bellucio	159.120.727-46	R. Dr. Guilherme Serrano, 26 - Santa LuízaVitória - ES, 29045-410	ES - Espírito Santo	(27) 999839004	16/03/2023	10/08/2022	08/12/2023	Pediu Demissão		R$ 1.300,00		Tech Sites	🖥️ Tech	Desenvolvedor 	X III	R$ 3.000	R$ 200	15912072746	46.430.957/0001-79	leonardo.bellucio@turbopartners.com.br		41,0	mar./23	33,5
+Dispensado	Leticia Felix	167.239.207-16	Rua Grajaú, nº100, Itapuã, Vila Velha	ES - Espírito Santo	(27) 997938671	31/05/2023	25/04/2023	14/11/2024	Foi Demitido		R$ 1.333,33		Tech Sites	🖥️ Tech	UIUX	X II	R$ 2.000	R$ 400	16723920716	Termo de Faculdade	leticia.felix@turbopartners.com.br	leticia710@gmail.com	32,4	out./23	26,3
+Dispensado	Lucas Eduardo	149.601.757-96	Rua Demostenes Nune Vieira, 4 	ES - Espírito Santo	(27) 996588098	04/04/2023	20/03/2023	03/04/2023	Foi Demitido		R$ 0,00		Tech Sites	🖥️ Tech	Desenvolvedor 	X II			-	-	lucas.gianordoli@turbopartners.com.br		0,5	-	-
+Dispensado	Manoela Sarno	066.574.465-00	R. Manoel Antônio Galvão, 176 - PituaçuSalvador - BA, 41741-550	BA - Bahia	(71) 81751293	29/05/2023	04/07/2022	08/11/2023	Pediu Demissão		R$ 1.050,00		Tech Sites	🖥️ Tech	Desenvolvedor 	X II	R$ 2.250	R$ 200	6657446500	49.513.979/0001-90	manoela.sarno@turbopartners.com.br		42,3	mai./23	31,4
+Dispensado	Matheus Braconi Grilo	198.680.257-45	Rua Costa Pereira, N 91, ap 701,  Centro, Cachoeiro de Itapemirim, 29300090	ES - Espírito Santo	(28) 992759229	15/11/2002	28/01/2025	25/07/2025	Pediu Demissão	Broxou	R$ 2.000,00		Tech Sites	🖥️ Tech	PO	X I	R$ 2.000	R$ 400	19868025745 (cpf)	ESTÁGIO	matheus.braconi@turbopartners.com.br	matheus.braconi@gmail.com	11,0	jun./25	6,0
+Dispensado	Nicolas Arantes	"150.342.777-35	"	R. Renato Nascimento Daher Carneiro, 780 - Ilha do Boi, Vitória - ES	ES - Espírito Santo	(27) 988126944	22/05/2023	01/08/2022	25/09/2023	Foi Demitido		R$ 1.550,00		Tech Sites	🖥️ Tech	Desenvolvedor 	X I	R$ 1.500	R$ 200	27988126944	49.607.221/0001-11	nicolas.arantes@turbopartners.com.br		41,3	fev./23	34,4
+Ativo 	Matheus Inácio Pin	134.038.067-66	Av. Antônio Gil Veloso, 2232 - Praia da Costa, Vila Velha - ES, 29101-735, ap 302	ES - Espírito Santo	(27) 999378846	16/02/2004	08/07/2025						Tech Sites	🖥️ Tech	UIUX	Estágio	R$ 1.000	R$ 400	13403806766	61.669.862/0001-04	matheus.pin@turbopartners.com.br	mporiginal16@gmail.com	5,6	-	-
+Dispensado	Thúlio Kuster Siqueira	198.421.037-81	Serra, Nova almeida,Reis magos, Rua Guarapari numero 54.  	ES - Espírito Santo	27999402308	20/08/2003	29/04/2024	08/08/2024	Foi Demitido		R$ 466,67		Tech Sites	🖥️ Tech	Desenvolvedor 	Estágio	R$ 1.000	R$ 400	thuliokss@gmail.com	-	thulio.kuster@turbopartners.com.br	thuliokss@gmail.com	20,1	-	-
+Ativo 	Thiago Kenzo Takahashi	400.429.988-83	R. Isaltina de Assunção Farias, 30 - Rio Tavares, Florianópolis - SC, 88048-416	SC - Santa Catarina	(48) 988185354	30/01/2004	27/11/2023						Tech Sites	🖥️ Tech	Desenvolvedor 	Estágio	R$ 2.000	R$ 400	400.429.988-83	54.171.759/0001-6	thiago.kenzo@turbopartners.com.br	thiagokenzo7@gmail.com	25,2	jul./25	5,0
+Ativo 	Vinicius Tineli Paiva	137.774.137-04	Rua Theófilo Costa, 350 - Jardim Camburi - Vitória/ES. CEP: 29092-010	ES - Espírito Santo	(27) 99953-6337	14/11/1991	25/11/2025				#REF!		Commerce	🖥️ Tech	Líder de Squad	Gerente/Supervisor	R$ 7.500	R$ 400	62.322.035/0001-02	62.322.035/0001-02	vinnicius.paiva@turbopartners.com.br	vinicius.tinelipaiva@gmail.com	0,9	-	-
+Ativo 	Wendeson Eduardo Diniz Barros	617.015.033-52	Avenida Miguel Vieira, Condomínio Belo Horizonte, apto 308 bloco 2, São Luís - MA cep: 65055394 	MA - Maranhão	(98) 98419-9728	20/02/1999	16/09/2025						Tech Sites	🖥️ Tech	UIUX	X III	R$ 3.000	R$ 400	45.246.515/0001-04	45.246.515/0001-04	eduardo.diniz@turbopartners.com.br	eduardodiniz.contato@gmail.com	3,3	-	-
+Dispensado	Priscilla Britto da Silva 	152.208.737-09	Rua da Assembleia, N°5, bairro: Graúna, Cariacica - ES (CEP: 29.154-615)	ES - Espírito Santo	(27) 995185007	25/03/2000	24/06/2024	23/05/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.800,00		Commerce	🗝️ Bloomfield	Designer	X III	R$ 3.000	R$ 400	27995185007	46.593.603/0001-45	priscilla.britto@turbopartners.com.br	pribritto@gmail.com	18,2	-	-
+Dispensado	Yasmin Buery de Melo Moreira  	044.378.805-79	Rua Praia de Aratuba Quadra 17 Lote 13	BA - Bahia	(71)98787-1822	06/10/2001	25/03/2024	08/04/2025	Foi Demitido	Desempenho insatisfatório	R$ 700,00		Commerce	🗝️ Bloomfield	Designer	X I	R$ 1.500	R$ 400	(71)98787-1822	54.347.102/0001-07	yasmin.buery@turbopartners.com.br	Yasminbuery@gmail.com	21,3	jan./25	11,1
+Dispensado	Jacqueline Henrique Soares da Silva	123.932.897-47	Rua conde de bonfim, número 20 - zelador. Tijuca, Rio de Janeiro. CEP: 20520-053	RJ - Rio de Janeiro	(21) 96915-3655	30/01/2000	28/01/2025	28/03/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.066,67		Commerce	🗝️ Bloomfield (OFF)	Analista de Comunicação	X II	R$ 2.000	R$ 400	Pessoa física: 12393289747 / Pessoa jurídica (cnpj): 51.900.825/0001-01 (realizar transferência de pagamento para CNPJ)	51.900.825/0001-01	jacqueline.silva@turbopartners.com.br	jacque.132@hotmail.com	11,0	-	-
+Dispensado	Julia Rangel Ronchi	161.515.407-86	Rua Jerusalém, número 131, apt 103, Araças, Vila Velha, 29103165	ES - Espírito Santo	27999037310	04/08/1999	18/02/2025	23/05/2025	Foi Demitido	Desempenho insatisfatório	R$ 1.866,67		Commerce	🗝️ Bloomfield (OFF)	Analista de Comunicação	X II	R$ 2.000	R$ 400	44.986.828/0001-36	44.986.828/0001-36	julia.rangel@turbopartners.com.br	juliarangelronchi@gmail.com	10,3	-	-
+Dispensado	Mayra Lazarone Barros	158.867.927-67	Rua Ademar Luiz Nepomuceno	ES - Espírito Santo	(27) 99787-9513	04/05/2004	10/04/2024	23/05/2025	Foi Demitido	Desempenho insatisfatório	R$ 1.866,67		Commerce	🗝️ Bloomfield (OFF)	Designer	X II	R$ 2.000	R$ 400	27997879513	54.607.597/0001-66	mayra.barros@turbopartners.com.br	mayra.lazarone123@gmail.com	20,7	nov./24	13,1
+Ativo 	Caio Massaroni	157.087.397-62	Av. Carlos Moreira Lima, 137 - Bento Ferreira, Vitória - ES, 29050-653	ES - Espírito Santo	(27) 992555947	17/06/1996	18/08/2022						Commerce	🤖 Squad I.A	Líder de Squad	X V	R$ 6.500	R$ 400	bcbca4d9-017b-45ba-8648-460187dc38f4	45.315.681/0001-15	caio.massaroni@turbopartners.com.br	caiomassaroni7@gmail.com	40,8	mar./25	9,1
+Dispensado	Fernando Clarindo Cristóvão 	420.467.438-06	Adolfo Catani, 433, Apt 12, São Carlos, CEP: 13560470	SP - São Paulo	(19) 996551005	01/10/2002	25/04/2025	-					Commerce	🤖 Squad I.A	Gestor de Performance	Estágio	R$ 1.000	R$ 400	ferccristovao@gmail.com	ESTÁGIO	fernando.cristovao@turbopartners.com.br	ferccristovao@gmail.com	8,1	-	-
+Dispensado	Guilherme Paulo Miranda	128.401.637-48	Rua Diógenes Malacarne 365, Apto 1202-2, Praia da Costa - Vila Velha, ES - 29.101-210	ES - Espírito Santo	(27) 992630725	29/08/2001	18/06/2025	06/11/2025	Foi Demitido	Desempenho insatisfatório	R$ 400,00		Commerce	🤖 Squad I.A	Desenvolvedor 	Estágio	R$ 1.000	R$ 400	12840163748 	ESTÁGIO	guilherme.miranda@turbopartners.com.br	guipm2@gmail.com	6,3	-	-
+Ativo 	Thiago Folador de Abreu	086.983.187-97	R. Humberto Serrano, 201 - Praia da Costa, Vila Velha - ES, 29101-461, apto 704	ES - Espírito Santo	(27) 988050063	16/01/1982	25/07/2024						Commerce	🤖 Squad I.A	Desenvolvedor 	X V	R$ 6.500	R$ 400	folador@folador.com	23.254.802/0001-23	thiago.folador@turbopartners.com.br	folador@folador.com	17,2	dez./25	-0,1
+Dispensado	Alana Anselmo Giglio Becherer	463.303.828-16	Av. Gisele Constantino, 31, Bloco 11, ap 504, Votorantim SP - Pq. Bela Vista, 18110650	SP - São Paulo	15998620944	26/11/1998	04/02/2025	23/05/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.333,33		Commerce	🧩 Fragmentados  (OFF)	Analista de Comunicação	X II	R$ 2.500	R$ 400	46330382816	53.578.110/0001-00	alana.becherer@turbopartners.com.br		10,7	-	-
+Dispensado	Aline Ribeiro Moreira	144.717.907-22	Rua Luis Gabeira 10, Divino Espirito Santo, Vila velha, 29107-025	ES - Espírito Santo	(28) 99900-5520	29/04/2001	24/09/2024	23/05/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.800,00		Commerce	🧩 Fragmentados  (OFF)	Analista de Comunicação	X III	R$ 3.000	R$ 400	14471790722		aline.moreira@turbopartners.com.br		15,2	mai./25	7,1
+Dispensado	Luíza Sessa Tavares Dias	144.943.057-07	Rua Maria Eleonora Pereira, 31, apto 202, Jardim da Penha, Vitória-ES, 29.060-180	ES - Espírito Santo	27999141103	11/05/1998	18/02/2025	23/05/2025	Pediu Demissão	Broxou	R$ 1.866,67		Commerce	🧩 Fragmentados  (OFF)	Analista de Comunicação	X II	R$ 2.000	R$ 400	27999141103 (nubank)	29.978.404/0001-36	luiza.dias@turbopartners.com.br	luizasessatav@gmail.com	10,3	-	-
+Dispensado	Abner Junior de Souza	112.500.599-84	Av. Azilé Miguel Abujamra 650, Londrina, Paraná CEP: 86036-708	PR - Paraná	(43) 998372875	26/06/2000	19/08/2025	24/10/2025	Pediu Demissão	Foi para outra empresa	R$ 2.900,00		Commerce	🪖 Selva 	Gestor de Performance	X III	R$ 3.000	R$ 400	112.500.599-84	45.017.775/0001-08	abner.souza@turbopartners.com.br	abnnersouza4626@gmail.com	4,2	-	-
+Ativo 	Bruno Passador Parreira	490.247.908-75	Avenida das figueiras (Condominio Villa flora), Votorantim, 18119-375, Jasmins 136	SP - São Paulo	(15) 99817-1098	03/11/2000	17/04/2025						Commerce	🪖 Selva 	Gestor de Performance	X IV	R$ 4.000	R$ 400	57.360.875/0001-11	57.360.875/0001-11	bruno.parreira@turbopartners.com.br	brn.midias@gmail.com	8,3	jul./25	5,0
+Ativo 	Carlos Eduardo Ferreira Lopes 	183.874.097-07	Rua Fernandes Onofre Trizzini, Balneário itaóca, 11733-816 - Mongaguá, São Paulo	SP - São Paulo	(13) 99706-1152	31/10/2000	28/10/2025						Commerce	🪖 Selva 	Designer	X III	R$ 4.000	R$ 400	carlosballer11@gmail.com	48.466.269/0001-94	carlos.lopes@turbopartners.com.br	carlosballer11@gmail.com	1,9	-	-
+Dispensado	Edigar Scodeler Silva	119.334.606-10	Rua Esmeraldina Aquino Machado, 38. Antonio Jose Machado - Pouso Alegre, Mg, 37551-105	MG - Minas Gerais	35998694697	08/07/1994	21/10/2025	19/11/2025	Pediu Demissão	Foi para outra empresa			Commerce	🪖 Selva 	Gestor de Performance	X IV	R$ 4.000	R$ 400	41.329.506/0001-26	41.329.506/0001-26	edigar.scodeler@turbopartners.com.br	edigarscodeler08@gmail.com	2,1	-	-
+Dispensado	Ezequiel de Sousa Barbosa 	056.957.571-00	Rua C2, Quadra 3B, Casa 24, Residencial Pádova, Cuiabá - MT, 78056-350	MT - Mato Grosso	(65) 992640637	27/02/1997	03/09/2025	24/10/2025	Pediu Demissão	Broxou	R$ 3.866,67		Commerce	🪖 Selva 	Gestor de Performance	X IV	R$ 4.000	R$ 400	49.644.712/0001-32	49.644.712/0001-32	ezequiel.barbosa@turbopartners.com.bR	ezequielnovo7@gmail.com	3,7	-	-
+Em desligamento	Gabriel Nogueira Gomes	215.368.417-06	Rua Rio Grande do Norte, 48 - Cidade Praiana, Rio das Ostras - RJ, 28890-068	RJ - Rio de Janeiro	(11) 94850-6701	09/06/2004	19/11/2025	25/12/2025			#REF!		Commerce	🪖 Selva 	Gestor de Performance	X V	R$ 5.000	R$ 400	215.368.417-06	46.763.784/0001-00	gabriel.nogueira@turbopartners.com.br	contato.gabriellnogueira@gmail.com	1,1	-	-
+Ativo 	Gabriel Pereira Taufner	190.478.037-79	Rua Carlos Martins, 481, Vitoria, Jardim Camburi, 29090-060	ES - Espírito Santo	(27) 99506-5804	12/06/2006	28/08/2025						Commerce	🪖 Selva 	Gestor de Performance	X I	R$ 1.500	R$ 400	27995065804	ESTÁGIO	gabriel.taufner@turbopartners.com.br	gabriel.p.taufner@hotmail.com	3,9	nov./25	0,9
+Ativo 	George Lucas Costa Dos Santos	046.427.345-54	Rua Paulo Afonso, 91, CIA I, Simões Filho - 43716-325	BA - Bahia	(71) 999442292	07/09/2001	18/02/2025						Commerce	🪖 Selva 	Designer	X III	R$ 3.500	R$ 400	49.492.685/0001-20	49.492.685/0001-20	george.lucas@turbopartners.com.br	lucasgcs79@icloud.com	10,3	out./25	2,0
+Ativo 	Glauber Pereira da Silva	12008396762	Avenida Saturnino Rangel Mauro, 3518, Praia de Itaparica, Vila Velha-ES. CEP 29.102-037	ES - Espírito Santo	(27) 995786154	08/06/1988	30/09/2025						Commerce	🪖 Selva 	Líder de Squad	Gerente/Supervisor	R$ 7.500	R$ 400	glauber.gpscorp@gmail.com	62.721.466/0001-33	glauber.pereira@turbopartners.com.br	glauber.gpscorp@gmail.com	2,8	-	-
+Ativo 	Gustavo de Souza Pires	145.413.997-84	Servidão Venâncio Bernardino das Chagas, 38, Rio tavares, Florianópolis - SC, CEP 88048-342	SC - Santa Catarina	(34) 991457276	29/04/1995	15/07/2025						Commerce	🪖 Selva 	Gestor de Performance	X III	R$ 3.500	R$ 400	46.757.103/0001-00	46.757.103/0001-00	gustavo.pires@turbopartners.com.br	gustavopiresmkt@gmail.com	5,4	out./25	2,0
+Dispensado	Pedro Vitor Boeloni Baier	142.501.197-77	Av. Governador Eurico Rezende, 200, Jardim Camburi, Vitória-ES, 29092030, Apto 804 B	ES - Espírito Santo	(27) 999010605	01/06/2005	21/10/2025	01/12/2025			R$ 200,00		Commerce	🪖 Selva 	Gestor de Performance	Estágio	R$ 1.000	R$ 400	27999010605	ESTÁGIO	pedro.baier@turbopartners.com.br	pedrobaier1@outlook.com	2,1	-	-
+Ativo 	Rafael Bodart Avila	178.590.827-80	Rua Aristides Caramuru n235, Guarapari, CEP 29215-180	ES - Espírito Santo	(27) 996349390	18/09/2000	06/01/2025						Commerce	🪖 Selva 	Gestor de Performance	X V	R$ 5.000	R$ 400	27996349390	55.759.299/0001-54	rafael.avila@turbopartners.com.br	rafael.avila200@gmail.com	11,7	nov./25	0,9
+Dispensado	Rodrigo Cunha Amorim	040.143.620-94	Rua Bramante Mion, 774 Apto 603, Bento Gonçalves, Rio Grande do Sul, 95705-356	RS - Rio Grande do Sul	51995890547	23/10/1997	21/10/2025						Commerce	🪖 Selva 	Gestor de Performance	X V	R$ 5.000	R$ 400	41634385000126	41.634.385/0001-26	rodrigo.cunha@turbopartners.com.br	rodrigocunhamorim@gmail.com	2,1	-	-
+Ativo 	Rayan Coutinho Cavessana	142.800.427-05	Rua Eseada Carioca 60, Vila Velha, 29102312, Edif São Conrado, apt 502	ES - Espírito Santo	(27) 998490401	14/10/1994	18/02/2025						Commerce	🪖 Selva 	Gestor de Performance	X III	R$ 4.250	R$ 400	14280042705	59.433.135/0001-93 	rayan.coutinho@turbopartners.com.br	rayan.coutinhoc@hotmail.com	10,3	dez./25	-0,1
+Ativo 	Rayanne Vieira Lengruber de Azevedo	147.560.327-45	Rua Dona Zulmira 21, apto 603 Maracanã, RJ 20550160	RJ - Rio de Janeiro	(21) 980233761	21/08/1992	03/09/2025				#NUM!		Commerce	🪖 Selva 	Designer	X III	R$ 3.000	R$ 400	14756032745	46.279.646/0001-50	rayanne.azevedo@turbopartners.com.br	rayannelengruber92@gmail.com	3,7	-	-
+Em desligamento	Vinicius Klein Andrade	850.577.380-20	Av. Luciano das Neves 3233, Vila Velha, 29102-065	ES - Espírito Santo	(51) 995545932	15/08/1996	20/08/2024	25/12/2025			R$ 6.000,00		Commerce	🪖 Selva 	Gestor de Performance	X VI	R$ 6.000	R$ 400	85057738020	53.865.158/0001-90	vinicius.klein@turbopartners.com.br	vinichem.andrade@gmail.com	16,3	set./25	3,0
+Ativo 	Wendel Martins de Azevedo	181.405.757-98	R. Sanhaço, 371 - Novo Horizonte, Serra - ES, 29163-343	ES - Espírito Santo	(27) 997384928	24/06/2001	25/10/2023						Commerce	🪖 Selva 	Designer	X III	R$ 4.000	R$ 400	46.401.432/0001-05	46.401.432/0001-05	wendel.martins@turbopartners.com.br	normansubr@gmail.com	26,3	set./25	3,0
+Ativo 	Amanda Lovise Lopes Comitre	202.500.567-98	Rua São Paulo, 2050, Praia da Costa, Vila Velha, 29101308	ES - Espírito Santo	(27) 999041023	04/02/2006	11/02/2025						Growth Interno	🚀 Turbo Interno	Designer	X III	R$ 3.500	R$ 400	59334289000128	59.334.289/0001-28	amanda.lovise@turbopartners.com.br	amandacomitrel@gmail.com	10,5	nov./25	0,9
+Ativo 	André Musso	157.252.937-77	Condomínio do Edifício Sandra, R. Padre José de Anchieta, 46 - Centro, Vitória - ES, 29018-270	ES - Espírito Santo	(27) 988721114	09/03/1999	15/01/2022						Sócios	🚀 Turbo Interno	C-Level	Diretor		R$ 400		-	andre.musso@turbopartners.com.br	andremusso37@gmail.com	47,9	dez./24	12,1
+Dispensado	Bruno Branco Camarin 	437.101.118-70	Rua Domingos Colombo, 213, Estância Bortoluzzo, São José do Rio Preto, SP, 15898-158	SP - São Paulo	(17) 991912014	22/05/2007	10/03/2025	25/11/2025	Pediu Demissão	Foi para outra empresa	R$ 1.033,33		Growth Interno	🚀 Turbo Interno	Gestor de Performance	Estágio	R$ 1.000	R$ 400	17991912014	ESTÁGIO	bruno.camarin@turbopartners.com.br	brunobrancocamarin@gmail.com	9,6	jul./25	5,0
+Dispensado	Daniel Pim Nunes	167.809.917-16	Rua Alfredo Maselli, 61, Rio Branco, Cariacica, 29147-710	ES - Espírito Santo	(27) 99968-9416	16/06/2002	13/05/2025	07/07/2025	Pediu Demissão	Problemas de saúde	R$ 800,00		Growth Interno	🚀 Turbo Interno	Designer	X II	R$ 2.000	R$ 400	27999689416	49.085.097/0001-71	daniel.pim@turbopartners.com.br	danielpim360@gmail.com	7,5	-	-
+Ativo 	Caio Pedro Malini	183.874.097-07	R. Santa Marta - Aribiri, Vila Velha - ES, 29120-370	ES - Espírito Santo	(33) 99975-0786	08/07/2005	25/11/2025						Growth Interno	🚀 Turbo Interno	Copy	Estágio	R$ 1.000	R$ 400	27999750786 ou caiopedromalini@gmail.com	Estágio	caio.malini@turbopartners.com.br	caiopedromalini@gmail.com	0,9	-	-
+Ativo 	Eduardo Tonane Portes	158.391.707-12	R. Elzira Vivacqua, 772 - Jardim Camburi, Vitória - ES, 29090-350	ES - Espírito Santo	(27) 998489926	28/12/2006	29/07/2025						Backoffice	🚀 Turbo Interno	Financeiro	X I	R$ 2.000	R$ 400	27998489926	ESTÁGIO	eduardo.tonane@turbopartners.com.br	eduardo.tonane@gmail.com	4,9	dez./25	-0,1
+Ativo 	Esther Fiorio de Oliveira	182.021.587-37	R. Padre Emílio Miotti, 298 - Bela Vista, Vitória - ES, 29027-422	ES - Espírito Santo	(27)99940-3923	27/07/1999	05/12/2023						Growth Interno	🚀 Turbo Interno	Analista de Comunicação	X IV	R$ 4.000	R$ 400	18202158737	53.096.077/0001-73	esther.fiorio@turbopartners.com.br	fiorioesther@gmail.com	25,0	jun./25	6,0
+Dispensado	Jhonnathan Correa	129.601.987-00	Rua São José N73 - Cariacica - 29145455 - São Francisco 	ES - Espírito Santo	27 992627273	12/03/1991	12/08/2025	25/08/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.066,67		Growth Interno	🚀 Turbo Interno	Videomaker	X II	R$ 2.000	R$ 400	12960198700	62.160.293/0001-21	jhonnathan.correa@turbopartners.com.br	francajhon91@gmail.com	4,4		1533,8
+Dispensado	Joao Vitor Domiciano	159.002.176-20	Rua Milton Pinheiro, 59, Pinheiro 2 (Manhuaçu-MG) 36902129	ES - Espírito Santo	31990801409	08/03/2002	13/05/2025	28/05/2025	Foi Demitido	Incompatibilidade de valores	R$ 4.400,00		Growth Interno	🚀 Turbo Interno	Pré-Vendas	X III	R$ 4.000	R$ 400	15900217620	46.355.336/0001-78	joao.domiciano@turbopartners.com.br	Joaovdomiciano@hotmail.com	7,5	-	-
+Dispensado	Leonardo Rodrigues da Silva Júnior	716.762.464-01	Rua João Roberto de Lima, 30, Paratibe, João Pessoa-PB, 58062-344	PB - Paraíba	(83) 998373689	25/03/2004	13/05/2025	15/08/2025			R$ 350,00		Growth Interno	🚀 Turbo Interno	Gestor de Performance	Estágio	R$ 500	R$ 400	83998373689	Estágio	leonardo.rodrigues@turbopartners.com.br	leonardojuniors1812@gmail.com	7,5	-	-
+Ativo 	Julia Viana Ribeiro	129.539.657-26	Rua Joaquim Lirio, 96 apto 802 - CEP 29055-460	ES - Espírito Santo	(27) 99917-9807	20/03/2000	02/12/2025				#REF!		Backoffice	🚀 Turbo Interno	Jurídico	X VI	R$ 6.000	R$ 400	27999169807		julia.viana@turbopartners.com.br	julia.vr3@gmail.com	0,7	-	-
+Ativo 	Karoline Nobre Fraga Tognere	146.336.517-90	Rua Dois Irmaos, 96. Edifício São Luiz, Campo Grande, 29146020	ES - Espírito Santo	(27) 997215354	14/04/1994	25/07/2024						Backoffice	🚀 Turbo Interno	G&G	Gerente/Supervisor	R$ 6.000	R$ 400	14633651790	51.404.348/0001-85	karol.tognere@turbopartners.com.br	karolnftognere@gmail.com	17,2	jan./25	11,8
+Dispensado	Mariana Mischiatti Cavaleiro	175.794.987-90	Rua Francisco Eugenio Mussielo, 251, Jardim da Penha, Vitória-ES	ES - Espírito Santo	(27) 99989-7933	24/05/1997	25/07/2024	02/06/2025	Pediu Demissão	Incompatibilidade de valores	R$ 1.260,00		Growth Interno	🚀 Turbo Interno	Inside Sales	X III	R$ 4.725	R$ 400	17579498790	49.768.901/0001-17	mariana.mischiatti@turbopartners.com.br	marianammischiatti@gmail.com	17,2	abril/25	8,1
+Ativo 	Lianca Lopes Costa Leite	160.362.547-09	R. Santiago Dantas, 96 - Nossa Sra. da Penha, Vila Velha - ES, 29110-230	ES - Espírito Santo	(27) 998091908	19/08/1998	10/06/2025						Backoffice	🚀 Turbo Interno	G&G	X III	R$ 3.500	R$ 400	16036254709	60.899.105/0001-56.	lianca.lopes@turbopartners.com.br	liancalopes17@gmail.com	6,5	-	-
+Dispensado	Pedro Santiago Nascimento	168.415.667-00	Rua Cachoeiro de Itapemirim, Ipiranga, Guarapari, ES	ES - Espírito Santo	(27) 99932-8563	10/01/2001	24/09/2024	18/06/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.800,00		Growth Interno	🚀 Turbo Interno	Designer	X III	R$ 3.500	R$ 400	16841566700	48.334.440/0001-01	pedro.nascimento@turbopartners.com.br	psannas15@gmail.com	15,2	jan./25	11,1
+Ativo 	Marlon Carneiro Oliveira	163.352.427-29	R. Ormy Conceição Ribeiro - Maria Ortiz, Vitória - ES, 29070-651	ES - Espírito Santo	(27) 997069225	12/03/1997	05/03/2025						Backoffice	🚀 Turbo Interno	Financeiro	X IV	R$ 7.000	R$ 400	27 99706-9225	44.492.055/0001-31	marlon.carneiro@turbopartners.com.br	marlon.co@hotmail.com	9,8	ago./25	4,0
+Ativo 	Matheus Henrique De Oliveira Costa	063.367.475-30	R. Feira de Santana, 645 - Barro Branco, Serra - ES, 29170-701	ES - Espírito Santo	(27) 996292386	10/08/1997	06/03/2025						Growth Interno	🚀 Turbo Interno	Videomaker	X III	R$ 3.500	R$ 400	27996292386	59.782.256/0001-40	matheus.Oliveira@turbopartners.com.br	matheusoliveiracosta97@gmail.com	9,7	nov./25	0,9
+Dispensado	Stéfano Calabrez Zuliani	163.428.517-43	Avenida Nicolau Von Schilgen, 701, Vitória - ES , CEP 29065-130	ES - Espírito Santo	(27) 98885-9246	21/01/1998	17/09/2024	26/05/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.066,67		Growth Interno	🚀 Turbo Interno	Pré-Vendas	X II	R$ 2.000	R$ 400	27988859246	-	stefano.zuliani@turbopartners.com.br	stefano_zuliani@outlook.com	15,4	-	-
+Dispensado	Talisson Targino Mesquita	19447359760	R. Theófilo Costa,390 - Jardim Camburi, Vitória -ES, CEP- 29092-010, Cond. Maimbá apt 501	ES - Espírito Santo	(27)99725-0904	09/04/2003	23/09/2025	24/10/2025	Pediu Demissão	Problemas pessoais	R$ 1.933,33		Commerce	🚀 Turbo Interno	Videomaker	X II	R$ 2.000	R$ 400	19447359760	32.548.148/0001-51	talisson.targino@turbopartners.com.br	talissontargino@hotmail.com	3,0	-	-
+Ativo 	Rafael Vilela	147.472.827-85	Rua Ludwik Macal, 1000 - Jardim da Penha, Vitória - ES, 29060-030, Apto 304, Condomínio do Edifício Karolina	ES - Espírito Santo	(27) 996877563	27/02/2000	15/08/2022						Commerce	🚀 Turbo Interno	Líder de Squad	Gerente/Supervisor	R$ 8.000	R$ 400	14747282785	48.773.118/0001-89	rafael.vilella@turbopartners.com.br	rafael.vilella32@hotmail.com	40,9	mar./25	9,1
+Ativo 	Rodrigo Queiroz	141.802.967-05	R. Abiail do Amaral Carneiro, 85 - Enseada do Suá, Vitória - ES, 29050-535	ES - Espírito Santo	(27) 997969628	26/05/1997	15/01/2022						Sócios	🚀 Turbo Interno	C-Level	Diretor		R$ 400	141.802.967-05	-	rodrigo.queiroz@turbopartners.com.br	rodrigoqs9@gmail.com	47,9	dez./24	12,1
+Ativo 	Samantha Pedroso Campos	700.319.366-36	Rua Walcir Tapias Oliveira, 37, Antonio Honorio, Vitória - ES, 29070845	ES - Espírito Santo	(27) 99242-6509	03/12/2002	10/11/2025						Commerce	🚀 Turbo Interno	Videomaker	X III	R$ 3.000	R$ 400	samantha.campos14@gmail.com	63.532.389/0001-36	samatha.campos@turbopartners.com.br	samantha.campos14@gmail.com	1,4	-	-
+Ativo 	Victor de Souza Peixoto	152.176.997-44	R. Comissário Octávio Queiroz, 675 - Jardim da Penha, apto 102, Vitória - ES, 29060-270	ES - Espírito Santo	(28) 999828634	15/09/1995	25/07/2024						Sócios	🚀 Turbo Interno	C-Level	Diretor		R$ 400	peixotos.victor@gmail.com	-	victor.peixoto@turbopartners.com.br	victorpeixoto31@gmail.com	17,2	out./25	2,0
+Ativo 	Vinicius Ichinosek	456.148.098-64	Rua Pacheco Jordão 14/A, Jardim Lisboa, 03675-020. São Paulo-SP	SP - São Paulo	(11) 995834413	06/05/2002	06/02/2023						Growth Interno	🚀 Turbo Interno	Gestor de Performance	X IV	R$ 4.000	R$ 400	456.148.098-64	49.522.494/0001-63	vinicius.ichino@turbopartners.com.br	viniciusichino@gmail.com	35,0	out./25	2,0
+Ativo 	Warley Pablo Santos Pereira Da Silva	215.084.817-17	R. Ronaldo Scampini, 689 - Jardim da Penha, Vitória - ES, 29060-760	ES - Espírito Santo	(27) 997823958	23/02/2006	13/05/2025						Backoffice	🚀 Turbo Interno	Analista de Dados	X III	R$ 3.500	R$ 400	27 99782-3958	55.164.938/0001-39	warley.silva@turbopartners.com.br	warleyreserva4@gmail.com	7,5	out./25	2,0
+Dispensado	Ives Thomaz Padua Farias de Oliveira	057.587.247-00	Rua Joao Antonio Afonso 105 - santa ines - bloco J - ap 203	ES - Espírito Santo	27996142465	17/12/1991	06/03/2025	28/03/2025	Foi Demitido	Desempenho insatisfatório	R$ 1.550,00		Growth Interno	Conteúdo	Designer	X I	R$ 1.500	R$ 400	057.587.247-00		ives.padua@turbopartners.com.br	i-v-e-s@hotmail.com	9,7	-	-
+Dispensado	Paulo Henrique de Abreu	149.704.667-00	Avenida Engenheiro Charles Bitran, 435, apt 902, torre H	ES - Espírito Santo	27 99991-6672	25/07/1994	10/05/2024	25/03/2025	Foi Demitido	Desempenho insatisfatório	R$ 4.666,67		Commerce	CX&CS	PO	X IV	R$ 5.000	R$ 400	14970466700	26585129/0001-00	 paulo.abreu@turbopartners.com.br	paullohac@gmail.com	19,7	nov./24	13,1
+Dispensado	Amanda Scalzer Lima Mota	159.417.747-37	Rua São João, 7, Bairro Sã	ES - Espírito Santo	(27) 99694-9861	29/06/1998	25/07/2024	13/12/2024	Foi Demitido		R$ 1.200,00		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 400	amandascalzer1998@gmail.com	54.072.212/0001-03	amanda.scalzer@turbopartners.com.br	amandascalzer1998@gmail.com	17,2	-	-
+Dispensado	Amine Cozac	176.270.337-80	Rua Castelo Branco, 150, Praia da Costa, Vila velha ES	ES - Espírito Santo	(27) 99693 0491	20/07/2023	16/01/2023	06/01/2023	Foi Demitido		R$ 0,00		Growth Interno		Pré-Vendas	X I			27996930491	49.192.070/0001-88	amine.cozac@turbopartners.com.br		35,7	-	-
+Dispensado	Ana Belle	832.152.205-04	Rua Piauí , nº 679, apto 102 - Edf Star palace, Pituba - Salvador BA 	BA - Bahia	(71) 986629644	23/10/2023	07/11/2022	25/05/2023	Foi Demitido		R$ 0,00		Commerce		Designer	X II			abramos1234@gmail.com	RECIBO	ana.belle@turbopartners.com.br		38,1	mai./23	31,4
+Dispensado	Ana Francielly Boure Correia	147.304.357-37	Rua Vital Brasil, 7, Soteco, Vila Velha - ES. 29102700	ES - Espírito Santo	(27)992625362	30/04/1999	26/02/2024	18/06/2024	Foi Demitido		R$ 1.600,00		Commerce		Designer	X III	R$ 2.000	R$ 400	 franbouesa@gmail.com	 43.482.232/0001-36	ana.correia@turbopartners.com.br	franbouesa@gmail.com	22,2	-	-
+Dispensado	André Voskanian	"139.125.727-80	"	Rua Francisco Eugenio Mussielo 1105, apto 402	ES - Espírito Santo	(27) 997475201	25/04/2023	01/06/2022	20/12/2024	Foi Demitido		R$ 3.333,33		Ventures		Gestor de Performance	Gerente/Supervisor	R$ 4.000	R$ 400	27997475201	41.987.820/0001-04	andrefvoskanian@gmail.com	andrefvoskanian@gmail.com	43,4	fev./23	34,4
+Dispensado	Antenor Balmas	121.223.907-51	Av Perimetral, Maringá - Serra, ES	ES - Espírito Santo	-	01/12/2023	09/11/2022	28/11/2022	Foi Demitido		R$ 0,00		Commerce		Gestor de Performance	X I			-	-	antenor.balmas@turbopartners.com.br		0,6	-	-
+Dispensado	Bethania Barbosa	163.746.157-78	R. mauro madureira 145 - Segurança do lar. Vitória ES 	ES - Espírito Santo	(27) 99577-2025	05/04/2004	03/01/2024	14/03/2024	Foi Demitido		R$ 1.200,00		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 400	163.746.157-78	51.645.140/0001-58	bethania.barbosa@turbopartners.com.br	Bethania5@hotmail.com	24,0	-	-
+Dispensado	Brazola		-	ES - Espírito Santo	-	26/10/2023	25/06/2022	29/11/2022	Pediu Demissão		R$ 0,00		Commerce		Gestor de Performance	X I			-	-	mateus.brazolino@turbopartners.com.br		5,2	-	-
+Dispensado	Bruno Guerra Coser	180.101.117-67	Rua Madeira de Freitas, 193 - Vitória, ES - 29055320 - Apto. 401	ES - Espírito Santo	(27) 99696-2033	28/04/2024	29/08/2024	25/10/2022	Pediu Demissão		R$ 2.000,00		Commerce		Gestor de Performance	X II	R$ 2.000	R$ 400	18010111767	54.503.109/0001-70	bruno.guerra@turbopartners.com.br	brunogcoser@gmail.com	16,0	-	-
+Dispensado	Caio Freixo Duarte	181.142.687-51	Av. Coronel Jose Martins de Figueiredo, 1009	ES - Espírito Santo	(27) 99952-6869	07/02/2023	07/08/2023	08/12/2023	Foi Demitido		R$ 520,00		Commerce		Gestor de Performance	X II	R$ 1.200	R$ 400	27999526869	52.401.028/0001-34.	caio.duarte@turbopartners.com.br	gestorcaioduarte@gmail.com	29,0	-	-
+Dispensado	Camilly Laube Siqueira de Deus 	193.362.547-31 	Rua Carlos Martins, 200, Jardim Camburi, 29.090-060, Vitória/ES	ES - Espírito Santo	(27) 99201-6704	31/08/2023	25/10/2023	24/07/2024	Foi Demitido		R$ 3.190,00		Backoffice		G&G	X I	R$ 3.300	R$ 400	52.392.821/0001-14	52.392.821/0001-14	camilly.laube@turbopartners.com.br	camillylaube8@gmail.com	26,3	-	-
+Dispensado	Cássio Rodrigues Zechini	152.326.077-74	Rua da Vitória 147, Grande Vitória, Vitória, ES - 29024047	ES - Espírito Santo	(27) 999101759	11/12/1995	26/02/2024	27/05/2024	Foi Demitido		R$ 2.133,33		Commerce		CXCS	X I	R$ 2.000	R$ 400	zechinicassio@gmail.com	51.464.445/0001-63	cassio.rodrigues@turbopartners.com.br	zechinicassio@gmail.com	22,2	-	-
+Dispensado	Ceres Naci	007.877.307-50		ES - Espírito Santo	27 99886-4626	24/11/1964	25/07/2024	-					Backoffice			X II	R$ 2.600	R$ 0		27 99886-4626	-	-	17,2	-	-
+Dispensado	Cynthya Schultz Musa	183.924.007-55	Rua Rolinha Cinzenta, 10, quadra 94-Serra, 29.163.351 	ES - Espírito Santo	(27) 99736-7355	20/04/2024	13/08/2024	25/10/2024	Foi Demitido		R$ 1.500,00		Commerce		CXCS	Estágio	R$ 1.500	R$ 400	27997367355	-	cynthya.schultz@turbopartners.com.br	smcynthya7@gmail.com	16,6	-	-
+Dispensado	Daniel Fazolo Pimentel Torres Oliveira	138.120.567-47	Rua Emilio Marins 130	ES - Espírito Santo	(27) 99789-2852	05/09/2024	25/07/2024	25/10/2024	Foi Demitido		R$ 0,00		Commerce		CXCS	X II		R$ 400	138.120.567-47	44.641.113/0001-41	daniel.fazolo@turbopartners.com.br		17,2	-	-
+Dispensado	Daniel Pinheiro dos Santos	135.062.366-01	R. Antônio Régis dos Santos - ItapuãVila Velha - ES, 29101-420	ES - Espírito Santo	(27) 992994554	25/02/2023	03/07/2023	02/08/2023	Foi Demitido		R$ 466,67		Growth Interno		Pré-Vendas	X I	R$ 1.750		31994392973	51.294.529/0001-04	daniel.pinheiro@turbopartners.com.br				
+Dispensado	Danielle Campos dos Santos 	131.126.237-70	Avenida Um, n 500, Santa Monica Popular, Vila Velha 	ES - Espírito Santo	(27)9989-77968 	29/01/1997	03/01/2024	28/02/2024	Foi Demitido		R$ 2.266,67		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 400	27998977968	53.344.998/0001-08	danielle.campos@turbopartners.com.br	danielle.campos.santos@gmail.con	24,0	-	-
+Dispensado	Denys Alves dos Santos	143.109.077-84	Rua Basilio da Gama n368	ES - Espírito Santo	(27)98857-7067	06/05/1996	13/01/2025	25/04/2025	Foi Demitido	Desempenho insatisfatório	R$ 3.100,00		Growth Interno		Designer	X III	R$ 3.000	R$ 400	143.109.077-84	22.812.078/0001-43	denys.alves@turbopartners.com.br	deenysalves2@gmail.com	11,5	-	-
+Dispensado	Diego Cassaro Vereza de Oliveira	175.897.107-09	Rua Joaquim Lyra, n⁰ 13. Barra do Jucu, Vila Velha, Espírito Santo. Cep: 29125-050	ES - Espírito Santo	(27)99267-1768	19/11/1996	01/10/2024	14/11/2024	Foi Demitido		R$ 1.333,33		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 400	17589710709		diego.cassaro@turbopartners.com.br	diegovereza96@gmail.com	14,9	-	-
+Dispensado	Edson Kelvin Laurindo Araujo 	134.084.134-79	Av João Waling 000 (terras Alphaville-c121) cep - 58411160	PB - Paraíba	83 988054358	31/12/2002	01/04/2024	09/04/2024	Foi Demitido		R$ 500,00		Commerce		Desenvolvedor 	Estágio	R$ 1.000	R$ 400	83 988054358	-	edson.laurindo@turbopartners.com.br	kelvinlaurindo@hotmail.com	21,0	-	-
+Dispensado	Eduardo Dalla Bernardina Marchezini	145.624.797-28	Rua Nossa Senhora das Graças, n110. De Lourdes, Vitória.	ES - Espírito Santo	27 99515-4134	05/08/2000	01/02/2024	18/06/2024	Pediu Demissão		R$ 960,00		Commerce		Gestor de Performance 	X II	R$ 1.200	R$ 200	145.624.797-28	53.757.642/0001-04	eduardo.dalla@turbopartners.com.br	eduardo.dalla.b.m@gmail.com	23,0	-	-
+Dispensado	Elen Gabrielly dos Santos Segadilha 	051.304.613-55	R. Guaçuí, 35, Nova Brasília - Cariacica  	ES - Espírito Santo	 (27)99288-3997	17/04/1994	03/01/2024	25/07/2024	Foi Demitido		R$ 2.000,00		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 400	5130461355	53.162.490/0001-99	elen.santos@turbopartners.com.br	elensegadilha@gmail.com	24,0	-	-
+Dispensado	Elioenai Brandão Rocha	159.932.297-80	Rua Leopoldina, 46, Vasco da Gama, Cariacica.	ES - Espírito Santo	(27) 99772-8791	30/10/2023	06/11/2023	31/01/2024	Pediu Demissão		R$ 2.466,67		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 200	elioenai.rocha@gmail.com	49.680.076/0001-02	elioenai.brandao@turbopartners.com.br		25,9	-	-
+Dispensado	Emanuelle Santana Souto 	 194.318.627-86	R.Milton Caldeira, 566, Itapuã, Vila Velha 	ES - Espírito Santo	(27) 99956-2442	06/05/2002	03/01/2024	13/03/2024	Foi Demitido		R$ 991,67		Backoffice		Financeiro 	X I	R$ 1.750	R$ 400	 27 999562442	37.311.490/0001-57	emanuelle.santana@turbopartners.com.br	santana.emanuelle@hotmail.com	24,0	-	-
+Dispensado	Gustavo Dias	137.286.217-06	Rua Doutor Cyro Lopes Pereira, 255, Jardim da Penha- Vitoria, ES	ES - Espírito Santo	(27) 992512222	30/05/2023	09/01/2023	25/9/2023	Foi Demitido		R$ 1.240,00		Commerce		Designer	X I	R$ 1.200	R$ 200	27992512222	42.788.407/0001-75	gustavo.dias@turbopartners.com.br		36,0	-	-
+Dispensado	Gustavo Henrique Moraes Pereira	 454.119.928-93	 Rua Salim Mahfoud, 767, São Bernado do Campo/SP	SP - São Paulo	1199278-7787	29/09/1996	01/04/2024	03/04/2024	Foi Demitido		R$ 360,00		Commerce		Gestor de Performance	X II	R$ 1.200	R$ 400	 1191322-5773	49.006.436/0001-87	gustavo.moraes@turbopartners.com.br	gutyhmp@gmail.com	21,0	-	-
+Dispensado	Habiatar	509.018.80-76	Rua do matadouro travessa reis 29	RS - Rio Grande do Sul	(51) 98482729696	17/04/2023	11/10/2022	25/10/2022	Foi Demitido		R$ 0,00		Commerce		Gestor de Performance	X I			-	-	habiatar.alves@turbopartners.com.br		0,5	-	-
+Dispensado	Heitor Domingos Guimarães	133.212.947-10	Avenida Dante Michelini - Jardim Camburi, Vitória - ES, 29090-070,	ES - Espírito Santo	(28) 99949-5469	17/09/2001	07/08/2023	31/03/2025	Pediu Demissão	Foi para outra empresa	R$ 5.100,00		Growth Interno		Analista de Dados	X III	R$ 4.500	R$ 400	28999495469	51.654.926/0001-31	heitor.guimaraes@turbopartners.com.br	heitorg1701@gmail.com	29,0	dez./24	12,1
+Dispensado	Henrique Cerqueira Gonzalez Martinez	111.447.866-06	Rua Ronaldo Scampini, 281, Jardim da Penha, Vitória/ES, 29060-760.	ES - Espírito Santo	(27) 999559924	08/06/1990	16/10/2024	25/11/2024	Foi Demitido		R$ 6.200,00		Growth Interno		Pré-Vendas	Gerente/Supervisor	R$ 6.000	R$ 400	46385509000109	46.385.509/0001-09	henrique.martinez@turbopartners.com.br	henriquegonzalezm@gmail.com	14,4	-	-
+Dispensado	Henrique Furtado	115.381.547-81	Av. Rio Branco 962 - ed. Ilha bela	ES - Espírito Santo	(27) 998064002	26/02/2023	17/09/2022	07/08/2023	Foi Demitido		R$ 758,33		Growth Interno		Inside Sales	X II	R$ 1.750	R$ 200	27998064002	49.829.916/0001-48	henrique.furtado@turbopartners.com.br		39,8	mar./23	33,5
+Dispensado	Iago Franklin de Lima Góis 	063.916.934-12	Rua Doutor Dório Silva, 85, Cond. Bauhaus, casa 07	ES - Espírito Santo	(27) 992565464	18/10/2000	04/11/2024	22/04/2025	Foi Demitido	Desempenho insatisfatório	R$ 2.800,00		Growth Interno		Inside Sales	X I	R$ 3.000	R$ 400	063.916.934-12	Vai abrir	iago.lima@turbopartners.com.br	Iagolima.g50@gmail.com	13,8	-	-
+Dispensado	Jéssica Germano	061.634.067-29	Rua Arthur Czartoryski, 600 APTO 304	ES - Espírito Santo	(27) 99298 4381	28/06/2023	23/01/2023	06/04/2023	Foi Demitido		R$ 0,00		Commerce		Designer	X I			-	-	jessica.germano@turbopartners.com.br		2,4	-	-
+Dispensado	João Lucas Feitosa	 405.704.758-13	Rua Desembargador Augusto Botelho, 209. Praia da Costa, Vila Velha/ES	ES - Espírito Santo	(11) 97737-6999	24/02/2023	30/11/2023	30/11/2023	Foi Demitido		R$ 960,00		Commerce		Gestor de Performance	X I	R$ 800	R$ 200	financeiro@bloomcapital.com.br	22.156.630/0001-92	Joao.feitosa@turbopartners.com.br				
+Dispensado	João Pedro Ferreira Vivaldi	145.598.127-30	Av. Estudante José Júlio de Souza 1200, ap.303, Praia de Itaparica	ES - Espírito Santo	(27) 997983112	31/12/2002	31/07/2023	25/02/2025	Pediu Demissão	Foi empreender	R$ 2.066,67		Commerce		Gestor de Performance	X II	R$ 2.000	R$ 400	27997983112	51.624.627/0001-54	joao.vivaldi@turbopartners.com.br	jpvivaldi@gmail.com	29,2	ago./24	16,2
+Dispensado	João Vitor Correa Nunes	083.695.146-85	Rua Presidente Vargas 675. Centro. 38740-032. Patrocínio - MG	MG - Minas Gerais	34 98805-5481	28/02/2004	29/04/2024	25/07/2024	Foi Demitido		R$ 1.200,00		Commerce		Gestor de Performance	X II	R$ 1.200	R$ 400	46949676000127	46949676000127	joao.nunes@turbopartners.com.br	joaovcnunes2004@gmail.com	20,1	-	-
+Dispensado	Júlia Acosta Ferreira	148.909.407-58	Rua doutor João Carlos de Souza, 121, barro vermelho, Atlantis Residence, apto 703, Vitória/ES	ES - Espírito Santo	27998891717	24/07/2024	22/07/2024	15/11/2024	Foi Demitido		R$ 2.100,00		Growth Interno		Inside Sales	X I	R$ 3.000	R$ 400	47.088.824/0001-29	47.088.824/0001-29	julia.acosta@turbopartners.com.br	juliaacostaf@gmail.com	17,3	-	-
+Dispensado	Júlia Cypreste Ciciliotti Ferreira	13886845788	Rua Nicolau Von Schilguen, Mata da Praia, Vitória-ES	ES - Espírito Santo	27 99943-1100	09/09/1999	29/04/2024	12/03/2025	Pediu Demissão	Foi empreender	R$ 1.000,00		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 400	27999431100	-	julia.cypreste@turbopartners.com.br	-	20,1	-	-
+Dispensado	Kadu Fafa Borges Vidal 	125.250.637.67	Rua Diógenes Nascimento das Neves, 52, Barro Vermelho, Vitória/ES	ES - Espírito Santo	27 98859-1179	09/09/2024	29/07/2024	17/01/2025	Pediu Demissão	Foi para outra empresa	R$ 1.533,33		Commerce		Gestor de Performance	X II	R$ 2.000	R$ 400	kaduvidal@hotmail.com	54.220.747/0001-84	kadu.vidal@turbopartners.com.br	kaduvidal@hotmail.com	17,1	ago./24	16,2
+Dispensado	Kalani Davi Gomes Ramalho Sobral	862.424.345-98	Rua eduardo santos 21 A, bairro piatã, 41650076	BA - Bahia	(71)992581353	20/10/2001	26/02/2024	10/05/2024	Pediu Demissão		R$ 600,00		Commerce		Gestor de Performance	X II	R$ 1.200	R$ 400	50.921.053/0001-13	50.921.053/0001-13	kalani.sobral@turbopartners.com.br	 kalanidavitrabalho@gmail.com	22,2	-	-
+Dispensado	Karina Ramalho	128.616.747-76	Rodovia do Sol, KM 18. Condomínio Jardins Veneza.	ES - Espírito Santo	(27) 998855355	24/10/2023	17/11/2022	27/02/2023	Foi Demitido		R$ 0,00		Commerce		Gestor de Performance	X I			-	-	karina.ramalho@turbopartners.com.br		3,4	-	-
+Dispensado	Karla Cristina Oliveira Santos 	186.626.047-22	Rua rio anchieta Nº 01, Hélio Ferraz, Serra - ES CEP 29160530	ES - Espírito Santo	(27)99298-4943	24/05/2001	03/01/2024	28/02/2024	Foi Demitido		R$ 2.266,67		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 400	27992984943	53.289.691/0001-51	karla.oliveira@turboopartners.com.br	karlasantosol@hotmail.com	24,0	-	-
+Dispensado	Kellen Ribeiro	133674116-39	Rua Asa Delta 1391 bairro Campina Verde, Divinopólis - MG	MG - Minas Gerais	37 9993-3468	07/05/2004	23/04/2024	04/07/2024	Foi Demitido		R$ 240,00		Commerce		Gestor de Performance	X I	R$ 800	R$ 400	35a62926-ae4f-4fe0-8b10-7f88f7015e90	54.830.833/0001-09.	kellen.ribeiro@turbopartners.com.br	adskellen@gmail.com	20,3	-	-
+Dispensado	Lavinia Teixeira Braggio de Souza	175.631.647-31	Rua Aricanga, 290 Rio Marinho - Vila Velha/ES	ES - Espírito Santo	(27) 997257525	14/11/2003	03/07/2023	29/09/2023	Foi Demitido		R$ 933,33		Growth Interno		Pré-Vendas	X I	R$ 800	R$ 200	27997257525	51.294.332/0001-67 	lavinia.braggio@turbopartners.com.br				
+Dispensado	Leonardo Santos 	147.563.617-22	Av. Guarapari, 780, Valparaíso, Serra, ES	ES - Espírito Santo	(27) 999666487	23/07/2023	01/06/2023	29/09/2023	Pediu Demissão		R$ 2.041,67		Growth Interno		Inside Sales	X I	R$ 1.750	R$ 200	27999666487	 38.245.286.000/1-48	leonardo.santos@turbopartners.com.br		31,2	-	-
+Dispensado	Leonardo Silva Claudino Cruz	 178.386.567-96	Rua Ana Siqueira, 1006, Alecrim, Vila Velha - ES	ES - Espírito Santo	27 998748995	17/07/1999	29/04/2024	11/07/2024	Foi Demitido		R$ 426,67		Commerce		Designer	X I	R$ 800	R$ 400	27 998748995	38.334.135/0001-66	leonardo.silva@turbopartners.com.br	silva.leo26@hotmail.com	20,1	-	-
+Dispensado	Letícia Rodrigues Andrade Dayrel	116.854.466-12	Rua Sete, 50, apto 202, Residencial Sul	MG - Minas Gerais	(38)988360939	19/11/1994	15/07/2024	14/03/2025	Foi Demitido	Desempenho insatisfatório	R$ 1.133,33		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 400	51.975.583/0001-07	51.975.583/0001-07	leticia.andrade@turbopartners.com.br	contatoleticiaandrade@outlook.com	17,5	-	-
+Dispensado	Leticia Silvestre	182.243.257-09	Rua Grajaú, Nº100, Itapuã, Vila Velha	ES - Espírito Santo	(27) 997938671	-	25/08/2022	25/11/2022	Foi Demitido		R$ 0,00		Commerce		Gestor de Performance	X I			-	-	leticia.vilastre@turbopartners.com.br		3,1	-	-
+Dispensado	Luis Guilherme Borborema Rocha	181.794.827-07	Avenida Fernando Ferrari, 2236	ES - Espírito Santo	(27) 98817-1917	18/01/2004	10/12/2024	27/03/2025	Pediu Demissão	Broxou	R$ 2.000,00		Growth Interno		Pré-Vendas	X II	R$ 2.000	R$ 400	181.794.827-07	N/a	luisguilherme.borborema@turbopartners.com.br	gui.borborema.it@gmail.com	12,6	-	-
+Dispensado	Luise Cristine nascimento Duarte 	069548105-33	Rua 3 de maio, 45, pituacu, salvador, Bahia 	BA - Bahia	71986685670	03/08/2000	25/04/2024	06/07/2024	Foi Demitido		R$ 293,33		Commerce		Gestor de Performance	X I	R$ 800	R$ 400	71986685670	54.888.772/0001-30	luise.duarte@turbopartners.com.br		20,2	-	-
+Dispensado	Luiz Fiorim	152.887.357-27	Rua arthur czartoryski, 117, ap 603 - Jardim da penha - Vitória	ES - Espírito Santo	(27) 996115344	24/07/2023	27/06/2022	18/08/2023	Pediu Demissão		R$ 960,00		Commerce		Gestor de Performance	X II	R$ 1.200	R$ 200	15288735727	49.047.344/0001-45	luiz.fiorim@turbopartners.com.br		42,5	fev./23	34,4
+Dispensado	Luiz Henrique Gomes Ribeiro	188.991.807-50	R. Maria de Lourdes Profilo Lyrio, Tabuazeiro	ES - Espírito Santo	(27) 99751-2486	21/02/2001	03/01/2024	14/11/2024	Foi Demitido		R$ 1.166,67		Tech Proprietária		Desenvolvedor 	X I	R$ 1.750	R$ 400	188.991.807-50	53.162.490/0001-99	henrique.gomes@turbopartners.com.br	ouisnuuk@hotmail.com	24,0	mai./24	19,2
+Dispensado	Luiza Ferregueti	149.088.357-64	R. Regina H. Vervloet, 46 - Pontal de Camburi, Vitória - ES	ES - Espírito Santo	(27) 99668-2130	01/02/2023	08/05/2023	12/04/2024	Pediu Demissão		R$ 1.200,00		Commerce		Designer	X III	R$ 2.000	R$ 400	149.088.357-64	49.288.928/0001-02	luiza.ferreguete@turbopartners.com.br	ferreguete6@gmail.com	32,0	-	-
+Dispensado	Maria Julia	186.212.007-24	Rua Chafic Murad, 804	ES - Espírito Santo	(353) 83 095 5175	15/07/2023	13/03/2023	25/04/2023	Foi Demitido		R$ 0,00		Commerce		Gestor de Performance	X I			-	-	maria.fogolin@turbopartners.com.br		1,4	-	-
+Dispensado	Maria Julya Bonela Muqui do Nascimento	 177.265.627-57	Rua campos, nº46 Morada de santa fé, Cariacica / ES 	ES - Espírito Santo	(27)99982-7975 	25/05/2001	26/02/2022	25/10/2022	Foi Demitido		R$ 2.000,00		Commerce		Gestor de Performance	X II	R$ 2.000	R$ 400	 177.265.627-57	 51.010.382/0001-75	maria.bonela@turbopartners.com.br	mariajulyabonella@gmail.com	46,5	ago./24	16,2
+Dispensado	Matheus Araujo		-	BA - Bahia	(71) 92851207	21/02/2023	12/09/2022	03/02/2023	Foi Demitido	Desempenho insatisfatório	R$ 300,00		Commerce		Gestor de Performance	X I	R$ 1.000	R$ 400	-	-	matheus.araujo@turbopartners.com.br		4,8	-	-
+Dispensado	Matheus Sampaio 	166.531.747-78	Rua tres, n 400, Condominio h12, ed inhapim, 804	ES - Espírito Santo	-	19/09/2023	05/02/2023	05/04/2023	Foi Demitido		R$ 0,00		Commerce		Gestor de Performance	X I			-	-	matheus.sampaio@turbopartners.com.br		2,0	-	-
+Dispensado	Miguel Guimarães	134.040.607-17	Rua Arthur Czartoryski, 587, Jardim da Penha, Vitória 	ES - Espírito Santo	(22) 998170840 	28/11/2023	15/05/2023	09/02/2024	Pediu Demissão		R$ 1.250,00		Commerce		Gestor de Performance	X II	R$ 2.500	R$ 200	22998170840	45.630.801/0001-79 	Miguel.guimaraes@turbopartners.com.br	guimaraes.m00@gmail.com	31,8	ago./23	28,4
+Dispensado	Millena Rossi Fernandes	150.559.397-29	Rua Doutor Dido Fontes, 981, Jardim da Penha, Vitória, 29060280	ES - Espírito Santo	(27) 99524-8123	07/10/1998	01/10/2024	19/02/2025	Foi Demitido		R$ 1.666,67		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 400	millena.rossi@hotmail.com	57.605.381/0001-50	millena.rossi@turbopartners.com.br	millenarossi5@gmail.com	14,9	-	-
+Dispensado	Natália Vitória Sales Camatta	125.485.247-60	Rua Eugenilio Ramos, 550. Apto 402. Bairro Jardim da Penha	ES - Espírito Santo	(27) 999848479	19/01/2024	29/08/2024	25/10/2022	Foi Demitido		R$ 1.000,00		Commerce		Gestor de Performance	Estágio	R$ 1.000	R$ 400	125.485.247-60	-	natalia.camatta@turbopartners.com.br	nataliasalescamata2011@gmail.com	16,0	-	-
+Dispensado	Pamela Alves	164.913.537-88	Rua Areobaldo Pinto dos Santos nº 01 Santos Dumont, Vila Velha	ES - Espírito Santo	(27) 99816-3466	24/11/1996	04/11/2022	31/03/2025	Pediu Demissão	Expectativa salarial	R$ 4.533,33		Backoffice		Financeiro 	X III	R$ 4.000	R$ 400	16491353788	41.152.360/0001-96	pamela.alves@turbopartnes.com.br	pamelamaraalves@hotmail.com	38,2	jan./24	23,3
+Dispensado	Pedro Fernandes	137.662.056-17	Rua Francisco Eugenio Mussielo 1105, apto 402	ES - Espírito Santo	(27) 997474362	24/02/2023	01/09/2022	25/09/2023	Pediu Demissão		R$ 4.133,33		Tech Proprietária		Desenvolvedor 	X IV	R$ 4.000	R$ 200	137.662.056-17	49.559.091/0001-99	pedro.fernandes@turbopartners.com.br		40,3	-	-
+Dispensado	Pedro Nascimento	180.508.157-81	Rua Monte Castelo, 26, colina de laranjeiras, Serra, ES	ES - Espírito Santo	(27) 999508806	14/01/2023	04/08/2022	01/02/2024	Foi Demitido		R$ 280,00		Commerce		Gestor de Performance	X II	R$ 1.200	R$ 200	18050815781	30.515.913/0001- 01	pedro.nascimento@turbopartners.com.br		41,2	fev./23	34,4
+Dispensado	Pricyla Medeiros	184.043.157-10	Rua Desembargador Augusto Botelho N 138, apto. 303	ES - Espírito Santo	(27)998681407	14/07/2023	22/11/2022	22/12/2022	Foi Demitido		R$ 0,00		Growth Interno		Pré-Vendas	X I			-	-	pricyla.medeiros@turbopartners.com.br		1,0	-	-
+Dispensado	Rafael Moulin		-	Fora Brasil	(27) 998764512	28/03/2023	09/08/2022	10/12/2022	Pediu Demissão		R$ 0,00		Commerce		Designer	X I			-	-	rafael.moulin@turbopartners.com.br		4,1	-	-
+Dispensado	Raquel Bezerra de Oliveira	418.345.108-64	Rua Eurico Sodré, 783 - CEP 02215-010 - São Paulo - SP	SP - São Paulo	 (11) 98311-6318	03/12/1991	13/05/2024	25/01/2025	Pediu Demissão	Broxou	R$ 2.066,67		Growth Interno		Copy	X I	R$ 2.000	R$ 400	418.345.108-64	54.627.605/00001-36	Raquel.Bezerra@turbopartners.com.br	raquelbeoli@gmail.com	19,6	-	-
+Dispensado	Ricardo Froede	166.490.337-23	Rua Herman Stern 235 Colina de laranjeiras, Serra	ES - Espírito Santo	(27) 992756258	07/05/2023	08/11/2022	24/02/2023	Foi Demitido		R$ 0,00		Commerce		Gestor de Performance	X III			-	-	ricardo.froede@turbopartners.com.br		3,6	-	-
+Dispensado	Tomas Villanueva Renault.	440.605.038-86	Rua Girassol, 488 , apartamento 111. Vila Madalena / SP capital.	SP - São Paulo	11958450123	24/11/1993	01/04/2024	25/04/2024	Foi Demitido		R$ 2.066,67		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 400	44060503886 /	-	tomas.renault@turbopartners.com.br	tomasvillarenault@gmail.com	21,0	-	-
+Dispensado	Victoria Marlene Stefanelli	074.722.565-60	Rua Desembargador Cassiano Castelo, 200 - Goiabeiras, Vitória - Espírito Santo, 29075-045, Brasil	ES - Espírito Santo	(27) 992757441	21/11/1995	17/09/2024	13/12/2024	Pediu Demissão		R$ 1.800,00		Growth Interno		Inside Sales	X I	R$ 3.000	R$ 400	50.132.345/0001-77	50.132.345/0001-77	victoria.stefanelli@turbopartners.com.br	victoriastefanelli@gmail.com	15,4	-	-
+Dispensado	Victoria Meireles	168.046.167-23	Rua Itapina, 39, Rio Marinho - Vila Velha, ES	ES - Espírito Santo	(27) 99797 5735	02/04/2023	09/01/2023	26/01/2024	Pediu Demissão		R$ 1.600,00		Commerce		Copy	X I	R$ 1.500	R$ 200	27997975735	49.519.007/0001-03	victoria.meireles@turbopartners.com.br		36,0	jul./23	29,4
+Dispensado	Vitória de Abreu Santos	 185.849.807-41	Rodovia Virgílio Várzea, 4570 - Canasvieiras, Florianópolis - SC, 88054-605	SC - Santa Catarina	21997585596	17/06/2002	13/05/2024	08/12/2024	Foi Demitido		R$ 866,67		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 400	18584980741	47.874.566/0001-06	viforiaabreu960@gmail.com	vitoria.abreu@turbopartners.com.br	19,6	-	-
+Dispensado	Yasmin Soares Gomes	160.108.557-56		ES - Espírito Santo	27999121106	01/04/1998	26/02/2024	09/05/2024	Foi Demitido		R$ 933,33		Growth Interno		Pré-Vendas	X I	R$ 2.000	R$ 400	 yasmingomezz@outlook.com	 53.556.638/0001-70	yasmin.gomes@turbopartners.com.br	 yasmingomezz@outlook.com	22,2	-	-
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
+																									
