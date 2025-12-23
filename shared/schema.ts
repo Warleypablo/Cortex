@@ -224,9 +224,9 @@ export const rhPromocoes = pgTable("rh_promocoes", {
   criadoPor: varchar("criado_por", { length: 100 }),
 });
 
-export const insertRhCargoSchema = createInsertSchema(rhCargos).omit({ id: true, criadoEm: true });
-export const insertRhNivelSchema = createInsertSchema(rhNiveis).omit({ id: true, criadoEm: true });
-export const insertRhSquadSchema = createInsertSchema(rhSquads).omit({ id: true, criadoEm: true });
+export const insertRhCargoSchema = createInsertSchema(rhCargos).omit({ id: true, criadoEm: true }).partial({ descricao: true, ativo: true });
+export const insertRhNivelSchema = createInsertSchema(rhNiveis).omit({ id: true, criadoEm: true }).partial({ ordem: true, ativo: true });
+export const insertRhSquadSchema = createInsertSchema(rhSquads).omit({ id: true, criadoEm: true }).partial({ descricao: true, ativo: true });
 export const insertRhPromocaoSchema = createInsertSchema(rhPromocoes).omit({ id: true, criadoEm: true });
 
 export type RhCargo = typeof rhCargos.$inferSelect;
