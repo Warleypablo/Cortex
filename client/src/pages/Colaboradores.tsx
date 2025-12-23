@@ -141,6 +141,25 @@ function formatDate(date: string | Date | null | undefined) {
   }
 }
 
+function calcularTempoTurbo(admissao: string | Date | null | undefined, demissao: string | Date | null | undefined, status: string | null): string {
+  if (!admissao) return "-";
+  const admissaoDate = new Date(admissao);
+  admissaoDate.setHours(0, 0, 0, 0);
+  let endDate: Date;
+  if (status === "Dispensado" && demissao) {
+    endDate = new Date(demissao);
+  } else {
+    endDate = new Date();
+  }
+  endDate.setHours(0, 0, 0, 0);
+  const diffTime = endDate.getTime() - admissaoDate.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  const diffMonths = diffDays / 30;
+  if (diffMonths <= 0) return "-";
+  const formatted = diffMonths.toFixed(1).replace(".", ",");
+  return `${formatted} ${diffMonths === 1 ? "mês" : "meses"}`;
+}
+
 function FilterDialog({
   filters,
   onApplyFilters,
@@ -2082,7 +2101,7 @@ export default function Colaboradores() {
                           </TableCell>
                           <TableCell className="py-3">
                             <div className="text-sm text-muted-foreground" data-testid={`text-meses-turbo-${colaborador.id}`}>
-                              {colaborador.mesesDeTurbo ? `${colaborador.mesesDeTurbo} ${colaborador.mesesDeTurbo === 1 ? "mês" : "meses"}` : "-"}
+                              {calcularTempoTurbo(colaborador.admissao, colaborador.demissao, colaborador.status)}
                             </div>
                           </TableCell>
                           <TableCell className="py-3">
