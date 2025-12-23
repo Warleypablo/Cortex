@@ -1376,14 +1376,17 @@ export default function DetailColaborador() {
   const calcularMesesDeTurbo = (): string => {
     if (!colaborador.admissao) return "-";
     const admissaoDate = new Date(colaborador.admissao);
+    admissaoDate.setHours(0, 0, 0, 0);
     let endDate: Date;
     if (colaborador.status === "Dispensado" && colaborador.demissao) {
       endDate = new Date(colaborador.demissao);
     } else {
       endDate = new Date();
     }
+    endDate.setHours(0, 0, 0, 0);
     const diffTime = endDate.getTime() - admissaoDate.getTime();
-    const diffMonths = diffTime / (1000 * 60 * 60 * 24 * 30.44);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    const diffMonths = diffDays / 30;
     return diffMonths > 0 ? diffMonths.toFixed(1) : "0";
   };
 
