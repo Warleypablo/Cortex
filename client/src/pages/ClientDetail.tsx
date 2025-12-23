@@ -391,6 +391,10 @@ export default function ClientDetail() {
       case "VENCIDO":
       case "OVERDUE":
         return <Badge variant="destructive" data-testid="badge-vencido">Vencido</Badge>;
+      case "CANCELED":
+      case "CANCELADO":
+      case "CANCELLED":
+        return <Badge variant="destructive" data-testid="badge-cancelado">Cancelado</Badge>;
       default:
         return <Badge variant="outline" data-testid="badge-status">{status || "N/A"}</Badge>;
     }
