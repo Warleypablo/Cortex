@@ -139,7 +139,7 @@ export interface IStorage {
   getColaboradores(): Promise<Colaborador[]>;
   getColaboradoresComPatrimonios(): Promise<(Colaborador & { patrimonios: { id: number; descricao: string | null }[] })[]>;
   createColaborador(colaborador: InsertColaborador): Promise<Colaborador>;
-  updateColaborador(id: number, colaborador: Partial<InsertColaborador>): Promise<Colaborador>;
+  updateColaborador(id: number, colaborador: Partial<InsertColaborador>, criadoPor?: string): Promise<Colaborador>;
   deleteColaborador(id: number): Promise<void>;
   createPromocao(promocao: InsertRhPromocao): Promise<RhPromocao>;
   getContratos(): Promise<ContratoCompleto[]>;
@@ -413,7 +413,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async updateColaborador(id: number, colaborador: Partial<InsertColaborador>): Promise<Colaborador> {
+  async updateColaborador(id: number, colaborador: Partial<InsertColaborador>, criadoPor?: string): Promise<Colaborador> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1559,7 +1559,7 @@ export class DbStorage implements IStorage {
     return newColaborador;
   }
 
-  async updateColaborador(id: number, colaborador: Partial<InsertColaborador>): Promise<Colaborador> {
+  async updateColaborador(id: number, colaborador: Partial<InsertColaborador>, criadoPor?: string): Promise<Colaborador> {
     const [currentColaborador] = await db
       .select()
       .from(schema.rhPessoal)
@@ -1607,6 +1607,7 @@ export class DbStorage implements IStorage {
         nivelAnterior: oldNivel || null,
         nivelNovo: nivelChanged ? (colaborador.nivel as string | null) : null,
         observacoes: "Alteração automática via edição",
+        criadoPor: criadoPor || null,
       });
     }
 
@@ -1625,6 +1626,7 @@ export class DbStorage implements IStorage {
         nivel_anterior, 
         nivel_novo, 
         observacoes, 
+        criado_por,
         criado_em
       ) VALUES (
         ${promocao.colaboradorId},
@@ -1636,6 +1638,7 @@ export class DbStorage implements IStorage {
         ${promocao.nivelAnterior || null},
         ${promocao.nivelNovo || null},
         ${promocao.observacoes || null},
+        ${promocao.criadoPor || null},
         NOW()
       ) RETURNING *
     `);

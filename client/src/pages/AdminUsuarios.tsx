@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,13 +9,17 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
-import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase } from "lucide-react";
+import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSetPageInfo } from "@/contexts/PageContext";
+
+type SortColumn = 'name' | 'email' | 'role' | 'allowedRoutes';
+type SortDirection = 'asc' | 'desc';
 
 interface ColaboradorVinculado {
   id: number;
@@ -409,10 +413,328 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
   );
 }
 
+function AddUserDialog({ open, onOpenChange }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<'admin' | 'user'>('user');
+  const [selectedRoutes, setSelectedRoutes] = useState<string[]>([]);
+  const [emailError, setEmailError] = useState("");
+
+  const validateEmail = (email: string): boolean => {
+    const validDomains = ['@turbopartners.com.br', '@gmail.com'];
+    const isValid = validDomains.some(domain => email.toLowerCase().endsWith(domain));
+    if (!isValid && email.length > 0) {
+      setEmailError("Email deve terminar com @turbopartners.com.br ou @gmail.com");
+    } else {
+      setEmailError("");
+    }
+    return isValid;
+  };
+
+  const createUserMutation = useMutation({
+    mutationFn: async (userData: { name: string; email: string; role: 'admin' | 'user'; allowedRoutes: string[] }) => {
+      return await apiRequest('POST', '/api/auth/users', userData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/debug/users'] });
+      toast({
+        title: "Usuário criado",
+        description: `Usuário ${name} foi criado com sucesso.`,
+      });
+      resetForm();
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao criar usuário",
+        description: error.message || "Ocorreu um erro ao criar o usuário.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetForm = () => {
+    setName("");
+    setEmail("");
+    setRole('user');
+    setSelectedRoutes([]);
+    setEmailError("");
+  };
+
+  const handleToggleRoute = (route: string) => {
+    if (selectedRoutes.includes(route)) {
+      setSelectedRoutes(selectedRoutes.filter((r) => r !== route));
+    } else {
+      setSelectedRoutes([...selectedRoutes, route]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    setSelectedRoutes(AVAILABLE_ROUTES.map((r) => r.path));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedRoutes([]);
+  };
+
+  const handleApplyPreset = (presetId: string) => {
+    const preset = ROLE_PRESETS.find(p => p.id === presetId);
+    if (preset) {
+      setSelectedRoutes(preset.routes);
+      toast({
+        title: "Perfil aplicado",
+        description: `Perfil "${preset.label}" aplicado.`,
+      });
+    }
+  };
+
+  const handleSave = () => {
+    if (!name.trim()) {
+      toast({
+        title: "Nome obrigatório",
+        description: "Por favor, informe o nome do usuário.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!email.trim() || !validateEmail(email)) {
+      toast({
+        title: "Email inválido",
+        description: "Email deve terminar com @turbopartners.com.br ou @gmail.com",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createUserMutation.mutate({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      role,
+      allowedRoutes: role === 'admin' ? [] : selectedRoutes,
+    });
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      resetForm();
+    }
+    onOpenChange(open);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Adicionar Novo Usuário</DialogTitle>
+          <DialogDescription>
+            Crie um novo usuário e defina suas permissões de acesso
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="user-name">Nome *</Label>
+              <Input
+                id="user-name"
+                placeholder="Nome completo"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                data-testid="input-user-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="user-email">Email *</Label>
+              <Input
+                id="user-email"
+                type="email"
+                placeholder="email@turbopartners.com.br"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (e.target.value.length > 0) {
+                    validateEmail(e.target.value);
+                  } else {
+                    setEmailError("");
+                  }
+                }}
+                className={emailError ? "border-destructive" : ""}
+                data-testid="input-user-email"
+              />
+              {emailError && (
+                <p className="text-xs text-destructive">{emailError}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Função</Label>
+            <Select value={role} onValueChange={(value: 'admin' | 'user') => setRole(value)}>
+              <SelectTrigger data-testid="select-user-role">
+                <SelectValue placeholder="Selecione a função" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user" data-testid="role-user">Usuário</SelectItem>
+                <SelectItem value="admin" data-testid="role-admin">Administrador</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {role !== 'admin' && (
+            <>
+              <Separator />
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium">Aplicar Perfil de Acesso</Label>
+                </div>
+                <Select onValueChange={handleApplyPreset}>
+                  <SelectTrigger data-testid="select-add-role-preset">
+                    <SelectValue placeholder="Selecione um perfil para aplicar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLE_PRESETS.map((preset) => (
+                      <SelectItem key={preset.id} value={preset.id} data-testid={`add-preset-${preset.id}`}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{preset.label}</span>
+                          <span className="text-xs text-muted-foreground">{preset.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  data-testid="button-add-select-all"
+                >
+                  Selecionar Todas
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDeselectAll}
+                  data-testid="button-add-deselect-all"
+                >
+                  Desmarcar Todas
+                </Button>
+                <div className="ml-auto text-sm text-muted-foreground">
+                  {selectedRoutes.length} de {AVAILABLE_ROUTES.length} selecionadas
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                {Object.entries(
+                  AVAILABLE_ROUTES.reduce((acc, route) => {
+                    if (!acc[route.category]) acc[route.category] = [];
+                    acc[route.category].push(route);
+                    return acc;
+                  }, {} as Record<string, typeof AVAILABLE_ROUTES>)
+                ).map(([category, routes]) => (
+                  <div key={category}>
+                    <h4 className="text-sm font-semibold text-muted-foreground mb-3">{category}</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {routes.map((route) => (
+                        <div key={route.path} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`add-route-${route.path}`}
+                            checked={selectedRoutes.includes(route.path)}
+                            onCheckedChange={() => handleToggleRoute(route.path)}
+                            data-testid={`add-checkbox-${route.path}`}
+                          />
+                          <Label
+                            htmlFor={`add-route-${route.path}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {route.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => handleOpenChange(false)}
+            data-testid="button-add-cancel"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={createUserMutation.isPending}
+            data-testid="button-add-save"
+          >
+            {createUserMutation.isPending ? "Criando..." : "Criar Usuário"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SortableTableHead({ 
+  column, 
+  label, 
+  sortColumn, 
+  sortDirection, 
+  onSort 
+}: { 
+  column: SortColumn;
+  label: string;
+  sortColumn: SortColumn | null;
+  sortDirection: SortDirection;
+  onSort: (column: SortColumn) => void;
+}) {
+  const isActive = sortColumn === column;
+  
+  return (
+    <TableHead 
+      className="cursor-pointer select-none hover-elevate"
+      onClick={() => onSort(column)}
+      data-testid={`th-sort-${column}`}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {isActive ? (
+          sortDirection === 'asc' ? (
+            <ArrowUp className="h-4 w-4" />
+          ) : (
+            <ArrowDown className="h-4 w-4" />
+          )
+        ) : (
+          <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+        )}
+      </div>
+    </TableHead>
+  );
+}
+
 export default function AdminUsuarios() {
   useSetPageInfo("Gerenciar Usuários", "Controle de acesso e permissões de usuários");
   
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const { toast } = useToast();
 
   const { data, isLoading, error } = useQuery<DebugData>({
@@ -443,6 +765,49 @@ export default function AdminUsuarios() {
     const newRole = user.role === 'admin' ? 'user' : 'admin';
     toggleRoleMutation.mutate({ userId: user.id, newRole });
   };
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedUsers = useMemo(() => {
+    if (!data?.users || !sortColumn) return data?.users || [];
+    
+    return [...data.users].sort((a, b) => {
+      let compareA: string | number;
+      let compareB: string | number;
+      
+      switch (sortColumn) {
+        case 'name':
+          compareA = a.name?.toLowerCase() || '';
+          compareB = b.name?.toLowerCase() || '';
+          break;
+        case 'email':
+          compareA = a.email?.toLowerCase() || '';
+          compareB = b.email?.toLowerCase() || '';
+          break;
+        case 'role':
+          compareA = a.role || 'user';
+          compareB = b.role || 'user';
+          break;
+        case 'allowedRoutes':
+          compareA = a.role === 'admin' ? Infinity : (a.allowedRoutes?.length || 0);
+          compareB = b.role === 'admin' ? Infinity : (b.allowedRoutes?.length || 0);
+          break;
+        default:
+          return 0;
+      }
+      
+      if (compareA < compareB) return sortDirection === 'asc' ? -1 : 1;
+      if (compareA > compareB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [data?.users, sortColumn, sortDirection]);
 
   if (isLoading) {
     return (
@@ -541,14 +906,20 @@ export default function AdminUsuarios() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Usuários Cadastrados</CardTitle>
-          <CardDescription>
-            Gerencie permissões e controle de acesso dos usuários
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Usuários Cadastrados</CardTitle>
+            <CardDescription>
+              Gerencie permissões e controle de acesso dos usuários
+            </CardDescription>
+          </div>
+          <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-user">
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Usuário
+          </Button>
         </CardHeader>
         <CardContent>
-          {users.length === 0 ? (
+          {sortedUsers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Nenhum usuário cadastrado ainda</p>
@@ -557,16 +928,40 @@ export default function AdminUsuarios() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Email</TableHead>
+                  <SortableTableHead 
+                    column="name" 
+                    label="Usuário" 
+                    sortColumn={sortColumn} 
+                    sortDirection={sortDirection} 
+                    onSort={handleSort} 
+                  />
+                  <SortableTableHead 
+                    column="email" 
+                    label="Email" 
+                    sortColumn={sortColumn} 
+                    sortDirection={sortDirection} 
+                    onSort={handleSort} 
+                  />
                   <TableHead>Colaborador</TableHead>
-                  <TableHead>Função</TableHead>
-                  <TableHead>Páginas Permitidas</TableHead>
+                  <SortableTableHead 
+                    column="role" 
+                    label="Função" 
+                    sortColumn={sortColumn} 
+                    sortDirection={sortDirection} 
+                    onSort={handleSort} 
+                  />
+                  <SortableTableHead 
+                    column="allowedRoutes" 
+                    label="Páginas Permitidas" 
+                    sortColumn={sortColumn} 
+                    sortDirection={sortDirection} 
+                    onSort={handleSort} 
+                  />
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
+                {sortedUsers.map((user) => (
                   <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -650,6 +1045,11 @@ export default function AdminUsuarios() {
           onToggleRole={handleToggleRole}
         />
       )}
+
+      <AddUserDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+      />
     </div>
   );
 }

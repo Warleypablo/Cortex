@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertColaboradorSchema, insertPatrimonioSchema, insertRhCargoSchema, insertRhNivelSchema, insertRhSquadSchema, insertRhPromocaoSchema } from "@shared/schema";
 import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
-import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole } from "./auth/userDb";
+import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser } from "./auth/userDb";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { analyzeDfc, chatWithDfc, type ChatMessage } from "./services/dfcAnalysis";
@@ -389,6 +389,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error updating role:", error);
       res.status(500).json({ error: "Failed to update role" });
+    }
+  });
+
+  app.post("/api/auth/users", isAdmin, async (req, res) => {
+    try {
+      const { name, email, role, allowedRoutes } = req.body;
+
+      if (!name || typeof name !== 'string') {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ error: "Email é obrigatório" });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      const validDomains = ['@turbopartners.com.br', '@gmail.com'];
+      const isValidEmail = validDomains.some(domain => normalizedEmail.endsWith(domain));
+      
+      if (!isValidEmail) {
+        return res.status(400).json({ error: "Email deve terminar com @turbopartners.com.br ou @gmail.com" });
+      }
+
+      if (role !== 'admin' && role !== 'user') {
+        return res.status(400).json({ error: "Role deve ser 'admin' ou 'user'" });
+      }
+
+      const newUser = await createManualUser({
+        name: name.trim(),
+        email: normalizedEmail,
+        role,
+        allowedRoutes: Array.isArray(allowedRoutes) ? allowedRoutes : [],
+      });
+
+      res.status(201).json(newUser);
+    } catch (error: any) {
+      console.error("[api] Error creating user:", error);
+      res.status(500).json({ error: error.message || "Failed to create user" });
     }
   });
 
@@ -1193,7 +1231,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validation.success) {
         return res.status(400).json({ error: "Invalid data", details: validation.error });
       }
-      const colaboradorAtualizado = await storage.updateColaborador(id, validation.data);
+      const user = req.user as { email?: string } | undefined;
+      const criadoPor = user?.email || null;
+      const colaboradorAtualizado = await storage.updateColaborador(id, validation.data, criadoPor || undefined);
       res.json(colaboradorAtualizado);
     } catch (error) {
       console.error("[api] Error updating colaborador:", error);

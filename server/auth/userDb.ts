@@ -371,3 +371,45 @@ export async function listAllKeys(): Promise<string[]> {
   const users = await getAllUsers();
   return users.map(u => `user:${u.id}`);
 }
+
+export async function createManualUser(data: {
+  name: string;
+  email: string;
+  role: 'admin' | 'user';
+  allowedRoutes: string[];
+}): Promise<User> {
+  const normalizedEmail = data.email.toLowerCase().trim();
+  
+  const existingUsers = await db
+    .select()
+    .from(authUsers)
+    .where(eq(authUsers.email, normalizedEmail));
+  
+  if (existingUsers.length > 0) {
+    throw new Error(`Usuário com email ${normalizedEmail} já existe`);
+  }
+  
+  const userId = `manual-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+  const routes = data.role === 'admin' ? ALL_ROUTES : data.allowedRoutes;
+  
+  const newUserData = {
+    id: userId,
+    googleId: `manual-${normalizedEmail}`,
+    email: normalizedEmail,
+    name: data.name,
+    picture: '',
+    role: data.role,
+    allowedRoutes: routes,
+  };
+  
+  await db.insert(authUsers).values(newUserData);
+  
+  const newUser: User = {
+    ...newUserData,
+    createdAt: new Date().toISOString(),
+  };
+  
+  setCachedUser(newUser);
+  console.log(`✅ Novo usuário manual criado: ${normalizedEmail}`);
+  return newUser;
+}
