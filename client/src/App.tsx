@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -9,6 +9,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import TopBar from "@/components/TopBar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { PageProvider } from "@/contexts/PageContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import { AssistantWidget } from "@/components/AssistantWidget";
 
@@ -88,31 +89,14 @@ function PageSkeleton() {
   );
 }
 
-interface User {
-  id: string;
-  googleId: string;
-  email: string;
-  name: string;
-  picture: string;
-  createdAt: string;
-  role: 'admin' | 'user';
-  allowedRoutes: string[];
-}
-
 function ProtectedRoute({ path, component: Component }: { path: string; component: React.ComponentType }) {
-  const { data: user } = useQuery<User>({
-    queryKey: ["/api/auth/me"],
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
+  const { user, hasAccess } = useAuth();
 
   if (!user) {
     return <PageLoader />;
   }
 
-  const hasAccess = user.role === 'admin' || (user.allowedRoutes && user.allowedRoutes.includes(path));
-
-  if (!hasAccess) {
+  if (!hasAccess(path)) {
     return (
       <Suspense fallback={<PageLoader />}>
         <AccessDenied />
@@ -129,12 +113,7 @@ function ProtectedRoute({ path, component: Component }: { path: string; componen
 
 function ProtectedRouter() {
   const [location, setLocation] = useLocation();
-  
-  const { data: user, isLoading, error } = useQuery<User>({
-    queryKey: ["/api/auth/me"],
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
+  const { user, isLoading, error } = useAuth();
 
   useEffect(() => {
     if (!isLoading && (error || !user)) {
@@ -294,7 +273,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
-          <AppLayout />
+          <AuthProvider>
+            <AppLayout />
+          </AuthProvider>
           <Toaster />
         </TooltipProvider>
       </ThemeProvider>
