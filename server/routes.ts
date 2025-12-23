@@ -8861,29 +8861,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/acessos/credentials-by-cnpj/:cnpj", async (req, res) => {
     try {
       const { cnpj } = req.params;
+      // Normalize CNPJ for comparison (remove all non-digits)
+      const normalizedCnpj = cnpj.replace(/[^\d]/g, '');
       
       const result = await db.execute(sql`
-        SELECT c.*, cr.*
+        SELECT 
+          c.id as client_id,
+          c.name as client_name,
+          cr.id as credential_id,
+          cr.platform,
+          cr.username,
+          cr.password,
+          cr.access_url,
+          cr.observations
         FROM clients c
         INNER JOIN credentials cr ON c.id = cr.client_id
-        WHERE c.linked_client_cnpj = ${cnpj}
+        WHERE REGEXP_REPLACE(c.linked_client_cnpj, '[^0-9]', '', 'g') = ${normalizedCnpj}
+           OR LOWER(TRIM(c.name)) = (
+             SELECT LOWER(TRIM(nome)) FROM caz_clientes 
+             WHERE REGEXP_REPLACE(cnpj, '[^0-9]', '', 'g') = ${normalizedCnpj}
+             LIMIT 1
+           )
         ORDER BY cr.platform
       `);
       
       const grouped: { [key: string]: any } = {};
       
       for (const row of result.rows as any[]) {
-        const clientId = row.id;
+        const clientId = row.client_id;
         if (!grouped[clientId]) {
           grouped[clientId] = {
-            id: row.id,
-            name: row.name,
+            id: clientId,
+            name: row.client_name,
             credentials: []
           };
         }
-        if (row.client_id) {
+        if (row.credential_id) {
           grouped[clientId].credentials.push({
-            id: row.id,
+            id: row.credential_id,
             platform: row.platform,
             username: row.username,
             password: row.password,
