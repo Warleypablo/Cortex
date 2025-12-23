@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { usePageInfo } from "@/contexts/PageContext";
-import { ArrowLeft, Package, User, DollarSign, Info, Mail, Phone, Briefcase, Calendar, Check, ChevronsUpDown, UserPlus, X, Edit, Trash2, History } from "lucide-react";
+import { ArrowLeft, Package, User, DollarSign, Info, Mail, Phone, Briefcase, Calendar, Check, ChevronsUpDown, UserPlus, X, Edit, Trash2, History, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,7 @@ interface PatrimonioComResponsavel {
   valorMercado: string | null;
   valorVenda: string | null;
   descricao: string | null;
+  senhaAtivo: string | null;
   colaborador?: Colaborador;
 }
 
@@ -86,6 +87,7 @@ const editPatrimonioSchema = z.object({
   descricao: z.string().optional(),
   valorPago: z.string().optional(),
   valorMercado: z.string().optional(),
+  senhaAtivo: z.string().optional(),
 });
 
 type EditPatrimonioForm = z.infer<typeof editPatrimonioSchema>;
@@ -138,6 +140,7 @@ export default function PatrimonioDetail() {
       descricao: "",
       valorPago: "",
       valorMercado: "",
+      senhaAtivo: "",
     },
   });
 
@@ -151,6 +154,7 @@ export default function PatrimonioDetail() {
         descricao: patrimonio.descricao || "",
         valorPago: patrimonio.valorPago || "",
         valorMercado: patrimonio.valorMercado || "",
+        senhaAtivo: patrimonio.senhaAtivo || "",
       });
     }
   }, [patrimonio, editDialogOpen, form]);
@@ -164,6 +168,7 @@ export default function PatrimonioDetail() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/patrimonio", patrimonioId] });
       qc.invalidateQueries({ queryKey: ["/api/patrimonio"] });
+      qc.invalidateQueries({ queryKey: ["/api/patrimonio", patrimonioId, "historico"] });
       toast({
         title: "Responsável atualizado",
         description: "O responsável pelo patrimônio foi atualizado com sucesso.",
@@ -445,6 +450,16 @@ export default function PatrimonioDetail() {
                     <div className="text-sm font-medium text-muted-foreground">Modelo / Descrição</div>
                     <div className="text-base whitespace-pre-wrap" data-testid="descricao-bem">
                       {patrimonio.descricao || "Nenhuma descrição disponível"}
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <Lock className="h-4 w-4" />
+                      Senha do Ativo
+                    </div>
+                    <div className="text-base font-mono" data-testid="senha-ativo">
+                      {patrimonio.senhaAtivo || "-"}
                     </div>
                   </div>
                 </CardContent>
@@ -820,6 +835,22 @@ export default function PatrimonioDetail() {
                   )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="senhaAtivo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Lock className="h-4 w-4" />
+                      Senha do Ativo
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: 123456" {...field} data-testid="input-senha-ativo" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <DialogFooter>
                 <Button
                   type="button"

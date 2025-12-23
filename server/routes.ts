@@ -1276,6 +1276,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const patrimonio = await storage.updatePatrimonioResponsavel(id, responsavelNome);
+      
+      const acao = responsavelNome === null 
+        ? "Responsável removido" 
+        : `Atribuído a ${responsavelNome}`;
+      const usuario = (req as any).user?.name || "Sistema";
+      
+      await storage.createPatrimonioHistorico({
+        patrimonioId: id,
+        acao,
+        usuario,
+        data: new Date(),
+      });
+      
       res.json(patrimonio);
     } catch (error) {
       console.error("[api] Error updating patrimonio responsavel:", error);
@@ -1323,7 +1336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid patrimonio ID" });
       }
       
-      const { numeroAtivo, ativo, marca, estadoConservacao, descricao, valorPago, valorMercado } = req.body;
+      const { numeroAtivo, ativo, marca, estadoConservacao, descricao, valorPago, valorMercado, senhaAtivo } = req.body;
       
       const updateData: Record<string, string | null> = {};
       if (numeroAtivo !== undefined) updateData.numeroAtivo = numeroAtivo || null;
@@ -1333,6 +1346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (descricao !== undefined) updateData.descricao = descricao || null;
       if (valorPago !== undefined) updateData.valorPago = valorPago || null;
       if (valorMercado !== undefined) updateData.valorMercado = valorMercado || null;
+      if (senhaAtivo !== undefined) updateData.senhaAtivo = senhaAtivo || null;
       
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ error: "No fields to update" });
