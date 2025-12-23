@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, Activity, BookOpen } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
-import turboLogoLight from "@assets/Logo_(12)_1766085175718.png";
-import turboLogoDark from "@assets/Logo_(11)_1766084062617.png";
+import turboLogoLight from "@assets/logo-preta_1766452973532.png";
+import turboLogoDark from "@assets/logo-branca_1766452973531.png";
 import {
   Sidebar,
   SidebarContent,
@@ -16,6 +16,7 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
   SidebarHeader,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useLocation, Link } from "wouter";
@@ -179,6 +180,8 @@ const adminItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { theme } = useTheme();
+  const { state, setOpen } = useSidebar();
+  const isCollapsed = state === "collapsed";
   const turboLogo = theme === "dark" ? turboLogoDark : turboLogoLight;
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -202,15 +205,31 @@ export function AppSidebar() {
   const visibleAdminItems = adminItems.filter((item) => hasAccess(item.url));
 
   const toggleCategory = (title: string) => {
+    if (isCollapsed) {
+      setOpen(true);
+    }
     setOpenCategories(prev => ({ ...prev, [title]: !prev[title] }));
   };
 
+  const handleItemClick = () => {
+    if (isCollapsed) {
+      setOpen(true);
+    }
+  };
+
   return (
-    <Sidebar>
-      <SidebarHeader className="border-b border-sidebar-border px-6 py-5">
-        <div className="flex flex-col items-start gap-1">
+    <Sidebar collapsible="icon">
+      <SidebarHeader 
+        className="border-b border-sidebar-border px-6 py-5 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-3 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:cursor-pointer"
+        onClick={() => isCollapsed && setOpen(true)}
+        data-testid="sidebar-header"
+      >
+        <div className="flex flex-col items-start gap-1 group-data-[collapsible=icon]:hidden">
           <img src={turboLogo} alt="Turbo" className="h-6 w-auto" />
           <span className="text-sm font-medium text-muted-foreground">Cortex</span>
+        </div>
+        <div className="hidden group-data-[collapsible=icon]:block">
+          <img src={turboLogo} alt="Turbo" className="h-8 w-8 object-contain" />
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -252,7 +271,7 @@ export function AppSidebar() {
                                 isActive={location === item.url}
                                 data-testid={`nav-${category.title.toLowerCase()}-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
                               >
-                                <Link href={item.url}>
+                                <Link href={item.url} onClick={handleItemClick}>
                                   <item.icon className="w-4 h-4" />
                                   <span>{item.title}</span>
                                 </Link>
@@ -280,7 +299,7 @@ export function AppSidebar() {
                     isActive={location === item.url || (item.url === "/clientes" && (location === "/" || location === "/contratos"))}
                     data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
                   >
-                    <Link href={item.url}>
+                    <Link href={item.url} onClick={handleItemClick}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
@@ -303,7 +322,7 @@ export function AppSidebar() {
                       isActive={location === item.url}
                       data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
                     >
-                      <Link href={item.url}>
+                      <Link href={item.url} onClick={handleItemClick}>
                         <item.icon />
                         <span>{item.title}</span>
                       </Link>
