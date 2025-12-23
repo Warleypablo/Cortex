@@ -8460,7 +8460,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const normalizedCnpj = row.linked_client_cnpj.toLowerCase().replace(/[^\d]/g, '');
           const cazData = cazStatusMap.get(normalizedCnpj);
           if (cazData) {
-            status = (cazData.ativo === 'Ativo' || cazData.ativo === 'ativo') ? 'ativo' : 'cancelado';
+            // Check if ativo field indicates active status (case-insensitive)
+            const ativoValue = String(cazData.ativo || '').toLowerCase().trim();
+            status = (ativoValue === 'ativo' || ativoValue === 'sim' || ativoValue === 'true' || ativoValue === '1') ? 'ativo' : 'cancelado';
             cazClienteId = cazData.id;
           }
         }
