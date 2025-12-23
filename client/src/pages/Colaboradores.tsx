@@ -1796,7 +1796,7 @@ export default function Colaboradores() {
                           </TableCell>
                           <TableCell className="py-3">
                             <Badge
-                              variant={colaborador.status === "Ativo" ? "default" : "secondary"}
+                              variant={colaborador.status === "Ativo" ? "default" : colaborador.status === "Dispensado" ? "destructive" : "secondary"}
                               data-testid={`badge-status-${colaborador.id}`}
                             >
                               {colaborador.status || "Desconhecido"}
