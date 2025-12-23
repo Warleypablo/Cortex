@@ -1985,8 +1985,9 @@ function ClientsTab() {
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
-  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortField, setSortField] = useState<SortField>('status');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [showOnlyLinked, setShowOnlyLinked] = useState(true);
   const { toast } = useToast();
   const createLog = useCreateLog();
 
@@ -2067,6 +2068,8 @@ function ClientsTab() {
 
   const sortedAndFilteredClients = useMemo(() => {
     let filtered = clients;
+    
+    // Ao buscar, ignora o filtro de linkados
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = clients.filter(
@@ -2074,7 +2077,16 @@ function ClientsTab() {
           client.name?.toLowerCase().includes(query) ||
           client.cnpj?.toLowerCase().includes(query)
       );
+    } else if (showOnlyLinked) {
+      // Mostra apenas clientes linkados (que têm cazClienteId)
+      filtered = clients.filter((client) => client.cazClienteId != null);
     }
+    
+    // Definir ordem de status: ativo primeiro, depois cancelado
+    const statusOrder: Record<string, number> = {
+      'ativo': 0,
+      'cancelado': 1,
+    };
     
     return [...filtered].sort((a, b) => {
       const aIsTurbo = isTurboClient(a.name);
@@ -2092,8 +2104,9 @@ function ClientsTab() {
           bVal = b.name?.toLowerCase() || '';
           break;
         case 'status':
-          aVal = a.status || 'ativo';
-          bVal = b.status || 'ativo';
+          // Ordenar por prioridade de status (ativos primeiro)
+          aVal = statusOrder[a.status || 'ativo'] ?? 99;
+          bVal = statusOrder[b.status || 'ativo'] ?? 99;
           break;
         case 'credential_count':
           aVal = a.credential_count || 0;
@@ -2111,7 +2124,7 @@ function ClientsTab() {
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [clients, searchQuery, sortField, sortDirection]);
+  }, [clients, searchQuery, sortField, sortDirection, showOnlyLinked]);
 
   const toggleExpand = (clientId: string) => {
     setExpandedClient(expandedClient === clientId ? null : clientId);
@@ -2138,10 +2151,13 @@ function ClientsTab() {
     );
   }
 
+  const linkedCount = clients.filter(c => c.cazClienteId != null).length;
+  const totalCount = clients.length;
+
   return (
     <>
-      <div className="mb-4">
-        <div className="relative">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             placeholder="Buscar por empresa..."
@@ -2151,18 +2167,60 @@ function ClientsTab() {
             data-testid="input-search-clients"
           />
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={showOnlyLinked && !searchQuery ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowOnlyLinked(true)}
+            disabled={!!searchQuery}
+            data-testid="filter-linked"
+          >
+            <Link2 className="w-4 h-4 mr-1.5" />
+            Linkados ({linkedCount})
+          </Button>
+          <Button
+            variant={!showOnlyLinked && !searchQuery ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowOnlyLinked(false)}
+            disabled={!!searchQuery}
+            data-testid="filter-all"
+          >
+            Todos ({totalCount})
+          </Button>
+        </div>
       </div>
+
+      {searchQuery && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Buscando por "{searchQuery}" em todos os clientes</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2"
+            onClick={() => setSearchQuery("")}
+          >
+            <X className="w-3 h-3 mr-1" />
+            Limpar
+          </Button>
+        </div>
+      )}
 
       {sortedAndFilteredClients.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Building2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium">
-            {searchQuery ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
+            {searchQuery 
+              ? "Nenhum cliente encontrado" 
+              : showOnlyLinked 
+                ? "Nenhum cliente linkado" 
+                : "Nenhum cliente cadastrado"}
           </p>
           <p className="text-sm">
             {searchQuery 
               ? "Tente buscar por outro termo" 
-              : "Adicione seu primeiro cliente clicando no botão acima"}
+              : showOnlyLinked
+                ? "Use a aba 'Vincular Clientes' para linkar clientes do Turbo Partners"
+                : "Adicione seu primeiro cliente clicando no botão acima"}
           </p>
         </div>
       ) : (
