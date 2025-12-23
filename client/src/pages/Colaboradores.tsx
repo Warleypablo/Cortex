@@ -199,6 +199,22 @@ function calcularTempoTurbo(admissao: string | Date | null | undefined, demissao
   return `${formatted} ${diffMonths === 1 ? "mês" : "meses"}`;
 }
 
+function calcularMesesDesdeUltimoAumento(ultimoAumento: string | Date | null | undefined): number | null {
+  if (!ultimoAumento) return null;
+  try {
+    const ultimoAumentoDate = new Date(ultimoAumento);
+    ultimoAumentoDate.setHours(0, 0, 0, 0);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const diffTime = hoje.getTime() - ultimoAumentoDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffMonths = diffDays / 30;
+    return diffMonths > 0 ? Math.round(diffMonths * 10) / 10 : 0;
+  } catch {
+    return null;
+  }
+}
+
 function FilterDialog({
   filters,
   onApplyFilters,
@@ -1989,6 +2005,7 @@ export default function Colaboradores() {
                           {getSortIcon('tempoTurbo')}
                         </div>
                       </TableHead>
+                      <TableHead className="min-w-[140px] bg-muted/50">Último Aumento</TableHead>
                       <TableHead className="min-w-[150px] bg-muted/50">Patrimônios</TableHead>
                       <TableHead className="min-w-[280px] bg-muted/50">Contatos</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">CPF</TableHead>
@@ -1996,7 +2013,6 @@ export default function Colaboradores() {
                       <TableHead className="min-w-[180px] bg-muted/50">PIX</TableHead>
                       <TableHead className="min-w-[200px] bg-muted/50">Localização</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">Admissão</TableHead>
-                      <TableHead className="min-w-[140px] bg-muted/50">Último Aumento</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">Demissão</TableHead>
                       <TableHead className="min-w-[200px] bg-muted/50">Motivo Demissão</TableHead>
                       <TableHead className="min-w-[120px] sticky right-0 bg-muted/50">Ações</TableHead>
@@ -2106,6 +2122,27 @@ export default function Colaboradores() {
                             </div>
                           </TableCell>
                           <TableCell className="py-3">
+                            <div className="space-y-1">
+                              {colaborador.ultimoAumento ? (
+                                <>
+                                  <div className="text-sm text-muted-foreground" data-testid={`text-ultimo-aumento-${colaborador.id}`}>
+                                    {formatDate(colaborador.ultimoAumento)}
+                                  </div>
+                                  {(() => {
+                                    const meses = calcularMesesDesdeUltimoAumento(colaborador.ultimoAumento);
+                                    return meses !== null && (
+                                      <div className="text-xs text-muted-foreground" data-testid={`text-meses-ult-aumento-${colaborador.id}`}>
+                                        há {meses.toFixed(1).replace(".", ",")} {meses === 1 ? "mês" : "meses"}
+                                      </div>
+                                    );
+                                  })()}
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">-</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3">
                             <div className="flex flex-wrap gap-1" data-testid={`patrimonios-${colaborador.id}`}>
                               {colaborador.patrimonios && colaborador.patrimonios.length > 0 ? (
                                 colaborador.patrimonios.map((p) => (
@@ -2199,24 +2236,6 @@ export default function Colaboradores() {
                           <TableCell className="py-3">
                             <div className="text-sm text-muted-foreground" data-testid={`text-admissao-${colaborador.id}`}>
                               {formatDate(colaborador.admissao)}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="space-y-1">
-                              {colaborador.ultimoAumento ? (
-                                <>
-                                  <div className="text-sm text-muted-foreground" data-testid={`text-ultimo-aumento-${colaborador.id}`}>
-                                    {formatDate(colaborador.ultimoAumento)}
-                                  </div>
-                                  {colaborador.mesesUltAumento !== null && colaborador.mesesUltAumento !== undefined && (
-                                    <div className="text-xs text-muted-foreground" data-testid={`text-meses-ult-aumento-${colaborador.id}`}>
-                                      há {colaborador.mesesUltAumento} {colaborador.mesesUltAumento === 1 ? "mês" : "meses"}
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
                             </div>
                           </TableCell>
                           <TableCell className="py-3">
