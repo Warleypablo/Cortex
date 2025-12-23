@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { ContratoCompleto } from "@shared/schema";
 
@@ -458,7 +458,7 @@ export default function ClientDetail() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatsCard
             title="Receita Total"
             value={new Intl.NumberFormat('pt-BR', { 
@@ -467,6 +467,7 @@ export default function ClientDetail() {
               minimumFractionDigits: 0
             }).format(totalReceitas)}
             icon={DollarSign}
+            variant="success"
           />
           <StatsCard
             title="Ticket Médio"
@@ -476,11 +477,20 @@ export default function ClientDetail() {
               minimumFractionDigits: 0
             }).format(ticketMedio)}
             icon={TrendingUp}
+            variant="info"
           />
           <StatsCard
             title="LT"
-            value={lt.toString()}
+            value={`${lt} meses`}
             icon={Receipt}
+            variant="default"
+          />
+          <StatsCard
+            title="Status"
+            value={temContratoAtivo ? "Ativo" : "Inativo"}
+            icon={Activity}
+            variant="status"
+            statusActive={temContratoAtivo}
           />
         </div>
 
