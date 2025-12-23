@@ -8460,7 +8460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const normalizedCnpj = row.linked_client_cnpj.toLowerCase().replace(/[^\d]/g, '');
           const cazData = cazStatusMap.get(normalizedCnpj);
           if (cazData) {
-            status = (cazData.ativo && typeof cazData.ativo === 'string' && cazData.ativo.toLowerCase() === 'ativo') ? 'ativo' : 'cancelado';
+            status = (cazData.ativo === 'Ativo' || cazData.ativo === 'ativo') ? 'ativo' : 'cancelado';
             cazClienteId = cazData.id;
           }
         }
