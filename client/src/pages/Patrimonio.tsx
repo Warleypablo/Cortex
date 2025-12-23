@@ -1113,26 +1113,6 @@ export default function Patrimonio() {
                           <TableRow>
                             <TableHead 
                               className="cursor-pointer hover:bg-muted/50 select-none"
-                              onClick={() => handleTelefoneSort("conta")}
-                              data-testid="th-conta"
-                            >
-                              <div className="flex items-center">
-                                Conta
-                                {getTelefoneSortIcon("conta")}
-                              </div>
-                            </TableHead>
-                            <TableHead 
-                              className="cursor-pointer hover:bg-muted/50 select-none"
-                              onClick={() => handleTelefoneSort("planoOperadora")}
-                              data-testid="th-plano"
-                            >
-                              <div className="flex items-center">
-                                Plano/Operadora
-                                {getTelefoneSortIcon("planoOperadora")}
-                              </div>
-                            </TableHead>
-                            <TableHead 
-                              className="cursor-pointer hover:bg-muted/50 select-none"
                               onClick={() => handleTelefoneSort("telefone")}
                               data-testid="th-telefone"
                             >
@@ -1149,6 +1129,36 @@ export default function Patrimonio() {
                               <div className="flex items-center">
                                 Responsável
                                 {getTelefoneSortIcon("responsavelNome")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleTelefoneSort("status")}
+                              data-testid="th-status"
+                            >
+                              <div className="flex items-center">
+                                Status
+                                {getTelefoneSortIcon("status")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleTelefoneSort("conta")}
+                              data-testid="th-conta"
+                            >
+                              <div className="flex items-center">
+                                Conta
+                                {getTelefoneSortIcon("conta")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleTelefoneSort("planoOperadora")}
+                              data-testid="th-plano"
+                            >
+                              <div className="flex items-center">
+                                Plano/Operadora
+                                {getTelefoneSortIcon("planoOperadora")}
                               </div>
                             </TableHead>
                             <TableHead 
@@ -1171,16 +1181,6 @@ export default function Patrimonio() {
                                 {getTelefoneSortIcon("ultimaRecarga")}
                               </div>
                             </TableHead>
-                            <TableHead 
-                              className="cursor-pointer hover:bg-muted/50 select-none"
-                              onClick={() => handleTelefoneSort("status")}
-                              data-testid="th-status"
-                            >
-                              <div className="flex items-center">
-                                Status
-                                {getTelefoneSortIcon("status")}
-                              </div>
-                            </TableHead>
                             <TableHead className="w-[60px]">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1194,18 +1194,6 @@ export default function Patrimonio() {
                           ) : (
                             filteredTelefones.map((telefone) => (
                               <TableRow key={telefone.id} data-testid={`row-telefone-${telefone.id}`}>
-                                <TableCell className="font-mono text-sm" data-testid={`text-conta-${telefone.id}`}>
-                                  {telefone.conta || "-"}
-                                </TableCell>
-                                <TableCell>
-                                  {telefone.planoOperadora ? (
-                                    <Badge className={getPlanoColor(telefone.planoOperadora)} data-testid={`badge-plano-${telefone.id}`}>
-                                      {telefone.planoOperadora}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground">-</span>
-                                  )}
-                                </TableCell>
                                 <TableCell className="font-medium" data-testid={`text-telefone-${telefone.id}`}>
                                   {telefone.telefone}
                                 </TableCell>
@@ -1222,16 +1210,28 @@ export default function Patrimonio() {
                                     telefone.responsavelNome || "-"
                                   )}
                                 </TableCell>
+                                <TableCell>
+                                  <Badge className={getStatusColor(telefone.status)} data-testid={`badge-status-${telefone.id}`}>
+                                    {telefone.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="font-mono text-sm" data-testid={`text-conta-${telefone.id}`}>
+                                  {telefone.conta || "-"}
+                                </TableCell>
+                                <TableCell>
+                                  {telefone.planoOperadora ? (
+                                    <Badge className={getPlanoColor(telefone.planoOperadora)} data-testid={`badge-plano-${telefone.id}`}>
+                                      {telefone.planoOperadora}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </TableCell>
                                 <TableCell data-testid={`text-setor-${telefone.id}`}>
                                   {telefone.setor}
                                 </TableCell>
                                 <TableCell data-testid={`text-recarga-${telefone.id}`}>
                                   {formatDate(telefone.ultimaRecarga)}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={getStatusColor(telefone.status)} data-testid={`badge-status-${telefone.id}`}>
-                                    {telefone.status}
-                                  </Badge>
                                 </TableCell>
                                 <TableCell>
                                   <Button
