@@ -1418,6 +1418,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============ Telefones (Linhas Telefônicas) Endpoints ============
+  app.get("/api/telefones", async (req, res) => {
+    try {
+      const telefones = await storage.getTelefones();
+      res.json(telefones);
+    } catch (error) {
+      console.error("[api] Error fetching telefones:", error);
+      res.status(500).json({ error: "Failed to fetch telefones" });
+    }
+  });
+
+  app.get("/api/telefones/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid telefone ID" });
+      }
+      const telefone = await storage.getTelefoneById(id);
+      if (!telefone) {
+        return res.status(404).json({ error: "Telefone not found" });
+      }
+      res.json(telefone);
+    } catch (error) {
+      console.error("[api] Error fetching telefone by id:", error);
+      res.status(500).json({ error: "Failed to fetch telefone" });
+    }
+  });
+
+  app.patch("/api/telefones/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid telefone ID" });
+      }
+      
+      const { responsavelNome, responsavelId, ultimaRecarga, status } = req.body;
+      
+      const updateData: Record<string, string | number | null> = {};
+      if (responsavelNome !== undefined) updateData.responsavelNome = responsavelNome || null;
+      if (responsavelId !== undefined) updateData.responsavelId = responsavelId || null;
+      if (ultimaRecarga !== undefined) updateData.ultimaRecarga = ultimaRecarga || null;
+      if (status !== undefined) updateData.status = status || null;
+      
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "No fields to update" });
+      }
+      
+      const telefone = await storage.updateTelefone(id, updateData);
+      res.json(telefone);
+    } catch (error) {
+      console.error("[api] Error updating telefone:", error);
+      res.status(500).json({ error: "Failed to update telefone" });
+    }
+  });
+
   // ============ RH Cargos Endpoints ============
   // Default options when table is empty or doesn't exist
   const defaultCargos = [
