@@ -198,6 +198,15 @@ export default function DashboardGeG() {
     return `${meses[parseInt(mes) - 1]}/${ano.slice(2)}`;
   };
 
+  const formatDecimal = (value: number): string => {
+    if (Number.isInteger(value)) return value.toString();
+    const rounded = Math.round(value * 100) / 100;
+    if (Number.isInteger(rounded)) return rounded.toString();
+    const formatted = rounded.toFixed(2);
+    if (formatted.endsWith('0')) return rounded.toFixed(1);
+    return formatted;
+  };
+
   const formatData = (data: string) => {
     const date = new Date(data);
     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
@@ -688,7 +697,7 @@ export default function DashboardGeG() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" label={{ value: 'Meses', position: 'insideBottom', offset: -5 }} />
                   <YAxis type="category" dataKey="squad" width={150} />
-                  <Tooltip />
+                  <Tooltip formatter={(value: number) => formatDecimal(value)} />
                   <Legend />
                   <Bar dataKey="tempoMedioMeses" name="Tempo Médio (meses)" fill="#8b5cf6" />
                 </BarChart>
