@@ -222,28 +222,30 @@ export default function Clients() {
             title="Total de Clientes"
             value={String(kpis.totalClientes)}
             icon={Users}
-            subtitle="Total de clientes cadastrados no ClickUp"
+            subtitle="Quantidade de clientes cadastrados no ClickUp (ativos + inativos)"
+            tooltipType="help"
           />
           <StatsCard
             title="Clientes Ativos"
             value={String(kpis.clientesAtivos)}
             icon={UserCheck}
             variant="success"
-            subtitle={`${kpis.totalClientes > 0 ? formatPercent((kpis.clientesAtivos / kpis.totalClientes) * 100) : '0%'} do total de clientes`}
+            subtitle={`${kpis.totalClientes > 0 ? formatPercent((kpis.clientesAtivos / kpis.totalClientes) * 100) : '0%'} dos clientes estão com status Ativo, Onboarding ou Triagem`}
+            tooltipType="help"
           />
           <StatsCard
             title="LTV Médio"
             value={formatCurrencyNoDecimals(kpis.ltvMedio)}
             icon={TrendingUp}
             variant="info"
-            subtitle="Lifetime Value - receita total média por cliente"
+            subtitle="Soma de toda a receita paga dividida pelo número de clientes. Quanto maior, mais valor cada cliente gerou."
             tooltipType="help"
           />
           <StatsCard
             title="LT Médio"
-            value={`${formatDecimal(kpis.ltMedio)} meses`}
+            value={formatDecimal(kpis.ltMedio)}
             icon={Clock}
-            subtitle="Lifetime - média de meses com pagamento por cliente"
+            subtitle="Média de meses que os clientes permanecem pagando. Quanto maior, mais tempo de relacionamento."
             tooltipType="help"
           />
           <StatsCard
@@ -251,7 +253,7 @@ export default function Clients() {
             value={formatCurrencyNoDecimals(kpis.aov)}
             icon={DollarSign}
             variant="success"
-            subtitle="Average Order Value - ticket médio mensal por cliente"
+            subtitle="Ticket médio mensal por cliente. É o LTV dividido pelo LT (tempo de vida)."
             tooltipType="help"
           />
         </div>
