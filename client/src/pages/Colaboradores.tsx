@@ -1679,6 +1679,7 @@ export default function Colaboradores() {
                     <TableRow className="bg-muted/50 border-b">
                       <TableHead className="min-w-[80px] bg-muted/50">ID</TableHead>
                       <TableHead className="min-w-[220px] bg-muted/50">Colaborador</TableHead>
+                      <TableHead className="min-w-[100px] bg-muted/50">Status</TableHead>
                       <TableHead className="min-w-[180px] bg-muted/50">Cargo / Nível</TableHead>
                       <TableHead className="min-w-[140px] bg-muted/50">Squad</TableHead>
                       <TableHead className="min-w-[140px] bg-muted/50">Setor</TableHead>
@@ -1687,7 +1688,6 @@ export default function Colaboradores() {
                       <TableHead className="min-w-[140px] bg-muted/50">CNPJ</TableHead>
                       <TableHead className="min-w-[180px] bg-muted/50">PIX</TableHead>
                       <TableHead className="min-w-[200px] bg-muted/50">Localização</TableHead>
-                      <TableHead className="min-w-[100px] bg-muted/50">Status</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">Admissão</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">Demissão</TableHead>
                       <TableHead className="min-w-[200px] bg-muted/50">Motivo Demissão</TableHead>
@@ -1750,6 +1750,14 @@ export default function Colaboradores() {
                                 )}
                               </div>
                             </div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <Badge
+                              variant={colaborador.status === "Ativo" ? "default" : "secondary"}
+                              data-testid={`badge-status-${colaborador.id}`}
+                            >
+                              {colaborador.status || "Desconhecido"}
+                            </Badge>
                           </TableCell>
                           <TableCell className="py-3">
                             <div className="space-y-1">
@@ -1852,14 +1860,6 @@ export default function Colaboradores() {
                                 <span className="text-muted-foreground text-sm">-</span>
                               )}
                             </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <Badge
-                              variant={colaborador.status === "Ativo" ? "default" : "secondary"}
-                              data-testid={`badge-status-${colaborador.id}`}
-                            >
-                              {colaborador.status || "Desconhecido"}
-                            </Badge>
                           </TableCell>
                           <TableCell className="py-3">
                             <div className="text-sm text-muted-foreground" data-testid={`text-admissao-${colaborador.id}`}>
