@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Search, Package, Filter, ChevronUp, ChevronDown, 
-  DollarSign, TrendingUp, CheckCircle, X, Users, Phone
+  DollarSign, TrendingUp, CheckCircle, X, Users, Phone, Pencil
 } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,17 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Telefone } from "@shared/schema";
 
 interface PatrimonioDb {
@@ -49,6 +60,7 @@ interface PatrimonioDb {
 
 type SortField = "numeroAtivo" | "ativo" | "marca" | "descricao" | "estadoConservacao" | "responsavelAtual" | "valorPago" | "valorMercado";
 type SortDirection = "asc" | "desc";
+type TelefonesSortField = "conta" | "planoOperadora" | "telefone" | "responsavelNome" | "setor" | "ultimaRecarga" | "status";
 
 export default function Patrimonio() {
   useSetPageInfo("Patrimônio", "Gerencie os bens e ativos da empresa");
@@ -69,6 +81,13 @@ export default function Patrimonio() {
   const [telefonesSearchQuery, setTelefonesSearchQuery] = useState("");
   const [filterSetor, setFilterSetor] = useState<string>("todos");
   const [filterPlano, setFilterPlano] = useState<string>("todos");
+  const [filterStatus, setFilterStatus] = useState<string>("todos");
+  const [telefonesSortField, setTelefonesSortField] = useState<TelefonesSortField | null>(null);
+  const [telefonesSortDirection, setTelefonesSortDirection] = useState<SortDirection>("asc");
+  const [editingTelefone, setEditingTelefone] = useState<Telefone | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  
+  const { toast } = useToast();
 
   const { data: patrimonios, isLoading, error } = useQuery<PatrimonioDb[]>({
     queryKey: ["/api/patrimonio"],
@@ -304,18 +323,39 @@ export default function Patrimonio() {
   const filteredTelefones = useMemo(() => {
     if (!telefones) return [];
     
-    return telefones.filter(t => {
+    let result = telefones.filter(t => {
       const matchesSearch = telefonesSearchQuery === "" ||
-        t.telefone.toLowerCase().includes(telefonesSearchQuery.toLowerCase()) ||
+        (t.telefone && t.telefone.toLowerCase().includes(telefonesSearchQuery.toLowerCase())) ||
         (t.responsavelNome && t.responsavelNome.toLowerCase().includes(telefonesSearchQuery.toLowerCase())) ||
         (t.conta && t.conta.toLowerCase().includes(telefonesSearchQuery.toLowerCase()));
       
       const matchesSetor = filterSetor === "todos" || t.setor === filterSetor;
       const matchesPlano = filterPlano === "todos" || t.planoOperadora === filterPlano;
+      const matchesStatus = filterStatus === "todos" || t.status === filterStatus;
       
-      return matchesSearch && matchesSetor && matchesPlano;
+      return matchesSearch && matchesSetor && matchesPlano && matchesStatus;
     });
-  }, [telefones, telefonesSearchQuery, filterSetor, filterPlano]);
+    
+    if (telefonesSortField) {
+      result = [...result].sort((a, b) => {
+        let valA: string = "";
+        let valB: string = "";
+        
+        if (telefonesSortField === "ultimaRecarga") {
+          valA = a.ultimaRecarga || "";
+          valB = b.ultimaRecarga || "";
+        } else {
+          valA = (a[telefonesSortField] || "") as string;
+          valB = (b[telefonesSortField] || "") as string;
+        }
+        
+        const comparison = valA.localeCompare(valB, 'pt-BR', { sensitivity: 'base' });
+        return telefonesSortDirection === "asc" ? comparison : -comparison;
+      });
+    }
+    
+    return result;
+  }, [telefones, telefonesSearchQuery, filterSetor, filterPlano, filterStatus, telefonesSortField, telefonesSortDirection]);
 
   const telefonesStats = useMemo(() => {
     if (!telefones) return { total: 0, ativos: 0, cancelados: 0, posTotal: 0, preTotal: 0 };
@@ -344,7 +384,7 @@ export default function Patrimonio() {
     return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     if (status === "Ativo") {
       return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
     }
@@ -365,9 +405,69 @@ export default function Patrimonio() {
     setTelefonesSearchQuery("");
     setFilterSetor("todos");
     setFilterPlano("todos");
+    setFilterStatus("todos");
   };
 
-  const hasTelefonesActiveFilters = filterSetor !== "todos" || filterPlano !== "todos" || telefonesSearchQuery !== "";
+  const hasTelefonesActiveFilters = filterSetor !== "todos" || filterPlano !== "todos" || filterStatus !== "todos" || telefonesSearchQuery !== "";
+
+  const handleTelefoneSort = (field: TelefonesSortField) => {
+    if (telefonesSortField === field) {
+      setTelefonesSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setTelefonesSortField(field);
+      setTelefonesSortDirection("asc");
+    }
+  };
+
+  const getTelefoneSortIcon = (field: TelefonesSortField) => {
+    if (telefonesSortField !== field) return null;
+    return telefonesSortDirection === "asc" 
+      ? <ChevronUp className="w-4 h-4 ml-1" />
+      : <ChevronDown className="w-4 h-4 ml-1" />;
+  };
+
+  const updateTelefoneMutation = useMutation({
+    mutationFn: async (data: { id: number; updates: Partial<Telefone> }) => {
+      return await apiRequest("PATCH", `/api/telefones/${data.id}`, data.updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/telefones"] });
+      setIsEditDialogOpen(false);
+      setEditingTelefone(null);
+      toast({
+        title: "Sucesso",
+        description: "Linha telefônica atualizada com sucesso.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar a linha telefônica.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditTelefone = (telefone: Telefone) => {
+    setEditingTelefone({ ...telefone });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEditTelefone = () => {
+    if (!editingTelefone) return;
+    updateTelefoneMutation.mutate({
+      id: editingTelefone.id,
+      updates: {
+        conta: editingTelefone.conta,
+        planoOperadora: editingTelefone.planoOperadora,
+        telefone: editingTelefone.telefone,
+        responsavelNome: editingTelefone.responsavelNome,
+        setor: editingTelefone.setor,
+        ultimaRecarga: editingTelefone.ultimaRecarga,
+        status: editingTelefone.status,
+      },
+    });
+  };
 
   const hasActiveFilters = filterTipoBem !== "todos" || filterEstado !== "todos" || filterMarca !== "todos" || searchQuery !== "";
 
@@ -952,6 +1052,17 @@ export default function Patrimonio() {
                       </SelectContent>
                     </Select>
 
+                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                      <SelectTrigger className="w-[150px]" data-testid="select-filter-status">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os status</SelectItem>
+                        <SelectItem value="Ativo">Ativo</SelectItem>
+                        <SelectItem value="Cancelado">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+
                     {hasTelefonesActiveFilters && (
                       <Button
                         variant="ghost"
@@ -976,19 +1087,83 @@ export default function Patrimonio() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Conta</TableHead>
-                            <TableHead>Plano/Operadora</TableHead>
-                            <TableHead>Telefone</TableHead>
-                            <TableHead>Responsável</TableHead>
-                            <TableHead>Setor</TableHead>
-                            <TableHead>Última Recarga</TableHead>
-                            <TableHead>Status</TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleTelefoneSort("conta")}
+                              data-testid="th-conta"
+                            >
+                              <div className="flex items-center">
+                                Conta
+                                {getTelefoneSortIcon("conta")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleTelefoneSort("planoOperadora")}
+                              data-testid="th-plano"
+                            >
+                              <div className="flex items-center">
+                                Plano/Operadora
+                                {getTelefoneSortIcon("planoOperadora")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleTelefoneSort("telefone")}
+                              data-testid="th-telefone"
+                            >
+                              <div className="flex items-center">
+                                Telefone
+                                {getTelefoneSortIcon("telefone")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleTelefoneSort("responsavelNome")}
+                              data-testid="th-responsavel"
+                            >
+                              <div className="flex items-center">
+                                Responsável
+                                {getTelefoneSortIcon("responsavelNome")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleTelefoneSort("setor")}
+                              data-testid="th-setor"
+                            >
+                              <div className="flex items-center">
+                                Setor
+                                {getTelefoneSortIcon("setor")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleTelefoneSort("ultimaRecarga")}
+                              data-testid="th-recarga"
+                            >
+                              <div className="flex items-center">
+                                Última Recarga
+                                {getTelefoneSortIcon("ultimaRecarga")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="cursor-pointer hover:bg-muted/50 select-none"
+                              onClick={() => handleTelefoneSort("status")}
+                              data-testid="th-status"
+                            >
+                              <div className="flex items-center">
+                                Status
+                                {getTelefoneSortIcon("status")}
+                              </div>
+                            </TableHead>
+                            <TableHead className="w-[60px]">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filteredTelefones.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                                 Nenhuma linha telefônica encontrada
                               </TableCell>
                             </TableRow>
@@ -1034,6 +1209,16 @@ export default function Patrimonio() {
                                     {telefone.status}
                                   </Badge>
                                 </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEditTelefone(telefone)}
+                                    data-testid={`button-edit-telefone-${telefone.id}`}
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                </TableCell>
                               </TableRow>
                             ))
                           )}
@@ -1047,6 +1232,134 @@ export default function Patrimonio() {
           </Tabs>
         </div>
       </div>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar Linha Telefônica</DialogTitle>
+            <DialogDescription>
+              Atualize as informações da linha telefônica abaixo.
+            </DialogDescription>
+          </DialogHeader>
+          {editingTelefone && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-conta" className="text-right">
+                  Conta
+                </Label>
+                <Input
+                  id="edit-conta"
+                  value={editingTelefone.conta || ""}
+                  onChange={(e) => setEditingTelefone({ ...editingTelefone, conta: e.target.value })}
+                  className="col-span-3"
+                  data-testid="input-edit-conta"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-plano" className="text-right">
+                  Plano/Operadora
+                </Label>
+                <Input
+                  id="edit-plano"
+                  value={editingTelefone.planoOperadora || ""}
+                  onChange={(e) => setEditingTelefone({ ...editingTelefone, planoOperadora: e.target.value })}
+                  className="col-span-3"
+                  data-testid="input-edit-plano"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-telefone" className="text-right">
+                  Telefone
+                </Label>
+                <Input
+                  id="edit-telefone"
+                  value={editingTelefone.telefone || ""}
+                  onChange={(e) => setEditingTelefone({ ...editingTelefone, telefone: e.target.value })}
+                  className="col-span-3"
+                  data-testid="input-edit-telefone"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-responsavel" className="text-right">
+                  Responsável
+                </Label>
+                <Input
+                  id="edit-responsavel"
+                  value={editingTelefone.responsavelNome || ""}
+                  onChange={(e) => setEditingTelefone({ ...editingTelefone, responsavelNome: e.target.value })}
+                  className="col-span-3"
+                  data-testid="input-edit-responsavel"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-setor" className="text-right">
+                  Setor
+                </Label>
+                <Input
+                  id="edit-setor"
+                  value={editingTelefone.setor || ""}
+                  onChange={(e) => setEditingTelefone({ ...editingTelefone, setor: e.target.value })}
+                  className="col-span-3"
+                  data-testid="input-edit-setor"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-recarga" className="text-right">
+                  Última Recarga
+                </Label>
+                <Input
+                  id="edit-recarga"
+                  type="date"
+                  value={editingTelefone.ultimaRecarga || ""}
+                  onChange={(e) => setEditingTelefone({ ...editingTelefone, ultimaRecarga: e.target.value })}
+                  className="col-span-3"
+                  data-testid="input-edit-recarga"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-status" className="text-right">
+                  Status
+                </Label>
+                <Select
+                  value={editingTelefone.status || ""}
+                  onValueChange={(value) => setEditingTelefone({ ...editingTelefone, status: value })}
+                >
+                  <SelectTrigger className="col-span-3" data-testid="select-edit-status">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Ativo">Ativo</SelectItem>
+                    <SelectItem value="Cancelado">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+              data-testid="button-cancel-edit"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveEditTelefone}
+              disabled={updateTelefoneMutation.isPending}
+              data-testid="button-save-edit"
+            >
+              {updateTelefoneMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                "Salvar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
