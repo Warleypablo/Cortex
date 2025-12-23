@@ -405,11 +405,11 @@ export default function PatrimonioDetail() {
               <Card>
                 <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <Info className="h-5 w-5 text-primary" />
+                    <Package className="h-5 w-5 text-primary" />
                   </div>
                   <div>
                     <CardTitle>Informações do Bem</CardTitle>
-                    <CardDescription>Dados principais do ativo</CardDescription>
+                    <CardDescription>Dados principais e financeiros do ativo</CardDescription>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -426,34 +426,50 @@ export default function PatrimonioDetail() {
                   <Separator />
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1">
-                      <div className="text-sm font-medium text-muted-foreground">Tipo de Bem (Categoria)</div>
-                      <div className="text-base" data-testid="tipo-bem">{patrimonio.ativo || "-"}</div>
+                      <div className="text-sm font-medium text-muted-foreground">Tipo de Bem</div>
+                      <div className="text-base font-medium" data-testid="tipo-bem">{patrimonio.ativo || "-"}</div>
                     </div>
                     <div className="space-y-1">
-                      <div className="text-sm font-medium text-muted-foreground">Marca (Fabricante)</div>
+                      <div className="text-sm font-medium text-muted-foreground">Marca</div>
                       <div className="text-base" data-testid="marca-bem">{patrimonio.marca || "-"}</div>
                     </div>
                   </div>
                   <Separator />
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium text-muted-foreground">Estado de Conservação</div>
-                    {patrimonio.estadoConservacao ? (
-                      <Badge variant="outline" className={getEstadoColor(patrimonio.estadoConservacao)} data-testid="estado-conservacao">
-                        {patrimonio.estadoConservacao}
-                      </Badge>
-                    ) : (
-                      <div className="text-base">-</div>
-                    )}
-                  </div>
-                  <Separator />
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium text-muted-foreground">Modelo / Descrição</div>
-                    <div className="text-base whitespace-pre-wrap" data-testid="descricao-bem">
-                      {patrimonio.descricao || "Nenhuma descrição disponível"}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-muted-foreground">Modelo / Descrição</div>
+                      <div className="text-base" data-testid="descricao-bem">
+                        {patrimonio.descricao || "-"}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-muted-foreground">Estado de Conservação</div>
+                      {patrimonio.estadoConservacao ? (
+                        <Badge variant="outline" className={getEstadoColor(patrimonio.estadoConservacao)} data-testid="estado-conservacao">
+                          {patrimonio.estadoConservacao}
+                        </Badge>
+                      ) : (
+                        <div className="text-base">-</div>
+                      )}
                     </div>
                   </div>
                   <Separator />
-                  <div className="space-y-2">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-muted-foreground">Valor Pago</div>
+                      <div className="text-lg font-semibold text-green-600 dark:text-green-400" data-testid="valor-pago">
+                        {formatCurrency(patrimonio.valorPago)}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-muted-foreground">Valor de Mercado</div>
+                      <div className="text-lg font-semibold text-blue-600 dark:text-blue-400" data-testid="valor-mercado">
+                        {formatCurrency(patrimonio.valorMercado)}
+                      </div>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="space-y-1">
                     <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <Lock className="h-4 w-4" />
                       Senha do Ativo
@@ -466,44 +482,16 @@ export default function PatrimonioDetail() {
               </Card>
 
               <Card>
-                <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <DollarSign className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle>Valores</CardTitle>
-                    <CardDescription>Informações financeiras</CardDescription>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium text-muted-foreground">Valor Pago</div>
-                    <div className="text-lg font-semibold text-green-600 dark:text-green-400" data-testid="valor-pago">
-                      {formatCurrency(patrimonio.valorPago)}
+                <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle>Responsável pelo Patrimônio</CardTitle>
+                      <CardDescription>Colaborador atualmente responsável pelo bem</CardDescription>
                     </div>
                   </div>
-                  <Separator />
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium text-muted-foreground">Valor de Mercado</div>
-                    <div className="text-lg font-semibold text-blue-600 dark:text-blue-400" data-testid="valor-mercado">
-                      {formatCurrency(patrimonio.valorMercado)}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <User className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle>Responsável pelo Patrimônio</CardTitle>
-                    <CardDescription>Colaborador atualmente responsável pelo bem</CardDescription>
-                  </div>
-                </div>
                 <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -635,6 +623,7 @@ export default function PatrimonioDetail() {
                 )}
               </CardContent>
             </Card>
+            </div>
 
             <Card>
               <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
