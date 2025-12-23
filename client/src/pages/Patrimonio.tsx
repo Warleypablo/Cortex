@@ -2,7 +2,10 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Package, ArrowDownNarrowWide, ArrowUpNarrowWide, ArrowDownAZ, ArrowUpZA } from "lucide-react";
+import { 
+  Loader2, Search, Package, Filter, ChevronUp, ChevronDown, 
+  DollarSign, TrendingUp, CheckCircle, X, BarChart3
+} from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +25,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface PatrimonioDb {
   id: number;
@@ -36,8 +44,8 @@ interface PatrimonioDb {
   descricao: string | null;
 }
 
-type SortNumericType = "asc" | "desc";
-type SortAlphaType = "none" | "asc" | "desc";
+type SortField = "numeroAtivo" | "ativo" | "marca" | "descricao" | "estadoConservacao" | "responsavelAtual" | "valorPago" | "valorMercado" | "valorVenda";
+type SortDirection = "asc" | "desc";
 
 export default function Patrimonio() {
   useSetPageInfo("Patrimônio", "Gerencie os bens e ativos da empresa");
@@ -48,10 +56,12 @@ export default function Patrimonio() {
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [filterTipoBem, setFilterTipoBem] = useState<string>("todos");
   const [filterEstado, setFilterEstado] = useState<string>("todos");
-  const [sortNumeric, setSortNumeric] = useState<SortNumericType>("asc");
-  const [sortAlpha, setSortAlpha] = useState<SortAlphaType>("none");
+  const [filterMarca, setFilterMarca] = useState<string>("todos");
+  const [sortField, setSortField] = useState<SortField>("numeroAtivo");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const { data: patrimonios, isLoading, error} = useQuery<PatrimonioDb[]>({
+  const { data: patrimonios, isLoading, error } = useQuery<PatrimonioDb[]>({
     queryKey: ["/api/patrimonio"],
   });
 
@@ -71,6 +81,51 @@ export default function Patrimonio() {
       if (p.estadoConservacao) estados.add(p.estadoConservacao);
     });
     return Array.from(estados).sort();
+  }, [patrimonios]);
+
+  const uniqueMarcas = useMemo(() => {
+    if (!patrimonios) return [];
+    const marcas = new Set<string>();
+    patrimonios.forEach(p => {
+      if (p.marca) marcas.add(p.marca);
+    });
+    return Array.from(marcas).sort();
+  }, [patrimonios]);
+
+  const stats = useMemo(() => {
+    if (!patrimonios) return { totalAtivos: 0, ativosBom: 0, valorPago: 0, valorMercado: 0, valorVenda: 0 };
+    
+    let ativosBom = 0;
+    let valorPago = 0;
+    let valorMercado = 0;
+    let valorVenda = 0;
+    
+    patrimonios.forEach(p => {
+      const estado = p.estadoConservacao?.toLowerCase() || "";
+      if (estado.includes("bom") || estado.includes("novo") || estado.includes("ótimo")) {
+        ativosBom++;
+      }
+      if (p.valorPago) {
+        const val = parseFloat(p.valorPago);
+        if (!isNaN(val)) valorPago += val;
+      }
+      if (p.valorMercado) {
+        const val = parseFloat(p.valorMercado);
+        if (!isNaN(val)) valorMercado += val;
+      }
+      if (p.valorVenda) {
+        const val = parseFloat(p.valorVenda);
+        if (!isNaN(val)) valorVenda += val;
+      }
+    });
+    
+    return {
+      totalAtivos: patrimonios.length,
+      ativosBom,
+      valorPago,
+      valorMercado,
+      valorVenda,
+    };
   }, [patrimonios]);
 
   const filteredAndSortedPatrimonios = useMemo(() => {
@@ -96,54 +151,55 @@ export default function Patrimonio() {
     if (filterEstado !== "todos") {
       result = result.filter(p => p.estadoConservacao === filterEstado);
     }
-    
-    if (sortAlpha !== "none") {
-      result.sort((a, b) => {
-        const nameA = a.responsavelAtual || "";
-        const nameB = b.responsavelAtual || "";
-        
-        if (!nameA && !nameB) return 0;
-        if (!nameA) return 1;
-        if (!nameB) return -1;
-        
-        if (sortAlpha === "asc") {
-          return nameA.localeCompare(nameB, 'pt-BR', { sensitivity: 'base' });
-        } else {
-          return nameB.localeCompare(nameA, 'pt-BR', { sensitivity: 'base' });
-        }
-      });
-    } else {
-      result.sort((a, b) => {
-        const numA = a.numeroAtivo || "";
-        const numB = b.numeroAtivo || "";
-        if (sortNumeric === "asc") {
-          return numA.localeCompare(numB, undefined, { numeric: true });
-        } else {
-          return numB.localeCompare(numA, undefined, { numeric: true });
-        }
-      });
+
+    if (filterMarca !== "todos") {
+      result = result.filter(p => p.marca === filterMarca);
     }
     
+    result.sort((a, b) => {
+      let valA: string | number = "";
+      let valB: string | number = "";
+      
+      if (sortField === "valorPago" || sortField === "valorMercado" || sortField === "valorVenda") {
+        valA = parseFloat(a[sortField] || "0") || 0;
+        valB = parseFloat(b[sortField] || "0") || 0;
+        return sortDirection === "asc" ? valA - valB : valB - valA;
+      } else {
+        valA = a[sortField] || "";
+        valB = b[sortField] || "";
+        if (sortField === "numeroAtivo") {
+          return sortDirection === "asc" 
+            ? valA.localeCompare(valB, undefined, { numeric: true })
+            : valB.localeCompare(valA, undefined, { numeric: true });
+        }
+        return sortDirection === "asc" 
+          ? valA.localeCompare(valB, 'pt-BR', { sensitivity: 'base' })
+          : valB.localeCompare(valA, 'pt-BR', { sensitivity: 'base' });
+      }
+    });
+    
     return result;
-  }, [patrimonios, searchQuery, filterTipoBem, filterEstado, sortNumeric, sortAlpha]);
+  }, [patrimonios, searchQuery, filterTipoBem, filterEstado, filterMarca, sortField, sortDirection]);
 
   const totalPages = Math.ceil(filteredAndSortedPatrimonios.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedPatrimonios = filteredAndSortedPatrimonios.slice(startIndex, endIndex);
 
-  const handleNumericSort = () => {
-    setSortNumeric(prev => prev === "asc" ? "desc" : "asc");
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
   };
 
-  const handleAlphaSort = () => {
-    if (sortAlpha === "none") {
-      setSortAlpha("asc");
-    } else if (sortAlpha === "asc") {
-      setSortAlpha("desc");
-    } else {
-      setSortAlpha("none");
-    }
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return null;
+    return sortDirection === "asc" 
+      ? <ChevronUp className="w-4 h-4 ml-1" />
+      : <ChevronDown className="w-4 h-4 ml-1" />;
   };
 
   const getEstadoColor = (estado: string | null) => {
@@ -168,6 +224,20 @@ export default function Patrimonio() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
   };
 
+  const formatCurrencyNumber = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+
+  const clearFilters = () => {
+    setFilterTipoBem("todos");
+    setFilterEstado("todos");
+    setFilterMarca("todos");
+    setSearchQuery("");
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = filterTipoBem !== "todos" || filterEstado !== "todos" || filterMarca !== "todos" || searchQuery !== "";
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen" data-testid="error-patrimonio">
@@ -185,8 +255,82 @@ export default function Patrimonio() {
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       <div className="flex-1 overflow-y-auto">
         <div className="container mx-auto p-6 space-y-6">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <Card data-testid="card-total-ativos">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total de Ativos</p>
+                    <p className="text-2xl font-bold">{stats.totalAtivos}</p>
+                  </div>
+                  <div className="p-3 bg-primary/10 rounded-full">
+                    <Package className="w-6 h-6 text-primary" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-ativos-bom">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Ativos em Bom Estado</p>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.ativosBom}</p>
+                  </div>
+                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
+                    <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-valor-pago">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Pago Total</p>
+                    <p className="text-xl font-bold">{formatCurrencyNumber(stats.valorPago)}</p>
+                  </div>
+                  <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                    <DollarSign className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-valor-mercado">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor de Mercado</p>
+                    <p className="text-xl font-bold">{formatCurrencyNumber(stats.valorMercado)}</p>
+                  </div>
+                  <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+                    <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-valor-venda">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor de Venda</p>
+                    <p className="text-xl font-bold">{formatCurrencyNumber(stats.valorVenda)}</p>
+                  </div>
+                  <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-full">
+                    <BarChart3 className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content Card */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 gap-4">
               <div className="space-y-1">
                 <CardTitle>Listagem de Patrimônio</CardTitle>
                 <CardDescription>
@@ -195,7 +339,8 @@ export default function Patrimonio() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-4">
+              {/* Search and Filter Button Row */}
+              <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex-1 min-w-[250px] relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
@@ -210,87 +355,107 @@ export default function Patrimonio() {
                   />
                 </div>
                 
-                <Select
-                  value={filterTipoBem}
-                  onValueChange={(value) => {
-                    setFilterTipoBem(value);
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="w-[200px]" data-testid="select-filter-tipo-bem">
-                    <SelectValue placeholder="Tipo de Bem" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Bens</SelectItem>
-                    {uniqueTiposBem.map(tipo => (
-                      <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button 
+                      variant={hasActiveFilters ? "default" : "outline"} 
+                      className="gap-2"
+                      data-testid="button-toggle-filters"
+                    >
+                      <Filter className="w-4 h-4" />
+                      Filtros
+                      {hasActiveFilters && (
+                        <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                          {[filterTipoBem !== "todos", filterEstado !== "todos", filterMarca !== "todos"].filter(Boolean).length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
+                </Collapsible>
 
-                <Select
-                  value={filterEstado}
-                  onValueChange={(value) => {
-                    setFilterEstado(value);
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="w-[200px]" data-testid="select-filter-estado">
-                    <SelectValue placeholder="Estado de Conservação" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Estados</SelectItem>
-                    {uniqueEstados.map(estado => (
-                      <SelectItem key={estado} value={estado}>{estado}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <div className="flex gap-2">
+                {hasActiveFilters && (
                   <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleNumericSort}
-                    disabled={sortAlpha !== "none"}
-                    data-testid="button-sort-numeric"
-                    title={
-                      sortAlpha !== "none" 
-                        ? "Ordenação alfabética está ativa" 
-                        : sortNumeric === "asc" 
-                        ? "Ordenar por número decrescente" 
-                        : "Ordenar por número crescente"
-                    }
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="gap-1 text-muted-foreground"
+                    data-testid="button-clear-filters"
                   >
-                    {sortNumeric === "asc" ? (
-                      <ArrowDownNarrowWide className="h-4 w-4" />
-                    ) : (
-                      <ArrowUpNarrowWide className="h-4 w-4" />
-                    )}
+                    <X className="w-4 h-4" />
+                    Limpar Filtros
                   </Button>
-
-                  <Button
-                    variant={sortAlpha === "none" ? "outline" : "default"}
-                    size="icon"
-                    onClick={handleAlphaSort}
-                    data-testid="button-sort-alpha"
-                    title={
-                      sortAlpha === "none" 
-                        ? "Ordenar alfabeticamente" 
-                        : sortAlpha === "asc" 
-                        ? "Ordenar alfabeticamente reverso" 
-                        : "Voltar para ordenação padrão"
-                    }
-                  >
-                    {sortAlpha === "asc" ? (
-                      <ArrowDownAZ className="h-4 w-4" />
-                    ) : sortAlpha === "desc" ? (
-                      <ArrowUpZA className="h-4 w-4" />
-                    ) : (
-                      <ArrowDownAZ className="h-4 w-4 opacity-50" />
-                    )}
-                  </Button>
-                </div>
+                )}
               </div>
+
+              {/* Collapsible Filters */}
+              <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+                <CollapsibleContent>
+                  <div className="flex flex-wrap gap-4 p-4 bg-muted/30 rounded-lg border">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Tipo de Bem</label>
+                      <Select
+                        value={filterTipoBem}
+                        onValueChange={(value) => {
+                          setFilterTipoBem(value);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="w-[180px]" data-testid="select-filter-tipo-bem">
+                          <SelectValue placeholder="Tipo de Bem" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos</SelectItem>
+                          {uniqueTiposBem.map(tipo => (
+                            <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Estado</label>
+                      <Select
+                        value={filterEstado}
+                        onValueChange={(value) => {
+                          setFilterEstado(value);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="w-[180px]" data-testid="select-filter-estado">
+                          <SelectValue placeholder="Estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos</SelectItem>
+                          {uniqueEstados.map(estado => (
+                            <SelectItem key={estado} value={estado}>{estado}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Marca</label>
+                      <Select
+                        value={filterMarca}
+                        onValueChange={(value) => {
+                          setFilterMarca(value);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="w-[180px]" data-testid="select-filter-marca">
+                          <SelectValue placeholder="Marca" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todas</SelectItem>
+                          {uniqueMarcas.map(marca => (
+                            <SelectItem key={marca} value={marca}>{marca}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
 
               {isLoading ? (
                 <div className="flex items-center justify-center py-12" data-testid="loading-patrimonio">
@@ -299,19 +464,100 @@ export default function Patrimonio() {
               ) : (
                 <>
                   <div className="rounded-lg border border-border bg-card overflow-hidden">
-                    <div className="max-h-[calc(100vh-400px)] overflow-y-auto overflow-x-auto">
+                    <div className="max-h-[calc(100vh-500px)] overflow-y-auto overflow-x-auto">
                       <Table>
                         <TableHeader className="sticky top-0 z-20 shadow-sm">
-                          <TableRow className="bg-background border-b">
-                            <TableHead className="min-w-[120px]" data-testid="header-numero">Num. Patrimônio</TableHead>
-                            <TableHead className="min-w-[200px]" data-testid="header-bem">Qual é o Bem</TableHead>
-                            <TableHead className="min-w-[150px]" data-testid="header-marca">Marca</TableHead>
-                            <TableHead className="min-w-[180px]" data-testid="header-modelo">Modelo</TableHead>
-                            <TableHead className="min-w-[140px]" data-testid="header-estado">Estado</TableHead>
-                            <TableHead className="min-w-[180px]" data-testid="header-responsavel">Responsável</TableHead>
-                            <TableHead className="min-w-[140px]" data-testid="header-valor-pago">Valor Pago</TableHead>
-                            <TableHead className="min-w-[140px]" data-testid="header-valor-mercado">Valor Mercado</TableHead>
-                            <TableHead className="min-w-[140px]" data-testid="header-valor-venda">Valor Venda</TableHead>
+                          <TableRow className="bg-muted/50 border-b">
+                            <TableHead 
+                              className="min-w-[120px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
+                              onClick={() => handleSort("numeroAtivo")}
+                              data-testid="header-numero"
+                            >
+                              <div className="flex items-center">
+                                Num. Patrimônio
+                                {getSortIcon("numeroAtivo")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="min-w-[200px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
+                              onClick={() => handleSort("ativo")}
+                              data-testid="header-bem"
+                            >
+                              <div className="flex items-center">
+                                Qual é o Bem
+                                {getSortIcon("ativo")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="min-w-[150px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
+                              onClick={() => handleSort("marca")}
+                              data-testid="header-marca"
+                            >
+                              <div className="flex items-center">
+                                Marca
+                                {getSortIcon("marca")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="min-w-[180px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
+                              onClick={() => handleSort("descricao")}
+                              data-testid="header-modelo"
+                            >
+                              <div className="flex items-center">
+                                Modelo
+                                {getSortIcon("descricao")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="min-w-[140px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
+                              onClick={() => handleSort("estadoConservacao")}
+                              data-testid="header-estado"
+                            >
+                              <div className="flex items-center">
+                                Estado
+                                {getSortIcon("estadoConservacao")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="min-w-[180px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
+                              onClick={() => handleSort("responsavelAtual")}
+                              data-testid="header-responsavel"
+                            >
+                              <div className="flex items-center">
+                                Responsável
+                                {getSortIcon("responsavelAtual")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="min-w-[140px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
+                              onClick={() => handleSort("valorPago")}
+                              data-testid="header-valor-pago"
+                            >
+                              <div className="flex items-center">
+                                Valor Pago
+                                {getSortIcon("valorPago")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="min-w-[140px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
+                              onClick={() => handleSort("valorMercado")}
+                              data-testid="header-valor-mercado"
+                            >
+                              <div className="flex items-center">
+                                Valor Mercado
+                                {getSortIcon("valorMercado")}
+                              </div>
+                            </TableHead>
+                            <TableHead 
+                              className="min-w-[140px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
+                              onClick={() => handleSort("valorVenda")}
+                              data-testid="header-valor-venda"
+                            >
+                              <div className="flex items-center">
+                                Valor Venda
+                                {getSortIcon("valorVenda")}
+                              </div>
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -325,7 +571,7 @@ export default function Patrimonio() {
                             paginatedPatrimonios.map((item) => (
                               <TableRow 
                                 key={item.id} 
-                                className="hover-elevate cursor-pointer"
+                                className="hover:bg-muted/30 cursor-pointer transition-colors"
                                 onClick={() => setLocation(`/patrimonio/${item.id}`)}
                                 data-testid={`patrimonio-row-${item.id}`}
                               >
