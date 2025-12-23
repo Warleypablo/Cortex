@@ -1443,3 +1443,26 @@ export const insertAccessLogSchema = createInsertSchema(accessLogs).omit({
 
 export type AccessLog = typeof accessLogs.$inferSelect;
 export type InsertAccessLog = z.infer<typeof insertAccessLogSchema>;
+
+// ============================================
+// Telefones Module - Linhas Telefônicas
+// ============================================
+
+export const rhTelefones = pgTable("rh_telefones", {
+  id: integer("id").primaryKey(),
+  conta: varchar("conta", { length: 50 }),
+  planoOperadora: varchar("plano_operadora", { length: 50 }),
+  telefone: varchar("telefone", { length: 20 }),
+  responsavelNome: varchar("responsavel_nome", { length: 150 }),
+  responsavelId: integer("responsavel_id"),
+  setor: varchar("setor", { length: 100 }),
+  ultimaRecarga: date("ultima_recarga"),
+  status: varchar("status", { length: 20 }),
+});
+
+export const insertTelefoneSchema = createInsertSchema(rhTelefones).omit({ 
+  id: true 
+});
+
+export type Telefone = typeof rhTelefones.$inferSelect;
+export type InsertTelefone = z.infer<typeof insertTelefoneSchema>;

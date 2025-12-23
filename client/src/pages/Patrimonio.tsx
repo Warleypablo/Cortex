@@ -4,10 +4,11 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Search, Package, Filter, ChevronUp, ChevronDown, 
-  DollarSign, TrendingUp, CheckCircle, X, Users
+  DollarSign, TrendingUp, CheckCircle, X, Users, Phone
 } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -30,6 +31,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import type { Telefone } from "@shared/schema";
 
 interface PatrimonioDb {
   id: number;
@@ -61,9 +63,19 @@ export default function Patrimonio() {
   const [sortField, setSortField] = useState<SortField | "default">("default");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("patrimonios");
+  
+  // Telefones state
+  const [telefonesSearchQuery, setTelefonesSearchQuery] = useState("");
+  const [filterSetor, setFilterSetor] = useState<string>("todos");
+  const [filterPlano, setFilterPlano] = useState<string>("todos");
 
   const { data: patrimonios, isLoading, error } = useQuery<PatrimonioDb[]>({
     queryKey: ["/api/patrimonio"],
+  });
+
+  const { data: telefones, isLoading: isLoadingTelefones } = useQuery<Telefone[]>({
+    queryKey: ["/api/telefones"],
   });
 
   const uniqueTiposBem = useMemo(() => {
@@ -270,6 +282,93 @@ export default function Patrimonio() {
     setCurrentPage(1);
   };
 
+  // Telefones filtering
+  const uniqueSetores = useMemo(() => {
+    if (!telefones) return [];
+    const setores = new Set<string>();
+    telefones.forEach(t => {
+      if (t.setor) setores.add(t.setor);
+    });
+    return Array.from(setores).sort();
+  }, [telefones]);
+
+  const uniquePlanos = useMemo(() => {
+    if (!telefones) return [];
+    const planos = new Set<string>();
+    telefones.forEach(t => {
+      if (t.planoOperadora) planos.add(t.planoOperadora);
+    });
+    return Array.from(planos).sort();
+  }, [telefones]);
+
+  const filteredTelefones = useMemo(() => {
+    if (!telefones) return [];
+    
+    return telefones.filter(t => {
+      const matchesSearch = telefonesSearchQuery === "" ||
+        t.telefone.toLowerCase().includes(telefonesSearchQuery.toLowerCase()) ||
+        (t.responsavelNome && t.responsavelNome.toLowerCase().includes(telefonesSearchQuery.toLowerCase())) ||
+        (t.conta && t.conta.toLowerCase().includes(telefonesSearchQuery.toLowerCase()));
+      
+      const matchesSetor = filterSetor === "todos" || t.setor === filterSetor;
+      const matchesPlano = filterPlano === "todos" || t.planoOperadora === filterPlano;
+      
+      return matchesSearch && matchesSetor && matchesPlano;
+    });
+  }, [telefones, telefonesSearchQuery, filterSetor, filterPlano]);
+
+  const telefonesStats = useMemo(() => {
+    if (!telefones) return { total: 0, ativos: 0, cancelados: 0, posTotal: 0, preTotal: 0 };
+    
+    return {
+      total: telefones.length,
+      ativos: telefones.filter(t => t.status === "Ativo").length,
+      cancelados: telefones.filter(t => t.status === "Cancelado").length,
+      posTotal: telefones.filter(t => t.planoOperadora?.includes("PÓS")).length,
+      preTotal: telefones.filter(t => t.planoOperadora?.includes("PRÉ")).length,
+    };
+  }, [telefones]);
+
+  const getPlanoColor = (plano: string | null) => {
+    if (!plano) return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+    const planoUpper = plano.toUpperCase();
+    if (planoUpper.includes("PÓS")) {
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    }
+    if (planoUpper.includes("PRÉ")) {
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+    }
+    if (planoUpper.includes("FLEX")) {
+      return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+    }
+    return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+  };
+
+  const getStatusColor = (status: string) => {
+    if (status === "Ativo") {
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    }
+    return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "-";
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('pt-BR');
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const clearTelefonesFilters = () => {
+    setTelefonesSearchQuery("");
+    setFilterSetor("todos");
+    setFilterPlano("todos");
+  };
+
+  const hasTelefonesActiveFilters = filterSetor !== "todos" || filterPlano !== "todos" || telefonesSearchQuery !== "";
+
   const hasActiveFilters = filterTipoBem !== "todos" || filterEstado !== "todos" || filterMarca !== "todos" || searchQuery !== "";
 
   if (error) {
@@ -289,8 +388,21 @@ export default function Patrimonio() {
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       <div className="flex-1 overflow-y-auto">
         <div className="container mx-auto p-6 space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2" data-testid="tabs-patrimonio">
+              <TabsTrigger value="patrimonios" className="gap-2" data-testid="tab-patrimonios">
+                <Package className="w-4 h-4" />
+                Patrimônios
+              </TabsTrigger>
+              <TabsTrigger value="telefones" className="gap-2" data-testid="tab-telefones">
+                <Phone className="w-4 h-4" />
+                Linhas Telefônicas
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="patrimonios" className="space-y-6 mt-6">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <Card data-testid="card-total-ativos">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -730,6 +842,209 @@ export default function Patrimonio() {
               )}
             </CardContent>
           </Card>
+            </TabsContent>
+
+            <TabsContent value="telefones" className="space-y-6 mt-6">
+              {/* Telefones Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card data-testid="card-total-telefones">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total de Linhas</p>
+                        <p className="text-2xl font-bold">{telefonesStats.total}</p>
+                      </div>
+                      <div className="p-3 bg-primary/10 rounded-full">
+                        <Phone className="w-6 h-6 text-primary" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-linhas-ativas">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Linhas Ativas</p>
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{telefonesStats.ativos}</p>
+                      </div>
+                      <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
+                        <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-linhas-pos">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Planos Pós-Pago</p>
+                        <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{telefonesStats.posTotal}</p>
+                      </div>
+                      <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                        <Phone className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-linhas-pre">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Planos Pré-Pago</p>
+                        <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{telefonesStats.preTotal}</p>
+                      </div>
+                      <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
+                        <Phone className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Telefones Table Card */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 gap-4">
+                  <div className="space-y-1">
+                    <CardTitle>Linhas Telefônicas</CardTitle>
+                    <CardDescription>
+                      Total de {filteredTelefones.length} {filteredTelefones.length === 1 ? "linha" : "linhas"}
+                    </CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Search and Filters */}
+                  <div className="flex flex-wrap gap-4 items-center">
+                    <div className="flex-1 min-w-[250px] relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                      <Input
+                        placeholder="Buscar por telefone, responsável ou conta..."
+                        value={telefonesSearchQuery}
+                        onChange={(e) => setTelefonesSearchQuery(e.target.value)}
+                        className="pl-9"
+                        data-testid="input-search-telefones"
+                      />
+                    </div>
+
+                    <Select value={filterSetor} onValueChange={setFilterSetor}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-filter-setor">
+                        <SelectValue placeholder="Setor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os setores</SelectItem>
+                        {uniqueSetores.map(setor => (
+                          <SelectItem key={setor} value={setor}>{setor}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={filterPlano} onValueChange={setFilterPlano}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-filter-plano">
+                        <SelectValue placeholder="Plano" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os planos</SelectItem>
+                        {uniquePlanos.map(plano => (
+                          <SelectItem key={plano} value={plano}>{plano}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {hasTelefonesActiveFilters && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearTelefonesFilters}
+                        className="gap-1 text-muted-foreground"
+                        data-testid="button-clear-telefones-filters"
+                      >
+                        <X className="w-4 h-4" />
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Table */}
+                  {isLoadingTelefones ? (
+                    <div className="flex items-center justify-center py-8" data-testid="loading-telefones">
+                      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <div className="rounded-md border overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Conta</TableHead>
+                            <TableHead>Plano/Operadora</TableHead>
+                            <TableHead>Telefone</TableHead>
+                            <TableHead>Responsável</TableHead>
+                            <TableHead>Setor</TableHead>
+                            <TableHead>Última Recarga</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredTelefones.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                                Nenhuma linha telefônica encontrada
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredTelefones.map((telefone) => (
+                              <TableRow key={telefone.id} data-testid={`row-telefone-${telefone.id}`}>
+                                <TableCell className="font-mono text-sm" data-testid={`text-conta-${telefone.id}`}>
+                                  {telefone.conta || "-"}
+                                </TableCell>
+                                <TableCell>
+                                  {telefone.planoOperadora ? (
+                                    <Badge className={getPlanoColor(telefone.planoOperadora)} data-testid={`badge-plano-${telefone.id}`}>
+                                      {telefone.planoOperadora}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="font-medium" data-testid={`text-telefone-${telefone.id}`}>
+                                  {telefone.telefone}
+                                </TableCell>
+                                <TableCell data-testid={`text-responsavel-${telefone.id}`}>
+                                  {telefone.responsavelId ? (
+                                    <Link 
+                                      href={`/colaboradores`}
+                                      className="text-primary hover:underline"
+                                      data-testid={`link-responsavel-${telefone.id}`}
+                                    >
+                                      {telefone.responsavelNome || "-"}
+                                    </Link>
+                                  ) : (
+                                    telefone.responsavelNome || "-"
+                                  )}
+                                </TableCell>
+                                <TableCell data-testid={`text-setor-${telefone.id}`}>
+                                  {telefone.setor}
+                                </TableCell>
+                                <TableCell data-testid={`text-recarga-${telefone.id}`}>
+                                  {formatDate(telefone.ultimaRecarga)}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={getStatusColor(telefone.status)} data-testid={`badge-status-${telefone.id}`}>
+                                    {telefone.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
