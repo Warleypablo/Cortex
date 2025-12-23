@@ -548,7 +548,7 @@ export default function Patrimonio() {
                     <p className="text-sm text-muted-foreground">Ativos em Bom Estado</p>
                     <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.ativosBom}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {stats.computadoresNotebooksBom} computadores/notebooks
+                      {stats.computadoresNotebooksBom} notebooks
                     </p>
                   </div>
                   <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
