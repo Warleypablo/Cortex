@@ -398,18 +398,18 @@ export default function ClientDetail() {
 
   const getContractStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();
-    if (statusLower.includes("ativo") || statusLower.includes("active")) {
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    if (statusLower.includes("cancelado") || statusLower.includes("inativo")) {
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-300 dark:border-red-700";
+    } else if (statusLower.includes("ativo") || statusLower.includes("active")) {
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-300 dark:border-green-700";
     } else if (statusLower.includes("onboard") || statusLower.includes("início")) {
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-300 dark:border-blue-700";
     } else if (statusLower.includes("triagem") || statusLower.includes("análise")) {
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700";
     } else if (statusLower.includes("cancelamento") || statusLower.includes("pausa")) {
-      return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
-    } else if (statusLower.includes("cancelado") || statusLower.includes("inativo")) {
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300 border-orange-300 dark:border-orange-700";
     }
-    return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+    return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300 border-gray-300 dark:border-gray-700";
   };
 
   const getSquadColorForContract = (squad: string) => {
