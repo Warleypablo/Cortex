@@ -11,7 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SelectWithAdd } from "@/components/ui/select-with-add";
-import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, UserCircle, ExternalLink, Search } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Colaborador, InsertColaborador, RhPromocao } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { z } from "zod";
@@ -49,9 +50,10 @@ interface PatrimonioItem {
   id: number;
   numeroAtivo: string | null;
   descricao: string | null;
-  status: string | null;
+  estadoConservacao: string | null;
   ativo: string | null;
   marca: string | null;
+  valorMercado: string | null;
 }
 
 interface AvailablePatrimonio {
@@ -1486,7 +1488,20 @@ export default function DetailColaborador() {
           </div>
         </Card>
 
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8" data-testid="info-cards-grid">
+        <Tabs defaultValue="informacoes" className="mb-8" data-testid="tabs-colaborador">
+          <TabsList className="mb-6" data-testid="tabs-list">
+            <TabsTrigger value="informacoes" className="gap-2" data-testid="tab-informacoes">
+              <User className="w-4 h-4" />
+              Informações
+            </TabsTrigger>
+            <TabsTrigger value="desenvolvimento" className="gap-2" data-testid="tab-desenvolvimento">
+              <TrendingUp className="w-4 h-4" />
+              Desenvolvimento
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="informacoes" data-testid="tab-content-informacoes">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8" data-testid="info-cards-grid">
           <InfoCard 
             icon={Calendar} 
             label="Meses de Turbo" 
@@ -1821,7 +1836,7 @@ export default function DetailColaborador() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary" data-testid={`badge-patrimonio-status-${patrimonio.id}`}>
-                          {patrimonio.status || "N/A"}
+                          {patrimonio.estadoConservacao || "N/A"}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -1847,6 +1862,80 @@ export default function DetailColaborador() {
             </div>
           )}
         </Card>
+          </TabsContent>
+
+          <TabsContent value="desenvolvimento" data-testid="tab-content-desenvolvimento">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="p-6 opacity-70" data-testid="card-enps">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                    <BarChart2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-lg font-semibold">e-NPS</h3>
+                      <Badge variant="secondary" className="text-xs">Em breve</Badge>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      Em breve - Avaliação de engajamento do colaborador
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6 opacity-70" data-testid="card-pdi">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-lg bg-green-100 dark:bg-green-900/30">
+                    <Target className="w-6 h-6 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-lg font-semibold">PDI</h3>
+                      <Badge variant="secondary" className="text-xs">Em breve</Badge>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      Em breve - Plano de desenvolvimento individual
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6 opacity-70" data-testid="card-1x1">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                    <MessageSquare className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-lg font-semibold">1x1</h3>
+                      <Badge variant="secondary" className="text-xs">Em breve</Badge>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      Em breve - Histórico de reuniões one-on-one
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6 opacity-70" data-testid="card-comentarios">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                    <FileText className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-lg font-semibold">Comentários</h3>
+                      <Badge variant="secondary" className="text-xs">Em breve</Badge>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      Em breve - Notas e observações sobre o colaborador
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
 
         <EditColaboradorDialog 
           colaborador={colaborador} 
