@@ -941,6 +941,46 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
     }
   );
 
+  const extractEstadoSigla = (estadoValue: string | null | undefined): string => {
+    if (!estadoValue) return "";
+    const trimmed = estadoValue.trim();
+    if (trimmed.length === 2) return trimmed.toUpperCase();
+    const match = trimmed.match(/^([A-Z]{2})\s*-/i);
+    if (match) return match[1].toUpperCase();
+    const states: Record<string, string> = {
+      "acre": "AC", "alagoas": "AL", "amapá": "AP", "amazonas": "AM", "bahia": "BA",
+      "ceará": "CE", "distrito federal": "DF", "espírito santo": "ES", "goiás": "GO",
+      "maranhão": "MA", "mato grosso": "MT", "mato grosso do sul": "MS", "minas gerais": "MG",
+      "pará": "PA", "paraíba": "PB", "paraná": "PR", "pernambuco": "PE", "piauí": "PI",
+      "rio de janeiro": "RJ", "rio grande do norte": "RN", "rio grande do sul": "RS",
+      "rondônia": "RO", "roraima": "RR", "santa catarina": "SC", "são paulo": "SP",
+      "sergipe": "SE", "tocantins": "TO"
+    };
+    const lowerVal = trimmed.toLowerCase();
+    for (const [name, sigla] of Object.entries(states)) {
+      if (lowerVal.includes(name)) return sigla;
+    }
+    return "";
+  };
+
+  const extractCidadeFromEndereco = (endereco: string | null | undefined): string => {
+    if (!endereco) return "";
+    const parts = endereco.split(",").map(p => p.trim());
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const part = parts[i];
+      if (part.match(/\d{5}-?\d{3}/)) continue;
+      if (part.match(/^[A-Z]{2}$/i)) continue;
+      if (part.match(/^[A-Z]{2}\s*-/i)) continue;
+      if (part.length > 2 && !part.match(/^\d+$/)) {
+        const cityMatch = part.match(/^([^-]+)/);
+        if (cityMatch) return cityMatch[1].trim();
+      }
+    }
+    return "";
+  };
+
+  const estadoSigla = extractEstadoSigla(colaborador.estado);
+
   const form = useForm<InsertColaborador & { demissao?: string; cidade?: string }>({
     resolver: zodResolver(editColaboradorSchema),
     defaultValues: {
@@ -955,8 +995,8 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
       squad: colaborador.squad || "",
       setor: colaborador.setor || "",
       endereco: colaborador.endereco || "",
-      estado: colaborador.estado || "",
-      cidade: (colaborador as any).cidade || "",
+      estado: estadoSigla,
+      cidade: (colaborador as any).cidade || extractCidadeFromEndereco(colaborador.endereco),
       pix: colaborador.pix || "",
       cnpj: colaborador.cnpj || "",
       aniversario: colaborador.aniversario ? new Date(colaborador.aniversario).toISOString().split('T')[0] : undefined,
@@ -980,10 +1020,10 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
   }, [status, form]);
 
   useEffect(() => {
-    if (estado !== colaborador.estado) {
+    if (estado !== estadoSigla && estado !== "") {
       form.setValue("cidade", "", { shouldValidate: false });
     }
-  }, [estado, colaborador.estado, form]);
+  }, [estado, estadoSigla, form]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertColaborador) => {
