@@ -3,6 +3,7 @@ import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { usePageInfo } from "@/contexts/PageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatDecimal } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1438,7 +1439,7 @@ export default function DetailColaborador() {
     const diffTime = endDate.getTime() - admissaoDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     const diffMonths = diffDays / 30;
-    return diffMonths > 0 ? diffMonths.toFixed(1) : "0";
+    return diffMonths > 0 ? formatDecimal(diffMonths, 1) : "0";
   };
 
   const calcularMesesDesdeUltimoAumento = (): string => {
@@ -1451,7 +1452,7 @@ export default function DetailColaborador() {
       const diffTime = hoje.getTime() - ultimoAumentoDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       const diffMonths = diffDays / 30;
-      return diffMonths > 0 ? diffMonths.toFixed(1) : "0";
+      return diffMonths > 0 ? formatDecimal(diffMonths, 1) : "0";
     } catch {
       return "-";
     }
