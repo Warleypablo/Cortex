@@ -203,7 +203,7 @@ export default function DashboardFinanceiro() {
   };
 
   const KPICard = ({ 
-    title, value, subtitle, icon: Icon, trend, trendValue, loading, variant = 'default' 
+    title, value, subtitle, icon: Icon, trend, trendValue, loading, variant = 'default', trendPositive, iconVariant 
   }: { 
     title: string; 
     value: string; 
@@ -213,13 +213,26 @@ export default function DashboardFinanceiro() {
     trendValue?: string;
     loading?: boolean;
     variant?: 'default' | 'success' | 'danger' | 'warning';
+    trendPositive?: boolean;
+    iconVariant?: 'default' | 'success' | 'danger' | 'warning' | 'info';
   }) => {
     const variantStyles = {
       default: 'text-foreground',
       success: 'text-green-600',
       danger: 'text-red-600',
-      warning: 'text-yellow-600'
+      warning: 'text-yellow-600',
+      info: 'text-blue-600'
     };
+
+    const iconBgStyles = {
+      default: 'bg-primary/10',
+      success: 'bg-green-100 dark:bg-green-900/30',
+      danger: 'bg-red-100 dark:bg-red-900/30',
+      warning: 'bg-yellow-100 dark:bg-yellow-900/30',
+      info: 'bg-blue-100 dark:bg-blue-900/30'
+    };
+
+    const effectiveIconVariant = iconVariant || variant;
 
     if (loading) {
       return (
@@ -238,6 +251,13 @@ export default function DashboardFinanceiro() {
       );
     }
 
+    const getBadgeVariant = () => {
+      if (trendPositive !== undefined) {
+        return trendPositive ? 'default' : 'destructive';
+      }
+      return trend === 'up' ? 'default' : trend === 'down' ? 'destructive' : 'secondary';
+    };
+
     return (
       <Card className="hover-elevate transition-all duration-200">
         <CardContent className="pt-6">
@@ -249,7 +269,7 @@ export default function DashboardFinanceiro() {
                 <div className="flex items-center gap-2 mt-1">
                   {trend && trendValue && (
                     <Badge 
-                      variant={trend === 'up' ? 'default' : trend === 'down' ? 'destructive' : 'secondary'}
+                      variant={getBadgeVariant()}
                       className="text-xs"
                     >
                       {trend === 'up' ? <TrendingUp className="w-3 h-3 mr-1" /> : trend === 'down' ? <TrendingDown className="w-3 h-3 mr-1" /> : null}
@@ -260,13 +280,8 @@ export default function DashboardFinanceiro() {
                 </div>
               )}
             </div>
-            <div className={`p-3 rounded-full ${
-              variant === 'success' ? 'bg-green-100 dark:bg-green-900/30' :
-              variant === 'danger' ? 'bg-red-100 dark:bg-red-900/30' :
-              variant === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
-              'bg-primary/10'
-            }`}>
-              <Icon className={`w-6 h-6 ${variantStyles[variant]}`} />
+            <div className={`p-3 rounded-full ${iconBgStyles[effectiveIconVariant]}`}>
+              <Icon className={`w-6 h-6 ${variantStyles[effectiveIconVariant]}`} />
             </div>
           </div>
         </CardContent>
@@ -301,9 +316,11 @@ export default function DashboardFinanceiro() {
           title="Despesa do Mês"
           value={formatCurrency(kpisCompletos?.despesaMesAtual || 0)}
           icon={TrendingDown}
-          variant={kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa < 0 ? 'success' : 'danger'}
-          trend={kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa < 0 ? 'up' : kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa > 0 ? 'down' : 'neutral'}
+          variant="danger"
+          trend={kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa < 0 ? 'down' : kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa > 0 ? 'up' : 'neutral'}
           trendValue={kpisCompletos?.variacaoDespesa ? formatPercent(kpisCompletos.variacaoDespesa) : undefined}
+          trendPositive={kpisCompletos?.variacaoDespesa ? kpisCompletos.variacaoDespesa < 0 : undefined}
+          iconVariant={kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa < 0 ? 'info' : 'danger'}
           subtitle="vs mês anterior"
           loading={isLoadingKpisCompletos}
         />
