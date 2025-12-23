@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
@@ -150,6 +150,10 @@ export interface IStorage {
   getColaboradoresDropdown(): Promise<{ id: number; nome: string }[]>;
   updatePatrimonioResponsavel(id: number, responsavelNome: string | null): Promise<Patrimonio>;
   updatePatrimonioResponsavelById(id: number, responsavelId: number, responsavelNome: string): Promise<Patrimonio>;
+  updatePatrimonio(id: number, data: Record<string, string | null>): Promise<Patrimonio>;
+  deletePatrimonio(id: number): Promise<void>;
+  getPatrimonioHistorico(patrimonioId: number): Promise<PatrimonioHistorico[]>;
+  createPatrimonioHistorico(data: InsertPatrimonioHistorico): Promise<PatrimonioHistorico>;
   getColaboradoresAnalise(): Promise<DashboardAnaliseData>;
   getSaldoAtualBancos(): Promise<SaldoBancos>;
   getFluxoCaixa(): Promise<FluxoCaixaItem[]>;
@@ -437,6 +441,22 @@ export class MemStorage implements IStorage {
   }
 
   async updatePatrimonioResponsavelById(id: number, responsavelId: number, responsavelNome: string): Promise<Patrimonio> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async updatePatrimonio(id: number, data: Record<string, string | null>): Promise<Patrimonio> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async deletePatrimonio(id: number): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getPatrimonioHistorico(patrimonioId: number): Promise<PatrimonioHistorico[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async createPatrimonioHistorico(data: InsertPatrimonioHistorico): Promise<PatrimonioHistorico> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1728,6 +1748,66 @@ export class DbStorage implements IStorage {
     }
     
     return updated;
+  }
+
+  async updatePatrimonio(id: number, data: Record<string, string | null>): Promise<Patrimonio> {
+    const ALLOWED_FIELDS = ['numeroAtivo', 'ativo', 'marca', 'estadoConservacao', 'descricao', 'valorPago', 'valorMercado'];
+    
+    const safeData: Record<string, string | null> = {};
+    for (const key of ALLOWED_FIELDS) {
+      if (key in data) {
+        safeData[key] = data[key];
+      }
+    }
+    
+    if (Object.keys(safeData).length === 0) {
+      throw new Error("No valid fields to update");
+    }
+    
+    const [updated] = await db
+      .update(schema.rhPatrimonio)
+      .set(safeData)
+      .where(eq(schema.rhPatrimonio.id, id))
+      .returning();
+    
+    if (!updated) {
+      throw new Error("Patrimônio não encontrado");
+    }
+    
+    return updated;
+  }
+
+  async deletePatrimonio(id: number): Promise<void> {
+    await db.delete(schema.rhPatrimonio).where(eq(schema.rhPatrimonio.id, id));
+  }
+
+  async getPatrimonioHistorico(patrimonioId: number): Promise<PatrimonioHistorico[]> {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, patrimonio_id as "patrimonioId", acao, usuario, data
+        FROM rh_patrimonio_historico
+        WHERE patrimonio_id = ${patrimonioId}
+        ORDER BY data DESC
+      `);
+      return (result.rows || []) as PatrimonioHistorico[];
+    } catch (error) {
+      console.log("[storage] Patrimonio historico table may not exist, returning empty array");
+      return [];
+    }
+  }
+
+  async createPatrimonioHistorico(data: InsertPatrimonioHistorico): Promise<PatrimonioHistorico> {
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO rh_patrimonio_historico (patrimonio_id, acao, usuario, data)
+        VALUES (${data.patrimonioId}, ${data.acao}, ${data.usuario}, ${data.data})
+        RETURNING id, patrimonio_id as "patrimonioId", acao, usuario, data
+      `);
+      return (result.rows[0] || {}) as PatrimonioHistorico;
+    } catch (error) {
+      console.log("[storage] Failed to create patrimonio historico:", error);
+      return { id: 0, patrimonioId: data.patrimonioId, acao: data.acao, usuario: data.usuario, data: data.data };
+    }
   }
 
   async getColaboradoresAnalise(): Promise<DashboardAnaliseData> {

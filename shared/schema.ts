@@ -319,6 +319,21 @@ export const insertPatrimonioSchema = createInsertSchema(rhPatrimonio).partial({
 export type InsertPatrimonio = z.infer<typeof insertPatrimonioSchema>;
 export type Patrimonio = typeof rhPatrimonio.$inferSelect;
 
+export type PatrimonioHistorico = {
+  id: number;
+  patrimonioId: number;
+  acao: string;
+  usuario: string;
+  data: Date;
+};
+
+export type InsertPatrimonioHistorico = {
+  patrimonioId: number;
+  acao: string;
+  usuario: string;
+  data: Date;
+};
+
 export type FluxoCaixaItem = {
   dataVencimento: Date;
   tipoEvento: string;
