@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo } from "lucide-react";
+import { SiInstagram } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import type { ContratoCompleto } from "@shared/schema";
 
@@ -38,6 +39,11 @@ interface ClienteDb {
   telefone: string | null;
   responsavel: string | null;
   responsavelGeral: string | null;
+  site: string | null;
+  email: string | null;
+  instagram: string | null;
+  linksContrato: string | null;
+  linkListaClickup: string | null;
   cluster: string | null;
   servicos: string | null;
   dataInicio: Date | null;
@@ -612,6 +618,48 @@ export default function ClientDetail() {
                 </div>
               </div>
 
+              <div className="flex items-start gap-3" data-testid="info-email">
+                <Mail className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Email</p>
+                  {cliente.email ? (
+                    <a href={`mailto:${cliente.email}`} className="font-medium text-primary hover:underline" data-testid="text-email">{cliente.email}</a>
+                  ) : (
+                    <p className="font-medium text-muted-foreground" data-testid="text-email">Não informado</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-site">
+                <Globe className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Site</p>
+                  {cliente.site ? (
+                    <a href={cliente.site.startsWith('http') ? cliente.site : `https://${cliente.site}`} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline flex items-center gap-1" data-testid="text-site">
+                      {cliente.site}
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : (
+                    <p className="font-medium text-muted-foreground" data-testid="text-site">Não informado</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-instagram">
+                <SiInstagram className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Instagram</p>
+                  {cliente.instagram ? (
+                    <a href={cliente.instagram.startsWith('http') ? cliente.instagram : `https://instagram.com/${cliente.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline flex items-center gap-1" data-testid="text-instagram">
+                      {cliente.instagram}
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : (
+                    <p className="font-medium text-muted-foreground" data-testid="text-instagram">Não informado</p>
+                  )}
+                </div>
+              </div>
+
               <div className="flex items-start gap-3" data-testid="info-data-cadastro">
                 <Calendar className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -642,6 +690,40 @@ export default function ClientDetail() {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Cluster</p>
                   <p className="font-medium" data-testid="text-cluster">{mapClusterToName(cliente.cluster)}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-link-clickup">
+                <ListTodo className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Link Lista ClickUp</p>
+                  {cliente.linkListaClickup ? (
+                    <a href={cliente.linkListaClickup} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline flex items-center gap-1" data-testid="text-link-clickup">
+                      Abrir no ClickUp
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : (
+                    <p className="font-medium text-muted-foreground" data-testid="text-link-clickup">Não informado</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-links-contrato">
+                <Link2 className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Links Contrato</p>
+                  {cliente.linksContrato ? (
+                    <div className="flex flex-col gap-1" data-testid="list-links-contrato">
+                      {cliente.linksContrato.split(/[,\n]/).filter(link => link.trim()).map((link, idx) => (
+                        <a key={idx} href={link.trim().startsWith('http') ? link.trim() : `https://${link.trim()}`} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline flex items-center gap-1 text-sm" data-testid={`link-contrato-${idx}`}>
+                          Contrato {idx + 1}
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="font-medium text-muted-foreground" data-testid="text-no-links-contrato">Não informado</p>
+                  )}
                 </div>
               </div>
 
