@@ -1,5 +1,6 @@
 import { useState, useMemo, Fragment, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import type { Client, Credential, InsertClient, InsertCredential, AccessLog, ClientStatus } from "@shared/schema";
 import { insertClientSchema, insertCredentialSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
@@ -77,7 +78,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-type ClientWithCredentialCount = Client & { credential_count: number };
+type ClientWithCredentialCount = Client & { credential_count: number; cazClienteId?: number | null };
 type ClientWithCredentials = Client & { credentials: Credential[] };
 
 type LogActionType = 'view_password' | 'copy_password' | 'add_credential' | 'edit_credential' | 'delete_credential' | 'add_client' | 'edit_client' | 'delete_client';
@@ -2216,12 +2217,17 @@ function ClientsTab() {
                         {client.linkedClientCnpj && (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="inline-flex">
+                              <Link 
+                                href={`/clientes/${encodeURIComponent(client.linkedClientCnpj)}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex hover:scale-110 transition-transform"
+                                data-testid={`link-client-page-${client.id}`}
+                              >
                                 <Link2 className="w-4 h-4 text-primary" data-testid={`icon-linked-${client.id}`} />
-                              </span>
+                              </Link>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>Vinculado ao CRM: {getCupClienteName(client.linkedClientCnpj)}</p>
+                              <p>Ver página do cliente: {getCupClienteName(client.linkedClientCnpj)}</p>
                             </TooltipContent>
                           </Tooltip>
                         )}
