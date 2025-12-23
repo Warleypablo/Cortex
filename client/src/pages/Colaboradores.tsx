@@ -1867,13 +1867,13 @@ export default function Colaboradores() {
                           {getSortIcon('setor')}
                         </div>
                       </TableHead>
+                      <TableHead className="min-w-[120px] bg-muted/50">Tempo Turbo</TableHead>
                       <TableHead className="min-w-[280px] bg-muted/50">Contatos</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">CPF</TableHead>
                       <TableHead className="min-w-[140px] bg-muted/50">CNPJ</TableHead>
                       <TableHead className="min-w-[180px] bg-muted/50">PIX</TableHead>
                       <TableHead className="min-w-[200px] bg-muted/50">Localização</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">Admissão</TableHead>
-                      <TableHead className="min-w-[120px] bg-muted/50">Tempo Turbo</TableHead>
                       <TableHead className="min-w-[140px] bg-muted/50">Último Aumento</TableHead>
                       <TableHead className="min-w-[150px] bg-muted/50">Patrimônios</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">Demissão</TableHead>
@@ -1975,6 +1975,11 @@ export default function Colaboradores() {
                             </div>
                           </TableCell>
                           <TableCell className="py-3">
+                            <div className="text-sm text-muted-foreground" data-testid={`text-meses-turbo-${colaborador.id}`}>
+                              {calcularTempoTurbo(colaborador.admissao, colaborador.demissao, colaborador.status)}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3">
                             <div className="space-y-1.5">
                               {colaborador.emailTurbo && (
                                 <div className="flex items-center gap-2 text-sm">
@@ -2047,11 +2052,6 @@ export default function Colaboradores() {
                           <TableCell className="py-3">
                             <div className="text-sm text-muted-foreground" data-testid={`text-admissao-${colaborador.id}`}>
                               {formatDate(colaborador.admissao)}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="text-sm text-muted-foreground" data-testid={`text-meses-turbo-${colaborador.id}`}>
-                              {calcularTempoTurbo(colaborador.admissao, colaborador.demissao, colaborador.status)}
                             </div>
                           </TableCell>
                           <TableCell className="py-3">
