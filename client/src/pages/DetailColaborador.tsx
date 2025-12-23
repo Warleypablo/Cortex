@@ -1297,6 +1297,25 @@ export default function DetailColaborador() {
     enabled: !!colaboradorId,
   });
 
+  // Fetch user photos for profile picture fallback
+  const { data: userPhotos = {} } = useQuery<Record<string, string>>({
+    queryKey: ["/api/user-photos"],
+  });
+
+  // Get photo from linkedUser or userPhotos by emailTurbo
+  const getColaboradorPhoto = () => {
+    if (colaborador?.linkedUser?.picture) {
+      return colaborador.linkedUser.picture;
+    }
+    if (colaborador?.emailTurbo) {
+      const email = colaborador.emailTurbo.toLowerCase().trim();
+      if (userPhotos[email]) {
+        return userPhotos[email];
+      }
+    }
+    return null;
+  };
+
   useEffect(() => {
     if (colaborador?.nome) {
       setPageInfo(colaborador.nome, `${colaborador.cargo || "Colaborador"} • ${colaborador.squad || "Sem squad"}`);
@@ -1367,8 +1386,8 @@ export default function DetailColaborador() {
             <div className="flex items-start justify-between flex-wrap gap-6">
               <div className="flex items-center gap-5">
                 <Avatar className="w-20 h-20 ring-4 ring-background shadow-lg">
-                  {colaborador.linkedUser?.picture ? (
-                    <AvatarImage src={colaborador.linkedUser.picture} alt={colaborador.nome} />
+                  {getColaboradorPhoto() ? (
+                    <AvatarImage src={getColaboradorPhoto()!} alt={colaborador.nome} />
                   ) : null}
                   <AvatarFallback className="text-2xl bg-primary/20 text-primary font-bold">{getInitials(colaborador.nome)}</AvatarFallback>
                 </Avatar>
