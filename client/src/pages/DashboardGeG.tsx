@@ -766,9 +766,10 @@ export default function DashboardGeG() {
                     <TableBody>
                       {(() => {
                         const totalNivel = colaboradoresPorNivel.reduce((sum, item) => sum + item.total, 0);
+                        const formatNivel = (nome: string) => nome.replace(/^X\s+/, '');
                         return colaboradoresPorNivel.map((item, index) => (
                           <TableRow key={item.nome} data-testid={`nivel-dist-${index}`}>
-                            <TableCell className="font-medium">{item.nome}</TableCell>
+                            <TableCell className="font-medium">{formatNivel(item.nome)}</TableCell>
                             <TableCell className="text-right">{item.total}</TableCell>
                             <TableCell className="text-right">{totalNivel > 0 ? ((item.total / totalNivel) * 100).toFixed(1) : 0}%</TableCell>
                           </TableRow>
