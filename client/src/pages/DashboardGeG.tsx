@@ -679,8 +679,22 @@ export default function DashboardGeG() {
                     </TableHeader>
                     <TableBody>
                       {(() => {
-                        const totalSquad = colaboradoresPorSquad.reduce((sum, item) => sum + item.total, 0);
-                        return colaboradoresPorSquad.map((item, index) => (
+                        const removeEmoji = (str: string) => str.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]/gu, '').trim();
+                        const aggregatedSquads = colaboradoresPorSquad.reduce((acc, item) => {
+                          const cleanName = removeEmoji(item.nome);
+                          const existing = acc.find(s => removeEmoji(s.nome) === cleanName);
+                          if (existing) {
+                            existing.total += item.total;
+                            if (item.nome.length > existing.nome.length) {
+                              existing.nome = item.nome;
+                            }
+                          } else {
+                            acc.push({ ...item });
+                          }
+                          return acc;
+                        }, [] as typeof colaboradoresPorSquad);
+                        const totalSquad = aggregatedSquads.reduce((sum, item) => sum + item.total, 0);
+                        return aggregatedSquads.map((item, index) => (
                           <TableRow key={item.nome} data-testid={`squad-dist-${index}`}>
                             <TableCell className="font-medium">{item.nome}</TableCell>
                             <TableCell className="text-right">{item.total}</TableCell>
