@@ -241,6 +241,17 @@ export default function ClientDetail() {
     }
   }, [cliente, setPageInfo]);
 
+  const servicosAtivos = useMemo(() => {
+    if (!contratos) return [];
+    return contratos
+      .filter(c => {
+        const statusLower = c.status?.toLowerCase() || "";
+        return statusLower.includes("ativo") || statusLower.includes("active");
+      })
+      .map(c => c.servico)
+      .filter((s): s is string => !!s);
+  }, [contratos]);
+
   const isLoading = isLoadingCliente;
 
   if (isLoading) {
@@ -351,17 +362,6 @@ export default function ClientDetail() {
       default: return code;
     }
   };
-
-  const servicosAtivos = useMemo(() => {
-    if (!contratos) return [];
-    return contratos
-      .filter(c => {
-        const statusLower = c.status?.toLowerCase() || "";
-        return statusLower.includes("ativo") || statusLower.includes("active");
-      })
-      .map(c => c.servico)
-      .filter((s): s is string => !!s);
-  }, [contratos]);
 
   return (
     <div className="bg-background">
