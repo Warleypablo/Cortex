@@ -178,6 +178,7 @@ export interface IStorage {
   getGegAniversariosEmpresa(squad: string, setor: string): Promise<any>;
   getGegFiltros(): Promise<any>;
   getGegValorMedioSalario(squad: string, setor: string): Promise<{ valorMedio: number; totalColaboradores: number }>;
+  getGegCustoFolha(squad: string, setor: string): Promise<{ custoTotal: number; totalColaboradores: number }>;
   getGegPatrimonioResumo(): Promise<{ totalAtivos: number; valorTotalPago: number; valorTotalMercado: number; porTipo: { tipo: string; quantidade: number }[] }>;
   getGegUltimasPromocoes(squad: string, setor: string, limit?: number): Promise<any[]>;
   getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
@@ -566,6 +567,10 @@ export class MemStorage implements IStorage {
   }
 
   async getGegValorMedioSalario(squad: string, setor: string): Promise<{ valorMedio: number; totalColaboradores: number }> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegCustoFolha(squad: string, setor: string): Promise<{ custoTotal: number; totalColaboradores: number }> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -3661,7 +3666,7 @@ export class DbStorage implements IStorage {
       sql`status = 'Ativo'`,
       sql`salario IS NOT NULL`,
       sql`salario != ''`,
-      sql`salario::numeric > 0`
+      sql`salario ~ '^[0-9]+(\.[0-9]+)?$'`
     ];
     
     if (squad !== 'todos') {
@@ -3682,6 +3687,36 @@ export class DbStorage implements IStorage {
     const row = result.rows[0] as any;
     return {
       valorMedio: parseFloat(row.valor_medio || '0'),
+      totalColaboradores: parseInt(row.total_colaboradores || '0'),
+    };
+  }
+
+  async getGegCustoFolha(squad: string, setor: string): Promise<{ custoTotal: number; totalColaboradores: number }> {
+    const conditions = [
+      sql`status = 'Ativo'`,
+      sql`salario IS NOT NULL`,
+      sql`salario != ''`,
+      sql`salario ~ '^[0-9]+(\.[0-9]+)?$'`
+    ];
+    
+    if (squad !== 'todos') {
+      conditions.push(sql`squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      conditions.push(sql`setor = ${setor}`);
+    }
+    
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(salario::numeric), 0) as custo_total,
+        COUNT(*) as total_colaboradores
+      FROM rh_pessoal
+      WHERE ${sql.join(conditions, sql` AND `)}
+    `);
+
+    const row = result.rows[0] as any;
+    return {
+      custoTotal: parseFloat(row.custo_total || '0'),
       totalColaboradores: parseInt(row.total_colaboradores || '0'),
     };
   }
