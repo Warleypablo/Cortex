@@ -1706,14 +1706,14 @@ export class DbStorage implements IStorage {
     return newPatrimonio;
   }
 
-  async getColaboradoresDropdown(): Promise<{ id: number; nome: string }[]> {
+  async getColaboradoresDropdown(): Promise<{ id: number; nome: string; status: string | null }[]> {
     const result = await db
       .select({
         id: schema.rhPessoal.id,
         nome: schema.rhPessoal.nome,
+        status: schema.rhPessoal.status,
       })
       .from(schema.rhPessoal)
-      .where(eq(schema.rhPessoal.status, 'Ativo'))
       .orderBy(schema.rhPessoal.nome);
     
     return result;
