@@ -1,11 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePageInfo } from "@/contexts/PageContext";
-import { ArrowLeft, Package, User, DollarSign, Info, FileText, Mail, Phone, Briefcase, Calendar, Check, ChevronsUpDown, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Package, User, DollarSign, Info, Mail, Phone, Briefcase, Calendar, Check, ChevronsUpDown, UserPlus, X, Edit, Trash2, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,8 +13,14 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 
 interface Colaborador {
   id: number;
@@ -64,14 +69,34 @@ interface ColaboradorDropdown {
   nome: string;
 }
 
+interface HistoricoItem {
+  id: number;
+  data: string;
+  acao: string;
+  usuario: string;
+}
+
+const editPatrimonioSchema = z.object({
+  numeroAtivo: z.string().optional(),
+  ativo: z.string().optional(),
+  marca: z.string().optional(),
+  estadoConservacao: z.string().optional(),
+  descricao: z.string().optional(),
+  valorPago: z.string().optional(),
+  valorMercado: z.string().optional(),
+});
+
+type EditPatrimonioForm = z.infer<typeof editPatrimonioSchema>;
+
 export default function PatrimonioDetail() {
   const { setPageInfo } = usePageInfo();
   const params = useParams();
   const [, setLocation] = useLocation();
   const patrimonioId = params.id;
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   const { toast } = useToast();
   const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const { data: patrimonio, isLoading, error } = useQuery<PatrimonioComResponsavel>({
     queryKey: ["/api/patrimonio", patrimonioId],
@@ -89,6 +114,45 @@ export default function PatrimonioDetail() {
     queryKey: ["/api/colaboradores/dropdown"],
   });
 
+  const { data: historico = [], isLoading: historicoLoading } = useQuery<HistoricoItem[]>({
+    queryKey: ["/api/patrimonio", patrimonioId, "historico"],
+    queryFn: async () => {
+      const res = await fetch(`/api/patrimonio/${patrimonioId}/historico`);
+      if (!res.ok) {
+        return [];
+      }
+      return res.json();
+    },
+    enabled: !!patrimonioId,
+  });
+
+  const form = useForm<EditPatrimonioForm>({
+    resolver: zodResolver(editPatrimonioSchema),
+    defaultValues: {
+      numeroAtivo: "",
+      ativo: "",
+      marca: "",
+      estadoConservacao: "",
+      descricao: "",
+      valorPago: "",
+      valorMercado: "",
+    },
+  });
+
+  useEffect(() => {
+    if (patrimonio && editDialogOpen) {
+      form.reset({
+        numeroAtivo: patrimonio.numeroAtivo || "",
+        ativo: patrimonio.ativo || "",
+        marca: patrimonio.marca || "",
+        estadoConservacao: patrimonio.estadoConservacao || "",
+        descricao: patrimonio.descricao || "",
+        valorPago: patrimonio.valorPago || "",
+        valorMercado: patrimonio.valorMercado || "",
+      });
+    }
+  }, [patrimonio, editDialogOpen, form]);
+
   const updateResponsavelMutation = useMutation({
     mutationFn: async (responsavelNome: string | null) => {
       return apiRequest("PATCH", `/api/patrimonio/${patrimonioId}/responsavel`, {
@@ -96,8 +160,8 @@ export default function PatrimonioDetail() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patrimonio", patrimonioId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/patrimonio"] });
+      qc.invalidateQueries({ queryKey: ["/api/patrimonio", patrimonioId] });
+      qc.invalidateQueries({ queryKey: ["/api/patrimonio"] });
       toast({
         title: "Responsável atualizado",
         description: "O responsável pelo patrimônio foi atualizado com sucesso.",
@@ -108,6 +172,49 @@ export default function PatrimonioDetail() {
       toast({
         title: "Erro ao atualizar",
         description: error.message || "Não foi possível atualizar o responsável.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePatrimonioMutation = useMutation({
+    mutationFn: async (data: EditPatrimonioForm) => {
+      return apiRequest("PATCH", `/api/patrimonio/${patrimonioId}`, data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/patrimonio", patrimonioId] });
+      qc.invalidateQueries({ queryKey: ["/api/patrimonio"] });
+      toast({
+        title: "Patrimônio atualizado",
+        description: "Os dados do patrimônio foram atualizados com sucesso.",
+      });
+      setEditDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar",
+        description: error.message || "Não foi possível atualizar o patrimônio.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePatrimonioMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/patrimonio/${patrimonioId}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/patrimonio"] });
+      toast({
+        title: "Patrimônio excluído",
+        description: "O patrimônio foi excluído com sucesso.",
+      });
+      setLocation("/patrimonio");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao excluir",
+        description: error.message || "Não foi possível excluir o patrimônio.",
         variant: "destructive",
       });
     },
@@ -135,6 +242,10 @@ export default function PatrimonioDetail() {
     updateResponsavelMutation.mutate(null);
   };
 
+  const onSubmitEdit = (data: EditPatrimonioForm) => {
+    updatePatrimonioMutation.mutate(data);
+  };
+
   const formatCurrency = (value: string | null) => {
     if (!value) return "-";
     const num = parseFloat(value);
@@ -146,6 +257,17 @@ export default function PatrimonioDetail() {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
     return new Intl.DateTimeFormat('pt-BR').format(date);
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
   };
 
   const getEstadoColor = (estado: string | null) => {
@@ -218,6 +340,47 @@ export default function PatrimonioDetail() {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setEditDialogOpen(true)}
+              data-testid="button-edit"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  data-testid="button-delete"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir patrimônio</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Tem certeza que deseja excluir este patrimônio? Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-delete">Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deletePatrimonioMutation.mutate()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    data-testid="button-confirm-delete"
+                  >
+                    {deletePatrimonioMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Excluir"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <div className="flex-1">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <span>Gestão de Ativos</span>
@@ -230,248 +393,54 @@ export default function PatrimonioDetail() {
             <Package className="w-8 h-8 text-primary" />
           </div>
 
-          <Tabs defaultValue="geral" className="w-full">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="geral" data-testid="tab-geral">Informações Gerais</TabsTrigger>
-              <TabsTrigger value="tecnicas" data-testid="tab-tecnicas">Informações Técnicas</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="geral" className="space-y-6 mt-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <Card>
-                  <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <Info className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle>Informações do Bem</CardTitle>
-                      <CardDescription>Dados principais do ativo</CardDescription>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground">Número do Patrimônio</div>
-                      <div className="text-lg font-semibold" data-testid="numero-patrimonio">
-                        {patrimonio.numeroAtivo || "-"}
-                      </div>
-                    </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground">Tipo de Bem</div>
-                      <div className="text-base" data-testid="tipo-bem">
-                        {patrimonio.ativo || "-"}
-                      </div>
-                    </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground">Marca</div>
-                      <div className="text-base" data-testid="marca-bem">
-                        {patrimonio.marca || "-"}
-                      </div>
-                    </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground">Estado de Conservação</div>
-                      {patrimonio.estadoConservacao ? (
-                        <Badge variant="outline" className={getEstadoColor(patrimonio.estadoConservacao)} data-testid="estado-conservacao">
-                          {patrimonio.estadoConservacao}
-                        </Badge>
-                      ) : (
-                        <div className="text-base">-</div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <DollarSign className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle>Valores</CardTitle>
-                      <CardDescription>Informações financeiras</CardDescription>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground">Valor Pago</div>
-                      <div className="text-lg font-semibold text-green-600 dark:text-green-400" data-testid="valor-pago">
-                        {formatCurrency(patrimonio.valorPago)}
-                      </div>
-                    </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground">Valor de Mercado</div>
-                      <div className="text-lg font-semibold text-blue-600 dark:text-blue-400" data-testid="valor-mercado">
-                        {formatCurrency(patrimonio.valorMercado)}
-                      </div>
-                    </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-muted-foreground">Valor de Venda</div>
-                      <div className="text-lg font-semibold text-purple-600 dark:text-purple-400" data-testid="valor-venda">
-                        {formatCurrency(patrimonio.valorVenda)}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <User className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle>Responsável pelo Patrimônio</CardTitle>
-                      <CardDescription>Colaborador atualmente responsável pelo bem</CardDescription>
-                    </div>
-                  </div>
-                  <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={comboboxOpen}
-                        className="w-[280px] justify-between"
-                        data-testid="button-atribuir-responsavel"
-                      >
-                        {patrimonio.responsavelAtual ? (
-                          <span className="truncate">{patrimonio.responsavelAtual}</span>
-                        ) : (
-                          <span className="text-muted-foreground">Atribuir responsável...</span>
-                        )}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[280px] p-0" align="end">
-                      <Command>
-                        <CommandInput placeholder="Buscar colaborador..." data-testid="input-buscar-colaborador" />
-                        <CommandList>
-                          <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
-                          <CommandGroup>
-                            {colaboradoresDropdown.map((colaborador) => (
-                              <CommandItem
-                                key={colaborador.id}
-                                value={colaborador.nome}
-                                onSelect={() => handleSelectResponsavel(colaborador.nome)}
-                                data-testid={`option-colaborador-${colaborador.id}`}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    patrimonio.responsavelAtual === colaborador.nome
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                {colaborador.nome}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </CardHeader>
-                <CardContent>
-                  {patrimonio.colaborador ? (
-                    <div className="flex items-start gap-4">
-                      <Avatar className="h-16 w-16">
-                        <AvatarFallback className="text-lg bg-primary/10 text-primary">
-                          {getInitials(patrimonio.colaborador.nome)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 space-y-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <div className="text-xl font-semibold" data-testid="colaborador-nome">
-                              {patrimonio.colaborador.nome}
-                            </div>
-                            {patrimonio.colaborador.cargo && (
-                              <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                                <Briefcase className="h-3 w-3" />
-                                {patrimonio.colaborador.cargo}
-                                {patrimonio.colaborador.setor && ` • ${patrimonio.colaborador.setor}`}
-                              </div>
-                            )}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleRemoveResponsavel}
-                            disabled={updateResponsavelMutation.isPending}
-                            data-testid="button-remover-responsavel"
-                            title="Remover responsável"
-                          >
-                            {updateResponsavelMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <X className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </Button>
-                        </div>
-
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {patrimonio.colaborador.emailTurbo && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Mail className="h-4 w-4 text-muted-foreground" />
-                              <span data-testid="colaborador-email">{patrimonio.colaborador.emailTurbo}</span>
-                            </div>
-                          )}
-                          {patrimonio.colaborador.telefone && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Phone className="h-4 w-4 text-muted-foreground" />
-                              <span data-testid="colaborador-telefone">{patrimonio.colaborador.telefone}</span>
-                            </div>
-                          )}
-                          {patrimonio.colaborador.admissao && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
-                              <span>Admissão: {formatDate(patrimonio.colaborador.admissao)}</span>
-                            </div>
-                          )}
-                          {patrimonio.colaborador.squad && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Badge variant="secondary">{patrimonio.colaborador.squad}</Badge>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
-                        <UserPlus className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Nenhum responsável atribuído.
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Use o botão acima para atribuir um colaborador.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="tecnicas" className="space-y-6 mt-6">
+          <div className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
               <Card>
                 <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <FileText className="h-5 w-5 text-primary" />
+                    <Info className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <CardTitle>Descrição e Especificações</CardTitle>
-                    <CardDescription>Detalhes técnicos do bem</CardDescription>
+                    <CardTitle>Informações do Bem</CardTitle>
+                    <CardDescription>Dados principais do ativo</CardDescription>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-muted-foreground">ID do Sistema</div>
+                      <div className="text-base font-mono">{patrimonio.id}</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-muted-foreground">Número de Ativo</div>
+                      <div className="text-base font-mono" data-testid="numero-patrimonio">{patrimonio.numeroAtivo || "-"}</div>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-muted-foreground">Tipo de Bem (Categoria)</div>
+                      <div className="text-base" data-testid="tipo-bem">{patrimonio.ativo || "-"}</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-muted-foreground">Marca (Fabricante)</div>
+                      <div className="text-base" data-testid="marca-bem">{patrimonio.marca || "-"}</div>
+                    </div>
+                  </div>
+                  <Separator />
                   <div className="space-y-2">
-                    <div className="text-sm font-medium text-muted-foreground">Descrição/Modelo</div>
+                    <div className="text-sm font-medium text-muted-foreground">Estado de Conservação</div>
+                    {patrimonio.estadoConservacao ? (
+                      <Badge variant="outline" className={getEstadoColor(patrimonio.estadoConservacao)} data-testid="estado-conservacao">
+                        {patrimonio.estadoConservacao}
+                      </Badge>
+                    ) : (
+                      <div className="text-base">-</div>
+                    )}
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-muted-foreground">Modelo / Descrição</div>
                     <div className="text-base whitespace-pre-wrap" data-testid="descricao-bem">
                       {patrimonio.descricao || "Nenhuma descrição disponível"}
                     </div>
@@ -480,34 +449,358 @@ export default function PatrimonioDetail() {
               </Card>
 
               <Card>
-                <CardHeader>
-                  <CardTitle>Resumo Técnico</CardTitle>
+                <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <DollarSign className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle>Valores</CardTitle>
+                    <CardDescription>Informações financeiras</CardDescription>
+                  </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium text-muted-foreground">ID do Sistema</div>
-                      <div className="text-base font-mono">{patrimonio.id}</div>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-muted-foreground">Valor Pago</div>
+                    <div className="text-lg font-semibold text-green-600 dark:text-green-400" data-testid="valor-pago">
+                      {formatCurrency(patrimonio.valorPago)}
                     </div>
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium text-muted-foreground">Número de Ativo</div>
-                      <div className="text-base font-mono">{patrimonio.numeroAtivo || "-"}</div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium text-muted-foreground">Categoria</div>
-                      <div className="text-base">{patrimonio.ativo || "-"}</div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium text-muted-foreground">Fabricante</div>
-                      <div className="text-base">{patrimonio.marca || "-"}</div>
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-muted-foreground">Valor de Mercado</div>
+                    <div className="text-lg font-semibold text-blue-600 dark:text-blue-400" data-testid="valor-mercado">
+                      {formatCurrency(patrimonio.valorMercado)}
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-          </Tabs>
+            </div>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <User className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle>Responsável pelo Patrimônio</CardTitle>
+                    <CardDescription>Colaborador atualmente responsável pelo bem</CardDescription>
+                  </div>
+                </div>
+                <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={comboboxOpen}
+                      className="w-[280px] justify-between"
+                      data-testid="button-atribuir-responsavel"
+                    >
+                      {patrimonio.responsavelAtual ? (
+                        <span className="truncate">{patrimonio.responsavelAtual}</span>
+                      ) : (
+                        <span className="text-muted-foreground">Atribuir responsável...</span>
+                      )}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[280px] p-0" align="end">
+                    <Command>
+                      <CommandInput placeholder="Buscar colaborador..." data-testid="input-buscar-colaborador" />
+                      <CommandList>
+                        <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {colaboradoresDropdown.map((colaborador) => (
+                            <CommandItem
+                              key={colaborador.id}
+                              value={colaborador.nome}
+                              onSelect={() => handleSelectResponsavel(colaborador.nome)}
+                              data-testid={`option-colaborador-${colaborador.id}`}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  patrimonio.responsavelAtual === colaborador.nome
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                              {colaborador.nome}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </CardHeader>
+              <CardContent>
+                {patrimonio.colaborador ? (
+                  <div className="flex items-start gap-4">
+                    <Avatar className="h-16 w-16">
+                      <AvatarFallback className="text-lg bg-primary/10 text-primary">
+                        {getInitials(patrimonio.colaborador.nome)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="text-xl font-semibold" data-testid="colaborador-nome">
+                            {patrimonio.colaborador.nome}
+                          </div>
+                          {patrimonio.colaborador.cargo && (
+                            <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                              <Briefcase className="h-3 w-3" />
+                              {patrimonio.colaborador.cargo}
+                              {patrimonio.colaborador.setor && ` • ${patrimonio.colaborador.setor}`}
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleRemoveResponsavel}
+                          disabled={updateResponsavelMutation.isPending}
+                          data-testid="button-remover-responsavel"
+                          title="Remover responsável"
+                        >
+                          {updateResponsavelMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <X className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {patrimonio.colaborador.emailTurbo && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            <span data-testid="colaborador-email">{patrimonio.colaborador.emailTurbo}</span>
+                          </div>
+                        )}
+                        {patrimonio.colaborador.telefone && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span data-testid="colaborador-telefone">{patrimonio.colaborador.telefone}</span>
+                          </div>
+                        )}
+                        {patrimonio.colaborador.admissao && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span>Admissão: {formatDate(patrimonio.colaborador.admissao)}</span>
+                          </div>
+                        )}
+                        {patrimonio.colaborador.squad && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Badge variant="secondary">{patrimonio.colaborador.squad}</Badge>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+                      <UserPlus className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum responsável atribuído.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Use o botão acima para atribuir um colaborador.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <History className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Histórico de Alterações</CardTitle>
+                  <CardDescription>Registro de mudanças do patrimônio</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {historicoLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : historico.length > 0 ? (
+                  <div className="space-y-4">
+                    {historico.map((item) => (
+                      <div key={item.id} className="flex items-start gap-3 pb-3 border-b last:border-b-0 last:pb-0">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted shrink-0">
+                          <History className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium" data-testid={`historico-acao-${item.id}`}>
+                            {item.acao}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                            <span data-testid={`historico-data-${item.id}`}>{formatDateTime(item.data)}</span>
+                            {item.usuario && (
+                              <>
+                                <span>•</span>
+                                <span data-testid={`historico-usuario-${item.id}`}>{item.usuario}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+                      <History className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum histórico disponível
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar Patrimônio</DialogTitle>
+            <DialogDescription>
+              Atualize as informações do patrimônio abaixo.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmitEdit)} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="numeroAtivo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Número do Ativo</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: 001" {...field} data-testid="input-numero-ativo" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="ativo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de Bem</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Notebook" {...field} data-testid="input-ativo" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="marca"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Marca</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Dell" {...field} data-testid="input-marca" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="estadoConservacao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estado de Conservação</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Bom" {...field} data-testid="input-estado-conservacao" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="descricao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Descrição / Modelo</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Dell Latitude 5520" {...field} data-testid="input-descricao" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="valorPago"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Valor Pago</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: 5000.00" {...field} data-testid="input-valor-pago" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="valorMercado"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Valor de Mercado</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: 4500.00" {...field} data-testid="input-valor-mercado" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditDialogOpen(false)}
+                  data-testid="button-cancel-edit"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updatePatrimonioMutation.isPending}
+                  data-testid="button-save-edit"
+                >
+                  {updatePatrimonioMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : null}
+                  Salvar
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
