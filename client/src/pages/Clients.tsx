@@ -29,6 +29,17 @@ import type { ClienteCompleto } from "../../../server/storage";
 type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
 type SortDirection = "asc" | "desc";
 
+const mapClusterToName = (cluster: string | null): string => {
+  if (!cluster) return "Não definido";
+  switch (cluster) {
+    case "1": return "NFNC";
+    case "2": return "Regulares";
+    case "3": return "Chaves";
+    case "4": return "Imperdíveis";
+    default: return cluster;
+  }
+};
+
 export default function Clients() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -491,7 +502,7 @@ export default function Clients() {
                       <SelectContent>
                         <SelectItem value="all">Todos os clusters</SelectItem>
                         {clustersUnicos.map(cluster => (
-                          <SelectItem key={cluster} value={cluster}>{cluster}</SelectItem>
+                          <SelectItem key={cluster} value={cluster}>{mapClusterToName(cluster)}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
