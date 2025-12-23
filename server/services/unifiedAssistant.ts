@@ -83,19 +83,38 @@ async function chatGeral(request: UnifiedAssistantRequest): Promise<UnifiedAssis
 }
 
 async function chatClientes(request: UnifiedAssistantRequest): Promise<UnifiedAssistantResponse> {
-  const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
-    { role: "system", content: CLIENTES_SYSTEM_PROMPT }
-  ];
-
-  if (request.historico) {
-    for (const msg of request.historico) {
-      messages.push({ role: msg.role, content: msg.content });
-    }
-  }
-
-  messages.push({ role: "user", content: request.message });
-
   try {
+    // Buscar dados reais de clientes para incluir no contexto
+    const topClientes = await storage.getTopClientesByLTV(20);
+    
+    // Formatar dados de clientes para o contexto
+    const clientesFormatados = topClientes.map((c, i) => 
+      `${i + 1}. ${c.nome} - LTV: R$ ${c.ltv.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | LT: ${c.ltMeses} meses | Serviços: ${c.servicos || 'N/A'}`
+    ).join('\n');
+
+    const dadosClientesContext = `
+
+DADOS REAIS DE CLIENTES (Top 20 por LTV):
+${clientesFormatados}
+
+IMPORTANTE: Use APENAS os dados acima para responder perguntas sobre clientes. NÃO invente dados.
+Se o usuário perguntar sobre um cliente específico que não está na lista, informe que você tem acesso limitado aos top 20 clientes por LTV.
+Para informações mais detalhadas, oriente o usuário a verificar na página de clientes.`;
+
+    const systemPromptComDados = CLIENTES_SYSTEM_PROMPT + dadosClientesContext;
+
+    const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+      { role: "system", content: systemPromptComDados }
+    ];
+
+    if (request.historico) {
+      for (const msg of request.historico) {
+        messages.push({ role: msg.role, content: msg.content });
+      }
+    }
+
+    messages.push({ role: "user", content: request.message });
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages,
