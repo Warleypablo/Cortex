@@ -267,7 +267,7 @@ export default function DashboardGeG() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           <Card data-testid="card-headcount">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Headcount</CardTitle>
@@ -350,6 +350,25 @@ export default function DashboardGeG() {
                     {tempoPermanencia?.tempoMedioAtivos ? formatDecimal(tempoPermanencia.tempoMedioAtivos) : '0'}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">meses (ativos)</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-tempo-desligados">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Permanência Desligados</CardTitle>
+              <UserMinus className="w-4 h-4 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              {isLoadingTempoPermanencia ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-red-600" data-testid="text-tempo-desligados">
+                    {tempoPermanencia?.tempoMedioDesligados ? formatDecimal(tempoPermanencia.tempoMedioDesligados) : '0'}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">meses (desligados)</p>
                 </>
               )}
             </CardContent>
