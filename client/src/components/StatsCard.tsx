@@ -136,7 +136,7 @@ export default function StatsCard({
                   side="bottom" 
                   align="start"
                   sideOffset={8}
-                  className="z-[100] backdrop-blur-xl bg-white/95 dark:bg-slate-900/95 border border-white/40 dark:border-white/10 shadow-xl shadow-black/10 dark:shadow-black/30 px-3 py-2 rounded-lg max-w-[250px]"
+                  className="z-[9999] backdrop-blur-xl bg-white/95 dark:bg-slate-900/95 border border-white/40 dark:border-white/10 shadow-xl shadow-black/10 dark:shadow-black/30 px-3 py-2 rounded-lg max-w-[250px]"
                 >
                   <p className="text-sm text-foreground">{subtitle}</p>
                 </TooltipContent>
