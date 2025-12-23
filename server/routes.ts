@@ -1448,6 +1448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     { id: 10, nome: "🔥 Chama (OFF)", descricao: null, ativo: "true" },
     { id: 11, nome: "🏹 Hunters (OFF)", descricao: null, ativo: "true" },
     { id: 12, nome: "🧩 Fragmentados (OFF)", descricao: null, ativo: "true" },
+    { id: 13, nome: "✨ Makers", descricao: null, ativo: "true" },
   ];
 
   app.get("/api/rh/cargos", async (req, res) => {
