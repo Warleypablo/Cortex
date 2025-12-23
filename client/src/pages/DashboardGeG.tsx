@@ -871,24 +871,34 @@ export default function DashboardGeG() {
                     <Skeleton key={i} className="h-14 w-full" />
                   ))}
                 </div>
-              ) : aniversariosEmpresa && aniversariosEmpresa.length > 0 ? (
+              ) : aniversariosEmpresa && aniversariosEmpresa.filter(a => a.anosDeEmpresa > 0).length > 0 ? (
                 <div className="space-y-2 max-h-[250px] overflow-y-auto">
-                  {aniversariosEmpresa.map((aniv) => (
-                    <div key={aniv.id} className="flex items-center justify-between p-3 bg-card rounded-lg border" data-testid={`aniversario-empresa-${aniv.id}`}>
-                      <div>
-                        <p className="font-medium text-sm">{aniv.nome}</p>
-                        <p className="text-xs text-muted-foreground">{aniv.cargo || 'N/A'} - {aniv.squad || 'N/A'}</p>
+                  {aniversariosEmpresa.filter(a => a.anosDeEmpresa > 0).map((aniv) => {
+                    const getYearBadgeColor = (anos: number) => {
+                      if (anos >= 5) return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
+                      if (anos >= 3) return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+                      if (anos >= 2) return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+                      return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+                    };
+                    return (
+                      <div key={aniv.id} className="flex items-center justify-between p-3 bg-card rounded-lg border" data-testid={`aniversario-empresa-${aniv.id}`}>
+                        <div>
+                          <p className="font-medium text-sm">{aniv.nome}</p>
+                          <p className="text-xs text-muted-foreground">{aniv.cargo || 'N/A'} - {aniv.squad || 'N/A'}</p>
+                        </div>
+                        <div className="text-right flex items-center gap-2">
+                          <Badge className={getYearBadgeColor(aniv.anosDeEmpresa)}>
+                            {aniv.anosDeEmpresa} {aniv.anosDeEmpresa === 1 ? 'ano' : 'anos'}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground">
+                            {aniv.diasAteAniversario === 0 ? 'Hoje!' : 
+                             aniv.diasAteAniversario === 1 ? 'Amanhã' : 
+                             `Em ${aniv.diasAteAniversario} dias`}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">{aniv.anosDeEmpresa} {aniv.anosDeEmpresa === 1 ? 'ano' : 'anos'}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {aniv.diasAteAniversario === 0 ? 'Hoje!' : 
-                           aniv.diasAteAniversario === 1 ? 'Amanhã' : 
-                           `Em ${aniv.diasAteAniversario} dias`}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-[200px]" data-testid="text-no-aniversarios-empresa">
