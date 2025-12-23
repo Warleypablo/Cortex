@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import ClientsTable from "@/components/ClientsTable";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Filter, Users, UserCheck, TrendingUp, Clock, DollarSign, X, Check } from "lucide-react";
+import { Loader2, Search, Filter, Users, UserCheck, TrendingUp, Clock, DollarSign, X, Check, Save, Bookmark, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import StatsCard from "@/components/StatsCard";
@@ -28,6 +28,24 @@ import type { ClienteCompleto } from "../../../server/storage";
 
 type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
 type SortDirection = "asc" | "desc";
+
+type SavedFilter = {
+  id: string;
+  name: string;
+  filters: {
+    servicoFilter: string[];
+    statusFilter: string[];
+    tipoContratoFilter: string;
+    responsavelFilter: string[];
+    clusterFilter: string;
+    ltOperator: string;
+    ltValue: string;
+    aovOperator: string;
+    aovValue: string;
+  };
+};
+
+const SAVED_FILTERS_KEY = "turbo-cortex-client-filters";
 
 const mapClusterToName = (cluster: string | null): string => {
   if (!cluster) return "Não definido";
@@ -56,6 +74,48 @@ export default function Clients() {
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  
+  // Saved filters state
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>(() => {
+    try {
+      const stored = localStorage.getItem(SAVED_FILTERS_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+  const [newFilterName, setNewFilterName] = useState("");
+  const [showSaveInput, setShowSaveInput] = useState(false);
+
+  const saveCurrentFilter = () => {
+    if (!newFilterName.trim()) return;
+    const newFilter: SavedFilter = {
+      id: Date.now().toString(),
+      name: newFilterName.trim(),
+      filters: { servicoFilter, statusFilter, tipoContratoFilter, responsavelFilter, clusterFilter, ltOperator, ltValue, aovOperator, aovValue }
+    };
+    const updated = [...savedFilters, newFilter];
+    setSavedFilters(updated);
+    localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(updated));
+    setNewFilterName("");
+    setShowSaveInput(false);
+  };
+
+  const loadSavedFilter = (filter: SavedFilter) => {
+    setServicoFilter(filter.filters.servicoFilter);
+    setStatusFilter(filter.filters.statusFilter);
+    setTipoContratoFilter(filter.filters.tipoContratoFilter);
+    setResponsavelFilter(filter.filters.responsavelFilter);
+    setClusterFilter(filter.filters.clusterFilter);
+    setLtOperator(filter.filters.ltOperator);
+    setLtValue(filter.filters.ltValue);
+    setAovOperator(filter.filters.aovOperator);
+    setAovValue(filter.filters.aovValue);
+  };
+
+  const deleteSavedFilter = (id: string) => {
+    const updated = savedFilters.filter(f => f.id !== id);
+    setSavedFilters(updated);
+    localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(updated));
+  };
 
   const { data: clientes, isLoading, error } = useQuery<ClienteCompleto[]>({
     queryKey: ["/api/clientes"],
@@ -399,20 +459,88 @@ export default function Clients() {
             <PopoverContent className="w-96 p-0 overflow-hidden" align="end">
               <div className="flex items-center justify-between p-4 pb-2 border-b">
                 <h4 className="font-medium text-sm">Filtros</h4>
-                {hasActiveFilters && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-7 text-xs"
-                    onClick={clearAllFilters}
-                    data-testid="button-clear-filters"
-                  >
-                    Limpar filtros
-                  </Button>
-                )}
+                <div className="flex items-center gap-1">
+                  {hasActiveFilters && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-xs"
+                      onClick={clearAllFilters}
+                      data-testid="button-clear-filters"
+                    >
+                      Limpar
+                    </Button>
+                  )}
+                  {hasActiveFilters && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7"
+                      onClick={() => setShowSaveInput(!showSaveInput)}
+                      data-testid="button-save-filter"
+                      title="Salvar filtro"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
               <ScrollArea className="h-[60vh]">
                 <div className="space-y-4 p-4">
+                  {/* Save filter input */}
+                  {showSaveInput && (
+                    <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
+                      <Input
+                        placeholder="Nome do filtro..."
+                        value={newFilterName}
+                        onChange={(e) => setNewFilterName(e.target.value)}
+                        className="h-8 text-sm"
+                        onKeyDown={(e) => e.key === 'Enter' && saveCurrentFilter()}
+                        data-testid="input-filter-name"
+                      />
+                      <Button size="sm" className="h-8" onClick={saveCurrentFilter} data-testid="button-confirm-save-filter">
+                        <Check className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-8" onClick={() => setShowSaveInput(false)}>
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* Saved filters list */}
+                  {savedFilters.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <Bookmark className="w-3 h-3" />
+                        Filtros Salvos
+                      </Label>
+                      <div className="border rounded-md divide-y">
+                        {savedFilters.map(filter => (
+                          <div 
+                            key={filter.id} 
+                            className="flex items-center justify-between px-3 py-2 hover:bg-muted/50 group"
+                          >
+                            <button
+                              className="text-sm text-left flex-1 truncate"
+                              onClick={() => loadSavedFilter(filter)}
+                              data-testid={`button-load-filter-${filter.id}`}
+                            >
+                              {filter.name}
+                            </button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => deleteSavedFilter(filter.id)}
+                              data-testid={`button-delete-filter-${filter.id}`}
+                            >
+                              <Trash2 className="w-3 h-3 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Tipo de Contrato</Label>
                     <Select
