@@ -1359,13 +1359,24 @@ export default function Patrimonio() {
                 <Label htmlFor="edit-setor" className="text-right">
                   Setor
                 </Label>
-                <Input
-                  id="edit-setor"
+                <Select
                   value={editingTelefone.setor || ""}
-                  onChange={(e) => setEditingTelefone({ ...editingTelefone, setor: e.target.value })}
-                  className="col-span-3"
-                  data-testid="input-edit-setor"
-                />
+                  onValueChange={(value) => setEditingTelefone({ ...editingTelefone, setor: value })}
+                >
+                  <SelectTrigger className="col-span-3" data-testid="select-edit-setor">
+                    <SelectValue placeholder="Selecione o setor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Tech">Tech</SelectItem>
+                    <SelectItem value="Growth Interno">Growth Interno</SelectItem>
+                    <SelectItem value="Commerce">Commerce</SelectItem>
+                    <SelectItem value="CX">CX</SelectItem>
+                    <SelectItem value="Financeiro">Financeiro</SelectItem>
+                    <SelectItem value="RH">RH</SelectItem>
+                    <SelectItem value="Jurídico">Jurídico</SelectItem>
+                    <SelectItem value="Administrativo">Administrativo</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-recarga" className="text-right">
