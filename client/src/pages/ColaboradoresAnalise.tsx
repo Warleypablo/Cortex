@@ -1,12 +1,16 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Cake, Briefcase, TrendingUp, Clock, Users, Loader2 } from "lucide-react";
+import { ArrowLeft, Cake, Briefcase, TrendingUp, Clock, Users, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Link } from "wouter";
 import { formatDecimal } from "@/lib/utils";
+
+type SortDirection = "asc" | "desc";
+type PromocaoSortColumn = "nome" | "cargo" | "squad" | "ultimoAumento" | "mesesDesdeAumento";
 
 interface AniversariantesMes {
   id: number;
@@ -79,6 +83,23 @@ export default function ColaboradoresAnalise() {
     queryKey: ["/api/colaboradores/analise"],
   });
 
+  const [sortColumn, setSortColumn] = useState<PromocaoSortColumn>("mesesDesdeAumento");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  const handleSort = (column: PromocaoSortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortIcon = (column: PromocaoSortColumn) => {
+    if (sortColumn !== column) return <ArrowUpDown className="w-4 h-4 ml-1" />;
+    return sortDirection === "asc" ? <ArrowUp className="w-4 h-4 ml-1" /> : <ArrowDown className="w-4 h-4 ml-1" />;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -97,6 +118,40 @@ export default function ColaboradoresAnalise() {
     tempoPermanenciaDesligados: 0,
     totalDesligados: 0,
   };
+
+  const sortedPromocoes = useMemo(() => {
+    const sorted = [...ultimasPromocoes].sort((a, b) => {
+      let aVal: any, bVal: any;
+      switch (sortColumn) {
+        case "nome":
+          aVal = a.nome?.toLowerCase() || "";
+          bVal = b.nome?.toLowerCase() || "";
+          break;
+        case "cargo":
+          aVal = a.cargo?.toLowerCase() || "";
+          bVal = b.cargo?.toLowerCase() || "";
+          break;
+        case "squad":
+          aVal = a.squad?.toLowerCase() || "";
+          bVal = b.squad?.toLowerCase() || "";
+          break;
+        case "ultimoAumento":
+          aVal = a.ultimoAumento ? new Date(a.ultimoAumento).getTime() : 0;
+          bVal = b.ultimoAumento ? new Date(b.ultimoAumento).getTime() : 0;
+          break;
+        case "mesesDesdeAumento":
+          aVal = a.mesesDesdeAumento ?? 999;
+          bVal = b.mesesDesdeAumento ?? 999;
+          break;
+        default:
+          return 0;
+      }
+      if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [ultimasPromocoes, sortColumn, sortDirection]);
 
   return (
     <div className="bg-background">
@@ -328,15 +383,55 @@ export default function ColaboradoresAnalise() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Cargo Atual</TableHead>
-                        <TableHead>Squad</TableHead>
-                        <TableHead>Última Promoção</TableHead>
-                        <TableHead className="text-right">Meses Desde</TableHead>
+                        <TableHead 
+                          className="cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleSort("nome")}
+                          data-testid="th-sort-nome"
+                        >
+                          <div className="flex items-center">
+                            Nome {getSortIcon("nome")}
+                          </div>
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleSort("cargo")}
+                          data-testid="th-sort-cargo"
+                        >
+                          <div className="flex items-center">
+                            Cargo Atual {getSortIcon("cargo")}
+                          </div>
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleSort("squad")}
+                          data-testid="th-sort-squad"
+                        >
+                          <div className="flex items-center">
+                            Squad {getSortIcon("squad")}
+                          </div>
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleSort("ultimoAumento")}
+                          data-testid="th-sort-ultima-promocao"
+                        >
+                          <div className="flex items-center">
+                            Última Promoção {getSortIcon("ultimoAumento")}
+                          </div>
+                        </TableHead>
+                        <TableHead 
+                          className="cursor-pointer hover:bg-muted/50 select-none text-right"
+                          onClick={() => handleSort("mesesDesdeAumento")}
+                          data-testid="th-sort-meses"
+                        >
+                          <div className="flex items-center justify-end">
+                            Meses Desde {getSortIcon("mesesDesdeAumento")}
+                          </div>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ultimasPromocoes.map((pessoa) => (
+                      {sortedPromocoes.map((pessoa) => (
                         <TableRow key={pessoa.id} data-testid={`row-promocao-${pessoa.id}`}>
                           <TableCell className="font-medium">{pessoa.nome}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">
