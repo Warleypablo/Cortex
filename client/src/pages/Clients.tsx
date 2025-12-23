@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import ClientsTable from "@/components/ClientsTable";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Filter, Users, UserCheck, TrendingUp, Clock, DollarSign, X } from "lucide-react";
+import { Loader2, Search, Filter, Users, UserCheck, TrendingUp, Clock, DollarSign, X, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import StatsCard from "@/components/StatsCard";
@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency, formatCurrencyNoDecimals, formatDecimal, formatPercent } from "@/lib/utils";
 import type { ClienteCompleto } from "../../../server/storage";
 
@@ -30,12 +32,15 @@ type SortDirection = "asc" | "desc";
 export default function Clients() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [servicoFilter, setServicoFilter] = useState<string>("all");
+  const [servicoFilter, setServicoFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [tipoContratoFilter, setTipoContratoFilter] = useState<string>("ambos");
-  const [responsavelFilter, setResponsavelFilter] = useState<string>("all");
+  const [responsavelFilter, setResponsavelFilter] = useState<string[]>([]);
   const [clusterFilter, setClusterFilter] = useState<string>("all");
-  const [ltvFilter, setLtvFilter] = useState<string>("all");
+  const [ltOperator, setLtOperator] = useState<string>("all");
+  const [ltValue, setLtValue] = useState<string>("");
+  const [aovOperator, setAovOperator] = useState<string>("all");
+  const [aovValue, setAovValue] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [sortField, setSortField] = useState<SortField>("name");
@@ -99,8 +104,8 @@ export default function Clients() {
       const query = searchQuery.toLowerCase();
       const matchesSearch = !searchQuery || nome.includes(query) || cnpj.includes(query);
 
-      const matchesServico = servicoFilter === "all" || 
-        (client.servicos && client.servicos.toLowerCase().includes(servicoFilter.toLowerCase()));
+      const matchesServico = servicoFilter.length === 0 || 
+        (client.servicos && servicoFilter.some(s => client.servicos!.toLowerCase().includes(s.toLowerCase())));
       
       const matchesStatus = statusFilter === "all" || 
         client.statusClickup === statusFilter;
@@ -110,22 +115,30 @@ export default function Clients() {
         (tipoContratoFilter === "recorrente" && (client.totalRecorrente || 0) > 0) ||
         (tipoContratoFilter === "pontual" && (client.totalPontual || 0) > 0);
 
-      const matchesResponsavel = responsavelFilter === "all" || 
-        client.responsavel === responsavelFilter;
+      const matchesResponsavel = responsavelFilter.length === 0 || 
+        responsavelFilter.includes(client.responsavel || "");
 
       const matchesCluster = clusterFilter === "all" || 
         client.cluster === clusterFilter;
 
-      const clientLtv = ltvMap?.[client.ids || String(client.id)] || 0;
-      const matchesLtv = ltvFilter === "all" ||
-        (ltvFilter === "0-10k" && clientLtv < 10000) ||
-        (ltvFilter === "10k-50k" && clientLtv >= 10000 && clientLtv < 50000) ||
-        (ltvFilter === "50k-100k" && clientLtv >= 50000 && clientLtv < 100000) ||
-        (ltvFilter === "100k+" && clientLtv >= 100000);
+      const clientLt = client.ltMeses || 0;
+      const ltVal = parseFloat(ltValue);
+      const matchesLt = ltOperator === "all" || !ltValue || isNaN(ltVal) ||
+        (ltOperator === "maior" && clientLt > ltVal) ||
+        (ltOperator === "menor" && clientLt < ltVal) ||
+        (ltOperator === "igual" && clientLt === ltVal);
 
-      return matchesSearch && matchesServico && matchesStatus && matchesTipoContrato && matchesResponsavel && matchesCluster && matchesLtv;
+      const clientLtv = ltvMap?.[client.ids || String(client.id)] || 0;
+      const clientAov = clientLt > 0 ? clientLtv / clientLt : 0;
+      const aovVal = parseFloat(aovValue);
+      const matchesAov = aovOperator === "all" || !aovValue || isNaN(aovVal) ||
+        (aovOperator === "maior" && clientAov > aovVal) ||
+        (aovOperator === "menor" && clientAov < aovVal) ||
+        (aovOperator === "igual" && clientAov === aovVal);
+
+      return matchesSearch && matchesServico && matchesStatus && matchesTipoContrato && matchesResponsavel && matchesCluster && matchesLt && matchesAov;
     });
-  }, [clientes, searchQuery, servicoFilter, statusFilter, tipoContratoFilter, responsavelFilter, clusterFilter, ltvFilter, ltvMap]);
+  }, [clientes, searchQuery, servicoFilter, statusFilter, tipoContratoFilter, responsavelFilter, clusterFilter, ltOperator, ltValue, aovOperator, aovValue, ltvMap]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -224,7 +237,47 @@ export default function Clients() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, servicoFilter, statusFilter, tipoContratoFilter, itemsPerPage, sortField, sortDirection]);
+  }, [searchQuery, servicoFilter, statusFilter, tipoContratoFilter, responsavelFilter, clusterFilter, ltOperator, ltValue, aovOperator, aovValue, itemsPerPage, sortField, sortDirection]);
+
+  const hasActiveFilters = tipoContratoFilter !== "ambos" || servicoFilter.length > 0 || statusFilter !== "all" || responsavelFilter.length > 0 || clusterFilter !== "all" || ltOperator !== "all" || aovOperator !== "all";
+
+  const activeFilterCount = [
+    tipoContratoFilter !== "ambos",
+    servicoFilter.length > 0,
+    statusFilter !== "all",
+    responsavelFilter.length > 0,
+    clusterFilter !== "all",
+    ltOperator !== "all",
+    aovOperator !== "all"
+  ].filter(Boolean).length;
+
+  const clearAllFilters = () => {
+    setTipoContratoFilter("ambos");
+    setServicoFilter([]);
+    setStatusFilter("all");
+    setResponsavelFilter([]);
+    setClusterFilter("all");
+    setLtOperator("all");
+    setLtValue("");
+    setAovOperator("all");
+    setAovValue("");
+  };
+
+  const toggleServicoFilter = (servico: string) => {
+    setServicoFilter(prev => 
+      prev.includes(servico) 
+        ? prev.filter(s => s !== servico)
+        : [...prev, servico]
+    );
+  };
+
+  const toggleResponsavelFilter = (responsavel: string) => {
+    setResponsavelFilter(prev => 
+      prev.includes(responsavel) 
+        ? prev.filter(r => r !== responsavel)
+        : [...prev, responsavel]
+    );
+  };
 
   if (error) {
     return (
@@ -317,145 +370,192 @@ export default function Clients() {
               <Button variant="outline" size="default" className="gap-2" data-testid="button-filter-clients">
                 <Filter className="w-4 h-4" />
                 <span className="hidden sm:inline">Filtros</span>
-                {(tipoContratoFilter !== "ambos" || servicoFilter !== "all" || statusFilter !== "all" || responsavelFilter !== "all" || clusterFilter !== "all" || ltvFilter !== "all") && (
+                {hasActiveFilters && (
                   <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-xs">
-                    {[tipoContratoFilter !== "ambos", servicoFilter !== "all", statusFilter !== "all", responsavelFilter !== "all", clusterFilter !== "all", ltvFilter !== "all"].filter(Boolean).length}
+                    {activeFilterCount}
                   </Badge>
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 max-h-[70vh] overflow-y-auto" align="end">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-sm">Filtros</h4>
-                  {(tipoContratoFilter !== "ambos" || servicoFilter !== "all" || statusFilter !== "all" || responsavelFilter !== "all" || clusterFilter !== "all" || ltvFilter !== "all") && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-7 text-xs"
-                      onClick={() => {
-                        setTipoContratoFilter("ambos");
-                        setServicoFilter("all");
-                        setStatusFilter("all");
-                        setResponsavelFilter("all");
-                        setClusterFilter("all");
-                        setLtvFilter("all");
-                      }}
-                      data-testid="button-clear-filters"
-                    >
-                      Limpar filtros
-                    </Button>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Tipo de Contrato</Label>
-                  <Select
-                    value={tipoContratoFilter}
-                    onValueChange={setTipoContratoFilter}
+            <PopoverContent className="w-80 p-0" align="end">
+              <div className="flex items-center justify-between p-4 pb-2 border-b">
+                <h4 className="font-medium text-sm">Filtros</h4>
+                {hasActiveFilters && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 text-xs"
+                    onClick={clearAllFilters}
+                    data-testid="button-clear-filters"
                   >
-                    <SelectTrigger className="w-full" data-testid="select-filter-tipo-contrato">
-                      <SelectValue placeholder="Tipo de contrato" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ambos">Ambos</SelectItem>
-                      <SelectItem value="recorrente">Recorrente</SelectItem>
-                      <SelectItem value="pontual">Pontual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Serviço</Label>
-                  <Select
-                    value={servicoFilter}
-                    onValueChange={setServicoFilter}
-                  >
-                    <SelectTrigger className="w-full" data-testid="select-filter-servico">
-                      <SelectValue placeholder="Todos os serviços" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os serviços</SelectItem>
-                      {servicosUnicos.map(servico => (
-                        <SelectItem key={servico} value={servico}>{servico}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Status</Label>
-                  <Select
-                    value={statusFilter}
-                    onValueChange={setStatusFilter}
-                  >
-                    <SelectTrigger className="w-full" data-testid="select-filter-status">
-                      <SelectValue placeholder="Todos os status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os status</SelectItem>
-                      {statusUnicos.map(status => (
-                        <SelectItem key={status} value={status}>{status}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Responsável</Label>
-                  <Select
-                    value={responsavelFilter}
-                    onValueChange={setResponsavelFilter}
-                  >
-                    <SelectTrigger className="w-full" data-testid="select-filter-responsavel">
-                      <SelectValue placeholder="Todos os responsáveis" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os responsáveis</SelectItem>
-                      {responsaveisUnicos.map(responsavel => (
-                        <SelectItem key={responsavel} value={responsavel}>{responsavel}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Cluster</Label>
-                  <Select
-                    value={clusterFilter}
-                    onValueChange={setClusterFilter}
-                  >
-                    <SelectTrigger className="w-full" data-testid="select-filter-cluster">
-                      <SelectValue placeholder="Todos os clusters" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os clusters</SelectItem>
-                      {clustersUnicos.map(cluster => (
-                        <SelectItem key={cluster} value={cluster}>{cluster}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Faixa de LTV</Label>
-                  <Select
-                    value={ltvFilter}
-                    onValueChange={setLtvFilter}
-                  >
-                    <SelectTrigger className="w-full" data-testid="select-filter-ltv">
-                      <SelectValue placeholder="Todas as faixas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas as faixas</SelectItem>
-                      <SelectItem value="0-10k">Até R$ 10.000</SelectItem>
-                      <SelectItem value="10k-50k">R$ 10.000 - R$ 50.000</SelectItem>
-                      <SelectItem value="50k-100k">R$ 50.000 - R$ 100.000</SelectItem>
-                      <SelectItem value="100k+">Acima de R$ 100.000</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                    Limpar filtros
+                  </Button>
+                )}
               </div>
+              <ScrollArea className="h-[60vh]">
+                <div className="space-y-4 p-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Tipo de Contrato</Label>
+                    <Select
+                      value={tipoContratoFilter}
+                      onValueChange={setTipoContratoFilter}
+                    >
+                      <SelectTrigger className="w-full" data-testid="select-filter-tipo-contrato">
+                        <SelectValue placeholder="Tipo de contrato" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ambos">Ambos</SelectItem>
+                        <SelectItem value="recorrente">Recorrente</SelectItem>
+                        <SelectItem value="pontual">Pontual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Status</Label>
+                    <Select
+                      value={statusFilter}
+                      onValueChange={setStatusFilter}
+                    >
+                      <SelectTrigger className="w-full" data-testid="select-filter-status">
+                        <SelectValue placeholder="Todos os status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os status</SelectItem>
+                        {statusUnicos.map(status => (
+                          <SelectItem key={status} value={status}>{status}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">Serviço (múltipla seleção)</Label>
+                      {servicoFilter.length > 0 && (
+                        <Badge variant="secondary" className="text-xs">{servicoFilter.length}</Badge>
+                      )}
+                    </div>
+                    <div className="border rounded-md max-h-32 overflow-y-auto">
+                      {servicosUnicos.map(servico => (
+                        <label
+                          key={servico}
+                          className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50"
+                          data-testid={`checkbox-servico-${servico}`}
+                        >
+                          <Checkbox 
+                            checked={servicoFilter.includes(servico)} 
+                            onCheckedChange={() => toggleServicoFilter(servico)}
+                          />
+                          <span className="text-sm truncate">{servico}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">Responsável (múltipla seleção)</Label>
+                      {responsavelFilter.length > 0 && (
+                        <Badge variant="secondary" className="text-xs">{responsavelFilter.length}</Badge>
+                      )}
+                    </div>
+                    <div className="border rounded-md max-h-32 overflow-y-auto">
+                      {responsaveisUnicos.map(responsavel => (
+                        <label
+                          key={responsavel}
+                          className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50"
+                          data-testid={`checkbox-responsavel-${responsavel}`}
+                        >
+                          <Checkbox 
+                            checked={responsavelFilter.includes(responsavel)} 
+                            onCheckedChange={() => toggleResponsavelFilter(responsavel)}
+                          />
+                          <span className="text-sm truncate">{responsavel}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Cluster</Label>
+                    <Select
+                      value={clusterFilter}
+                      onValueChange={setClusterFilter}
+                    >
+                      <SelectTrigger className="w-full" data-testid="select-filter-cluster">
+                        <SelectValue placeholder="Todos os clusters" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os clusters</SelectItem>
+                        {clustersUnicos.map(cluster => (
+                          <SelectItem key={cluster} value={cluster}>{cluster}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">LT (meses)</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={ltOperator}
+                        onValueChange={setLtOperator}
+                      >
+                        <SelectTrigger className="w-28" data-testid="select-filter-lt-operator">
+                          <SelectValue placeholder="Operador" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="maior">Maior que</SelectItem>
+                          <SelectItem value="menor">Menor que</SelectItem>
+                          <SelectItem value="igual">Igual a</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {ltOperator !== "all" && (
+                        <Input
+                          type="number"
+                          placeholder="Valor"
+                          value={ltValue}
+                          onChange={(e) => setLtValue(e.target.value)}
+                          className="flex-1"
+                          data-testid="input-filter-lt-value"
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">AOV (R$)</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={aovOperator}
+                        onValueChange={setAovOperator}
+                      >
+                        <SelectTrigger className="w-28" data-testid="select-filter-aov-operator">
+                          <SelectValue placeholder="Operador" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="maior">Maior que</SelectItem>
+                          <SelectItem value="menor">Menor que</SelectItem>
+                          <SelectItem value="igual">Igual a</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {aovOperator !== "all" && (
+                        <Input
+                          type="number"
+                          placeholder="Valor"
+                          value={aovValue}
+                          onChange={(e) => setAovValue(e.target.value)}
+                          className="flex-1"
+                          data-testid="input-filter-aov-value"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </ScrollArea>
             </PopoverContent>
           </Popover>
         </div>
