@@ -171,7 +171,7 @@ interface SquadOption {
 }
 
 interface EstadoOption {
-  sigla: string;
+  uf: string;
   nome: string;
 }
 
@@ -1096,8 +1096,8 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                       </FormControl>
                       <SelectContent>
                         {estados.map((est) => (
-                          <SelectItem key={est.sigla} value={est.sigla}>
-                            {est.sigla} - {est.nome}
+                          <SelectItem key={est.uf} value={est.uf}>
+                            {est.uf} - {est.nome}
                           </SelectItem>
                         ))}
                       </SelectContent>
