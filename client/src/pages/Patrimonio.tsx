@@ -106,15 +106,16 @@ export default function Patrimonio() {
       const estado = p.estadoConservacao?.toLowerCase() || "";
       const ativo = p.ativo?.toLowerCase() || "";
       const isBomEstado = estado.includes("bom") || estado.includes("novo") || estado.includes("ótimo");
+      const isBomOuEstoque = isBomEstado || estado.includes("estoque");
       const isComputadorNotebook = ativo.includes("computador") || ativo.includes("notebook");
       
       if (isBomEstado) {
         ativosBom++;
-        if (isComputadorNotebook) {
-          computadoresNotebooksBom++;
-        }
       }
-      if (isComputadorNotebook && isBomEstado && p.responsavelAtual) {
+      if (isComputadorNotebook && isBomOuEstoque) {
+        computadoresNotebooksBom++;
+      }
+      if (isComputadorNotebook && isBomOuEstoque && p.responsavelAtual) {
         computadoresNotebooksAtribuidos++;
       }
       if (p.valorPago) {
