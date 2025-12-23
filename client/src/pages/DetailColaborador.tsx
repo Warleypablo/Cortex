@@ -104,6 +104,7 @@ type ColaboradorDetail = Colaborador & {
   patrimonios: PatrimonioItem[];
   promocoes?: PromocaoItem[];
   linkedUser?: LinkedUser | null;
+  cidade?: string | null;
 };
 
 const squadColors: Record<string, string> = {
@@ -1588,12 +1589,21 @@ export default function DetailColaborador() {
                   {colaborador.emailTurbo || "-"}
                 </p>
               </div>
-              <div className="pb-4 border-b border-border/50">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Email Pessoal</p>
-                <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-info-email-pessoal">
-                  <Mail className="w-4 h-4 text-muted-foreground" />
-                  {colaborador.emailPessoal || "-"}
-                </p>
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border/50">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Email Pessoal</p>
+                  <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-info-email-pessoal">
+                    <Mail className="w-4 h-4 text-muted-foreground" />
+                    {colaborador.emailPessoal || "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">PIX</p>
+                  <p className="font-semibold flex items-center gap-2 truncate text-foreground" title={colaborador.pix || undefined} data-testid="text-info-pix">
+                    <CreditCard className="w-4 h-4 text-violet-500" />
+                    {colaborador.pix || "-"}
+                  </p>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border/50">
                 <div>
@@ -1604,10 +1614,10 @@ export default function DetailColaborador() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">PIX</p>
-                  <p className="font-semibold flex items-center gap-2 truncate text-foreground" title={colaborador.pix || undefined} data-testid="text-info-pix">
-                    <CreditCard className="w-4 h-4 text-violet-500" />
-                    {colaborador.pix || "-"}
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Cidade</p>
+                  <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-info-cidade">
+                    <MapPin className="w-4 h-4 text-orange-500" />
+                    {colaborador.cidade || "-"}
                   </p>
                 </div>
               </div>
