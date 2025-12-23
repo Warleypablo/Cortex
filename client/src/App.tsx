@@ -272,7 +272,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TooltipProvider>
+        <TooltipProvider delayDuration={100} skipDelayDuration={500}>
           <AuthProvider>
             <AppLayout />
           </AuthProvider>
