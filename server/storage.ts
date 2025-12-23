@@ -1722,21 +1722,28 @@ export class DbStorage implements IStorage {
   }
 
   async getPatrimonios(): Promise<Patrimonio[]> {
-    const result = await db.select({
-      id: schema.rhPatrimonio.id,
-      numeroAtivo: schema.rhPatrimonio.numeroAtivo,
-      ativo: schema.rhPatrimonio.ativo,
-      marca: schema.rhPatrimonio.marca,
-      estadoConservacao: schema.rhPatrimonio.estadoConservacao,
-      responsavelAtual: schema.rhPatrimonio.responsavelAtual,
-      responsavelId: schema.rhPatrimonio.responsavelId,
-      valorPago: schema.rhPatrimonio.valorPago,
-      valorMercado: schema.rhPatrimonio.valorMercado,
-      valorVenda: schema.rhPatrimonio.valorVenda,
-      descricao: schema.rhPatrimonio.descricao,
-    }).from(schema.rhPatrimonio).orderBy(schema.rhPatrimonio.numeroAtivo);
+    const result = await db.execute(sql`
+      SELECT 
+        p.id,
+        p.numero_ativo as "numeroAtivo",
+        p.ativo,
+        p.marca,
+        p.estado_conservacao as "estadoConservacao",
+        p.responsavel_atual as "responsavelAtual",
+        COALESCE(p.responsavel_id, c.id) as "responsavelId",
+        p.valor_pago as "valorPago",
+        p.valor_mercado as "valorMercado",
+        p.valor_venda as "valorVenda",
+        p.descricao
+      FROM rh_patrimonio p
+      LEFT JOIN rh_pessoal c ON (
+        p.responsavel_id = c.id 
+        OR (p.responsavel_id IS NULL AND p.responsavel_atual = c.nome)
+      )
+      ORDER BY p.numero_ativo
+    `);
     
-    return result.map(row => ({
+    return (result.rows || []).map((row: any) => ({
       ...row,
       senhaAtivo: null,
     }));
