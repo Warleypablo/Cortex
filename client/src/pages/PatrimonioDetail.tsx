@@ -554,8 +554,20 @@ export default function PatrimonioDetail() {
                     <div className="flex-1 space-y-4">
                       <div className="flex items-start justify-between">
                         <div>
-                          <div className="text-xl font-semibold" data-testid="colaborador-nome">
-                            {patrimonio.colaborador.nome}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl font-semibold" data-testid="colaborador-nome">
+                              {patrimonio.colaborador.nome}
+                            </span>
+                            <Badge 
+                              variant="outline" 
+                              className={patrimonio.colaborador.status === "Ativo" 
+                                ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-300" 
+                                : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-300"
+                              }
+                              data-testid="colaborador-status"
+                            >
+                              {patrimonio.colaborador.status || "Ativo"}
+                            </Badge>
                           </div>
                           {patrimonio.colaborador.cargo && (
                             <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
