@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatCurrency, formatDecimal, formatPercent } from "@/lib/utils";
+import { formatCurrency, formatCurrencyNoDecimals, formatDecimal, formatPercent } from "@/lib/utils";
 import type { ClienteCompleto } from "../../../server/storage";
 
 type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
@@ -233,7 +233,7 @@ export default function Clients() {
           />
           <StatsCard
             title="LTV Médio"
-            value={formatCurrency(kpis.ltvMedio)}
+            value={formatCurrencyNoDecimals(kpis.ltvMedio)}
             icon={TrendingUp}
             variant="info"
             subtitle="Lifetime Value - receita total média por cliente"
@@ -248,7 +248,7 @@ export default function Clients() {
           />
           <StatsCard
             title="AOV"
-            value={formatCurrency(kpis.aov)}
+            value={formatCurrencyNoDecimals(kpis.aov)}
             icon={DollarSign}
             variant="success"
             subtitle="Average Order Value - ticket médio mensal por cliente"

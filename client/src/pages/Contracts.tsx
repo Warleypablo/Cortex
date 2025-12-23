@@ -4,8 +4,9 @@ import { useLocation } from "wouter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpDown, FileText, FileCheck, DollarSign } from "lucide-react";
+import StatsCard from "@/components/StatsCard";
+import { formatCurrencyNoDecimals } from "@/lib/utils";
 import SearchBar from "@/components/SearchBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ContratoCompleto } from "@shared/schema";
@@ -232,50 +233,27 @@ export default function Contracts() {
       <div className="container mx-auto px-4 py-8 max-w-7xl">
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card data-testid="card-total-contratos">
-            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total de Contratos</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-contratos">
-                {kpis.totalContratos}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Contratos {servicoFilter !== "all" || statusFilter !== "all" ? "filtrados" : "cadastrados"}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-contratos-ativos">
-            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Contratos Ativos</CardTitle>
-              <FileCheck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-contratos-ativos">
-                {kpis.contratosAtivos}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Ativo, onboarding e triagem
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-aov-medio">
-            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">AOV Médio</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-aov-medio">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(kpis.aovMedio)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Ticket médio por contrato
-              </p>
-            </CardContent>
-          </Card>
+          <StatsCard
+            title="Total de Contratos"
+            value={String(kpis.totalContratos)}
+            icon={FileText}
+            subtitle={servicoFilter !== "all" || statusFilter !== "all" ? "Contratos filtrados" : "Contratos cadastrados"}
+          />
+          <StatsCard
+            title="Contratos Ativos"
+            value={String(kpis.contratosAtivos)}
+            icon={FileCheck}
+            variant="success"
+            subtitle="Ativo, onboarding e triagem"
+          />
+          <StatsCard
+            title="AOV Médio"
+            value={formatCurrencyNoDecimals(kpis.aovMedio)}
+            icon={DollarSign}
+            variant="info"
+            subtitle="Ticket médio por contrato"
+            tooltipType="help"
+          />
         </div>
 
         <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-6">
