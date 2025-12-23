@@ -1874,23 +1874,74 @@ export class DbStorage implements IStorage {
     await db.delete(schema.rhPatrimonio).where(eq(schema.rhPatrimonio.id, id));
   }
 
+  private async ensurePatrimonioHistoricoTable(): Promise<void> {
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS rh_patrimonio_historico (
+          id SERIAL PRIMARY KEY,
+          patrimonio_id INTEGER NOT NULL REFERENCES rh_patrimonio(id) ON DELETE CASCADE,
+          acao TEXT NOT NULL,
+          usuario TEXT NOT NULL,
+          data TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS idx_patrimonio_historico_patrimonio_data 
+        ON rh_patrimonio_historico(patrimonio_id, data DESC)
+      `);
+    } catch (error) {
+      console.log("[storage] Error ensuring patrimonio historico table:", error);
+    }
+  }
+
   async getPatrimonioHistorico(patrimonioId: number): Promise<PatrimonioHistorico[]> {
     try {
+      await this.ensurePatrimonioHistoricoTable();
+      
       const result = await db.execute(sql`
         SELECT id, patrimonio_id as "patrimonioId", acao, usuario, data
         FROM rh_patrimonio_historico
         WHERE patrimonio_id = ${patrimonioId}
         ORDER BY data DESC
       `);
-      return (result.rows || []) as PatrimonioHistorico[];
+      
+      const historico = (result.rows || []) as PatrimonioHistorico[];
+      
+      if (historico.length === 0) {
+        const patrimonio = await this.getPatrimonioById(patrimonioId);
+        if (patrimonio) {
+          const responsavelInfo = patrimonio.responsavelAtual 
+            ? `Atribuído a ${patrimonio.responsavelAtual}`
+            : "Patrimônio cadastrado no sistema";
+          
+          await this.createPatrimonioHistorico({
+            patrimonioId,
+            acao: responsavelInfo,
+            usuario: "Sistema",
+            data: new Date(),
+          });
+          
+          const updatedResult = await db.execute(sql`
+            SELECT id, patrimonio_id as "patrimonioId", acao, usuario, data
+            FROM rh_patrimonio_historico
+            WHERE patrimonio_id = ${patrimonioId}
+            ORDER BY data DESC
+          `);
+          return (updatedResult.rows || []) as PatrimonioHistorico[];
+        }
+      }
+      
+      return historico;
     } catch (error) {
-      console.log("[storage] Patrimonio historico table may not exist, returning empty array");
+      console.log("[storage] Error fetching patrimonio historico:", error);
       return [];
     }
   }
 
   async createPatrimonioHistorico(data: InsertPatrimonioHistorico): Promise<PatrimonioHistorico> {
     try {
+      await this.ensurePatrimonioHistoricoTable();
+      
       const result = await db.execute(sql`
         INSERT INTO rh_patrimonio_historico (patrimonio_id, acao, usuario, data)
         VALUES (${data.patrimonioId}, ${data.acao}, ${data.usuario}, ${data.data})
@@ -1898,7 +1949,7 @@ export class DbStorage implements IStorage {
       `);
       return (result.rows[0] || {}) as PatrimonioHistorico;
     } catch (error) {
-      console.log("[storage] Failed to create patrimonio historico:", error);
+      console.error("[storage] Failed to create patrimonio historico:", error);
       return { id: 0, patrimonioId: data.patrimonioId, acao: data.acao, usuario: data.usuario, data: data.data };
     }
   }
