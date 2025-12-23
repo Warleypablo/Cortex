@@ -436,6 +436,36 @@ export default function ClientDetail() {
     }
   };
 
+  const calcularLTContrato = (contrato: { status: string | null; dataInicio: Date | null; dataSolicitacaoEncerramento: Date | null }) => {
+    if (!contrato.dataInicio) return '-';
+    
+    const dataInicio = new Date(contrato.dataInicio);
+    const statusLower = (contrato.status || '').toLowerCase();
+    
+    const statusAtivos = ['triagem', 'onboarding', 'ativo', 'em cancelamento', 'cancelamento'];
+    const isStatusAtivo = statusAtivos.some(s => statusLower.includes(s));
+    
+    let dataFim: Date;
+    
+    if (statusLower.includes('cancelado') || statusLower.includes('inativo')) {
+      if (contrato.dataSolicitacaoEncerramento) {
+        dataFim = new Date(contrato.dataSolicitacaoEncerramento);
+      } else {
+        return '-';
+      }
+    } else if (isStatusAtivo) {
+      dataFim = new Date();
+    } else {
+      return '-';
+    }
+    
+    const diffMs = dataFim.getTime() - dataInicio.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const months = Math.floor(diffDays / 30);
+    
+    return months > 0 ? `${months}m` : `${diffDays}d`;
+  };
+
   const SortIndicator = ({ sortKey, config }: { sortKey: string; config: SortConfig | null }) => {
     if (config?.key !== sortKey) return null;
     return config.direction === 'asc' 
@@ -730,6 +760,12 @@ export default function ClientDetail() {
                           <SortIndicator sortKey="valorp" config={contratosSortConfig} />
                         </div>
                       </TableHead>
+                      <TableHead className="bg-muted/30" data-testid="header-plano">
+                        Plano
+                      </TableHead>
+                      <TableHead className="bg-muted/30 text-center" data-testid="header-lt">
+                        LT
+                      </TableHead>
                       <TableHead className="bg-muted/30" data-testid="header-solic-cancel">
                         Solic. Cancel.
                       </TableHead>
@@ -784,6 +820,12 @@ export default function ClientDetail() {
                               : '-'
                             }
                           </TableCell>
+                          <TableCell className="text-muted-foreground" data-testid={`text-plano-${contrato.idSubtask}`}>
+                            {contrato.plano || '-'}
+                          </TableCell>
+                          <TableCell className="text-center font-medium" data-testid={`text-lt-${contrato.idSubtask}`}>
+                            {calcularLTContrato(contrato)}
+                          </TableCell>
                           <TableCell className="text-muted-foreground" data-testid={`text-solic-cancel-${contrato.idSubtask}`}>
                             {contrato.dataSolicitacaoEncerramento ? new Date(contrato.dataSolicitacaoEncerramento).toLocaleDateString('pt-BR') : '-'}
                           </TableCell>
@@ -794,7 +836,7 @@ export default function ClientDetail() {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={10} className="text-center text-muted-foreground py-8" data-testid="text-no-contracts">
+                        <TableCell colSpan={12} className="text-center text-muted-foreground py-8" data-testid="text-no-contracts">
                           Nenhum contrato encontrado para este cliente
                         </TableCell>
                       </TableRow>
