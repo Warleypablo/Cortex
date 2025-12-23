@@ -3308,9 +3308,9 @@ export class DbStorage implements IStorage {
               AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
           ) as lt_meses,
           (
-            SELECT string_agg(DISTINCT produto, ', ')
+            SELECT string_agg(DISTINCT cup_contratos.produto, ', ')
             FROM cup_contratos
-            WHERE id_task = cc.task_id
+            WHERE cup_contratos.id_task = cc.task_id
           ) as servicos
         FROM cup_clientes cc
         LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
