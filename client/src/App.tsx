@@ -10,59 +10,80 @@ import TopBar from "@/components/TopBar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { PageProvider } from "@/contexts/PageContext";
 import { Loader2 } from "lucide-react";
-import Clients from "@/pages/Clients";
-import Contracts from "@/pages/Contracts";
-import ClientesContratos from "@/pages/ClientesContratos";
-import ClientDetail from "@/pages/ClientDetail";
-import Colaboradores from "@/pages/Colaboradores";
-import ColaboradoresAnalise from "@/pages/ColaboradoresAnalise";
-import DetailColaborador from "@/pages/DetailColaborador";
-import Patrimonio from "@/pages/Patrimonio";
-import PatrimonioDetail from "@/pages/PatrimonioDetail";
-import Ferramentas from "@/pages/Ferramentas";
-import TurboZap from "@/pages/TurboZap";
-import VisaoGeral from "@/pages/VisaoGeral";
-import DashboardFinanceiro from "@/pages/DashboardFinanceiro";
-import DashboardGeG from "@/pages/DashboardGeG";
-import DashboardRetencao from "@/pages/DashboardRetencao";
-import DashboardDFC from "@/pages/DashboardDFC";
-import DashboardInadimplencia from "@/pages/DashboardInadimplencia";
-import DashboardInhire from "@/pages/DashboardInhire";
-import DashboardRecrutamento from "@/pages/DashboardRecrutamento";
-import DashboardTech from "@/pages/DashboardTech";
-import TechProjetos from "@/pages/TechProjetos";
-import FluxoCaixa from "@/pages/FluxoCaixa";
-import MetaAds from "@/pages/MetaAds";
-import AuditoriaSistemas from "@/pages/AuditoriaSistemas";
-import AdminUsuarios from "@/pages/AdminUsuarios";
-import AdminLogs from "@/pages/AdminLogs";
-import AccessDenied from "@/pages/AccessDenied";
-import Login from "@/pages/Login";
-import DashboardClosers from "@/pages/DashboardClosers";
-import DashboardSDRs from "@/pages/DashboardSDRs";
-import DetailClosers from "@/pages/DetailClosers";
-import DetailSDRs from "@/pages/DetailSDRs";
-import AnaliseVendas from "@/pages/AnaliseVendas";
-import PresentationMode from "@/pages/PresentationMode";
-import DetalhamentoVendas from "@/pages/DetalhamentoVendas";
-import Criativos from "@/pages/Criativos";
-import GrowthVisaoGeral from "@/pages/GrowthVisaoGeral";
-import PerformancePlataformas from "@/pages/PerformancePlataformas";
-import RevenueGoals from "@/pages/RevenueGoals";
-import CasesChat from "@/pages/CasesChat";
-import JuridicoClientes from "@/pages/JuridicoClientes";
-import InvestorsReport from "@/pages/InvestorsReport";
-import Acessos from "@/pages/Acessos";
-import Conhecimentos from "@/pages/Conhecimentos";
-import Beneficios from "@/pages/Beneficios";
 import { AssistantWidget } from "@/components/AssistantWidget";
 
+const Clients = lazy(() => import("@/pages/Clients"));
+const Contracts = lazy(() => import("@/pages/Contracts"));
+const ClientesContratos = lazy(() => import("@/pages/ClientesContratos"));
+const ClientDetail = lazy(() => import("@/pages/ClientDetail"));
+const Colaboradores = lazy(() => import("@/pages/Colaboradores"));
+const ColaboradoresAnalise = lazy(() => import("@/pages/ColaboradoresAnalise"));
+const DetailColaborador = lazy(() => import("@/pages/DetailColaborador"));
+const Patrimonio = lazy(() => import("@/pages/Patrimonio"));
+const PatrimonioDetail = lazy(() => import("@/pages/PatrimonioDetail"));
+const Ferramentas = lazy(() => import("@/pages/Ferramentas"));
+const TurboZap = lazy(() => import("@/pages/TurboZap"));
+const VisaoGeral = lazy(() => import("@/pages/VisaoGeral"));
+const DashboardFinanceiro = lazy(() => import("@/pages/DashboardFinanceiro"));
+const DashboardGeG = lazy(() => import("@/pages/DashboardGeG"));
+const DashboardRetencao = lazy(() => import("@/pages/DashboardRetencao"));
+const DashboardDFC = lazy(() => import("@/pages/DashboardDFC"));
+const DashboardInadimplencia = lazy(() => import("@/pages/DashboardInadimplencia"));
+const DashboardInhire = lazy(() => import("@/pages/DashboardInhire"));
+const DashboardRecrutamento = lazy(() => import("@/pages/DashboardRecrutamento"));
+const DashboardTech = lazy(() => import("@/pages/DashboardTech"));
+const TechProjetos = lazy(() => import("@/pages/TechProjetos"));
+const FluxoCaixa = lazy(() => import("@/pages/FluxoCaixa"));
+const MetaAds = lazy(() => import("@/pages/MetaAds"));
+const AuditoriaSistemas = lazy(() => import("@/pages/AuditoriaSistemas"));
+const AdminUsuarios = lazy(() => import("@/pages/AdminUsuarios"));
+const AdminLogs = lazy(() => import("@/pages/AdminLogs"));
+const AccessDenied = lazy(() => import("@/pages/AccessDenied"));
+const Login = lazy(() => import("@/pages/Login"));
+const DashboardClosers = lazy(() => import("@/pages/DashboardClosers"));
+const DashboardSDRs = lazy(() => import("@/pages/DashboardSDRs"));
+const DetailClosers = lazy(() => import("@/pages/DetailClosers"));
+const DetailSDRs = lazy(() => import("@/pages/DetailSDRs"));
+const AnaliseVendas = lazy(() => import("@/pages/AnaliseVendas"));
+const PresentationMode = lazy(() => import("@/pages/PresentationMode"));
+const DetalhamentoVendas = lazy(() => import("@/pages/DetalhamentoVendas"));
+const Criativos = lazy(() => import("@/pages/Criativos"));
+const GrowthVisaoGeral = lazy(() => import("@/pages/GrowthVisaoGeral"));
+const PerformancePlataformas = lazy(() => import("@/pages/PerformancePlataformas"));
+const RevenueGoals = lazy(() => import("@/pages/RevenueGoals"));
+const CasesChat = lazy(() => import("@/pages/CasesChat"));
+const JuridicoClientes = lazy(() => import("@/pages/JuridicoClientes"));
+const InvestorsReport = lazy(() => import("@/pages/InvestorsReport"));
+const Acessos = lazy(() => import("@/pages/Acessos"));
+const Conhecimentos = lazy(() => import("@/pages/Conhecimentos"));
+const Beneficios = lazy(() => import("@/pages/Beneficios"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center h-full" data-testid="loading-page">
-      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    <div className="flex flex-col items-center justify-center h-full gap-4" data-testid="loading-page">
+      <div className="relative">
+        <div className="w-16 h-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+        <Loader2 className="w-6 h-6 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-primary animate-pulse" />
+      </div>
+      <p className="text-sm text-muted-foreground animate-pulse">Carregando...</p>
+    </div>
+  );
+}
+
+function PageSkeleton() {
+  return (
+    <div className="p-6 space-y-6 animate-pulse" data-testid="page-skeleton">
+      <div className="flex items-center justify-between">
+        <div className="h-8 bg-muted rounded-lg w-48" />
+        <div className="h-10 bg-muted rounded-lg w-32" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-32 bg-muted rounded-2xl" />
+        ))}
+      </div>
+      <div className="h-96 bg-muted rounded-2xl" />
     </div>
   );
 }
@@ -81,6 +102,8 @@ interface User {
 function ProtectedRoute({ path, component: Component }: { path: string; component: React.ComponentType }) {
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   if (!user) {
@@ -90,10 +113,18 @@ function ProtectedRoute({ path, component: Component }: { path: string; componen
   const hasAccess = user.role === 'admin' || (user.allowedRoutes && user.allowedRoutes.includes(path));
 
   if (!hasAccess) {
-    return <AccessDenied />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <AccessDenied />
+      </Suspense>
+    );
   }
 
-  return <Component />;
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <Component />
+    </Suspense>
+  );
 }
 
 function ProtectedRouter() {
@@ -101,6 +132,8 @@ function ProtectedRouter() {
   
   const { data: user, isLoading, error } = useQuery<User>({
     queryKey: ["/api/auth/me"],
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   useEffect(() => {
@@ -211,10 +244,12 @@ function ProtectedRouter() {
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/login" component={Login} />
-      <Route><ProtectedRouter /></Route>
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route><ProtectedRouter /></Route>
+      </Switch>
+    </Suspense>
   );
 }
 
