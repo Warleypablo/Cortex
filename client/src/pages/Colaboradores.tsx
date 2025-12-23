@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { formatCurrency } from "@/lib/utils";
@@ -1513,6 +1513,8 @@ export default function Colaboradores() {
   const [deletingColaborador, setDeletingColaborador] = useState<ColaboradorComPatrimonios | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const { data: colaboradores = [], isLoading } = useQuery<ColaboradorComPatrimonios[]>({
     queryKey: ["/api/colaboradores/com-patrimonios"],
@@ -1597,10 +1599,76 @@ export default function Colaboradores() {
     return filtered;
   }, [colaboradores, filters]);
 
-  const totalPages = Math.ceil(filteredColaboradores.length / itemsPerPage);
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (column: string) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="w-4 h-4 ml-1 text-muted-foreground/50" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="w-4 h-4 ml-1 text-primary" />
+      : <ArrowDown className="w-4 h-4 ml-1 text-primary" />;
+  };
+
+  const sortedColaboradores = useMemo(() => {
+    if (!sortColumn) return filteredColaboradores;
+
+    return [...filteredColaboradores].sort((a, b) => {
+      let aVal: string | number | null = null;
+      let bVal: string | number | null = null;
+
+      switch (sortColumn) {
+        case 'id':
+          aVal = a.id;
+          bVal = b.id;
+          break;
+        case 'nome':
+          aVal = a.nome?.toLowerCase() || '';
+          bVal = b.nome?.toLowerCase() || '';
+          break;
+        case 'status':
+          aVal = a.status?.toLowerCase() || '';
+          bVal = b.status?.toLowerCase() || '';
+          break;
+        case 'cargo':
+          aVal = `${a.cargo || ''} ${a.nivel || ''}`.toLowerCase().trim();
+          bVal = `${b.cargo || ''} ${b.nivel || ''}`.toLowerCase().trim();
+          break;
+        case 'squad':
+          aVal = a.squad?.toLowerCase() || '';
+          bVal = b.squad?.toLowerCase() || '';
+          break;
+        case 'setor':
+          aVal = a.setor?.toLowerCase() || '';
+          bVal = b.setor?.toLowerCase() || '';
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal === null || aVal === '') return sortDirection === 'asc' ? 1 : -1;
+      if (bVal === null || bVal === '') return sortDirection === 'asc' ? -1 : 1;
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+
+      const comparison = String(aVal).localeCompare(String(bVal), 'pt-BR');
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [filteredColaboradores, sortColumn, sortDirection]);
+
+  const totalPages = Math.ceil(sortedColaboradores.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedColaboradores = filteredColaboradores.slice(startIndex, endIndex);
+  const paginatedColaboradores = sortedColaboradores.slice(startIndex, endIndex);
 
   useEffect(() => {
     if (totalPages > 0 && currentPage > totalPages) {
@@ -1712,20 +1780,74 @@ export default function Colaboradores() {
             <CardContent className="p-0">
               <div className="flex items-center justify-between gap-4 px-4 py-3 border-b">
                 <div className="text-sm text-muted-foreground" data-testid="text-result-count">
-                  {filteredColaboradores.length}{" "}
-                  {filteredColaboradores.length === 1 ? "colaborador encontrado" : "colaboradores encontrados"}
+                  {sortedColaboradores.length}{" "}
+                  {sortedColaboradores.length === 1 ? "colaborador encontrado" : "colaboradores encontrados"}
                 </div>
               </div>
               <div className="min-h-[600px] max-h-[calc(100vh-450px)] overflow-y-auto overflow-x-auto">
                 <Table>
                   <TableHeader className="sticky top-0 z-20">
                     <TableRow className="bg-muted/50 border-b">
-                      <TableHead className="min-w-[80px] bg-muted/50">ID</TableHead>
-                      <TableHead className="min-w-[220px] bg-muted/50">Colaborador</TableHead>
-                      <TableHead className="min-w-[100px] bg-muted/50">Status</TableHead>
-                      <TableHead className="min-w-[180px] bg-muted/50">Cargo / Nível</TableHead>
-                      <TableHead className="min-w-[140px] bg-muted/50">Squad</TableHead>
-                      <TableHead className="min-w-[140px] bg-muted/50">Setor</TableHead>
+                      <TableHead 
+                        className="min-w-[80px] bg-muted/50 cursor-pointer select-none" 
+                        onClick={() => handleSort('id')}
+                        data-testid="table-header-id"
+                      >
+                        <div className="flex items-center">
+                          ID
+                          {getSortIcon('id')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="min-w-[220px] bg-muted/50 cursor-pointer select-none" 
+                        onClick={() => handleSort('nome')}
+                        data-testid="table-header-nome"
+                      >
+                        <div className="flex items-center">
+                          Colaborador
+                          {getSortIcon('nome')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="min-w-[100px] bg-muted/50 cursor-pointer select-none" 
+                        onClick={() => handleSort('status')}
+                        data-testid="table-header-status"
+                      >
+                        <div className="flex items-center">
+                          Status
+                          {getSortIcon('status')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="min-w-[180px] bg-muted/50 cursor-pointer select-none" 
+                        onClick={() => handleSort('cargo')}
+                        data-testid="table-header-cargo"
+                      >
+                        <div className="flex items-center">
+                          Cargo / Nível
+                          {getSortIcon('cargo')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="min-w-[140px] bg-muted/50 cursor-pointer select-none" 
+                        onClick={() => handleSort('squad')}
+                        data-testid="table-header-squad"
+                      >
+                        <div className="flex items-center">
+                          Squad
+                          {getSortIcon('squad')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="min-w-[140px] bg-muted/50 cursor-pointer select-none" 
+                        onClick={() => handleSort('setor')}
+                        data-testid="table-header-setor"
+                      >
+                        <div className="flex items-center">
+                          Setor
+                          {getSortIcon('setor')}
+                        </div>
+                      </TableHead>
                       <TableHead className="min-w-[280px] bg-muted/50">Contatos</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">CPF</TableHead>
                       <TableHead className="min-w-[140px] bg-muted/50">CNPJ</TableHead>
