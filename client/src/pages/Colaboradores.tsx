@@ -1532,7 +1532,7 @@ export default function Colaboradores() {
   const [deletingColaborador, setDeletingColaborador] = useState<ColaboradorComPatrimonios | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
-  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<string | null>("status");
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const { data: colaboradores = [], isLoading } = useQuery<ColaboradorComPatrimonios[]>({
@@ -1702,7 +1702,7 @@ export default function Colaboradores() {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     thirtyDaysAgo.setHours(0, 0, 0, 0);
     const novosUltimos30d = colaboradores.filter((c) => {
-      if (!c.admissao) return false;
+      if (!c.admissao || c.status !== "Ativo") return false;
       const admissaoDate = new Date(c.admissao);
       admissaoDate.setHours(0, 0, 0, 0);
       return admissaoDate >= thirtyDaysAgo;
