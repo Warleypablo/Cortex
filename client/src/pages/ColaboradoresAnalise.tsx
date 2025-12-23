@@ -69,12 +69,42 @@ function formatDate(date: string | null | undefined) {
   }
 }
 
+const squadIcons: Record<string, string> = {
+  'Vendas': '💰 Vendas',
+  'Selva': '🪖 Selva',
+  'Squadra': '⚓️ Squadra',
+  'Pulse': '💠 Pulse',
+  'Squad X': '👾 Squad X',
+  'Tech': '🖥️ Tech',
+  'CX&CS': '📊 CX&CS',
+  'Turbo Interno': '🚀 Turbo Interno',
+  'Ventures': '⭐️ Ventures',
+  'Chama': '🔥 Chama (OFF)',
+  'Hunters': '🏹 Hunters (OFF)',
+  'Fragmentados': '🧩 Fragmentados (OFF)',
+  'Makers': '🛠️ Makers',
+};
+
 const squadColors: Record<string, string> = {
-  Performance: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  Vendas: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  Comunicação: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  Tech: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
-  Commerce: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  '💰 Vendas': "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  '🪖 Selva': "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  '⚓️ Squadra': "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  '💠 Pulse': "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
+  '👾 Squad X': "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  '🖥️ Tech': "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
+  '📊 CX&CS': "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+  '🚀 Turbo Interno': "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  '⭐️ Ventures': "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  '🔥 Chama (OFF)': "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  '🏹 Hunters (OFF)': "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
+  '🧩 Fragmentados (OFF)': "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400",
+  '🛠️ Makers': "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400",
+};
+
+const formatSquadName = (squad: string | null | undefined): string => {
+  if (!squad) return "-";
+  const cleanSquad = squad.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u2693]/gu, '').trim();
+  return squadIcons[cleanSquad] || squad;
 };
 
 export default function ColaboradoresAnalise() {
@@ -257,15 +287,18 @@ export default function ColaboradoresAnalise() {
                             {pessoa.cargo || "-"}
                           </TableCell>
                           <TableCell>
-                            {pessoa.squad && squadColors[pessoa.squad] ? (
-                              <Badge className={squadColors[pessoa.squad]} variant="outline">
-                                {pessoa.squad}
-                              </Badge>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">
-                                {pessoa.squad || "-"}
-                              </span>
-                            )}
+                            {(() => {
+                              const formattedSquad = formatSquadName(pessoa.squad);
+                              return formattedSquad !== "-" && squadColors[formattedSquad] ? (
+                                <Badge className={squadColors[formattedSquad]} variant="outline">
+                                  {formattedSquad}
+                                </Badge>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">
+                                  {formattedSquad}
+                                </span>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell className="text-right">
                             {pessoa.diasAteAniversario === 0 ? (
@@ -301,7 +334,7 @@ export default function ColaboradoresAnalise() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {aniversarioEmpresaMes.length === 0 ? (
+              {aniversarioEmpresaMes.filter(a => a.anosDeEmpresa > 0).length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   Nenhum aniversário de empresa este mês
                 </div>
@@ -319,7 +352,7 @@ export default function ColaboradoresAnalise() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {aniversarioEmpresaMes.map((pessoa) => (
+                      {aniversarioEmpresaMes.filter(a => a.anosDeEmpresa > 0).map((pessoa) => (
                         <TableRow key={pessoa.id} data-testid={`row-aniversario-empresa-${pessoa.id}`}>
                           <TableCell className="font-medium">{pessoa.nome}</TableCell>
                           <TableCell>{formatDate(pessoa.admissao)}</TableCell>
@@ -327,18 +360,23 @@ export default function ColaboradoresAnalise() {
                             {pessoa.cargo || "-"}
                           </TableCell>
                           <TableCell>
-                            {pessoa.squad && squadColors[pessoa.squad] ? (
-                              <Badge className={squadColors[pessoa.squad]} variant="outline">
-                                {pessoa.squad}
-                              </Badge>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">
-                                {pessoa.squad || "-"}
-                              </span>
-                            )}
+                            {(() => {
+                              const formattedSquad = formatSquadName(pessoa.squad);
+                              return formattedSquad !== "-" && squadColors[formattedSquad] ? (
+                                <Badge className={squadColors[formattedSquad]} variant="outline">
+                                  {formattedSquad}
+                                </Badge>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">
+                                  {formattedSquad}
+                                </span>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Badge variant="secondary">{pessoa.anosDeEmpresa} anos</Badge>
+                            {pessoa.anosDeEmpresa > 0 && (
+                              <Badge variant="secondary">{pessoa.anosDeEmpresa} {pessoa.anosDeEmpresa === 1 ? 'ano' : 'anos'}</Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             {pessoa.diasAteAniversarioEmpresa === 0 ? (
@@ -438,15 +476,18 @@ export default function ColaboradoresAnalise() {
                             {pessoa.cargo || "-"}
                           </TableCell>
                           <TableCell>
-                            {pessoa.squad && squadColors[pessoa.squad] ? (
-                              <Badge className={squadColors[pessoa.squad]} variant="outline">
-                                {pessoa.squad}
-                              </Badge>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">
-                                {pessoa.squad || "-"}
-                              </span>
-                            )}
+                            {(() => {
+                              const formattedSquad = formatSquadName(pessoa.squad);
+                              return formattedSquad !== "-" && squadColors[formattedSquad] ? (
+                                <Badge className={squadColors[formattedSquad]} variant="outline">
+                                  {formattedSquad}
+                                </Badge>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">
+                                  {formattedSquad}
+                                </span>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>{formatDate(pessoa.ultimoAumento)}</TableCell>
                           <TableCell className="text-right">
