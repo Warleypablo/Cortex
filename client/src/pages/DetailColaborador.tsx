@@ -1502,7 +1502,7 @@ export default function DetailColaborador() {
                     {colaborador.nivel && (
                       <span className="flex items-center gap-1.5" data-testid="text-colaborador-nivel">
                         <Award className="w-4 h-4" />
-                        {colaborador.nivel}
+                        {mapNivelToNew(colaborador.nivel)}
                       </span>
                     )}
                   </div>
@@ -1572,7 +1572,7 @@ export default function DetailColaborador() {
           <InfoCard 
             icon={TrendingUp} 
             label="Nível" 
-            value={colaborador.nivel}
+            value={mapNivelToNew(colaborador.nivel)}
             iconBgColor="bg-teal-100 dark:bg-teal-900/30"
             iconColor="text-teal-600 dark:text-teal-400"
           />
@@ -1684,7 +1684,7 @@ export default function DetailColaborador() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Nível</p>
-                  <p className="font-semibold text-foreground" data-testid="text-prof-nivel">{colaborador.nivel || "-"}</p>
+                  <p className="font-semibold text-foreground" data-testid="text-prof-nivel">{mapNivelToNew(colaborador.nivel) || "-"}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border/50">
