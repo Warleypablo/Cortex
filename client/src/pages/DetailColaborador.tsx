@@ -1524,37 +1524,6 @@ export default function DetailColaborador() {
           />
         </div>
 
-        {colaborador.linkedUser && (
-          <Card className="p-6 mb-8 hover-elevate" data-testid="card-linked-user">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
-                <UserCircle className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              </div>
-              Usuário Vinculado ao Sistema
-            </h2>
-            <div className="flex items-center gap-4">
-              <Avatar className="w-12 h-12 ring-2 ring-border">
-                {colaborador.linkedUser.picture ? (
-                  <AvatarImage src={colaborador.linkedUser.picture} alt={colaborador.linkedUser.name} />
-                ) : null}
-                <AvatarFallback>{getInitials(colaborador.linkedUser.name)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-foreground" data-testid="text-linked-user-name">
-                  {colaborador.linkedUser.name}
-                </p>
-                <p className="text-sm text-muted-foreground flex items-center gap-2 truncate" data-testid="text-linked-user-email">
-                  <Mail className="w-4 h-4 flex-shrink-0" />
-                  {colaborador.linkedUser.email}
-                </p>
-              </div>
-              <Badge variant="secondary" data-testid="badge-linked-user-role">
-                {colaborador.linkedUser.role}
-              </Badge>
-            </div>
-          </Card>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card className="p-6 hover-elevate" data-testid="card-personal-info">
             <h2 className="text-lg font-semibold mb-5 flex items-center gap-3">
