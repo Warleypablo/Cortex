@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { usePageInfo } from "@/contexts/PageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SelectWithAdd } from "@/components/ui/select-with-add";
 import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, UserCircle, ExternalLink, Search } from "lucide-react";
 import type { Colaborador, InsertColaborador, RhPromocao } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
@@ -657,6 +659,8 @@ function AssignPatrimonioDialog({
 
 function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborador: ColaboradorDetail; open: boolean; onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const { data: cargos = [], isLoading: cargosLoading } = useQuery<CargoOption[]>({
     queryKey: ["/api/rh/cargos"],
@@ -917,20 +921,19 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cargo</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-edit-cargo">
-                          <SelectValue placeholder={cargosLoading ? "Carregando..." : "Selecione o cargo"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {cargos.map((cargo) => (
-                          <SelectItem key={cargo.id} value={cargo.nome}>
-                            {cargo.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SelectWithAdd
+                        value={field.value || undefined}
+                        onValueChange={field.onChange}
+                        options={cargos}
+                        isLoading={cargosLoading}
+                        placeholder="Selecione o cargo"
+                        isAdmin={isAdmin}
+                        apiEndpoint="/api/rh/cargos"
+                        queryKey={["/api/rh/cargos"]}
+                        testIdPrefix="select-edit-cargo"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -941,20 +944,19 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nível</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-edit-nivel">
-                          <SelectValue placeholder={niveisLoading ? "Carregando..." : "Selecione o nível"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {niveis.map((nivel) => (
-                          <SelectItem key={nivel.id} value={nivel.nome}>
-                            {nivel.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SelectWithAdd
+                        value={field.value || undefined}
+                        onValueChange={field.onChange}
+                        options={niveis}
+                        isLoading={niveisLoading}
+                        placeholder="Selecione o nível"
+                        isAdmin={isAdmin}
+                        apiEndpoint="/api/rh/niveis"
+                        queryKey={["/api/rh/niveis"]}
+                        testIdPrefix="select-edit-nivel"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -981,20 +983,20 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Squad</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-edit-squad">
-                          <SelectValue placeholder={squadsLoading ? "Carregando..." : "Selecione o squad"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {squads.map((squad) => (
-                          <SelectItem key={squad.id} value={squad.nome}>
-                            {squad.emoji ? `${squad.emoji} ${squad.nome}` : squad.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SelectWithAdd
+                        value={field.value || undefined}
+                        onValueChange={field.onChange}
+                        options={squads}
+                        isLoading={squadsLoading}
+                        placeholder="Selecione o squad"
+                        isAdmin={isAdmin}
+                        apiEndpoint="/api/rh/squads"
+                        queryKey={["/api/rh/squads"]}
+                        displayEmoji={true}
+                        testIdPrefix="select-edit-squad"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
