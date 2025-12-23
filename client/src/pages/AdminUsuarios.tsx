@@ -511,11 +511,12 @@ function AddUserDialog({ open, onOpenChange }: {
       return;
     }
 
+    const uniqueRoutes = [...new Set(selectedRoutes)];
     createUserMutation.mutate({
       name: name.trim(),
       email: email.trim().toLowerCase(),
       role,
-      allowedRoutes: role === 'admin' ? [] : selectedRoutes,
+      allowedRoutes: role === 'admin' ? [] : uniqueRoutes,
     });
   };
 
