@@ -310,6 +310,7 @@ export const rhPatrimonio = pgTable("rh_patrimonio", {
   valorMercado: decimal("valor_mercado"),
   valorVenda: decimal("valor_venda"),
   descricao: text("descricao"),
+  senhaAtivo: varchar("senha_ativo", { length: 200 }),
 });
 
 export const insertPatrimonioSchema = createInsertSchema(rhPatrimonio).partial({
