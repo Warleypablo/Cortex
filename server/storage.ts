@@ -1664,6 +1664,7 @@ export class DbStorage implements IStorage {
         valorMercado: schema.rhPatrimonio.valorMercado,
         valorVenda: schema.rhPatrimonio.valorVenda,
         descricao: schema.rhPatrimonio.descricao,
+        senhaAtivo: schema.rhPatrimonio.senhaAtivo,
         colaborador: schema.rhPessoal,
       })
       .from(schema.rhPatrimonio)
@@ -1697,6 +1698,7 @@ export class DbStorage implements IStorage {
       valorMercado: row.valorMercado,
       valorVenda: row.valorVenda,
       descricao: row.descricao,
+      senhaAtivo: row.senhaAtivo,
       colaborador: row.colaborador || undefined,
     };
   }
@@ -1751,7 +1753,7 @@ export class DbStorage implements IStorage {
   }
 
   async updatePatrimonio(id: number, data: Record<string, string | null>): Promise<Patrimonio> {
-    const ALLOWED_FIELDS = ['numeroAtivo', 'ativo', 'marca', 'estadoConservacao', 'descricao', 'valorPago', 'valorMercado'];
+    const ALLOWED_FIELDS = ['numeroAtivo', 'ativo', 'marca', 'estadoConservacao', 'descricao', 'valorPago', 'valorMercado', 'senhaAtivo'];
     
     const safeData: Record<string, string | null> = {};
     for (const key of ALLOWED_FIELDS) {
