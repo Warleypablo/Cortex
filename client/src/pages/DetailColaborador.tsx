@@ -102,6 +102,18 @@ interface LinkedUser {
   role: string;
 }
 
+interface TelefoneItem {
+  id: number;
+  conta: string | null;
+  planoOperadora: string | null;
+  telefone: string;
+  responsavelNome: string | null;
+  responsavelId: number | null;
+  setor: string | null;
+  ultimaRecarga: string | null;
+  status: string;
+}
+
 interface SystemUser {
   id: string;
   email: string;
@@ -1356,6 +1368,16 @@ export default function DetailColaborador() {
     queryKey: ["/api/user-photos"],
   });
 
+  // Fetch all telefones and filter by colaboradorId
+  const { data: allTelefones = [] } = useQuery<TelefoneItem[]>({
+    queryKey: ["/api/telefones"],
+  });
+
+  // Filter telefones that belong to this colaborador
+  const colaboradorTelefones = allTelefones.filter(
+    (t) => t.responsavelId === Number(colaboradorId) && t.status === "Ativo"
+  );
+
   // Get photo from linkedUser or userPhotos by emailTurbo
   const getColaboradorPhoto = () => {
     if (colaborador?.linkedUser?.picture) {
@@ -1920,6 +1942,57 @@ export default function DetailColaborador() {
               </div>
               <p className="text-muted-foreground font-medium mb-1">Nenhum patrimônio atribuído</p>
               <p className="text-sm text-muted-foreground/80">Clique em "Adicionar Patrimônio" para atribuir equipamentos a este colaborador</p>
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-6 mb-8 hover-elevate" data-testid="card-telefones">
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+            <h2 className="text-lg font-semibold flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/30">
+                <Phone className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              </div>
+              Linhas Telefônicas
+            </h2>
+          </div>
+          {colaboradorTelefones.length > 0 ? (
+            <div className="overflow-x-auto border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="font-semibold">Telefone</TableHead>
+                    <TableHead className="font-semibold">Plano/Operadora</TableHead>
+                    <TableHead className="font-semibold">Setor</TableHead>
+                    <TableHead className="font-semibold">Conta</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {colaboradorTelefones.map((telefone) => (
+                    <TableRow key={telefone.id} data-testid={`row-telefone-${telefone.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-telefone-numero-${telefone.id}`}>
+                        {telefone.telefone}
+                      </TableCell>
+                      <TableCell data-testid={`text-telefone-plano-${telefone.id}`}>
+                        {telefone.planoOperadora || "-"}
+                      </TableCell>
+                      <TableCell data-testid={`text-telefone-setor-${telefone.id}`}>
+                        {telefone.setor || "-"}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground" data-testid={`text-telefone-conta-${telefone.id}`}>
+                        {telefone.conta || "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-center py-12" data-testid="text-no-telefones">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                <Phone className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground font-medium mb-1">Nenhuma linha telefônica ativa</p>
+              <p className="text-sm text-muted-foreground/80">Este colaborador não possui linhas telefônicas atribuídas</p>
             </div>
           )}
         </Card>
