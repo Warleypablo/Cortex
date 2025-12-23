@@ -68,6 +68,7 @@ interface PatrimonioComResponsavel {
 interface ColaboradorDropdown {
   id: number;
   nome: string;
+  status?: string | null;
 }
 
 interface HistoricoItem {
@@ -517,6 +518,7 @@ export default function PatrimonioDetail() {
                               value={colaborador.nome}
                               onSelect={() => handleSelectResponsavel(colaborador.nome)}
                               data-testid={`option-colaborador-${colaborador.id}`}
+                              className={colaborador.status === "Dispensado" ? "text-muted-foreground" : ""}
                             >
                               <Check
                                 className={cn(
@@ -526,7 +528,10 @@ export default function PatrimonioDetail() {
                                     : "opacity-0"
                                 )}
                               />
-                              {colaborador.nome}
+                              <span className="flex-1">{colaborador.nome}</span>
+                              {colaborador.status === "Dispensado" && (
+                                <span className="text-xs text-muted-foreground ml-2">(Dispensado)</span>
+                              )}
                             </CommandItem>
                           ))}
                         </CommandGroup>
