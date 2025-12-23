@@ -165,6 +165,17 @@ export default function ClientDetail() {
     }
   };
 
+  const mapClusterToName = (cluster: string | null): string => {
+    if (!cluster) return "Não definido";
+    switch (cluster) {
+      case "1": return "NFNC";
+      case "2": return "Regulares";
+      case "3": return "Chaves";
+      case "4": return "Imperdíveis";
+      default: return cluster;
+    }
+  };
+
   const sortedContratos = useMemo(() => {
     if (!contratos) return [];
     if (!contratosSortConfig) return contratos;
@@ -615,7 +626,7 @@ export default function ClientDetail() {
                 <Layers className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Cluster</p>
-                  <p className="font-medium" data-testid="text-cluster">{cliente.cluster || "Não definido"}</p>
+                  <p className="font-medium" data-testid="text-cluster">{mapClusterToName(cliente.cluster)}</p>
                 </div>
               </div>
 
