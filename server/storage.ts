@@ -1820,9 +1820,17 @@ export class DbStorage implements IStorage {
   }
 
   async updatePatrimonioResponsavel(id: number, responsavelNome: string | null): Promise<Patrimonio> {
+    const updateData: { responsavelAtual: string | null; responsavelId?: null } = { 
+      responsavelAtual: responsavelNome 
+    };
+    
+    if (responsavelNome === null) {
+      updateData.responsavelId = null;
+    }
+    
     const [updated] = await db
       .update(schema.rhPatrimonio)
-      .set({ responsavelAtual: responsavelNome })
+      .set(updateData)
       .where(eq(schema.rhPatrimonio.id, id))
       .returning();
     
