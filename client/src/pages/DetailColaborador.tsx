@@ -701,6 +701,33 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
     }
   );
 
+  // Extract estado sigla from format "ES - Espírito Santo" to "ES"
+  const getEstadoSigla = (estado: string | null): string => {
+    if (!estado) return "";
+    if (estado.includes(" - ")) {
+      return estado.split(" - ")[0].trim();
+    }
+    return estado;
+  };
+
+  // Extract cidade from endereco field if cidade column is empty
+  const getCidadeFromEndereco = (endereco: string | null, cidadeColumn: string | null): string => {
+    if (cidadeColumn) return cidadeColumn;
+    if (!endereco) return "";
+    // Try to extract city from address patterns like "..., CityName SP - ..." or "..., CityName - Neighborhood, ..."
+    const patterns = [
+      /,\s*([A-Za-zÀ-ú\s]+)\s+[A-Z]{2}\s*-/,  // "..., Votorantim SP - ..."
+      /,\s*([A-Za-zÀ-ú\s]+)\s*-\s*[A-Za-zÀ-ú\s]+,/,  // "..., City - Neighborhood, ..."
+    ];
+    for (const pattern of patterns) {
+      const match = endereco.match(pattern);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+    return "";
+  };
+
   const form = useForm<InsertColaborador & { demissao?: string; tipoDemissao?: string; ultimoAumento?: string; cidade?: string; userId?: string | null }>({
     resolver: zodResolver(editColaboradorSchema),
     defaultValues: {
@@ -715,8 +742,8 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
       squad: colaborador.squad || "",
       setor: colaborador.setor || "",
       endereco: colaborador.endereco || "",
-      estado: colaborador.estado || "",
-      cidade: (colaborador as any).cidade || "",
+      estado: getEstadoSigla(colaborador.estado),
+      cidade: getCidadeFromEndereco(colaborador.endereco, (colaborador as any).cidade),
       pix: colaborador.pix || "",
       cnpj: colaborador.cnpj || "",
       salario: colaborador.salario || "",
