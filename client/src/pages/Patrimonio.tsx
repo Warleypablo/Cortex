@@ -57,7 +57,7 @@ export default function Patrimonio() {
   const [filterTipoBem, setFilterTipoBem] = useState<string>("todos");
   const [filterEstado, setFilterEstado] = useState<string>("todos");
   const [filterMarca, setFilterMarca] = useState<string>("todos");
-  const [sortField, setSortField] = useState<SortField>("numeroAtivo");
+  const [sortField, setSortField] = useState<SortField | "default">("default");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -159,10 +159,34 @@ export default function Patrimonio() {
     }
     
     result.sort((a, b) => {
+      // Ordenação padrão: Notebooks/Computadores primeiro, depois bom estado
+      if (sortField === "default") {
+        const ativoA = a.ativo?.toLowerCase() || "";
+        const ativoB = b.ativo?.toLowerCase() || "";
+        const estadoA = a.estadoConservacao?.toLowerCase() || "";
+        const estadoB = b.estadoConservacao?.toLowerCase() || "";
+        
+        const isNotebookComputadorA = ativoA.includes("notebook") || ativoA.includes("computador");
+        const isNotebookComputadorB = ativoB.includes("notebook") || ativoB.includes("computador");
+        const isBomA = estadoA.includes("bom") || estadoA.includes("novo") || estadoA.includes("ótimo");
+        const isBomB = estadoB.includes("bom") || estadoB.includes("novo") || estadoB.includes("ótimo");
+        
+        // Prioridade 1: Notebooks/Computadores primeiro
+        if (isNotebookComputadorA && !isNotebookComputadorB) return -1;
+        if (!isNotebookComputadorA && isNotebookComputadorB) return 1;
+        
+        // Prioridade 2: Bom estado primeiro
+        if (isBomA && !isBomB) return -1;
+        if (!isBomA && isBomB) return 1;
+        
+        // Desempate por número do ativo
+        return (a.numeroAtivo || "").localeCompare(b.numeroAtivo || "", undefined, { numeric: true });
+      }
+      
       let valA: string | number = "";
       let valB: string | number = "";
       
-      if (sortField === "valorPago" || sortField === "valorMercado" || sortField === "valorVenda") {
+      if (sortField === "valorPago" || sortField === "valorMercado") {
         valA = parseFloat(a[sortField] || "0") || 0;
         valB = parseFloat(b[sortField] || "0") || 0;
         return sortDirection === "asc" ? valA - valB : valB - valA;
@@ -198,7 +222,7 @@ export default function Patrimonio() {
   };
 
   const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return null;
+    if (sortField === "default" || sortField !== field) return null;
     return sortDirection === "asc" 
       ? <ChevronUp className="w-4 h-4 ml-1" />
       : <ChevronDown className="w-4 h-4 ml-1" />;
