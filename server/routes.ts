@@ -1232,8 +1232,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid data", details: validation.error });
       }
       const user = req.user as { email?: string } | undefined;
-      const criadoPor = user?.email || null;
-      const colaboradorAtualizado = await storage.updateColaborador(id, validation.data, criadoPor || undefined);
+      const criadoPor = user?.email || 'Sistema';
+      const colaboradorAtualizado = await storage.updateColaborador(id, validation.data, criadoPor);
       res.json(colaboradorAtualizado);
     } catch (error) {
       console.error("[api] Error updating colaborador:", error);
