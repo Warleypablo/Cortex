@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Users, FileText, Search, Filter, X, Check, Save, Bookmark, Trash2 } from "lucide-react";
+import { Users, FileText, Search, Filter, X, Check, Save, Bookmark, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePageInfo } from "@/contexts/PageContext";
 import { Input } from "@/components/ui/input";
@@ -821,6 +821,15 @@ export default function ClientesContratos() {
                 </ScrollArea>
               </PopoverContent>
             </Popover>
+            
+            <Button 
+              variant="default" 
+              data-testid="button-add-contract"
+              onClick={() => window.open('https://contratos.turbopartners.com.br/index.php?page=contratos&action=new', '_blank')}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Novo Contrato
+            </Button>
           </div>
         )}
       </div>

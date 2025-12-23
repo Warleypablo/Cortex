@@ -257,16 +257,6 @@ export default function Contracts({
           />
         </div>
 
-        <div className="flex items-center justify-end mb-6">
-          <Button 
-            variant="default" 
-            data-testid="button-add-contract"
-            onClick={() => window.open('https://contratos.turbopartners.com.br/index.php?page=contratos&action=new', '_blank')}
-          >
-            + Novo Contrato
-          </Button>
-        </div>
-
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="max-h-[calc(100vh-400px)] overflow-y-auto">
             <Table>
