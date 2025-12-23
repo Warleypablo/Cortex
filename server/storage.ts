@@ -1229,6 +1229,8 @@ export class DbStorage implements IStorage {
           COALESCE(${schema.cazClientes.id}, ('x' || substr(md5(${schema.cupClientes.taskId}), 1, 8))::bit(32)::int)::text = ${id}
           OR ${schema.cazClientes.ids} = ${id} 
           OR ${schema.cupClientes.taskId} = ${id}
+          OR REPLACE(${schema.cazClientes.cnpj}, '.', '') = REPLACE(REPLACE(${id}, '.', ''), '-', '')
+          OR REPLACE(${schema.cupClientes.cnpj}, '.', '') = REPLACE(REPLACE(${id}, '.', ''), '-', '')
         `
       )
       .limit(1);
@@ -1270,7 +1272,10 @@ export class DbStorage implements IStorage {
         0 as "totalRecorrente",
         0 as "totalPontual"
       FROM caz_clientes
-      WHERE id::text = ${id} OR ids = ${id}
+      WHERE id::text = ${id} 
+        OR ids = ${id}
+        OR REPLACE(REPLACE(cnpj, '.', ''), '-', '') = REPLACE(REPLACE(${id}, '.', ''), '-', '')
+        OR REPLACE(REPLACE(cnpj, '/', ''), ' ', '') = REPLACE(REPLACE(${id}, '/', ''), ' ', '')
       LIMIT 1
     `);
 
