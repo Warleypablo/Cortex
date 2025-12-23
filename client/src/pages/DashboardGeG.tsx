@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDecimal } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Users, TrendingUp, UserPlus, UserMinus, Clock, Cake, Award, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
@@ -639,63 +640,37 @@ export default function DashboardGeG() {
           <Card data-testid="card-colaboradores-por-squad">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <PieChartIcon className="w-5 h-5 text-blue-500" />
-                <CardTitle>Por Squad</CardTitle>
+                <Users className="w-5 h-5 text-blue-500" />
+                <CardTitle>Distribuição por Squad</CardTitle>
               </div>
-              <CardDescription>Distribuição por squad</CardDescription>
+              <CardDescription>Colaboradores ativos por squad</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingColaboradoresPorSquad ? (
                 <Skeleton className="h-[250px] w-full" />
               ) : colaboradoresPorSquad && colaboradoresPorSquad.length > 0 ? (
-                <div className="flex flex-col items-center">
-                  <ResponsiveContainer width="100%" height={160}>
-                    <PieChart>
-                      <Pie
-                        data={colaboradoresPorSquad}
-                        dataKey="total"
-                        nameKey="nome"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={60}
-                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {colaboradoresPorSquad.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload as Distribuicao;
-                            return (
-                              <div className="bg-popover border rounded-md shadow-md p-2">
-                                <p className="font-medium text-sm">{data.nome}</p>
-                                <p className="text-xs text-muted-foreground">{data.total} colaboradores</p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="space-y-1 mt-2 max-h-[80px] overflow-y-auto w-full">
-                    {colaboradoresPorSquad.slice(0, 5).map((item, index) => (
-                      <div key={item.nome} className="flex items-center gap-2 text-xs" data-testid={`squad-dist-${index}`}>
-                        <div 
-                          className="w-2 h-2 rounded-full flex-shrink-0" 
-                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} 
-                        />
-                        <span className="text-muted-foreground truncate">{item.nome}</span>
-                        <span className="font-medium ml-auto">({item.total})</span>
-                      </div>
-                    ))}
-                    {colaboradoresPorSquad.length > 5 && (
-                      <p className="text-xs text-muted-foreground">+{colaboradoresPorSquad.length - 5} outros</p>
-                    )}
-                  </div>
+                <div className="max-h-[280px] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead className="text-right">Qtd</TableHead>
+                        <TableHead className="text-right">%</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(() => {
+                        const totalSquad = colaboradoresPorSquad.reduce((sum, item) => sum + item.total, 0);
+                        return colaboradoresPorSquad.map((item, index) => (
+                          <TableRow key={item.nome} data-testid={`squad-dist-${index}`}>
+                            <TableCell className="font-medium">{item.nome}</TableCell>
+                            <TableCell className="text-right">{item.total}</TableCell>
+                            <TableCell className="text-right">{totalSquad > 0 ? ((item.total / totalSquad) * 100).toFixed(1) : 0}%</TableCell>
+                          </TableRow>
+                        ));
+                      })()}
+                    </TableBody>
+                  </Table>
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-squad">
@@ -708,63 +683,37 @@ export default function DashboardGeG() {
           <Card data-testid="card-colaboradores-por-cargo">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <PieChartIcon className="w-5 h-5 text-purple-500" />
-                <CardTitle>Por Cargo</CardTitle>
+                <Award className="w-5 h-5 text-purple-500" />
+                <CardTitle>Distribuição por Cargo</CardTitle>
               </div>
-              <CardDescription>Distribuição por cargo</CardDescription>
+              <CardDescription>Colaboradores ativos por cargo</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingColaboradoresPorCargo ? (
                 <Skeleton className="h-[250px] w-full" />
               ) : colaboradoresPorCargo && colaboradoresPorCargo.length > 0 ? (
-                <div className="flex flex-col items-center">
-                  <ResponsiveContainer width="100%" height={160}>
-                    <PieChart>
-                      <Pie
-                        data={colaboradoresPorCargo}
-                        dataKey="total"
-                        nameKey="nome"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={60}
-                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {colaboradoresPorCargo.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload as Distribuicao;
-                            return (
-                              <div className="bg-popover border rounded-md shadow-md p-2">
-                                <p className="font-medium text-sm">{data.nome}</p>
-                                <p className="text-xs text-muted-foreground">{data.total} colaboradores</p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="space-y-1 mt-2 max-h-[80px] overflow-y-auto w-full">
-                    {colaboradoresPorCargo.slice(0, 5).map((item, index) => (
-                      <div key={item.nome} className="flex items-center gap-2 text-xs" data-testid={`cargo-dist-${index}`}>
-                        <div 
-                          className="w-2 h-2 rounded-full flex-shrink-0" 
-                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} 
-                        />
-                        <span className="text-muted-foreground truncate">{item.nome}</span>
-                        <span className="font-medium ml-auto">({item.total})</span>
-                      </div>
-                    ))}
-                    {colaboradoresPorCargo.length > 5 && (
-                      <p className="text-xs text-muted-foreground">+{colaboradoresPorCargo.length - 5} outros</p>
-                    )}
-                  </div>
+                <div className="max-h-[280px] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead className="text-right">Qtd</TableHead>
+                        <TableHead className="text-right">%</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(() => {
+                        const totalCargo = colaboradoresPorCargo.reduce((sum, item) => sum + item.total, 0);
+                        return colaboradoresPorCargo.map((item, index) => (
+                          <TableRow key={item.nome} data-testid={`cargo-dist-${index}`}>
+                            <TableCell className="font-medium">{item.nome}</TableCell>
+                            <TableCell className="text-right">{item.total}</TableCell>
+                            <TableCell className="text-right">{totalCargo > 0 ? ((item.total / totalCargo) * 100).toFixed(1) : 0}%</TableCell>
+                          </TableRow>
+                        ));
+                      })()}
+                    </TableBody>
+                  </Table>
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-cargo">
@@ -777,63 +726,37 @@ export default function DashboardGeG() {
           <Card data-testid="card-colaboradores-por-nivel">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <PieChartIcon className="w-5 h-5 text-green-500" />
-                <CardTitle>Por Nível</CardTitle>
+                <TrendingUp className="w-5 h-5 text-green-500" />
+                <CardTitle>Distribuição por Nível</CardTitle>
               </div>
-              <CardDescription>Distribuição por nível</CardDescription>
+              <CardDescription>Colaboradores ativos por nível</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingColaboradoresPorNivel ? (
                 <Skeleton className="h-[250px] w-full" />
               ) : colaboradoresPorNivel && colaboradoresPorNivel.length > 0 ? (
-                <div className="flex flex-col items-center">
-                  <ResponsiveContainer width="100%" height={160}>
-                    <PieChart>
-                      <Pie
-                        data={colaboradoresPorNivel}
-                        dataKey="total"
-                        nameKey="nome"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={60}
-                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {colaboradoresPorNivel.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload as Distribuicao;
-                            return (
-                              <div className="bg-popover border rounded-md shadow-md p-2">
-                                <p className="font-medium text-sm">{data.nome}</p>
-                                <p className="text-xs text-muted-foreground">{data.total} colaboradores</p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="space-y-1 mt-2 max-h-[80px] overflow-y-auto w-full">
-                    {colaboradoresPorNivel.slice(0, 5).map((item, index) => (
-                      <div key={item.nome} className="flex items-center gap-2 text-xs" data-testid={`nivel-dist-${index}`}>
-                        <div 
-                          className="w-2 h-2 rounded-full flex-shrink-0" 
-                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} 
-                        />
-                        <span className="text-muted-foreground truncate">{item.nome}</span>
-                        <span className="font-medium ml-auto">({item.total})</span>
-                      </div>
-                    ))}
-                    {colaboradoresPorNivel.length > 5 && (
-                      <p className="text-xs text-muted-foreground">+{colaboradoresPorNivel.length - 5} outros</p>
-                    )}
-                  </div>
+                <div className="max-h-[280px] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead className="text-right">Qtd</TableHead>
+                        <TableHead className="text-right">%</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(() => {
+                        const totalNivel = colaboradoresPorNivel.reduce((sum, item) => sum + item.total, 0);
+                        return colaboradoresPorNivel.map((item, index) => (
+                          <TableRow key={item.nome} data-testid={`nivel-dist-${index}`}>
+                            <TableCell className="font-medium">{item.nome}</TableCell>
+                            <TableCell className="text-right">{item.total}</TableCell>
+                            <TableCell className="text-right">{totalNivel > 0 ? ((item.total / totalNivel) * 100).toFixed(1) : 0}%</TableCell>
+                          </TableRow>
+                        ));
+                      })()}
+                    </TableBody>
+                  </Table>
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-nivel">
