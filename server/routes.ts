@@ -1215,6 +1215,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint para importar datas de último aumento em batch
+  app.post("/api/colaboradores/import-ultimo-aumento", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { data } = req.body as { data: { nome: string; ultimoAumento: string | null }[] };
+      
+      if (!data || !Array.isArray(data)) {
+        return res.status(400).json({ error: "Invalid data format. Expected { data: [{nome, ultimoAumento}] }" });
+      }
+
+      const colaboradores = await storage.getColaboradores();
+      const results: { nome: string; status: string; error?: string }[] = [];
+
+      for (const item of data) {
+        const nome = item.nome?.trim();
+        const ultimoAumentoStr = item.ultimoAumento?.trim();
+
+        if (!nome) {
+          results.push({ nome: item.nome || "unknown", status: "skipped", error: "Nome vazio" });
+          continue;
+        }
+
+        // Encontrar colaborador por nome (match parcial ou exato)
+        const colaborador = colaboradores.find(c => 
+          c.nome?.toLowerCase().trim() === nome.toLowerCase()
+        );
+
+        if (!colaborador) {
+          results.push({ nome, status: "not_found", error: "Colaborador não encontrado" });
+          continue;
+        }
+
+        // Se não tem data de último aumento, pular
+        if (!ultimoAumentoStr || ultimoAumentoStr === "-") {
+          results.push({ nome, status: "skipped", error: "Sem data de último aumento" });
+          continue;
+        }
+
+        try {
+          // Converter data de DD/MM/YY para YYYY-MM-DD
+          const parts = ultimoAumentoStr.split("/");
+          if (parts.length !== 3) {
+            results.push({ nome, status: "error", error: `Formato de data inválido: ${ultimoAumentoStr}` });
+            continue;
+          }
+          
+          const day = parts[0].padStart(2, "0");
+          const month = parts[1].padStart(2, "0");
+          let year = parts[2];
+          
+          // Converter ano de 2 dígitos para 4 dígitos
+          if (year.length === 2) {
+            year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
+          }
+          
+          const ultimoAumentoDate = `${year}-${month}-${day}`;
+
+          await storage.updateColaborador(colaborador.id, { 
+            ultimoAumento: ultimoAumentoDate
+          });
+          
+          results.push({ nome, status: "updated" });
+        } catch (error) {
+          results.push({ nome, status: "error", error: String(error) });
+        }
+      }
+
+      const updated = results.filter(r => r.status === "updated").length;
+      const notFound = results.filter(r => r.status === "not_found").length;
+      const skipped = results.filter(r => r.status === "skipped").length;
+      const errors = results.filter(r => r.status === "error").length;
+
+      res.json({
+        summary: { total: data.length, updated, notFound, skipped, errors },
+        details: results
+      });
+    } catch (error) {
+      console.error("[api] Error importing ultimo aumento:", error);
+      res.status(500).json({ error: "Failed to import ultimo aumento data" });
+    }
+  });
+
   app.get("/api/contratos", async (req, res) => {
     try {
       const contratos = await storage.getContratos();
