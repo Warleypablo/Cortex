@@ -38,7 +38,8 @@ import {
   Calendar,
   Headphones,
   Bell,
-  Monitor
+  Monitor,
+  Info
 } from "lucide-react";
 import { DealCelebration, useDealCelebrationTrigger } from "@/components/DealCelebration";
 import { formatPercent } from "@/lib/utils";
@@ -526,21 +527,24 @@ export default function DashboardSDRs() {
               value: metrics?.leadsTotais || 0, 
               icon: Users,
               gradient: "from-blue-600 to-indigo-600",
-              format: (v: number) => v.toString()
+              format: (v: number) => v.toString(),
+              tooltip: "Total de leads captados no período"
             },
             { 
               label: "Reuniões Realizadas", 
               value: metrics?.reunioesRealizadas || 0, 
               icon: CalendarCheck,
               gradient: "from-cyan-600 to-teal-600",
-              format: (v: number) => v.toString()
+              format: (v: number) => v.toString(),
+              tooltip: "Reuniões agendadas pelos SDRs"
             },
             { 
               label: "Taxa de Conversão", 
               value: metrics?.taxaConversao || 0, 
               icon: TrendingUp,
               gradient: "from-emerald-600 to-green-600",
-              format: (v: number) => formatPercent(v)
+              format: (v: number) => formatPercent(v),
+              tooltip: "Reuniões dividido por Leads (%)"
             },
           ].map((kpi, index) => (
             <motion.div
@@ -558,6 +562,14 @@ export default function DashboardSDRs() {
                     <kpi.icon className="w-5 h-5 text-foreground" />
                   </div>
                   <span className="text-sm font-medium text-muted-foreground">{kpi.label}</span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{kpi.tooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 
                 {isLoading ? (

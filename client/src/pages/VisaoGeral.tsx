@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
-import { DollarSign, TrendingUp, TrendingDown, Users, PauseCircle } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { DollarSign, TrendingUp, TrendingDown, Users, PauseCircle, Info } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 
@@ -128,7 +129,19 @@ export default function VisaoGeral() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
             <Card data-testid="card-mrr">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">MRR Ativo</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  <span className="flex items-center gap-1.5">
+                    MRR Ativo
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Receita Mensal Recorrente de contratos ativos</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                </CardTitle>
                 <DollarSign className="w-4 h-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -141,7 +154,19 @@ export default function VisaoGeral() {
 
             <Card data-testid="card-aquisicao-mrr">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Aquisição MRR</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  <span className="flex items-center gap-1.5">
+                    Aquisição MRR
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Valor de novos contratos recorrentes no mês</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                </CardTitle>
                 <TrendingUp className="w-4 h-4 text-green-600" />
               </CardHeader>
               <CardContent>
@@ -154,7 +179,19 @@ export default function VisaoGeral() {
 
             <Card data-testid="card-aquisicao-pontual">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Aquisição Pontual</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  <span className="flex items-center gap-1.5">
+                    Aquisição Pontual
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Valor de novos contratos pontuais no mês</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                </CardTitle>
                 <TrendingUp className="w-4 h-4 text-blue-600" />
               </CardHeader>
               <CardContent>
@@ -167,7 +204,19 @@ export default function VisaoGeral() {
 
             <Card data-testid="card-cac">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">CAC</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  <span className="flex items-center gap-1.5">
+                    CAC
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Custo de Aquisição de Cliente</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                </CardTitle>
                 <Users className="w-4 h-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -180,7 +229,19 @@ export default function VisaoGeral() {
 
             <Card data-testid="card-churn">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Churn</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  <span className="flex items-center gap-1.5">
+                    Churn
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Valor de contratos cancelados no mês</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                </CardTitle>
                 <TrendingDown className="w-4 h-4 text-red-600" />
               </CardHeader>
               <CardContent>
@@ -193,7 +254,19 @@ export default function VisaoGeral() {
 
             <Card data-testid="card-pausados">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pausados</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  <span className="flex items-center gap-1.5">
+                    Pausados
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Valor de contratos pausados no mês</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                </CardTitle>
                 <PauseCircle className="w-4 h-4 text-orange-600" />
               </CardHeader>
               <CardContent>
@@ -234,7 +307,7 @@ export default function VisaoGeral() {
                         tick={{ fill: 'currentColor' }}
                         tickFormatter={(value) => formatCurrency(value)}
                       />
-                      <Tooltip 
+                      <RechartsTooltip 
                         formatter={(value: number) => [formatCurrency(value), 'MRR']}
                         contentStyle={{ 
                           backgroundColor: 'hsl(var(--background))',
@@ -373,7 +446,7 @@ export default function VisaoGeral() {
                       tick={{ fill: 'currentColor' }}
                       width={80}
                     />
-                    <Tooltip 
+                    <RechartsTooltip 
                       formatter={(value: number) => [formatCurrency(value), 'MRR']}
                       contentStyle={{ 
                         backgroundColor: 'hsl(var(--background))',

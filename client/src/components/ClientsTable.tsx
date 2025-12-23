@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { ServiceIcons } from "@/components/ServiceIcons";
 import { formatCurrency, formatDecimal } from "@/lib/utils";
 import type { ClienteCompleto } from "../../../server/storage";
@@ -82,7 +83,17 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
               className="hover-elevate -ml-3"
               data-testid="sort-ltv"
             >
-              LTV
+              <span className="flex items-center gap-1">
+                LTV
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Lifetime Value: soma de toda receita paga pelo cliente</p>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
               <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -94,7 +105,17 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
               className="hover-elevate -ml-3"
               data-testid="sort-lt"
             >
-              LT
+              <span className="flex items-center gap-1">
+                LT
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Lifetime: meses ativos com receita paga</p>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
               <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
           </div>
