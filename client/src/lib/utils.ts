@@ -57,6 +57,19 @@ export function formatCurrency(value: number): string {
 }
 
 /**
+ * Formats a number as Brazilian currency (BRL) without decimal places.
+ */
+export function formatCurrencyNoDecimals(value: number): string {
+  if (value === null || value === undefined || isNaN(value)) return 'R$ 0';
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+/**
  * Formats a number as compact Brazilian currency (K, M, B).
  */
 export function formatCurrencyCompact(value: number): string {
