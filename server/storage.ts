@@ -1571,6 +1571,7 @@ export class DbStorage implements IStorage {
   }
 
   async getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]> {
+    const cleanId = clienteId.replace(/[.\-\/\s]/g, '');
     const result = await db.execute(sql`
       SELECT DISTINCT ON (ct.id_subtask)
         ct.id_subtask as "idSubtask",
@@ -1594,6 +1595,9 @@ export class DbStorage implements IStorage {
       LEFT JOIN cup_clientes cc ON ct.id_task = cc.task_id
       LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
       WHERE caz.ids = ${clienteId}
+        OR cc.task_id = ${clienteId}
+        OR REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') = ${cleanId}
+        OR REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = ${cleanId}
       ORDER BY ct.id_subtask, caz.id DESC NULLS LAST, ct.data_inicio DESC
     `);
 
