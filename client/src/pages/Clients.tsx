@@ -44,7 +44,7 @@ export default function Clients() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [servicoFilter, setServicoFilter] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [tipoContratoFilter, setTipoContratoFilter] = useState<string>("ambos");
   const [responsavelFilter, setResponsavelFilter] = useState<string[]>([]);
   const [clusterFilter, setClusterFilter] = useState<string>("all");
@@ -118,8 +118,8 @@ export default function Clients() {
       const matchesServico = servicoFilter.length === 0 || 
         (client.servicos && servicoFilter.some(s => client.servicos!.toLowerCase().includes(s.toLowerCase())));
       
-      const matchesStatus = statusFilter === "all" || 
-        client.statusClickup === statusFilter;
+      const matchesStatus = statusFilter.length === 0 || 
+        statusFilter.includes(client.statusClickup || "");
 
       const matchesTipoContrato = 
         tipoContratoFilter === "ambos" ||
@@ -250,12 +250,12 @@ export default function Clients() {
     setCurrentPage(1);
   }, [searchQuery, servicoFilter, statusFilter, tipoContratoFilter, responsavelFilter, clusterFilter, ltOperator, ltValue, aovOperator, aovValue, itemsPerPage, sortField, sortDirection]);
 
-  const hasActiveFilters = tipoContratoFilter !== "ambos" || servicoFilter.length > 0 || statusFilter !== "all" || responsavelFilter.length > 0 || clusterFilter !== "all" || ltOperator !== "all" || aovOperator !== "all";
+  const hasActiveFilters = tipoContratoFilter !== "ambos" || servicoFilter.length > 0 || statusFilter.length > 0 || responsavelFilter.length > 0 || clusterFilter !== "all" || ltOperator !== "all" || aovOperator !== "all";
 
   const activeFilterCount = [
     tipoContratoFilter !== "ambos",
     servicoFilter.length > 0,
-    statusFilter !== "all",
+    statusFilter.length > 0,
     responsavelFilter.length > 0,
     clusterFilter !== "all",
     ltOperator !== "all",
@@ -265,7 +265,7 @@ export default function Clients() {
   const clearAllFilters = () => {
     setTipoContratoFilter("ambos");
     setServicoFilter([]);
-    setStatusFilter("all");
+    setStatusFilter([]);
     setResponsavelFilter([]);
     setClusterFilter("all");
     setLtOperator("all");
@@ -287,6 +287,14 @@ export default function Clients() {
       prev.includes(responsavel) 
         ? prev.filter(r => r !== responsavel)
         : [...prev, responsavel]
+    );
+  };
+
+  const toggleStatusFilter = (status: string) => {
+    setStatusFilter(prev => 
+      prev.includes(status) 
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
     );
   };
 
@@ -423,21 +431,28 @@ export default function Clients() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Status</Label>
-                    <Select
-                      value={statusFilter}
-                      onValueChange={setStatusFilter}
-                    >
-                      <SelectTrigger className="w-full" data-testid="select-filter-status">
-                        <SelectValue placeholder="Todos os status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos os status</SelectItem>
-                        {statusUnicos.map(status => (
-                          <SelectItem key={status} value={status}>{status}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-muted-foreground">Status (múltipla seleção)</Label>
+                      {statusFilter.length > 0 && (
+                        <Badge variant="secondary" className="text-xs">{statusFilter.length}</Badge>
+                      )}
+                    </div>
+                    <div className="border rounded-md max-h-32 overflow-y-auto overflow-x-hidden">
+                      {statusUnicos.map(status => (
+                        <label
+                          key={status}
+                          className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
+                          data-testid={`checkbox-status-${status}`}
+                        >
+                          <Checkbox 
+                            checked={statusFilter.includes(status)} 
+                            onCheckedChange={() => toggleStatusFilter(status)}
+                            className="flex-shrink-0"
+                          />
+                          <span className="text-sm truncate flex-1 min-w-0">{status}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="space-y-2">
