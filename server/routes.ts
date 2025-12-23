@@ -1436,6 +1436,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const patrimonio = await storage.updatePatrimonioResponsavelById(id, responsavelId, responsavelNome.trim());
+      
+      const usuario = (req as any).user?.name || "Sistema";
+      await storage.createPatrimonioHistorico({
+        patrimonioId: id,
+        acao: `Atribuído a ${responsavelNome.trim()}`,
+        usuario,
+        data: new Date(),
+      });
+      
       res.json(patrimonio);
     } catch (error) {
       console.error("[api] Error assigning patrimonio:", error);
