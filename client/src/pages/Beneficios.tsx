@@ -475,7 +475,7 @@ function BenefitCard({
       <CardContent className="space-y-3">
         <div className="flex flex-wrap gap-2 items-center">
           {benefit.cupom && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap">
               <Badge variant="outline" className="font-mono text-sm">
                 <Tag className="w-3 h-3 mr-1" />
                 {benefit.cupom}
@@ -492,6 +492,23 @@ function BenefitCard({
               >
                 <Copy className="w-3 h-3" />
               </Button>
+              {benefit.site && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-6"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(benefit.cupom!);
+                    const url = benefit.site!.startsWith("http") ? benefit.site : `https://${benefit.site}`;
+                    window.open(url, "_blank");
+                  }}
+                  data-testid={`button-use-cupom-card-${benefit.id}`}
+                >
+                  <ExternalLink className="w-3 h-3 mr-1" />
+                  Usar cupom
+                </Button>
+              )}
             </div>
           )}
           {benefit.desconto && (
@@ -667,6 +684,16 @@ export default function Beneficios() {
     });
   };
 
+  const copyAndOpenSite = (cupom: string, site: string) => {
+    navigator.clipboard.writeText(cupom);
+    const url = site.startsWith("http") ? site : `https://${site}`;
+    window.open(url, "_blank");
+    toast({
+      title: "Cupom copiado!",
+      description: "O cupom foi copiado e o site foi aberto em uma nova aba",
+    });
+  };
+
   const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <Button
       variant="ghost"
@@ -826,9 +853,25 @@ export default function Beneficios() {
                                 e.stopPropagation();
                                 copyToClipboard(benefit.cupom!, "Cupom");
                               }}
+                              data-testid={`button-copy-cupom-table-${benefit.id}`}
                             >
                               <Copy className="w-3 h-3" />
                             </Button>
+                            {benefit.site && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="h-6 ml-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyAndOpenSite(benefit.cupom!, benefit.site!);
+                                }}
+                                data-testid={`button-use-cupom-${benefit.id}`}
+                              >
+                                <ExternalLink className="w-3 h-3 mr-1" />
+                                Usar
+                              </Button>
+                            )}
                           </div>
                         ) : (
                           <span className="text-muted-foreground text-sm">-</span>
