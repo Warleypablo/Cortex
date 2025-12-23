@@ -849,51 +849,7 @@ export default function DashboardGeG() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <Card data-testid="card-ultimas-promocoes">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-purple-500" />
-                <CardTitle>Últimas Promoções</CardTitle>
-              </div>
-              <CardDescription>Colaboradores promovidos recentemente</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingPromocoes ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-14 w-full" />
-                  ))}
-                </div>
-              ) : ultimasPromocoes && ultimasPromocoes.length > 0 ? (
-                <div className="space-y-2 max-h-[250px] overflow-y-auto">
-                  {ultimasPromocoes.map((promo) => (
-                    <div key={promo.id} className="flex items-center justify-between p-3 bg-card rounded-lg border" data-testid={`promocao-${promo.id}`}>
-                      <div>
-                        <p className="font-medium text-sm">{promo.nome}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {promo.cargo || 'N/A'} {promo.nivel ? `- ${promo.nivel}` : ''} | {promo.squad || 'N/A'}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">
-                          {promo.ultimoAumento ? new Date(promo.ultimoAumento).toLocaleDateString('pt-BR') : 'N/A'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Há {promo.mesesUltAumento} {promo.mesesUltAumento === 1 ? 'mês' : 'meses'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-[200px]" data-testid="text-no-promocoes">
-                  <p className="text-muted-foreground">Nenhuma promoção registrada</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
+        <div className="grid grid-cols-1 gap-6 mb-8">
           <Card data-testid="card-mas-contratacoes" className="border-amber-500/20">
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -944,6 +900,52 @@ export default function DashboardGeG() {
                     </div>
                   )}
                 </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 mb-8">
+          <Card data-testid="card-ultimas-promocoes">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-purple-500" />
+                <CardTitle>Últimas Promoções</CardTitle>
+              </div>
+              <CardDescription>Colaboradores promovidos recentemente</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingPromocoes ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : ultimasPromocoes && ultimasPromocoes.length > 0 ? (
+                <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                  {ultimasPromocoes.map((promo) => (
+                    <div key={promo.id} className="flex items-center justify-between p-3 bg-card rounded-lg border" data-testid={`promocao-${promo.id}`}>
+                      <div>
+                        <p className="font-medium text-sm">{promo.nome}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {promo.cargo || 'N/A'} {promo.nivel ? `- ${promo.nivel}` : ''} | {promo.squad || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">
+                          {promo.ultimoAumento ? new Date(promo.ultimoAumento).toLocaleDateString('pt-BR') : 'N/A'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Há {promo.mesesUltAumento} {promo.mesesUltAumento === 1 ? 'mês' : 'meses'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[200px]" data-testid="text-no-promocoes">
+                  <p className="text-muted-foreground">Nenhuma promoção registrada</p>
+                </div>
               )}
             </CardContent>
           </Card>
