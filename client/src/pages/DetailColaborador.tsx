@@ -1373,6 +1373,20 @@ export default function DetailColaborador() {
     }
   };
 
+  const calcularMesesDeTurbo = (): string => {
+    if (!colaborador.admissao) return "-";
+    const admissaoDate = new Date(colaborador.admissao);
+    let endDate: Date;
+    if (colaborador.status === "Dispensado" && colaborador.demissao) {
+      endDate = new Date(colaborador.demissao);
+    } else {
+      endDate = new Date();
+    }
+    const diffTime = endDate.getTime() - admissaoDate.getTime();
+    const diffMonths = diffTime / (1000 * 60 * 60 * 24 * 30.44);
+    return diffMonths > 0 ? diffMonths.toFixed(1) : "0";
+  };
+
   return (
     <div className="bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -1394,9 +1408,18 @@ export default function DetailColaborador() {
                   <AvatarFallback className="text-2xl bg-primary/20 text-primary font-bold">{getInitials(colaborador.nome)}</AvatarFallback>
                 </Avatar>
                 <div className="space-y-1">
-                  <h1 className="text-2xl font-bold text-foreground" data-testid="text-colaborador-nome">
-                    {colaborador.nome}
-                  </h1>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-foreground" data-testid="text-colaborador-nome">
+                      {colaborador.nome}
+                    </h1>
+                    <Badge 
+                      variant={getStatusBadgeVariant(colaborador.status)} 
+                      className="px-3 py-1 text-sm font-medium"
+                      data-testid="badge-status-header"
+                    >
+                      {colaborador.status || "Desconhecido"}
+                    </Badge>
+                  </div>
                   <div className="flex items-center gap-3 text-sm text-muted-foreground">
                     {colaborador.cargo && (
                       <span className="flex items-center gap-1.5" data-testid="text-colaborador-cargo">
@@ -1424,13 +1447,6 @@ export default function DetailColaborador() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Badge 
-                  variant={getStatusBadgeVariant(colaborador.status)} 
-                  className="px-3 py-1 text-sm font-medium"
-                  data-testid="badge-status"
-                >
-                  {colaborador.status || "Desconhecido"}
-                </Badge>
                 <Button onClick={() => setEditDialogOpen(true)} data-testid="button-edit-colaborador">
                   <Pencil className="w-4 h-4 mr-2" />
                   Editar
@@ -1444,7 +1460,7 @@ export default function DetailColaborador() {
           <InfoCard 
             icon={Calendar} 
             label="Meses de Turbo" 
-            value={colaborador.mesesDeTurbo?.toString() || "-"}
+            value={calcularMesesDeTurbo()}
             iconBgColor="bg-orange-100 dark:bg-orange-900/30"
             iconColor="text-orange-600 dark:text-orange-400"
           />
@@ -1633,7 +1649,7 @@ export default function DetailColaborador() {
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Meses de Turbo</p>
                   <p className="font-semibold text-foreground" data-testid="text-prof-meses-turbo">
-                    <span className="text-primary font-bold">{colaborador.mesesDeTurbo || "-"}</span>
+                    <span className="text-primary font-bold">{calcularMesesDeTurbo()}</span>
                   </p>
                 </div>
               </div>
