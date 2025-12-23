@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import ClientsTable from "@/components/ClientsTable";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Filter, Users, UserCheck, TrendingUp, Clock, DollarSign } from "lucide-react";
+import { Loader2, Search, Filter, Users, UserCheck, TrendingUp, Clock, DollarSign, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import StatsCard from "@/components/StatsCard";
@@ -14,6 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatCurrencyNoDecimals, formatDecimal, formatPercent } from "@/lib/utils";
 import type { ClienteCompleto } from "../../../server/storage";
 
@@ -271,52 +278,94 @@ export default function Clients() {
             />
           </div>
           
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <Select
-              value={tipoContratoFilter}
-              onValueChange={setTipoContratoFilter}
-            >
-              <SelectTrigger className="w-[140px]" data-testid="select-filter-tipo-contrato">
-                <SelectValue placeholder="Tipo de contrato" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ambos">Ambos</SelectItem>
-                <SelectItem value="recorrente">Recorrente</SelectItem>
-                <SelectItem value="pontual">Pontual</SelectItem>
-              </SelectContent>
-            </Select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="default" className="gap-2" data-testid="button-filter-clients">
+                <Filter className="w-4 h-4" />
+                <span className="hidden sm:inline">Filtros</span>
+                {(tipoContratoFilter !== "ambos" || servicoFilter !== "all" || statusFilter !== "all") && (
+                  <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-xs">
+                    {[tipoContratoFilter !== "ambos", servicoFilter !== "all", statusFilter !== "all"].filter(Boolean).length}
+                  </Badge>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="end">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-sm">Filtros</h4>
+                  {(tipoContratoFilter !== "ambos" || servicoFilter !== "all" || statusFilter !== "all") && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-xs"
+                      onClick={() => {
+                        setTipoContratoFilter("ambos");
+                        setServicoFilter("all");
+                        setStatusFilter("all");
+                      }}
+                      data-testid="button-clear-filters"
+                    >
+                      Limpar filtros
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Tipo de Contrato</Label>
+                  <Select
+                    value={tipoContratoFilter}
+                    onValueChange={setTipoContratoFilter}
+                  >
+                    <SelectTrigger className="w-full" data-testid="select-filter-tipo-contrato">
+                      <SelectValue placeholder="Tipo de contrato" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ambos">Ambos</SelectItem>
+                      <SelectItem value="recorrente">Recorrente</SelectItem>
+                      <SelectItem value="pontual">Pontual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <Select
-              value={servicoFilter}
-              onValueChange={setServicoFilter}
-            >
-              <SelectTrigger className="w-[180px]" data-testid="select-filter-servico">
-                <SelectValue placeholder="Todos os serviços" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os serviços</SelectItem>
-                {servicosUnicos.map(servico => (
-                  <SelectItem key={servico} value={servico}>{servico}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Serviço</Label>
+                  <Select
+                    value={servicoFilter}
+                    onValueChange={setServicoFilter}
+                  >
+                    <SelectTrigger className="w-full" data-testid="select-filter-servico">
+                      <SelectValue placeholder="Todos os serviços" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os serviços</SelectItem>
+                      {servicosUnicos.map(servico => (
+                        <SelectItem key={servico} value={servico}>{servico}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <Select
-              value={statusFilter}
-              onValueChange={setStatusFilter}
-            >
-              <SelectTrigger className="w-[150px]" data-testid="select-filter-status">
-                <SelectValue placeholder="Todos os status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os status</SelectItem>
-                {statusUnicos.map(status => (
-                  <SelectItem key={status} value={status}>{status}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Status</Label>
+                  <Select
+                    value={statusFilter}
+                    onValueChange={setStatusFilter}
+                  >
+                    <SelectTrigger className="w-full" data-testid="select-filter-status">
+                      <SelectValue placeholder="Todos os status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os status</SelectItem>
+                      {statusUnicos.map(status => (
+                        <SelectItem key={status} value={status}>{status}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="flex-1 min-h-0">
