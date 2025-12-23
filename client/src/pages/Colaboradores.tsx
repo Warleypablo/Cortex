@@ -1735,6 +1735,10 @@ export default function Colaboradores() {
           aVal = a.setor?.toLowerCase() || '';
           bVal = b.setor?.toLowerCase() || '';
           break;
+        case 'salario':
+          aVal = parseFloat(String(a.salario || 0)) || 0;
+          bVal = parseFloat(String(b.salario || 0)) || 0;
+          break;
         case 'tempoTurbo':
           aVal = calcularTempoTurboMeses(a.admissao, a.demissao, a.status);
           bVal = calcularTempoTurboMeses(b.admissao, b.demissao, b.status);
@@ -1934,6 +1938,16 @@ export default function Colaboradores() {
                         </div>
                       </TableHead>
                       <TableHead 
+                        className="min-w-[120px] bg-muted/50 cursor-pointer select-none" 
+                        onClick={() => handleSort('salario')}
+                        data-testid="table-header-salario"
+                      >
+                        <div className="flex items-center">
+                          Salário
+                          {getSortIcon('salario')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
                         className="min-w-[140px] bg-muted/50 cursor-pointer select-none" 
                         onClick={() => handleSort('squad')}
                         data-testid="table-header-squad"
@@ -2049,6 +2063,11 @@ export default function Colaboradores() {
                                   {colaborador.nivel}
                                 </div>
                               )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="text-sm font-medium" data-testid={`text-salario-${colaborador.id}`}>
+                              {colaborador.salario ? formatCurrency(parseFloat(String(colaborador.salario))) : "-"}
                             </div>
                           </TableCell>
                           <TableCell className="py-3">
