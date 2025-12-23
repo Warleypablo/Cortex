@@ -1,0 +1,101 @@
+Status	Nome	CPF
+Ativo 	Aline de Carvalho de Souza 	142.420.117-92
+Ativo 	Allan Eduardo Machado de Araujo Alencar	110.669.664-60
+Ativo 	Amanda Lovise Lopes Comitre	202.500.567-98
+Ativo 	Amanda Sakai dos Santos	096.175.789-21
+Ativo 	Ana Luiza Lello Maria	185.621.187-88
+Ativo 	Anderson Matheus Silva de Moura	151.472.007-89
+Ativo 	André Luís Freitas Moraes Séder	049.304.815-46
+Ativo 	André Musso	157.252.937-77
+Ativo 	Arthur Freitas Barbosa Gama Zon	156.002.307-45
+Ativo 	Bernardo Soroldani Vital Campos	122.383.947-88
+Ativo 	Bibiana Chaves Paz	849.711.180-04
+Ativo 	Brenda Federici Vieira	154.175.297-02
+Ativo 	Breno Carmo	064.457.565-28
+Ativo 	Bruno Passador Parreira	490.247.908-75
+Ativo 	Caio Massaroni	157.087.397-62
+Ativo 	Caio Pedro Malini	183.874.097-07
+Ativo 	Carlos Eduardo Ferreira Lopes 	183.874.097-07
+Ativo 	Daiani Silva Vieira	181.427.677-75
+Ativo 	Daniel Basilio Giestas	105.310.327-10
+Ativo 	Davi de Souza Ferraz Matos 	142.448.517-71
+Ativo 	Debora Mund 	149.074.007-48
+Ativo 	Eduardo Tonane Portes	158.391.707-12
+Ativo 	Elizio José da Silva Filho	085.393.234-43
+Ativo 	Emerson Henrique Gama da Silva	145.453.367-60
+Ativo 	Esther Fiorio de Oliveira	182.021.587-37
+Ativo 	Fabiely Laurett Gums	142.359.477-02
+Ativo 	Fabio Richard Salgado de Oliveira 	102.605.647-02
+Ativo 	Fernanda de Almeida Tobias 	158.607.307-99
+Ativo 	Francisco Eduardo Lopes Lemes	027.217.432-79
+Ativo 	Gabriel Pereira Taufner	190.478.037-79
+Ativo 	Gabriela Teixeira Menezes de Souza Toledo 	19245222764
+Ativo 	Gabriela Viana Vasconcelos de Sousa	041.304.923-06
+Ativo 	Geiziele Izidorio Oliveira	187.240.917-23
+Ativo 	George Lucas Costa Dos Santos	046.427.345-54
+Ativo 	Glauber Pereira da Silva	12008396762
+Ativo 	Guilherme Cassemiro Pacheco Monteiro 	114.974.486-38
+Ativo 	Gustavo de Souza Pires	145.413.997-84
+Ativo 	Helamã Peres Janes	143.700.907-76
+Ativo 	Hiuri Carriço Liberato	166.527.877-33
+Ativo 	Isabella Novaes de Souza 	192.228.937-00
+Ativo 	Ismael Ataide Serafim	116.139.417-65
+Ativo 	João Guarçoni	176.161.167.44
+Ativo 	João Lucas Negromonte Marques Mendes	063.367.304-84
+Ativo 	João Pedro Lopes 	214.916.277-60
+Ativo 	Jônatas Cavalcante da Silva 	160.803.696-05
+Ativo 	Jordnei Gadelha da Silva	029.863.322-18
+Ativo 	Julia Manhães Silva 	139.413.617-08
+Ativo 	Julia Viana Ribeiro	129.539.657-26
+Ativo 	Kaike Matos dos Santos Pereira 	166.330.037-22
+Ativo 	Kamila Martins Hernandes Ribeiro	701.424.281-40
+Ativo 	Karoline Nobre Fraga Tognere	146.336.517-90
+Ativo 	Lara Grobério Miranda Carlos	149.073.787-18
+Ativo 	Laura Falcão	126.874.447-66
+Ativo 	Laura Gonzaga da Silva 	502.268.108-01
+Ativo 	Lenize Pretti	136.114.137-98
+Ativo 	Leonardo Soares Ferreira	159.988.567-08
+Ativo 	Lianca Lopes Costa Leite	160.362.547-09
+Ativo 	Livia de Oliveira Scalon	703.448.531-36
+Ativo 	Lucas de Oliveira Pereira	061.175.877-67
+Ativo 	Lucas Emanoel de Jesus Antunes	124.733.077-09
+Ativo 	Lucas Rosetti Miranda	174.731.707-16
+Ativo 	Maria Alice da Silva Costa 	 176.050.027-50
+Ativo 	Maria Midyan De Sousa Sequeira Dias	166.152.787-66 
+Ativo 	Mariah Eduarda Grippa de Sousa	176.487.787-00
+Ativo 	Mariana Amaral Dalto	163.120.307-09
+Ativo 	Marlon Carneiro Oliveira	163.352.427-29
+Ativo 	Matheus Glendel de Azevedo	181.405.927-06
+Ativo 	Matheus Henrique De Oliveira Costa	063.367.475-30
+Ativo 	Matheus Inácio Pin	134.038.067-66
+Ativo 	Matheus Jann Scalfoni	146.026.247-66
+Ativo 	Milena Gomes Vieira	141.961.757-59
+Ativo 	Pedro Henrique Teodoro do Amaral	131.892.247-06
+Ativo 	Pedro Paulo Cortines Barretto	142.966.427-40
+Ativo 	Pietro Rutigliano Júnior	046.872.795-70
+Ativo 	Rafael Bodart Avila	178.590.827-80
+Ativo 	Rafael Vilela	147.472.827-85
+Ativo 	Ramon Souza dos Reis	199.684.207-27
+Ativo 	Raquel Soares Santos Fernandes	15371618732
+Ativo 	Rayan Coutinho Cavessana	142.800.427-05
+Ativo 	Rayanne Vieira Lengruber de Azevedo	147.560.327-45
+Ativo 	Renan Fortunato Silveira	129.228.407-27
+Ativo 	Roberto Fachetti	137.059.757-65
+Ativo 	Rodrigo Padrão	147.564.187-75
+Ativo 	Rodrigo Queiroz	141.802.967-05
+Ativo 	Samantha Pedroso Campos	700.319.366-36
+Ativo 	Thiago Andrey da Silva Marinho	161.077.974-67
+Ativo 	Thiago Folador de Abreu	086.983.187-97
+Ativo 	Thiago Henrique Martins	125.251.669-06
+Ativo 	Thiago Kenzo Takahashi	400.429.988-83
+Ativo 	Victor Anderson Arpini Vianna	175.054.357-52
+Ativo 	Victor de Souza Peixoto	152.176.997-44
+Ativo 	Victor dos Santos Matsushita	482.652.038-70
+Ativo 	Victor Klein Machado	110.625.777-44
+Ativo 	Vinicius Ichinosek	456.148.098-64
+Ativo 	Vinicius Tineli Paiva	137.774.137-04
+Ativo 	Warley Pablo Santos Pereira Da Silva	215.084.817-17
+Ativo 	Wendel Martins de Azevedo	181.405.757-98
+Ativo 	Wendeson Eduardo Diniz Barros	617.015.033-52
+Ativo 	Weverton Silva Assis	20744644798
+Ativo 	Yan Roldi de Albuquerque 	192.761.587-90
