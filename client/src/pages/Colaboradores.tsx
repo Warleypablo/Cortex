@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, UserMinus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, UserMinus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, ArrowUpDown, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link, useLocation } from "wouter";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { formatCurrency, formatDecimal } from "@/lib/utils";
@@ -1895,7 +1896,17 @@ export default function Colaboradores() {
             </Card>
             <Card className="hover-elevate">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Novos (Últimos 30 dias)</CardTitle>
+                <div className="flex items-center gap-1">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Novos</CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Colaboradores admitidos nos últimos 30 dias</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <UserPlus className="w-4 h-4 text-blue-500" />
               </CardHeader>
               <CardContent>
@@ -1904,7 +1915,17 @@ export default function Colaboradores() {
             </Card>
             <Card className="hover-elevate">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Desligados (Últimos 30 dias)</CardTitle>
+                <div className="flex items-center gap-1">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Desligados</CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Colaboradores desligados nos últimos 30 dias</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <UserMinus className="w-4 h-4 text-red-500" />
               </CardHeader>
               <CardContent>
