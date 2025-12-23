@@ -320,7 +320,7 @@ export default function DashboardFinanceiro() {
           trend={kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa < 0 ? 'down' : kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa > 0 ? 'up' : 'neutral'}
           trendValue={kpisCompletos?.variacaoDespesa ? formatPercent(kpisCompletos.variacaoDespesa) : undefined}
           trendPositive={kpisCompletos?.variacaoDespesa ? kpisCompletos.variacaoDespesa < 0 : undefined}
-          iconVariant={kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa < 0 ? 'info' : 'danger'}
+          iconVariant="danger"
           subtitle="vs mês anterior"
           loading={isLoadingKpisCompletos}
         />
