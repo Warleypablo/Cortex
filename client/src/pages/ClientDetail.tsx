@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar, Briefcase, Layers, CheckCircle } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { ContratoCompleto } from "@shared/schema";
 
@@ -62,6 +62,11 @@ interface RevenueData {
   valor: number;
 }
 
+interface SortConfig {
+  key: string;
+  direction: 'asc' | 'desc';
+}
+
 export default function ClientDetail() {
   const { setPageInfo } = usePageInfo();
   const { toast } = useToast();
@@ -72,6 +77,8 @@ export default function ClientDetail() {
   const [monthsFilter, setMonthsFilter] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  const [contratosSortConfig, setContratosSortConfig] = useState<SortConfig | null>(null);
+  const [receitasSortConfig, setReceitasSortConfig] = useState<SortConfig | null>(null);
 
   const { data: cliente, isLoading: isLoadingCliente, error: clienteError } = useQuery<ClienteDb>({
     queryKey: ["/api/cliente", clientId],
@@ -105,6 +112,20 @@ export default function ClientDetail() {
     enabled: !!cliente?.cnpj,
   });
 
+  const handleContratoSort = (key: string) => {
+    setContratosSortConfig(prev => ({
+      key,
+      direction: prev?.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const handleReceitaSort = (key: string) => {
+    setReceitasSortConfig(prev => ({
+      key,
+      direction: prev?.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
   const togglePasswordVisibility = (credentialId: string) => {
     setVisiblePasswords(prev => {
       const newSet = new Set(prev);
@@ -133,15 +154,85 @@ export default function ClientDetail() {
     }
   };
 
+  const mapSquadCodeToName = (code: string | null): string => {
+    if (!code) return "Não definido";
+    switch (code) {
+      case "0": return "Supreme";
+      case "1": return "Forja";
+      case "2": return "Squadra";
+      case "3": return "Chama";
+      default: return code;
+    }
+  };
+
+  const sortedContratos = useMemo(() => {
+    if (!contratos) return [];
+    if (!contratosSortConfig) return contratos;
+
+    return [...contratos].sort((a, b) => {
+      const { key, direction } = contratosSortConfig;
+      const multiplier = direction === 'asc' ? 1 : -1;
+
+      switch (key) {
+        case 'servico':
+          return multiplier * (a.servico || '').localeCompare(b.servico || '');
+        case 'status':
+          return multiplier * (a.status || '').localeCompare(b.status || '');
+        case 'squad':
+          return multiplier * mapSquadCodeToName(a.squad).localeCompare(mapSquadCodeToName(b.squad));
+        case 'dataInicio':
+          const dateA = a.dataInicio ? new Date(a.dataInicio).getTime() : 0;
+          const dateB = b.dataInicio ? new Date(b.dataInicio).getTime() : 0;
+          return multiplier * (dateA - dateB);
+        case 'valorr':
+          return multiplier * (parseFloat(a.valorr || '0') - parseFloat(b.valorr || '0'));
+        case 'valorp':
+          return multiplier * (parseFloat(a.valorp || '0') - parseFloat(b.valorp || '0'));
+        default:
+          return 0;
+      }
+    });
+  }, [contratos, contratosSortConfig]);
+
   const sortedReceitas = useMemo(() => {
     if (!receitas) return [];
     
-    return [...receitas].sort((a, b) => {
-      const dateA = a.dataVencimento ? new Date(a.dataVencimento).getTime() : 0;
-      const dateB = b.dataVencimento ? new Date(b.dataVencimento).getTime() : 0;
-      return dateB - dateA;
-    });
-  }, [receitas]);
+    const sorted = [...receitas];
+    
+    if (receitasSortConfig) {
+      const { key, direction } = receitasSortConfig;
+      const multiplier = direction === 'asc' ? 1 : -1;
+
+      sorted.sort((a, b) => {
+        switch (key) {
+          case 'descricao':
+            return multiplier * (a.descricao || '').localeCompare(b.descricao || '');
+          case 'status':
+            return multiplier * (a.status || '').localeCompare(b.status || '');
+          case 'dataVencimento':
+            const dateA = a.dataVencimento ? new Date(a.dataVencimento).getTime() : 0;
+            const dateB = b.dataVencimento ? new Date(b.dataVencimento).getTime() : 0;
+            return multiplier * (dateA - dateB);
+          case 'total':
+            return multiplier * (parseFloat(a.total || '0') - parseFloat(b.total || '0'));
+          case 'pago':
+            return multiplier * (parseFloat(a.pago || '0') - parseFloat(b.pago || '0'));
+          case 'naoPago':
+            return multiplier * (parseFloat(a.naoPago || '0') - parseFloat(b.naoPago || '0'));
+          default:
+            return 0;
+        }
+      });
+    } else {
+      sorted.sort((a, b) => {
+        const dateA = a.dataVencimento ? new Date(a.dataVencimento).getTime() : 0;
+        const dateB = b.dataVencimento ? new Date(b.dataVencimento).getTime() : 0;
+        return dateB - dateA;
+      });
+    }
+    
+    return sorted;
+  }, [receitas, receitasSortConfig]);
 
   const filteredReceitas = useMemo(() => {
     if (!selectedMonth) return sortedReceitas;
@@ -288,19 +379,6 @@ export default function ClientDetail() {
     );
   }
 
-  const getSquadColor = (squad: string) => {
-    switch (squad) {
-      case "Performance":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
-      case "Comunicação":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
-      case "Tech":
-        return "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300";
-      default:
-        return "";
-    }
-  };
-
   const getStatusBadge = (status: string | null) => {
     const normalizedStatus = status?.toUpperCase();
     switch (normalizedStatus) {
@@ -352,15 +430,11 @@ export default function ClientDetail() {
     }
   };
 
-  const mapSquadCodeToName = (code: string | null): string => {
-    if (!code) return "Não definido";
-    switch (code) {
-      case "0": return "Supreme";
-      case "1": return "Forja";
-      case "2": return "Squadra";
-      case "3": return "Chama";
-      default: return code;
-    }
+  const SortIndicator = ({ sortKey, config }: { sortKey: string; config: SortConfig | null }) => {
+    if (config?.key !== sortKey) return null;
+    return config.direction === 'asc' 
+      ? <ChevronUp className="h-4 w-4" />
+      : <ChevronDown className="h-4 w-4" />;
   };
 
   return (
@@ -382,7 +456,39 @@ export default function ClientDetail() {
               )}
             </div>
           </div>
-          
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <StatsCard
+            title="Receita Total"
+            value={new Intl.NumberFormat('pt-BR', { 
+              style: 'currency', 
+              currency: 'BRL',
+              minimumFractionDigits: 0
+            }).format(totalReceitas)}
+            icon={DollarSign}
+          />
+          <StatsCard
+            title="Ticket Médio"
+            value={new Intl.NumberFormat('pt-BR', { 
+              style: 'currency', 
+              currency: 'BRL',
+              minimumFractionDigits: 0
+            }).format(ticketMedio)}
+            icon={TrendingUp}
+          />
+          <StatsCard
+            title="LT"
+            value={lt.toString()}
+            icon={Receipt}
+          />
+        </div>
+
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <Building2 className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold">Dados Cadastrais</h2>
+          </div>
           <Card className="p-6" data-testid="card-client-info">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="flex items-start gap-3" data-testid="info-cnpj">
@@ -488,32 +594,6 @@ export default function ClientDetail() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <StatsCard
-            title="Receita Total"
-            value={new Intl.NumberFormat('pt-BR', { 
-              style: 'currency', 
-              currency: 'BRL',
-              minimumFractionDigits: 0
-            }).format(totalReceitas)}
-            icon={DollarSign}
-          />
-          <StatsCard
-            title="Ticket Médio"
-            value={new Intl.NumberFormat('pt-BR', { 
-              style: 'currency', 
-              currency: 'BRL',
-              minimumFractionDigits: 0
-            }).format(ticketMedio)}
-            icon={TrendingUp}
-          />
-          <StatsCard
-            title="LT"
-            value={lt.toString()}
-            icon={Receipt}
-          />
-        </div>
-
         {isLoadingRevenue ? (
           <div className="mb-8 flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -553,7 +633,10 @@ export default function ClientDetail() {
         ) : null}
 
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-6">Contratos</h2>
+          <div className="flex items-center gap-3 mb-4">
+            <FileText className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold">Contratos</h2>
+          </div>
           <Card className="overflow-hidden">
             {isLoadingContratos ? (
               <div className="flex items-center justify-center py-8" data-testid="loading-contratos">
@@ -563,82 +646,139 @@ export default function ClientDetail() {
               <div className="max-h-[400px] overflow-y-auto">
                 <Table>
                   <TableHeader className="sticky top-0 z-20 shadow-sm">
-                    <TableRow className="bg-background border-b">
-                    <TableHead className="bg-background" data-testid="header-service">Serviço</TableHead>
-                    <TableHead className="bg-background" data-testid="header-status">Status</TableHead>
-                    <TableHead className="bg-background" data-testid="header-squad">Squad</TableHead>
-                    <TableHead className="bg-background" data-testid="header-responsavel">Responsável</TableHead>
-                    <TableHead className="bg-background" data-testid="header-cs">CS</TableHead>
-                    <TableHead className="bg-background" data-testid="header-date">Data Início</TableHead>
-                    <TableHead className="text-right bg-background" data-testid="header-recurring">Valor Recorrente</TableHead>
-                    <TableHead className="text-right bg-background" data-testid="header-onetime">Valor Pontual</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contratos && contratos.length > 0 ? (
-                    contratos.map((contrato) => (
-                      <TableRow key={contrato.idSubtask} data-testid={`contract-row-${contrato.idSubtask}`}>
-                        <TableCell className="font-medium" data-testid={`text-service-${contrato.idSubtask}`}>
-                          {contrato.servico || "Sem serviço"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            className={getContractStatusColor(contrato.status || "")} 
-                            variant="outline"
-                            data-testid={`badge-status-${contrato.idSubtask}`}
-                          >
-                            {contrato.status || "Desconhecido"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            className={getSquadColorForContract(mapSquadCodeToName(contrato.squad))} 
-                            variant="outline"
-                            data-testid={`badge-squad-${contrato.idSubtask}`}
-                          >
-                            {mapSquadCodeToName(contrato.squad)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground" data-testid={`text-responsavel-${contrato.idSubtask}`}>
-                          {contrato.responsavel || '-'}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground" data-testid={`text-cs-${contrato.idSubtask}`}>
-                          {contrato.csResponsavel || '-'}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground" data-testid={`text-date-${contrato.idSubtask}`}>
-                          {contrato.dataInicio ? new Date(contrato.dataInicio).toLocaleDateString('pt-BR') : '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold" data-testid={`text-recurring-${contrato.idSubtask}`}>
-                          {contrato.valorr && parseFloat(contrato.valorr) > 0
-                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(contrato.valorr))
-                            : '-'
-                          }
-                        </TableCell>
-                        <TableCell className="text-right font-semibold" data-testid={`text-onetime-${contrato.idSubtask}`}>
-                          {contrato.valorp && parseFloat(contrato.valorp) > 0
-                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(contrato.valorp))
-                            : '-'
-                          }
+                    <TableRow className="bg-muted/30 border-b">
+                      <TableHead 
+                        className="bg-muted/30 cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleContratoSort('servico')}
+                        data-testid="header-sort-service"
+                      >
+                        <div className="flex items-center gap-1">
+                          Serviço
+                          <SortIndicator sortKey="servico" config={contratosSortConfig} />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="bg-muted/30 cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleContratoSort('status')}
+                        data-testid="header-sort-status"
+                      >
+                        <div className="flex items-center gap-1">
+                          Status
+                          <SortIndicator sortKey="status" config={contratosSortConfig} />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="bg-muted/30 cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleContratoSort('squad')}
+                        data-testid="header-sort-squad"
+                      >
+                        <div className="flex items-center gap-1">
+                          Squad
+                          <SortIndicator sortKey="squad" config={contratosSortConfig} />
+                        </div>
+                      </TableHead>
+                      <TableHead className="bg-muted/30" data-testid="header-responsavel">Responsável</TableHead>
+                      <TableHead className="bg-muted/30" data-testid="header-cs">CS</TableHead>
+                      <TableHead 
+                        className="bg-muted/30 cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleContratoSort('dataInicio')}
+                        data-testid="header-sort-date"
+                      >
+                        <div className="flex items-center gap-1">
+                          Data Início
+                          <SortIndicator sortKey="dataInicio" config={contratosSortConfig} />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="text-right bg-muted/30 cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleContratoSort('valorr')}
+                        data-testid="header-sort-recurring"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          Valor Recorrente
+                          <SortIndicator sortKey="valorr" config={contratosSortConfig} />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="text-right bg-muted/30 cursor-pointer hover:bg-muted/50 select-none"
+                        onClick={() => handleContratoSort('valorp')}
+                        data-testid="header-sort-onetime"
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          Valor Pontual
+                          <SortIndicator sortKey="valorp" config={contratosSortConfig} />
+                        </div>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedContratos && sortedContratos.length > 0 ? (
+                      sortedContratos.map((contrato) => (
+                        <TableRow key={contrato.idSubtask} className="hover-elevate" data-testid={`contract-row-${contrato.idSubtask}`}>
+                          <TableCell className="font-medium" data-testid={`text-service-${contrato.idSubtask}`}>
+                            {contrato.servico || "Sem serviço"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              className={getContractStatusColor(contrato.status || "")} 
+                              variant="outline"
+                              data-testid={`badge-status-${contrato.idSubtask}`}
+                            >
+                              {contrato.status || "Desconhecido"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              className={getSquadColorForContract(mapSquadCodeToName(contrato.squad))} 
+                              variant="outline"
+                              data-testid={`badge-squad-${contrato.idSubtask}`}
+                            >
+                              {mapSquadCodeToName(contrato.squad)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground" data-testid={`text-responsavel-${contrato.idSubtask}`}>
+                            {contrato.responsavel || '-'}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground" data-testid={`text-cs-${contrato.idSubtask}`}>
+                            {contrato.csResponsavel || '-'}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground" data-testid={`text-date-${contrato.idSubtask}`}>
+                            {contrato.dataInicio ? new Date(contrato.dataInicio).toLocaleDateString('pt-BR') : '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold" data-testid={`text-recurring-${contrato.idSubtask}`}>
+                            {contrato.valorr && parseFloat(contrato.valorr) > 0
+                              ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(contrato.valorr))
+                              : '-'
+                            }
+                          </TableCell>
+                          <TableCell className="text-right font-semibold" data-testid={`text-onetime-${contrato.idSubtask}`}>
+                            {contrato.valorp && parseFloat(contrato.valorp) > 0
+                              ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(contrato.valorp))
+                              : '-'
+                            }
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-contracts">
+                          Nenhum contrato encontrado para este cliente
                         </TableCell>
                       </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-contracts">
-                        Nenhum contrato encontrado para este cliente
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </Card>
         </div>
 
         <div className="mb-8">
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <h2 className="text-2xl font-semibold">Contas a Receber</h2>
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-3">
+              <CreditCard className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold">Contas a Receber</h2>
+            </div>
             {selectedMonth && (
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" data-testid="badge-month-filter">
@@ -664,77 +804,131 @@ export default function ClientDetail() {
               <>
                 <div className="max-h-[400px] overflow-y-auto">
                   <Table>
-                  <TableHeader className="sticky top-0 z-20 shadow-sm">
-                    <TableRow className="bg-background border-b">
-                    <TableHead className="bg-background">Descrição</TableHead>
-                    <TableHead className="bg-background">Status</TableHead>
-                    <TableHead className="bg-background">Vencimento</TableHead>
-                    <TableHead className="bg-background">Valor Total</TableHead>
-                    <TableHead className="bg-background">Pago</TableHead>
-                    <TableHead className="bg-background">Pendente</TableHead>
-                    <TableHead className="bg-background">Link Cobrança</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedReceitas.length > 0 ? (
-                    paginatedReceitas.map((receita, idx) => (
-                      <TableRow key={`receita-${receita.id}-${idx}`}>
-                        <TableCell className="font-medium">
-                          {receita.descricao || "Sem descrição"}
-                        </TableCell>
-                        <TableCell>
-                          {getStatusBadge(receita.status)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {receita.dataVencimento 
-                            ? new Date(receita.dataVencimento).toLocaleDateString('pt-BR')
-                            : "N/A"
-                          }
-                        </TableCell>
-                        <TableCell className="font-semibold">
-                          {new Intl.NumberFormat('pt-BR', { 
-                            style: 'currency', 
-                            currency: 'BRL' 
-                          }).format(parseFloat(receita.total || "0"))}
-                        </TableCell>
-                        <TableCell className="text-green-600">
-                          {new Intl.NumberFormat('pt-BR', { 
-                            style: 'currency', 
-                            currency: 'BRL' 
-                          }).format(parseFloat(receita.pago || "0"))}
-                        </TableCell>
-                        <TableCell className="text-orange-600">
-                          {new Intl.NumberFormat('pt-BR', { 
-                            style: 'currency', 
-                            currency: 'BRL' 
-                          }).format(parseFloat(receita.naoPago || "0"))}
-                        </TableCell>
-                        <TableCell>
-                          {receita.urlCobranca ? (
-                            <a 
-                              href={receita.urlCobranca} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-primary hover:underline"
-                              data-testid={`link-cobranca-${receita.id}`}
-                            >
-                              Acessar
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          ) : (
-                            <span className="text-muted-foreground text-sm" data-testid={`text-no-link-${receita.id}`}>-</span>
-                          )}
-                        </TableCell>
+                    <TableHeader className="sticky top-0 z-20 shadow-sm">
+                      <TableRow className="bg-muted/30 border-b">
+                        <TableHead 
+                          className="bg-muted/30 cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleReceitaSort('descricao')}
+                          data-testid="header-sort-descricao"
+                        >
+                          <div className="flex items-center gap-1">
+                            Descrição
+                            <SortIndicator sortKey="descricao" config={receitasSortConfig} />
+                          </div>
+                        </TableHead>
+                        <TableHead 
+                          className="bg-muted/30 cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleReceitaSort('status')}
+                          data-testid="header-sort-receita-status"
+                        >
+                          <div className="flex items-center gap-1">
+                            Status
+                            <SortIndicator sortKey="status" config={receitasSortConfig} />
+                          </div>
+                        </TableHead>
+                        <TableHead 
+                          className="bg-muted/30 cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleReceitaSort('dataVencimento')}
+                          data-testid="header-sort-vencimento"
+                        >
+                          <div className="flex items-center gap-1">
+                            Vencimento
+                            <SortIndicator sortKey="dataVencimento" config={receitasSortConfig} />
+                          </div>
+                        </TableHead>
+                        <TableHead 
+                          className="bg-muted/30 cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleReceitaSort('total')}
+                          data-testid="header-sort-total"
+                        >
+                          <div className="flex items-center gap-1">
+                            Valor Total
+                            <SortIndicator sortKey="total" config={receitasSortConfig} />
+                          </div>
+                        </TableHead>
+                        <TableHead 
+                          className="bg-muted/30 cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleReceitaSort('pago')}
+                          data-testid="header-sort-pago"
+                        >
+                          <div className="flex items-center gap-1">
+                            Pago
+                            <SortIndicator sortKey="pago" config={receitasSortConfig} />
+                          </div>
+                        </TableHead>
+                        <TableHead 
+                          className="bg-muted/30 cursor-pointer hover:bg-muted/50 select-none"
+                          onClick={() => handleReceitaSort('naoPago')}
+                          data-testid="header-sort-pendente"
+                        >
+                          <div className="flex items-center gap-1">
+                            Pendente
+                            <SortIndicator sortKey="naoPago" config={receitasSortConfig} />
+                          </div>
+                        </TableHead>
+                        <TableHead className="bg-muted/30">Link Cobrança</TableHead>
                       </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        Nenhuma conta a receber encontrada
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedReceitas.length > 0 ? (
+                        paginatedReceitas.map((receita, idx) => (
+                          <TableRow key={`receita-${receita.id}-${idx}`} className="hover-elevate">
+                            <TableCell className="font-medium">
+                              {receita.descricao || "Sem descrição"}
+                            </TableCell>
+                            <TableCell>
+                              {getStatusBadge(receita.status)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {receita.dataVencimento 
+                                ? new Date(receita.dataVencimento).toLocaleDateString('pt-BR')
+                                : "N/A"
+                              }
+                            </TableCell>
+                            <TableCell className="font-semibold">
+                              {new Intl.NumberFormat('pt-BR', { 
+                                style: 'currency', 
+                                currency: 'BRL' 
+                              }).format(parseFloat(receita.total || "0"))}
+                            </TableCell>
+                            <TableCell className="text-green-600">
+                              {new Intl.NumberFormat('pt-BR', { 
+                                style: 'currency', 
+                                currency: 'BRL' 
+                              }).format(parseFloat(receita.pago || "0"))}
+                            </TableCell>
+                            <TableCell className="text-orange-600">
+                              {new Intl.NumberFormat('pt-BR', { 
+                                style: 'currency', 
+                                currency: 'BRL' 
+                              }).format(parseFloat(receita.naoPago || "0"))}
+                            </TableCell>
+                            <TableCell>
+                              {receita.urlCobranca ? (
+                                <a 
+                                  href={receita.urlCobranca} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                                  data-testid={`link-cobranca-${receita.id}`}
+                                >
+                                  Acessar
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              ) : (
+                                <span className="text-muted-foreground text-sm" data-testid={`text-no-link-${receita.id}`}>-</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            Nenhuma conta a receber encontrada
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
                   </Table>
                 </div>
 
@@ -812,9 +1006,9 @@ export default function ClientDetail() {
         </div>
 
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <Key className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-semibold">Credenciais de Acesso</h2>
+          <div className="flex items-center gap-3 mb-4">
+            <Key className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold">Credenciais de Acesso</h2>
           </div>
           <Card className="overflow-hidden">
             {isLoadingCredenciais ? (
@@ -825,18 +1019,18 @@ export default function ClientDetail() {
               <div className="max-h-[500px] overflow-y-auto">
                 <Table>
                   <TableHeader className="sticky top-0 z-20 shadow-sm">
-                    <TableRow className="bg-background border-b">
-                      <TableHead className="bg-background">Plataforma</TableHead>
-                      <TableHead className="bg-background">Login</TableHead>
-                      <TableHead className="bg-background">Senha</TableHead>
-                      <TableHead className="bg-background">URL</TableHead>
-                      <TableHead className="bg-background">Observações</TableHead>
+                    <TableRow className="bg-muted/30 border-b">
+                      <TableHead className="bg-muted/30">Plataforma</TableHead>
+                      <TableHead className="bg-muted/30">Login</TableHead>
+                      <TableHead className="bg-muted/30">Senha</TableHead>
+                      <TableHead className="bg-muted/30">URL</TableHead>
+                      <TableHead className="bg-muted/30">Observações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {credenciais.flatMap((group) => 
                       group.credentials.map((cred) => (
-                        <TableRow key={cred.id} data-testid={`credential-row-${cred.id}`}>
+                        <TableRow key={cred.id} className="hover-elevate" data-testid={`credential-row-${cred.id}`}>
                           <TableCell className="font-medium" data-testid={`text-platform-${cred.id}`}>
                             {cred.platform || "-"}
                           </TableCell>
