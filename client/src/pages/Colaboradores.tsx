@@ -175,8 +175,8 @@ function formatDate(date: string | Date | null | undefined) {
   }
 }
 
-function calcularTempoTurbo(admissao: string | Date | null | undefined, demissao: string | Date | null | undefined, status: string | null): string {
-  if (!admissao) return "-";
+function calcularTempoTurboMeses(admissao: string | Date | null | undefined, demissao: string | Date | null | undefined, status: string | null): number {
+  if (!admissao) return -1;
   const admissaoDate = new Date(admissao);
   admissaoDate.setHours(0, 0, 0, 0);
   let endDate: Date;
@@ -189,7 +189,12 @@ function calcularTempoTurbo(admissao: string | Date | null | undefined, demissao
   const diffTime = endDate.getTime() - admissaoDate.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   const diffMonths = diffDays / 30;
-  if (diffMonths <= 0) return "-";
+  return diffMonths <= 0 ? -1 : diffMonths;
+}
+
+function calcularTempoTurbo(admissao: string | Date | null | undefined, demissao: string | Date | null | undefined, status: string | null): string {
+  const diffMonths = calcularTempoTurboMeses(admissao, demissao, status);
+  if (diffMonths < 0) return "-";
   const formatted = diffMonths.toFixed(1).replace(".", ",");
   return `${formatted} ${diffMonths === 1 ? "mês" : "meses"}`;
 }
@@ -1730,6 +1735,10 @@ export default function Colaboradores() {
           aVal = a.setor?.toLowerCase() || '';
           bVal = b.setor?.toLowerCase() || '';
           break;
+        case 'tempoTurbo':
+          aVal = calcularTempoTurboMeses(a.admissao, a.demissao, a.status);
+          bVal = calcularTempoTurboMeses(b.admissao, b.demissao, b.status);
+          break;
         default:
           return 0;
       }
@@ -1944,7 +1953,16 @@ export default function Colaboradores() {
                           {getSortIcon('setor')}
                         </div>
                       </TableHead>
-                      <TableHead className="min-w-[120px] bg-muted/50">Tempo Turbo</TableHead>
+                      <TableHead 
+                        className="min-w-[120px] bg-muted/50 cursor-pointer select-none" 
+                        onClick={() => handleSort('tempoTurbo')}
+                        data-testid="table-header-tempo-turbo"
+                      >
+                        <div className="flex items-center">
+                          Tempo Turbo
+                          {getSortIcon('tempoTurbo')}
+                        </div>
+                      </TableHead>
                       <TableHead className="min-w-[280px] bg-muted/50">Contatos</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">CPF</TableHead>
                       <TableHead className="min-w-[140px] bg-muted/50">CNPJ</TableHead>
