@@ -377,7 +377,7 @@ export default function Clients() {
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0" align="end">
+            <PopoverContent className="w-80 p-0 overflow-hidden" align="end">
               <div className="flex items-center justify-between p-4 pb-2 border-b">
                 <h4 className="font-medium text-sm">Filtros</h4>
                 {hasActiveFilters && (
@@ -436,18 +436,19 @@ export default function Clients() {
                         <Badge variant="secondary" className="text-xs">{servicoFilter.length}</Badge>
                       )}
                     </div>
-                    <div className="border rounded-md max-h-32 overflow-y-auto">
+                    <div className="border rounded-md max-h-32 overflow-y-auto overflow-x-hidden">
                       {servicosUnicos.map(servico => (
                         <label
                           key={servico}
-                          className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50"
+                          className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
                           data-testid={`checkbox-servico-${servico}`}
                         >
                           <Checkbox 
                             checked={servicoFilter.includes(servico)} 
                             onCheckedChange={() => toggleServicoFilter(servico)}
+                            className="flex-shrink-0"
                           />
-                          <span className="text-sm truncate">{servico}</span>
+                          <span className="text-sm truncate flex-1 min-w-0">{servico}</span>
                         </label>
                       ))}
                     </div>
@@ -460,18 +461,19 @@ export default function Clients() {
                         <Badge variant="secondary" className="text-xs">{responsavelFilter.length}</Badge>
                       )}
                     </div>
-                    <div className="border rounded-md max-h-32 overflow-y-auto">
+                    <div className="border rounded-md max-h-32 overflow-y-auto overflow-x-hidden">
                       {responsaveisUnicos.map(responsavel => (
                         <label
                           key={responsavel}
-                          className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50"
+                          className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
                           data-testid={`checkbox-responsavel-${responsavel}`}
                         >
                           <Checkbox 
                             checked={responsavelFilter.includes(responsavel)} 
                             onCheckedChange={() => toggleResponsavelFilter(responsavel)}
+                            className="flex-shrink-0"
                           />
-                          <span className="text-sm truncate">{responsavel}</span>
+                          <span className="text-sm truncate flex-1 min-w-0">{responsavel}</span>
                         </label>
                       ))}
                     </div>
