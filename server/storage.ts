@@ -1292,6 +1292,18 @@ export class DbStorage implements IStorage {
   }
 
   async getContasReceberByCliente(clienteId: string, limit: number = 100): Promise<ContaReceber[]> {
+    // First, find the client's ids field (used by Conta Azul for linking)
+    const clienteResult = await db.execute(sql`
+      SELECT COALESCE(ids, id::text) as ids_ref 
+      FROM caz_clientes 
+      WHERE id::text = ${clienteId} 
+         OR ids = ${clienteId}
+         OR REGEXP_REPLACE(cnpj, '[^0-9]', '', 'g') = REGEXP_REPLACE(${clienteId}, '[^0-9]', '', 'g')
+      LIMIT 1
+    `);
+    
+    const idsRef = clienteResult.rows.length > 0 ? (clienteResult.rows[0] as any).ids_ref : clienteId;
+    
     const result = await db.select({
       id: schema.cazReceber.id,
       status: schema.cazReceber.status,
@@ -1312,7 +1324,7 @@ export class DbStorage implements IStorage {
         schema.cazParcelas, 
         sql`${schema.cazReceber.id}::varchar = ${schema.cazParcelas.id}::varchar`
       )
-      .where(eq(schema.cazReceber.clienteId, clienteId))
+      .where(eq(schema.cazReceber.clienteId, idsRef))
       .orderBy(desc(schema.cazReceber.dataCriacao))
       .limit(limit);
     
@@ -1328,6 +1340,18 @@ export class DbStorage implements IStorage {
   }
 
   async getClienteRevenue(clienteId: string): Promise<{ mes: string; valor: number }[]> {
+    // First, find the client's ids field (used by Conta Azul for linking)
+    const clienteResult = await db.execute(sql`
+      SELECT COALESCE(ids, id::text) as ids_ref 
+      FROM caz_clientes 
+      WHERE id::text = ${clienteId} 
+         OR ids = ${clienteId}
+         OR REGEXP_REPLACE(cnpj, '[^0-9]', '', 'g') = REGEXP_REPLACE(${clienteId}, '[^0-9]', '', 'g')
+      LIMIT 1
+    `);
+    
+    const idsRef = clienteResult.rows.length > 0 ? (clienteResult.rows[0] as any).ids_ref : clienteId;
+    
     const receitas = await db.select({
       mes: sql<string>`TO_CHAR(
         COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}), 
@@ -1341,7 +1365,7 @@ export class DbStorage implements IStorage {
     .from(schema.cazReceber)
     .where(
       and(
-        eq(schema.cazReceber.clienteId, clienteId),
+        eq(schema.cazReceber.clienteId, idsRef),
         sql`UPPER(${schema.cazReceber.status}) IN ('PAGO', 'ACQUITTED')`,
         sql`COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}) IS NOT NULL`
       )
