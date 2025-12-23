@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Search, Package, Filter, ChevronUp, ChevronDown, 
-  DollarSign, TrendingUp, CheckCircle, X, BarChart3
+  DollarSign, TrendingUp, CheckCircle, X
 } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,7 +44,7 @@ interface PatrimonioDb {
   descricao: string | null;
 }
 
-type SortField = "numeroAtivo" | "ativo" | "marca" | "descricao" | "estadoConservacao" | "responsavelAtual" | "valorPago" | "valorMercado" | "valorVenda";
+type SortField = "numeroAtivo" | "ativo" | "marca" | "descricao" | "estadoConservacao" | "responsavelAtual" | "valorPago" | "valorMercado";
 type SortDirection = "asc" | "desc";
 
 export default function Patrimonio() {
@@ -93,17 +93,23 @@ export default function Patrimonio() {
   }, [patrimonios]);
 
   const stats = useMemo(() => {
-    if (!patrimonios) return { totalAtivos: 0, ativosBom: 0, valorPago: 0, valorMercado: 0, valorVenda: 0 };
+    if (!patrimonios) return { totalAtivos: 0, ativosBom: 0, computadoresNotebooksBom: 0, valorPago: 0, valorMercado: 0 };
     
     let ativosBom = 0;
+    let computadoresNotebooksBom = 0;
     let valorPago = 0;
     let valorMercado = 0;
-    let valorVenda = 0;
     
     patrimonios.forEach(p => {
       const estado = p.estadoConservacao?.toLowerCase() || "";
-      if (estado.includes("bom") || estado.includes("novo") || estado.includes("ótimo")) {
+      const ativo = p.ativo?.toLowerCase() || "";
+      const isBomEstado = estado.includes("bom") || estado.includes("novo") || estado.includes("ótimo");
+      
+      if (isBomEstado) {
         ativosBom++;
+        if (ativo.includes("computador") || ativo.includes("notebook")) {
+          computadoresNotebooksBom++;
+        }
       }
       if (p.valorPago) {
         const val = parseFloat(p.valorPago);
@@ -113,18 +119,14 @@ export default function Patrimonio() {
         const val = parseFloat(p.valorMercado);
         if (!isNaN(val)) valorMercado += val;
       }
-      if (p.valorVenda) {
-        const val = parseFloat(p.valorVenda);
-        if (!isNaN(val)) valorVenda += val;
-      }
     });
     
     return {
       totalAtivos: patrimonios.length,
       ativosBom,
+      computadoresNotebooksBom,
       valorPago,
       valorMercado,
-      valorVenda,
     };
   }, [patrimonios]);
 
@@ -256,7 +258,7 @@ export default function Patrimonio() {
       <div className="flex-1 overflow-y-auto">
         <div className="container mx-auto p-6 space-y-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card data-testid="card-total-ativos">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -277,6 +279,9 @@ export default function Patrimonio() {
                   <div>
                     <p className="text-sm text-muted-foreground">Ativos em Bom Estado</p>
                     <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.ativosBom}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {stats.computadoresNotebooksBom} computadores/notebooks
+                    </p>
                   </div>
                   <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
                     <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -308,20 +313,6 @@ export default function Patrimonio() {
                   </div>
                   <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full">
                     <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-valor-venda">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Valor de Venda</p>
-                    <p className="text-xl font-bold">{formatCurrencyNumber(stats.valorVenda)}</p>
-                  </div>
-                  <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-full">
-                    <BarChart3 className="w-6 h-6 text-orange-600 dark:text-orange-400" />
                   </div>
                 </div>
               </CardContent>
@@ -548,22 +539,12 @@ export default function Patrimonio() {
                                 {getSortIcon("valorMercado")}
                               </div>
                             </TableHead>
-                            <TableHead 
-                              className="min-w-[140px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
-                              onClick={() => handleSort("valorVenda")}
-                              data-testid="header-valor-venda"
-                            >
-                              <div className="flex items-center">
-                                Valor Venda
-                                {getSortIcon("valorVenda")}
-                              </div>
-                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {paginatedPatrimonios.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                                 Nenhum patrimônio encontrado.
                               </TableCell>
                             </TableRow>
@@ -609,9 +590,6 @@ export default function Patrimonio() {
                                 </TableCell>
                                 <TableCell className="font-semibold" data-testid={`valor-mercado-${item.id}`}>
                                   {formatCurrency(item.valorMercado)}
-                                </TableCell>
-                                <TableCell className="font-semibold" data-testid={`valor-venda-${item.id}`}>
-                                  {formatCurrency(item.valorVenda)}
                                 </TableCell>
                               </TableRow>
                             ))
