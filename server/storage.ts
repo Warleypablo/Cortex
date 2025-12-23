@@ -1820,69 +1820,110 @@ export class DbStorage implements IStorage {
   }
 
   async updatePatrimonioResponsavel(id: number, responsavelNome: string | null): Promise<Patrimonio> {
-    const updateData: { responsavelAtual: string | null; responsavelId?: null } = { 
-      responsavelAtual: responsavelNome 
-    };
-    
     if (responsavelNome === null) {
-      updateData.responsavelId = null;
+      await db.execute(sql`
+        UPDATE rh_patrimonio 
+        SET responsavel_atual = NULL, responsavel_id = NULL 
+        WHERE id = ${id}
+      `);
+    } else {
+      await db.execute(sql`
+        UPDATE rh_patrimonio 
+        SET responsavel_atual = ${responsavelNome} 
+        WHERE id = ${id}
+      `);
     }
     
-    const [updated] = await db
-      .update(schema.rhPatrimonio)
-      .set(updateData)
-      .where(eq(schema.rhPatrimonio.id, id))
-      .returning();
+    const result = await db.execute(sql`
+      SELECT 
+        id, numero_ativo as "numeroAtivo", ativo, marca, 
+        estado_conservacao as "estadoConservacao", 
+        responsavel_atual as "responsavelAtual",
+        responsavel_id as "responsavelId",
+        valor_pago as "valorPago", valor_mercado as "valorMercado",
+        valor_venda as "valorVenda", descricao
+      FROM rh_patrimonio WHERE id = ${id}
+    `);
     
-    if (!updated) {
+    if (!result.rows || result.rows.length === 0) {
       throw new Error("Patrimônio não encontrado");
     }
     
-    return updated;
+    return { ...(result.rows[0] as any), senhaAtivo: null };
   }
 
   async updatePatrimonioResponsavelById(id: number, responsavelId: number, responsavelNome: string): Promise<Patrimonio> {
-    const [updated] = await db
-      .update(schema.rhPatrimonio)
-      .set({ 
-        responsavelAtual: responsavelNome,
-        responsavelId: responsavelId 
-      })
-      .where(eq(schema.rhPatrimonio.id, id))
-      .returning();
+    await db.execute(sql`
+      UPDATE rh_patrimonio 
+      SET responsavel_atual = ${responsavelNome}, responsavel_id = ${responsavelId} 
+      WHERE id = ${id}
+    `);
     
-    if (!updated) {
+    const result = await db.execute(sql`
+      SELECT 
+        id, numero_ativo as "numeroAtivo", ativo, marca, 
+        estado_conservacao as "estadoConservacao", 
+        responsavel_atual as "responsavelAtual",
+        responsavel_id as "responsavelId",
+        valor_pago as "valorPago", valor_mercado as "valorMercado",
+        valor_venda as "valorVenda", descricao
+      FROM rh_patrimonio WHERE id = ${id}
+    `);
+    
+    if (!result.rows || result.rows.length === 0) {
       throw new Error("Patrimônio não encontrado");
     }
     
-    return updated;
+    return { ...(result.rows[0] as any), senhaAtivo: null };
   }
 
   async updatePatrimonio(id: number, data: Record<string, string | null>): Promise<Patrimonio> {
-    const ALLOWED_FIELDS = ['numeroAtivo', 'ativo', 'marca', 'estadoConservacao', 'descricao', 'valorPago', 'valorMercado', 'senhaAtivo'];
+    const updates: ReturnType<typeof sql>[] = [];
     
-    const safeData: Record<string, string | null> = {};
-    for (const key of ALLOWED_FIELDS) {
-      if (key in data) {
-        safeData[key] = data[key];
-      }
+    if ('numeroAtivo' in data) {
+      updates.push(sql`numero_ativo = ${data.numeroAtivo}`);
+    }
+    if ('ativo' in data) {
+      updates.push(sql`ativo = ${data.ativo}`);
+    }
+    if ('marca' in data) {
+      updates.push(sql`marca = ${data.marca}`);
+    }
+    if ('estadoConservacao' in data) {
+      updates.push(sql`estado_conservacao = ${data.estadoConservacao}`);
+    }
+    if ('descricao' in data) {
+      updates.push(sql`descricao = ${data.descricao}`);
+    }
+    if ('valorPago' in data) {
+      updates.push(sql`valor_pago = ${data.valorPago}`);
+    }
+    if ('valorMercado' in data) {
+      updates.push(sql`valor_mercado = ${data.valorMercado}`);
     }
     
-    if (Object.keys(safeData).length === 0) {
+    if (updates.length === 0) {
       throw new Error("No valid fields to update");
     }
     
-    const [updated] = await db
-      .update(schema.rhPatrimonio)
-      .set(safeData)
-      .where(eq(schema.rhPatrimonio.id, id))
-      .returning();
+    await db.execute(sql`UPDATE rh_patrimonio SET ${sql.join(updates, sql`, `)} WHERE id = ${id}`);
     
-    if (!updated) {
+    const result = await db.execute(sql`
+      SELECT 
+        id, numero_ativo as "numeroAtivo", ativo, marca, 
+        estado_conservacao as "estadoConservacao", 
+        responsavel_atual as "responsavelAtual",
+        responsavel_id as "responsavelId",
+        valor_pago as "valorPago", valor_mercado as "valorMercado",
+        valor_venda as "valorVenda", descricao
+      FROM rh_patrimonio WHERE id = ${id}
+    `);
+    
+    if (!result.rows || result.rows.length === 0) {
       throw new Error("Patrimônio não encontrado");
     }
     
-    return updated;
+    return { ...(result.rows[0] as any), senhaAtivo: null };
   }
 
   async deletePatrimonio(id: number): Promise<void> {
