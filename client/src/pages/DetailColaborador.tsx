@@ -1501,7 +1501,7 @@ export default function DetailColaborador() {
           </TabsList>
 
           <TabsContent value="informacoes" data-testid="tab-content-informacoes">
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8" data-testid="info-cards-grid">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8" data-testid="info-cards-grid">
           <InfoCard 
             icon={Calendar} 
             label="Meses de Turbo" 
@@ -1536,6 +1536,13 @@ export default function DetailColaborador() {
             value={colaborador.nivel}
             iconBgColor="bg-teal-100 dark:bg-teal-900/30"
             iconColor="text-teal-600 dark:text-teal-400"
+          />
+          <InfoCard 
+            icon={DollarSign} 
+            label="Salário" 
+            value={colaborador.salario ? `R$ ${Math.floor(parseFloat(colaborador.salario)).toLocaleString('pt-BR')}` : null}
+            iconBgColor="bg-emerald-100 dark:bg-emerald-900/30"
+            iconColor="text-emerald-600 dark:text-emerald-400"
           />
         </div>
 
