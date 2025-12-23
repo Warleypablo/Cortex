@@ -2234,12 +2234,14 @@ function ClientsTab() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge 
-                        variant={client.status === 'cancelado' ? 'destructive' : 'outline'}
-                        className={client.status !== 'cancelado' ? 'border-green-500 text-green-600 dark:text-green-400' : ''}
-                      >
-                        {client.status === 'cancelado' ? 'Cancelado' : 'Ativo'}
-                      </Badge>
+                      {!isTurboClient(client.name) && (
+                        <Badge 
+                          variant={client.status === 'cancelado' ? 'destructive' : 'outline'}
+                          className={client.status !== 'cancelado' ? 'border-green-500 text-green-600 dark:text-green-400' : ''}
+                        >
+                          {client.status === 'cancelado' ? 'Cancelado' : 'Ativo'}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="secondary">
