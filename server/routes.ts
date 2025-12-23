@@ -8372,6 +8372,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const turboToolsCount = await db.execute(sql`SELECT COUNT(*) as count FROM turbo_tools`);
       const turboCount = parseInt((turboToolsCount.rows[0] as any)?.count) || 0;
       
+      // Get caz_clientes status map for lookup
+      const cazStatusResult = await db.execute(sql`SELECT cnpj, ativo, id FROM caz_clientes WHERE cnpj IS NOT NULL`);
+      const cazStatusMap = new Map<string, { ativo: string; id: number }>();
+      for (const row of cazStatusResult.rows as any[]) {
+        if (row.cnpj) {
+          cazStatusMap.set(row.cnpj.toLowerCase().replace(/[^\d]/g, ''), { ativo: row.ativo, id: row.id });
+        }
+      }
+      
       let result;
       if (search) {
         const searchPattern = `%${search}%`;
@@ -8380,10 +8389,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             CASE 
               WHEN LOWER(TRIM(c.name)) = 'turbo partners' THEN ${turboCount}
               ELSE (SELECT COUNT(*) FROM credentials cr WHERE cr.client_id = c.id)
-            END as credential_count,
-            caz.ativo as caz_status
+            END as credential_count
           FROM clients c 
-          LEFT JOIN caz_clientes caz ON LOWER(TRIM(c.name)) = LOWER(TRIM(caz.nome)) OR c.linked_client_cnpj = caz.cnpj
           WHERE LOWER(c.name) LIKE LOWER(${searchPattern}) OR LOWER(c.cnpj) LIKE LOWER(${searchPattern})
           ORDER BY c.created_at DESC
         `);
@@ -8393,27 +8400,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             CASE 
               WHEN LOWER(TRIM(c.name)) = 'turbo partners' THEN ${turboCount}
               ELSE (SELECT COUNT(*) FROM credentials cr WHERE cr.client_id = c.id)
-            END as credential_count,
-            caz.ativo as caz_status
+            END as credential_count
           FROM clients c 
-          LEFT JOIN caz_clientes caz ON LOWER(TRIM(c.name)) = LOWER(TRIM(caz.nome)) OR c.linked_client_cnpj = caz.cnpj
           ORDER BY c.created_at DESC
         `);
       }
       
       // Map with status from caz_clientes
       const mapped = result.rows.map((row: any) => {
-        const cazStatus = row.caz_status;
         let status = row.status || 'ativo';
+        let cazClienteId: number | null = null;
         
-        // Use caz_clientes status if available (safely handle non-string values)
-        if (cazStatus && typeof cazStatus === 'string') {
-          status = cazStatus.toLowerCase() === 'ativo' ? 'ativo' : 'cancelado';
+        // Look up status by linked_client_cnpj
+        if (row.linked_client_cnpj) {
+          const normalizedCnpj = row.linked_client_cnpj.toLowerCase().replace(/[^\d]/g, '');
+          const cazData = cazStatusMap.get(normalizedCnpj);
+          if (cazData) {
+            status = (cazData.ativo && typeof cazData.ativo === 'string' && cazData.ativo.toLowerCase() === 'ativo') ? 'ativo' : 'cancelado';
+            cazClienteId = cazData.id;
+          }
         }
         
         return {
           ...mapClient(row),
           status,
+          cazClienteId,
         };
       });
       
