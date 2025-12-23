@@ -1055,13 +1055,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 'id', p.id,
                 'numeroAtivo', p.numero_ativo,
                 'descricao', p.descricao,
-                'estadoConservacao', p.estado_conservacao
+                'ativo', p.ativo,
+                'marca', p.marca,
+                'estadoConservacao', p.estado_conservacao,
+                'valorMercado', p.valor_mercado
               )
             ) FILTER (WHERE p.id IS NOT NULL),
             '[]'
           ) as patrimonios
         FROM rh_pessoal c
-        LEFT JOIN rh_patrimonio p ON p.responsavel_atual = c.nome
+        LEFT JOIN rh_patrimonio p ON (p.responsavel_id = c.id OR (p.responsavel_id IS NULL AND p.responsavel_atual = c.nome))
         WHERE c.id = ${id}
         GROUP BY c.id
       `);

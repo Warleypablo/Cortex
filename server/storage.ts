@@ -1664,7 +1664,6 @@ export class DbStorage implements IStorage {
         valorMercado: schema.rhPatrimonio.valorMercado,
         valorVenda: schema.rhPatrimonio.valorVenda,
         descricao: schema.rhPatrimonio.descricao,
-        senhaAtivo: schema.rhPatrimonio.senhaAtivo,
         colaborador: schema.rhPessoal,
       })
       .from(schema.rhPatrimonio)
@@ -1698,7 +1697,7 @@ export class DbStorage implements IStorage {
       valorMercado: row.valorMercado,
       valorVenda: row.valorVenda,
       descricao: row.descricao,
-      senhaAtivo: row.senhaAtivo,
+      senhaAtivo: null,
       colaborador: row.colaborador || undefined,
     };
   }
