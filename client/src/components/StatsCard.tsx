@@ -99,7 +99,7 @@ export default function StatsCard({
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
             {title}
           </p>
-          <p className="text-3xl font-bold text-foreground truncate">
+          <p className="text-[1.75rem] font-bold text-foreground truncate leading-tight">
             {value}
           </p>
           {trend && (
@@ -110,20 +110,6 @@ export default function StatsCard({
               <span>{trend.isPositive ? "↑" : "↓"}</span>
               <span>{trend.value}</span>
             </p>
-          )}
-          {isStatusCard && (
-            <div className="flex items-center gap-2 mt-2">
-              <span className={cn(
-                "w-2.5 h-2.5 rounded-full animate-pulse",
-                statusActive ? "bg-emerald-500" : "bg-slate-400"
-              )} />
-              <span className={cn(
-                "text-sm font-medium",
-                statusActive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500 dark:text-slate-400"
-              )}>
-                {statusActive ? "Cliente Ativo" : "Cliente Inativo"}
-              </span>
-            </div>
           )}
         </div>
         <div 
