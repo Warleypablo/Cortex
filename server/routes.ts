@@ -1316,6 +1316,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/patrimonio/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid patrimonio ID" });
+      }
+      
+      const { numeroAtivo, ativo, marca, estadoConservacao, descricao, valorPago, valorMercado } = req.body;
+      
+      const updateData: Record<string, string | null> = {};
+      if (numeroAtivo !== undefined) updateData.numeroAtivo = numeroAtivo || null;
+      if (ativo !== undefined) updateData.ativo = ativo || null;
+      if (marca !== undefined) updateData.marca = marca || null;
+      if (estadoConservacao !== undefined) updateData.estadoConservacao = estadoConservacao || null;
+      if (descricao !== undefined) updateData.descricao = descricao || null;
+      if (valorPago !== undefined) updateData.valorPago = valorPago || null;
+      if (valorMercado !== undefined) updateData.valorMercado = valorMercado || null;
+      
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "No fields to update" });
+      }
+      
+      const patrimonio = await storage.updatePatrimonio(id, updateData);
+      res.json(patrimonio);
+    } catch (error) {
+      console.error("[api] Error updating patrimonio:", error);
+      res.status(500).json({ error: "Failed to update patrimonio" });
+    }
+  });
+
+  app.delete("/api/patrimonio/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid patrimonio ID" });
+      }
+      
+      await storage.deletePatrimonio(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting patrimonio:", error);
+      res.status(500).json({ error: "Failed to delete patrimonio" });
+    }
+  });
+
+  app.get("/api/patrimonio/:id/historico", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid patrimonio ID" });
+      }
+      
+      const historico = await storage.getPatrimonioHistorico(id);
+      res.json(historico);
+    } catch (error) {
+      console.error("[api] Error fetching patrimonio historico:", error);
+      res.status(500).json({ error: "Failed to fetch patrimonio historico" });
+    }
+  });
+
+  app.post("/api/patrimonio/:id/historico", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid patrimonio ID" });
+      }
+      
+      const { acao, usuario } = req.body;
+      if (!acao || !usuario) {
+        return res.status(400).json({ error: "acao and usuario are required" });
+      }
+      
+      const registro = await storage.createPatrimonioHistorico({
+        patrimonioId: id,
+        acao,
+        usuario,
+        data: new Date(),
+      });
+      res.status(201).json(registro);
+    } catch (error) {
+      console.error("[api] Error creating patrimonio historico:", error);
+      res.status(500).json({ error: "Failed to create patrimonio historico" });
+    }
+  });
+
   // ============ RH Cargos Endpoints ============
   // Default options when table is empty or doesn't exist
   const defaultCargos = [
