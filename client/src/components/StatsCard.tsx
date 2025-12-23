@@ -90,7 +90,7 @@ export default function StatsCard({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl p-6",
+        "relative rounded-2xl p-6",
         "backdrop-blur-xl",
         "border",
         "shadow-lg shadow-black/5 dark:shadow-black/20",
@@ -102,7 +102,7 @@ export default function StatsCard({
       )}
       data-testid={`stats-card-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent dark:from-white/5 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent dark:from-white/5 pointer-events-none rounded-2xl overflow-hidden" />
       
       <div className="relative flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -122,8 +122,10 @@ export default function StatsCard({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent 
-                  side="top" 
-                  className="backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border border-white/40 dark:border-white/10 shadow-xl shadow-black/10 dark:shadow-black/30 px-3 py-2 rounded-lg"
+                  side="bottom" 
+                  align="start"
+                  sideOffset={8}
+                  className="z-[100] backdrop-blur-xl bg-white/95 dark:bg-slate-900/95 border border-white/40 dark:border-white/10 shadow-xl shadow-black/10 dark:shadow-black/30 px-3 py-2 rounded-lg max-w-[250px]"
                 >
                   <p className="text-sm text-foreground">{subtitle}</p>
                 </TooltipContent>
