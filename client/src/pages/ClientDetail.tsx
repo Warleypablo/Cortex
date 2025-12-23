@@ -447,7 +447,7 @@ export default function ClientDetail() {
     }
   };
 
-  const calcularLTContrato = (contrato: { status: string | null; dataInicio: Date | null; dataSolicitacaoEncerramento: Date | null }) => {
+  const calcularLTContrato = (contrato: { status: string | null; dataInicio: Date | null; dataSolicitacaoEncerramento: Date | null; dataEncerramento: Date | null }) => {
     if (!contrato.dataInicio) return '-';
     
     const dataInicio = new Date(contrato.dataInicio);
@@ -458,7 +458,13 @@ export default function ClientDetail() {
     
     let dataFim: Date;
     
-    if (statusLower.includes('cancelado') || statusLower.includes('inativo')) {
+    if (statusLower.includes('entregue') || statusLower.includes('concluído') || statusLower.includes('finalizado')) {
+      if (contrato.dataEncerramento) {
+        dataFim = new Date(contrato.dataEncerramento);
+      } else {
+        return '-';
+      }
+    } else if (statusLower.includes('cancelado') || statusLower.includes('inativo')) {
       if (contrato.dataSolicitacaoEncerramento) {
         dataFim = new Date(contrato.dataSolicitacaoEncerramento);
       } else {
