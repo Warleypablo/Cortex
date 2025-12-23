@@ -1573,9 +1573,12 @@ export default function Colaboradores() {
     const ativos = colaboradores.filter((c) => c.status === "Ativo").length;
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
     const novosUltimos30d = colaboradores.filter((c) => {
       if (!c.admissao) return false;
-      return new Date(c.admissao) >= thirtyDaysAgo;
+      const admissaoDate = new Date(c.admissao);
+      admissaoDate.setHours(0, 0, 0, 0);
+      return admissaoDate >= thirtyDaysAgo;
     }).length;
     return { total, ativos, novosUltimos30d };
   }, [colaboradores]);
