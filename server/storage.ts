@@ -8,6 +8,7 @@ export type ClienteCompleto = Cliente & {
   statusClickup: string | null;
   telefone: string | null;
   responsavel: string | null;
+  responsavelGeral: string | null;
   cluster: string | null;
   cnpjCliente: string | null;
   servicos: string | null;
@@ -1112,6 +1113,7 @@ export class DbStorage implements IStorage {
         cc.status as "statusClickup",
         cc.telefone,
         cc.responsavel,
+        cc.responsavel_geral as "responsavelGeral",
         cc.cluster,
         cc.cnpj as "cnpjCliente",
         (
@@ -1182,6 +1184,7 @@ export class DbStorage implements IStorage {
         statusClickup: schema.cupClientes.status,
         telefone: schema.cupClientes.telefone,
         responsavel: schema.cupClientes.responsavel,
+        responsavelGeral: schema.cupClientes.responsavelGeral,
         cluster: schema.cupClientes.cluster,
         cnpjCliente: schema.cupClientes.cnpj,
         servicos: sql<string>`(
