@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, UserCircle, ExternalLink } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, UserCircle, ExternalLink, Search } from "lucide-react";
 import type { Colaborador, InsertColaborador, RhPromocao } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { z } from "zod";
@@ -50,6 +50,19 @@ interface PatrimonioItem {
   status: string | null;
   ativo: string | null;
   marca: string | null;
+}
+
+interface AvailablePatrimonio {
+  id: number;
+  numeroAtivo: string | null;
+  ativo: string | null;
+  marca: string | null;
+  estadoConservacao: string | null;
+  responsavelAtual: string | null;
+  responsavelId: number | null;
+  valorPago: string | null;
+  valorMercado: string | null;
+  descricao: string | null;
 }
 
 interface PromocaoItem {
@@ -473,6 +486,170 @@ function AddPromocaoDialog({
             </DialogFooter>
           </form>
         </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AssignPatrimonioDialog({ 
+  colaborador, 
+  open, 
+  onOpenChange 
+}: { 
+  colaborador: ColaboradorDetail; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void 
+}) {
+  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: patrimonios = [], isLoading } = useQuery<AvailablePatrimonio[]>({
+    queryKey: ["/api/patrimonio/disponiveis"],
+    enabled: open,
+  });
+
+  const filteredPatrimonios = patrimonios.filter((p) => {
+    const search = searchTerm.toLowerCase();
+    return (
+      (p.ativo?.toLowerCase().includes(search) || false) ||
+      (p.marca?.toLowerCase().includes(search) || false) ||
+      (p.numeroAtivo?.toLowerCase().includes(search) || false) ||
+      (p.descricao?.toLowerCase().includes(search) || false)
+    );
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: async (patrimonioId: number) => {
+      try {
+        const response = await apiRequest("PATCH", `/api/patrimonio/${patrimonioId}/atribuir`, {
+          responsavelId: colaborador.id,
+          responsavelNome: colaborador.nome,
+        });
+        return await response.json();
+      } catch (err) {
+        if (err instanceof Error) {
+          throw err;
+        }
+        throw new Error("Falha ao atribuir patrimônio");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaborador.id.toString()] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patrimonio/disponiveis"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/patrimonio"] });
+      toast({
+        title: "Patrimônio atribuído",
+        description: `O patrimônio foi atribuído a ${colaborador.nome} com sucesso.`,
+      });
+      onOpenChange(false);
+    },
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao atribuir patrimônio";
+      toast({
+        title: "Erro ao atribuir patrimônio",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAssign = (patrimonioId: number) => {
+    assignMutation.mutate(patrimonioId);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Atribuir Patrimônio</DialogTitle>
+          <DialogDescription>
+            Selecione um patrimônio para atribuir a {colaborador.nome}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por equipamento, marca ou número..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-patrimonio"
+          />
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : filteredPatrimonios.length > 0 ? (
+          <div className="overflow-x-auto border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nº Ativo</TableHead>
+                  <TableHead>Equipamento</TableHead>
+                  <TableHead>Marca</TableHead>
+                  <TableHead>Responsável Atual</TableHead>
+                  <TableHead className="text-right">Ação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPatrimonios.map((patrimonio) => (
+                  <TableRow key={patrimonio.id} data-testid={`row-assign-patrimonio-${patrimonio.id}`}>
+                    <TableCell className="font-mono" data-testid={`text-assign-numero-${patrimonio.id}`}>
+                      {patrimonio.numeroAtivo || "-"}
+                    </TableCell>
+                    <TableCell data-testid={`text-assign-ativo-${patrimonio.id}`}>
+                      {patrimonio.ativo || patrimonio.descricao || "-"}
+                    </TableCell>
+                    <TableCell data-testid={`text-assign-marca-${patrimonio.id}`}>
+                      {patrimonio.marca || "-"}
+                    </TableCell>
+                    <TableCell>
+                      {patrimonio.responsavelAtual ? (
+                        <Badge variant="outline" data-testid={`badge-assign-responsavel-${patrimonio.id}`}>
+                          {patrimonio.responsavelAtual}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Disponível</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        onClick={() => handleAssign(patrimonio.id)}
+                        disabled={assignMutation.isPending}
+                        data-testid={`button-assign-patrimonio-${patrimonio.id}`}
+                      >
+                        {assignMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>Atribuir</>
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground" data-testid="text-no-patrimonios-available">
+            {searchTerm ? "Nenhum patrimônio encontrado com esse termo" : "Nenhum patrimônio disponível"}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            data-testid="button-assign-cancel"
+          >
+            Fechar
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -1035,17 +1212,27 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
   );
 }
 
-function InfoCard({ icon: Icon, label, value }: { icon: typeof User; label: string; value: string | null | undefined }) {
+interface InfoCardProps {
+  icon: typeof User;
+  label: string;
+  value: string | null | undefined;
+  iconBgColor?: string;
+  iconColor?: string;
+}
+
+function InfoCard({ icon: Icon, label, value, iconBgColor = "bg-primary/10", iconColor = "text-primary" }: InfoCardProps) {
   return (
-    <div className="flex items-center gap-3 p-4 bg-card rounded-lg border border-border">
-      <div className="p-2 bg-primary/10 rounded-lg">
-        <Icon className="w-5 h-5 text-primary" />
+    <Card className="p-4 hover-elevate" data-testid={`info-card-${label.toLowerCase().replace(/\s+/g, '-')}`}>
+      <div className="flex items-center gap-3">
+        <div className={`p-2.5 rounded-lg ${iconBgColor}`}>
+          <Icon className={`w-5 h-5 ${iconColor}`} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+          <p className="font-semibold text-foreground truncate text-lg">{value || "-"}</p>
+        </div>
       </div>
-      <div>
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="font-medium text-foreground">{value || "-"}</p>
-      </div>
-    </div>
+    </Card>
   );
 }
 
@@ -1055,6 +1242,7 @@ export default function DetailColaborador() {
   const colaboradorId = params?.id || "";
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addPromocaoDialogOpen, setAddPromocaoDialogOpen] = useState(false);
+  const [assignPatrimonioDialogOpen, setAssignPatrimonioDialogOpen] = useState(false);
 
   const { data: colaborador, isLoading, error } = useQuery<ColaboradorDetail>({
     queryKey: ["/api/colaboradores", colaboradorId],
@@ -1119,103 +1307,133 @@ export default function DetailColaborador() {
   return (
     <div className="bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="mb-6">
-          <Link href="/colaboradores">
-            <Button variant="ghost" size="sm" className="hover-elevate -ml-2 mb-4" data-testid="button-back">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar para colaboradores
-            </Button>
-          </Link>
-          
-          <div className="flex items-start justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <Avatar className="w-16 h-16">
-                {colaborador.linkedUser?.picture ? (
-                  <AvatarImage src={colaborador.linkedUser.picture} alt={colaborador.nome} />
-                ) : null}
-                <AvatarFallback className="text-xl">{getInitials(colaborador.nome)}</AvatarFallback>
-              </Avatar>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground" data-testid="text-colaborador-nome">
-                  {colaborador.nome}
-                </h1>
-                <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                  {colaborador.cargo && (
-                    <span data-testid="text-colaborador-cargo">{colaborador.cargo}</span>
-                  )}
-                  {colaborador.cargo && colaborador.nivel && <span>•</span>}
-                  {colaborador.nivel && (
-                    <span data-testid="text-colaborador-nivel">{colaborador.nivel}</span>
+        <Link href="/colaboradores">
+          <Button variant="ghost" size="sm" className="hover-elevate -ml-2 mb-4" data-testid="button-back">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Voltar para colaboradores
+          </Button>
+        </Link>
+
+        <Card className="mb-8 overflow-hidden" data-testid="card-header">
+          <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent dark:from-primary/20 dark:via-primary/10 dark:to-transparent p-6">
+            <div className="flex items-start justify-between flex-wrap gap-6">
+              <div className="flex items-center gap-5">
+                <Avatar className="w-20 h-20 ring-4 ring-background shadow-lg">
+                  {colaborador.linkedUser?.picture ? (
+                    <AvatarImage src={colaborador.linkedUser.picture} alt={colaborador.nome} />
+                  ) : null}
+                  <AvatarFallback className="text-2xl bg-primary/20 text-primary font-bold">{getInitials(colaborador.nome)}</AvatarFallback>
+                </Avatar>
+                <div className="space-y-1">
+                  <h1 className="text-2xl font-bold text-foreground" data-testid="text-colaborador-nome">
+                    {colaborador.nome}
+                  </h1>
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    {colaborador.cargo && (
+                      <span className="flex items-center gap-1.5" data-testid="text-colaborador-cargo">
+                        <Briefcase className="w-4 h-4" />
+                        {colaborador.cargo}
+                      </span>
+                    )}
+                    {colaborador.cargo && colaborador.nivel && <span className="text-border">•</span>}
+                    {colaborador.nivel && (
+                      <span className="flex items-center gap-1.5" data-testid="text-colaborador-nivel">
+                        <Award className="w-4 h-4" />
+                        {colaborador.nivel}
+                      </span>
+                    )}
+                  </div>
+                  {colaborador.squad && (
+                    <Badge
+                      variant="secondary"
+                      className={`mt-1 ${squadColors[colaborador.squad] || ""}`}
+                      data-testid="badge-header-squad"
+                    >
+                      {colaborador.squad}
+                    </Badge>
                   )}
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge 
-                variant={getStatusBadgeVariant(colaborador.status)} 
-                data-testid="badge-status"
-              >
-                {colaborador.status || "Desconhecido"}
-              </Badge>
-              <Button onClick={() => setEditDialogOpen(true)} data-testid="button-edit-colaborador">
-                <Pencil className="w-4 h-4 mr-2" />
-                Editar
-              </Button>
+              <div className="flex items-center gap-3">
+                <Badge 
+                  variant={getStatusBadgeVariant(colaborador.status)} 
+                  className="px-3 py-1 text-sm font-medium"
+                  data-testid="badge-status"
+                >
+                  {colaborador.status || "Desconhecido"}
+                </Badge>
+                <Button onClick={() => setEditDialogOpen(true)} data-testid="button-edit-colaborador">
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8" data-testid="info-cards-grid">
           <InfoCard 
             icon={Calendar} 
             label="Meses de Turbo" 
-            value={colaborador.mesesDeTurbo?.toString() || "-"} 
+            value={colaborador.mesesDeTurbo?.toString() || "-"}
+            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
+            iconColor="text-orange-600 dark:text-orange-400"
           />
           <InfoCard 
             icon={Building2} 
             label="Setor" 
-            value={colaborador.setor} 
+            value={colaborador.setor}
+            iconBgColor="bg-blue-100 dark:bg-blue-900/30"
+            iconColor="text-blue-600 dark:text-blue-400"
           />
           <InfoCard 
             icon={Briefcase} 
             label="Squad" 
-            value={colaborador.squad} 
+            value={colaborador.squad}
+            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
+            iconColor="text-purple-600 dark:text-purple-400"
           />
           <InfoCard 
             icon={Award} 
             label="Cargo" 
-            value={colaborador.cargo} 
+            value={colaborador.cargo}
+            iconBgColor="bg-green-100 dark:bg-green-900/30"
+            iconColor="text-green-600 dark:text-green-400"
           />
           <InfoCard 
-            icon={Award} 
+            icon={TrendingUp} 
             label="Nível" 
-            value={colaborador.nivel} 
+            value={colaborador.nivel}
+            iconBgColor="bg-teal-100 dark:bg-teal-900/30"
+            iconColor="text-teal-600 dark:text-teal-400"
           />
         </div>
 
         {colaborador.linkedUser && (
-          <Card className="p-6 mb-8">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <UserCircle className="w-5 h-5" />
+          <Card className="p-6 mb-8 hover-elevate" data-testid="card-linked-user">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+                <UserCircle className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
               Usuário Vinculado ao Sistema
             </h2>
             <div className="flex items-center gap-4">
-              <Avatar className="w-12 h-12">
+              <Avatar className="w-12 h-12 ring-2 ring-border">
                 {colaborador.linkedUser.picture ? (
                   <AvatarImage src={colaborador.linkedUser.picture} alt={colaborador.linkedUser.name} />
                 ) : null}
                 <AvatarFallback>{getInitials(colaborador.linkedUser.name)}</AvatarFallback>
               </Avatar>
-              <div className="flex-1">
-                <p className="font-medium text-foreground" data-testid="text-linked-user-name">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-foreground" data-testid="text-linked-user-name">
                   {colaborador.linkedUser.name}
                 </p>
-                <p className="text-sm text-muted-foreground flex items-center gap-2" data-testid="text-linked-user-email">
-                  <Mail className="w-4 h-4" />
+                <p className="text-sm text-muted-foreground flex items-center gap-2 truncate" data-testid="text-linked-user-email">
+                  <Mail className="w-4 h-4 flex-shrink-0" />
                   {colaborador.linkedUser.email}
                 </p>
               </div>
-              <Badge variant="outline" data-testid="badge-linked-user-role">
+              <Badge variant="secondary" data-testid="badge-linked-user-role">
                 {colaborador.linkedUser.role}
               </Badge>
             </div>
@@ -1223,95 +1441,105 @@ export default function DetailColaborador() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <User className="w-5 h-5" />
+          <Card className="p-6 hover-elevate" data-testid="card-personal-info">
+            <h2 className="text-lg font-semibold mb-5 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
               Informações Pessoais
             </h2>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border/50">
                 <div>
-                  <p className="text-sm text-muted-foreground">Nome</p>
-                  <p className="font-medium" data-testid="text-info-nome">{colaborador.nome}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Nome</p>
+                  <p className="font-semibold text-foreground" data-testid="text-info-nome">{colaborador.nome}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">CPF</p>
-                  <p className="font-medium font-mono" data-testid="text-info-cpf">{colaborador.cpf || "-"}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">CPF</p>
+                  <p className="font-semibold font-mono text-foreground" data-testid="text-info-cpf">{colaborador.cpf || "-"}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border/50">
                 <div>
-                  <p className="text-sm text-muted-foreground">Telefone</p>
-                  <p className="font-medium flex items-center gap-2" data-testid="text-info-telefone">
-                    {colaborador.telefone && <Phone className="w-4 h-4 text-muted-foreground" />}
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Telefone</p>
+                  <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-info-telefone">
+                    {colaborador.telefone && <Phone className="w-4 h-4 text-green-500" />}
                     {colaborador.telefone || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Aniversário</p>
-                  <p className="font-medium" data-testid="text-info-aniversario">{formatDate(colaborador.aniversario)}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Aniversário</p>
+                  <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-info-aniversario">
+                    <Calendar className="w-4 h-4 text-pink-500" />
+                    {formatDate(colaborador.aniversario)}
+                  </p>
                 </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Email Turbo</p>
-                <p className="font-medium flex items-center gap-2" data-testid="text-info-email-turbo">
-                  {colaborador.emailTurbo && <Mail className="w-4 h-4 text-primary" />}
+              <div className="pb-4 border-b border-border/50">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Email Turbo</p>
+                <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-info-email-turbo">
+                  <Mail className="w-4 h-4 text-primary" />
                   {colaborador.emailTurbo || "-"}
                 </p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Email Pessoal</p>
-                <p className="font-medium flex items-center gap-2" data-testid="text-info-email-pessoal">
-                  {colaborador.emailPessoal && <Mail className="w-4 h-4 text-muted-foreground" />}
+              <div className="pb-4 border-b border-border/50">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Email Pessoal</p>
+                <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-info-email-pessoal">
+                  <Mail className="w-4 h-4 text-muted-foreground" />
                   {colaborador.emailPessoal || "-"}
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border/50">
                 <div>
-                  <p className="text-sm text-muted-foreground">Estado</p>
-                  <p className="font-medium flex items-center gap-2" data-testid="text-info-estado">
-                    {colaborador.estado && <MapPin className="w-4 h-4 text-muted-foreground" />}
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Estado</p>
+                  <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-info-estado">
+                    <MapPin className="w-4 h-4 text-red-500" />
                     {colaborador.estado || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">PIX</p>
-                  <p className="font-medium flex items-center gap-2 truncate" title={colaborador.pix || undefined} data-testid="text-info-pix">
-                    {colaborador.pix && <CreditCard className="w-4 h-4 text-muted-foreground" />}
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">PIX</p>
+                  <p className="font-semibold flex items-center gap-2 truncate text-foreground" title={colaborador.pix || undefined} data-testid="text-info-pix">
+                    <CreditCard className="w-4 h-4 text-violet-500" />
                     {colaborador.pix || "-"}
                   </p>
                 </div>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Endereço</p>
-                <p className="font-medium" data-testid="text-info-endereco">{colaborador.endereco || "-"}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Endereço</p>
+                <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-info-endereco">
+                  <MapPin className="w-4 h-4 text-muted-foreground" />
+                  {colaborador.endereco || "-"}
+                </p>
               </div>
             </div>
           </Card>
 
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Briefcase className="w-5 h-5" />
+          <Card className="p-6 hover-elevate" data-testid="card-professional-info">
+            <h2 className="text-lg font-semibold mb-5 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                <Briefcase className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
               Informações Profissionais
             </h2>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border/50">
                 <div>
-                  <p className="text-sm text-muted-foreground">Cargo</p>
-                  <p className="font-medium" data-testid="text-prof-cargo">{colaborador.cargo || "-"}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Cargo</p>
+                  <p className="font-semibold text-foreground" data-testid="text-prof-cargo">{colaborador.cargo || "-"}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Nível</p>
-                  <p className="font-medium" data-testid="text-prof-nivel">{colaborador.nivel || "-"}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Nível</p>
+                  <p className="font-semibold text-foreground" data-testid="text-prof-nivel">{colaborador.nivel || "-"}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border/50">
                 <div>
-                  <p className="text-sm text-muted-foreground">Setor</p>
-                  <p className="font-medium" data-testid="text-prof-setor">{colaborador.setor || "-"}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Setor</p>
+                  <p className="font-semibold text-foreground" data-testid="text-prof-setor">{colaborador.setor || "-"}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Squad</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Squad</p>
                   {colaborador.squad ? (
                     <Badge
                       variant="secondary"
@@ -1321,59 +1549,73 @@ export default function DetailColaborador() {
                       {colaborador.squad}
                     </Badge>
                   ) : (
-                    <p className="font-medium">-</p>
+                    <p className="font-semibold text-foreground">-</p>
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border/50">
                 <div>
-                  <p className="text-sm text-muted-foreground">Admissão</p>
-                  <p className="font-medium" data-testid="text-prof-admissao">{formatDate(colaborador.admissao)}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Admissão</p>
+                  <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-prof-admissao">
+                    <Calendar className="w-4 h-4 text-blue-500" />
+                    {formatDate(colaborador.admissao)}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Meses de Turbo</p>
-                  <p className="font-medium" data-testid="text-prof-meses-turbo">{colaborador.mesesDeTurbo || "-"}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Meses de Turbo</p>
+                  <p className="font-semibold text-foreground" data-testid="text-prof-meses-turbo">
+                    <span className="text-primary font-bold">{colaborador.mesesDeTurbo || "-"}</span>
+                  </p>
                 </div>
               </div>
               {colaborador.demissao && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border/50">
                   <div>
-                    <p className="text-sm text-muted-foreground">Demissão</p>
-                    <p className="font-medium" data-testid="text-prof-demissao">{formatDate(colaborador.demissao)}</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Demissão</p>
+                    <p className="font-semibold flex items-center gap-2 text-destructive" data-testid="text-prof-demissao">
+                      <Calendar className="w-4 h-4" />
+                      {formatDate(colaborador.demissao)}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Tipo Demissão</p>
-                    <p className="font-medium" data-testid="text-prof-tipo-demissao">{colaborador.tipoDemissao || "-"}</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Tipo Demissão</p>
+                    <p className="font-semibold text-foreground" data-testid="text-prof-tipo-demissao">{colaborador.tipoDemissao || "-"}</p>
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border/50">
                 <div>
-                  <p className="text-sm text-muted-foreground">Salário</p>
-                  <p className="font-medium flex items-center gap-2" data-testid="text-prof-salario">
-                    <DollarSign className="w-4 h-4 text-green-500" />
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Salário</p>
+                  <p className="font-semibold flex items-center gap-2 text-green-600 dark:text-green-400" data-testid="text-prof-salario">
+                    <DollarSign className="w-4 h-4" />
                     {colaborador.salario ? `R$ ${parseFloat(colaborador.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Último Aumento</p>
-                  <p className="font-medium" data-testid="text-prof-ultimo-aumento">{formatDate(colaborador.ultimoAumento)}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Último Aumento</p>
+                  <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-prof-ultimo-aumento">
+                    <TrendingUp className="w-4 h-4 text-green-500" />
+                    {formatDate(colaborador.ultimoAumento)}
+                  </p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">CNPJ</p>
-                  <p className="font-medium font-mono" data-testid="text-prof-cnpj">{colaborador.cnpj || "-"}</p>
-                </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">CNPJ</p>
+                <p className="font-semibold font-mono text-foreground flex items-center gap-2" data-testid="text-prof-cnpj">
+                  <Building2 className="w-4 h-4 text-muted-foreground" />
+                  {colaborador.cnpj || "-"}
+                </p>
               </div>
             </div>
           </Card>
         </div>
 
-        <Card className="p-6 mb-8">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
+        <Card className="p-6 mb-8 hover-elevate" data-testid="card-promocoes">
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+            <h2 className="text-lg font-semibold flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
               Histórico de Promoções
             </h2>
             <Button 
@@ -1386,42 +1628,47 @@ export default function DetailColaborador() {
             </Button>
           </div>
           {colaborador.promocoes && colaborador.promocoes.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto border rounded-lg">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Salário Anterior</TableHead>
-                    <TableHead>Salário Novo</TableHead>
-                    <TableHead>Cargo Anterior</TableHead>
-                    <TableHead>Cargo Novo</TableHead>
-                    <TableHead>Nível Anterior</TableHead>
-                    <TableHead>Nível Novo</TableHead>
-                    <TableHead>Motivo</TableHead>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="font-semibold">Data</TableHead>
+                    <TableHead className="font-semibold">Salário Anterior</TableHead>
+                    <TableHead className="font-semibold">Salário Novo</TableHead>
+                    <TableHead className="font-semibold">Cargo Anterior</TableHead>
+                    <TableHead className="font-semibold">Cargo Novo</TableHead>
+                    <TableHead className="font-semibold">Nível Anterior</TableHead>
+                    <TableHead className="font-semibold">Nível Novo</TableHead>
+                    <TableHead className="font-semibold">Motivo</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {colaborador.promocoes.map((promocao) => (
+                  {colaborador.promocoes.map((promocao, index) => (
                     <TableRow key={promocao.id} data-testid={`row-promocao-${promocao.id}`}>
                       <TableCell data-testid={`text-promocao-data-${promocao.id}`}>
-                        {formatDateFns(promocao.dataPromocao)}
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+                          <span className="font-medium">{formatDateFns(promocao.dataPromocao)}</span>
+                        </div>
                       </TableCell>
-                      <TableCell className="font-mono" data-testid={`text-promocao-salario-anterior-${promocao.id}`}>
+                      <TableCell className="font-mono text-muted-foreground" data-testid={`text-promocao-salario-anterior-${promocao.id}`}>
                         {formatCurrency(promocao.salarioAnterior)}
                       </TableCell>
-                      <TableCell className="font-mono text-green-600 dark:text-green-400" data-testid={`text-promocao-salario-novo-${promocao.id}`}>
-                        {formatCurrency(promocao.salarioNovo)}
+                      <TableCell data-testid={`text-promocao-salario-novo-${promocao.id}`}>
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                          {formatCurrency(promocao.salarioNovo)}
+                        </span>
                       </TableCell>
-                      <TableCell data-testid={`text-promocao-cargo-anterior-${promocao.id}`}>
+                      <TableCell className="text-muted-foreground" data-testid={`text-promocao-cargo-anterior-${promocao.id}`}>
                         {promocao.cargoAnterior || "-"}
                       </TableCell>
-                      <TableCell data-testid={`text-promocao-cargo-novo-${promocao.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-promocao-cargo-novo-${promocao.id}`}>
                         {promocao.cargoNovo || "-"}
                       </TableCell>
-                      <TableCell data-testid={`text-promocao-nivel-anterior-${promocao.id}`}>
+                      <TableCell className="text-muted-foreground" data-testid={`text-promocao-nivel-anterior-${promocao.id}`}>
                         {promocao.nivelAnterior || "-"}
                       </TableCell>
-                      <TableCell data-testid={`text-promocao-nivel-novo-${promocao.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-promocao-nivel-novo-${promocao.id}`}>
                         {promocao.nivelNovo || "-"}
                       </TableCell>
                       <TableCell className="max-w-xs truncate" title={promocao.observacoes || undefined} data-testid={`text-promocao-observacoes-${promocao.id}`}>
@@ -1433,47 +1680,63 @@ export default function DetailColaborador() {
               </Table>
             </div>
           ) : (
-            <p className="text-muted-foreground text-center py-8" data-testid="text-no-promocoes">
-              Nenhum histórico de promoção registrado
-            </p>
+            <div className="text-center py-12" data-testid="text-no-promocoes">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                <TrendingUp className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground font-medium mb-1">Nenhum histórico de promoção</p>
+              <p className="text-sm text-muted-foreground/80">Clique em "Adicionar Promoção" para registrar uma nova promoção</p>
+            </div>
           )}
         </Card>
 
-        <Card className="p-6 mb-8">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Package className="w-5 h-5" />
-            Ativos / Patrimônios
-          </h2>
+        <Card className="p-6 mb-8 hover-elevate" data-testid="card-patrimonios">
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+            <h2 className="text-lg font-semibold flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30">
+                <Package className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+              </div>
+              Ativos / Patrimônios
+            </h2>
+            <Button 
+              size="sm" 
+              onClick={() => setAssignPatrimonioDialogOpen(true)}
+              data-testid="button-add-patrimonio"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Adicionar Patrimônio
+            </Button>
+          </div>
           {colaborador.patrimonios && colaborador.patrimonios.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto border rounded-lg">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Número Ativo</TableHead>
-                    <TableHead>Equipamento</TableHead>
-                    <TableHead>Marca</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Ações</TableHead>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="font-semibold">ID</TableHead>
+                    <TableHead className="font-semibold">Número Ativo</TableHead>
+                    <TableHead className="font-semibold">Equipamento</TableHead>
+                    <TableHead className="font-semibold">Marca</TableHead>
+                    <TableHead className="font-semibold">Status</TableHead>
+                    <TableHead className="font-semibold">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {colaborador.patrimonios.map((patrimonio) => (
                     <TableRow key={patrimonio.id} data-testid={`row-patrimonio-${patrimonio.id}`}>
-                      <TableCell className="font-mono" data-testid={`text-patrimonio-id-${patrimonio.id}`}>
-                        {patrimonio.id}
+                      <TableCell className="font-mono text-muted-foreground" data-testid={`text-patrimonio-id-${patrimonio.id}`}>
+                        #{patrimonio.id}
                       </TableCell>
-                      <TableCell className="font-mono" data-testid={`text-patrimonio-numero-${patrimonio.id}`}>
+                      <TableCell className="font-mono font-medium" data-testid={`text-patrimonio-numero-${patrimonio.id}`}>
                         {patrimonio.numeroAtivo || "-"}
                       </TableCell>
-                      <TableCell data-testid={`text-patrimonio-ativo-${patrimonio.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-patrimonio-ativo-${patrimonio.id}`}>
                         {patrimonio.ativo || patrimonio.descricao || "-"}
                       </TableCell>
                       <TableCell data-testid={`text-patrimonio-marca-${patrimonio.id}`}>
                         {patrimonio.marca || "-"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" data-testid={`badge-patrimonio-status-${patrimonio.id}`}>
+                        <Badge variant="secondary" data-testid={`badge-patrimonio-status-${patrimonio.id}`}>
                           {patrimonio.status || "N/A"}
                         </Badge>
                       </TableCell>
@@ -1491,9 +1754,13 @@ export default function DetailColaborador() {
               </Table>
             </div>
           ) : (
-            <p className="text-muted-foreground text-center py-8" data-testid="text-no-patrimonios">
-              Nenhum patrimônio atribuído a este colaborador
-            </p>
+            <div className="text-center py-12" data-testid="text-no-patrimonios">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                <Package className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground font-medium mb-1">Nenhum patrimônio atribuído</p>
+              <p className="text-sm text-muted-foreground/80">Clique em "Adicionar Patrimônio" para atribuir equipamentos a este colaborador</p>
+            </div>
           )}
         </Card>
 
@@ -1507,6 +1774,12 @@ export default function DetailColaborador() {
           colaborador={colaborador}
           open={addPromocaoDialogOpen}
           onOpenChange={setAddPromocaoDialogOpen}
+        />
+
+        <AssignPatrimonioDialog
+          colaborador={colaborador}
+          open={assignPatrimonioDialogOpen}
+          onOpenChange={setAssignPatrimonioDialogOpen}
         />
       </div>
     </div>
