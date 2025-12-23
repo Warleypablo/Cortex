@@ -90,24 +90,35 @@ export default function StatsCard({
   return (
     <div
       className={cn(
-        "relative rounded-2xl p-6",
+        "relative rounded-xl p-4",
         "backdrop-blur-xl",
         "border",
-        "shadow-lg shadow-black/5 dark:shadow-black/20",
+        "shadow-md shadow-black/5 dark:shadow-black/20",
         "transition-shadow duration-300",
-        "hover:shadow-xl hover:shadow-black/10 dark:hover:shadow-black/30",
+        "hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30",
         isStatusCard ? statusStyles.bg : finalStyles.bg,
         isStatusCard ? statusStyles.border : finalStyles.border,
         isStatusCard && statusStyles.ring,
       )}
       data-testid={`stats-card-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent dark:from-white/5 pointer-events-none rounded-2xl overflow-hidden" />
+      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent dark:from-white/5 pointer-events-none rounded-xl overflow-hidden" />
       
-      <div className="relative flex items-center justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+      <div className="relative flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <div 
+            className={cn(
+              "w-7 h-7 rounded-md flex items-center justify-center shrink-0",
+              isStatusCard ? statusStyles.iconBg : finalStyles.iconBg
+            )}
+          >
+            <Icon className={cn(
+              "w-3.5 h-3.5",
+              isStatusCard ? statusStyles.icon : finalStyles.icon
+            )} />
+          </div>
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider truncate">
               {title}
             </p>
             {subtitle && (
@@ -115,10 +126,10 @@ export default function StatsCard({
                 <TooltipTrigger asChild>
                   <button 
                     type="button"
-                    className="w-4 h-4 rounded-full bg-muted/50 dark:bg-white/10 flex items-center justify-center hover:bg-muted dark:hover:bg-white/20 transition-colors"
+                    className="w-3.5 h-3.5 rounded-full bg-muted/50 dark:bg-white/10 flex items-center justify-center hover:bg-muted dark:hover:bg-white/20 transition-colors shrink-0"
                     data-testid={`tooltip-${title.toLowerCase().replace(/\s+/g, '-')}`}
                   >
-                    <TooltipIcon className="w-2.5 h-2.5 text-muted-foreground" />
+                    <TooltipIcon className="w-2 h-2 text-muted-foreground" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent 
@@ -132,30 +143,20 @@ export default function StatsCard({
               </Tooltip>
             )}
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-foreground leading-tight break-words">
+        </div>
+        <div className="pl-9">
+          <p className="text-lg sm:text-xl font-bold text-foreground leading-tight break-words">
             {value}
           </p>
           {trend && (
             <p className={cn(
-              "text-sm font-medium mt-2 flex items-center gap-1",
+              "text-xs font-medium mt-1 flex items-center gap-1",
               trend.isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
             )}>
               <span>{trend.isPositive ? "↑" : "↓"}</span>
               <span>{trend.value}</span>
             </p>
           )}
-        </div>
-        <div 
-          className={cn(
-            "w-14 h-14 rounded-xl flex items-center justify-center shrink-0",
-            "transition-transform duration-300",
-            isStatusCard ? statusStyles.iconBg : finalStyles.iconBg
-          )}
-        >
-          <Icon className={cn(
-            "w-7 h-7",
-            isStatusCard ? statusStyles.icon : finalStyles.icon
-          )} />
         </div>
       </div>
     </div>
