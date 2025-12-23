@@ -1010,6 +1010,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/colaboradores/analise", async (req, res) => {
+    try {
+      const analiseData = await storage.getColaboradoresAnalise();
+      res.json(analiseData);
+    } catch (error) {
+      console.error("[api] Error fetching colaboradores analise:", error);
+      res.status(500).json({ error: "Failed to fetch colaboradores analise" });
+    }
+  });
+
+  app.get("/api/colaboradores/dropdown", async (req, res) => {
+    try {
+      const colaboradores = await storage.getColaboradoresDropdown();
+      res.json(colaboradores);
+    } catch (error) {
+      console.error("[api] Error fetching colaboradores dropdown:", error);
+      res.status(500).json({ error: "Failed to fetch colaboradores" });
+    }
+  });
+
   app.get("/api/colaboradores/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -1171,16 +1191,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/colaboradores/analise", async (req, res) => {
-    try {
-      const analiseData = await storage.getColaboradoresAnalise();
-      res.json(analiseData);
-    } catch (error) {
-      console.error("[api] Error fetching colaboradores analise:", error);
-      res.status(500).json({ error: "Failed to fetch colaboradores analise" });
-    }
-  });
-
   app.get("/api/contratos", async (req, res) => {
     try {
       const contratos = await storage.getContratos();
@@ -1229,16 +1239,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error creating patrimonio:", error);
       res.status(500).json({ error: "Failed to create patrimonio" });
-    }
-  });
-
-  app.get("/api/colaboradores/dropdown", async (req, res) => {
-    try {
-      const colaboradores = await storage.getColaboradoresDropdown();
-      res.json(colaboradores);
-    } catch (error) {
-      console.error("[api] Error fetching colaboradores dropdown:", error);
-      res.status(500).json({ error: "Failed to fetch colaboradores" });
     }
   });
 
