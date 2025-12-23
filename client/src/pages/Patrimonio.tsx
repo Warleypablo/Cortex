@@ -180,7 +180,8 @@ export default function Patrimonio() {
       if (isComputadorNotebook && isBomOuEstoque) {
         computadoresNotebooksBom++;
       }
-      if (isComputadorNotebook && isBomOuEstoque && p.responsavelAtual) {
+      const temResponsavel = p.responsavelAtual && p.responsavelAtual !== "-" && p.responsavelAtual.trim() !== "";
+      if (isComputadorNotebook && isBomOuEstoque && temResponsavel) {
         computadoresNotebooksAtribuidos++;
       }
       if (p.valorPago) {
