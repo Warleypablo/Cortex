@@ -1399,11 +1399,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "responsavelNome deve ser uma string ou null" });
       }
 
+      // Buscar o patrimônio atual para saber quem era o responsável anterior
+      const patrimonioAnterior = await storage.getPatrimonioById(id);
+      const responsavelAnterior = patrimonioAnterior?.responsavelAtual || null;
+
       const patrimonio = await storage.updatePatrimonioResponsavel(id, responsavelNome);
       
-      const acao = responsavelNome === null 
-        ? "Responsável removido" 
-        : `Atribuído a ${responsavelNome}`;
+      let acao: string;
+      if (responsavelNome === null) {
+        acao = responsavelAnterior 
+          ? `Responsável removido (${responsavelAnterior})` 
+          : "Responsável removido";
+      } else {
+        acao = `Atribuído a ${responsavelNome}`;
+      }
       const usuario = (req as any).user?.name || "Sistema";
       
       await storage.createPatrimonioHistorico({
