@@ -4,7 +4,7 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Search, Package, Filter, ChevronUp, ChevronDown, 
-  DollarSign, TrendingUp, CheckCircle, X
+  DollarSign, TrendingUp, CheckCircle, X, Users
 } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,10 +94,11 @@ export default function Patrimonio() {
   }, [patrimonios]);
 
   const stats = useMemo(() => {
-    if (!patrimonios) return { totalAtivos: 0, ativosBom: 0, computadoresNotebooksBom: 0, valorPago: 0, valorMercado: 0 };
+    if (!patrimonios) return { totalAtivos: 0, ativosBom: 0, computadoresNotebooksBom: 0, computadoresNotebooksAtribuidos: 0, valorPago: 0, valorMercado: 0 };
     
     let ativosBom = 0;
     let computadoresNotebooksBom = 0;
+    let computadoresNotebooksAtribuidos = 0;
     let valorPago = 0;
     let valorMercado = 0;
     
@@ -105,12 +106,16 @@ export default function Patrimonio() {
       const estado = p.estadoConservacao?.toLowerCase() || "";
       const ativo = p.ativo?.toLowerCase() || "";
       const isBomEstado = estado.includes("bom") || estado.includes("novo") || estado.includes("ótimo");
+      const isComputadorNotebook = ativo.includes("computador") || ativo.includes("notebook");
       
       if (isBomEstado) {
         ativosBom++;
-        if (ativo.includes("computador") || ativo.includes("notebook")) {
+        if (isComputadorNotebook) {
           computadoresNotebooksBom++;
         }
+      }
+      if (isComputadorNotebook && isBomEstado && p.responsavelAtual) {
+        computadoresNotebooksAtribuidos++;
       }
       if (p.valorPago) {
         const val = parseFloat(p.valorPago);
@@ -126,6 +131,7 @@ export default function Patrimonio() {
       totalAtivos: patrimonios.length,
       ativosBom,
       computadoresNotebooksBom,
+      computadoresNotebooksAtribuidos,
       valorPago,
       valorMercado,
     };
@@ -283,7 +289,7 @@ export default function Patrimonio() {
       <div className="flex-1 overflow-y-auto">
         <div className="container mx-auto p-6 space-y-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <Card data-testid="card-total-ativos">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -310,6 +316,23 @@ export default function Patrimonio() {
                   </div>
                   <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
                     <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-atribuidos">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Computadores Atribuídos</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.computadoresNotebooksAtribuidos}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      de {stats.computadoresNotebooksBom} disponíveis
+                    </p>
+                  </div>
+                  <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                    <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
                 </div>
               </CardContent>
