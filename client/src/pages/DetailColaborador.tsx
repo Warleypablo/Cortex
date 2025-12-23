@@ -680,6 +680,8 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
 
   const editColaboradorSchema = insertColaboradorSchema.extend({
     demissao: z.string().optional(),
+    tipoDemissao: z.string().optional(),
+    ultimoAumento: z.string().optional(),
     cidade: z.string().optional(),
     userId: z.string().optional().nullable(),
   }).refine(
@@ -695,7 +697,7 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
     }
   );
 
-  const form = useForm<InsertColaborador & { demissao?: string; cidade?: string; userId?: string | null }>({
+  const form = useForm<InsertColaborador & { demissao?: string; tipoDemissao?: string; ultimoAumento?: string; cidade?: string; userId?: string | null }>({
     resolver: zodResolver(editColaboradorSchema),
     defaultValues: {
       nome: colaborador.nome || "",
@@ -717,6 +719,8 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
       aniversario: colaborador.aniversario ? new Date(colaborador.aniversario).toISOString().split('T')[0] : undefined,
       admissao: colaborador.admissao ? new Date(colaborador.admissao).toISOString().split('T')[0] : undefined,
       demissao: colaborador.demissao ? new Date(colaborador.demissao).toISOString().split('T')[0] : undefined,
+      tipoDemissao: colaborador.tipoDemissao || "",
+      ultimoAumento: colaborador.ultimoAumento ? new Date(colaborador.ultimoAumento).toISOString().split('T')[0] : undefined,
       userId: colaborador.userId || null,
     },
   });
@@ -1161,25 +1165,69 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
             </div>
 
             {status === "Dispensado" && (
-              <FormField
-                control={form.control}
-                name="demissao"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Data de Demissão *</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value || ""}
-                        data-testid="input-edit-demissao"
-                        type="date"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="demissao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Data de Demissão *</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="input-edit-demissao"
+                          type="date"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="tipoDemissao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de Demissão</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-edit-tipo-demissao">
+                            <SelectValue placeholder="Selecione o tipo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Pediu Demissão">Pediu Demissão</SelectItem>
+                          <SelectItem value="Demitido">Demitido</SelectItem>
+                          <SelectItem value="Acordo">Acordo</SelectItem>
+                          <SelectItem value="Término de Contrato">Término de Contrato</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             )}
+
+            <FormField
+              control={form.control}
+              name="ultimoAumento"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Último Aumento</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      value={field.value || ""}
+                      data-testid="input-edit-ultimo-aumento"
+                      type="date"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <DialogFooter>
               <Button
