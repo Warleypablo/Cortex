@@ -78,14 +78,32 @@ const stripEmoji = (text: string): string => {
 
 const findMatchingSquad = (colaboradorSquad: string | null, squads: SquadOption[]): string => {
   if (!colaboradorSquad) return "";
-  const normalized = stripEmoji(colaboradorSquad).toLowerCase();
+  
+  // Try exact match first
   for (const squad of squads) {
-    const squadNameNormalized = stripEmoji(squad.nome).toLowerCase();
-    if (squadNameNormalized === normalized || squad.nome === colaboradorSquad) {
+    if (squad.nome === colaboradorSquad) {
       return squad.nome;
     }
   }
-  return colaboradorSquad;
+  
+  // Try matching without emojis
+  const normalizedColaborador = stripEmoji(colaboradorSquad).toLowerCase().trim();
+  for (const squad of squads) {
+    const normalizedSquad = stripEmoji(squad.nome).toLowerCase().trim();
+    if (normalizedSquad === normalizedColaborador) {
+      return squad.nome;
+    }
+  }
+  
+  // Try partial matching (squad name contains colaborador squad or vice versa)
+  for (const squad of squads) {
+    const normalizedSquad = stripEmoji(squad.nome).toLowerCase().trim();
+    if (normalizedSquad.includes(normalizedColaborador) || normalizedColaborador.includes(normalizedSquad)) {
+      return squad.nome;
+    }
+  }
+  
+  return "";
 };
 
 const statusOptions = ["Vai Começar", "Ativo", "Dispensado", "Em Desligamento"];
