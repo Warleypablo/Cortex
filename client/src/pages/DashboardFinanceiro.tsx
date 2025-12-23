@@ -301,8 +301,8 @@ export default function DashboardFinanceiro() {
           title="Despesa do Mês"
           value={formatCurrency(kpisCompletos?.despesaMesAtual || 0)}
           icon={TrendingDown}
-          variant="danger"
-          trend={kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa > 0 ? 'up' : kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa < 0 ? 'down' : 'neutral'}
+          variant={kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa < 0 ? 'success' : 'danger'}
+          trend={kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa < 0 ? 'up' : kpisCompletos?.variacaoDespesa && kpisCompletos.variacaoDespesa > 0 ? 'down' : 'neutral'}
           trendValue={kpisCompletos?.variacaoDespesa ? formatPercent(kpisCompletos.variacaoDespesa) : undefined}
           subtitle="vs mês anterior"
           loading={isLoadingKpisCompletos}
