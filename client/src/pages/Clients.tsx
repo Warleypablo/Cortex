@@ -3,9 +3,8 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import ClientsTable from "@/components/ClientsTable";
 import { Button } from "@/components/ui/button";
-import { Loader2, Search, Filter, Users, UserCheck, TrendingUp, Clock, DollarSign, X, Check, Save, Bookmark, Trash2, Activity } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Loader2, Users, UserCheck, TrendingUp, Clock, DollarSign, Activity } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import StatsCard from "@/components/StatsCard";
 import {
   Select,
@@ -14,108 +13,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatCurrency, formatCurrencyNoDecimals, formatDecimal, formatPercent } from "@/lib/utils";
+import { formatCurrencyNoDecimals, formatDecimal, formatPercent } from "@/lib/utils";
 import type { ClienteCompleto } from "../../../server/storage";
 
 type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
 type SortDirection = "asc" | "desc";
 
-type SavedFilter = {
-  id: string;
-  name: string;
-  filters: {
-    servicoFilter: string[];
-    statusFilter: string[];
-    tipoContratoFilter: string;
-    responsavelFilter: string[];
-    clusterFilter: string;
-    ltOperator: string;
-    ltValue: string;
-    aovOperator: string;
-    aovValue: string;
-  };
-};
+interface ClientsProps {
+  searchQuery: string;
+  servicoFilter: string[];
+  statusFilter: string[];
+  tipoContratoFilter: string;
+  responsavelFilter: string[];
+  clusterFilter: string;
+  ltOperator: string;
+  ltValue: string;
+  aovOperator: string;
+  aovValue: string;
+}
 
-const SAVED_FILTERS_KEY = "turbo-cortex-client-filters";
-
-const mapClusterToName = (cluster: string | null): string => {
-  if (!cluster) return "Não definido";
-  switch (cluster) {
-    case "0": return "NFNC";
-    case "1": return "Regulares";
-    case "2": return "Chaves";
-    case "3": return "Imperdíveis";
-    default: return cluster;
-  }
-};
-
-export default function Clients() {
+export default function Clients({
+  searchQuery,
+  servicoFilter,
+  statusFilter,
+  tipoContratoFilter,
+  responsavelFilter,
+  clusterFilter,
+  ltOperator,
+  ltValue,
+  aovOperator,
+  aovValue,
+}: ClientsProps) {
   const [, setLocation] = useLocation();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [servicoFilter, setServicoFilter] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [tipoContratoFilter, setTipoContratoFilter] = useState<string>("ambos");
-  const [responsavelFilter, setResponsavelFilter] = useState<string[]>([]);
-  const [clusterFilter, setClusterFilter] = useState<string>("all");
-  const [ltOperator, setLtOperator] = useState<string>("all");
-  const [ltValue, setLtValue] = useState<string>("");
-  const [aovOperator, setAovOperator] = useState<string>("all");
-  const [aovValue, setAovValue] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [sortField, setSortField] = useState<SortField>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  
-  // Saved filters state
-  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>(() => {
-    try {
-      const stored = localStorage.getItem(SAVED_FILTERS_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
-  });
-  const [newFilterName, setNewFilterName] = useState("");
-  const [showSaveInput, setShowSaveInput] = useState(false);
-
-  const saveCurrentFilter = () => {
-    if (!newFilterName.trim()) return;
-    const newFilter: SavedFilter = {
-      id: Date.now().toString(),
-      name: newFilterName.trim(),
-      filters: { servicoFilter, statusFilter, tipoContratoFilter, responsavelFilter, clusterFilter, ltOperator, ltValue, aovOperator, aovValue }
-    };
-    const updated = [...savedFilters, newFilter];
-    setSavedFilters(updated);
-    localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(updated));
-    setNewFilterName("");
-    setShowSaveInput(false);
-  };
-
-  const loadSavedFilter = (filter: SavedFilter) => {
-    setServicoFilter(filter.filters.servicoFilter);
-    setStatusFilter(filter.filters.statusFilter);
-    setTipoContratoFilter(filter.filters.tipoContratoFilter);
-    setResponsavelFilter(filter.filters.responsavelFilter);
-    setClusterFilter(filter.filters.clusterFilter);
-    setLtOperator(filter.filters.ltOperator);
-    setLtValue(filter.filters.ltValue);
-    setAovOperator(filter.filters.aovOperator);
-    setAovValue(filter.filters.aovValue);
-  };
-
-  const deleteSavedFilter = (id: string) => {
-    const updated = savedFilters.filter(f => f.id !== id);
-    setSavedFilters(updated);
-    localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(updated));
-  };
 
   const { data: clientes, isLoading, error } = useQuery<ClienteCompleto[]>({
     queryKey: ["/api/clientes"],
@@ -124,47 +57,6 @@ export default function Clients() {
   const { data: ltvMap } = useQuery<Record<string, number>>({
     queryKey: ["/api/clientes-ltv"],
   });
-
-  const servicosUnicos = useMemo(() => {
-    if (!clientes) return [];
-    const servicosSet = new Set<string>();
-    clientes.forEach(client => {
-      if (client.servicos) {
-        client.servicos.split(',').forEach(servico => {
-          const trimmed = servico.trim();
-          if (trimmed) servicosSet.add(trimmed);
-        });
-      }
-    });
-    return Array.from(servicosSet).sort();
-  }, [clientes]);
-
-  const statusUnicos = useMemo(() => {
-    if (!clientes) return [];
-    const statusSet = new Set<string>();
-    clientes.forEach(client => {
-      if (client.statusClickup) statusSet.add(client.statusClickup);
-    });
-    return Array.from(statusSet).sort();
-  }, [clientes]);
-
-  const responsaveisUnicos = useMemo(() => {
-    if (!clientes) return [];
-    const responsavelSet = new Set<string>();
-    clientes.forEach(client => {
-      if (client.responsavel) responsavelSet.add(client.responsavel);
-    });
-    return Array.from(responsavelSet).sort();
-  }, [clientes]);
-
-  const clustersUnicos = useMemo(() => {
-    if (!clientes) return [];
-    const clusterSet = new Set<string>();
-    clientes.forEach(client => {
-      if (client.cluster) clusterSet.add(client.cluster);
-    });
-    return Array.from(clusterSet).sort();
-  }, [clientes]);
 
   const filteredClients = useMemo(() => {
     if (!clientes) return [];
@@ -314,54 +206,6 @@ export default function Clients() {
     setCurrentPage(1);
   }, [searchQuery, servicoFilter, statusFilter, tipoContratoFilter, responsavelFilter, clusterFilter, ltOperator, ltValue, aovOperator, aovValue, itemsPerPage, sortField, sortDirection]);
 
-  const hasActiveFilters = tipoContratoFilter !== "ambos" || servicoFilter.length > 0 || statusFilter.length > 0 || responsavelFilter.length > 0 || clusterFilter !== "all" || ltOperator !== "all" || aovOperator !== "all";
-
-  const activeFilterCount = [
-    tipoContratoFilter !== "ambos",
-    servicoFilter.length > 0,
-    statusFilter.length > 0,
-    responsavelFilter.length > 0,
-    clusterFilter !== "all",
-    ltOperator !== "all",
-    aovOperator !== "all"
-  ].filter(Boolean).length;
-
-  const clearAllFilters = () => {
-    setTipoContratoFilter("ambos");
-    setServicoFilter([]);
-    setStatusFilter([]);
-    setResponsavelFilter([]);
-    setClusterFilter("all");
-    setLtOperator("all");
-    setLtValue("");
-    setAovOperator("all");
-    setAovValue("");
-  };
-
-  const toggleServicoFilter = (servico: string) => {
-    setServicoFilter(prev => 
-      prev.includes(servico) 
-        ? prev.filter(s => s !== servico)
-        : [...prev, servico]
-    );
-  };
-
-  const toggleResponsavelFilter = (responsavel: string) => {
-    setResponsavelFilter(prev => 
-      prev.includes(responsavel) 
-        ? prev.filter(r => r !== responsavel)
-        : [...prev, responsavel]
-    );
-  };
-
-  const toggleStatusFilter = (status: string) => {
-    setStatusFilter(prev => 
-      prev.includes(status) 
-        ? prev.filter(s => s !== status)
-        : [...prev, status]
-    );
-  };
-
   if (error) {
     return (
       <div className="bg-background">
@@ -441,291 +285,6 @@ export default function Clients() {
             subtitle="Ticket médio mensal por cliente. É o LTV dividido pelo LT (tempo de vida)."
             tooltipType="help"
           />
-        </div>
-
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Buscar por nome ou CNPJ..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-clients"
-            />
-          </div>
-          
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="default" className="gap-2" data-testid="button-filter-clients">
-                <Filter className="w-4 h-4" />
-                <span className="hidden sm:inline">Filtros</span>
-                {hasActiveFilters && (
-                  <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-xs">
-                    {activeFilterCount}
-                  </Badge>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-96 p-0 overflow-hidden" align="end">
-              <div className="flex items-center justify-between p-4 pb-2 border-b">
-                <h4 className="font-medium text-sm">Filtros</h4>
-                <div className="flex items-center gap-1">
-                  {hasActiveFilters && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-7 text-xs"
-                      onClick={clearAllFilters}
-                      data-testid="button-clear-filters"
-                    >
-                      Limpar
-                    </Button>
-                  )}
-                  {hasActiveFilters && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-7 w-7"
-                      onClick={() => setShowSaveInput(!showSaveInput)}
-                      data-testid="button-save-filter"
-                      title="Salvar filtro"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <ScrollArea className="h-[60vh]">
-                <div className="space-y-4 p-4">
-                  {/* Save filter input */}
-                  {showSaveInput && (
-                    <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
-                      <Input
-                        placeholder="Nome do filtro..."
-                        value={newFilterName}
-                        onChange={(e) => setNewFilterName(e.target.value)}
-                        className="h-8 text-sm"
-                        onKeyDown={(e) => e.key === 'Enter' && saveCurrentFilter()}
-                        data-testid="input-filter-name"
-                      />
-                      <Button size="sm" className="h-8" onClick={saveCurrentFilter} data-testid="button-confirm-save-filter">
-                        <Check className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-8" onClick={() => setShowSaveInput(false)}>
-                        <X className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  )}
-                  
-                  {/* Saved filters list */}
-                  {savedFilters.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
-                        <Bookmark className="w-3 h-3" />
-                        Filtros Salvos
-                      </Label>
-                      <div className="border rounded-md divide-y">
-                        {savedFilters.map(filter => (
-                          <div 
-                            key={filter.id} 
-                            className="flex items-center justify-between px-3 py-2 hover:bg-muted/50 group"
-                          >
-                            <button
-                              className="text-sm text-left flex-1 truncate"
-                              onClick={() => loadSavedFilter(filter)}
-                              data-testid={`button-load-filter-${filter.id}`}
-                            >
-                              {filter.name}
-                            </button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => deleteSavedFilter(filter.id)}
-                              data-testid={`button-delete-filter-${filter.id}`}
-                            >
-                              <Trash2 className="w-3 h-3 text-destructive" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Tipo de Contrato</Label>
-                    <Select
-                      value={tipoContratoFilter}
-                      onValueChange={setTipoContratoFilter}
-                    >
-                      <SelectTrigger className="w-full" data-testid="select-filter-tipo-contrato">
-                        <SelectValue placeholder="Tipo de contrato" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ambos">Ambos</SelectItem>
-                        <SelectItem value="recorrente">Recorrente</SelectItem>
-                        <SelectItem value="pontual">Pontual</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-muted-foreground">Status (múltipla seleção)</Label>
-                      {statusFilter.length > 0 && (
-                        <Badge variant="secondary" className="text-xs">{statusFilter.length}</Badge>
-                      )}
-                    </div>
-                    <div className="border rounded-md max-h-32 overflow-y-auto overflow-x-hidden">
-                      {statusUnicos.map(status => (
-                        <label
-                          key={status}
-                          className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
-                          data-testid={`checkbox-status-${status}`}
-                        >
-                          <Checkbox 
-                            checked={statusFilter.includes(status)} 
-                            onCheckedChange={() => toggleStatusFilter(status)}
-                            className="flex-shrink-0"
-                          />
-                          <span className="text-sm truncate flex-1 min-w-0">{status}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-muted-foreground">Serviço (múltipla seleção)</Label>
-                      {servicoFilter.length > 0 && (
-                        <Badge variant="secondary" className="text-xs">{servicoFilter.length}</Badge>
-                      )}
-                    </div>
-                    <div className="border rounded-md max-h-32 overflow-y-auto overflow-x-hidden">
-                      {servicosUnicos.map(servico => (
-                        <label
-                          key={servico}
-                          className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
-                          data-testid={`checkbox-servico-${servico}`}
-                        >
-                          <Checkbox 
-                            checked={servicoFilter.includes(servico)} 
-                            onCheckedChange={() => toggleServicoFilter(servico)}
-                            className="flex-shrink-0"
-                          />
-                          <span className="text-sm truncate flex-1 min-w-0">{servico}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-muted-foreground">Responsável (múltipla seleção)</Label>
-                      {responsavelFilter.length > 0 && (
-                        <Badge variant="secondary" className="text-xs">{responsavelFilter.length}</Badge>
-                      )}
-                    </div>
-                    <div className="border rounded-md max-h-32 overflow-y-auto overflow-x-hidden">
-                      {responsaveisUnicos.map(responsavel => (
-                        <label
-                          key={responsavel}
-                          className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
-                          data-testid={`checkbox-responsavel-${responsavel}`}
-                        >
-                          <Checkbox 
-                            checked={responsavelFilter.includes(responsavel)} 
-                            onCheckedChange={() => toggleResponsavelFilter(responsavel)}
-                            className="flex-shrink-0"
-                          />
-                          <span className="text-sm truncate flex-1 min-w-0">{responsavel}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Cluster</Label>
-                    <Select
-                      value={clusterFilter}
-                      onValueChange={setClusterFilter}
-                    >
-                      <SelectTrigger className="w-full" data-testid="select-filter-cluster">
-                        <SelectValue placeholder="Todos os clusters" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos os clusters</SelectItem>
-                        {clustersUnicos.map(cluster => (
-                          <SelectItem key={cluster} value={cluster}>{mapClusterToName(cluster)}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">LT (meses)</Label>
-                    <div className="flex gap-2">
-                      <Select
-                        value={ltOperator}
-                        onValueChange={setLtOperator}
-                      >
-                        <SelectTrigger className="w-28" data-testid="select-filter-lt-operator">
-                          <SelectValue placeholder="Operador" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos</SelectItem>
-                          <SelectItem value="maior">Maior que</SelectItem>
-                          <SelectItem value="menor">Menor que</SelectItem>
-                          <SelectItem value="igual">Igual a</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {ltOperator !== "all" && (
-                        <Input
-                          type="number"
-                          placeholder="Valor"
-                          value={ltValue}
-                          onChange={(e) => setLtValue(e.target.value)}
-                          className="flex-1"
-                          data-testid="input-filter-lt-value"
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">AOV (R$)</Label>
-                    <div className="flex gap-2">
-                      <Select
-                        value={aovOperator}
-                        onValueChange={setAovOperator}
-                      >
-                        <SelectTrigger className="w-28" data-testid="select-filter-aov-operator">
-                          <SelectValue placeholder="Operador" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos</SelectItem>
-                          <SelectItem value="maior">Maior que</SelectItem>
-                          <SelectItem value="menor">Menor que</SelectItem>
-                          <SelectItem value="igual">Igual a</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {aovOperator !== "all" && (
-                        <Input
-                          type="number"
-                          placeholder="Valor"
-                          value={aovValue}
-                          onChange={(e) => setAovValue(e.target.value)}
-                          className="flex-1"
-                          data-testid="input-filter-aov-value"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </ScrollArea>
-            </PopoverContent>
-          </Popover>
         </div>
 
         <div className="flex-1 min-h-0">
