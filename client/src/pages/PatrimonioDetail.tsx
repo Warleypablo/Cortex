@@ -18,6 +18,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -700,9 +701,21 @@ export default function PatrimonioDetail() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tipo de Bem</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Notebook" {...field} data-testid="input-ativo" />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-ativo">
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Notebook">Notebook</SelectItem>
+                          <SelectItem value="Computador">Computador</SelectItem>
+                          <SelectItem value="Monitor">Monitor</SelectItem>
+                          <SelectItem value="Celular">Celular</SelectItem>
+                          <SelectItem value="Moveis">Móveis</SelectItem>
+                          <SelectItem value="Outros">Outros</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -715,9 +728,24 @@ export default function PatrimonioDetail() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Marca</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Dell" {...field} data-testid="input-marca" />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-marca">
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Apple">Apple</SelectItem>
+                          <SelectItem value="Dell">Dell</SelectItem>
+                          <SelectItem value="Samsung">Samsung</SelectItem>
+                          <SelectItem value="Acer">Acer</SelectItem>
+                          <SelectItem value="Philips">Philips</SelectItem>
+                          <SelectItem value="LG">LG</SelectItem>
+                          <SelectItem value="Warrior">Warrior</SelectItem>
+                          <SelectItem value="AOC">AOC</SelectItem>
+                          <SelectItem value="Outro">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -728,9 +756,19 @@ export default function PatrimonioDetail() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Estado de Conservação</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Bom" {...field} data-testid="input-estado-conservacao" />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-estado-conservacao">
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Em Estoque">Em Estoque</SelectItem>
+                          <SelectItem value="Bom">Bom</SelectItem>
+                          <SelectItem value="Ruim/Quebrado">Ruim/Quebrado</SelectItem>
+                          <SelectItem value="Baixado/Vendido">Baixado/Vendido</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
