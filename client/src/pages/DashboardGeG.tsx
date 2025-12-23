@@ -679,20 +679,36 @@ export default function DashboardGeG() {
                     </TableHeader>
                     <TableBody>
                       {(() => {
-                        const removeEmoji = (str: string) => str.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]/gu, '').trim();
+                        const squadIcons: Record<string, string> = {
+                          'Vendas': '💰 Vendas',
+                          'Selva': '🪖 Selva',
+                          'Squadra': '⚓️ Squadra',
+                          'Pulse': '💠 Pulse',
+                          'Squad X': '👾 Squad X',
+                          'Tech': '🖥️ Tech',
+                          'CX&CS': '📊 CX&CS',
+                          'Turbo Interno': '🚀 Turbo Interno',
+                          'Ventures': '⭐️ Ventures',
+                          'Chama': '🔥 Chama (OFF)',
+                          'Hunters': '🏹 Hunters (OFF)',
+                          'Fragmentados': '🧩 Fragmentados (OFF)',
+                          'Makers': '🛠️ Makers',
+                        };
+                        const removeEmoji = (str: string) => str.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u2693]/gu, '').trim();
+                        const formatSquadName = (nome: string) => {
+                          const cleanName = removeEmoji(nome);
+                          return squadIcons[cleanName] || nome;
+                        };
                         const aggregatedSquads = colaboradoresPorSquad.reduce((acc, item) => {
                           const cleanName = removeEmoji(item.nome);
                           const existing = acc.find(s => removeEmoji(s.nome) === cleanName);
                           if (existing) {
                             existing.total += item.total;
-                            if (item.nome.length > existing.nome.length) {
-                              existing.nome = item.nome;
-                            }
                           } else {
-                            acc.push({ ...item });
+                            acc.push({ nome: formatSquadName(item.nome), total: item.total });
                           }
                           return acc;
-                        }, [] as typeof colaboradoresPorSquad);
+                        }, [] as { nome: string; total: number }[]);
                         const totalSquad = aggregatedSquads.reduce((sum, item) => sum + item.total, 0);
                         return aggregatedSquads.map((item, index) => (
                           <TableRow key={item.nome} data-testid={`squad-dist-${index}`}>
