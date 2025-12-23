@@ -46,6 +46,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+// Map old nivel format (with "X " prefix) to new format (without prefix)
+function mapNivelToNew(nivel: string | null): string {
+  if (!nivel) return "";
+  if (nivel.startsWith("X ")) {
+    return nivel.substring(2);
+  }
+  return nivel;
+}
+
 interface PatrimonioItem {
   id: number;
   numeroAtivo: string | null;
@@ -729,16 +738,6 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
       }
     }
     return "";
-  };
-
-  // Map old nivel format (with "X " prefix) to new format (without prefix)
-  const mapNivelToNew = (nivel: string | null): string => {
-    if (!nivel) return "";
-    // Remove "X " prefix if present (e.g., "X II" -> "II", "X III" -> "III")
-    if (nivel.startsWith("X ")) {
-      return nivel.substring(2);
-    }
-    return nivel;
   };
 
   const form = useForm<InsertColaborador & { demissao?: string; tipoDemissao?: string; ultimoAumento?: string; cidade?: string; userId?: string | null }>({
