@@ -307,54 +307,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return digits.padStart(11, '0');
   };
 
-  // Temporary route for bulk update by name matching
-  app.post("/internal/bulk-update-by-names", async (req, res) => {
-    try {
-      const { nomesAtivos } = req.body;
-      if (!nomesAtivos || !Array.isArray(nomesAtivos)) {
-        return res.status(400).json({ error: "nomesAtivos must be an array" });
-      }
-      
-      const colaboradores = await storage.getColaboradores();
-      let updatedAtivo = 0;
-      let updatedDispensado = 0;
-      let matched: string[] = [];
-      let notMatched: string[] = [];
-      
-      // Normalize names for comparison
-      const normalizeNome = (nome: string) => nome.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      const nomesSet = new Set(nomesAtivos.map(normalizeNome));
-      
-      for (const colaborador of colaboradores) {
-        const nomeNorm = normalizeNome(colaborador.nome || '');
-        const isInList = nomesSet.has(nomeNorm);
-        
-        if (isInList) {
-          matched.push(colaborador.nome);
-          if (colaborador.status !== 'Ativo') {
-            await storage.updateColaborador(colaborador.id, { status: 'Ativo' });
-            updatedAtivo++;
-          }
-        } else if (colaborador.status !== 'Dispensado') {
-          await storage.updateColaborador(colaborador.id, { status: 'Dispensado' });
-          updatedDispensado++;
-        }
-      }
-      
-      // Find names not matched
-      for (const nome of nomesAtivos) {
-        const nomeNorm = normalizeNome(nome);
-        const found = colaboradores.some(c => normalizeNome(c.nome || '') === nomeNorm);
-        if (!found) notMatched.push(nome);
-      }
-      
-      res.json({ success: true, updatedAtivo, updatedDispensado, matched: matched.length, notMatched, totalProcessed: colaboradores.length });
-    } catch (error) {
-      console.error("[api] Error:", error);
-      res.status(500).json({ error: String(error) });
-    }
-  });
-
   app.use("/api", isAuthenticated);
   
   app.get("/api/debug/users", isAdmin, async (req, res) => {
