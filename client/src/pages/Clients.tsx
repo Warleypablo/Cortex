@@ -33,6 +33,9 @@ export default function Clients() {
   const [servicoFilter, setServicoFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [tipoContratoFilter, setTipoContratoFilter] = useState<string>("ambos");
+  const [responsavelFilter, setResponsavelFilter] = useState<string>("all");
+  const [clusterFilter, setClusterFilter] = useState<string>("all");
+  const [ltvFilter, setLtvFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [sortField, setSortField] = useState<SortField>("name");
@@ -69,6 +72,24 @@ export default function Clients() {
     return Array.from(statusSet).sort();
   }, [clientes]);
 
+  const responsaveisUnicos = useMemo(() => {
+    if (!clientes) return [];
+    const responsavelSet = new Set<string>();
+    clientes.forEach(client => {
+      if (client.responsavel) responsavelSet.add(client.responsavel);
+    });
+    return Array.from(responsavelSet).sort();
+  }, [clientes]);
+
+  const clustersUnicos = useMemo(() => {
+    if (!clientes) return [];
+    const clusterSet = new Set<string>();
+    clientes.forEach(client => {
+      if (client.cluster) clusterSet.add(client.cluster);
+    });
+    return Array.from(clusterSet).sort();
+  }, [clientes]);
+
   const filteredClients = useMemo(() => {
     if (!clientes) return [];
     
@@ -89,9 +110,22 @@ export default function Clients() {
         (tipoContratoFilter === "recorrente" && (client.totalRecorrente || 0) > 0) ||
         (tipoContratoFilter === "pontual" && (client.totalPontual || 0) > 0);
 
-      return matchesSearch && matchesServico && matchesStatus && matchesTipoContrato;
+      const matchesResponsavel = responsavelFilter === "all" || 
+        client.responsavel === responsavelFilter;
+
+      const matchesCluster = clusterFilter === "all" || 
+        client.cluster === clusterFilter;
+
+      const clientLtv = ltvMap?.[client.ids || String(client.id)] || 0;
+      const matchesLtv = ltvFilter === "all" ||
+        (ltvFilter === "0-10k" && clientLtv < 10000) ||
+        (ltvFilter === "10k-50k" && clientLtv >= 10000 && clientLtv < 50000) ||
+        (ltvFilter === "50k-100k" && clientLtv >= 50000 && clientLtv < 100000) ||
+        (ltvFilter === "100k+" && clientLtv >= 100000);
+
+      return matchesSearch && matchesServico && matchesStatus && matchesTipoContrato && matchesResponsavel && matchesCluster && matchesLtv;
     });
-  }, [clientes, searchQuery, servicoFilter, statusFilter, tipoContratoFilter]);
+  }, [clientes, searchQuery, servicoFilter, statusFilter, tipoContratoFilter, responsavelFilter, clusterFilter, ltvFilter, ltvMap]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -283,18 +317,18 @@ export default function Clients() {
               <Button variant="outline" size="default" className="gap-2" data-testid="button-filter-clients">
                 <Filter className="w-4 h-4" />
                 <span className="hidden sm:inline">Filtros</span>
-                {(tipoContratoFilter !== "ambos" || servicoFilter !== "all" || statusFilter !== "all") && (
+                {(tipoContratoFilter !== "ambos" || servicoFilter !== "all" || statusFilter !== "all" || responsavelFilter !== "all" || clusterFilter !== "all" || ltvFilter !== "all") && (
                   <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-xs">
-                    {[tipoContratoFilter !== "ambos", servicoFilter !== "all", statusFilter !== "all"].filter(Boolean).length}
+                    {[tipoContratoFilter !== "ambos", servicoFilter !== "all", statusFilter !== "all", responsavelFilter !== "all", clusterFilter !== "all", ltvFilter !== "all"].filter(Boolean).length}
                   </Badge>
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80" align="end">
+            <PopoverContent className="w-80 max-h-[70vh] overflow-y-auto" align="end">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium text-sm">Filtros</h4>
-                  {(tipoContratoFilter !== "ambos" || servicoFilter !== "all" || statusFilter !== "all") && (
+                  {(tipoContratoFilter !== "ambos" || servicoFilter !== "all" || statusFilter !== "all" || responsavelFilter !== "all" || clusterFilter !== "all" || ltvFilter !== "all") && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
@@ -303,6 +337,9 @@ export default function Clients() {
                         setTipoContratoFilter("ambos");
                         setServicoFilter("all");
                         setStatusFilter("all");
+                        setResponsavelFilter("all");
+                        setClusterFilter("all");
+                        setLtvFilter("all");
                       }}
                       data-testid="button-clear-filters"
                     >
@@ -360,6 +397,61 @@ export default function Clients() {
                       {statusUnicos.map(status => (
                         <SelectItem key={status} value={status}>{status}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Responsável</Label>
+                  <Select
+                    value={responsavelFilter}
+                    onValueChange={setResponsavelFilter}
+                  >
+                    <SelectTrigger className="w-full" data-testid="select-filter-responsavel">
+                      <SelectValue placeholder="Todos os responsáveis" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os responsáveis</SelectItem>
+                      {responsaveisUnicos.map(responsavel => (
+                        <SelectItem key={responsavel} value={responsavel}>{responsavel}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Cluster</Label>
+                  <Select
+                    value={clusterFilter}
+                    onValueChange={setClusterFilter}
+                  >
+                    <SelectTrigger className="w-full" data-testid="select-filter-cluster">
+                      <SelectValue placeholder="Todos os clusters" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os clusters</SelectItem>
+                      {clustersUnicos.map(cluster => (
+                        <SelectItem key={cluster} value={cluster}>{cluster}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Faixa de LTV</Label>
+                  <Select
+                    value={ltvFilter}
+                    onValueChange={setLtvFilter}
+                  >
+                    <SelectTrigger className="w-full" data-testid="select-filter-ltv">
+                      <SelectValue placeholder="Todas as faixas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as faixas</SelectItem>
+                      <SelectItem value="0-10k">Até R$ 10.000</SelectItem>
+                      <SelectItem value="10k-50k">R$ 10.000 - R$ 50.000</SelectItem>
+                      <SelectItem value="50k-100k">R$ 50.000 - R$ 100.000</SelectItem>
+                      <SelectItem value="100k+">Acima de R$ 100.000</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
