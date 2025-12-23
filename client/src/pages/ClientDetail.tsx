@@ -730,6 +730,12 @@ export default function ClientDetail() {
                           <SortIndicator sortKey="valorp" config={contratosSortConfig} />
                         </div>
                       </TableHead>
+                      <TableHead className="bg-muted/30" data-testid="header-solic-cancel">
+                        Solic. Cancel.
+                      </TableHead>
+                      <TableHead className="bg-muted/30" data-testid="header-data-entrega">
+                        Data Entrega
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -778,11 +784,17 @@ export default function ClientDetail() {
                               : '-'
                             }
                           </TableCell>
+                          <TableCell className="text-muted-foreground" data-testid={`text-solic-cancel-${contrato.idSubtask}`}>
+                            {contrato.dataSolicitacaoEncerramento ? new Date(contrato.dataSolicitacaoEncerramento).toLocaleDateString('pt-BR') : '-'}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground" data-testid={`text-data-entrega-${contrato.idSubtask}`}>
+                            {contrato.dataEncerramento ? new Date(contrato.dataEncerramento).toLocaleDateString('pt-BR') : '-'}
+                          </TableCell>
                         </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-contracts">
+                        <TableCell colSpan={10} className="text-center text-muted-foreground py-8" data-testid="text-no-contracts">
                           Nenhum contrato encontrado para este cliente
                         </TableCell>
                       </TableRow>
