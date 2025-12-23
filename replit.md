@@ -39,6 +39,7 @@ Preferred communication style: Simple, everyday language.
     - **Performance por Plataforma Dashboard (Growth)**: Hierarchical tree view (Platform → Campaign → AdSet → Ad) with expandable/collapsible rows. Displays all Criativos metrics except Video Hook/Hold. Supports date range and status (Ativo/Pausado/Todos) filters. Uses same conditional formatting rules as Criativos page via metric_rulesets.
     - **Commercial SDR/Closer Detail Pages**: Detailed analytics for individual sales team members, including performance metrics, source/pipeline distribution, and trend analysis (DetailClosers.tsx and DetailSDRs.tsx).
     - **Jurídico (Legal) Dashboard**: Legal department module for tracking clients with "cobrar" (collect) status from inadimplência (delinquency) system. Features client accordion list with full details, overdue parcelas table, and legal procedure management (notificação, protesto, ação judicial, acordo, baixa). Data stored in `juridico_clientes` table with tracking for procedure type, status, agreement details, and protocol numbers.
+    - **Patrimônio (Assets)**: Asset management with two tabs - "Patrimônios" for physical assets and "Linhas Telefônicas" for phone lines. Phone lines tab includes: conta, plano/operadora (Pós/Pré/Flex), telefone, responsável, setor, última recarga, and status. Features filters by setor and plano, search, and stats cards. Data stored in `rh_telefones` table with responsável linking to colaboradores.
 - **Theming**: Dark mode support; light mode is primary.
 
 ### Backend Architecture
