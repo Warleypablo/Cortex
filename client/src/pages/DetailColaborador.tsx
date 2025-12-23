@@ -731,6 +731,16 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
     return "";
   };
 
+  // Map old nivel format (with "X " prefix) to new format (without prefix)
+  const mapNivelToNew = (nivel: string | null): string => {
+    if (!nivel) return "";
+    // Remove "X " prefix if present (e.g., "X II" -> "II", "X III" -> "III")
+    if (nivel.startsWith("X ")) {
+      return nivel.substring(2);
+    }
+    return nivel;
+  };
+
   const form = useForm<InsertColaborador & { demissao?: string; tipoDemissao?: string; ultimoAumento?: string; cidade?: string; userId?: string | null }>({
     resolver: zodResolver(editColaboradorSchema),
     defaultValues: {
@@ -741,7 +751,7 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
       emailTurbo: colaborador.emailTurbo || "",
       emailPessoal: colaborador.emailPessoal || "",
       cargo: colaborador.cargo || "",
-      nivel: colaborador.nivel || "",
+      nivel: mapNivelToNew(colaborador.nivel),
       squad: colaborador.squad || "",
       setor: colaborador.setor || "",
       endereco: colaborador.endereco || "",
