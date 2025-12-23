@@ -728,9 +728,21 @@ function AddColaboradorDialog() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Setor</FormLabel>
-                    <FormControl>
-                      <Input {...field} value={field.value || ""} data-testid="input-setor" placeholder="Ex: Tecnologia" />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-setor">
+                          <SelectValue placeholder="Selecione o setor" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Commerce">Commerce</SelectItem>
+                        <SelectItem value="Growth Interno">Growth Interno</SelectItem>
+                        <SelectItem value="Tech Sites">Tech Sites</SelectItem>
+                        <SelectItem value="Backoffice">Backoffice</SelectItem>
+                        <SelectItem value="Sócios">Sócios</SelectItem>
+                        <SelectItem value="Ventures">Ventures</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
