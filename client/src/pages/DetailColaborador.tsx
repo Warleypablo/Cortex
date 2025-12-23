@@ -1432,6 +1432,22 @@ export default function DetailColaborador() {
     return diffMonths > 0 ? diffMonths.toFixed(1) : "0";
   };
 
+  const calcularMesesDesdeUltimoAumento = (): string => {
+    if (!colaborador.ultimoAumento) return "-";
+    try {
+      const ultimoAumentoDate = new Date(colaborador.ultimoAumento);
+      ultimoAumentoDate.setHours(0, 0, 0, 0);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const diffTime = hoje.getTime() - ultimoAumentoDate.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const diffMonths = diffDays / 30;
+      return diffMonths > 0 ? diffMonths.toFixed(1) : "0";
+    } catch {
+      return "-";
+    }
+  };
+
   return (
     <div className="bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -1711,7 +1727,7 @@ export default function DetailColaborador() {
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-border/50">
+              <div className="grid grid-cols-3 gap-4 pb-4 border-b border-border/50">
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Salário</p>
                   <p className="font-semibold flex items-center gap-2 text-green-600 dark:text-green-400" data-testid="text-prof-salario">
@@ -1724,6 +1740,12 @@ export default function DetailColaborador() {
                   <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-prof-ultimo-aumento">
                     <TrendingUp className="w-4 h-4 text-green-500" />
                     {formatDate(colaborador.ultimoAumento)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Meses Último Aumento</p>
+                  <p className="font-semibold text-foreground" data-testid="text-prof-meses-ultimo-aumento">
+                    <span className="text-primary font-bold">{calcularMesesDesdeUltimoAumento()}</span>
                   </p>
                 </div>
               </div>
