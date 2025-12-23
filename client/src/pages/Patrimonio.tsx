@@ -4,7 +4,7 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Search, Package, Filter, ChevronUp, ChevronDown, 
-  DollarSign, TrendingUp, CheckCircle, X, Users, Phone, Pencil
+  DollarSign, TrendingUp, CheckCircle, X, Users, Phone, Pencil, Check, ChevronsUpDown
 } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +43,25 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Telefone } from "@shared/schema";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+
+interface ColaboradorDropdown {
+  id: number;
+  nome: string;
+}
 
 interface PatrimonioDb {
   id: number;
@@ -86,6 +105,7 @@ export default function Patrimonio() {
   const [telefonesSortDirection, setTelefonesSortDirection] = useState<SortDirection>("asc");
   const [editingTelefone, setEditingTelefone] = useState<Telefone | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [responsavelOpen, setResponsavelOpen] = useState(false);
   
   const { toast } = useToast();
 
@@ -95,6 +115,10 @@ export default function Patrimonio() {
 
   const { data: telefones, isLoading: isLoadingTelefones } = useQuery<Telefone[]>({
     queryKey: ["/api/telefones"],
+  });
+
+  const { data: colaboradoresDropdown } = useQuery<ColaboradorDropdown[]>({
+    queryKey: ["/api/colaboradores/dropdown"],
   });
 
   const uniqueTiposBem = useMemo(() => {
@@ -1283,13 +1307,53 @@ export default function Patrimonio() {
                 <Label htmlFor="edit-responsavel" className="text-right">
                   Responsável
                 </Label>
-                <Input
-                  id="edit-responsavel"
-                  value={editingTelefone.responsavelNome || ""}
-                  onChange={(e) => setEditingTelefone({ ...editingTelefone, responsavelNome: e.target.value })}
-                  className="col-span-3"
-                  data-testid="input-edit-responsavel"
-                />
+                <Popover open={responsavelOpen} onOpenChange={setResponsavelOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={responsavelOpen}
+                      className="col-span-3 justify-between"
+                      data-testid="combobox-edit-responsavel"
+                    >
+                      {editingTelefone.responsavelNome || "Selecione um colaborador..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar colaborador..." data-testid="input-search-responsavel" />
+                      <CommandList>
+                        <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value=""
+                            onSelect={() => {
+                              setEditingTelefone({ ...editingTelefone, responsavelId: null, responsavelNome: null });
+                              setResponsavelOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", !editingTelefone.responsavelId ? "opacity-100" : "opacity-0")} />
+                            Nenhum
+                          </CommandItem>
+                          {colaboradoresDropdown?.map((col) => (
+                            <CommandItem
+                              key={col.id}
+                              value={col.nome}
+                              onSelect={() => {
+                                setEditingTelefone({ ...editingTelefone, responsavelId: col.id, responsavelNome: col.nome });
+                                setResponsavelOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", editingTelefone.responsavelId === col.id ? "opacity-100" : "opacity-0")} />
+                              {col.nome}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-setor" className="text-right">
