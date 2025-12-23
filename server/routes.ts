@@ -8363,7 +8363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     updatedAt: row.updated_at,
   });
 
-  // GET all clients with credential count
+  // GET all clients with credential count and status from caz_clientes
   app.get("/api/acessos/clients", async (req, res) => {
     try {
       const search = req.query.search as string;
@@ -8380,8 +8380,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             CASE 
               WHEN LOWER(TRIM(c.name)) = 'turbo partners' THEN ${turboCount}
               ELSE (SELECT COUNT(*) FROM credentials cr WHERE cr.client_id = c.id)
-            END as credential_count 
+            END as credential_count,
+            caz.ativo as caz_status
           FROM clients c 
+          LEFT JOIN caz_clientes caz ON LOWER(TRIM(c.name)) = LOWER(TRIM(caz.nome)) OR c.linked_client_cnpj = caz.cnpj
           WHERE LOWER(c.name) LIKE LOWER(${searchPattern}) OR LOWER(c.cnpj) LIKE LOWER(${searchPattern})
           ORDER BY c.created_at DESC
         `);
@@ -8391,12 +8393,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             CASE 
               WHEN LOWER(TRIM(c.name)) = 'turbo partners' THEN ${turboCount}
               ELSE (SELECT COUNT(*) FROM credentials cr WHERE cr.client_id = c.id)
-            END as credential_count 
+            END as credential_count,
+            caz.ativo as caz_status
           FROM clients c 
+          LEFT JOIN caz_clientes caz ON LOWER(TRIM(c.name)) = LOWER(TRIM(caz.nome)) OR c.linked_client_cnpj = caz.cnpj
           ORDER BY c.created_at DESC
         `);
       }
-      res.json(result.rows.map(mapClient));
+      
+      // Map with status from caz_clientes
+      const mapped = result.rows.map((row: any) => {
+        const cazStatus = row.caz_status;
+        let status = row.status || 'ativo';
+        
+        // Use caz_clientes status if available
+        if (cazStatus) {
+          status = cazStatus.toLowerCase() === 'ativo' ? 'ativo' : 'cancelado';
+        }
+        
+        return {
+          ...mapClient(row),
+          status,
+        };
+      });
+      
+      res.json(mapped);
     } catch (error) {
       console.error("[api] Error fetching clients:", error);
       res.status(500).json({ error: "Failed to fetch clients" });
