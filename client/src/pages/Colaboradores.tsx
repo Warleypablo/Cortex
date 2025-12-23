@@ -1873,19 +1873,18 @@ export default function Colaboradores() {
                       <TableHead className="min-w-[180px] bg-muted/50">PIX</TableHead>
                       <TableHead className="min-w-[200px] bg-muted/50">Localização</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">Admissão</TableHead>
-                      <TableHead className="min-w-[120px] bg-muted/50">Demissão</TableHead>
-                      <TableHead className="min-w-[200px] bg-muted/50">Motivo Demissão</TableHead>
-                      <TableHead className="min-w-[140px] bg-muted/50">Proporcional</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">Tempo Turbo</TableHead>
                       <TableHead className="min-w-[140px] bg-muted/50">Último Aumento</TableHead>
                       <TableHead className="min-w-[150px] bg-muted/50">Patrimônios</TableHead>
+                      <TableHead className="min-w-[120px] bg-muted/50">Demissão</TableHead>
+                      <TableHead className="min-w-[200px] bg-muted/50">Motivo Demissão</TableHead>
                       <TableHead className="min-w-[120px] sticky right-0 bg-muted/50">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedColaboradores.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={19} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={18} className="text-center py-12 text-muted-foreground">
                           <div className="flex flex-col items-center gap-2">
                             <Users className="w-8 h-8 text-muted-foreground/50" />
                             <span>Nenhum colaborador encontrado</span>
@@ -2051,55 +2050,6 @@ export default function Colaboradores() {
                             </div>
                           </TableCell>
                           <TableCell className="py-3">
-                            <div className="space-y-1">
-                              {colaborador.demissao ? (
-                                <>
-                                  <div className="text-sm text-muted-foreground" data-testid={`text-demissao-${colaborador.id}`}>
-                                    {formatDate(colaborador.demissao)}
-                                  </div>
-                                  {colaborador.tipoDemissao && (
-                                    <div className="text-xs text-muted-foreground" data-testid={`text-tipo-demissao-${colaborador.id}`}>
-                                      {colaborador.tipoDemissao}
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="space-y-1">
-                              {colaborador.motivoDemissao ? (
-                                <div className="text-sm text-muted-foreground max-w-[180px] truncate" title={colaborador.motivoDemissao} data-testid={`text-motivo-demissao-${colaborador.id}`}>
-                                  {colaborador.motivoDemissao}
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="space-y-1">
-                              {(colaborador.proporcional || colaborador.proporcionalCaju) ? (
-                                <>
-                                  {colaborador.proporcional && (
-                                    <div className="text-sm text-muted-foreground" data-testid={`text-proporcional-${colaborador.id}`}>
-                                      {formatCurrency(Number(colaborador.proporcional))}
-                                    </div>
-                                  )}
-                                  {colaborador.proporcionalCaju && (
-                                    <div className="text-xs text-muted-foreground" data-testid={`text-proporcional-caju-${colaborador.id}`}>
-                                      Caju: {formatCurrency(Number(colaborador.proporcionalCaju))}
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
                             <div className="text-sm text-muted-foreground" data-testid={`text-meses-turbo-${colaborador.id}`}>
                               {calcularTempoTurbo(colaborador.admissao, colaborador.demissao, colaborador.status)}
                             </div>
@@ -2138,6 +2088,35 @@ export default function Colaboradores() {
                                     </Badge>
                                   </Link>
                                 ))
+                              ) : (
+                                <span className="text-muted-foreground text-sm">-</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="space-y-1">
+                              {colaborador.demissao ? (
+                                <>
+                                  <div className="text-sm text-muted-foreground" data-testid={`text-demissao-${colaborador.id}`}>
+                                    {formatDate(colaborador.demissao)}
+                                  </div>
+                                  {colaborador.tipoDemissao && (
+                                    <div className="text-xs text-muted-foreground" data-testid={`text-tipo-demissao-${colaborador.id}`}>
+                                      {colaborador.tipoDemissao}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">-</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <div className="space-y-1">
+                              {colaborador.motivoDemissao ? (
+                                <div className="text-sm text-muted-foreground max-w-[180px] truncate" title={colaborador.motivoDemissao} data-testid={`text-motivo-demissao-${colaborador.id}`}>
+                                  {colaborador.motivoDemissao}
+                                </div>
                               ) : (
                                 <span className="text-muted-foreground text-sm">-</span>
                               )}
