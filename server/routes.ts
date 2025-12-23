@@ -8406,8 +8406,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const cazStatus = row.caz_status;
         let status = row.status || 'ativo';
         
-        // Use caz_clientes status if available
-        if (cazStatus) {
+        // Use caz_clientes status if available (safely handle non-string values)
+        if (cazStatus && typeof cazStatus === 'string') {
           status = cazStatus.toLowerCase() === 'ativo' ? 'ativo' : 'cancelado';
         }
         
