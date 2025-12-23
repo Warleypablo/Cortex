@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Search, Filter, Users, UserCheck, TrendingUp, Clock, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import StatsCard from "@/components/StatsCard";
 import {
   Select,
   SelectContent,
@@ -217,80 +218,42 @@ export default function Clients() {
     <div className="bg-background h-full">
       <div className="container mx-auto px-4 py-4 max-w-7xl h-full flex flex-col">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
-          <Card data-testid="card-total-clientes">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-clientes">
-                {kpis.totalClientes}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Clientes em ClickUp
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-clientes-ativos">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
-              <UserCheck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-clientes-ativos">
-                {kpis.clientesAtivos}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {kpis.totalClientes > 0 ? `${formatPercent((kpis.clientesAtivos / kpis.totalClientes) * 100)} do total` : '0% do total'}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-ltv-medio">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">LTV Médio</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-ltv-medio">
-                {formatCurrency(kpis.ltvMedio)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Lifetime value médio
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-lt-medio">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">LT Médio</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-lt-medio">
-                {formatDecimal(kpis.ltMedio)} meses
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Meses ativos (com pagamento)
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-aov">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">AOV</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-aov">
-                {formatCurrency(kpis.aov)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Ticket médio mensal
-              </p>
-            </CardContent>
-          </Card>
+          <StatsCard
+            title="Total de Clientes"
+            value={String(kpis.totalClientes)}
+            icon={Users}
+            subtitle="Total de clientes cadastrados no ClickUp"
+          />
+          <StatsCard
+            title="Clientes Ativos"
+            value={String(kpis.clientesAtivos)}
+            icon={UserCheck}
+            variant="success"
+            subtitle={`${kpis.totalClientes > 0 ? formatPercent((kpis.clientesAtivos / kpis.totalClientes) * 100) : '0%'} do total de clientes`}
+          />
+          <StatsCard
+            title="LTV Médio"
+            value={formatCurrency(kpis.ltvMedio)}
+            icon={TrendingUp}
+            variant="info"
+            subtitle="Lifetime Value - receita total média por cliente"
+            tooltipType="help"
+          />
+          <StatsCard
+            title="LT Médio"
+            value={`${formatDecimal(kpis.ltMedio)} meses`}
+            icon={Clock}
+            subtitle="Lifetime - média de meses com pagamento por cliente"
+            tooltipType="help"
+          />
+          <StatsCard
+            title="AOV"
+            value={formatCurrency(kpis.aov)}
+            icon={DollarSign}
+            variant="success"
+            subtitle="Average Order Value - ticket médio mensal por cliente"
+            tooltipType="help"
+          />
         </div>
 
         <div className="flex items-center gap-3 mb-4">

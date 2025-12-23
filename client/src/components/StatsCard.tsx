@@ -1,5 +1,10 @@
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, Info, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type CardVariant = "default" | "success" | "warning" | "info" | "status";
 
@@ -13,6 +18,8 @@ interface StatsCardProps {
     isPositive: boolean;
   };
   statusActive?: boolean;
+  subtitle?: string;
+  tooltipType?: "info" | "help";
 }
 
 const variantStyles: Record<CardVariant, { bg: string; border: string; icon: string; iconBg: string }> = {
@@ -54,8 +61,11 @@ export default function StatsCard({
   icon: Icon, 
   variant = "default",
   trend,
-  statusActive 
+  statusActive,
+  subtitle,
+  tooltipType = "info"
 }: StatsCardProps) {
+  const TooltipIcon = tooltipType === "help" ? HelpCircle : Info;
   const styles = variantStyles[variant];
   
   const isStatusCard = variant === "status";
@@ -96,9 +106,30 @@ export default function StatsCard({
       
       <div className="relative flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            {title}
-          </p>
+          <div className="flex items-center gap-1.5 mb-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {title}
+            </p>
+            {subtitle && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button 
+                    type="button"
+                    className="w-4 h-4 rounded-full bg-muted/50 dark:bg-white/10 flex items-center justify-center hover:bg-muted dark:hover:bg-white/20 transition-colors"
+                    data-testid={`tooltip-${title.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <TooltipIcon className="w-2.5 h-2.5 text-muted-foreground" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent 
+                  side="top" 
+                  className="backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border border-white/40 dark:border-white/10 shadow-xl shadow-black/10 dark:shadow-black/30 px-3 py-2 rounded-lg"
+                >
+                  <p className="text-sm text-foreground">{subtitle}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
           <p className="text-[1.75rem] font-bold text-foreground truncate leading-tight">
             {value}
           </p>

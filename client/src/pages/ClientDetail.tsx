@@ -468,6 +468,7 @@ export default function ClientDetail() {
             }).format(totalReceitas)}
             icon={DollarSign}
             variant="success"
+            subtitle="Soma de todos os pagamentos recebidos deste cliente"
           />
           <StatsCard
             title="Ticket Médio"
@@ -478,12 +479,15 @@ export default function ClientDetail() {
             }).format(ticketMedio)}
             icon={TrendingUp}
             variant="info"
+            subtitle="Valor médio por pagamento recebido"
           />
           <StatsCard
             title="LT"
             value={`${lt} meses`}
             icon={Receipt}
             variant="default"
+            subtitle="Lifetime - quantidade de meses com pagamento"
+            tooltipType="help"
           />
           <StatsCard
             title="Status"
@@ -491,6 +495,7 @@ export default function ClientDetail() {
             icon={Activity}
             variant="status"
             statusActive={temContratoAtivo}
+            subtitle={temContratoAtivo ? "Cliente possui contratos ativos" : "Nenhum contrato ativo no momento"}
           />
         </div>
 
