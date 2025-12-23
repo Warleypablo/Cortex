@@ -30,10 +30,9 @@ interface AdmissoesDemissoes {
   demissoes: number;
 }
 
-interface TempoPromocao {
-  squad: string;
-  tempoMedioMeses: number;
-  totalColaboradores: number;
+interface Distribuicao {
+  nome: string;
+  total: number;
 }
 
 interface Aniversariante {
@@ -65,12 +64,6 @@ interface ValorMedioSalario {
   totalColaboradores: number;
 }
 
-interface PatrimonioResumo {
-  totalAtivos: number;
-  valorTotalPago: number;
-  valorTotalMercado: number;
-  porTipo: { tipo: string; quantidade: number }[];
-}
 
 interface UltimaPromocao {
   id: number;
@@ -144,10 +137,6 @@ export default function DashboardGeG() {
     queryKey: ['/api/geg/admissoes-demissoes', { periodo, squad, setor }],
   });
 
-  const { data: tempoPromocao, isLoading: isLoadingTempoPromocao } = useQuery<TempoPromocao[]>({
-    queryKey: ['/api/geg/tempo-promocao', { squad, setor }],
-  });
-
   const { data: aniversariantesMes, isLoading: isLoadingAniversariantes } = useQuery<Aniversariante[]>({
     queryKey: ['/api/geg/aniversariantes-mes', { squad, setor }],
   });
@@ -162,10 +151,6 @@ export default function DashboardGeG() {
 
   const { data: valorMedioSalario, isLoading: isLoadingValorMedio } = useQuery<ValorMedioSalario>({
     queryKey: ['/api/geg/valor-medio-salario', { squad, setor }],
-  });
-
-  const { data: patrimonioResumo, isLoading: isLoadingPatrimonio } = useQuery<PatrimonioResumo>({
-    queryKey: ['/api/geg/patrimonio-resumo'],
   });
 
   const { data: ultimasPromocoes, isLoading: isLoadingPromocoes } = useQuery<UltimaPromocao[]>({
@@ -190,6 +175,18 @@ export default function DashboardGeG() {
 
   const { data: headcountPorTenure, isLoading: isLoadingHeadcountPorTenure } = useQuery<HeadcountPorTenure[]>({
     queryKey: ['/api/geg/headcount-por-tenure', { squad, setor }],
+  });
+
+  const { data: colaboradoresPorSquad, isLoading: isLoadingColaboradoresPorSquad } = useQuery<Distribuicao[]>({
+    queryKey: ['/api/geg/colaboradores-por-squad', { squad, setor }],
+  });
+
+  const { data: colaboradoresPorCargo, isLoading: isLoadingColaboradoresPorCargo } = useQuery<Distribuicao[]>({
+    queryKey: ['/api/geg/colaboradores-por-cargo', { squad, setor }],
+  });
+
+  const { data: colaboradoresPorNivel, isLoading: isLoadingColaboradoresPorNivel } = useQuery<Distribuicao[]>({
+    queryKey: ['/api/geg/colaboradores-por-nivel', { squad, setor }],
   });
 
   const formatMesAno = (mesAno: string) => {
@@ -350,10 +347,10 @@ export default function DashboardGeG() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card data-testid="card-valor-medio">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Valor Médio</CardTitle>
+              <CardTitle className="text-sm font-medium">Salário Médio</CardTitle>
               <Award className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -368,36 +365,6 @@ export default function DashboardGeG() {
                     {valorMedioSalario?.totalColaboradores || 0} colaboradores
                   </p>
                 </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-patrimonio" className="col-span-2">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">Resumo de Patrimônio</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoadingPatrimonio ? (
-                <Skeleton className="h-20 w-full" />
-              ) : (
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <div className="text-2xl font-bold" data-testid="text-total-ativos">{patrimonioResumo?.totalAtivos || 0}</div>
-                    <p className="text-xs text-muted-foreground mt-1">Total de Ativos</p>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold" data-testid="text-valor-pago">
-                      R$ {patrimonioResumo?.valorTotalPago ? (patrimonioResumo.valorTotalPago / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '0,0'}k
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Valor Pago Total</p>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold" data-testid="text-valor-mercado">
-                      R$ {patrimonioResumo?.valorTotalMercado ? (patrimonioResumo.valorTotalMercado / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '0,0'}k
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Valor de Mercado</p>
-                  </div>
-                </div>
               )}
             </CardContent>
           </Card>
@@ -611,6 +578,215 @@ export default function DashboardGeG() {
           </Card>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card data-testid="card-colaboradores-por-squad">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <PieChartIcon className="w-5 h-5 text-blue-500" />
+                <CardTitle>Distribuição por Squad</CardTitle>
+              </div>
+              <CardDescription>Colaboradores ativos por squad</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingColaboradoresPorSquad ? (
+                <Skeleton className="h-[250px] w-full" />
+              ) : colaboradoresPorSquad && colaboradoresPorSquad.length > 0 ? (
+                <div className="flex flex-col items-center">
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie
+                        data={colaboradoresPorSquad}
+                        dataKey="total"
+                        nameKey="nome"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={70}
+                        label={({ nome, percent }) => `${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {colaboradoresPorSquad.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload as Distribuicao;
+                            return (
+                              <div className="bg-popover border rounded-md shadow-md p-2">
+                                <p className="font-medium text-sm">{data.nome}</p>
+                                <p className="text-xs text-muted-foreground">{data.total} colaboradores</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-1 mt-2 max-h-[100px] overflow-y-auto w-full">
+                    {colaboradoresPorSquad.slice(0, 6).map((item, index) => (
+                      <div key={item.nome} className="flex items-center gap-2 text-xs" data-testid={`squad-dist-${index}`}>
+                        <div 
+                          className="w-2 h-2 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} 
+                        />
+                        <span className="text-muted-foreground truncate">{item.nome}</span>
+                        <span className="font-medium ml-auto">({item.total})</span>
+                      </div>
+                    ))}
+                    {colaboradoresPorSquad.length > 6 && (
+                      <p className="text-xs text-muted-foreground">+{colaboradoresPorSquad.length - 6} outros</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-squad">
+                  <p className="text-muted-foreground">Nenhum dado disponível</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-colaboradores-por-cargo">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <PieChartIcon className="w-5 h-5 text-purple-500" />
+                <CardTitle>Distribuição por Cargo</CardTitle>
+              </div>
+              <CardDescription>Colaboradores ativos por cargo</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingColaboradoresPorCargo ? (
+                <Skeleton className="h-[250px] w-full" />
+              ) : colaboradoresPorCargo && colaboradoresPorCargo.length > 0 ? (
+                <div className="flex flex-col items-center">
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie
+                        data={colaboradoresPorCargo}
+                        dataKey="total"
+                        nameKey="nome"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={70}
+                        label={({ nome, percent }) => `${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {colaboradoresPorCargo.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload as Distribuicao;
+                            return (
+                              <div className="bg-popover border rounded-md shadow-md p-2">
+                                <p className="font-medium text-sm">{data.nome}</p>
+                                <p className="text-xs text-muted-foreground">{data.total} colaboradores</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-1 mt-2 max-h-[100px] overflow-y-auto w-full">
+                    {colaboradoresPorCargo.slice(0, 6).map((item, index) => (
+                      <div key={item.nome} className="flex items-center gap-2 text-xs" data-testid={`cargo-dist-${index}`}>
+                        <div 
+                          className="w-2 h-2 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} 
+                        />
+                        <span className="text-muted-foreground truncate">{item.nome}</span>
+                        <span className="font-medium ml-auto">({item.total})</span>
+                      </div>
+                    ))}
+                    {colaboradoresPorCargo.length > 6 && (
+                      <p className="text-xs text-muted-foreground">+{colaboradoresPorCargo.length - 6} outros</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-cargo">
+                  <p className="text-muted-foreground">Nenhum dado disponível</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-colaboradores-por-nivel">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <PieChartIcon className="w-5 h-5 text-green-500" />
+                <CardTitle>Distribuição por Nível</CardTitle>
+              </div>
+              <CardDescription>Colaboradores ativos por nível</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingColaboradoresPorNivel ? (
+                <Skeleton className="h-[250px] w-full" />
+              ) : colaboradoresPorNivel && colaboradoresPorNivel.length > 0 ? (
+                <div className="flex flex-col items-center">
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie
+                        data={colaboradoresPorNivel}
+                        dataKey="total"
+                        nameKey="nome"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={70}
+                        label={({ nome, percent }) => `${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {colaboradoresPorNivel.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload as Distribuicao;
+                            return (
+                              <div className="bg-popover border rounded-md shadow-md p-2">
+                                <p className="font-medium text-sm">{data.nome}</p>
+                                <p className="text-xs text-muted-foreground">{data.total} colaboradores</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-1 mt-2 max-h-[100px] overflow-y-auto w-full">
+                    {colaboradoresPorNivel.slice(0, 6).map((item, index) => (
+                      <div key={item.nome} className="flex items-center gap-2 text-xs" data-testid={`nivel-dist-${index}`}>
+                        <div 
+                          className="w-2 h-2 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} 
+                        />
+                        <span className="text-muted-foreground truncate">{item.nome}</span>
+                        <span className="font-medium ml-auto">({item.total})</span>
+                      </div>
+                    ))}
+                    {colaboradoresPorNivel.length > 6 && (
+                      <p className="text-xs text-muted-foreground">+{colaboradoresPorNivel.length - 6} outros</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-nivel">
+                  <p className="text-muted-foreground">Nenhum dado disponível</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card data-testid="card-evolucao-headcount">
             <CardHeader>
@@ -671,35 +847,6 @@ export default function DashboardGeG() {
             </CardContent>
           </Card>
         </div>
-
-        <Card className="mb-8" data-testid="card-tempo-promocao">
-          <CardHeader>
-            <CardTitle>Tempo Médio de Promoção por Squad</CardTitle>
-            <CardDescription>Média de meses entre admissão e última promoção</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingTempoPromocao ? (
-              <div className="flex items-center justify-center h-[300px]">
-                <Skeleton className="h-[300px] w-full" />
-              </div>
-            ) : tempoPromocao && tempoPromocao.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={tempoPromocao} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" label={{ value: 'Meses', position: 'insideBottom', offset: -5 }} />
-                  <YAxis type="category" dataKey="squad" width={150} />
-                  <Tooltip formatter={(value: number) => formatDecimal(value)} />
-                  <Legend />
-                  <Bar dataKey="tempoMedioMeses" name="Tempo Médio (meses)" fill="#8b5cf6" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[300px]" data-testid="text-no-data-tempo-promocao">
-                <p className="text-muted-foreground">Nenhum dado disponível</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         <Card className="mb-8" data-testid="card-ultimas-promocoes">
           <CardHeader>

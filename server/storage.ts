@@ -189,6 +189,9 @@ export interface IStorage {
   upsertContextoJuridico(data: { clienteId: string; contextoJuridico?: string; procedimentoJuridico?: string; statusJuridico?: string; valorAcordado?: number; atualizadoPor: string }): Promise<{ contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>;
   getGegDemissoesPorTipo(squad: string, setor: string): Promise<GegDemissoesPorTipo[]>;
   getGegHeadcountPorTenure(squad: string, setor: string): Promise<GegHeadcountPorTenure[]>;
+  getGegColaboradoresPorSquad(squad: string, setor: string): Promise<GegDistribuicao[]>;
+  getGegColaboradoresPorCargo(squad: string, setor: string): Promise<GegDistribuicao[]>;
+  getGegColaboradoresPorNivel(squad: string, setor: string): Promise<GegDistribuicao[]>;
   getTopResponsaveis(limit?: number, mesAno?: string): Promise<{ nome: string; mrr: number; posicao: number }[]>;
   getTopSquads(limit?: number, mesAno?: string): Promise<{ squad: string; mrr: number; posicao: number }[]>;
   getInhireMetrics(): Promise<InhireMetrics>;
@@ -278,6 +281,11 @@ export interface GegHeadcountPorTenure {
   faixa: string;
   total: number;
   ordem: number;
+}
+
+export interface GegDistribuicao {
+  nome: string;
+  total: number;
 }
 
 // Tech Dashboard Types
@@ -586,6 +594,18 @@ export class MemStorage implements IStorage {
   }
 
   async getGegHeadcountPorTenure(squad: string, setor: string): Promise<GegHeadcountPorTenure[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegColaboradoresPorSquad(squad: string, setor: string): Promise<GegDistribuicao[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegColaboradoresPorCargo(squad: string, setor: string): Promise<GegDistribuicao[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegColaboradoresPorNivel(squad: string, setor: string): Promise<GegDistribuicao[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -3634,17 +3654,26 @@ export class DbStorage implements IStorage {
   }
 
   async getGegValorMedioSalario(squad: string, setor: string): Promise<{ valorMedio: number; totalColaboradores: number }> {
-    const result = await db.execute(sql.raw(`
+    const conditions = [
+      sql`status = 'Ativo'`,
+      sql`salario IS NOT NULL`,
+      sql`salario > 0`
+    ];
+    
+    if (squad !== 'todos') {
+      conditions.push(sql`squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      conditions.push(sql`setor = ${setor}`);
+    }
+    
+    const result = await db.execute(sql`
       SELECT 
-        AVG(proporcional) as valor_medio,
+        AVG(salario) as valor_medio,
         COUNT(*) as total_colaboradores
       FROM rh_pessoal
-      WHERE status = 'Ativo'
-        AND proporcional IS NOT NULL
-        AND proporcional > 0
-        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
-        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
-    `));
+      WHERE ${sql.join(conditions, sql` AND `)}
+    `);
 
     const row = result.rows[0] as any;
     return {
@@ -3874,6 +3903,96 @@ export class DbStorage implements IStorage {
       faixa: row.faixa as string,
       total: parseInt(row.total as string || '0'),
       ordem: parseInt(row.ordem as string || '0'),
+    }));
+  }
+
+  async getGegColaboradoresPorSquad(squad: string, setor: string): Promise<GegDistribuicao[]> {
+    const conditions = [
+      sql`status = 'Ativo'`,
+      sql`squad IS NOT NULL`,
+      sql`squad != ''`
+    ];
+    
+    if (squad !== 'todos') {
+      conditions.push(sql`squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      conditions.push(sql`setor = ${setor}`);
+    }
+    
+    const result = await db.execute(sql`
+      SELECT 
+        squad as nome,
+        COUNT(*) as total
+      FROM rh_pessoal
+      WHERE ${sql.join(conditions, sql` AND `)}
+      GROUP BY squad
+      ORDER BY total DESC
+    `);
+
+    return result.rows.map(row => ({
+      nome: row.nome as string,
+      total: parseInt(row.total as string || '0'),
+    }));
+  }
+
+  async getGegColaboradoresPorCargo(squad: string, setor: string): Promise<GegDistribuicao[]> {
+    const conditions = [
+      sql`status = 'Ativo'`,
+      sql`cargo IS NOT NULL`,
+      sql`cargo != ''`
+    ];
+    
+    if (squad !== 'todos') {
+      conditions.push(sql`squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      conditions.push(sql`setor = ${setor}`);
+    }
+    
+    const result = await db.execute(sql`
+      SELECT 
+        cargo as nome,
+        COUNT(*) as total
+      FROM rh_pessoal
+      WHERE ${sql.join(conditions, sql` AND `)}
+      GROUP BY cargo
+      ORDER BY total DESC
+    `);
+
+    return result.rows.map(row => ({
+      nome: row.nome as string,
+      total: parseInt(row.total as string || '0'),
+    }));
+  }
+
+  async getGegColaboradoresPorNivel(squad: string, setor: string): Promise<GegDistribuicao[]> {
+    const conditions = [
+      sql`status = 'Ativo'`,
+      sql`nivel IS NOT NULL`,
+      sql`nivel != ''`
+    ];
+    
+    if (squad !== 'todos') {
+      conditions.push(sql`squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      conditions.push(sql`setor = ${setor}`);
+    }
+    
+    const result = await db.execute(sql`
+      SELECT 
+        nivel as nome,
+        COUNT(*) as total
+      FROM rh_pessoal
+      WHERE ${sql.join(conditions, sql` AND `)}
+      GROUP BY nivel
+      ORDER BY total DESC
+    `);
+
+    return result.rows.map(row => ({
+      nome: row.nome as string,
+      total: parseInt(row.total as string || '0'),
     }));
   }
 

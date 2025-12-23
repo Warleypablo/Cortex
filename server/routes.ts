@@ -5828,6 +5828,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/geg/colaboradores-por-squad", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const resultado = await storage.getGegColaboradoresPorSquad(squad, setor);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG colaboradores por squad:", error);
+      res.status(500).json({ error: "Failed to fetch GEG colaboradores por squad" });
+    }
+  });
+
+  app.get("/api/geg/colaboradores-por-cargo", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const resultado = await storage.getGegColaboradoresPorCargo(squad, setor);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG colaboradores por cargo:", error);
+      res.status(500).json({ error: "Failed to fetch GEG colaboradores por cargo" });
+    }
+  });
+
+  app.get("/api/geg/colaboradores-por-nivel", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const resultado = await storage.getGegColaboradoresPorNivel(squad, setor);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG colaboradores por nivel:", error);
+      res.status(500).json({ error: "Failed to fetch GEG colaboradores por nivel" });
+    }
+  });
+
   app.get("/api/inhire/metrics", async (req, res) => {
     try {
       const metrics = await storage.getInhireMetrics();
