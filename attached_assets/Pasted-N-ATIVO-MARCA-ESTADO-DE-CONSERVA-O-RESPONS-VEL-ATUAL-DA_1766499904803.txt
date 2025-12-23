@@ -1,0 +1,254 @@
+Nº	ATIVO	MARCA	ESTADO DE CONSERVAÇÃO	RESPONSÁVEL ATUAL	DATA COMPRA	VALOR PAGO	VALOR MERCADO	VALOR DE VENDA	DESCRIÇÃO
+0007	Computador	Apple	Baixado/Vendido	-		R$ 3.000	R$ 1.500	R$ 1.300	iMac
+0009	Computador	Apple	Baixado/Vendido	-		R$ 3.000	R$ 0	R$ 0	iMac
+0014	Monitor	Warrior 	Baixado/Vendido	-		R$ 1.000	R$ 0	R$ 0	140 Hz, quebrou e jogamos fora
+0020	Notebook	Acer	Baixado/Vendido	-		R$ 4.000	R$ 1.000	R$ 0	Notebook Acer Nitro 5
+0042	Monitor	LG	Baixado/Vendido			R$ 1.000	R$ 0	R$ 0	Jogamos fora - Monitor com tela quebrada (60%)
+0049	Computador	Outro	Baixado/Vendido	-		R$ 3.500	R$ 1.250	R$ 0	CPU Windowns
+0052	Computador	Apple	Baixado/Vendido	-		R$ 5.000	R$ 0	R$ 2.500	Mac mini m1
+0054	Computador	Apple	Baixado/Vendido	-		R$ 3.500	R$ 1.500	R$ 1.500	Mac mini 2018 intermediario (breno) - 
+0055	Computador	Apple	Baixado/Vendido	-		R$ 5.000	R$ 2.500	R$ 2.300	Mac mini m1
+0058	Notebook	Apple	Baixado/Vendido	-		R$ 5.000	R$ 0	R$ 2.500	Macbook Air M1  (tela quebrada) - Trocado em outro macbook
+0060	Computador	Apple	Baixado/Vendido	-		R$ 3.500	R$ 0	R$ 1.650	Mac mini intermediario 
+0073	Moveis	Outro	Baixado/Vendido	-		R$ 450	R$ 0	R$ 0	Cadeira Padrão - baixado
+0093	Notebook	Apple	Baixado/Vendido	Eneas		R$ 5.900	R$ 3.000		Macbook Air M1 - CALOTE
+0095	Moveis	Outro	Baixado/Vendido	-		R$ 1.000	R$ 0	R$ 200	Estante Madeira
+0110	Moveis	Outro	Baixado/Vendido	-		R$ 500	R$ 0	R$ 0	Estante Aluminio
+0111	Moveis	Outro	Baixado/Vendido	-		R$ 500	R$ 0	R$ 0	Estante Aluminio
+0112	Moveis	Outro	Baixado/Vendido	-		R$ 500	R$ 0	R$ 0	Estante Aluminio
+0113	Moveis	Outro	Baixado/Vendido	-		R$ 500	R$ 0	R$ 0	Estante Aluminio
+0114	Moveis	Outro	Baixado/Vendido	-		R$ 500	R$ 0	R$ 0	Estante Aluminio
+0140	Celular 	Apple	Baixado/Vendido	-		R$ 800	R$ 800		iPhone 8 - não esta ligando bateria estudafa
+0161	Outros	Outro	Baixado/Vendido	-		R$ 1.800	R$ 0	R$ 1.000	Robo Aspirador
+0173	Outros	Apple	Baixado/Vendido	-		R$ 3.000	R$ 0	R$ 3.000	Ipad Pro 11
+0190	Notebook	Apple	Baixado/Vendido	-		R$ 4.500	R$ 3.500		Macbook Pro i9 (antigo Rodrigo Q)
+0192	Notebook	Apple	Baixado/Vendido	-		R$ 5.900	R$ 4.500	R$ 1.500	Macbook Air M1 (sem camera) - esta com ze maria. crediti
+0221	Notebook	Apple	Baixado/Vendido	-		R$ 5.900	R$ 1.000	R$ 1.000	Macbook Air M1 - Aline Moreira, Maria alice deixou cair vinho em cima
+0223	Notebook	Apple	Baixado/Vendido	-		R$ 6.000	R$ 5.000	R$ 1.500	Macbook Pro M1 - vendido pro ze
+0225	Notebook	Apple	Baixado/Vendido	-		R$ 6.500	R$ 0	R$ 4.200	Macbook Pro M1 - 16GB - 1TB
+0229	Notebook	Apple	Baixado/Vendido	-		R$ 5.900	R$ 4.500	R$ 1.500	Macbook Air M1 - Esta com ze maria , tela quebrada. credito
+0233	Notebook	Apple	Baixado/Vendido	-		R$ 5.900	R$ 4.500	R$ 1.000	Macbook Air M1
+0001	Monitor	Aoc	Bom	-		R$ 900	R$ 900		AOC
+0002	Monitor	Philips 	Bom	-		R$ 600	R$ 600		Monitor Philips
+0003	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0004	Monitor	Acer	Bom	-		R$ 500	R$ 500		Monitor menor e Funcionando
+0005	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0006	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0008	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0010	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0011	Monitor	Aoc	Bom	-		R$ 900	R$ 900		AOC
+0012	Monitor	Aoc	Bom	-		R$ 900	R$ 900		AOC
+0013	Monitor	Aoc	Bom	-		R$ 900	R$ 900		AOC
+0015	Monitor	Aoc	Bom	-		R$ 900	R$ 900		AOC
+0016	Monitor	Aoc	Bom	-		R$ 900	R$ 900		AOC
+0017	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0018	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0019	Monitor	Samsung 	Bom	-		R$ 1.000	R$ 1.000		Tela Grande (quase TV)
+0021	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0022	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0023	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0024	Notebook	Apple	Bom	Raquel		R$ 5.900	R$ 3.000		Macbook Air M1
+0025	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0026	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0027	Monitor	LG	Bom	-		R$ 600	R$ 600		LG pequeno
+0028	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0029	Monitor	Aoc	Bom	-		R$ 900	R$ 900		AOC
+0030	Monitor	Aoc	Bom	-		R$ 900	R$ 900		AOC
+0031	Monitor	Aoc	Bom	-		R$ 900	R$ 900		AOC
+0032	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0033	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0034	Monitor	Aoc	Bom	-		R$ 900	R$ 900		AOC
+0035	Monitor	LG	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0036	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0037	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0038	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0039	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0040	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0043	Monitor	Samsung 	Bom	-		R$ 3.000	R$ 3.000		Sala de reunião - Televisão 65 polegadas
+0047	Notebook	Apple	Bom	Kamila Ribeiro		R$ 5.900	R$ 3.000		Macbook Air M1
+0048	Notebook	Apple	Bom	Arthur Machado		R$ 5.900	R$ 3.000		Macbook Air M1  
+0051	Computador	Apple	Bom	Sala de Operação TV		R$ 1.800	R$ 1.000		Mac mini antigo
+0053	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0057	Computador	Apple	Bom	Usando na TV do Dash		R$ 5.000	R$ 2.500		Mac mini m1
+0061	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0062	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0063	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0064	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0065	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0066	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0067	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0068	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0069	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0070	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0071	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0072	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0074	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0075	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0076	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0077	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0078	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0079	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0080	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0081	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0082	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0083	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0084	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0085	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0086	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0087	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0088	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0089	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0090	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0091	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0092	Moveis	Outro	Bom	-		R$ 450	R$ 70		Cadeira Padrão
+0094	Moveis	Outro	Bom	-		R$ 1.000	R$ 1.000		Estante Madeira
+0096	Moveis	Outro	Bom	-		R$ 1.500	R$ 1.000		Geladeira
+0097	Moveis	Outro	Bom	-		R$ 1.200	R$ 800		Mesa Grande
+0098	Moveis	Outro	Bom	-		R$ 1.200	R$ 800		Mesa Grande
+0099	Moveis	Outro	Bom	-		R$ 1.200	R$ 800		Mesa Grande
+0100	Moveis	Outro	Bom	-		R$ 1.200	R$ 800		Mesa Grande
+0101	Moveis	Outro	Bom	-		R$ 1.200	R$ 800		Mesa Grande
+0102	Moveis	Outro	Bom	-		R$ 800	R$ 600		Mesa Pequena
+0103	Moveis	Outro	Bom	-		R$ 1.200	R$ 800		Mesa Grande
+0104	Moveis	Outro	Bom	-		R$ 1.200	R$ 800		Mesa Grande
+0105	Moveis	Outro	Bom	-		R$ 800	R$ 600		Mesa Pequena
+0106	Moveis	Outro	Bom	-		R$ 1.200	R$ 800		Mesa Grande
+0107	Moveis	Outro	Bom	-		R$ 1.200	R$ 800		Mesa Grande
+0108	Moveis	Outro	Bom	-		R$ 1.200	R$ 1.200		Mesa Sala Reunião
+0109	Moveis	Outro	Bom	-		R$ 1.000	R$ 1.000		Estante Madeira
+0115	Computador	Apple	Bom	Helamã 		R$ 5.000	R$ 2.500		Mac mini m1
+0116	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0118	Moveis	Outro	Bom	-		R$ 700	R$ 700		Purificador de agua
+0119	Computador	Apple	Bom	Vinicius Ichino		R$ 5.500	R$ 3.000		Mac mini m2
+0120	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0121	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0122	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0123	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0126	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0127	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0128	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0129	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0130	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0131	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0132	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0133	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0134	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0135	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0136	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0137	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0138	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0139	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0141	Notebook	Apple	Bom	Gabriela Teixeira		R$ 5.900	R$ 3.000		Macbook Air M1
+0142	Notebook	Apple	Bom	Debora Mundo		R$ 5.900	R$ 3.000		Macbook Air M1
+0143	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0144	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0146	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0147	Notebook	Apple	Bom	Lenize Pretti		R$ 5.900	R$ 3.000		Macbook Air M1
+0148	Notebook	Apple	Bom	Lianca Lopes		R$ 6.000	R$ 3.500		Macbook Pro M1
+0149	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0150	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0151	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0152	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0153	Notebook	Apple	Bom	Guilherme Cassemiro		R$ 5.900	R$ 3.000		Macbook Air M1
+0154	Notebook	Apple	Bom	Gabriel Taufner		R$ 5.900	R$ 3.000		Macbook Air M1
+0155	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0156	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0157	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0158	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0159	Notebook	Apple	Bom	Vitor Klein		R$ 5.900	R$ 3.000		Macbook Air M1 
+0160	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0163	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0164	Notebook	Apple	Bom	Yan Roldi		R$ 5.900	R$ 3.000		Macbook Air M1
+0165	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0166	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0167	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0168	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0169	Moveis	Outro	Bom	-		R$ 490	R$ 70		Cadeira Padrão
+0170	Moveis	Outro	Bom	-		R$ 800	R$ 600		Mesa Pequena
+0171	Moveis	Outro	Bom	-		R$ 800	R$ 600		Mesa Pequena
+0172	Moveis	Outro	Bom	-		R$ 800	R$ 600		Mesa Pequena
+0174	Notebook	Apple	Bom	Pedro Paulo		R$ 5.900	R$ 3.000		Macbook Air M1
+0176	Celular 	Apple	Bom	Vinicius  Guri		R$ 1.000	R$ 1.000		Iphone 8 plus
+0177	Notebook	Apple	Bom	Wendel		R$ 6.500	R$ 4.000		Macbook Air M2
+0178	Notebook	Apple	Bom	Weverton		R$ 5.900	R$ 3.000		Macbook Air M1 
+0179	Notebook	Apple	Bom	Julia Manhães		R$ 5.900	R$ 3.000		Macbook Air M1
+0180	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0181	Monitor	Dell	Bom			R$ 1.000	R$ 1.000		Dell padrão 
+0182	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		Dell padrão 
+0183	Notebook	Apple	Bom	Hiuri		R$ 6.500	R$ 4.000		Macbook Air M2 - 10.11 (data do reparo)
+0185	Notebook	Apple	Bom	Karol Tognere		R$ 5.900	R$ 3.000		Macbook Air M1
+0186	Notebook	Apple	Bom	Fernanda de Almeida		R$ 5.900	R$ 3.000		Macbook Air M1 
+0188	Notebook	Apple	Bom	André Luís Freitas Moraes Séder		R$ 5.900	R$ 3.000		Macbook Air M1 
+0189	Notebook	Apple	Bom	Arthur Zon		R$ 5.900	R$ 3.000		Macbook Air M1
+0190	Monitor	Dell	Bom	-		R$ 1.000	R$ 1.000		(nao usar esse adesivo) - Tela na Bahia sem patrimonio
+0191	Celular 	Apple	Bom	Lara Grobeiro		R$ 900	R$ 900		iPhone SE
+0193	Celular 	Apple	Bom	Eduardo Tonane		R$ 2.000	R$ 2.000		iPhone 11 - Telefone Turbooh
+0195	Notebook	Apple	Bom	Ana Lello		R$ 5.900	R$ 3.000		Macbook Air M1
+0196	Notebook	Apple	Bom	Esther Fiorio		R$ 5.900	R$ 3.000		Macbook Air M1
+0197	Notebook	Apple	Bom	Matheus Scalfoni		R$ 5.900	R$ 3.000		Macbook Air M1
+0199	Notebook	Apple	Bom	Anna Gabriela Rauta		R$ 5.900	R$ 3.000		Macbook Air M1  
+0200	Notebook	Apple	Bom	Roberto Fachetti		R$ 6.500	R$ 4.000		Macbook Air M2
+0201	Notebook	Apple	Bom	Ramon Reis		R$ 5.900	R$ 3.000		Macbook Air M1
+0203	Notebook	Apple	Bom	Caio Massaroni		R$ 6.500	R$ 4.000		Macbook Air M2
+0204	Notebook	Apple	Bom	Alexandre Hazard		R$ 6.000	R$ 3.500		Macbook Pro M1
+0205	Notebook	Apple	Bom	Maria Midyan		R$ 5.900	R$ 3.000		Macbook Air M1
+0206	Notebook	Apple	Bom	Rodrigo Padrão		R$ 5.900	R$ 3.000		Macbook Air M1
+0209	Notebook	Apple	Bom	Arthur Fagundes		R$ 5.900	R$ 3.000		Macbook Air M1
+0210	Notebook	Apple	Bom	Matheus Glendel		R$ 6.500	R$ 4.000		Macbook Air M2
+0211	Celular 	Apple	Bom	Guilherme Cassemiro		R$ 500	R$ 500		Iphone XR
+0212	Notebook	Apple	Bom	Vinicius  Guri		R$ 5.900	R$ 3.000		Macbook Air M1
+0213	Notebook	Apple	Bom	Leonardo Soares		R$ 6.500	R$ 4.000		Macbook Air M2
+0215	Notebook	Apple	Bom	Rafael Vilella		R$ 6.500	R$ 4.000		Macbook Air M2
+0216	Monitor	Dell	Bom	-		R$ 1.100	R$ 1.100		Dell 27
+0217	Monitor	Dell	Bom	-		R$ 1.100	R$ 1.100		Dell 27
+0218	Notebook	Apple	Bom	Kaike 		R$ 5.900	R$ 3.000		Macbook Air M1
+0220	Notebook	Apple	Bom	Rayan Coutinho		R$ 5.900	R$ 3.000		Macbook Air M1
+0222	Notebook	Apple	Bom	Lara Grobeiro		R$ 5.900	R$ 3.000		Macbook Air M1
+0224	Notebook	Apple	Bom	Glauber Pereira		R$ 5.900	R$ 3.000		Macbook Air M1 
+0226	Notebook	Apple	Bom	Lucas Rosseti		R$ 6.000	R$ 3.500		Macbook Pro M1
+0227	Notebook	Apple	Bom	Mariah Eduarda Grippa de Sousa		R$ 6.000	R$ 3.500		Macbook Pro M1
+0228	Notebook	Apple	Bom	Fabiely Laurett		R$ 6.000	R$ 3.000		Macbook Air M1  
+0230	Notebook	Apple	Bom	Fabio Richard		R$ 5.900	R$ 3.000		Macbook Air M1
+0231	Notebook	Apple	Bom	Matheus Pin		R$ 5.900	R$ 3.000		Macbook Air M1
+0232	Notebook	Apple	Bom	Daniel Basilio Giestas		R$ 5.900	R$ 3.000		Macbook Air M1
+0234	Notebook	Apple	Bom	Caio Pedro Malini		R$ 5.900	R$ 4.000		Macbook Air M1 - conserto do ze 15.11
+0235	Notebook	Apple	Bom	Dai (UI/UX)		R$ 5.900	R$ 4.500		Macbook pro M1 512 GB
+0236	Monitor	LG	Bom	-		R$ 800	R$ 800		LG UltraWide + Suporte Articulado
+0237	Notebook	Apple	Bom	Eduardo Financeiro		R$ 5.900	R$ 3.000		Macbook Air M1
+0238	Notebook	Apple	Bom	Breno Carmo		R$ 10.000	R$ 8.000		Macbook Pro M3 - Turco Noruegues
+0239	Monitor	LG	Bom	-		R$ 1.000	R$ 600		Monitor LG (Antiga)
+0241	Notebook	Apple	Bom	Bibiana 		R$ 4.500	R$ 3.000		Macbook Air M1
+0242	Notebook	Apple	Bom	Maria Alice		R$ 4.500	R$ 3.000		Macbook Air M1
+0243	Notebook	Apple	Bom	Aline Carvalho		R$ 4.500	R$ 3.000		Macbook Air M1
+0244	Notebook	Apple	Bom	Alanna		R$ 4.500	R$ 3.000		Macbook Air M1
+0245	Notebook	Apple	Bom	Isabella Novaes 		R$ 4.500	R$ 3.000		Macbook Air M1
+0246	Celular 	Apple	Bom	Rafael Vilella		R$ 1.000	R$ 1.400		Iphone 12 Pro Max
+0247	Outros	Outro	Bom			R$ 3.000	R$ 4.000		Insta 360 x4 + tripe
+0248	Outros	Outro	Bom			R$ 6.000	R$ 5.000		
+0249	Outros	Outro	Bom			R$ 6.000	R$ 5.000		
+0251	Notebook	Apple	Bom	Matt		R$ 10.000	R$ 9.000		Macbook Pro M3 Max
+0252	Notebook	Acer	Bom	Marlon		R$ 3.000	R$ 2.500		Notebook Acer A515-57-5429 Intel Core I5-12450h 16gb Ram 512gb Ssd
+0253	Notebook	Apple	Bom	Lucas Antunes 		R$ 4.500	R$ 3.000		Macbook Air M1
+0254	Notebook	Apple	Bom	Amanda Lovise		R$ 6.500	R$ 4.000		Macbook Air M2
+0255	Notebook	Apple	Bom	João Guarçoni		R$ 4.500	R$ 3.500		Macbook Pro M1
+0256	Notebook	Apple	Bom	Davi Ferraz		R$ 7.100	R$ 6.000		Macbook Air M3 16GB
+0257	Notebook	Apple	Bom	Lucas Pereira		R$ 6.500	R$ 5.000		Macbook Air M3
+0259	Notebook	Apple	Bom	Vinicius Paiva		R$ 3.500	R$ 3.500		Macbook Pro M1
+0260	Notebook	Apple	Bom	Samantha (VM)		R$ 6.000	R$ 5.500		Macbook Air M4
+0261	Notebook	Acer	Bom	Warley		R$ 4.000	R$ 2.000		Acer Nitro 5
+0263	Notebook	Apple	Bom	Victor Peixoto	21/10/2025	R$ 6.000	R$ 5.500		Macbook Air M4
+0045	Celular 	Apple	Em Estoque	-		R$ 600	R$ 600		
+0046	Celular 	Apple	Em Estoque	-		R$ 500	R$ 500		Iphone 6
+0050	Notebook	Outro	Em Estoque	-		R$ 3.500	R$ 2.000		Lenovo Ideapad game3
+0059	Computador	Apple	Em Estoque	-		R$ 5.000	R$ 2.500		Mac mini m1
+0124	Notebook	Apple	Em Estoque	-		R$ 5.900	R$ 3.000		Macbook Air M1
+0162	Notebook	Apple	Em Estoque	-		R$ 5.900	R$ 4.000		Macbook Air M1
+0175	Celular 	Apple	Em Estoque	-		R$ 700	R$ 700		Iphone 8
+0184	Celular 	Apple	Em Estoque	-		R$ 1.000	R$ 1.000		Iphone XR
+0187	Celular 	Apple	Em Estoque	-		R$ 1.000	R$ 1.000		iPhone XR
+0198	Celular 	Apple	Em Estoque	-		R$ 1.500	R$ 1.500		iPhone 11 
+0202	Notebook	Apple	Em Estoque	-		R$ 5.900	R$ 3.000		Macbook Air M1 - voltou do concerto 15.11.25
+0214	Notebook	Apple	Bom	Helamã		R$ 5.900	R$ 3.000		Macbook Air M1 - sem camera
+0240	Notebook	Apple	Em Estoque	-		R$ 4.500	R$ 3.000		Macbook Air M1- Travando a tela
+0262	Notebook	Apple	Em Estoque	-		R$ 3.500	R$ 3.000		Macbook Air M1
+0258	Computador	Apple	Ruim/Quebrado	-		R$ 2.500	R$ 1.000		Mac mini antigo - Não funciona bem 

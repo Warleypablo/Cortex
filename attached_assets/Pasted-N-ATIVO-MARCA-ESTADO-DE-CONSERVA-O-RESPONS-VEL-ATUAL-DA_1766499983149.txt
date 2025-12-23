@@ -1,0 +1,60 @@
+Nº,ATIVO,MARCA,ESTADO DE CONSERVAÇÃO,RESPONSÁVEL ATUAL,DATA COMPRA,VALOR PAGO,VALOR MERCADO,VALOR DE VENDA,DESCRIÇÃO
+0007,Computador,Apple,Baixado/Vendido,,,3000,1500,1300,iMac
+0009,Computador,Apple,Baixado/Vendido,,,3000,0,0,iMac
+0014,Monitor,Warrior,Baixado/Vendido,,,1000,0,0,140 Hz quebrou e jogamos fora
+0020,Notebook,Acer,Baixado/Vendido,,,4000,1000,0,Notebook Acer Nitro 5
+0042,Monitor,LG,Baixado/Vendido,,,1000,0,0,Monitor com tela quebrada jogado fora
+0049,Computador,Outro,Baixado/Vendido,,,3500,1250,0,CPU Windows
+0052,Computador,Apple,Baixado/Vendido,,,5000,0,2500,Mac mini M1
+0054,Computador,Apple,Baixado/Vendido,,,3500,1500,1500,Mac mini 2018 intermediário
+0055,Computador,Apple,Baixado/Vendido,,,5000,2500,2300,Mac mini M1
+0058,Notebook,Apple,Baixado/Vendido,,,5000,0,2500,MacBook Air M1 tela quebrada
+0060,Computador,Apple,Baixado/Vendido,,,3500,0,1650,Mac mini intermediário
+0073,Moveis,Outro,Baixado/Vendido,,,450,0,0,Cadeira padrão
+0093,Notebook,Apple,Baixado/Vendido,Eneas,,5900,3000,,MacBook Air M1 calote
+0095,Moveis,Outro,Baixado/Vendido,,,1000,0,200,Estante madeira
+0110,Moveis,Outro,Baixado/Vendido,,,500,0,0,Estante alumínio
+0111,Moveis,Outro,Baixado/Vendido,,,500,0,0,Estante alumínio
+0112,Moveis,Outro,Baixado/Vendido,,,500,0,0,Estante alumínio
+0113,Moveis,Outro,Baixado/Vendido,,,500,0,0,Estante alumínio
+0114,Moveis,Outro,Baixado/Vendido,,,500,0,0,Estante alumínio
+0140,Celular,Apple,Baixado/Vendido,,,800,800,,iPhone 8 bateria estufada
+0161,Outros,Outro,Baixado/Vendido,,,1800,0,1000,Robo aspirador
+0173,Outros,Apple,Baixado/Vendido,,,3000,0,3000,iPad Pro 11
+0190,Notebook,Apple,Baixado/Vendido,,,4500,3500,,MacBook Pro i9
+0192,Notebook,Apple,Baixado/Vendido,,,5900,4500,1500,MacBook Air M1 sem câmera
+0221,Notebook,Apple,Baixado/Vendido,,,5900,1000,1000,MacBook Air M1 vinho derramado
+0223,Notebook,Apple,Baixado/Vendido,,,6000,5000,1500,MacBook Pro M1
+0225,Notebook,Apple,Baixado/Vendido,,,6500,0,4200,MacBook Pro M1 16GB 1TB
+0229,Notebook,Apple,Baixado/Vendido,,,5900,4500,1500,MacBook Air M1 tela quebrada
+0233,Notebook,Apple,Baixado/Vendido,,,5900,4500,1000,MacBook Air M1
+0001,Monitor,AOC,Bom,,,900,900,,Monitor AOC
+0002,Monitor,Philips,Bom,,,600,600,,Monitor Philips
+0003,Monitor,Dell,Bom,,,1000,1000,,Monitor Dell
+0004,Monitor,Acer,Bom,,,500,500,,Monitor pequeno
+0024,Notebook,Apple,Bom,Raquel,,5900,3000,,MacBook Air M1
+0047,Notebook,Apple,Bom,Kamila Ribeiro,,5900,3000,,MacBook Air M1
+0048,Notebook,Apple,Bom,Arthur Machado,,5900,3000,,MacBook Air M1
+0051,Computador,Apple,Bom,Sala de Operação TV,,1800,1000,,Mac mini antigo
+0057,Computador,Apple,Bom,TV Dash,,5000,2500,,Mac mini M1
+0115,Computador,Apple,Bom,Helamã,,5000,2500,,Mac mini M1
+0119,Computador,Apple,Bom,Vinicius Ichino,,5500,3000,,Mac mini M2
+0141,Notebook,Apple,Bom,Gabriela Teixeira,,5900,3000,,MacBook Air M1
+0177,Notebook,Apple,Bom,Wendel,,6500,4000,,MacBook Air M2
+0211,Celular,Apple,Bom,Guilherme Cassemiro,,500,500,,iPhone XR
+0246,Celular,Apple,Bom,Rafael Vilella,,1000,1400,,iPhone 12 Pro Max
+0263,Notebook,Apple,Bom,Victor Peixoto,21/10/2025,6000,5500,,MacBook Air M4
+0045,Celular,Apple,Em Estoque,,,600,600,,
+0046,Celular,Apple,Em Estoque,,,500,500,,iPhone 6
+0050,Notebook,Outro,Em Estoque,,,3500,2000,,Lenovo Ideapad Gaming 3
+0059,Computador,Apple,Em Estoque,,,5000,2500,,Mac mini M1
+0124,Notebook,Apple,Em Estoque,,,5900,3000,,MacBook Air M1
+0162,Notebook,Apple,Em Estoque,,,5900,4000,,MacBook Air M1
+0175,Celular,Apple,Em Estoque,,,700,700,,iPhone 8
+0184,Celular,Apple,Em Estoque,,,1000,1000,,iPhone XR
+0187,Celular,Apple,Em Estoque,,,1000,1000,,iPhone XR
+0198,Celular,Apple,Em Estoque,,,1500,1500,,iPhone 11
+0202,Notebook,Apple,Em Estoque,,,5900,3000,,MacBook Air M1
+0240,Notebook,Apple,Em Estoque,,,4500,3000,,MacBook Air M1 travando tela
+0262,Notebook,Apple,Em Estoque,,,3500,3000,,MacBook Air M1
+0258,Computador,Apple,Ruim/Quebrado,,,2500,1000,,Mac mini antigo não funciona bem

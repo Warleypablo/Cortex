@@ -32,7 +32,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const colaboradores = await storage.getColaboradores();
       res.json({ 
         total: colaboradores.length, 
-        ativos: colaboradores.filter(c => c.status === 'ativo').length,
+        ativos: colaboradores.filter(c => c.status === 'Ativo').length,
         primeiros5: colaboradores.slice(0, 5).map(c => ({ id: c.id, nome: c.nome, status: c.status }))
       });
     } catch (error) {
@@ -294,6 +294,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("[debug] Error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
+  // Normalize CPF to 11-digit string
+  const normalizeCpf = (cpf: string | null | undefined): string => {
+    if (!cpf) return '';
+    // Remove all non-digit characters
+    const digits = cpf.replace(/\D/g, '');
+    // Pad with leading zeros to ensure 11 digits
+    return digits.padStart(11, '0');
+  };
+
+  // Temporary route for bulk update by name matching
+  app.post("/internal/bulk-update-by-names", async (req, res) => {
+    try {
+      const { nomesAtivos } = req.body;
+      if (!nomesAtivos || !Array.isArray(nomesAtivos)) {
+        return res.status(400).json({ error: "nomesAtivos must be an array" });
+      }
+      
+      const colaboradores = await storage.getColaboradores();
+      let updatedAtivo = 0;
+      let updatedDispensado = 0;
+      let matched: string[] = [];
+      let notMatched: string[] = [];
+      
+      // Normalize names for comparison
+      const normalizeNome = (nome: string) => nome.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const nomesSet = new Set(nomesAtivos.map(normalizeNome));
+      
+      for (const colaborador of colaboradores) {
+        const nomeNorm = normalizeNome(colaborador.nome || '');
+        const isInList = nomesSet.has(nomeNorm);
+        
+        if (isInList) {
+          matched.push(colaborador.nome);
+          if (colaborador.status !== 'Ativo') {
+            await storage.updateColaborador(colaborador.id, { status: 'Ativo' });
+            updatedAtivo++;
+          }
+        } else if (colaborador.status !== 'Dispensado') {
+          await storage.updateColaborador(colaborador.id, { status: 'Dispensado' });
+          updatedDispensado++;
+        }
+      }
+      
+      // Find names not matched
+      for (const nome of nomesAtivos) {
+        const nomeNorm = normalizeNome(nome);
+        const found = colaboradores.some(c => normalizeNome(c.nome || '') === nomeNorm);
+        if (!found) notMatched.push(nome);
+      }
+      
+      res.json({ success: true, updatedAtivo, updatedDispensado, matched: matched.length, notMatched, totalProcessed: colaboradores.length });
+    } catch (error) {
+      console.error("[api] Error:", error);
       res.status(500).json({ error: String(error) });
     }
   });
@@ -982,7 +1039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/colaboradores", async (req, res) => {
     try {
       const colaboradores = await storage.getColaboradores();
-      console.log(`[DEBUG] Colaboradores encontrados no banco: ${colaboradores.length} total, ${colaboradores.filter(c => c.status === 'ativo').length} ativos`);
+      console.log(`[DEBUG] Colaboradores encontrados no banco: ${colaboradores.length} total, ${colaboradores.filter(c => c.status === 'Ativo').length} ativos`);
       res.json(colaboradores);
     } catch (error) {
       console.error("[api] Error fetching colaboradores:", error);
