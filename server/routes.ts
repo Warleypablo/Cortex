@@ -1578,12 +1578,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   const defaultNiveis = [
     { id: 1, nome: "Estágio", ordem: 1, ativo: "true" },
-    { id: 2, nome: "X I", ordem: 2, ativo: "true" },
-    { id: 3, nome: "X II", ordem: 3, ativo: "true" },
-    { id: 4, nome: "X III", ordem: 4, ativo: "true" },
-    { id: 5, nome: "X IV", ordem: 5, ativo: "true" },
-    { id: 6, nome: "X V", ordem: 6, ativo: "true" },
-    { id: 7, nome: "X VI", ordem: 7, ativo: "true" },
+    { id: 2, nome: "I", ordem: 2, ativo: "true" },
+    { id: 3, nome: "II", ordem: 3, ativo: "true" },
+    { id: 4, nome: "III", ordem: 4, ativo: "true" },
+    { id: 5, nome: "IV", ordem: 5, ativo: "true" },
+    { id: 6, nome: "V", ordem: 6, ativo: "true" },
+    { id: 7, nome: "VI", ordem: 7, ativo: "true" },
     { id: 8, nome: "Gerente/Supervisor", ordem: 8, ativo: "true" },
     { id: 9, nome: "Diretor", ordem: 9, ativo: "true" },
   ];
