@@ -122,7 +122,7 @@ export default function ColaboradoresAnalise() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {formatDecimal(tempoMedioPromocao.tempoMedioMeses)} meses
+                  {formatDecimal(tempoMedioPromocao.tempoMedioMeses, 1)} meses
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {tempoMedioPromocao.totalColaboradores} colaboradores com histórico
@@ -139,7 +139,7 @@ export default function ColaboradoresAnalise() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {formatDecimal(tempoPermanencia.tempoPermanenciaAtivos)} meses
+                  {formatDecimal(tempoPermanencia.tempoPermanenciaAtivos, 1)} meses
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {tempoPermanencia.totalAtivos} colaboradores ativos
@@ -156,7 +156,7 @@ export default function ColaboradoresAnalise() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {formatDecimal(tempoPermanencia.tempoPermanenciaDesligados)} meses
+                  {formatDecimal(tempoPermanencia.tempoPermanenciaDesligados, 1)} meses
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {tempoPermanencia.totalDesligados} colaboradores desligados
