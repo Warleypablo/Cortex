@@ -215,6 +215,14 @@ function calcularMesesDesdeUltimoAumento(ultimoAumento: string | Date | null | u
   }
 }
 
+function mapNivelToNew(nivel: string | null): string {
+  if (!nivel) return "";
+  if (nivel.startsWith("X ")) {
+    return nivel.substring(2);
+  }
+  return nivel;
+}
+
 function FilterDialog({
   filters,
   onApplyFilters,
@@ -2088,7 +2096,7 @@ export default function Colaboradores() {
                               {colaborador.nivel && (
                                 <div className="text-xs text-muted-foreground flex items-center gap-1.5" data-testid={`text-nivel-${colaborador.id}`}>
                                   <Award className="w-3 h-3" />
-                                  {colaborador.nivel}
+                                  {mapNivelToNew(colaborador.nivel)}
                                 </div>
                               )}
                             </div>
