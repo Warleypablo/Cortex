@@ -3666,7 +3666,8 @@ export class DbStorage implements IStorage {
       sql`status = 'Ativo'`,
       sql`salario IS NOT NULL`,
       sql`salario != ''`,
-      sql`salario ~ '^[0-9]+(\.[0-9]+)?$'`
+      sql`salario ~ '^[0-9]+(\.[0-9]+)?$'`,
+      sql`(nivel IS NULL OR nivel != 'Estágio')`
     ];
     
     if (squad !== 'todos') {
