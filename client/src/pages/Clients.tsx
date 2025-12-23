@@ -32,10 +32,10 @@ type SortDirection = "asc" | "desc";
 const mapClusterToName = (cluster: string | null): string => {
   if (!cluster) return "Não definido";
   switch (cluster) {
-    case "1": return "NFNC";
-    case "2": return "Regulares";
-    case "3": return "Chaves";
-    case "4": return "Imperdíveis";
+    case "0": return "NFNC";
+    case "1": return "Regulares";
+    case "2": return "Chaves";
+    case "3": return "Imperdíveis";
     default: return cluster;
   }
 };
