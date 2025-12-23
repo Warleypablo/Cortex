@@ -1977,6 +1977,7 @@ export default function Colaboradores() {
                           {getSortIcon('tempoTurbo')}
                         </div>
                       </TableHead>
+                      <TableHead className="min-w-[150px] bg-muted/50">Patrimônios</TableHead>
                       <TableHead className="min-w-[280px] bg-muted/50">Contatos</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">CPF</TableHead>
                       <TableHead className="min-w-[140px] bg-muted/50">CNPJ</TableHead>
@@ -1984,7 +1985,6 @@ export default function Colaboradores() {
                       <TableHead className="min-w-[200px] bg-muted/50">Localização</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">Admissão</TableHead>
                       <TableHead className="min-w-[140px] bg-muted/50">Último Aumento</TableHead>
-                      <TableHead className="min-w-[150px] bg-muted/50">Patrimônios</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">Demissão</TableHead>
                       <TableHead className="min-w-[200px] bg-muted/50">Motivo Demissão</TableHead>
                       <TableHead className="min-w-[120px] sticky right-0 bg-muted/50">Ações</TableHead>
@@ -2094,6 +2094,27 @@ export default function Colaboradores() {
                             </div>
                           </TableCell>
                           <TableCell className="py-3">
+                            <div className="flex flex-wrap gap-1" data-testid={`patrimonios-${colaborador.id}`}>
+                              {colaborador.patrimonios && colaborador.patrimonios.length > 0 ? (
+                                colaborador.patrimonios.map((p) => (
+                                  <Link key={p.id} href={`/patrimonio/${p.id}`}>
+                                    <Badge
+                                      variant="outline"
+                                      className="cursor-pointer hover:bg-primary/10"
+                                      title={p.descricao || `Patrimônio #${p.numeroAtivo || p.id}`}
+                                      data-testid={`badge-patrimonio-${p.id}`}
+                                    >
+                                      <Package className="w-3 h-3 mr-1" />
+                                      {p.numeroAtivo || p.id}
+                                    </Badge>
+                                  </Link>
+                                ))
+                              ) : (
+                                <span className="text-muted-foreground text-sm">-</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3">
                             <div className="space-y-1.5">
                               {colaborador.emailTurbo && (
                                 <div className="flex items-center gap-2 text-sm">
@@ -2181,27 +2202,6 @@ export default function Colaboradores() {
                                     </div>
                                   )}
                                 </>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="flex flex-wrap gap-1" data-testid={`patrimonios-${colaborador.id}`}>
-                              {colaborador.patrimonios && colaborador.patrimonios.length > 0 ? (
-                                colaborador.patrimonios.map((p) => (
-                                  <Link key={p.id} href={`/patrimonio/${p.id}`}>
-                                    <Badge
-                                      variant="outline"
-                                      className="cursor-pointer hover:bg-primary/10"
-                                      title={p.descricao || `Patrimônio #${p.numeroAtivo || p.id}`}
-                                      data-testid={`badge-patrimonio-${p.id}`}
-                                    >
-                                      <Package className="w-3 h-3 mr-1" />
-                                      {p.numeroAtivo || p.id}
-                                    </Badge>
-                                  </Link>
-                                ))
                               ) : (
                                 <span className="text-muted-foreground text-sm">-</span>
                               )}
