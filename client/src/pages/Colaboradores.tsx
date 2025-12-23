@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, UserMinus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { formatCurrency } from "@/lib/utils";
@@ -1744,7 +1744,13 @@ export default function Colaboradores() {
       admissaoDate.setHours(0, 0, 0, 0);
       return admissaoDate >= thirtyDaysAgo;
     }).length;
-    return { total, ativos, novosUltimos30d };
+    const desligadosUltimos30d = colaboradores.filter((c) => {
+      if (!c.demissao || c.status !== "Dispensado") return false;
+      const demissaoDate = new Date(c.demissao);
+      demissaoDate.setHours(0, 0, 0, 0);
+      return demissaoDate >= thirtyDaysAgo;
+    }).length;
+    return { total, ativos, novosUltimos30d, desligadosUltimos30d };
   }, [colaboradores]);
 
   const handleRemoveFilter = (key: keyof FilterState) => {
@@ -1794,7 +1800,7 @@ export default function Colaboradores() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="metrics-summary">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="metrics-summary">
             <Card className="hover-elevate">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total de Colaboradores</CardTitle>
@@ -1820,6 +1826,15 @@ export default function Colaboradores() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600 dark:text-blue-400" data-testid="metric-novos">{metrics.novosUltimos30d}</div>
+              </CardContent>
+            </Card>
+            <Card className="hover-elevate">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Desligados (Últimos 30 dias)</CardTitle>
+                <UserMinus className="w-4 h-4 text-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="metric-desligados">{metrics.desligadosUltimos30d}</div>
               </CardContent>
             </Card>
           </div>
