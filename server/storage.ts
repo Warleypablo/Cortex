@@ -169,6 +169,7 @@ export interface IStorage {
   getMrrEvolucaoMensal(mesAnoFim: string): Promise<import("@shared/schema").MrrEvolucaoMensal[]>;
   getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]>;
   getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]>;
+  getTopClientesByLTV(limit?: number): Promise<{ nome: string; ltv: number; ltMeses: number; servicos: string }[]>;
   getDfc(dataInicio?: string, dataFim?: string): Promise<DfcHierarchicalResponse>;
   getGegMetricas(periodo: string, squad: string, setor: string): Promise<any>;
   getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string): Promise<any>;
@@ -531,6 +532,10 @@ export class MemStorage implements IStorage {
   }
 
   async getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTopClientesByLTV(limit: number = 10): Promise<{ nome: string; ltv: number; ltMeses: number; servicos: string }[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -3281,6 +3286,48 @@ export class DbStorage implements IStorage {
       valorTotal: parseFloat(row.valor_total || '0'),
       percentualChurn: parseFloat(row.percentual_churn || '0'),
       valorAtivoTotal: parseFloat(row.valor_ativo_total || '0'),
+    }));
+  }
+
+  async getTopClientesByLTV(limit: number = 10): Promise<{ nome: string; ltv: number; ltMeses: number; servicos: string }[]> {
+    const result = await db.execute(sql`
+      WITH cliente_ltv AS (
+        SELECT 
+          COALESCE(cc.nome, caz.nome, caz.empresa) as nome,
+          COALESCE(caz.ids, caz.id::text) as cliente_id,
+          (
+            SELECT COALESCE(SUM(cr.valor), 0)
+            FROM caz_receber cr
+            WHERE cr.cliente_id = COALESCE(caz.ids, caz.id::text)
+              AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
+          ) as ltv,
+          (
+            SELECT COUNT(DISTINCT TO_CHAR(COALESCE(cr.data_vencimento, cr.data_criacao), 'YYYY-MM'))
+            FROM caz_receber cr
+            WHERE cr.cliente_id = COALESCE(caz.ids, caz.id::text)
+              AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
+          ) as lt_meses,
+          (
+            SELECT string_agg(DISTINCT produto, ', ')
+            FROM cup_contratos
+            WHERE id_task = cc.task_id
+          ) as servicos
+        FROM cup_clientes cc
+        LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
+        WHERE caz.ids IS NOT NULL OR caz.id IS NOT NULL
+      )
+      SELECT nome, ltv, lt_meses as "ltMeses", COALESCE(servicos, '') as servicos
+      FROM cliente_ltv
+      WHERE ltv > 0
+      ORDER BY ltv DESC
+      LIMIT ${limit}
+    `);
+
+    return result.rows.map((row: any) => ({
+      nome: row.nome || 'Cliente sem nome',
+      ltv: parseFloat(row.ltv || '0'),
+      ltMeses: parseInt(row.ltMeses || '0'),
+      servicos: row.servicos || '',
     }));
   }
 
