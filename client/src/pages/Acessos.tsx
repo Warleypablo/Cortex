@@ -78,7 +78,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-type ClientWithCredentialCount = Client & { credential_count: number; cazClienteId?: number | null };
+type ClientWithCredentialCount = Client & { credential_count: number; cazClienteId?: number | null; platforms?: string[] };
 type ClientWithCredentials = Client & { credentials: Credential[] };
 
 type LogActionType = 'view_password' | 'copy_password' | 'add_credential' | 'edit_credential' | 'delete_credential' | 'add_client' | 'edit_client' | 'delete_client';
@@ -2075,7 +2075,11 @@ function ClientsTab() {
       filtered = clients.filter(
         (client) =>
           client.name?.toLowerCase().includes(query) ||
-          client.cnpj?.toLowerCase().includes(query)
+          client.cnpj?.toLowerCase().includes(query) ||
+          // Buscar também por plataforma
+          (client.platforms && client.platforms.some(platform => 
+            platform.toLowerCase().includes(query)
+          ))
       );
     } else if (showOnlyLinked) {
       // Mostra apenas clientes linkados (que têm cazClienteId)
@@ -2160,7 +2164,7 @@ function ClientsTab() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Buscar por empresa..."
+            placeholder="Buscar por empresa ou plataforma..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -2192,7 +2196,7 @@ function ClientsTab() {
 
       {searchQuery && (
         <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-          <span>Buscando por "{searchQuery}" em todos os clientes</span>
+          <span>Buscando por "{searchQuery}" em empresas e plataformas ({sortedAndFilteredClients.length} resultados)</span>
           <Button
             variant="ghost"
             size="sm"
@@ -2232,6 +2236,7 @@ function ClientsTab() {
                 <TableHead>
                   <SortableHeader field="name">Empresa</SortableHeader>
                 </TableHead>
+                <TableHead>Plataformas</TableHead>
                 <TableHead>
                   <SortableHeader field="status">Status</SortableHeader>
                 </TableHead>
@@ -2290,6 +2295,34 @@ function ClientsTab() {
                           </Tooltip>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {client.platforms && client.platforms.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                          {client.platforms.slice(0, 3).map((platform, idx) => {
+                            const isMatch = searchQuery && platform.toLowerCase().includes(searchQuery.toLowerCase());
+                            return (
+                              <Badge 
+                                key={idx} 
+                                variant="outline" 
+                                className={cn(
+                                  "text-xs",
+                                  isMatch && "border-primary bg-primary/10 text-primary"
+                                )}
+                              >
+                                {platform}
+                              </Badge>
+                            );
+                          })}
+                          {client.platforms.length > 3 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{client.platforms.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {!isTurboClient(client.name) && (
