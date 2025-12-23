@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar, Briefcase, Layers, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { ContratoCompleto } from "@shared/schema";
 
@@ -35,6 +35,11 @@ interface ClienteDb {
   createdAt: string | null;
   empresa: string | null;
   ids: string | null;
+  telefone: string | null;
+  responsavel: string | null;
+  cluster: string | null;
+  servicos: string | null;
+  dataInicio: Date | null;
 }
 
 interface ContaReceber {
@@ -347,46 +352,140 @@ export default function ClientDetail() {
     }
   };
 
+  const servicosAtivos = useMemo(() => {
+    if (!contratos) return [];
+    return contratos
+      .filter(c => {
+        const statusLower = c.status?.toLowerCase() || "";
+        return statusLower.includes("ativo") || statusLower.includes("active");
+      })
+      .map(c => c.servico)
+      .filter((s): s is string => !!s);
+  }, [contratos]);
+
   return (
     <div className="bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="mb-6">
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="hover-elevate -ml-2 mb-4" data-testid="button-back">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar para clientes
-            </Button>
-          </Link>
-          
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span>CNPJ: {cliente.cnpj || "N/A"}</span>
-                {cliente.endereco && (
-                  <>
-                    <span>•</span>
-                    <span>{cliente.endereco}</span>
-                  </>
-                )}
-                {cliente.createdAt && (
-                  <>
-                    <span>•</span>
-                    <span>Cadastro: {new Date(cliente.createdAt).toLocaleDateString('pt-BR')}</span>
-                  </>
-                )}
-              </div>
-            </div>
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <Link href="/">
+              <Button variant="ghost" size="sm" className="hover-elevate -ml-2" data-testid="button-back">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Voltar para clientes
+              </Button>
+            </Link>
             <div className="flex items-center gap-3">
               {temInadimplencia && (
                 <Badge variant="destructive" data-testid="badge-inadimplente">
                   Inadimplente
                 </Badge>
               )}
-              <Badge variant={temContratoAtivo ? "default" : "secondary"} data-testid="badge-status-cliente">
-                {temContratoAtivo ? "Ativo" : "Inativo"}
-              </Badge>
             </div>
           </div>
+          
+          <Card className="p-6" data-testid="card-client-info">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="flex items-start gap-3" data-testid="info-cnpj">
+                <Building2 className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">CNPJ</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium" data-testid="text-cnpj">{cliente.cnpj || "N/A"}</p>
+                    {cliente.cnpj && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => copyToClipboard(cliente.cnpj!, "CNPJ")}
+                        data-testid="button-copy-cnpj"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-endereco">
+                <MapPin className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Endereço</p>
+                  <p className="font-medium" data-testid="text-endereco">{cliente.endereco || "Não informado"}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-telefone">
+                <Phone className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Telefone</p>
+                  <p className="font-medium" data-testid="text-telefone">{cliente.telefone || "Não informado"}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-responsavel">
+                <User className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Responsável</p>
+                  <p className="font-medium" data-testid="text-responsavel">{cliente.responsavel || "Não informado"}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-data-cadastro">
+                <Calendar className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Data de Cadastro</p>
+                  <p className="font-medium" data-testid="text-data-cadastro">
+                    {cliente.createdAt 
+                      ? new Date(cliente.createdAt).toLocaleDateString('pt-BR')
+                      : cliente.dataInicio 
+                        ? new Date(cliente.dataInicio).toLocaleDateString('pt-BR')
+                        : "N/A"
+                    }
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-status">
+                <CheckCircle className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Status</p>
+                  <Badge variant={temContratoAtivo ? "default" : "secondary"} data-testid="badge-status-cliente">
+                    {temContratoAtivo ? "Ativo" : "Inativo"}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-cluster">
+                <Layers className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Cluster</p>
+                  <p className="font-medium" data-testid="text-cluster">{cliente.cluster || "Não definido"}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 md:col-span-2" data-testid="info-servicos">
+                <Briefcase className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Serviços Ativos</p>
+                  {servicosAtivos.length > 0 ? (
+                    <div className="flex flex-wrap gap-2" data-testid="list-servicos">
+                      {servicosAtivos.map((servico, idx) => (
+                        <Badge 
+                          key={idx} 
+                          variant="outline" 
+                          className="bg-primary/10"
+                          data-testid={`badge-servico-${idx}`}
+                        >
+                          {servico}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground" data-testid="text-no-servicos">Nenhum serviço ativo</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -423,7 +522,7 @@ export default function ClientDetail() {
           <div className="mb-8">
             <Card>
               <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between gap-4 mb-4">
                   <h2 className="text-xl font-semibold">Histórico de Faturamento</h2>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">Período:</span>
@@ -538,7 +637,7 @@ export default function ClientDetail() {
         </div>
 
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between gap-4 mb-6">
             <h2 className="text-2xl font-semibold">Contas a Receber</h2>
             {selectedMonth && (
               <div className="flex items-center gap-2">
@@ -640,7 +739,7 @@ export default function ClientDetail() {
                 </div>
 
                 {receitasTotalPages > 1 && (
-                  <div className="flex items-center justify-between p-4">
+                  <div className="flex items-center justify-between gap-4 p-4">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">Itens por página:</span>
                       <Select
@@ -748,7 +847,6 @@ export default function ClientDetail() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7"
                                   onClick={() => copyToClipboard(cred.username, "Login")}
                                   data-testid={`button-copy-username-${cred.id}`}
                                 >
@@ -773,7 +871,6 @@ export default function ClientDetail() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7"
                                     onClick={() => togglePasswordVisibility(cred.id)}
                                     data-testid={`button-toggle-password-${cred.id}`}
                                   >
@@ -786,7 +883,6 @@ export default function ClientDetail() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7"
                                     onClick={() => copyToClipboard(cred.password, "Senha")}
                                     data-testid={`button-copy-password-${cred.id}`}
                                   >
