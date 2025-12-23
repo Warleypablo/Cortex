@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, UserMinus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useSetPageInfo } from "@/contexts/PageContext";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDecimal } from "@/lib/utils";
 
 type ColaboradorComPatrimonios = Colaborador & {
   patrimonios: { id: number; numeroAtivo: string | null; descricao: string | null }[];
@@ -195,7 +195,7 @@ function calcularTempoTurboMeses(admissao: string | Date | null | undefined, dem
 function calcularTempoTurbo(admissao: string | Date | null | undefined, demissao: string | Date | null | undefined, status: string | null): string {
   const diffMonths = calcularTempoTurboMeses(admissao, demissao, status);
   if (diffMonths < 0) return "-";
-  const formatted = diffMonths.toFixed(1).replace(".", ",");
+  const formatted = formatDecimal(diffMonths, 1).replace(".", ",");
   return `${formatted} ${diffMonths === 1 ? "mês" : "meses"}`;
 }
 
@@ -2140,7 +2140,7 @@ export default function Colaboradores() {
                                     const meses = calcularMesesDesdeUltimoAumento(colaborador.ultimoAumento);
                                     return meses !== null && (
                                       <div className="text-xs text-muted-foreground" data-testid={`text-meses-ult-aumento-${colaborador.id}`}>
-                                        há {meses.toFixed(1).replace(".", ",")} {meses === 1 ? "mês" : "meses"}
+                                        há {formatDecimal(meses, 1).replace(".", ",")} {meses === 1 ? "mês" : "meses"}
                                       </div>
                                     );
                                   })()}
