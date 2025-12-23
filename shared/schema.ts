@@ -112,6 +112,11 @@ export const cupClientes = pgTable("cup_clientes", {
   cluster: text("cluster"),
   taskId: text("task_id"),
   responsavelGeral: text("responsavel_geral"),
+  site: text("site"),
+  email: text("email"),
+  instagram: text("instagram"),
+  linksContrato: text("links_contrato"),
+  linkListaClickup: text("link_lista_clickup"),
 });
 
 export const cupContratos = pgTable("cup_contratos", {
