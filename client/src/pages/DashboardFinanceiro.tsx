@@ -14,10 +14,11 @@ import {
   Loader2, TrendingUp, TrendingDown, DollarSign, X, ChevronRight, 
   ArrowUpCircle, ArrowDownCircle, Wallet, PieChart, Users, CreditCard,
   Building2, Target, BarChart3, LineChart as LineChartIcon, AlertTriangle,
-  Clock, Banknote, Receipt, FileWarning
+  Clock, Banknote, Receipt, FileWarning, Info
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, 
   Cell, ComposedChart, Line, PieChart as RechartsPie, Pie, AreaChart, Area,
   LineChart
 } from "recharts";
@@ -203,7 +204,7 @@ export default function DashboardFinanceiro() {
   };
 
   const KPICard = ({ 
-    title, value, subtitle, icon: Icon, trend, trendValue, loading, variant = 'default', trendPositive, iconVariant 
+    title, value, subtitle, icon: Icon, trend, trendValue, loading, variant = 'default', trendPositive, iconVariant, infoTooltip 
   }: { 
     title: string; 
     value: string; 
@@ -215,6 +216,7 @@ export default function DashboardFinanceiro() {
     variant?: 'default' | 'success' | 'danger' | 'warning';
     trendPositive?: boolean;
     iconVariant?: 'default' | 'success' | 'danger' | 'warning' | 'info';
+    infoTooltip?: string;
   }) => {
     const variantStyles = {
       default: 'text-foreground',
@@ -263,7 +265,21 @@ export default function DashboardFinanceiro() {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">{title}</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                {infoTooltip ? (
+                  <span className="flex items-center gap-1.5">
+                    {title}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{infoTooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+                ) : title}
+              </p>
               <p className={`text-2xl font-bold ${variantStyles[variant]}`}>{value}</p>
               {(trend || subtitle) && (
                 <div className="flex items-center gap-2 mt-1">
@@ -311,6 +327,7 @@ export default function DashboardFinanceiro() {
           trendValue={kpisCompletos?.variacaoReceita ? formatPercent(kpisCompletos.variacaoReceita) : undefined}
           subtitle="vs mês anterior"
           loading={isLoadingKpisCompletos}
+          infoTooltip="Soma das receitas registradas no mês atual"
         />
         <KPICard
           title="Despesa do Mês"
@@ -323,6 +340,7 @@ export default function DashboardFinanceiro() {
           iconVariant="danger"
           subtitle="vs mês anterior"
           loading={isLoadingKpisCompletos}
+          infoTooltip="Soma das despesas registradas no mês atual"
         />
         <KPICard
           title="Resultado do Mês"
@@ -330,14 +348,16 @@ export default function DashboardFinanceiro() {
           icon={Banknote}
           variant={(kpisCompletos?.resultadoMesAtual || 0) >= 0 ? 'success' : 'danger'}
           loading={isLoadingKpisCompletos}
+          infoTooltip="Receita menos Despesa do mês"
         />
         <KPICard
-          title="Margem do Mês"
+          title="Margem de Lucro"
           value={formatPercent(kpisCompletos?.margemMesAtual || 0)}
           icon={PieChart}
           variant={(kpisCompletos?.margemMesAtual || 0) >= 20 ? 'success' : (kpisCompletos?.margemMesAtual || 0) >= 0 ? 'warning' : 'danger'}
           subtitle="Receita - Despesa / Receita"
           loading={isLoadingKpisCompletos}
+          infoTooltip="Resultado dividido pela Receita (%)"
         />
       </div>
 
@@ -385,7 +405,7 @@ export default function DashboardFinanceiro() {
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="mesLabel" tick={{ fill: 'currentColor', fontSize: 11 }} />
                   <YAxis tick={{ fill: 'currentColor' }} tickFormatter={formatCurrencyCompact} />
-                  <Tooltip 
+                  <RechartsTooltip 
                     formatter={(value: number) => formatCurrency(value)}
                     contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
                   />
@@ -421,7 +441,7 @@ export default function DashboardFinanceiro() {
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="mesLabel" tick={{ fill: 'currentColor', fontSize: 11 }} />
                   <YAxis tick={{ fill: 'currentColor' }} tickFormatter={(v) => `${v.toFixed(0)}%`} />
-                  <Tooltip 
+                  <RechartsTooltip 
                     formatter={(value: number) => formatPercent(value)}
                     contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
                   />
@@ -514,7 +534,7 @@ export default function DashboardFinanceiro() {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                    <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
                   </RechartsPie>
                 </ResponsiveContainer>
                 <div className="w-1/2 space-y-2">
@@ -566,7 +586,7 @@ export default function DashboardFinanceiro() {
                     tick={{ fill: 'currentColor', fontSize: 11 }}
                     tickFormatter={(value) => value.length > 20 ? value.substring(0, 20) + '...' : value}
                   />
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
                   <Bar dataKey="valor" name="Valor" fill="#22c55e" radius={[0, 4, 4, 0]}>
                     {categoriasReceita.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -607,7 +627,7 @@ export default function DashboardFinanceiro() {
                     tick={{ fill: 'currentColor', fontSize: 11 }}
                     tickFormatter={(value) => value.length > 20 ? value.substring(0, 20) + '...' : value}
                   />
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
                   <Bar dataKey="valor" name="Valor" radius={[0, 4, 4, 0]}>
                     {categoriasDespesa.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS_DESPESA[index % COLORS_DESPESA.length]} />
@@ -729,7 +749,7 @@ export default function DashboardFinanceiro() {
                   tick={{ fill: 'currentColor', fontSize: 11 }}
                   tickFormatter={(value) => value.length > 25 ? value.substring(0, 25) + '...' : value}
                 />
-                <Tooltip 
+                <RechartsTooltip 
                   formatter={(value: number) => formatCurrency(value)} 
                   contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
                 />
@@ -836,7 +856,7 @@ export default function DashboardFinanceiro() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="mes" tick={{ fill: 'currentColor' }} />
                 <YAxis tick={{ fill: 'currentColor' }} tickFormatter={formatCurrencyCompact} />
-                <Tooltip 
+                <RechartsTooltip 
                   formatter={(value: number) => formatCurrency(value)}
                   contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
                 />
@@ -892,7 +912,7 @@ export default function DashboardFinanceiro() {
                     <XAxis dataKey="dia" tick={{ fill: 'currentColor', fontSize: 11 }} angle={-45} textAnchor="end" height={80} />
                     <YAxis yAxisId="left" tick={{ fill: 'currentColor' }} tickFormatter={formatCurrencyCompact} />
                     <YAxis yAxisId="right" orientation="right" tick={{ fill: 'currentColor' }} tickFormatter={formatCurrencyCompact} />
-                    <Tooltip 
+                    <RechartsTooltip 
                       formatter={(value: number, name: string) => [formatCurrency(value), name === 'saldoAcumulado' ? 'Saldo Acumulado' : name]}
                       contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
                     />

@@ -37,7 +37,8 @@ import {
   Repeat,
   X,
   Calendar,
-  Monitor
+  Monitor,
+  Info
 } from "lucide-react";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
 
@@ -554,6 +555,14 @@ export default function DashboardClosers() {
               <div className="flex items-center gap-2 mb-2">
                 <Repeat className="w-5 h-5 text-emerald-400" />
                 <span className="text-sm font-medium text-emerald-300">MRR Obtido</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-emerald-300/70 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Receita Mensal Recorrente dos negócios fechados</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               {isLoading ? (
                 <Skeleton className="h-10 w-32" />
@@ -582,6 +591,14 @@ export default function DashboardClosers() {
               <div className="flex items-center gap-2 mb-2">
                 <DollarSign className="w-5 h-5 text-blue-400" />
                 <span className="text-sm font-medium text-blue-300">Pontual Obtido</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-blue-300/70 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Receita pontual (não recorrente) dos negócios fechados</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               {isLoading ? (
                 <Skeleton className="h-10 w-32" />
@@ -610,6 +627,14 @@ export default function DashboardClosers() {
               <div className="flex items-center gap-2 mb-2">
                 <Users className="w-5 h-5 text-violet-400" />
                 <span className="text-sm font-medium text-violet-300">Reuniões</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-violet-300/70 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Reuniões realizadas pelos closers</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               {isLoading ? (
                 <Skeleton className="h-10 w-20" />
@@ -638,6 +663,14 @@ export default function DashboardClosers() {
               <div className="flex items-center gap-2 mb-2">
                 <Handshake className="w-5 h-5 text-amber-400" />
                 <span className="text-sm font-medium text-amber-300">Negócios</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-amber-300/70 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Quantidade de negócios fechados no período</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               {isLoading ? (
                 <Skeleton className="h-10 w-20" />
@@ -666,6 +699,14 @@ export default function DashboardClosers() {
               <div className="flex items-center gap-2 mb-2">
                 <Target className="w-5 h-5 text-rose-400" />
                 <span className="text-sm font-medium text-rose-300">Conversão</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-rose-300/70 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Negócios ganhos dividido por reuniões (%)</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               {isLoading ? (
                 <Skeleton className="h-10 w-20" />

@@ -4,7 +4,7 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Search, Package, Filter, ChevronUp, ChevronDown, 
-  DollarSign, TrendingUp, CheckCircle, X, Users, Phone, Pencil, Check, ChevronsUpDown
+  DollarSign, TrendingUp, CheckCircle, X, Users, Phone, Pencil, Check, ChevronsUpDown, Info
 } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,6 +57,11 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ColaboradorDropdown {
   id: number;
@@ -550,7 +555,17 @@ export default function Patrimonio() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Total de Ativos</p>
+                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      Total de Ativos
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Total de itens cadastrados no patrimônio</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </span>
                     <p className="text-2xl font-bold">{stats.totalAtivos}</p>
                   </div>
                   <div className="p-3 bg-primary/10 rounded-full">
@@ -581,7 +596,17 @@ export default function Patrimonio() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Computadores Atribuídos</p>
+                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      Computadores Atribuídos
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Itens com responsável definido</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </span>
                     <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.computadoresNotebooksAtribuidos}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       de {stats.computadoresNotebooksBom} disponíveis
