@@ -13,7 +13,7 @@ type ColaboradorComPatrimonios = Colaborador & {
 };
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { z } from "zod";
 import {
@@ -1490,6 +1490,18 @@ export default function Colaboradores() {
     queryKey: ["/api/rh/niveis"],
   });
 
+  const { data: userPhotos = {} } = useQuery<Record<string, string>>({
+    queryKey: ["/api/user-photos"],
+  });
+
+  const getColaboradorPhoto = (colaborador: ColaboradorComPatrimonios) => {
+    const email = colaborador.emailTurbo?.toLowerCase().trim();
+    if (email && userPhotos[email]) {
+      return userPhotos[email];
+    }
+    return null;
+  };
+
   const filteredColaboradores = useMemo(() => {
     let filtered = colaboradores;
 
@@ -1718,6 +1730,10 @@ export default function Colaboradores() {
                           <TableCell className="py-3">
                             <div className="flex items-center gap-3">
                               <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
+                                <AvatarImage 
+                                  src={getColaboradorPhoto(colaborador) || undefined} 
+                                  alt={colaborador.nome}
+                                />
                                 <AvatarFallback className="bg-primary/10 text-primary font-medium">
                                   {getInitials(colaborador.nome)}
                                 </AvatarFallback>
