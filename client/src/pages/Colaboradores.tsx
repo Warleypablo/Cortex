@@ -1598,6 +1598,13 @@ export default function Colaboradores() {
     queryKey: ["/api/rh/squads"],
   });
 
+  const getSquadWithEmoji = useMemo(() => {
+    return (squadValue: string | null): string => {
+      if (!squadValue) return "";
+      return findMatchingSquad(squadValue, squads) || squadValue;
+    };
+  }, [squads]);
+
   const { data: cargos = [] } = useQuery<CargoOption[]>({
     queryKey: ["/api/rh/cargos"],
   });
@@ -2030,10 +2037,10 @@ export default function Colaboradores() {
                             {colaborador.squad ? (
                               <Badge
                                 variant="secondary"
-                                className={squadColors[colaborador.squad] || "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400"}
+                                className={squadColors[stripEmoji(colaborador.squad)] || "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400"}
                                 data-testid={`badge-squad-${colaborador.id}`}
                               >
-                                {colaborador.squad}
+                                {getSquadWithEmoji(colaborador.squad)}
                               </Badge>
                             ) : (
                               <span className="text-muted-foreground text-sm">-</span>
