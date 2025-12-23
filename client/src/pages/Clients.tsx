@@ -388,7 +388,7 @@ export default function Clients() {
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0 overflow-hidden" align="end">
+            <PopoverContent className="w-96 p-0 overflow-hidden" align="end">
               <div className="flex items-center justify-between p-4 pb-2 border-b">
                 <h4 className="font-medium text-sm">Filtros</h4>
                 {hasActiveFilters && (
