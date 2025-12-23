@@ -8414,6 +8414,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Get all credentials platforms for each client
+      const credentialsPlatformsResult = await db.execute(sql`
+        SELECT client_id, array_agg(DISTINCT platform) as platforms 
+        FROM credentials 
+        GROUP BY client_id
+      `);
+      const clientPlatformsMap = new Map<string, string[]>();
+      for (const row of credentialsPlatformsResult.rows as any[]) {
+        clientPlatformsMap.set(row.client_id, row.platforms || []);
+      }
+      
       let result;
       if (search) {
         const searchPattern = `%${search}%`;
@@ -8454,10 +8465,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
+        // Get platforms for this client
+        const platforms = clientPlatformsMap.get(row.id) || [];
+        
         return {
           ...mapClient(row),
           status,
           cazClienteId,
+          platforms,
         };
       });
       
