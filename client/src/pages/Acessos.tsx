@@ -2218,7 +2218,7 @@ function ClientsTab() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Link 
-                                href={`/clientes/${encodeURIComponent(client.linkedClientCnpj)}`}
+                                href={`/cliente/${encodeURIComponent(client.linkedClientCnpj)}`}
                                 onClick={(e) => e.stopPropagation()}
                                 className="inline-flex hover:scale-110 transition-transform"
                                 data-testid={`link-client-page-${client.id}`}
