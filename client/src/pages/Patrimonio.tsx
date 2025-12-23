@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Search, Package, Filter, ChevronUp, ChevronDown, 
@@ -38,6 +38,7 @@ interface PatrimonioDb {
   marca: string | null;
   estadoConservacao: string | null;
   responsavelAtual: string | null;
+  responsavelId: number | null;
   valorPago: string | null;
   valorMercado: string | null;
   valorVenda: string | null;
@@ -607,7 +608,17 @@ export default function Patrimonio() {
                                   )}
                                 </TableCell>
                                 <TableCell data-testid={`responsavel-${item.id}`}>
-                                  {item.responsavelAtual || "-"}
+                                  {item.responsavelAtual && item.responsavelId ? (
+                                    <Link 
+                                      href={`/colaboradores/${item.responsavelId}`}
+                                      className="text-primary hover:underline cursor-pointer"
+                                      data-testid={`link-responsavel-${item.id}`}
+                                    >
+                                      {item.responsavelAtual}
+                                    </Link>
+                                  ) : (
+                                    item.responsavelAtual || "-"
+                                  )}
                                 </TableCell>
                                 <TableCell className="font-semibold" data-testid={`valor-pago-${item.id}`}>
                                   {formatCurrency(item.valorPago)}
