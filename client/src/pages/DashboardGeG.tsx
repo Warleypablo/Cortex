@@ -198,15 +198,6 @@ export default function DashboardGeG() {
     return `${meses[parseInt(mes) - 1]}/${ano.slice(2)}`;
   };
 
-  const formatDecimal = (value: number): string => {
-    if (Number.isInteger(value)) return value.toString();
-    const rounded = Math.round(value * 100) / 100;
-    if (Number.isInteger(rounded)) return rounded.toString();
-    const formatted = rounded.toFixed(2);
-    if (formatted.endsWith('0')) return rounded.toFixed(1);
-    return formatted;
-  };
-
   const formatData = (data: string) => {
     const date = new Date(data);
     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
