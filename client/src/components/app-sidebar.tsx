@@ -103,7 +103,6 @@ const dashboardCategories = [
     subItems: [
       { title: "Visão Geral", url: "/visao-geral", icon: Eye },
       { title: "Análise de Retenção", url: "/dashboard/retencao", icon: UserCheck },
-      { title: "Meta Ads", url: "/dashboard/meta-ads", icon: Target },
     ],
   },
   {
@@ -134,6 +133,7 @@ const dashboardCategories = [
     baseUrl: "/growth",
     subItems: [
       { title: "Visão Geral", url: "/growth/visao-geral", icon: Eye },
+      { title: "Meta Ads", url: "/dashboard/meta-ads", icon: Target },
       { title: "Por Plataforma", url: "/growth/performance-plataformas", icon: Layers },
       { title: "Criativos", url: "/growth/criativos", icon: Image },
     ],
