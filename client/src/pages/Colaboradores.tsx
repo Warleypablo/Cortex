@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, UserMinus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, ArrowUpDown, Info } from "lucide-react";
+import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, UserMinus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, ArrowUpDown, Info, TrendingUp, TrendingDown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link, useLocation } from "wouter";
 import { useSetPageInfo } from "@/contexts/PageContext";
@@ -1875,7 +1875,7 @@ export default function Colaboradores() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="metrics-summary">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4" data-testid="metrics-summary">
             <Card className="hover-elevate">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total de Colaboradores</CardTitle>
@@ -1897,7 +1897,7 @@ export default function Colaboradores() {
             <Card className="hover-elevate">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <div className="flex items-center gap-1">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Novos</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Contratados</CardTitle>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
@@ -1910,7 +1910,7 @@ export default function Colaboradores() {
                 <UserPlus className="w-4 h-4 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400" data-testid="metric-novos">{metrics.novosUltimos30d}</div>
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400" data-testid="metric-contratados">{metrics.novosUltimos30d}</div>
               </CardContent>
             </Card>
             <Card className="hover-elevate">
@@ -1930,6 +1930,34 @@ export default function Colaboradores() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600 dark:text-red-400" data-testid="metric-desligados">{metrics.desligadosUltimos30d}</div>
+              </CardContent>
+            </Card>
+            <Card className="hover-elevate">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <div className="flex items-center gap-1">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Crescimento</CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Saldo entre contratados e desligados nos últimos 30 dias</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                {(metrics.novosUltimos30d - metrics.desligadosUltimos30d) >= 0 ? (
+                  <TrendingUp className="w-4 h-4 text-green-500" />
+                ) : (
+                  <TrendingDown className="w-4 h-4 text-red-500" />
+                )}
+              </CardHeader>
+              <CardContent>
+                <div 
+                  className={`text-2xl font-bold ${(metrics.novosUltimos30d - metrics.desligadosUltimos30d) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                  data-testid="metric-crescimento"
+                >
+                  {(metrics.novosUltimos30d - metrics.desligadosUltimos30d) > 0 ? '+' : ''}{metrics.novosUltimos30d - metrics.desligadosUltimos30d}
+                </div>
               </CardContent>
             </Card>
           </div>
