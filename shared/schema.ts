@@ -1155,6 +1155,24 @@ export const insertJuridicoClienteSchema = createInsertSchema(juridicoClientes).
 export type JuridicoCliente = typeof juridicoClientes.$inferSelect;
 export type InsertJuridicoCliente = z.infer<typeof insertJuridicoClienteSchema>;
 
+// Tabela para comunicações/avisos internos sobre clientes
+export const clienteComunicacoes = pgTable("cliente_comunicacoes", {
+  id: serial("id").primaryKey(),
+  clienteId: text("cliente_id").notNull(),
+  tipo: varchar("tipo", { length: 30 }).notNull(), // 'aviso' | 'reuniao' | 'alerta' | 'atualizacao' | 'interno'
+  titulo: varchar("titulo", { length: 200 }).notNull(),
+  conteudo: text("conteudo"),
+  prioridade: varchar("prioridade", { length: 20 }).default("normal"), // 'baixa' | 'normal' | 'alta' | 'urgente'
+  status: varchar("status", { length: 20 }).default("ativo"), // 'ativo' | 'arquivado'
+  criadoPor: varchar("criado_por", { length: 100 }).notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const insertClienteComunicacaoSchema = createInsertSchema(clienteComunicacoes).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type ClienteComunicacao = typeof clienteComunicacoes.$inferSelect;
+export type InsertClienteComunicacao = z.infer<typeof insertClienteComunicacaoSchema>;
+
 // Global Search Types
 export type SearchEntityType = 'cliente' | 'colaborador' | 'contrato' | 'cobranca' | 'projeto' | 'acesso' | 'credencial' | 'conhecimento' | 'ferramenta' | 'patrimonio' | 'beneficio';
 
