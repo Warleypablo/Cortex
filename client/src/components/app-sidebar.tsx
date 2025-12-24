@@ -169,6 +169,14 @@ const dashboardCategories = [
       { title: "Investors Report", url: "/investors-report", icon: TrendingUp },
     ],
   },
+  {
+    title: "OKR 2026",
+    icon: Trophy,
+    baseUrl: "/okr-2026",
+    subItems: [
+      { title: "Dashboard", url: "/okr-2026", icon: Target },
+    ],
+  },
 ];
 
 
