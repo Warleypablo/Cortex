@@ -165,6 +165,24 @@ function formatDateFns(date: string | Date | null | undefined) {
   }
 }
 
+// Extract cidade from endereco field if cidade column is empty
+function getCidadeFromEndereco(endereco: string | null, cidadeColumn: string | null): string {
+  if (cidadeColumn) return cidadeColumn;
+  if (!endereco) return "";
+  // Try to extract city from address patterns like "..., CityName SP - ..." or "..., CityName - Neighborhood, ..."
+  const patterns = [
+    /,\s*([A-Za-zÀ-ú\s]+)\s+[A-Z]{2}\s*-/,  // "..., Votorantim SP - ..."
+    /,\s*([A-Za-zÀ-ú\s]+)\s*-\s*[A-Za-zÀ-ú\s]+,/,  // "..., City - Neighborhood, ..."
+  ];
+  for (const pattern of patterns) {
+    const match = endereco.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  return "";
+}
+
 function formatCurrency(value: string | number | null | undefined) {
   if (!value) return "-";
   try {
@@ -733,24 +751,6 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
       return estado.split(" - ")[0].trim();
     }
     return estado;
-  };
-
-  // Extract cidade from endereco field if cidade column is empty
-  const getCidadeFromEndereco = (endereco: string | null, cidadeColumn: string | null): string => {
-    if (cidadeColumn) return cidadeColumn;
-    if (!endereco) return "";
-    // Try to extract city from address patterns like "..., CityName SP - ..." or "..., CityName - Neighborhood, ..."
-    const patterns = [
-      /,\s*([A-Za-zÀ-ú\s]+)\s+[A-Z]{2}\s*-/,  // "..., Votorantim SP - ..."
-      /,\s*([A-Za-zÀ-ú\s]+)\s*-\s*[A-Za-zÀ-ú\s]+,/,  // "..., City - Neighborhood, ..."
-    ];
-    for (const pattern of patterns) {
-      const match = endereco.match(pattern);
-      if (match && match[1]) {
-        return match[1].trim();
-      }
-    }
-    return "";
   };
 
   const form = useForm<InsertColaborador & { demissao?: string; tipoDemissao?: string; ultimoAumento?: string; cidade?: string; userId?: string | null }>({
