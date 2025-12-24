@@ -695,7 +695,19 @@ export default function DashboardGeG() {
                           'Fragmentados': '🧩 Fragmentados (OFF)',
                           'Makers': '🛠️ Makers',
                         };
-                        const removeEmoji = (str: string) => str.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u2693]/gu, '').trim();
+                        const removeEmoji = (str: string) => {
+                          return str.split('').filter(char => {
+                            const code = char.codePointAt(0) || 0;
+                            return !(
+                              (code >= 0x1F300 && code <= 0x1F9FF) ||
+                              (code >= 0x2600 && code <= 0x26FF) ||
+                              (code >= 0x2700 && code <= 0x27BF) ||
+                              (code >= 0x1F600 && code <= 0x1F64F) ||
+                              (code >= 0x1F680 && code <= 0x1F6FF) ||
+                              code === 0x2693
+                            );
+                          }).join('').trim();
+                        };
                         const formatSquadName = (nome: string) => {
                           const cleanName = removeEmoji(nome);
                           return squadIcons[cleanName] || nome;
