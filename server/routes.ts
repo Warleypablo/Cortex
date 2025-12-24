@@ -9285,6 +9285,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST update ClickUp links for clientes based on CNPJ
+  app.post("/api/clientes/update-clickup-links", async (req, res) => {
+    try {
+      const { data } = req.body;
+      
+      if (!data || !Array.isArray(data)) {
+        return res.status(400).json({ error: "Data must be an array of {link, cnpj} objects" });
+      }
+      
+      let updated = 0;
+      let notFound = 0;
+      const errors: string[] = [];
+      
+      for (const item of data) {
+        const { link, cnpj } = item;
+        
+        if (!link || !cnpj) {
+          errors.push(`Invalid item: missing link or cnpj`);
+          continue;
+        }
+        
+        // Clean CNPJ - remove any non-numeric characters
+        const cleanCnpj = cnpj.replace(/\D/g, '');
+        
+        try {
+          const result = await db.execute(sql`
+            UPDATE cup_clientes 
+            SET link_lista_clickup = ${link}
+            WHERE REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') = ${cleanCnpj}
+            RETURNING cnpj
+          `);
+          
+          if (result.rows.length > 0) {
+            updated++;
+          } else {
+            notFound++;
+          }
+        } catch (err) {
+          errors.push(`Error updating CNPJ ${cnpj}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        updated, 
+        notFound, 
+        total: data.length,
+        errors: errors.length > 0 ? errors.slice(0, 10) : undefined
+      });
+    } catch (error) {
+      console.error("[api] Error updating ClickUp links:", error);
+      res.status(500).json({ error: "Failed to update ClickUp links" });
+    }
+  });
+
   // POST AI matching for client linking - improved algorithm
   app.post("/api/acessos/ai-match-clients", async (req, res) => {
     try {
