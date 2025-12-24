@@ -173,17 +173,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Get structure of cup_projetos_tech
       const projetosAtivos = await db.execute(sql`
-        SELECT * FROM staging.cup_projetos_tech LIMIT 5
+        SELECT * FROM cup_projetos_tech LIMIT 5
       `);
       
       // Get structure of cup_projetos_tech_fechados
       const projetosFechados = await db.execute(sql`
-        SELECT * FROM staging.cup_projetos_tech_fechados LIMIT 5
+        SELECT * FROM cup_projetos_tech_fechados LIMIT 5
       `);
       
       // Get structure of cup_tech_tasks
       const tasks = await db.execute(sql`
-        SELECT * FROM staging.cup_tech_tasks LIMIT 5
+        SELECT * FROM cup_tech_tasks LIMIT 5
       `);
       
       // Get column info
@@ -192,9 +192,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const columnsTasks = tasks.rows.length > 0 ? Object.keys(tasks.rows[0] as object) : [];
       
       // Get counts
-      const countAtivos = await db.execute(sql`SELECT COUNT(*) as count FROM staging.cup_projetos_tech`);
-      const countFechados = await db.execute(sql`SELECT COUNT(*) as count FROM staging.cup_projetos_tech_fechados`);
-      const countTasks = await db.execute(sql`SELECT COUNT(*) as count FROM staging.cup_tech_tasks`);
+      const countAtivos = await db.execute(sql`SELECT COUNT(*) as count FROM cup_projetos_tech`);
+      const countFechados = await db.execute(sql`SELECT COUNT(*) as count FROM cup_projetos_tech_fechados`);
+      const countTasks = await db.execute(sql`SELECT COUNT(*) as count FROM cup_tech_tasks`);
       
       res.json({
         cup_projetos_tech: {
@@ -9088,8 +9088,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json([]);
       }
       
+      // Build the array format for PostgreSQL
+      const idsArray = `{${ids.join(',')}}`;
+      
       const clientsResult = await db.execute(sql`
-        SELECT * FROM clients WHERE id::text = ANY(${ids})
+        SELECT * FROM clients WHERE id::text = ANY(${idsArray}::text[])
       `);
       
       if (clientsResult.rows.length === 0) {
@@ -9097,7 +9100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const credentialsResult = await db.execute(sql`
-        SELECT * FROM credentials WHERE client_id::text = ANY(${ids}) ORDER BY platform
+        SELECT * FROM credentials WHERE client_id::text = ANY(${idsArray}::text[]) ORDER BY platform
       `);
       
       const credentialsByClientId = new Map<string, any[]>();
@@ -10309,15 +10312,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 1. Birthday notifications (today + next 3 days)
       const birthdayResult = await db.execute(sql`
-        SELECT id, nome, nascimento
-        FROM staging.rh_pessoal
-        WHERE nascimento IS NOT NULL
+        SELECT id, nome, aniversario as nascimento
+        FROM rh_pessoal
+        WHERE aniversario IS NOT NULL
           AND demissao IS NULL
           AND (
-            (EXTRACT(MONTH FROM nascimento) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(DAY FROM nascimento) = EXTRACT(DAY FROM CURRENT_DATE))
-            OR (EXTRACT(MONTH FROM nascimento) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 day') AND EXTRACT(DAY FROM nascimento) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '1 day'))
-            OR (EXTRACT(MONTH FROM nascimento) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '2 days') AND EXTRACT(DAY FROM nascimento) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '2 days'))
-            OR (EXTRACT(MONTH FROM nascimento) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '3 days') AND EXTRACT(DAY FROM nascimento) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '3 days'))
+            (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE))
+            OR (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 day') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '1 day'))
+            OR (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '2 days') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '2 days'))
+            OR (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '3 days') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '3 days'))
           )
       `);
       
@@ -10356,7 +10359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 2. Contract expiring notifications (next 30 days)
       const contractResult = await db.execute(sql`
         SELECT c.id, c.cnpj, c.data_encerramento, cl.name as client_name
-        FROM staging.contratos c
+        FROM contratos c
         LEFT JOIN clients cl ON cl.cnpj = c.cnpj
         WHERE c.data_encerramento IS NOT NULL
           AND c.data_encerramento >= CURRENT_DATE
@@ -10388,8 +10391,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 3. Overdue payments notifications (>7 days overdue)
       const overdueResult = await db.execute(sql`
         SELECT DISTINCT c.cnpj, cl.name as client_name, COUNT(*) as parcelas_vencidas, SUM(p.valor) as total_devido
-        FROM staging.parcelas p
-        JOIN staging.contratos c ON c.id = p.contrato_id
+        FROM parcelas p
+        JOIN contratos c ON c.id = p.contrato_id
         LEFT JOIN clients cl ON cl.cnpj = c.cnpj
         WHERE p.data_vencimento < CURRENT_DATE - INTERVAL '7 days'
           AND p.status != 'Pago'
