@@ -438,10 +438,7 @@ export default function DashboardGeG() {
               {isLoadingMetricas ? (
                 <Skeleton className="h-8 w-16" />
               ) : (
-                <>
-                  <div className="text-2xl font-bold" data-testid="text-headcount">{metricas?.headcount || 0}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Colaboradores ativos</p>
-                </>
+                <div className="text-2xl font-bold" data-testid="text-headcount">{metricas?.headcount || 0}</div>
               )}
             </CardContent>
           </Card>
@@ -465,10 +462,7 @@ export default function DashboardGeG() {
               {isLoadingMetricas ? (
                 <Skeleton className="h-8 w-16" />
               ) : (
-                <>
-                  <div className="text-2xl font-bold" data-testid="text-turnover">{metricas?.turnover || 0}%</div>
-                  <p className="text-xs text-muted-foreground mt-1">No período</p>
-                </>
+                <div className="text-2xl font-bold" data-testid="text-turnover">{metricas?.turnover || 0}%</div>
               )}
             </CardContent>
           </Card>
@@ -492,10 +486,7 @@ export default function DashboardGeG() {
               {isLoadingMetricas ? (
                 <Skeleton className="h-8 w-16" />
               ) : (
-                <>
-                  <div className="text-2xl font-bold text-green-600" data-testid="text-contratados">{metricas?.admissoes || 0}</div>
-                  <p className="text-xs text-muted-foreground mt-1">No período</p>
-                </>
+                <div className="text-2xl font-bold text-green-600" data-testid="text-contratados">{metricas?.admissoes || 0}</div>
               )}
             </CardContent>
           </Card>
@@ -519,10 +510,7 @@ export default function DashboardGeG() {
               {isLoadingMetricas ? (
                 <Skeleton className="h-8 w-16" />
               ) : (
-                <>
-                  <div className="text-2xl font-bold text-red-600" data-testid="text-demissoes">{metricas?.demissoes || 0}</div>
-                  <p className="text-xs text-muted-foreground mt-1">No período</p>
-                </>
+                <div className="text-2xl font-bold text-red-600" data-testid="text-demissoes">{metricas?.demissoes || 0}</div>
               )}
             </CardContent>
           </Card>
@@ -550,12 +538,9 @@ export default function DashboardGeG() {
               {isLoadingMetricas ? (
                 <Skeleton className="h-8 w-16" />
               ) : (
-                <>
-                  <div className={`text-2xl font-bold ${((metricas?.admissoes || 0) - (metricas?.demissoes || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`} data-testid="text-crescimento">
-                    {((metricas?.admissoes || 0) - (metricas?.demissoes || 0)) >= 0 ? '+' : ''}{(metricas?.admissoes || 0) - (metricas?.demissoes || 0)}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">No período</p>
-                </>
+                <div className={`text-2xl font-bold ${((metricas?.admissoes || 0) - (metricas?.demissoes || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`} data-testid="text-crescimento">
+                  {((metricas?.admissoes || 0) - (metricas?.demissoes || 0)) >= 0 ? '+' : ''}{(metricas?.admissoes || 0) - (metricas?.demissoes || 0)}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -579,12 +564,9 @@ export default function DashboardGeG() {
               {isLoadingTempoPermanencia ? (
                 <Skeleton className="h-8 w-16" />
               ) : (
-                <>
-                  <div className="text-2xl font-bold" data-testid="text-tempo-ativos">
-                    {tempoPermanencia?.tempoMedioAtivos ? formatDecimal(tempoPermanencia.tempoMedioAtivos) : '0'}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">meses (ativos)</p>
-                </>
+                <div className="text-2xl font-bold" data-testid="text-tempo-ativos">
+                  {tempoPermanencia?.tempoMedioAtivos ? formatDecimal(tempoPermanencia.tempoMedioAtivos) : '0'}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -608,12 +590,9 @@ export default function DashboardGeG() {
               {isLoadingTempoPermanencia ? (
                 <Skeleton className="h-8 w-16" />
               ) : (
-                <>
-                  <div className="text-2xl font-bold text-red-600" data-testid="text-tempo-desligados">
-                    {tempoPermanencia?.tempoMedioDesligados ? formatDecimal(tempoPermanencia.tempoMedioDesligados) : '0'}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">meses (desligados)</p>
-                </>
+                <div className="text-2xl font-bold text-red-600" data-testid="text-tempo-desligados">
+                  {tempoPermanencia?.tempoMedioDesligados ? formatDecimal(tempoPermanencia.tempoMedioDesligados) : '0'}
+                </div>
               )}
             </CardContent>
           </Card>
