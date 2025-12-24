@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { LogOut, Bell, AlertTriangle, CheckCircle, X, Check, Settings, Shield, Activity, Cake, FileText } from "lucide-react";
+import { LogOut, Bell, AlertTriangle, CheckCircle, X, Check, Settings, Shield, Cake, FileText } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -404,12 +404,6 @@ export default function TopBar() {
                   <Link href="/admin/usuarios" className="flex items-center gap-2 cursor-pointer">
                     <Shield className="h-4 w-4" />
                     Gerenciar Usuários
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/logs" className="flex items-center gap-2 cursor-pointer">
-                    <Activity className="h-4 w-4" />
-                    Logs do Sistema
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>

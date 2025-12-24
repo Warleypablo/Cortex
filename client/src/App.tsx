@@ -38,7 +38,6 @@ const FluxoCaixa = lazy(() => import("@/pages/FluxoCaixa"));
 const MetaAds = lazy(() => import("@/pages/MetaAds"));
 const AuditoriaSistemas = lazy(() => import("@/pages/AuditoriaSistemas"));
 const AdminUsuarios = lazy(() => import("@/pages/AdminUsuarios"));
-const AdminLogs = lazy(() => import("@/pages/AdminLogs"));
 const AccessDenied = lazy(() => import("@/pages/AccessDenied"));
 const Login = lazy(() => import("@/pages/Login"));
 const DashboardClosers = lazy(() => import("@/pages/DashboardClosers"));
@@ -208,7 +207,6 @@ function ProtectedRouter() {
       
       {/* Admin */}
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
-      <Route path="/admin/logs">{() => <ProtectedRoute path="/admin/logs" component={AdminLogs} />}</Route>
       
       <Route>
         {() => (

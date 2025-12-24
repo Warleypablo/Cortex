@@ -124,8 +124,7 @@ interface DataReconciliation {
   notes: string | null;
 }
 
-export default function AdminLogs() {
-  useSetPageInfo("Logs do Sistema", "Monitore acessos, chamadas de API e status das integrações");
+export function AdminLogsContent() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [systemLogsPage, setSystemLogsPage] = useState(1);
   const [authLogsPage, setAuthLogsPage] = useState(1);
@@ -1013,4 +1012,9 @@ export default function AdminLogs() {
       </Tabs>
     </div>
   );
+}
+
+export default function AdminLogs() {
+  useSetPageInfo("Logs do Sistema", "Monitore acessos, chamadas de API e status das integrações");
+  return <AdminLogsContent />;
 }
