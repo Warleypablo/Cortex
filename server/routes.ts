@@ -66,6 +66,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY data_vencimento
       `);
       
+      const maxDatesResult = await db.execute(sql`
+        SELECT 
+          'caz_receber' as tabela,
+          MAX(data_vencimento) as max_vencimento,
+          MAX(data_criacao) as max_criacao,
+          COUNT(*) as total
+        FROM caz_receber
+        UNION ALL
+        SELECT 
+          'caz_parcelas' as tabela,
+          MAX(data_vencimento) as max_vencimento,
+          MAX(data_quitacao) as max_criacao,
+          COUNT(*) as total
+        FROM caz_parcelas
+      `);
+      
+      const clientesSimilares = await db.execute(sql`
+        SELECT id, nome, cnpj, ids 
+        FROM caz_clientes 
+        WHERE LOWER(nome) LIKE '%feira%'
+        ORDER BY nome
+      `);
+      
+      const faturasRecentes = await db.execute(sql`
+        SELECT id, cliente_id, cliente_nome, data_vencimento, total, status, descricao 
+        FROM caz_receber 
+        WHERE (LOWER(cliente_nome) LIKE '%feira%' OR LOWER(descricao) LIKE '%feira%')
+          AND data_vencimento >= '2024-11-01'
+        ORDER BY data_vencimento DESC
+        LIMIT 20
+      `);
+      
       res.json({
         cliente: {
           id: cliente.id,
@@ -77,7 +109,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receberCount: receberResult.rows.length,
         parcelasJan2025: jan2025Result.rows,
         ultimasParcelas: parcelasResult.rows.slice(0, 10),
-        ultimasReceber: receberResult.rows.slice(0, 10)
+        ultimasReceber: receberResult.rows.slice(0, 10),
+        statusTabelas: maxDatesResult.rows,
+        clientesSimilares: clientesSimilares.rows,
+        faturasRecentesFeira: faturasRecentes.rows
       });
     } catch (error) {
       console.error("[debug] Error:", error);
