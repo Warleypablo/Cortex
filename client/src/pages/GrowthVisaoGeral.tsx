@@ -28,6 +28,8 @@ interface KPICardProps {
 }
 
 function KPICard({ title, value, meta, metaPercent, vsLM, subtitle, icon, trend, infoTooltip }: KPICardProps) {
+  const hasTooltipContent = infoTooltip || subtitle;
+  
   return (
     <Card className="relative overflow-hidden hover-elevate transition-all">
       <CardContent className="p-4">
@@ -35,13 +37,20 @@ function KPICard({ title, value, meta, metaPercent, vsLM, subtitle, icon, trend,
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide truncate">{title}</p>
-              {infoTooltip && (
+              {hasTooltipContent && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="w-3.5 h-3.5 text-muted-foreground/60 hover:text-muted-foreground cursor-help flex-shrink-0" />
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[200px] text-xs">
-                    {infoTooltip}
+                  <TooltipContent side="top" className="max-w-[280px] text-xs">
+                    <div className="space-y-1.5">
+                      {infoTooltip && <p>{infoTooltip}</p>}
+                      {subtitle && (
+                        <p className="font-medium text-foreground border-t border-border pt-1.5 mt-1.5">
+                          {subtitle}
+                        </p>
+                      )}
+                    </div>
                   </TooltipContent>
                 </Tooltip>
               )}
@@ -65,9 +74,6 @@ function KPICard({ title, value, meta, metaPercent, vsLM, subtitle, icon, trend,
                   {formatPercent(Math.abs(vsLM))}
                 </span>
               </div>
-            )}
-            {subtitle && (
-              <p className="text-[10px] text-muted-foreground mt-1 truncate">{subtitle}</p>
             )}
           </div>
           <div className={`p-2 rounded-lg flex-shrink-0 ${trend === 'up' ? 'bg-green-100 dark:bg-green-500/20 text-green-600' : trend === 'down' ? 'bg-red-100 dark:bg-red-500/20 text-red-500' : 'bg-primary/10 text-primary'}`}>
