@@ -291,20 +291,22 @@ export type ContratoCompleto = {
   responsavelGeral: string | null;
 };
 
-export type UpdateContrato = {
-  servico?: string;
-  produto?: string;
-  status?: string;
-  valorr?: string;
-  valorp?: string;
-  dataInicio?: string;
-  dataEncerramento?: string;
-  dataSolicitacaoEncerramento?: string;
-  plano?: string;
-  squad?: string;
-  responsavel?: string;
-  csResponsavel?: string;
-};
+export const updateContratoSchema = z.object({
+  servico: z.string().optional(),
+  produto: z.string().optional(),
+  status: z.string().optional(),
+  valorr: z.string().optional(),
+  valorp: z.string().optional(),
+  dataInicio: z.string().optional(),
+  dataEncerramento: z.string().optional(),
+  dataSolicitacaoEncerramento: z.string().optional(),
+  plano: z.string().optional(),
+  squad: z.string().optional(),
+  responsavel: z.string().optional(),
+  csResponsavel: z.string().optional(),
+});
+
+export type UpdateContrato = z.infer<typeof updateContratoSchema>;
 
 export type ClienteContratoDetail = {
   clienteId: string;
