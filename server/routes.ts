@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertColaboradorSchema, insertPatrimonioSchema, insertRhCargoSchema, insertRhNivelSchema, insertRhSquadSchema, insertRhPromocaoSchema } from "@shared/schema";
+import { insertColaboradorSchema, insertPatrimonioSchema, insertRhCargoSchema, insertRhNivelSchema, insertRhSquadSchema, insertRhPromocaoSchema, updateContratoSchema } from "@shared/schema";
 import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
 import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser } from "./auth/userDb";
@@ -1411,12 +1411,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/contratos/:id", async (req, res) => {
+  app.patch("/api/contratos/:idSubtask", async (req, res) => {
     try {
-      const { id } = req.params;
-      const updateData = req.body;
+      const { idSubtask } = req.params;
+      const validation = updateContratoSchema.safeParse(req.body);
       
-      const contrato = await storage.updateContrato(id, updateData);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid data", details: validation.error });
+      }
+      
+      const contrato = await storage.updateContrato(idSubtask, validation.data);
       if (!contrato) {
         return res.status(404).json({ error: "Contrato não encontrado" });
       }
