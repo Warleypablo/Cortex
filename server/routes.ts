@@ -1066,6 +1066,215 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // Client Portal API - Tasks, Communications, Legal Status
+  // ============================================
+
+  // GET /api/cliente/:cnpj/tasks - Fetch tasks for a client
+  app.get("/api/cliente/:cnpj/tasks", async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      
+      // First get the client name from cup_clientes
+      const clienteResult = await db.execute(sql`
+        SELECT nome FROM cup_clientes WHERE cnpj = ${cnpj}
+      `);
+      
+      const clienteNome = clienteResult.rows.length > 0 ? (clienteResult.rows[0] as any).nome : null;
+      
+      // Query tasks from cup_tech_tasks, joining with cup_projetos_tech for project info
+      // Tasks can be linked by cliente name or CNPJ in the project
+      const tasksResult = await db.execute(sql`
+        SELECT 
+          t.id,
+          t.name,
+          t.status,
+          t.priority,
+          t.assignee,
+          t.due_date,
+          t.project_name,
+          t.project_id,
+          t.date_created,
+          t.date_updated
+        FROM cup_tech_tasks t
+        LEFT JOIN cup_projetos_tech p ON t.project_id = p.id OR t.project_name = p.cliente
+        WHERE 
+          t.project_name ILIKE ${clienteNome ? `%${clienteNome}%` : '%NOMATCH%'}
+          OR p.cliente ILIKE ${clienteNome ? `%${clienteNome}%` : '%NOMATCH%'}
+          OR p.cnpj = ${cnpj}
+        ORDER BY t.date_created DESC
+        LIMIT 100
+      `);
+      
+      res.json(tasksResult.rows);
+    } catch (error) {
+      console.error("[api] Error fetching client tasks:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // GET /api/cliente/:cnpj/comunicacoes - List all communications for a client
+  app.get("/api/cliente/:cnpj/comunicacoes", async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      const { status } = req.query;
+      
+      let result;
+      if (status) {
+        result = await db.execute(sql`
+          SELECT * FROM cliente_comunicacoes 
+          WHERE cliente_id = ${cnpj} AND status = ${status}
+          ORDER BY criado_em DESC
+        `);
+      } else {
+        result = await db.execute(sql`
+          SELECT * FROM cliente_comunicacoes 
+          WHERE cliente_id = ${cnpj}
+          ORDER BY criado_em DESC
+        `);
+      }
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching client communications:", error);
+      res.status(500).json({ error: "Failed to fetch communications" });
+    }
+  });
+
+  // POST /api/cliente/:cnpj/comunicacoes - Create new communication
+  app.post("/api/cliente/:cnpj/comunicacoes", async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      const { tipo, titulo, conteudo, prioridade, status } = req.body;
+      const criadoPor = (req as any).user?.email || 'sistema';
+      
+      if (!tipo || !titulo) {
+        return res.status(400).json({ error: "Tipo e título são obrigatórios" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO cliente_comunicacoes (cliente_id, tipo, titulo, conteudo, prioridade, status, criado_por, criado_em, atualizado_em)
+        VALUES (${cnpj}, ${tipo}, ${titulo}, ${conteudo || null}, ${prioridade || 'normal'}, ${status || 'ativo'}, ${criadoPor}, NOW(), NOW())
+        RETURNING *
+      `);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating communication:", error);
+      res.status(500).json({ error: "Failed to create communication" });
+    }
+  });
+
+  // PATCH /api/cliente/:cnpj/comunicacoes/:id - Update communication
+  app.patch("/api/cliente/:cnpj/comunicacoes/:id", async (req, res) => {
+    try {
+      const { cnpj, id } = req.params;
+      const { tipo, titulo, conteudo, prioridade, status } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE cliente_comunicacoes 
+        SET 
+          tipo = COALESCE(${tipo}, tipo),
+          titulo = COALESCE(${titulo}, titulo),
+          conteudo = COALESCE(${conteudo}, conteudo),
+          prioridade = COALESCE(${prioridade}, prioridade),
+          status = COALESCE(${status}, status),
+          atualizado_em = NOW()
+        WHERE id = ${parseInt(id)} AND cliente_id = ${cnpj}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Comunicação não encontrada" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error updating communication:", error);
+      res.status(500).json({ error: "Failed to update communication" });
+    }
+  });
+
+  // DELETE /api/cliente/:cnpj/comunicacoes/:id - Delete communication
+  app.delete("/api/cliente/:cnpj/comunicacoes/:id", async (req, res) => {
+    try {
+      const { cnpj, id } = req.params;
+      
+      const result = await db.execute(sql`
+        DELETE FROM cliente_comunicacoes 
+        WHERE id = ${parseInt(id)} AND cliente_id = ${cnpj}
+        RETURNING id
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Comunicação não encontrada" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting communication:", error);
+      res.status(500).json({ error: "Failed to delete communication" });
+    }
+  });
+
+  // GET /api/cliente/:cnpj/situacao-juridica - Fetch legal/financial status
+  app.get("/api/cliente/:cnpj/situacao-juridica", async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      
+      // Query both inadimplencia_contextos and juridico_clientes in parallel
+      const [inadimplenciaResult, juridicoResult] = await Promise.all([
+        db.execute(sql`
+          SELECT 
+            cliente_id,
+            contexto,
+            evidencias,
+            acao,
+            status_financeiro,
+            detalhe_financeiro,
+            atualizado_por,
+            atualizado_em,
+            valor_acordado,
+            data_acordo
+          FROM inadimplencia_contextos 
+          WHERE cliente_id = ${cnpj}
+        `),
+        db.execute(sql`
+          SELECT 
+            id,
+            cliente_id,
+            procedimento,
+            status_juridico,
+            observacoes,
+            valor_acordado,
+            data_acordo,
+            numero_parcelas,
+            protocolo_processo,
+            advogado_responsavel,
+            data_criacao,
+            data_atualizacao,
+            atualizado_por
+          FROM juridico_clientes 
+          WHERE cliente_id = ${cnpj}
+        `)
+      ]);
+      
+      const inadimplencia = inadimplenciaResult.rows.length > 0 ? inadimplenciaResult.rows[0] : null;
+      const juridico = juridicoResult.rows.length > 0 ? juridicoResult.rows[0] : null;
+      
+      res.json({
+        clienteId: cnpj,
+        inadimplencia,
+        juridico,
+        hasInadimplencia: inadimplencia !== null,
+        hasJuridico: juridico !== null
+      });
+    } catch (error) {
+      console.error("[api] Error fetching legal status:", error);
+      res.status(500).json({ error: "Failed to fetch legal status" });
+    }
+  });
+
   app.get("/api/fornecedores/:fornecedorId/despesas", async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
