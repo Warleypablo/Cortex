@@ -1,0 +1,207 @@
+Você já criou o módulo OKR 2026. Agora precisamos “profissionalizar”:
+- ampliar métricas (inadimplência, churn, net churn, logo churn, receita e divisão, vendas novas vs monetização base, TurboOH)
+- melhorar KRs (menos redundância, mais alinhadas ao plano Bigger & Better: Consolidação, Escala e Padronização + eficiência + melhoria de produto/sistemas)
+- enriquecer iniciativas (Hugz, sistemas internos, eficiência operacional, TurboOH, padronização)
+- manter read-only: NÃO criar tabelas no banco, NÃO usar supabase, NÃO persistir iniciativas no DB. Pode manter JSON seed read-only.
+
+🎯 Nome interno do plano 2026:
+“Bigger & Better — Consolidação, Escala e Padronização”
+
+========================
+1) PRINCÍPIOS / RESTRIÇÕES
+========================
+- Somente leitura do Google Cloud SQL usando o pool/driver atual (pg.Pool + drizzle/db.execute).
+- Não criar tabelas, não migrar schema, não gravar dados.
+- O módulo OKR 2026 deve ser +1 item no menu lateral e ter 1 tela com 2–3 abas:
+  (a) Dashboard
+  (b) KRs
+  (c) Iniciativas
+- Não destrinchar por produto/serviço. Apenas macro + BU (TurboOH) + Tech Projects como KPI de margem/eficiência.
+
+========================
+2) PADRONIZAR “REGISTRY” (config-driven)
+========================
+Crie/ajuste:
+server/okr/okrRegistry.ts
+- export const metricRegistry = { key: {label, unit, format, cadence, seriesQueryFn, latestQueryFn, notes} }
+- export const krRegistry = [ { id, objectiveId, title, metricKey, operator, cadence, targetType, targets, description } ]
+- export const objectiveRegistry = [ { id, title, ownerRole, narrative } ]
+
+O frontend deve consumir /api/okr/summary que retorna:
+{
+  objectives: [...],
+  krs: [...],              // com currentValue e status
+  highlights: {...},        // cards principais
+  series: {...}             // séries para gráficos
+}
+
+========================
+3) MÉTRICAS QUE DEVEM EXISTIR (MVP completo)
+========================
+Implementar no metricsAdapter.ts (ou refatorar para okrRegistry + adapter):
+Reaproveitar tabelas já existentes no Cortex:
+- cup_data_hist, cup_contratos, (cup_clientes se existir)
+- caz_parcelas (+ categorias), caz_receber, rh_pessoal
+
+3.1 Receita e composição
+- MRR_Ativo (mensal, snapshot)
+- Receita_Pontual (mensal)
+- Outras_Receitas (mensal)
+- Receita_Total_Faturavel (mensal) = MRR + Pontual + Outras (ou via DFC se preferir)
+- Receita_Liquida (mensal) = Receita Total - Impostos
+- CSV (mensal)
+- Lucro_Bruto (mensal)
+- SG&A (mensal)
+- CAC (mensal)
+- EBITDA (mensal)
+- Geracao_Caixa (mensal)
+- Saldo_Caixa (mensal, se tiver no DB; se não, calcular acumulado de geração)
+
+3.2 Vendas (novas vs monetização base)
+- New_MRR (mensal) = contratos iniciados no mês (somente novos clientes se possível; senão, novos contratos)
+- Expansion_MRR (mensal) = aumento de valorr em base (diff snapshots) — se for pesado, usar aproximação por comparação mês a mês no cup_data_hist.
+- Base_Monetization_MRR (mensal) = Expansion_MRR (nome no dashboard “Monetização da Base”)
+- Vendas_Pontual (mensal) = valor_p contratos iniciados no mês
+
+3.3 Retenção / churn
+- Gross_MRR_Churn (mensal) = somatório valorr cancelado no mês
+- Gross_MRR_Churn_% (mensal) = gross_churn / MRR_inicio_mes
+- Net_MRR_Churn (mensal) = Gross - Expansion
+- Net_MRR_Churn_% (mensal) = net_churn / MRR_inicio_mes
+- Logo_Churn (mensal) = #clientes cancelados no mês
+- Logo_Churn_% (mensal) = clientes_cancelados / clientes_inicio_mes
+Obs: se cup_clientes não existir, calcular logo churn via cup_contratos agrupado por cliente_id (cliente considerado “cancelado” se não tiver contratos ativos após o mês).
+
+3.4 Inadimplência
+- Inadimplencia_Valor (mensal) = total vencido em atraso (caz_receber)
+- Inadimplencia_% (mensal) = vencido / receita_faturavel (ou vencido / receita_liquida, escolha 1 e documente)
+
+3.5 Eficiência operacional
+- Headcount_Total (mensal) = rh_pessoal ativos
+- Headcount_CSV / CAC / SGA (mensal) se existirem no RH; se não, usar a divisão já existente no BI do Cortex.
+- Receita_por_Cabeca = Receita_Total / Headcount
+- MRR_por_Cabeca = MRR / Headcount
+- SGA_% = SG&A / Receita_Liquida
+- CAC_% = CAC / Receita_Liquida
+
+3.6 TurboOH (BU evidenciada)
+- Receita_OH (mensal) = filtro por categorias/clientes TurboOH (usar a mesma regra já existente no Cortex; se não tiver, criar mapping em server/okr/ohMapping.ts com lista de categorias/keywords)
+- Resultado_OH (mensal) = Receita_OH - Custos_OH (mesma regra de mapping)
+- Margem_OH_% (mensal)
+
+3.7 Tech Projects (macro, sem “produto”)
+- Valor_Projetos_Tech (mensal) = valor projetos entregues tech
+- Custo_Freelancers_Tech (mensal)
+- Pct_Freelancers_Tech = custo_freelancers / valor_projetos
+
+========================
+4) KRs 2026 (reais, não redundantes)
+========================
+Atualize e consolide KRs para refletir:
+- escala do ecossistema (company + BU)
+- eficiência e caixa (sistemas e disciplina)
+- retenção / risco (inadimplência e churn)
+- padronização + melhoria de produto/sistemas (como iniciativa medida por proxy operacional)
+
+Defina targets usando os valores do BP informado:
+
+O1 — Escala do Ecossistema (Company)
+KR1 (MRR Quarter-End):
+- Mar: 1_338_869.55
+- Jun: 1_611_315.266
+- Sep: 1_871_384.456
+- Dez: 2_122_127.056
+
+KR2 (Receita Líquida Anual, soma mensal): 20_055_090.582
+
+KR3 (Clientes Ativos em Dez): 511
+
+KR4 (Mix de Receita Recorrente saudável):
+- % Receita Recorrente sobre Receita Total >= 80% (calcular mensal e mostrar média trimestral)
+
+O2 — Eficiência e Caixa (Company)
+KR1 (EBITDA Anual, soma mensal): 5_269_767.578
+
+KR2 (Geração de Caixa Anual, soma mensal): 3_088_046.602
+
+KR3 (Saldo de Caixa em Dez): 3_738_046.602
+
+KR4 (SG&A % teto): <= 21% (média trimestral, usando SG&A/Receita Líquida)
+
+KR5 (CAC % teto): <= 23% (média trimestral, usando CAC/Receita Líquida)
+
+O3 — Retenção e Risco (Company)
+KR1 (Inadimplência %): <= 6.0% (média trimestral; com alerta semanal se passar)
+
+KR2 (Net MRR Churn %): <= 9.0% (média trimestral)
+
+KR3 (Logo Churn %): <= 10.0% (média trimestral)
+
+O4 — BU Evidenciada (TurboOH)
+KR1 (Receita OH anual): >= 1_425_600
+KR2 (Resultado OH anual): >= 989_700
+Obs: se o cálculo OH no DB ainda não bater esses números, manter esses targets como “OKR Target” e exibir também “Valor Medido (DB)” com flag “Mapping em ajuste”.
+
+O5 — Sistemas internos e produto (proxy técnico, sem inventar métrica)
+Sem criar novas tabelas. Medir com proxies que já temos:
+KR1 (Pct Freelancers Tech): <= 8% (média trimestral)
+KR2 (MRR/Headcount em Dez): >= 11_700 (aprox BP: 11_790) — use o target 11_790
+
+========================
+5) INICIATIVAS (seed read-only, mais robusto)
+========================
+Atualize server/okr/initiatives.json com 15–20 iniciativas com estrutura:
+{
+  id, objectiveId, name, ownerRole, start, end, status,
+  krsImpacted: [krIds],
+  successMetricKeys: [metricKeys],
+  notes
+}
+
+Sugestão mínima de iniciativas (inclua todas):
+- Hugz: Cobrança & Retenção (inadimplência, churn, net churn, logo churn)
+- Padronização de operação por BU (SOPs, QBR, templates)
+- Produto: pacotes “TurboCommerce” (sem detalhar produto, só “pacotes e padrão de entrega”)
+- Data Coverage: padronizar categorias DFC (SG&A, CAC, CSV) para confiabilidade do BI
+- Regras de upsell/expansão (monetização base) + playbook
+- Qualidade de entrega: health score de clientes (proxy via churn/expansão)
+- TurboOH: mapeamento confiável no DB (categorias/cliente) + margem
+- TurboOH: playbook comercial e oferta (sem detalhar inventário)
+- Eficiência: revisão de alocação headcount CSV/CAC/SGA (se já existir no RH)
+- Tech: pipeline e SLA de projetos (projeto entregue vs custo freelancers)
+- Governança: Monthly OKR Review com decision log
+- Automação: alertas semanais (inadimplência>teto, net churn>teto, SG&A%>teto, CAC%>teto)
+
+========================
+6) UI/UX (melhorias pragmáticas)
+========================
+Na aba Dashboard:
+- Cards: MRR, Receita Líquida, EBITDA, Caixa, Inadimplência %, Net Churn %, Logo Churn %
+- Bloco TurboOH destacado: Receita OH, Resultado OH, Margem OH
+- Bloco Vendas: New MRR vs Monetização Base (Expansion)
+- Gráficos: MRR (linha), EBITDA (barra), Inadimplência% (linha), Churn% (linha)
+
+Na aba KRs:
+- Tabela com status automático:
+  Verde: >=100% target (ou <= teto)
+  Amarelo: 90–99% (ou até +10% do teto)
+  Vermelho: <90% (ou > teto +10%)
+- Filtro por Objective e por Cadence (Quarter / Annual)
+
+Na aba Iniciativas:
+- Lista com chips de status + objetivo
+- Mostrar quais KRs impacta e qual métrica confirma
+
+========================
+7) NÃO QUEBRAR O CORTEX
+========================
+- Reutilizar queries existentes sempre que possível.
+- Cache simples em memória por 5 minutos para endpoints /api/okr/*
+- Tratar ausência de tabela/campo: retornar “N/A” com reason e criar fallback.
+
+Entregáveis:
+- Endpoint consolidado /api/okr/summary
+- Registry (okrRegistry.ts) com métricas + KRs + objetivos
+- Iniciativas seed ampliadas
+- UI refinada (3 abas) consumindo summary
+- Zero escrita no banco
