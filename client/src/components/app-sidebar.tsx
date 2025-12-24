@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, Activity, BookOpen, Lock } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen, Lock } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogoLight from "@assets/logo-preta_1766452973532.png";
 import turboLogoDark from "@assets/logo-branca_1766452973531.png";
@@ -165,18 +165,6 @@ const dashboardCategories = [
   },
 ];
 
-const adminItems = [
-  {
-    title: "Gerenciar Usuários",
-    url: "/admin/usuarios",
-    icon: Shield,
-  },
-  {
-    title: "Logs do Sistema",
-    url: "/admin/logs",
-    icon: Activity,
-  },
-];
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -203,7 +191,6 @@ export function AppSidebar() {
   };
 
   const visibleMenuItems = menuItems.filter((item) => hasAccess(item.url));
-  const visibleAdminItems = adminItems.filter((item) => hasAccess(item.url));
 
   const toggleCategory = (title: string) => {
     if (isCollapsed) {
@@ -324,29 +311,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {visibleAdminItems.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Administração</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {visibleAdminItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={location === item.url}
-                      data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                      <Link href={item.url} onClick={handleItemClick}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        )}
       </SidebarContent>
     </Sidebar>
   );

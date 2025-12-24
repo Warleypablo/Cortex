@@ -15,7 +15,16 @@ import {
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
-import { LogOut, Bell, Info, AlertTriangle, CheckCircle, X, Check } from "lucide-react";
+import { LogOut, Bell, Info, AlertTriangle, CheckCircle, X, Check, Settings, Shield, Activity } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -215,6 +224,8 @@ interface User {
   name: string;
   picture: string;
   createdAt: string;
+  role: 'admin' | 'user';
+  allowedRoutes: string[];
 }
 
 export default function TopBar() {
@@ -291,6 +302,41 @@ export default function TopBar() {
           </Tooltip>
           
           <PresentationModeButton />
+          
+          {user && user.role === 'admin' && (
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="flex items-center justify-center h-10 w-10 rounded-full border border-border bg-background hover:bg-muted transition-colors"
+                      data-testid="button-admin-settings"
+                      aria-label="Configurações"
+                    >
+                      <Settings className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Administração</TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Administração</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/usuarios" className="flex items-center gap-2 cursor-pointer">
+                    <Shield className="h-4 w-4" />
+                    Gerenciar Usuários
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/logs" className="flex items-center gap-2 cursor-pointer">
+                    <Activity className="h-4 w-4" />
+                    Logs do Sistema
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           
           {user && (
             <Tooltip>
