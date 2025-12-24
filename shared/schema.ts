@@ -163,7 +163,6 @@ export const rhPessoal = pgTable("rh_pessoal", {
   cpf: varchar("cpf", { length: 14 }),
   endereco: text("endereco"),
   estado: varchar("estado", { length: 2 }),
-  cidade: varchar("cidade", { length: 100 }),
   telefone: varchar("telefone", { length: 20 }),
   aniversario: date("aniversario"),
   admissao: date("admissao"),
