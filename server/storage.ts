@@ -1458,7 +1458,100 @@ export class DbStorage implements IStorage {
       .orderBy(desc(schema.cazReceber.dataCriacao))
       .limit(limit);
     
-    return result;
+    // Generate future installments based on existing payment patterns
+    const allReceitas: ContaReceber[] = [...result];
+    const parcelamentoMap = new Map<string, { parcelas: typeof result; totalParcelas: number; valorMedio: number }>();
+    
+    // Identify installment patterns (format: "X/Y - Venda NNNN" or "X/Y - Description")
+    for (const receita of result) {
+      if (!receita.descricao) continue;
+      const match = receita.descricao.match(/^(\d+)\/(\d+)\s*-\s*(.+)$/);
+      if (match) {
+        const parcelaAtual = parseInt(match[1]);
+        const totalParcelas = parseInt(match[2]);
+        const baseDescricao = match[3].trim();
+        
+        if (!parcelamentoMap.has(baseDescricao)) {
+          parcelamentoMap.set(baseDescricao, { parcelas: [], totalParcelas, valorMedio: 0 });
+        }
+        parcelamentoMap.get(baseDescricao)!.parcelas.push(receita);
+      }
+    }
+    
+    // Generate missing future installments
+    const today = new Date();
+    
+    for (const [baseDescricao, info] of parcelamentoMap.entries()) {
+      const { parcelas, totalParcelas } = info;
+      if (parcelas.length === 0) continue;
+      
+      // Find existing installment numbers
+      const existingNumbers = new Set<number>();
+      let lastVencimento: Date | null = null;
+      let valorTotal: number = 0;
+      let count = 0;
+      
+      for (const p of parcelas) {
+        const match = p.descricao?.match(/^(\d+)\/(\d+)/);
+        if (match) {
+          existingNumbers.add(parseInt(match[1]));
+        }
+        if (p.dataVencimento) {
+          if (!lastVencimento || new Date(p.dataVencimento) > new Date(lastVencimento)) {
+            lastVencimento = new Date(p.dataVencimento);
+          }
+        }
+        if (p.total) {
+          valorTotal += parseFloat(String(p.total));
+          count++;
+        }
+      }
+      
+      const valorMedio = count > 0 ? valorTotal / count : 0;
+      if (!lastVencimento || valorMedio === 0) continue;
+      
+      // Generate missing future installments
+      let futureCount = 0;
+      for (let i = 1; i <= totalParcelas; i++) {
+        if (!existingNumbers.has(i)) {
+          // Calculate expected vencimento date (1 month after last known vencimento per missing installment)
+          futureCount++;
+          const vencimentoPrevisto = new Date(lastVencimento);
+          vencimentoPrevisto.setMonth(vencimentoPrevisto.getMonth() + futureCount);
+          
+          // Determine status: first future = "Em Aberto", rest = "Prevista"
+          const isFirstFuture = futureCount === 1;
+          const statusFuturo = isFirstFuture ? "Em Aberto" : "Prevista";
+          
+          const parcelaFutura: ContaReceber = {
+            id: -(i * 1000 + parcelas[0].id), // Negative ID to indicate synthetic
+            status: statusFuturo,
+            total: String(valorMedio.toFixed(2)),
+            descricao: `${i}/${totalParcelas} - ${baseDescricao}`,
+            dataVencimento: vencimentoPrevisto,
+            naoPago: String(valorMedio.toFixed(2)),
+            pago: "0",
+            dataCriacao: parcelas[0].dataCriacao,
+            dataAlteracao: null,
+            clienteId: parcelas[0].clienteId,
+            clienteNome: parcelas[0].clienteNome,
+            empresa: parcelas[0].empresa,
+            urlCobranca: null,
+          };
+          
+          allReceitas.push(parcelaFutura);
+        }
+      }
+    }
+    
+    // Sort by vencimento descending (most recent first)
+    allReceitas.sort((a, b) => {
+      const dateA = a.dataVencimento ? new Date(a.dataVencimento).getTime() : 0;
+      const dateB = b.dataVencimento ? new Date(b.dataVencimento).getTime() : 0;
+      return dateB - dateA;
+    });
+    
+    return allReceitas;
   }
 
   async getContasPagarByFornecedor(fornecedorId: string, limit: number = 100): Promise<ContaPagar[]> {
