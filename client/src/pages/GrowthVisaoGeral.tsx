@@ -226,26 +226,24 @@ interface FunnelProps {
 function FunnelVisualization({ totalLeads, totalMQLs, totalVendasMQL, taxaConversaoMQL, taxaVendaMQL }: FunnelProps) {
   const [activeTab, setActiveTab] = useState<'mql' | 'geral'>('mql');
   
-  // Calcular RM e RR estimados (se não tiver dados específicos, estimar proporcionalmente)
-  const rmMQL = Math.round(totalMQLs * 0.41); // Proporção típica
+  const rmMQL = Math.round(totalMQLs * 0.41);
   const rrMQL = Math.round(rmMQL * 0.51);
   
   const mqlStages = [
-    { label: 'MQLs', value: totalMQLs, color: 'bg-red-500' },
-    { label: 'RM MQL', value: rmMQL, percent: totalMQLs > 0 ? Math.round((rmMQL / totalMQLs) * 100) : 0, color: 'bg-orange-500' },
-    { label: 'RR MQL', value: rrMQL, percent: rmMQL > 0 ? Math.round((rrMQL / rmMQL) * 100) : 0, color: 'bg-yellow-500' },
-    { label: 'Vendas MQL', value: totalVendasMQL, percent: rrMQL > 0 ? Math.round((totalVendasMQL / rrMQL) * 100) : 0, color: 'bg-green-500' },
+    { label: 'MQLs', value: totalMQLs, color: 'bg-red-500', widthPercent: 100 },
+    { label: 'RM MQL', value: rmMQL, percent: totalMQLs > 0 ? Math.round((rmMQL / totalMQLs) * 100) : 0, color: 'bg-orange-500', widthPercent: 78 },
+    { label: 'RR MQL', value: rrMQL, percent: rmMQL > 0 ? Math.round((rrMQL / rmMQL) * 100) : 0, color: 'bg-yellow-500', widthPercent: 56 },
+    { label: 'Vendas MQL', value: totalVendasMQL, percent: rrMQL > 0 ? Math.round((totalVendasMQL / rrMQL) * 100) : 0, color: 'bg-green-500', widthPercent: 40 },
   ];
   
   const geralStages = [
-    { label: 'Leads Total', value: totalLeads, color: 'bg-blue-500' },
-    { label: 'MQLs', value: totalMQLs, percent: Math.round(taxaConversaoMQL), color: 'bg-orange-500' },
-    { label: 'Vendas', value: totalVendasMQL, percent: Math.round(taxaVendaMQL), color: 'bg-green-500' },
+    { label: 'Leads Total', value: totalLeads, color: 'bg-blue-500', widthPercent: 100 },
+    { label: 'MQLs', value: totalMQLs, percent: Math.round(taxaConversaoMQL), color: 'bg-orange-500', widthPercent: 65 },
+    { label: 'Vendas', value: totalVendasMQL, percent: Math.round(taxaVendaMQL), color: 'bg-green-500', widthPercent: 35 },
   ];
   
   const stages = activeTab === 'mql' ? mqlStages : geralStages;
   const taxaFinal = activeTab === 'mql' ? (totalMQLs > 0 ? Math.round((totalVendasMQL / totalMQLs) * 100) : 0) : Math.round(taxaVendaMQL);
-  const firstStage = stages[0];
 
   const formatValue = (stage: any) => {
     if (stage.isCurrency) return formatCurrency(stage.value);
@@ -254,8 +252,8 @@ function FunnelVisualization({ totalLeads, totalMQLs, totalVendasMQL, taxaConver
   };
 
   return (
-    <div className="flex flex-col gap-3 p-4">
-      <div className="flex gap-1 p-1 bg-muted rounded-lg mb-2">
+    <div className="flex flex-col gap-2 p-4">
+      <div className="flex gap-1 p-1 bg-muted rounded-lg mb-3">
         <button
           onClick={() => setActiveTab('mql')}
           className={`flex-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
@@ -280,34 +278,28 @@ function FunnelVisualization({ totalLeads, totalMQLs, totalVendasMQL, taxaConver
         </button>
       </div>
       
-      <div className="flex items-center gap-3 mb-2">
-        <div className={`w-12 h-12 rounded-full ${firstStage.color} flex items-center justify-center`}>
-          <span className="text-white font-bold text-[9px] text-center leading-tight px-1">
-            {formatValue(firstStage)}
-          </span>
-        </div>
-        <span className="text-sm font-medium">{firstStage.label}</span>
-      </div>
-      
-      {stages.slice(1).map((stage: any) => (
-        <div key={stage.label} className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-full ${stage.color} flex items-center justify-center`}>
-            <span className="text-white font-bold text-[9px] text-center leading-tight px-1">
-              {formatValue(stage)}
-            </span>
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">{stage.label}</span>
+      <div className="flex flex-col items-center gap-1">
+        {stages.map((stage: any, index: number) => (
+          <div 
+            key={stage.label}
+            className={`${stage.color} text-white py-2 px-3 flex items-center justify-between rounded-md transition-all min-h-[36px]`}
+            style={{ width: `${stage.widthPercent}%` }}
+            data-testid={`funnel-stage-${index}`}
+          >
+            <span className="text-xs font-medium truncate">{stage.label}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-sm">{formatValue(stage)}</span>
               {stage.percent !== undefined && (
-                <Badge variant="outline" className="text-xs">{stage.percent}%</Badge>
+                <span className="text-[10px] opacity-90 bg-white/20 px-1.5 py-0.5 rounded">
+                  {stage.percent}%
+                </span>
               )}
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
       
-      <div className="mt-2 pt-2 border-t">
+      <div className="mt-3 pt-2 border-t">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Taxa Final</span>
           <Badge className={taxaFinal >= 0 ? "bg-green-500" : "bg-red-500"}>{taxaFinal}%</Badge>
