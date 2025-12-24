@@ -1677,7 +1677,7 @@ export default function DetailColaborador() {
                   <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Cidade</p>
                   <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-info-cidade">
                     <MapPin className="w-4 h-4 text-orange-500" />
-                    {colaborador.cidade || "-"}
+                    {getCidadeFromEndereco(colaborador.endereco, (colaborador as any).cidade) || "-"}
                   </p>
                 </div>
               </div>
@@ -1775,8 +1775,8 @@ export default function DetailColaborador() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Meses Último Aumento</p>
-                  <p className="font-semibold text-foreground" data-testid="text-prof-meses-ultimo-aumento">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Meses Sem Aumento</p>
+                  <p className="font-semibold text-foreground" data-testid="text-prof-meses-sem-aumento">
                     <span className="text-primary font-bold">{calcularMesesDesdeUltimoAumento()}</span>
                   </p>
                 </div>
