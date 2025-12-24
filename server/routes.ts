@@ -27,6 +27,64 @@ function isAdmin(req: any, res: any, next: any) {
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use(authRoutes);
   
+  app.get("/debug-cliente-faturas/:cnpj", async (req, res) => {
+    try {
+      const cnpj = req.params.cnpj;
+      
+      const clienteResult = await db.execute(sql`
+        SELECT id, nome, cnpj, ids FROM caz_clientes 
+        WHERE REGEXP_REPLACE(cnpj, '[^0-9]', '', 'g') = REGEXP_REPLACE(${cnpj}, '[^0-9]', '', 'g')
+        LIMIT 1
+      `);
+      
+      const cliente = clienteResult.rows[0] as any;
+      if (!cliente) {
+        return res.json({ error: "Cliente não encontrado", cnpj });
+      }
+      
+      const idsRef = cliente.ids || String(cliente.id);
+      
+      const parcelasResult = await db.execute(sql`
+        SELECT * FROM caz_parcelas 
+        WHERE id_cliente = ${idsRef}
+        ORDER BY data_vencimento DESC
+        LIMIT 50
+      `);
+      
+      const receberResult = await db.execute(sql`
+        SELECT * FROM caz_receber 
+        WHERE cliente_id = ${idsRef}
+        ORDER BY data_vencimento DESC
+        LIMIT 50
+      `);
+      
+      const jan2025Result = await db.execute(sql`
+        SELECT * FROM caz_parcelas 
+        WHERE id_cliente = ${idsRef}
+          AND data_vencimento >= '2025-01-01'
+          AND data_vencimento <= '2025-01-31'
+        ORDER BY data_vencimento
+      `);
+      
+      res.json({
+        cliente: {
+          id: cliente.id,
+          nome: cliente.nome,
+          cnpj: cliente.cnpj,
+          ids: cliente.ids
+        },
+        parcelasCount: parcelasResult.rows.length,
+        receberCount: receberResult.rows.length,
+        parcelasJan2025: jan2025Result.rows,
+        ultimasParcelas: parcelasResult.rows.slice(0, 10),
+        ultimasReceber: receberResult.rows.slice(0, 10)
+      });
+    } catch (error) {
+      console.error("[debug] Error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
   app.get("/debug-colaboradores-count", async (req, res) => {
     try {
       const colaboradores = await storage.getColaboradores();
