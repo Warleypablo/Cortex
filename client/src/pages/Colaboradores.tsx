@@ -230,12 +230,14 @@ function FilterDialog({
   squads,
   cargos,
   niveis,
+  setores,
 }: {
   filters: FilterState;
   onApplyFilters: (filters: FilterState) => void;
   squads: SquadOption[];
   cargos: CargoOption[];
   niveis: NivelOption[];
+  setores: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<FilterState>(filters);
@@ -405,15 +407,23 @@ function FilterDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="filter-setor">Setor</Label>
-            <Input
-              id="filter-setor"
-              type="text"
-              placeholder="Filtrar por setor..."
-              value={localFilters.setor}
-              onChange={(e) => setLocalFilters({ ...localFilters, setor: e.target.value })}
-              data-testid="input-filter-setor"
-            />
+            <Label>Setor</Label>
+            <Select
+              value={localFilters.setor || "all"}
+              onValueChange={(value) => setLocalFilters({ ...localFilters, setor: value === "all" ? "" : value })}
+            >
+              <SelectTrigger data-testid="select-filter-setor">
+                <SelectValue placeholder="Todos os setores" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os setores</SelectItem>
+                {setores.map((setor) => (
+                  <SelectItem key={setor} value={setor}>
+                    {setor}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -1655,6 +1665,10 @@ export default function Colaboradores() {
     queryKey: ["/api/rh/niveis"],
   });
 
+  const { data: gegFiltros } = useQuery<{ squads: string[]; setores: string[]; niveis: string[]; cargos: string[] }>({
+    queryKey: ["/api/geg/filtros"],
+  });
+
   const { data: userPhotos = {} } = useQuery<Record<string, string>>({
     queryKey: ["/api/user-photos"],
   });
@@ -1872,6 +1886,7 @@ export default function Colaboradores() {
                 squads={squads}
                 cargos={cargos}
                 niveis={niveis}
+                setores={gegFiltros?.setores || []}
               />
               <Link href="/colaboradores/analise">
                 <Button variant="outline" data-testid="button-analise-colaboradores">
