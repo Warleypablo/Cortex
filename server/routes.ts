@@ -5827,6 +5827,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/geg/valor-beneficio", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+
+      const resultado = await storage.getGegValorBeneficio(squad, setor);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG valor beneficio:", error);
+      res.status(500).json({ error: "Failed to fetch GEG valor beneficio" });
+    }
+  });
+
   app.get("/api/geg/patrimonio-resumo", async (req, res) => {
     try {
       const resultado = await storage.getGegPatrimonioResumo();

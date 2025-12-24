@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, UserPlus, UserMinus, Clock, Cake, Award, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet, Filter } from "lucide-react";
+import { Users, TrendingUp, UserPlus, UserMinus, Clock, Cake, Award, Gift, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet, Filter } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -154,6 +154,11 @@ interface CustoFolha {
   totalColaboradores: number;
 }
 
+interface GegValorBeneficio {
+  valorTotal: number;
+  totalColaboradores: number;
+}
+
 interface UltimaPromocao {
   id: number;
   nome: string;
@@ -246,6 +251,10 @@ export default function DashboardGeG() {
 
   const { data: custoFolha, isLoading: isLoadingCustoFolha } = useQuery<CustoFolha>({
     queryKey: ['/api/geg/custo-folha', { squad, setor }],
+  });
+
+  const { data: valorBeneficio, isLoading: isLoadingValorBeneficio } = useQuery<GegValorBeneficio>({
+    queryKey: ['/api/geg/valor-beneficio', { squad, setor }],
   });
 
   const { data: ultimasPromocoes, isLoading: isLoadingPromocoes } = useQuery<UltimaPromocao[]>({
@@ -482,31 +491,10 @@ export default function DashboardGeG() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card data-testid="card-valor-medio">
-            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salário Médio</CardTitle>
-              <DollarSign className="w-4 h-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {isLoadingValorMedio ? (
-                <Skeleton className="h-8 w-24" />
-              ) : (
-                <>
-                  <div className="text-2xl font-bold" data-testid="text-valor-medio">
-                    R$ {formatCurrency(valorMedioSalario?.valorMedio || 0)}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Base: {valorMedioSalario?.totalColaboradores || 0} colaboradores
-                  </p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card data-testid="card-custo-folha">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Custo Folha Total</CardTitle>
+              <CardTitle className="text-sm font-medium">Custo Folha</CardTitle>
               <Wallet className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -525,21 +513,57 @@ export default function DashboardGeG() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-custo-por-colaborador">
+          <Card data-testid="card-valor-beneficio">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Custo por Colaborador</CardTitle>
-              <Users className="w-4 h-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Valor Benefício</CardTitle>
+              <Gift className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {isLoadingCustoFolha || isLoadingMetricas ? (
+              {isLoadingValorBeneficio ? (
                 <Skeleton className="h-8 w-24" />
               ) : (
                 <>
-                  <div className="text-2xl font-bold" data-testid="text-custo-por-colaborador">
-                    R$ {formatCurrency(receitaPorColaborador)}
+                  <div className="text-2xl font-bold" data-testid="text-valor-beneficio">
+                    R$ {formatCurrency(valorBeneficio?.valorTotal || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Folha / Headcount
+                    {valorBeneficio?.totalColaboradores || 0} colaboradores
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-valor-premiacao">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Valor Premiação</CardTitle>
+              <Award className="w-4 h-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-muted-foreground" data-testid="text-valor-premiacao">
+                R$ 0,00
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Em breve
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-valor-medio">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Salário Médio</CardTitle>
+              <DollarSign className="w-4 h-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {isLoadingValorMedio ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold" data-testid="text-valor-medio">
+                    R$ {formatCurrency(valorMedioSalario?.valorMedio || 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Base: {valorMedioSalario?.totalColaboradores || 0} colaboradores
                   </p>
                 </>
               )}
