@@ -25,8 +25,8 @@ interface LinkedClient {
   id: number;
   nome: string;
   cnpj: string;
-  squad: string;
-  responsavel: string;
+  clienteSquad: string;
+  clienteResponsavel: string;
   status: string;
 }
 
@@ -36,8 +36,8 @@ interface WhatsAppGroup {
   clienteId: number | null;
   clienteNome: string | null;
   clienteCnpj: string | null;
-  squad: string | null;
-  responsavel: string | null;
+  clienteSquad: string | null;
+  clienteResponsavel: string | null;
   lastMessage: string;
   lastMessageTimestamp: string;
   unreadCount: number;
@@ -48,20 +48,20 @@ interface MockClient {
   id: number;
   nome: string;
   cnpj: string;
-  squad: string;
-  responsavel: string;
+  clienteSquad: string;
+  clienteResponsavel: string;
   status: string;
 }
 
 const mockClients: MockClient[] = [
-  { id: 1, nome: "Libanesa Alimentos", cnpj: "01.621.976/0001-25", squad: "Alpha", responsavel: "Mariana Costa", status: "Ativo" },
-  { id: 2, nome: "Scardua & Cia", cnpj: "12.345.678/0001-90", squad: "Beta", responsavel: "Lucas Ferreira", status: "Ativo" },
-  { id: 3, nome: "TechFlow Solutions", cnpj: "98.765.432/0001-11", squad: "Alpha", responsavel: "Fernanda Lima", status: "Ativo" },
-  { id: 4, nome: "Distribuidora Norte", cnpj: "55.444.333/0001-22", squad: "Gamma", responsavel: "Roberto Silva", status: "Ativo" },
-  { id: 5, nome: "Construtora Horizonte", cnpj: "77.888.999/0001-33", squad: "Beta", responsavel: "Patricia Souza", status: "Pausado" },
-  { id: 6, nome: "Farmácia Popular SP", cnpj: "11.222.333/0001-44", squad: "Alpha", responsavel: "Carlos Mendes", status: "Ativo" },
-  { id: 7, nome: "Auto Peças Brasil", cnpj: "33.444.555/0001-66", squad: "Gamma", responsavel: "Ana Paula Reis", status: "Ativo" },
-  { id: 8, nome: "Restaurante Sabor & Arte", cnpj: "22.111.000/0001-77", squad: "Beta", responsavel: "José Oliveira", status: "Ativo" },
+  { id: 1, nome: "Libanesa Alimentos", cnpj: "01.621.976/0001-25", clienteSquad: "Alpha", clienteResponsavel: "Mariana Costa", status: "Ativo" },
+  { id: 2, nome: "Scardua & Cia", cnpj: "12.345.678/0001-90", clienteSquad: "Beta", clienteResponsavel: "Lucas Ferreira", status: "Ativo" },
+  { id: 3, nome: "TechFlow Solutions", cnpj: "98.765.432/0001-11", clienteSquad: "Alpha", clienteResponsavel: "Fernanda Lima", status: "Ativo" },
+  { id: 4, nome: "Distribuidora Norte", cnpj: "55.444.333/0001-22", clienteSquad: "Gamma", clienteResponsavel: "Roberto Silva", status: "Ativo" },
+  { id: 5, nome: "Construtora Horizonte", cnpj: "77.888.999/0001-33", clienteSquad: "Beta", clienteResponsavel: "Patricia Souza", status: "Pausado" },
+  { id: 6, nome: "Farmácia Popular SP", cnpj: "11.222.333/0001-44", clienteSquad: "Alpha", clienteResponsavel: "Carlos Mendes", status: "Ativo" },
+  { id: 7, nome: "Auto Peças Brasil", cnpj: "33.444.555/0001-66", clienteSquad: "Gamma", clienteResponsavel: "Ana Paula Reis", status: "Ativo" },
+  { id: 8, nome: "Restaurante Sabor & Arte", cnpj: "22.111.000/0001-77", clienteSquad: "Beta", clienteResponsavel: "José Oliveira", status: "Ativo" },
 ];
 
 const mockConversations: Record<Channel, WhatsAppGroup[]> = {
@@ -72,8 +72,8 @@ const mockConversations: Record<Channel, WhatsAppGroup[]> = {
       clienteId: 1,
       clienteNome: "Libanesa Alimentos",
       clienteCnpj: "01.621.976/0001-25",
-      squad: "Alpha",
-      responsavel: "Mariana Costa",
+      clienteSquad: "Alpha",
+      clienteResponsavel: "Mariana Costa",
       lastMessage: "Bom dia! Precisamos revisar a campanha de natal",
       lastMessageTimestamp: "10:45",
       unreadCount: 3,
@@ -91,8 +91,8 @@ const mockConversations: Record<Channel, WhatsAppGroup[]> = {
       clienteId: 3,
       clienteNome: "TechFlow Solutions",
       clienteCnpj: "98.765.432/0001-11",
-      squad: "Alpha",
-      responsavel: "Fernanda Lima",
+      clienteSquad: "Alpha",
+      clienteResponsavel: "Fernanda Lima",
       lastMessage: "O relatório foi enviado por email",
       lastMessageTimestamp: "09:15",
       unreadCount: 0,
@@ -108,8 +108,8 @@ const mockConversations: Record<Channel, WhatsAppGroup[]> = {
       clienteId: null,
       clienteNome: null,
       clienteCnpj: null,
-      squad: null,
-      responsavel: null,
+      clienteSquad: null,
+      clienteResponsavel: null,
       lastMessage: "Olá, somos da empresa ABC e gostaríamos de saber mais",
       lastMessageTimestamp: "Ontem",
       unreadCount: 5,
@@ -125,8 +125,8 @@ const mockConversations: Record<Channel, WhatsAppGroup[]> = {
       clienteId: 7,
       clienteNome: "Auto Peças Brasil",
       clienteCnpj: "33.444.555/0001-66",
-      squad: "Gamma",
-      responsavel: "Ana Paula Reis",
+      clienteSquad: "Gamma",
+      clienteResponsavel: "Ana Paula Reis",
       lastMessage: "Perfeito, obrigado pelo suporte!",
       lastMessageTimestamp: "08:30",
       unreadCount: 0,
@@ -144,8 +144,8 @@ const mockConversations: Record<Channel, WhatsAppGroup[]> = {
       clienteId: 2,
       clienteNome: "Scardua & Cia",
       clienteCnpj: "12.345.678/0001-90",
-      squad: "Beta",
-      responsavel: "Lucas Ferreira",
+      clienteSquad: "Beta",
+      clienteResponsavel: "Lucas Ferreira",
       lastMessage: "Quando podemos agendar nossa reunião de alinhamento?",
       lastMessageTimestamp: "11:20",
       unreadCount: 2,
@@ -161,8 +161,8 @@ const mockConversations: Record<Channel, WhatsAppGroup[]> = {
       clienteId: 4,
       clienteNome: "Distribuidora Norte",
       clienteCnpj: "55.444.333/0001-22",
-      squad: "Gamma",
-      responsavel: "Roberto Silva",
+      clienteSquad: "Gamma",
+      clienteResponsavel: "Roberto Silva",
       lastMessage: "Os materiais ficaram excelentes, parabéns!",
       lastMessageTimestamp: "10:00",
       unreadCount: 0,
@@ -177,8 +177,8 @@ const mockConversations: Record<Channel, WhatsAppGroup[]> = {
       clienteId: null,
       clienteNome: null,
       clienteCnpj: null,
-      squad: null,
-      responsavel: null,
+      clienteSquad: null,
+      clienteResponsavel: null,
       lastMessage: "Gostaríamos de agendar uma apresentação",
       lastMessageTimestamp: "Ontem",
       unreadCount: 4,
@@ -193,8 +193,8 @@ const mockConversations: Record<Channel, WhatsAppGroup[]> = {
       clienteId: 6,
       clienteNome: "Farmácia Popular SP",
       clienteCnpj: "11.222.333/0001-44",
-      squad: "Alpha",
-      responsavel: "Carlos Mendes",
+      clienteSquad: "Alpha",
+      clienteResponsavel: "Carlos Mendes",
       lastMessage: "Confirmado! Até amanhã então",
       lastMessageTimestamp: "09:30",
       unreadCount: 0,
@@ -211,8 +211,8 @@ const mockConversations: Record<Channel, WhatsAppGroup[]> = {
       clienteId: 5,
       clienteNome: "Construtora Horizonte",
       clienteCnpj: "77.888.999/0001-33",
-      squad: "Beta",
-      responsavel: "Patricia Souza",
+      clienteSquad: "Beta",
+      clienteResponsavel: "Patricia Souza",
       lastMessage: "O pagamento foi efetuado hoje pela manhã",
       lastMessageTimestamp: "11:50",
       unreadCount: 1,
@@ -227,8 +227,8 @@ const mockConversations: Record<Channel, WhatsAppGroup[]> = {
       clienteId: 8,
       clienteNome: "Restaurante Sabor & Arte",
       clienteCnpj: "22.111.000/0001-77",
-      squad: "Beta",
-      responsavel: "José Oliveira",
+      clienteSquad: "Beta",
+      clienteResponsavel: "José Oliveira",
       lastMessage: "A nota fiscal foi enviada para o email cadastrado",
       lastMessageTimestamp: "10:15",
       unreadCount: 0,
@@ -243,8 +243,8 @@ const mockConversations: Record<Channel, WhatsAppGroup[]> = {
       clienteId: null,
       clienteNome: null,
       clienteCnpj: null,
-      squad: null,
-      responsavel: null,
+      clienteSquad: null,
+      clienteResponsavel: null,
       lastMessage: "Qual o CNPJ para emissão do contrato?",
       lastMessageTimestamp: "Ontem",
       unreadCount: 2,
@@ -259,8 +259,8 @@ const mockConversations: Record<Channel, WhatsAppGroup[]> = {
       clienteId: 1,
       clienteNome: "Libanesa Alimentos",
       clienteCnpj: "01.621.976/0001-25",
-      squad: "Alpha",
-      responsavel: "Mariana Costa",
+      clienteSquad: "Alpha",
+      clienteResponsavel: "Mariana Costa",
       lastMessage: "Perfeito, comprovante recebido!",
       lastMessageTimestamp: "08:45",
       unreadCount: 0,
@@ -334,8 +334,8 @@ export default function Atendimento() {
           clienteId: client.id,
           clienteNome: client.nome,
           clienteCnpj: client.cnpj,
-          squad: client.squad,
-          responsavel: client.responsavel,
+          clienteSquad: client.clienteSquad,
+          clienteResponsavel: client.clienteResponsavel,
         };
         updated[activeChannel] = channelGroups;
         
@@ -363,8 +363,8 @@ export default function Atendimento() {
           clienteId: null,
           clienteNome: null,
           clienteCnpj: null,
-          squad: null,
-          responsavel: null,
+          clienteSquad: null,
+          clienteResponsavel: null,
         };
         updated[activeChannel] = channelGroups;
         
@@ -471,15 +471,15 @@ export default function Atendimento() {
                               )}
                             </div>
                             
-                            {group.squad && group.responsavel && (
+                            {group.clienteSquad && group.clienteResponsavel && (
                               <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
                                 <span className="flex items-center gap-0.5">
                                   <Layers className="w-2.5 h-2.5" />
-                                  {group.squad}
+                                  {group.clienteSquad}
                                 </span>
                                 <span className="flex items-center gap-0.5">
                                   <User className="w-2.5 h-2.5" />
-                                  {group.responsavel}
+                                  {group.clienteResponsavel}
                                 </span>
                               </div>
                             )}
@@ -545,11 +545,11 @@ export default function Atendimento() {
                               <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Layers className="w-3 h-3" />
-                                  Squad: {selectedGroup.squad}
+                                  Squad: {selectedGroup.clienteSquad}
                                 </span>
                                 <span className="flex items-center gap-1">
                                   <User className="w-3 h-3" />
-                                  {selectedGroup.responsavel}
+                                  {selectedGroup.clienteResponsavel}
                                 </span>
                               </div>
                             </div>
@@ -697,11 +697,11 @@ export default function Atendimento() {
                         <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                           <span className="flex items-center gap-1">
                             <Layers className="w-3 h-3" />
-                            {client.squad}
+                            {client.clienteSquad}
                           </span>
                           <span className="flex items-center gap-1">
                             <User className="w-3 h-3" />
-                            {client.responsavel}
+                            {client.clienteResponsavel}
                           </span>
                         </div>
                       </div>
