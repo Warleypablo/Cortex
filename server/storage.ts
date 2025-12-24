@@ -2026,7 +2026,7 @@ export class DbStorage implements IStorage {
 
   async updateContrato(idSubtask: string, data: UpdateContrato): Promise<ContratoCompleto | undefined> {
     await db.execute(sql`
-      UPDATE cup_contratos SET
+      UPDATE staging.cup_contratos SET
         servico = COALESCE(${data.servico}, servico),
         produto = COALESCE(${data.produto}, produto),
         status = COALESCE(${data.status}, status),
