@@ -181,6 +181,7 @@ export interface IStorage {
   getGegFiltros(): Promise<any>;
   getGegValorMedioSalario(squad: string, setor: string): Promise<{ valorMedio: number; totalColaboradores: number }>;
   getGegCustoFolha(squad: string, setor: string): Promise<{ custoTotal: number; totalColaboradores: number }>;
+  getGegValorBeneficio(squad: string, setor: string): Promise<{ valorTotal: number; totalColaboradores: number }>;
   getGegPatrimonioResumo(): Promise<{ totalAtivos: number; valorTotalPago: number; valorTotalMercado: number; porTipo: { tipo: string; quantidade: number }[] }>;
   getGegUltimasPromocoes(squad: string, setor: string, limit?: number): Promise<any[]>;
   getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
@@ -581,6 +582,10 @@ export class MemStorage implements IStorage {
   }
 
   async getGegCustoFolha(squad: string, setor: string): Promise<{ custoTotal: number; totalColaboradores: number }> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegValorBeneficio(squad: string, setor: string): Promise<{ valorTotal: number; totalColaboradores: number }> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -3992,6 +3997,36 @@ export class DbStorage implements IStorage {
     const row = result.rows[0] as any;
     return {
       custoTotal: parseFloat(row.custo_total || '0'),
+      totalColaboradores: parseInt(row.total_colaboradores || '0'),
+    };
+  }
+
+  async getGegValorBeneficio(squad: string, setor: string): Promise<{ valorTotal: number; totalColaboradores: number }> {
+    const conditions = [
+      sql`status = 'Ativo'`,
+      sql`proporcional_caju IS NOT NULL`,
+      sql`proporcional_caju != ''`,
+      sql`proporcional_caju ~ '^[0-9]+(\.[0-9]+)?$'`
+    ];
+    
+    if (squad !== 'todos') {
+      conditions.push(sql`squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      conditions.push(sql`setor = ${setor}`);
+    }
+    
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(proporcional_caju::numeric), 0) as valor_total,
+        COUNT(*) as total_colaboradores
+      FROM rh_pessoal
+      WHERE ${sql.join(conditions, sql` AND `)}
+    `);
+
+    const row = result.rows[0] as any;
+    return {
+      valorTotal: parseFloat(row.valor_total || '0'),
       totalColaboradores: parseInt(row.total_colaboradores || '0'),
     };
   }
