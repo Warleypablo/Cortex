@@ -184,9 +184,18 @@ interface HeadcountPorTenure {
 }
 
 const CHART_COLORS = [
-  '#0ea5e9', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', 
-  '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'
+  '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', 
+  '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#22c55e'
 ];
+
+const CHART_GRADIENTS = {
+  primary: { start: '#3b82f6', end: '#1d4ed8' },
+  success: { start: '#10b981', end: '#059669' },
+  error: { start: '#ef4444', end: '#dc2626' },
+  warning: { start: '#f59e0b', end: '#d97706' },
+  purple: { start: '#8b5cf6', end: '#7c3aed' },
+  cyan: { start: '#0ea5e9', end: '#0284c7' },
+};
 
 export default function DashboardGeG() {
   useSetPageInfo("Dashboard GEG", "Gestão Estratégica de Pessoas");
@@ -790,15 +799,46 @@ export default function DashboardGeG() {
                 return combinedData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={300}>
                     <ComposedChart data={combinedData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="mes" tickFormatter={formatMesAno} />
-                      <YAxis yAxisId="left" />
-                      <YAxis yAxisId="right" orientation="right" />
-                      <Tooltip labelFormatter={formatMesAno} />
-                      <Legend />
-                      <Bar yAxisId="left" dataKey="admissoes" name="Contratados" fill="#10b981" radius={[4, 4, 0, 0]} />
-                      <Bar yAxisId="left" dataKey="demissoes" name="Demissões" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                      <Line yAxisId="right" type="monotone" dataKey="headcount" name="Headcount" stroke="#0ea5e9" strokeWidth={2} dot={{ fill: '#0ea5e9' }} />
+                      <defs>
+                        <linearGradient id="gradientAdmissoes" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
+                          <stop offset="100%" stopColor="#059669" stopOpacity={0.8} />
+                        </linearGradient>
+                        <linearGradient id="gradientDemissoes" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#ef4444" stopOpacity={1} />
+                          <stop offset="100%" stopColor="#dc2626" stopOpacity={0.8} />
+                        </linearGradient>
+                        <linearGradient id="gradientHeadcount" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#0ea5e9" stopOpacity={1} />
+                          <stop offset="100%" stopColor="#3b82f6" stopOpacity={1} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} />
+                      <XAxis dataKey="mes" tickFormatter={formatMesAno} stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <Tooltip 
+                        labelFormatter={formatMesAno} 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--popover))', 
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                        }}
+                      />
+                      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                      <Bar yAxisId="left" dataKey="admissoes" name="Contratados" fill="url(#gradientAdmissoes)" radius={[6, 6, 0, 0]} />
+                      <Bar yAxisId="left" dataKey="demissoes" name="Demissões" fill="url(#gradientDemissoes)" radius={[6, 6, 0, 0]} />
+                      <Line 
+                        yAxisId="right" 
+                        type="monotone" 
+                        dataKey="headcount" 
+                        name="Headcount" 
+                        stroke="url(#gradientHeadcount)" 
+                        strokeWidth={3} 
+                        dot={{ fill: '#0ea5e9', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, strokeWidth: 2, fill: '#fff', stroke: '#0ea5e9' }}
+                      />
                     </ComposedChart>
                   </ResponsiveContainer>
                 ) : (

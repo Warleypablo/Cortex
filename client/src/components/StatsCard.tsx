@@ -28,40 +28,40 @@ interface StatsCardProps {
 
 const variantStyles: Record<CardVariant, { bg: string; border: string; icon: string; iconBg: string }> = {
   default: {
-    bg: "bg-white/60 dark:bg-white/5",
-    border: "border-white/40 dark:border-white/10",
+    bg: "bg-gradient-to-br from-white/80 via-white/60 to-slate-50/40 dark:from-slate-800/60 dark:via-slate-900/50 dark:to-slate-950/40",
+    border: "border-white/60 dark:border-white/10",
     icon: "text-primary",
-    iconBg: "bg-primary/10 dark:bg-primary/20",
+    iconBg: "bg-gradient-to-br from-primary/20 to-primary/10 dark:from-primary/30 dark:to-primary/15",
   },
   success: {
-    bg: "bg-gradient-to-br from-emerald-50/80 to-white/60 dark:from-emerald-950/30 dark:to-white/5",
-    border: "border-emerald-200/50 dark:border-emerald-500/20",
+    bg: "bg-gradient-to-br from-emerald-50/90 via-white/70 to-white/70 dark:from-emerald-950/50 dark:via-emerald-900/30 dark:to-slate-900/40",
+    border: "border-emerald-200/60 dark:border-emerald-500/25",
     icon: "text-emerald-600 dark:text-emerald-400",
-    iconBg: "bg-emerald-100 dark:bg-emerald-900/40",
+    iconBg: "bg-gradient-to-br from-emerald-200/80 to-emerald-100/60 dark:from-emerald-800/60 dark:to-emerald-900/40",
   },
   warning: {
-    bg: "bg-gradient-to-br from-amber-50/80 to-white/60 dark:from-amber-950/30 dark:to-white/5",
-    border: "border-amber-200/50 dark:border-amber-500/20",
+    bg: "bg-gradient-to-br from-amber-50/90 via-white/70 to-white/70 dark:from-amber-950/50 dark:via-amber-900/30 dark:to-slate-900/40",
+    border: "border-amber-200/60 dark:border-amber-500/25",
     icon: "text-amber-600 dark:text-amber-400",
-    iconBg: "bg-amber-100 dark:bg-amber-900/40",
+    iconBg: "bg-gradient-to-br from-amber-200/80 to-amber-100/60 dark:from-amber-800/60 dark:to-amber-900/40",
   },
   error: {
-    bg: "bg-gradient-to-br from-red-50/80 to-white/60 dark:from-red-950/30 dark:to-white/5",
-    border: "border-red-200/50 dark:border-red-500/20",
+    bg: "bg-gradient-to-br from-red-50/90 via-white/70 to-white/70 dark:from-red-950/50 dark:via-red-900/30 dark:to-slate-900/40",
+    border: "border-red-200/60 dark:border-red-500/25",
     icon: "text-red-600 dark:text-red-400",
-    iconBg: "bg-red-100 dark:bg-red-900/40",
+    iconBg: "bg-gradient-to-br from-red-200/80 to-red-100/60 dark:from-red-800/60 dark:to-red-900/40",
   },
   info: {
-    bg: "bg-gradient-to-br from-blue-50/80 to-white/60 dark:from-blue-950/30 dark:to-white/5",
-    border: "border-blue-200/50 dark:border-blue-500/20",
+    bg: "bg-gradient-to-br from-blue-50/90 via-white/70 to-white/70 dark:from-blue-950/50 dark:via-blue-900/30 dark:to-slate-900/40",
+    border: "border-blue-200/60 dark:border-blue-500/25",
     icon: "text-blue-600 dark:text-blue-400",
-    iconBg: "bg-blue-100 dark:bg-blue-900/40",
+    iconBg: "bg-gradient-to-br from-blue-200/80 to-blue-100/60 dark:from-blue-800/60 dark:to-blue-900/40",
   },
   status: {
-    bg: "bg-white/60 dark:bg-white/5",
-    border: "border-white/40 dark:border-white/10",
+    bg: "bg-gradient-to-br from-white/80 via-white/60 to-slate-50/40 dark:from-slate-800/60 dark:via-slate-900/50 dark:to-slate-950/40",
+    border: "border-white/60 dark:border-white/10",
     icon: "text-primary",
-    iconBg: "bg-primary/10 dark:bg-primary/20",
+    iconBg: "bg-gradient-to-br from-primary/20 to-primary/10 dark:from-primary/30 dark:to-primary/15",
   },
 };
 
@@ -111,27 +111,30 @@ export default function StatsCard({
         "relative rounded-xl p-4",
         "backdrop-blur-xl",
         "border",
-        "shadow-md shadow-black/5 dark:shadow-black/20",
-        "transition-shadow duration-300",
-        "hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30",
+        "shadow-md",
+        "transition-all duration-300 ease-out",
+        "hover:shadow-lg hover:scale-[1.01]",
+        "group",
         isStatusCard ? statusStyles.bg : finalStyles.bg,
         isStatusCard ? statusStyles.border : finalStyles.border,
         isStatusCard && statusStyles.ring,
       )}
       data-testid={`stats-card-${title.toLowerCase().replace(/\s+/g, '-')}`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent dark:from-white/5 pointer-events-none rounded-xl overflow-hidden" />
+      <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-white/5 to-transparent dark:from-white/8 dark:via-white/3 dark:to-transparent pointer-events-none rounded-xl overflow-hidden" />
       
       <div className="relative flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <div 
             className={cn(
-              "w-7 h-7 rounded-md flex items-center justify-center shrink-0",
+              "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+              "shadow-sm",
+              "transition-transform duration-300 group-hover:scale-110",
               isStatusCard ? statusStyles.iconBg : finalStyles.iconBg
             )}
           >
             <Icon className={cn(
-              "w-3.5 h-3.5",
+              "w-4 h-4 transition-transform duration-300",
               isStatusCard ? statusStyles.icon : finalStyles.icon
             )} />
           </div>
@@ -162,18 +165,20 @@ export default function StatsCard({
             )}
           </div>
         </div>
-        <div className="pl-9">
-          <p className="text-lg sm:text-xl font-bold text-foreground leading-tight break-words">
+        <div className="pl-10">
+          <p className="text-xl sm:text-2xl font-bold text-foreground leading-tight break-words tracking-tight">
             {displayValue}
           </p>
           {trend && (
-            <p className={cn(
-              "text-xs font-medium mt-1 flex items-center gap-1",
-              trend.isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
+            <div className={cn(
+              "inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-xs font-semibold",
+              trend.isPositive 
+                ? "bg-emerald-100/80 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" 
+                : "bg-red-100/80 text-red-700 dark:bg-red-900/40 dark:text-red-300"
             )}>
-              <span>{trend.isPositive ? "↑" : "↓"}</span>
+              <span className="text-[10px]">{trend.isPositive ? "▲" : "▼"}</span>
               <span>{trend.value}</span>
-            </p>
+            </div>
           )}
         </div>
       </div>
