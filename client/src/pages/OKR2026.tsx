@@ -27,6 +27,11 @@ interface DashboardMetrics {
   headcount: number;
   receita_por_head: number;
   mrr_por_head: number;
+  turbooh_receita_liquida_ytd: number | null;
+  turbooh_resultado_ytd: number | null;
+  tech_projetos_entregues: number;
+  tech_freelancers_custo: number;
+  tech_freelancers_percentual: number;
 }
 
 interface Targets {
@@ -38,6 +43,15 @@ interface Targets {
     inadimplencia_max: number;
     gross_mrr_churn_max: number;
     clientes_eoy: number;
+  };
+  turbooh?: {
+    receita_liquida_anual: number;
+    resultado_anual: number;
+    clientes_eoy: number;
+  };
+  tech?: {
+    projetos_mensal: Record<string, number>;
+    freelancers_mensal: Record<string, number>;
   };
 }
 
@@ -641,6 +655,169 @@ function DashboardTab() {
         </Card>
       )}
 
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-yellow-500" />
+            Top Alertas
+          </CardTitle>
+          <CardDescription>Métricas que requerem atenção imediata</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {(() => {
+              const alerts: { title: string; atual: string; target: string; status: "red" | "yellow"; recommendation: string }[] = [];
+              
+              const mrrProgress = mrrTarget > 0 ? (metrics.mrr_ativo / mrrTarget) * 100 : 100;
+              if (mrrProgress < 90) {
+                alerts.push({
+                  title: "MRR Ativo",
+                  atual: formatCurrency(metrics.mrr_ativo),
+                  target: formatCurrency(mrrTarget),
+                  status: mrrProgress < 70 ? "red" : "yellow",
+                  recommendation: "Acelerar aquisição de novos clientes e expansões"
+                });
+              }
+              
+              if (metrics.inadimplencia_percentual > targets.company.inadimplencia_max) {
+                alerts.push({
+                  title: "Inadimplência",
+                  atual: formatPercent(metrics.inadimplencia_percentual),
+                  target: `máx ${formatPercent(targets.company.inadimplencia_max)}`,
+                  status: metrics.inadimplencia_percentual > 8 ? "red" : "yellow",
+                  recommendation: "Intensificar régua de cobrança e renegociações"
+                });
+              }
+              
+              if (metrics.gross_mrr_churn_percentual > targets.company.gross_mrr_churn_max) {
+                alerts.push({
+                  title: "Gross MRR Churn",
+                  atual: formatPercent(metrics.gross_mrr_churn_percentual),
+                  target: `máx ${formatPercent(targets.company.gross_mrr_churn_max)}`,
+                  status: metrics.gross_mrr_churn_percentual > 12 ? "red" : "yellow",
+                  recommendation: "Revisar health-check e onboarding de clientes"
+                });
+              }
+              
+              const receitaProgress = targets.company.receita_liquida_anual > 0 
+                ? (metrics.receita_liquida_ytd / targets.company.receita_liquida_anual) * 100 
+                : 100;
+              const currentMonth = new Date().getMonth() + 1;
+              const expectedProgress = (currentMonth / 12) * 100;
+              if (receitaProgress < expectedProgress * 0.9) {
+                alerts.push({
+                  title: "Receita Líquida",
+                  atual: formatCurrency(metrics.receita_liquida_ytd),
+                  target: formatCurrency(targets.company.receita_liquida_anual),
+                  status: receitaProgress < expectedProgress * 0.7 ? "red" : "yellow",
+                  recommendation: "Revisar pipeline e acelerar fechamentos"
+                });
+              }
+              
+              if (alerts.length === 0) {
+                return (
+                  <div className="flex items-center gap-2 text-sm text-green-600">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Todas as métricas principais estão no alvo!</span>
+                  </div>
+                );
+              }
+              
+              return alerts.slice(0, 4).map((alert, i) => (
+                <div key={i} className={`p-3 rounded-lg border ${alert.status === "red" ? "bg-red-500/5 border-red-500/20" : "bg-yellow-500/5 border-yellow-500/20"}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-medium ${alert.status === "red" ? "text-red-600" : "text-yellow-600"}`}>
+                          {alert.title}
+                        </span>
+                        <Badge variant="outline" className={`text-[10px] ${alert.status === "red" ? "bg-red-500/10 text-red-600 border-red-500/20" : "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"}`}>
+                          {alert.status === "red" ? "Crítico" : "Atenção"}
+                        </Badge>
+                      </div>
+                      <div className="text-sm mt-1">
+                        <span className="text-muted-foreground">Atual: </span>
+                        <span className="font-medium">{alert.atual}</span>
+                        <span className="text-muted-foreground"> | Meta: </span>
+                        <span className="font-medium">{alert.target}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {alert.recommendation}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ));
+            })()}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Rocket className="w-4 h-4 text-blue-500" />
+                TurboOH
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-muted-foreground">Receita Líquida YTD</div>
+                <div className="text-xl font-bold mt-1">
+                  {metrics.turbooh_receita_liquida_ytd !== null 
+                    ? formatCurrency(metrics.turbooh_receita_liquida_ytd) 
+                    : <span className="text-muted-foreground text-sm">Em instrumentação</span>}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Meta: {formatCurrency(targets.turbooh?.receita_liquida_anual || 1425600)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Resultado YTD</div>
+                <div className="text-xl font-bold mt-1">
+                  {metrics.turbooh_resultado_ytd !== null 
+                    ? formatCurrency(metrics.turbooh_resultado_ytd) 
+                    : <span className="text-muted-foreground text-sm">Em instrumentação</span>}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Meta: {formatCurrency(targets.turbooh?.resultado_anual || 989700)}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Activity className="w-4 h-4 text-purple-500" />
+                Tech
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-muted-foreground">Projetos Entregues</div>
+                <div className="text-xl font-bold mt-1">
+                  {metrics.tech_projetos_entregues > 0 
+                    ? formatNumber(metrics.tech_projetos_entregues) 
+                    : <span className="text-muted-foreground text-sm">Em instrumentação</span>}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Custo Freelancers</div>
+                <div className="text-xl font-bold mt-1">
+                  {metrics.tech_freelancers_custo > 0 
+                    ? formatCurrency(metrics.tech_freelancers_custo) 
+                    : <span className="text-muted-foreground text-sm">Em instrumentação</span>}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <HealthScore metrics={metrics} targets={targets} />
 
@@ -683,10 +860,6 @@ function DashboardTab() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Minus className="w-4 h-4" />
               <span>Logo Churn %</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Minus className="w-4 h-4" />
-              <span>TurboOH Receita</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Minus className="w-4 h-4" />
