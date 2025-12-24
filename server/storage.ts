@@ -1207,6 +1207,76 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
 }
 
 export class DbStorage implements IStorage {
+  private telefonesInitialized = false;
+
+  // Initialize rh_telefones table if it doesn't exist
+  async initializeTelefones(): Promise<void> {
+    if (this.telefonesInitialized) return;
+    
+    try {
+      // Check if table exists
+      const tableCheck = await db.execute(sql`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_name = 'rh_telefones'
+        ) as exists
+      `);
+      
+      const tableExists = (tableCheck.rows[0] as any)?.exists;
+      
+      if (!tableExists) {
+        console.log('[DbStorage] Creating rh_telefones table...');
+        
+        // Create table
+        await db.execute(sql`
+          CREATE TABLE rh_telefones (
+            id INTEGER PRIMARY KEY,
+            conta VARCHAR(50),
+            plano_operadora VARCHAR(50),
+            telefone VARCHAR(20),
+            responsavel_nome VARCHAR(150),
+            responsavel_id INTEGER,
+            setor VARCHAR(100),
+            ultima_recarga DATE,
+            status VARCHAR(20)
+          )
+        `);
+        
+        // Insert initial data
+        await db.execute(sql`
+          INSERT INTO rh_telefones (id, conta, plano_operadora, telefone, responsavel_nome, responsavel_id, setor, ultima_recarga, status) VALUES
+          (1, '0454365107', 'PÓS / VIVO', '(27) 99754-7217', NULL, NULL, 'Commerce', NULL, 'Ativo'),
+          (2, '0450751313', 'PÓS / VIVO', '(27) 99749-6354', 'Rafael Vilela', NULL, 'Commerce', NULL, 'Ativo'),
+          (3, '0450751314', 'PÓS / VIVO', '(27) 99749-4918', 'Maria Mid CX', NULL, 'Commerce', NULL, 'Ativo'),
+          (4, '0450751318', 'PÓS / VIVO', '(27) 99752-3255', NULL, NULL, 'Commerce', NULL, 'Ativo'),
+          (5, '0450751315', 'PÓS / VIVO', '(27) 99753-5768', 'Lenize', NULL, 'Growth Interno', NULL, 'Ativo'),
+          (6, '0450751316', 'PÓS / VIVO', '(27) 99752-9172', 'Isabella', NULL, 'Growth Interno', NULL, 'Ativo'),
+          (7, '0450751317', 'PÓS / VIVO', '(27) 99750-3255', 'João domiciano', NULL, 'Growth Interno', NULL, 'Ativo'),
+          (8, '0450751319', 'PÓS / VIVO', '(27) 99645-1273', 'Fabiely', NULL, 'Growth Interno', NULL, 'Ativo'),
+          (9, '0450751320', 'PÓS / VIVO', '(27) 99755-6776', 'Kaike', NULL, 'Growth Interno', NULL, 'Ativo'),
+          (10, NULL, 'PRÉ / CLARO', '(27) 99251-3812', 'Andre Luis Séder', NULL, 'Tech', '2025-08-01', 'Ativo'),
+          (11, NULL, 'PRÉ / VIVO', '(27) 99651-2624', 'Lucas Antunes', NULL, 'CX', '2025-07-23', 'Ativo'),
+          (12, NULL, 'PRÉ / CLARO', '(27) 99294-5879', 'Pedro Barreto (I.A CX)', NULL, 'CX', '2025-09-22', 'Ativo'),
+          (13, NULL, 'PRÉ / CLARO', '(27) 98820-1954', 'Maria Clara', NULL, 'CX', NULL, 'Ativo'),
+          (14, NULL, 'PRÉ / CLARO', '(27) 99311-5805', 'Guilherme Santtos', NULL, 'CX', '2025-06-20', 'Ativo'),
+          (15, NULL, 'PRÉ / VIVO', '(27) 99656-5645', 'Financeiro', NULL, 'Financeiro', '2025-09-16', 'Ativo'),
+          (16, NULL, 'PRÉ / VIVO', '(27) 99661-3559', 'Matheus Scalfoni', NULL, 'Closer', NULL, 'Cancelado'),
+          (17, NULL, NULL, '(27) 98882-2935', 'Aliny', NULL, 'CXCS', '2025-10-15', 'Ativo'),
+          (18, NULL, 'PRÉ / VIVO', '(27) 99883-8103', NULL, NULL, 'Pré-Vendas', NULL, 'Ativo'),
+          (19, 'Cartão Itau', 'FLEX / CLARO', '(27) 99288-3587', 'Turbooh - Musso', NULL, 'TurboOOH', '2025-11-24', 'Ativo'),
+          (20, NULL, 'PRÉ / CLARO', '(27) 98847-9795', 'Breno - Tech', NULL, 'Tech', '2025-11-25', 'Ativo'),
+          (21, NULL, 'PRÉ / CLARO', '(27) 992475297', 'Matheus Scalfoni', NULL, 'Closer', '2025-12-09', 'Ativo')
+        `);
+        
+        console.log('[DbStorage] rh_telefones table created and populated');
+      }
+      
+      this.telefonesInitialized = true;
+    } catch (error) {
+      console.error('[DbStorage] Error initializing telefones:', error);
+    }
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
     return user;
@@ -7920,6 +7990,7 @@ export class DbStorage implements IStorage {
 
   // Telefones (Linhas Telefônicas) - Database backed
   async getTelefones(): Promise<import("@shared/schema").Telefone[]> {
+    await this.initializeTelefones();
     const result = await db.execute(sql`
       SELECT 
         id, 
