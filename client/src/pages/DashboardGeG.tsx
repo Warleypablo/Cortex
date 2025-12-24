@@ -177,6 +177,12 @@ interface DemissoesPorTipo {
   percentual: number;
 }
 
+interface CustoPorSetor {
+  setor: string;
+  custoTotal: number;
+  totalColaboradores: number;
+}
+
 interface HeadcountPorTenure {
   faixa: string;
   total: number;
@@ -266,6 +272,10 @@ export default function DashboardGeG() {
 
   const { data: demissoesPorTipo, isLoading: isLoadingDemissoesPorTipo } = useQuery<DemissoesPorTipo[]>({
     queryKey: ['/api/geg/demissoes-por-tipo', { squad, setor, nivel, cargo }],
+  });
+
+  const { data: custoPorSetor, isLoading: isLoadingCustoPorSetor } = useQuery<CustoPorSetor[]>({
+    queryKey: ['/api/geg/custo-por-setor', { squad, setor, nivel, cargo }],
   });
 
   const { data: headcountPorTenure, isLoading: isLoadingHeadcountPorTenure } = useQuery<HeadcountPorTenure[]>({
@@ -885,66 +895,51 @@ export default function DashboardGeG() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-demissoes-por-tipo">
+          <Card data-testid="card-custo-por-setor">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <PieChartIcon className="w-5 h-5 text-red-500" />
-                <CardTitle>Demissões por Tipo</CardTitle>
+                <DollarSign className="w-5 h-5 text-green-500" />
+                <CardTitle>Custo por Setor</CardTitle>
               </div>
-              <CardDescription>Distribuição por tipo de desligamento</CardDescription>
+              <CardDescription>Custos salariais por área</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoadingDemissoesPorTipo ? (
+              {isLoadingCustoPorSetor ? (
                 <Skeleton className="h-[250px] w-full" />
-              ) : demissoesPorTipo && demissoesPorTipo.length > 0 ? (
-                <div className="flex flex-col items-center">
-                  <ResponsiveContainer width="100%" height={180}>
-                    <PieChart>
-                      <Pie
-                        data={demissoesPorTipo}
-                        dataKey="total"
-                        nameKey="tipo"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={70}
-                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {demissoesPorTipo.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload as DemissoesPorTipo;
-                            return (
-                              <div className="bg-popover border rounded-md shadow-md p-2">
-                                <p className="font-medium text-sm">{data.tipo}</p>
-                                <p className="text-xs text-muted-foreground">{data.total} ({data.percentual.toFixed(1)}%)</p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="space-y-1 mt-2 max-h-[80px] overflow-y-auto w-full">
-                    {demissoesPorTipo.map((item, index) => (
-                      <div key={item.tipo} className="flex items-center gap-2 text-xs" data-testid={`demissao-tipo-${index}`}>
-                        <div 
-                          className="w-2 h-2 rounded-full flex-shrink-0" 
-                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} 
-                        />
-                        <span className="text-muted-foreground truncate">{item.tipo}</span>
-                        <span className="font-medium ml-auto">({item.total})</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              ) : custoPorSetor && custoPorSetor.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={custoPorSetor} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      type="number" 
+                      tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                    />
+                    <YAxis dataKey="setor" type="category" width={100} tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload as CustoPorSetor;
+                          return (
+                            <div className="bg-popover border rounded-md shadow-md p-2">
+                              <p className="font-medium text-sm">{data.setor}</p>
+                              <p className="text-xs text-muted-foreground">
+                                R$ {formatCurrency(data.custoTotal)} ({data.totalColaboradores} colaboradores)
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar dataKey="custoTotal" name="Custo Total" radius={[0, 4, 4, 0]}>
+                      {custoPorSetor.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-demissoes-tipo">
+                <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-custo-setor">
                   <p className="text-muted-foreground">Nenhum dado disponível</p>
                 </div>
               )}
@@ -1326,6 +1321,74 @@ export default function DashboardGeG() {
             </CardContent>
           </Card>
 
+          <Card data-testid="card-demissoes-por-tipo">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <PieChartIcon className="w-5 h-5 text-red-500" />
+                <CardTitle>Demissões por Tipo</CardTitle>
+              </div>
+              <CardDescription>Distribuição por tipo de desligamento</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingDemissoesPorTipo ? (
+                <Skeleton className="h-[250px] w-full" />
+              ) : demissoesPorTipo && demissoesPorTipo.length > 0 ? (
+                <div className="flex flex-col items-center">
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie
+                        data={demissoesPorTipo}
+                        dataKey="total"
+                        nameKey="tipo"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={70}
+                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {demissoesPorTipo.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload as DemissoesPorTipo;
+                            return (
+                              <div className="bg-popover border rounded-md shadow-md p-2">
+                                <p className="font-medium text-sm">{data.tipo}</p>
+                                <p className="text-xs text-muted-foreground">{data.total} ({data.percentual.toFixed(1)}%)</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-1 mt-2 max-h-[80px] overflow-y-auto w-full">
+                    {demissoesPorTipo.map((item, index) => (
+                      <div key={item.tipo} className="flex items-center gap-2 text-xs" data-testid={`demissao-tipo-${index}`}>
+                        <div 
+                          className="w-2 h-2 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} 
+                        />
+                        <span className="text-muted-foreground truncate">{item.tipo}</span>
+                        <span className="font-medium ml-auto">({item.total})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-demissoes-tipo">
+                  <p className="text-muted-foreground">Nenhum dado disponível</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 mb-8">
           <Card data-testid="card-ultimas-promocoes">
             <CardHeader>
               <div className="flex items-center gap-2">

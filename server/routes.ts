@@ -6315,6 +6315,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/geg/custo-por-setor", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
+
+      const resultado = await storage.getGegCustoPorSetor(squad, setor, nivel, cargo);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG custo por setor:", error);
+      res.status(500).json({ error: "Failed to fetch GEG custo por setor" });
+    }
+  });
+
   app.get("/api/geg/demissoes-por-tipo", async (req, res) => {
     try {
       const squad = req.query.squad as string || 'todos';
