@@ -27,6 +27,8 @@ export const cazClientes = pgTable("caz_clientes", {
   id: integer("id").primaryKey(),
   nome: text("nome"),
   cnpj: text("cnpj"),
+  email: text("email"),
+  telefone: text("telefone"),
   endereco: text("endereco"),
   ativo: text("ativo"),
   createdAt: timestamp("created_at"),
