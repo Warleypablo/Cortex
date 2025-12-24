@@ -12,7 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { SiInstagram } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -93,6 +97,19 @@ export default function ClientDetail() {
   const [contratosSortConfig, setContratosSortConfig] = useState<SortConfig | null>(null);
   const [receitasSortConfig, setReceitasSortConfig] = useState<SortConfig | null>(null);
   const [isEditingDados, setIsEditingDados] = useState(false);
+  const [editingContratoId, setEditingContratoId] = useState<string | null>(null);
+
+  interface EditContratoFormData {
+    servico: string;
+    status: string;
+    squad: string;
+    responsavel: string;
+    csResponsavel: string;
+    dataInicio: string;
+    valorr: string;
+    valorp: string;
+    produto: string;
+  }
 
   interface EditFormData {
     telefone: string;
@@ -119,6 +136,20 @@ export default function ClientDetail() {
       linksContrato: "",
       linkListaClickup: "",
       cluster: "",
+    },
+  });
+
+  const contratoEditForm = useForm<EditContratoFormData>({
+    defaultValues: {
+      servico: "",
+      status: "",
+      squad: "",
+      responsavel: "",
+      csResponsavel: "",
+      dataInicio: "",
+      valorr: "",
+      valorp: "",
+      produto: "",
     },
   });
 
@@ -152,6 +183,35 @@ export default function ClientDetail() {
       return response.json();
     },
     enabled: !!cliente?.cnpj,
+  });
+
+  const { data: colaboradoresDropdown } = useQuery<{ id: number; nome: string; status: string | null }[]>({
+    queryKey: ["/api/colaboradores/dropdown"],
+    enabled: !!editingContratoId,
+  });
+
+  const updateContratoMutation = useMutation({
+    mutationFn: async (data: EditContratoFormData & { idSubtask: string }) => {
+      const { idSubtask, ...updateData } = data;
+      const response = await apiRequest("PATCH", `/api/contratos/${idSubtask}`, updateData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente", clientId, "contratos"] });
+      setEditingContratoId(null);
+      contratoEditForm.reset();
+      toast({
+        title: "Sucesso!",
+        description: "Contrato atualizado com sucesso.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao atualizar",
+        description: error.message || "Não foi possível atualizar o contrato.",
+        variant: "destructive",
+      });
+    },
   });
 
   const updateClienteMutation = useMutation({
@@ -207,6 +267,106 @@ export default function ClientDetail() {
   const onSubmitEdit = (data: EditFormData) => {
     updateClienteMutation.mutate(data);
   };
+
+  const mapSquadNameToCode = (name: string): string => {
+    switch (name) {
+      case "Supreme": return "0";
+      case "Forja": return "1";
+      case "Squadra": return "2";
+      case "Chama": return "3";
+      default: return name;
+    }
+  };
+
+  const handleStartEditContrato = (contrato: ContratoCompleto) => {
+    setEditingContratoId(contrato.idSubtask);
+    
+    // Format values for the form (currency with mask)
+    const formatCurrency = (val: string | null) => {
+      if (!val) return "";
+      const floatVal = parseFloat(val);
+      if (isNaN(floatVal)) return "";
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(floatVal);
+    };
+
+    contratoEditForm.reset({
+      servico: contrato.servico || "",
+      status: contrato.status || "",
+      squad: contrato.squad || "",
+      responsavel: contrato.responsavel || "",
+      csResponsavel: contrato.csResponsavel || "",
+      dataInicio: contrato.dataInicio ? new Date(contrato.dataInicio).toISOString().split('T')[0] : "",
+      valorr: formatCurrency(contrato.valorr),
+      valorp: formatCurrency(contrato.valorp),
+      produto: contrato.plano || contrato.produto || "",
+    });
+  };
+
+  const handleCancelEditContrato = () => {
+    setEditingContratoId(null);
+    contratoEditForm.reset();
+  };
+
+  const handleSaveContrato = () => {
+    if (!editingContratoId) return;
+    const data = contratoEditForm.getValues();
+    
+    // Formatting logic
+    const formattedData = {
+      ...data,
+      idSubtask: editingContratoId,
+      // 1. Currency fields (valorr, valorp)
+      valorr: data.valorr ? data.valorr.toString().replace(/[R$\s.]/g, '').replace(',', '.') : null,
+      valorp: data.valorp ? data.valorp.toString().replace(/[R$\s.]/g, '').replace(',', '.') : null,
+      // 2. Date field (dataInicio) - handle Date object or dd/MM/yyyy string
+      dataInicio: (() => {
+        if (!data.dataInicio) return null;
+        if (data.dataInicio.includes('/')) {
+          const [day, month, year] = data.dataInicio.split('/');
+          return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        return data.dataInicio; // Already YYYY-MM-DD from state
+      })(),
+      // 3. Empty strings to null
+      responsavel: data.responsavel || null,
+      csResponsavel: data.csResponsavel || null,
+      produto: data.produto || null,
+      status: data.status || null,
+      squad: data.squad || null,
+      servico: data.servico || null,
+    };
+
+    updateContratoMutation.mutate(formattedData as any);
+  };
+
+  const servicosDisponiveis = useMemo(() => {
+    const servicos = new Set<string>();
+    contratos?.forEach(c => {
+      if (c.servico) servicos.add(c.servico);
+    });
+    ["Performance", "Comunicação", "Tech", "Estratégia", "Mídia", "CRM", "SEO", "Branding", "Social Media"].forEach(s => servicos.add(s));
+    return Array.from(servicos).sort();
+  }, [contratos]);
+
+  const statusOptions = [
+    "ativo",
+    "onboarding", 
+    "triagem",
+    "cancelado/inativo",
+    "pausado",
+    "em cancelamento",
+    "entregue"
+  ];
+
+  const squadOptions = [
+    { value: "0", label: "Supreme" },
+    { value: "1", label: "Forja" },
+    { value: "2", label: "Squadra" },
+    { value: "3", label: "Chama" },
+  ];
 
   const handleContratoSort = (key: string) => {
     setContratosSortConfig(prev => ({
@@ -1217,71 +1377,291 @@ export default function ClientDetail() {
                       <TableHead className="bg-muted/30" data-testid="header-data-entrega">
                         Data Entrega
                       </TableHead>
+                      <TableHead className="bg-muted/30 text-center" data-testid="header-acoes">
+                        Ações
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedContratos && sortedContratos.length > 0 ? (
-                      sortedContratos.map((contrato) => (
-                        <TableRow key={contrato.idSubtask} className="hover-elevate" data-testid={`contract-row-${contrato.idSubtask}`}>
-                          <TableCell className="font-medium" data-testid={`text-service-${contrato.idSubtask}`}>
-                            {contrato.servico || "Sem serviço"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              className={getContractStatusColor(contrato.status || "")} 
-                              variant="outline"
-                              data-testid={`badge-status-${contrato.idSubtask}`}
-                            >
-                              {contrato.status || "Desconhecido"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              className={getSquadColorForContract(mapSquadCodeToName(contrato.squad))} 
-                              variant="outline"
-                              data-testid={`badge-squad-${contrato.idSubtask}`}
-                            >
-                              {mapSquadCodeToName(contrato.squad)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground" data-testid={`text-responsavel-${contrato.idSubtask}`}>
-                            {contrato.responsavel || '-'}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground" data-testid={`text-cs-${contrato.idSubtask}`}>
-                            {contrato.csResponsavel || '-'}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground" data-testid={`text-date-${contrato.idSubtask}`}>
-                            {contrato.dataInicio ? new Date(contrato.dataInicio).toLocaleDateString('pt-BR') : '-'}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold" data-testid={`text-recurring-${contrato.idSubtask}`}>
-                            {contrato.valorr && parseFloat(contrato.valorr) > 0
-                              ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(contrato.valorr))
-                              : '-'
-                            }
-                          </TableCell>
-                          <TableCell className="text-right font-semibold" data-testid={`text-onetime-${contrato.idSubtask}`}>
-                            {contrato.valorp && parseFloat(contrato.valorp) > 0
-                              ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(contrato.valorp))
-                              : '-'
-                            }
-                          </TableCell>
-                          <TableCell className="text-muted-foreground" data-testid={`text-plano-${contrato.idSubtask}`}>
-                            {contrato.plano || '-'}
-                          </TableCell>
-                          <TableCell className="text-center font-medium" data-testid={`text-lt-${contrato.idSubtask}`}>
-                            {calcularLTContrato(contrato)}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground" data-testid={`text-solic-cancel-${contrato.idSubtask}`}>
-                            {contrato.dataSolicitacaoEncerramento ? new Date(contrato.dataSolicitacaoEncerramento).toLocaleDateString('pt-BR') : '-'}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground" data-testid={`text-data-entrega-${contrato.idSubtask}`}>
-                            {contrato.dataEncerramento ? new Date(contrato.dataEncerramento).toLocaleDateString('pt-BR') : '-'}
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      sortedContratos.map((contrato) => {
+                        const isEditing = editingContratoId === contrato.idSubtask;
+                        
+                        if (isEditing) {
+                          return (
+                            <TableRow key={contrato.idSubtask} className="bg-muted/20" data-testid={`contract-row-editing-${contrato.idSubtask}`}>
+                              <TableCell>
+                                <Select
+                                  value={contratoEditForm.watch("servico")}
+                                  onValueChange={(val) => contratoEditForm.setValue("servico", val)}
+                                >
+                                  <SelectTrigger className="w-[140px]" data-testid={`select-servico-${contrato.idSubtask}`}>
+                                    <SelectValue placeholder="Selecione..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {servicosDisponiveis.map((s) => (
+                                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={contratoEditForm.watch("status")}
+                                  onValueChange={(val) => contratoEditForm.setValue("status", val)}
+                                >
+                                  <SelectTrigger className="w-[140px]" data-testid={`select-status-${contrato.idSubtask}`}>
+                                    <SelectValue placeholder="Status..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {statusOptions.map((s) => (
+                                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={contratoEditForm.watch("squad")}
+                                  onValueChange={(val) => contratoEditForm.setValue("squad", val)}
+                                >
+                                  <SelectTrigger className="w-[120px]" data-testid={`select-squad-${contrato.idSubtask}`}>
+                                    <SelectValue placeholder="Squad..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {squadOptions.map((s) => (
+                                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={contratoEditForm.watch("responsavel")}
+                                  onValueChange={(val) => contratoEditForm.setValue("responsavel", val)}
+                                >
+                                  <SelectTrigger className="w-[140px]" data-testid={`select-responsavel-${contrato.idSubtask}`}>
+                                    <SelectValue placeholder="Responsável..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="">Nenhum</SelectItem>
+                                    {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
+                                      <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={contratoEditForm.watch("csResponsavel")}
+                                  onValueChange={(val) => contratoEditForm.setValue("csResponsavel", val)}
+                                >
+                                  <SelectTrigger className="w-[140px]" data-testid={`select-cs-${contrato.idSubtask}`}>
+                                    <SelectValue placeholder="CS..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="">Nenhum</SelectItem>
+                                    {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
+                                      <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className="w-[130px] justify-start text-left font-normal"
+                                      data-testid={`date-picker-${contrato.idSubtask}`}
+                                    >
+                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      {contratoEditForm.watch("dataInicio") 
+                                        ? format(new Date(contratoEditForm.watch("dataInicio")), "dd/MM/yyyy", { locale: ptBR })
+                                        : "Selecione..."
+                                      }
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={contratoEditForm.watch("dataInicio") ? new Date(contratoEditForm.watch("dataInicio")) : undefined}
+                                      onSelect={(date) => {
+                                        if (date) {
+                                          contratoEditForm.setValue("dataInicio", date.toISOString().split('T')[0]);
+                                        }
+                                      }}
+                                      initialFocus
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="text"
+                                  className="w-[100px] text-right"
+                                  placeholder="R$ 0,00"
+                                  value={contratoEditForm.watch("valorr")}
+                                  onChange={(e) => {
+                                    let val = e.target.value.replace(/\D/g, "");
+                                    if (val) {
+                                      const floatVal = parseFloat(val) / 100;
+                                      const formatted = new Intl.NumberFormat('pt-BR', {
+                                        style: 'currency',
+                                        currency: 'BRL'
+                                      }).format(floatVal);
+                                      contratoEditForm.setValue("valorr", formatted);
+                                    } else {
+                                      contratoEditForm.setValue("valorr", "");
+                                    }
+                                  }}
+                                  data-testid={`input-valorr-${contrato.idSubtask}`}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="text"
+                                  className="w-[100px] text-right"
+                                  placeholder="R$ 0,00"
+                                  value={contratoEditForm.watch("valorp")}
+                                  onChange={(e) => {
+                                    let val = e.target.value.replace(/\D/g, "");
+                                    if (val) {
+                                      const floatVal = parseFloat(val) / 100;
+                                      const formatted = new Intl.NumberFormat('pt-BR', {
+                                        style: 'currency',
+                                        currency: 'BRL'
+                                      }).format(floatVal);
+                                      contratoEditForm.setValue("valorp", formatted);
+                                    } else {
+                                      contratoEditForm.setValue("valorp", "");
+                                    }
+                                  }}
+                                  data-testid={`input-valorp-${contrato.idSubtask}`}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="text"
+                                  className="w-[100px]"
+                                  placeholder="Plano..."
+                                  value={contratoEditForm.watch("produto")}
+                                  onChange={(e) => contratoEditForm.setValue("produto", e.target.value)}
+                                  data-testid={`input-produto-${contrato.idSubtask}`}
+                                />
+                              </TableCell>
+                              <TableCell className="text-center font-medium" data-testid={`text-lt-${contrato.idSubtask}`}>
+                                {calcularLTContrato(contrato)}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {contrato.dataSolicitacaoEncerramento ? new Date(contrato.dataSolicitacaoEncerramento).toLocaleDateString('pt-BR') : '-'}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {contrato.dataEncerramento ? new Date(contrato.dataEncerramento).toLocaleDateString('pt-BR') : '-'}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={handleSaveContrato}
+                                    disabled={updateContratoMutation.isPending}
+                                    data-testid={`button-save-${contrato.idSubtask}`}
+                                  >
+                                    {updateContratoMutation.isPending ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Check className="h-4 w-4 text-green-600" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={handleCancelEditContrato}
+                                    disabled={updateContratoMutation.isPending}
+                                    data-testid={`button-cancel-${contrato.idSubtask}`}
+                                  >
+                                    <X className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
+                        
+                        return (
+                          <TableRow key={contrato.idSubtask} className="hover-elevate" data-testid={`contract-row-${contrato.idSubtask}`}>
+                            <TableCell className="font-medium" data-testid={`text-service-${contrato.idSubtask}`}>
+                              {contrato.servico || "Sem serviço"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                className={getContractStatusColor(contrato.status || "")} 
+                                variant="outline"
+                                data-testid={`badge-status-${contrato.idSubtask}`}
+                              >
+                                {contrato.status || "Desconhecido"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                className={getSquadColorForContract(mapSquadCodeToName(contrato.squad))} 
+                                variant="outline"
+                                data-testid={`badge-squad-${contrato.idSubtask}`}
+                              >
+                                {mapSquadCodeToName(contrato.squad)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground" data-testid={`text-responsavel-${contrato.idSubtask}`}>
+                              {contrato.responsavel || '-'}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground" data-testid={`text-cs-${contrato.idSubtask}`}>
+                              {contrato.csResponsavel || '-'}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground" data-testid={`text-date-${contrato.idSubtask}`}>
+                              {contrato.dataInicio ? new Date(contrato.dataInicio).toLocaleDateString('pt-BR') : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold" data-testid={`text-recurring-${contrato.idSubtask}`}>
+                              {contrato.valorr && parseFloat(contrato.valorr) > 0
+                                ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(contrato.valorr))
+                                : '-'
+                              }
+                            </TableCell>
+                            <TableCell className="text-right font-semibold" data-testid={`text-onetime-${contrato.idSubtask}`}>
+                              {contrato.valorp && parseFloat(contrato.valorp) > 0
+                                ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(contrato.valorp))
+                                : '-'
+                              }
+                            </TableCell>
+                            <TableCell className="text-muted-foreground" data-testid={`text-plano-${contrato.idSubtask}`}>
+                              {contrato.plano || '-'}
+                            </TableCell>
+                            <TableCell className="text-center font-medium" data-testid={`text-lt-${contrato.idSubtask}`}>
+                              {calcularLTContrato(contrato)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground" data-testid={`text-solic-cancel-${contrato.idSubtask}`}>
+                              {contrato.dataSolicitacaoEncerramento ? new Date(contrato.dataSolicitacaoEncerramento).toLocaleDateString('pt-BR') : '-'}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground" data-testid={`text-data-entrega-${contrato.idSubtask}`}>
+                              {contrato.dataEncerramento ? new Date(contrato.dataEncerramento).toLocaleDateString('pt-BR') : '-'}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleStartEditContrato(contrato)}
+                                disabled={!!editingContratoId}
+                                data-testid={`button-edit-${contrato.idSubtask}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={12} className="text-center text-muted-foreground py-8" data-testid="text-no-contracts">
+                        <TableCell colSpan={13} className="text-center text-muted-foreground py-8" data-testid="text-no-contracts">
                           Nenhum contrato encontrado para este cliente
                         </TableCell>
                       </TableRow>
