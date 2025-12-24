@@ -1,16 +1,21 @@
 import { useMemo, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, FileText, FileCheck, DollarSign, Activity } from "lucide-react";
+import { ArrowUpDown, FileText, FileCheck, DollarSign, Activity, Edit2 } from "lucide-react";
 import StatsCard from "@/components/StatsCard";
 import { ContractsTableSkeleton } from "@/components/TableSkeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { differenceInMonths, format } from "date-fns";
+import { differenceInMonths, differenceInDays, format } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { ContratoCompleto } from "@shared/schema";
 
 interface Contract {
@@ -22,11 +27,18 @@ interface Contract {
   clientId: string;
   status: string;
   squad: string;
+  squadCode: string;
+  responsavel: string;
+  csResponsavel: string;
   createdDate: string;
+  dataEntrega: string;
   recurringValue: number;
   oneTimeValue: number;
   lt: number;
+  ltDays: number;
   dataSolicitacaoEncerramento: string;
+  rawDataInicio: string | null;
+  rawDataEncerramento: string | null;
 }
 
 interface ContractsProps {
@@ -38,7 +50,7 @@ interface ContractsProps {
   planoFilter: string[];
 }
 
-type SortField = "service" | "clientName" | "status" | "squad" | "createdDate" | "lt" | "dataSolicitacaoEncerramento";
+type SortField = "service" | "status" | "squad" | "responsavel" | "csResponsavel" | "createdDate" | "recurringValue" | "oneTimeValue" | "plano" | "lt" | "dataSolicitacaoEncerramento" | "dataEntrega";
 type SortDirection = "asc" | "desc";
 
 const mapSquadCodeToName = (code: string | null): string => {
@@ -61,13 +73,59 @@ export default function Contracts({
   planoFilter,
 }: ContractsProps) {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [sortField, setSortField] = useState<SortField>("createdDate");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [editingContract, setEditingContract] = useState<Contract | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    servico: "",
+    produto: "",
+    status: "",
+    squad: "",
+    plano: "",
+    valorr: "",
+    valorp: "",
+    dataInicio: "",
+    dataEncerramento: "",
+    responsavel: "",
+    csResponsavel: "",
+  });
 
   const { data: contratos = [], isLoading, error } = useQuery<ContratoCompleto[]>({
     queryKey: ["/api/contratos"],
+  });
+
+  const { data: colaboradores = [] } = useQuery<{ id: number; nome: string; status: string | null }[]>({
+    queryKey: ["/api/colaboradores/dropdown"],
+  });
+
+  const sortedColaboradores = useMemo(() => {
+    return [...colaboradores].sort((a, b) => {
+      const aAtivo = a.status?.toLowerCase() === "ativo" ? 0 : 1;
+      const bAtivo = b.status?.toLowerCase() === "ativo" ? 0 : 1;
+      if (aAtivo !== bAtivo) return aAtivo - bAtivo;
+      return a.nome.localeCompare(b.nome);
+    });
+  }, [colaboradores]);
+
+  const updateContractMutation = useMutation({
+    mutationFn: async (data: { id: string; updates: any }) => {
+      const res = await apiRequest("PATCH", `/api/contratos/${data.id}`, data.updates);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contratos"] });
+      toast({ title: "Contrato atualizado", description: "As alterações foram salvas com sucesso." });
+      setIsEditDialogOpen(false);
+      setEditingContract(null);
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível atualizar o contrato.", variant: "destructive" });
+    }
   });
 
   const contracts: Contract[] = useMemo(() => {
@@ -75,9 +133,14 @@ export default function Contracts({
       const endDate = c.dataEncerramento ? new Date(c.dataEncerramento) : new Date();
       const startDate = c.dataInicio ? new Date(c.dataInicio) : null;
       const lt = startDate ? differenceInMonths(endDate, startDate) : 0;
+      const ltDays = startDate ? differenceInDays(endDate, startDate) : 0;
       
       const dataSolicCancel = c.dataSolicitacaoEncerramento 
         ? format(new Date(c.dataSolicitacaoEncerramento), 'dd/MM/yyyy')
+        : "";
+
+      const dataEntrega = c.dataEncerramento
+        ? format(new Date(c.dataEncerramento), 'dd/MM/yyyy')
         : "";
 
       return {
@@ -89,11 +152,18 @@ export default function Contracts({
         clientId: c.idCliente || "",
         status: c.status || "Desconhecido",
         squad: mapSquadCodeToName(c.squad),
+        squadCode: c.squad || "",
+        responsavel: c.responsavel || "",
+        csResponsavel: c.csResponsavel || "",
         createdDate: c.dataInicio ? new Date(c.dataInicio).toISOString().split('T')[0] : "",
+        dataEntrega,
         recurringValue: parseFloat(c.valorr || "0"),
         oneTimeValue: parseFloat(c.valorp || "0"),
         lt,
+        ltDays,
         dataSolicitacaoEncerramento: dataSolicCancel,
+        rawDataInicio: c.dataInicio ? new Date(c.dataInicio).toISOString().split('T')[0] : null,
+        rawDataEncerramento: c.dataEncerramento ? new Date(c.dataEncerramento).toISOString().split('T')[0] : null,
       };
     });
   }, [contratos]);
@@ -105,6 +175,45 @@ export default function Contracts({
       setSortField(field);
       setSortDirection("asc");
     }
+  };
+
+  const handleEditClick = (contract: Contract, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingContract(contract);
+    setEditForm({
+      servico: contract.service,
+      produto: contract.produto,
+      status: contract.status,
+      squad: contract.squadCode,
+      plano: contract.plano,
+      valorr: contract.recurringValue.toString(),
+      valorp: contract.oneTimeValue.toString(),
+      dataInicio: contract.rawDataInicio || "",
+      dataEncerramento: contract.rawDataEncerramento || "",
+      responsavel: contract.responsavel,
+      csResponsavel: contract.csResponsavel,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingContract) return;
+    updateContractMutation.mutate({
+      id: editingContract.id,
+      updates: {
+        servico: editForm.servico,
+        produto: editForm.produto,
+        status: editForm.status,
+        squad: editForm.squad,
+        plano: editForm.plano,
+        valorr: editForm.valorr,
+        valorp: editForm.valorp,
+        dataInicio: editForm.dataInicio || null,
+        dataEncerramento: editForm.dataEncerramento || null,
+        responsavel: editForm.responsavel,
+        csResponsavel: editForm.csResponsavel,
+      },
+    });
   };
 
   const filteredContracts = useMemo(() => {
@@ -133,14 +242,22 @@ export default function Contracts({
       
       if (sortField === "service") {
         comparison = a.service.localeCompare(b.service);
-      } else if (sortField === "clientName") {
-        comparison = a.clientName.localeCompare(b.clientName);
       } else if (sortField === "status") {
         comparison = a.status.localeCompare(b.status);
       } else if (sortField === "squad") {
         comparison = a.squad.localeCompare(b.squad);
+      } else if (sortField === "responsavel") {
+        comparison = a.responsavel.localeCompare(b.responsavel);
+      } else if (sortField === "csResponsavel") {
+        comparison = a.csResponsavel.localeCompare(b.csResponsavel);
       } else if (sortField === "createdDate") {
-        comparison = new Date(a.createdDate).getTime() - new Date(b.createdDate).getTime();
+        comparison = new Date(a.createdDate || 0).getTime() - new Date(b.createdDate || 0).getTime();
+      } else if (sortField === "recurringValue") {
+        comparison = a.recurringValue - b.recurringValue;
+      } else if (sortField === "oneTimeValue") {
+        comparison = a.oneTimeValue - b.oneTimeValue;
+      } else if (sortField === "plano") {
+        comparison = a.plano.localeCompare(b.plano);
       } else if (sortField === "lt") {
         comparison = a.lt - b.lt;
       } else if (sortField === "dataSolicitacaoEncerramento") {
@@ -153,6 +270,20 @@ export default function Contracts({
         } else {
           const [dayA, monthA, yearA] = a.dataSolicitacaoEncerramento.split('/').map(Number);
           const [dayB, monthB, yearB] = b.dataSolicitacaoEncerramento.split('/').map(Number);
+          const dateA = new Date(yearA, monthA - 1, dayA);
+          const dateB = new Date(yearB, monthB - 1, dayB);
+          comparison = dateA.getTime() - dateB.getTime();
+        }
+      } else if (sortField === "dataEntrega") {
+        if (!a.dataEntrega && !b.dataEntrega) {
+          comparison = 0;
+        } else if (!a.dataEntrega) {
+          comparison = 1;
+        } else if (!b.dataEntrega) {
+          comparison = -1;
+        } else {
+          const [dayA, monthA, yearA] = a.dataEntrega.split('/').map(Number);
+          const [dayB, monthB, yearB] = b.dataEntrega.split('/').map(Number);
           const dateA = new Date(yearA, monthA - 1, dayA);
           const dateB = new Date(yearB, monthB - 1, dayB);
           comparison = dateA.getTime() - dateB.getTime();
@@ -236,6 +367,13 @@ export default function Contracts({
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
     }
+  };
+
+  const formatLT = (months: number, days: number) => {
+    if (months >= 1) {
+      return `${months} m`;
+    }
+    return `${days} d`;
   };
 
   if (isLoading) {
@@ -322,155 +460,212 @@ export default function Contracts({
         </div>
 
         <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <div className="max-h-[calc(100vh-400px)] overflow-y-auto">
+          <div className="max-h-[calc(100vh-400px)] overflow-x-auto overflow-y-auto">
             <Table>
               <TableHeader className="sticky top-0 z-20 shadow-sm">
                 <TableRow className="bg-background border-b">
-                <TableHead className="bg-background">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleSort("service")}
-                    className="hover-elevate -ml-3"
-                    data-testid="sort-service"
-                  >
-                    Serviço
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-                <TableHead className="bg-background">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleSort("clientName")}
-                    className="hover-elevate -ml-3"
-                    data-testid="sort-client"
-                  >
-                    Cliente
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-                <TableHead className="bg-background">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleSort("status")}
-                    className="hover-elevate -ml-3"
-                    data-testid="sort-status"
-                  >
-                    Status
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-                <TableHead className="bg-background">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleSort("squad")}
-                    className="hover-elevate -ml-3"
-                    data-testid="sort-squad"
-                  >
-                    Squad
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-                <TableHead className="bg-background">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleSort("createdDate")}
-                    className="hover-elevate -ml-3"
-                    data-testid="sort-date"
-                  >
-                    Data Início
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-                <TableHead className="bg-background">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleSort("lt")}
-                    className="hover-elevate -ml-3"
-                    data-testid="sort-lt"
-                  >
-                    LT
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-                <TableHead className="bg-background">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleSort("dataSolicitacaoEncerramento")}
-                    className="hover-elevate -ml-3"
-                    data-testid="sort-data-solic-cancel"
-                  >
-                    Data Solic. Cancel.
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-                <TableHead className="text-right bg-background">Valor R</TableHead>
-                <TableHead className="text-right bg-background">Valor P</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedContracts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                    {searchQuery ? "Nenhum contrato encontrado com esse critério de busca." : "Nenhum contrato cadastrado."}
-                  </TableCell>
+                  <TableHead className="bg-background w-[40px]"></TableHead>
+                  <TableHead className="bg-background">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort("service")}
+                      className="hover-elevate -ml-3"
+                      data-testid="sort-service"
+                    >
+                      Serviço
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="bg-background">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort("status")}
+                      className="hover-elevate -ml-3"
+                      data-testid="sort-status"
+                    >
+                      Status
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="bg-background">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort("squad")}
+                      className="hover-elevate -ml-3"
+                      data-testid="sort-squad"
+                    >
+                      Squad
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="bg-background">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort("responsavel")}
+                      className="hover-elevate -ml-3"
+                      data-testid="sort-responsavel"
+                    >
+                      Responsável
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="bg-background">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort("csResponsavel")}
+                      className="hover-elevate -ml-3"
+                      data-testid="sort-cs"
+                    >
+                      CS
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="bg-background">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort("createdDate")}
+                      className="hover-elevate -ml-3"
+                      data-testid="sort-date"
+                    >
+                      Data Início
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="text-right bg-background">Valor R</TableHead>
+                  <TableHead className="text-right bg-background">Valor P</TableHead>
+                  <TableHead className="bg-background">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort("plano")}
+                      className="hover-elevate -ml-3"
+                      data-testid="sort-plano"
+                    >
+                      Plano
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="bg-background">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort("lt")}
+                      className="hover-elevate -ml-3"
+                      data-testid="sort-lt"
+                    >
+                      LT
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="bg-background">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort("dataSolicitacaoEncerramento")}
+                      className="hover-elevate -ml-3"
+                      data-testid="sort-solic-cancel"
+                    >
+                      Solic. Cancel.
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="bg-background">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleSort("dataEntrega")}
+                      className="hover-elevate -ml-3"
+                      data-testid="sort-data-entrega"
+                    >
+                      Data Entrega
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
                 </TableRow>
-              ) : (
-                paginatedContracts.map((contract) => (
-                  <TableRow 
-                    key={contract.id} 
-                    className="cursor-pointer hover-elevate"
-                    onClick={() => contract.clientId && setLocation(`/cliente/${contract.clientId}`)}
-                    data-testid={`contract-row-${contract.id}`}
-                  >
-                    <TableCell className="font-medium" data-testid={`text-service-${contract.id}`}>
-                      {contract.service}
-                    </TableCell>
-                    <TableCell data-testid={`text-client-${contract.id}`}>
-                      {contract.clientName}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(contract.status)} variant="outline" data-testid={`badge-status-${contract.id}`}>
-                        {contract.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getSquadColor(contract.squad)} variant="outline" data-testid={`badge-squad-${contract.id}`}>
-                        {contract.squad}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground" data-testid={`text-date-${contract.id}`}>
-                      {contract.createdDate ? new Date(contract.createdDate).toLocaleDateString('pt-BR') : '-'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground" data-testid={`text-lt-${contract.id}`}>
-                      {contract.lt} m
-                    </TableCell>
-                    <TableCell className="text-muted-foreground" data-testid={`text-data-solic-cancel-${contract.id}`}>
-                      {contract.dataSolicitacaoEncerramento || '-'}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold" data-testid={`text-recurring-${contract.id}`}>
-                      {contract.recurringValue > 0 
-                        ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.recurringValue)
-                        : '-'
-                      }
-                    </TableCell>
-                    <TableCell className="text-right font-semibold" data-testid={`text-onetime-${contract.id}`}>
-                      {contract.oneTimeValue > 0 
-                        ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.oneTimeValue)
-                        : '-'
-                      }
+              </TableHeader>
+              <TableBody>
+                {paginatedContracts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
+                      {searchQuery ? "Nenhum contrato encontrado com esse critério de busca." : "Nenhum contrato cadastrado."}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  paginatedContracts.map((contract) => (
+                    <TableRow 
+                      key={contract.id} 
+                      className="cursor-pointer hover-elevate"
+                      onClick={() => contract.clientId && setLocation(`/cliente/${contract.clientId}`)}
+                      data-testid={`contract-row-${contract.id}`}
+                    >
+                      <TableCell className="w-[40px]">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => handleEditClick(contract, e)}
+                          className="h-8 w-8"
+                          data-testid={`button-edit-${contract.id}`}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                      <TableCell className="font-medium" data-testid={`text-service-${contract.id}`}>
+                        {contract.service}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(contract.status)} variant="outline" data-testid={`badge-status-${contract.id}`}>
+                          {contract.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getSquadColor(contract.squad)} variant="outline" data-testid={`badge-squad-${contract.id}`}>
+                          {contract.squad}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground" data-testid={`text-responsavel-${contract.id}`}>
+                        {contract.responsavel || '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground" data-testid={`text-cs-${contract.id}`}>
+                        {contract.csResponsavel || '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground" data-testid={`text-date-${contract.id}`}>
+                        {contract.createdDate ? new Date(contract.createdDate).toLocaleDateString('pt-BR') : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold" data-testid={`text-recurring-${contract.id}`}>
+                        {contract.recurringValue > 0 
+                          ? formatCurrencyNoDecimals(contract.recurringValue)
+                          : '-'
+                        }
+                      </TableCell>
+                      <TableCell className="text-right font-semibold" data-testid={`text-onetime-${contract.id}`}>
+                        {contract.oneTimeValue > 0 
+                          ? formatCurrencyNoDecimals(contract.oneTimeValue)
+                          : '-'
+                        }
+                      </TableCell>
+                      <TableCell className="text-muted-foreground" data-testid={`text-plano-${contract.id}`}>
+                        {contract.plano || '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground" data-testid={`text-lt-${contract.id}`}>
+                        {formatLT(contract.lt, contract.ltDays)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground" data-testid={`text-solic-cancel-${contract.id}`}>
+                        {contract.dataSolicitacaoEncerramento || '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground" data-testid={`text-data-entrega-${contract.id}`}>
+                        {contract.dataEntrega || '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
         </div>
 
@@ -542,6 +737,175 @@ export default function Contracts({
             </div>
           </div>
         )}
+
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Contrato</DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="servico">Serviço</Label>
+                <Input
+                  id="servico"
+                  value={editForm.servico}
+                  onChange={(e) => setEditForm({ ...editForm, servico: e.target.value })}
+                  data-testid="input-edit-servico"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="produto">Produto</Label>
+                <Input
+                  id="produto"
+                  value={editForm.produto}
+                  onChange={(e) => setEditForm({ ...editForm, produto: e.target.value })}
+                  data-testid="input-edit-produto"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={editForm.status}
+                  onValueChange={(value) => setEditForm({ ...editForm, status: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-status">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Ativo">Ativo</SelectItem>
+                    <SelectItem value="Onboarding">Onboarding</SelectItem>
+                    <SelectItem value="Triagem">Triagem</SelectItem>
+                    <SelectItem value="Em Cancelamento">Em Cancelamento</SelectItem>
+                    <SelectItem value="Cancelado">Cancelado</SelectItem>
+                    <SelectItem value="Inativo">Inativo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="squad">Squad</Label>
+                <Select
+                  value={editForm.squad}
+                  onValueChange={(value) => setEditForm({ ...editForm, squad: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-squad">
+                    <SelectValue placeholder="Selecione o squad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Supreme</SelectItem>
+                    <SelectItem value="1">Forja</SelectItem>
+                    <SelectItem value="2">Squadra</SelectItem>
+                    <SelectItem value="3">Chama</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="plano">Plano</Label>
+                <Input
+                  id="plano"
+                  value={editForm.plano}
+                  onChange={(e) => setEditForm({ ...editForm, plano: e.target.value })}
+                  data-testid="input-edit-plano"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="valorr">Valor Recorrente</Label>
+                <Input
+                  id="valorr"
+                  type="number"
+                  step="0.01"
+                  value={editForm.valorr}
+                  onChange={(e) => setEditForm({ ...editForm, valorr: e.target.value })}
+                  data-testid="input-edit-valorr"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="valorp">Valor Pontual</Label>
+                <Input
+                  id="valorp"
+                  type="number"
+                  step="0.01"
+                  value={editForm.valorp}
+                  onChange={(e) => setEditForm({ ...editForm, valorp: e.target.value })}
+                  data-testid="input-edit-valorp"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dataInicio">Data Início</Label>
+                <Input
+                  id="dataInicio"
+                  type="date"
+                  value={editForm.dataInicio}
+                  onChange={(e) => setEditForm({ ...editForm, dataInicio: e.target.value })}
+                  data-testid="input-edit-data-inicio"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dataEncerramento">Data Encerramento</Label>
+                <Input
+                  id="dataEncerramento"
+                  type="date"
+                  value={editForm.dataEncerramento}
+                  onChange={(e) => setEditForm({ ...editForm, dataEncerramento: e.target.value })}
+                  data-testid="input-edit-data-encerramento"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="responsavel">Responsável</Label>
+                <Select
+                  value={editForm.responsavel}
+                  onValueChange={(value) => setEditForm({ ...editForm, responsavel: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-responsavel">
+                    <SelectValue placeholder="Selecione o responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Nenhum</SelectItem>
+                    {sortedColaboradores.map((colab) => (
+                      <SelectItem key={colab.id} value={colab.nome}>
+                        {colab.nome} {colab.status?.toLowerCase() !== "ativo" ? "(Inativo)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="csResponsavel">CS Responsável</Label>
+                <Select
+                  value={editForm.csResponsavel}
+                  onValueChange={(value) => setEditForm({ ...editForm, csResponsavel: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-cs">
+                    <SelectValue placeholder="Selecione o CS" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Nenhum</SelectItem>
+                    {sortedColaboradores.map((colab) => (
+                      <SelectItem key={colab.id} value={colab.nome}>
+                        {colab.nome} {colab.status?.toLowerCase() !== "ativo" ? "(Inativo)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsEditDialogOpen(false)}
+                data-testid="button-cancel-edit"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSaveEdit}
+                disabled={updateContractMutation.isPending}
+                data-testid="button-save-edit"
+              >
+                {updateContractMutation.isPending ? "Salvando..." : "Salvar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
