@@ -231,7 +231,7 @@ export default function DashboardGeG() {
   });
 
   const { data: valorPremiacao, isLoading: isLoadingValorPremiacao } = useQuery<GegValorPremiacao>({
-    queryKey: ['/api/geg/valor-premiacao'],
+    queryKey: ['/api/geg/valor-premiacao', { squad, setor, nivel, cargo }],
   });
 
   const { data: ultimasPromocoes, isLoading: isLoadingPromocoes } = useQuery<UltimaPromocao[]>({
@@ -619,7 +619,7 @@ export default function DashboardGeG() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           <Card data-testid="card-custo-folha">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
               <div className="flex items-center gap-1">
@@ -735,6 +735,42 @@ export default function DashboardGeG() {
                 <>
                   <div className="text-2xl font-bold" data-testid="text-valor-medio">
                     R$ {formatCurrency(valorMedioSalario?.valorMedio || 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Base: {valorMedioSalario?.totalColaboradores || 0} colaboradores
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-salario-bonus">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">Salário + Bônus</CardTitle>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">Média salarial somada à média de premiações por colaborador</p>
+                  </TooltipContent>
+                </UITooltip>
+              </div>
+              <Wallet className="w-4 h-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {(isLoadingValorMedio || isLoadingValorPremiacao) ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold" data-testid="text-salario-bonus">
+                    R$ {formatCurrency(
+                      (valorMedioSalario?.valorMedio || 0) + 
+                      (valorMedioSalario?.totalColaboradores && valorMedioSalario.totalColaboradores > 0 
+                        ? (valorPremiacao?.valorTotal || 0) / valorMedioSalario.totalColaboradores 
+                        : 0)
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Base: {valorMedioSalario?.totalColaboradores || 0} colaboradores

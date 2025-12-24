@@ -182,7 +182,7 @@ export interface IStorage {
   getGegValorMedioSalario(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorMedio: number; totalColaboradores: number }>;
   getGegCustoFolha(squad: string, setor: string, nivel: string, cargo: string): Promise<{ custoTotal: number; totalColaboradores: number }>;
   getGegValorBeneficio(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorTotal: number; totalColaboradores: number }>;
-  getGegValorPremiacao(): Promise<{ valorTotal: number }>;
+  getGegValorPremiacao(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorTotal: number }>;
   getGegPatrimonioResumo(): Promise<{ totalAtivos: number; valorTotalPago: number; valorTotalMercado: number; porTipo: { tipo: string; quantidade: number }[] }>;
   getGegUltimasPromocoes(squad: string, setor: string, nivel: string, cargo: string, limit?: number): Promise<any[]>;
   getGegTempoPermanencia(squad: string, setor: string, nivel: string, cargo: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
@@ -593,7 +593,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegValorPremiacao(): Promise<{ valorTotal: number }> {
+  async getGegValorPremiacao(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorTotal: number }> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -4142,11 +4142,29 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getGegValorPremiacao(): Promise<{ valorTotal: number }> {
+  async getGegValorPremiacao(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorTotal: number }> {
+    const conditions = [
+      sql`(p.categoria_id LIKE '05.01.10%' OR p.categoria_id LIKE '06.10.08%')`
+    ];
+    
+    if (squad !== 'todos') {
+      conditions.push(sql`c.squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      conditions.push(sql`c.setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      conditions.push(sql`c.nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      conditions.push(sql`c.cargo = ${cargo}`);
+    }
+    
     const result = await db.execute(sql`
-      SELECT COALESCE(SUM(CAST(valor_categoria AS NUMERIC)), 0) as valor_total
-      FROM caz_parcelas
-      WHERE categoria_id LIKE '05.01.10%' OR categoria_id LIKE '06.10.08%'
+      SELECT COALESCE(SUM(CAST(p.valor_categoria AS NUMERIC)), 0) as valor_total
+      FROM caz_parcelas p
+      INNER JOIN rh_pessoal c ON TRIM(p.nome) = TRIM(c.nome)
+      WHERE ${sql.join(conditions, sql` AND `)}
     `);
 
     const row = result.rows[0] as any;
