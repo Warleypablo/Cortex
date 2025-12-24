@@ -10,6 +10,7 @@ import { ContractsTableSkeleton } from "@/components/TableSkeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { differenceInMonths, format } from "date-fns";
 import type { ContratoCompleto } from "@shared/schema";
 
 interface Contract {
@@ -23,6 +24,8 @@ interface Contract {
   createdDate: string;
   recurringValue: number;
   oneTimeValue: number;
+  lt: number;
+  dataSolicitacaoEncerramento: string;
 }
 
 interface ContractsProps {
@@ -32,7 +35,7 @@ interface ContractsProps {
   tipoContratoFilter: string;
 }
 
-type SortField = "service" | "clientName" | "status" | "squad" | "createdDate";
+type SortField = "service" | "clientName" | "status" | "squad" | "createdDate" | "lt" | "dataSolicitacaoEncerramento";
 type SortDirection = "asc" | "desc";
 
 const mapSquadCodeToName = (code: string | null): string => {
@@ -63,18 +66,30 @@ export default function Contracts({
   });
 
   const contracts: Contract[] = useMemo(() => {
-    return contratos.map(c => ({
-      id: c.idSubtask || "",
-      service: c.servico || c.produto || "Sem serviço",
-      produto: c.produto || c.servico || "",
-      clientName: c.nomeCliente || "Cliente não identificado",
-      clientId: c.idCliente || "",
-      status: c.status || "Desconhecido",
-      squad: mapSquadCodeToName(c.squad),
-      createdDate: c.dataInicio ? new Date(c.dataInicio).toISOString().split('T')[0] : "",
-      recurringValue: parseFloat(c.valorr || "0"),
-      oneTimeValue: parseFloat(c.valorp || "0"),
-    }));
+    return contratos.map(c => {
+      const endDate = c.dataEncerramento ? new Date(c.dataEncerramento) : new Date();
+      const startDate = c.dataInicio ? new Date(c.dataInicio) : null;
+      const lt = startDate ? differenceInMonths(endDate, startDate) : 0;
+      
+      const dataSolicCancel = c.dataSolicitacaoEncerramento 
+        ? format(new Date(c.dataSolicitacaoEncerramento), 'dd/MM/yyyy')
+        : "";
+
+      return {
+        id: c.idSubtask || "",
+        service: c.servico || c.produto || "Sem serviço",
+        produto: c.produto || c.servico || "",
+        clientName: c.nomeCliente || "Cliente não identificado",
+        clientId: c.idCliente || "",
+        status: c.status || "Desconhecido",
+        squad: mapSquadCodeToName(c.squad),
+        createdDate: c.dataInicio ? new Date(c.dataInicio).toISOString().split('T')[0] : "",
+        recurringValue: parseFloat(c.valorr || "0"),
+        oneTimeValue: parseFloat(c.valorp || "0"),
+        lt,
+        dataSolicitacaoEncerramento: dataSolicCancel,
+      };
+    });
   }, [contratos]);
 
   const handleSort = (field: SortField) => {
@@ -118,6 +133,22 @@ export default function Contracts({
         comparison = a.squad.localeCompare(b.squad);
       } else if (sortField === "createdDate") {
         comparison = new Date(a.createdDate).getTime() - new Date(b.createdDate).getTime();
+      } else if (sortField === "lt") {
+        comparison = a.lt - b.lt;
+      } else if (sortField === "dataSolicitacaoEncerramento") {
+        if (!a.dataSolicitacaoEncerramento && !b.dataSolicitacaoEncerramento) {
+          comparison = 0;
+        } else if (!a.dataSolicitacaoEncerramento) {
+          comparison = 1;
+        } else if (!b.dataSolicitacaoEncerramento) {
+          comparison = -1;
+        } else {
+          const [dayA, monthA, yearA] = a.dataSolicitacaoEncerramento.split('/').map(Number);
+          const [dayB, monthB, yearB] = b.dataSolicitacaoEncerramento.split('/').map(Number);
+          const dateA = new Date(yearA, monthA - 1, dayA);
+          const dateB = new Date(yearB, monthB - 1, dayB);
+          comparison = dateA.getTime() - dateB.getTime();
+        }
       }
       
       return sortDirection === "asc" ? comparison : -comparison;
@@ -347,6 +378,30 @@ export default function Contracts({
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
+                <TableHead className="bg-background">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleSort("lt")}
+                    className="hover-elevate -ml-3"
+                    data-testid="sort-lt"
+                  >
+                    LT
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
+                <TableHead className="bg-background">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleSort("dataSolicitacaoEncerramento")}
+                    className="hover-elevate -ml-3"
+                    data-testid="sort-data-solic-cancel"
+                  >
+                    Data Solic. Cancel.
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
                 <TableHead className="text-right bg-background">Valor R</TableHead>
                 <TableHead className="text-right bg-background">Valor P</TableHead>
               </TableRow>
@@ -354,7 +409,7 @@ export default function Contracts({
             <TableBody>
               {paginatedContracts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                     {searchQuery ? "Nenhum contrato encontrado com esse critério de busca." : "Nenhum contrato cadastrado."}
                   </TableCell>
                 </TableRow>
@@ -384,6 +439,12 @@ export default function Contracts({
                     </TableCell>
                     <TableCell className="text-muted-foreground" data-testid={`text-date-${contract.id}`}>
                       {contract.createdDate ? new Date(contract.createdDate).toLocaleDateString('pt-BR') : '-'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground" data-testid={`text-lt-${contract.id}`}>
+                      {contract.lt} m
+                    </TableCell>
+                    <TableCell className="text-muted-foreground" data-testid={`text-data-solic-cancel-${contract.id}`}>
+                      {contract.dataSolicitacaoEncerramento || '-'}
                     </TableCell>
                     <TableCell className="text-right font-semibold" data-testid={`text-recurring-${contract.id}`}>
                       {contract.recurringValue > 0 
