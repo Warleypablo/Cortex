@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, memo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
@@ -1570,6 +1570,301 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
   );
 }
 
+interface ColaboradorTableRowProps {
+  colaborador: ColaboradorComPatrimonios;
+  index: number;
+  onRowClick: (id: number) => void;
+  onEdit: (colaborador: ColaboradorComPatrimonios) => void;
+  onDelete: (colaborador: ColaboradorComPatrimonios) => void;
+  getColaboradorPhoto: (colaborador: ColaboradorComPatrimonios) => string | null;
+  getSquadWithEmoji: (squadValue: string | null) => string;
+}
+
+const ColaboradorTableRow = memo(function ColaboradorTableRow({
+  colaborador,
+  index,
+  onRowClick,
+  onEdit,
+  onDelete,
+  getColaboradorPhoto,
+  getSquadWithEmoji,
+}: ColaboradorTableRowProps) {
+  const handleRowClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="button"]')) {
+      return;
+    }
+    onRowClick(colaborador.id);
+  }, [onRowClick, colaborador.id]);
+
+  const handleEdit = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(colaborador);
+  }, [onEdit, colaborador]);
+
+  const handleDelete = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete(colaborador);
+  }, [onDelete, colaborador]);
+
+  return (
+    <TableRow
+      className={`hover:bg-muted/30 cursor-pointer transition-colors ${index % 2 === 0 ? '' : 'bg-muted/10'}`}
+      onClick={handleRowClick}
+      data-testid={`row-colaborador-${colaborador.id}`}
+    >
+      <TableCell className="py-3">
+        <div className="text-sm text-muted-foreground font-mono" data-testid={`text-id-${colaborador.id}`}>
+          {colaborador.id}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="flex items-center gap-3">
+          <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
+            <AvatarImage 
+              src={getColaboradorPhoto(colaborador) || undefined} 
+              alt={colaborador.nome}
+            />
+            <AvatarFallback className="bg-primary/10 text-primary font-medium">
+              {getInitials(colaborador.nome)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col">
+            <span className="font-medium leading-tight" data-testid={`text-nome-${colaborador.id}`}>
+              {colaborador.nome}
+            </span>
+            {colaborador.aniversario && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5" data-testid={`text-aniversario-${colaborador.id}`}>
+                <Calendar className="w-3 h-3" />
+                {formatDate(colaborador.aniversario)}
+              </span>
+            )}
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <Badge
+          variant={colaborador.status === "Ativo" ? "default" : colaborador.status === "Dispensado" ? "destructive" : "secondary"}
+          data-testid={`badge-status-${colaborador.id}`}
+        >
+          {colaborador.status || "Desconhecido"}
+        </Badge>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="space-y-1">
+          <div className="text-sm font-medium flex items-center gap-1.5" data-testid={`text-cargo-${colaborador.id}`}>
+            <Briefcase className="w-3 h-3 text-muted-foreground" />
+            {colaborador.cargo || "-"}
+          </div>
+          {colaborador.nivel && (
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5" data-testid={`text-nivel-${colaborador.id}`}>
+              <Award className="w-3 h-3" />
+              {mapNivelToNew(colaborador.nivel)}
+            </div>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="text-sm font-medium" data-testid={`text-salario-${colaborador.id}`}>
+          {colaborador.salario ? formatCurrency(parseFloat(String(colaborador.salario))) : "-"}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        {colaborador.squad ? (
+          <Badge
+            variant="secondary"
+            className={squadColors[stripEmoji(colaborador.squad)] || "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400"}
+            data-testid={`badge-squad-${colaborador.id}`}
+          >
+            {getSquadWithEmoji(colaborador.squad)}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground text-sm">-</span>
+        )}
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="text-sm text-muted-foreground" data-testid={`text-setor-${colaborador.id}`}>
+          {colaborador.setor || "-"}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="text-sm text-muted-foreground" data-testid={`text-meses-turbo-${colaborador.id}`}>
+          {calcularTempoTurbo(colaborador.admissao, colaborador.demissao, colaborador.status)}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="space-y-1">
+          {colaborador.ultimoAumento ? (
+            <>
+              <div className="text-sm text-muted-foreground" data-testid={`text-ultimo-aumento-${colaborador.id}`}>
+                {formatDate(colaborador.ultimoAumento)}
+              </div>
+              {(() => {
+                const meses = calcularMesesDesdeUltimoAumento(colaborador.ultimoAumento);
+                return meses !== null && (
+                  <div className="text-xs text-muted-foreground" data-testid={`text-meses-ult-aumento-${colaborador.id}`}>
+                    há {formatDecimal(meses, 1).replace(".", ",")} {meses === 1 ? "mês" : "meses"}
+                  </div>
+                );
+              })()}
+            </>
+          ) : (
+            <span className="text-muted-foreground text-sm">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="flex flex-wrap gap-1" data-testid={`patrimonios-${colaborador.id}`}>
+          {colaborador.patrimonios && colaborador.patrimonios.length > 0 ? (
+            colaborador.patrimonios.map((p) => (
+              <Link key={p.id} href={`/patrimonio/${p.id}`}>
+                <Badge
+                  variant="outline"
+                  className="cursor-pointer hover:bg-primary/10"
+                  title={p.descricao || `Patrimônio #${p.numeroAtivo || p.id}`}
+                  data-testid={`badge-patrimonio-${p.id}`}
+                >
+                  <Package className="w-3 h-3 mr-1" />
+                  {p.numeroAtivo || p.id}
+                </Badge>
+              </Link>
+            ))
+          ) : (
+            <span className="text-muted-foreground text-sm">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="space-y-1.5">
+          {colaborador.emailTurbo && (
+            <div className="flex items-center gap-2 text-sm">
+              <Mail className="w-3 h-3 text-primary" />
+              <span className="text-muted-foreground truncate max-w-[220px]" title={colaborador.emailTurbo} data-testid={`text-email-turbo-${colaborador.id}`}>
+                {colaborador.emailTurbo}
+              </span>
+            </div>
+          )}
+          {colaborador.emailPessoal && (
+            <div className="flex items-center gap-2 text-sm">
+              <Mail className="w-3 h-3 text-muted-foreground" />
+              <span className="text-muted-foreground truncate max-w-[220px]" title={colaborador.emailPessoal} data-testid={`text-email-pessoal-${colaborador.id}`}>
+                {colaborador.emailPessoal}
+              </span>
+            </div>
+          )}
+          {colaborador.telefone && (
+            <div className="flex items-center gap-2 text-sm">
+              <Phone className="w-3 h-3 text-muted-foreground" />
+              <span className="text-muted-foreground" data-testid={`text-telefone-${colaborador.id}`}>{colaborador.telefone}</span>
+            </div>
+          )}
+          {!colaborador.emailTurbo && !colaborador.emailPessoal && !colaborador.telefone && (
+            <span className="text-muted-foreground text-sm">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="text-sm text-muted-foreground font-mono" data-testid={`text-cpf-${colaborador.id}`}>
+          {colaborador.cpf || "-"}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="text-sm text-muted-foreground font-mono" data-testid={`text-cnpj-${colaborador.id}`}>
+          {colaborador.cnpj || "-"}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="flex items-center gap-2 text-sm">
+          {colaborador.pix && (
+            <>
+              <CreditCard className="w-3 h-3 text-muted-foreground" />
+              <span className="text-muted-foreground truncate max-w-[160px]" title={colaborador.pix} data-testid={`text-pix-${colaborador.id}`}>
+                {colaborador.pix}
+              </span>
+            </>
+          )}
+          {!colaborador.pix && <span className="text-muted-foreground">-</span>}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="space-y-1">
+          {colaborador.estado && (
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="w-3 h-3 text-muted-foreground" />
+              <span className="text-muted-foreground font-medium" data-testid={`text-estado-${colaborador.id}`}>{colaborador.estado}</span>
+            </div>
+          )}
+          {colaborador.endereco && (
+            <div className="text-xs text-muted-foreground truncate max-w-[180px]" title={colaborador.endereco} data-testid={`text-endereco-${colaborador.id}`}>
+              {colaborador.endereco}
+            </div>
+          )}
+          {!colaborador.estado && !colaborador.endereco && (
+            <span className="text-muted-foreground text-sm">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="text-sm text-muted-foreground" data-testid={`text-admissao-${colaborador.id}`}>
+          {formatDate(colaborador.admissao)}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="space-y-1">
+          {colaborador.demissao ? (
+            <>
+              <div className="text-sm text-muted-foreground" data-testid={`text-demissao-${colaborador.id}`}>
+                {formatDate(colaborador.demissao)}
+              </div>
+              {colaborador.tipoDemissao && (
+                <div className="text-xs text-muted-foreground" data-testid={`text-tipo-demissao-${colaborador.id}`}>
+                  {colaborador.tipoDemissao}
+                </div>
+              )}
+            </>
+          ) : (
+            <span className="text-muted-foreground text-sm">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="py-3">
+        <div className="space-y-1">
+          {colaborador.motivoDemissao ? (
+            <div className="text-sm text-muted-foreground max-w-[180px] truncate" title={colaborador.motivoDemissao} data-testid={`text-motivo-demissao-${colaborador.id}`}>
+              {colaborador.motivoDemissao}
+            </div>
+          ) : (
+            <span className="text-muted-foreground text-sm">-</span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="py-3 sticky right-0 bg-background">
+        <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={handleEdit}
+            data-testid={`button-edit-${colaborador.id}`}
+            title="Editar colaborador"
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={handleDelete}
+            data-testid={`button-delete-${colaborador.id}`}
+            title="Excluir colaborador"
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+});
+
 function DeleteConfirmDialog({ colaborador, open, onOpenChange }: { colaborador: Colaborador; open: boolean; onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
 
@@ -1642,9 +1937,15 @@ export default function Colaboradores() {
   const [sortColumn, setSortColumn] = useState<string | null>("status");
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  const { data: colaboradores = [], isLoading } = useQuery<ColaboradorComPatrimonios[]>({
+  const { data: colaboradoresResponse, isLoading } = useQuery<{ data: ColaboradorComPatrimonios[]; total: number; page: number; limit: number } | ColaboradorComPatrimonios[]>({
     queryKey: ["/api/colaboradores/com-patrimonios"],
   });
+  
+  const colaboradores = useMemo(() => {
+    if (!colaboradoresResponse) return [];
+    if (Array.isArray(colaboradoresResponse)) return colaboradoresResponse;
+    return colaboradoresResponse.data || [];
+  }, [colaboradoresResponse]);
 
   const { data: squads = [] } = useQuery<SquadOption[]>({
     queryKey: ["/api/rh/squads"],
@@ -1673,13 +1974,13 @@ export default function Colaboradores() {
     queryKey: ["/api/user-photos"],
   });
 
-  const getColaboradorPhoto = (colaborador: ColaboradorComPatrimonios) => {
+  const getColaboradorPhoto = useCallback((colaborador: ColaboradorComPatrimonios) => {
     const email = colaborador.emailTurbo?.toLowerCase().trim();
     if (email && userPhotos[email]) {
       return userPhotos[email];
     }
     return null;
-  };
+  }, [userPhotos]);
 
   const filteredColaboradores = useMemo(() => {
     let filtered = colaboradores;
@@ -1736,23 +2037,26 @@ export default function Colaboradores() {
     return filtered;
   }, [colaboradores, filters]);
 
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
-  };
+  const handleSort = useCallback((column: string) => {
+    setSortColumn((prevColumn) => {
+      if (prevColumn === column) {
+        setSortDirection((prevDir) => prevDir === 'asc' ? 'desc' : 'asc');
+        return prevColumn;
+      } else {
+        setSortDirection('asc');
+        return column;
+      }
+    });
+  }, []);
 
-  const getSortIcon = (column: string) => {
+  const getSortIcon = useCallback((column: string) => {
     if (sortColumn !== column) {
       return <ArrowUpDown className="w-4 h-4 ml-1 text-muted-foreground/50" />;
     }
     return sortDirection === 'asc' 
       ? <ArrowUp className="w-4 h-4 ml-1 text-primary" />
       : <ArrowDown className="w-4 h-4 ml-1 text-primary" />;
-  };
+  }, [sortColumn, sortDirection]);
 
   const sortedColaboradores = useMemo(() => {
     if (!sortColumn) return filteredColaboradores;
@@ -1850,12 +2154,24 @@ export default function Colaboradores() {
     return { total, ativos, novosUltimos30d, desligadosUltimos30d };
   }, [colaboradores]);
 
-  const handleRemoveFilter = (key: keyof FilterState) => {
+  const handleRemoveFilter = useCallback((key: keyof FilterState) => {
     setFilters((prev) => ({
       ...prev,
       [key]: key === "search" || key === "setor" || key === "admissaoFrom" || key === "admissaoTo" ? "" : "all",
     }));
-  };
+  }, []);
+
+  const handleRowClick = useCallback((id: number) => {
+    setLocation(`/colaborador/${id}`);
+  }, [setLocation]);
+
+  const handleEditColaborador = useCallback((colaborador: ColaboradorComPatrimonios) => {
+    setEditingColaborador(colaborador);
+  }, []);
+
+  const handleDeleteColaborador = useCallback((colaborador: ColaboradorComPatrimonios) => {
+    setDeletingColaborador(colaborador);
+  }, []);
 
   if (isLoading) {
     return (
@@ -2128,273 +2444,16 @@ export default function Colaboradores() {
                       </TableRow>
                     ) : (
                       paginatedColaboradores.map((colaborador, index) => (
-                        <TableRow
+                        <ColaboradorTableRow
                           key={colaborador.id}
-                          className={`hover:bg-muted/30 cursor-pointer transition-colors ${index % 2 === 0 ? '' : 'bg-muted/10'}`}
-                          onClick={(e) => {
-                            const target = e.target as HTMLElement;
-                            if (target.closest('button') || target.closest('[role="button"]')) {
-                              return;
-                            }
-                            setLocation(`/colaborador/${colaborador.id}`);
-                          }}
-                          data-testid={`row-colaborador-${colaborador.id}`}
-                        >
-                          <TableCell className="py-3">
-                            <div className="text-sm text-muted-foreground font-mono" data-testid={`text-id-${colaborador.id}`}>
-                              {colaborador.id}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
-                                <AvatarImage 
-                                  src={getColaboradorPhoto(colaborador) || undefined} 
-                                  alt={colaborador.nome}
-                                />
-                                <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                                  {getInitials(colaborador.nome)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex flex-col">
-                                <span className="font-medium leading-tight" data-testid={`text-nome-${colaborador.id}`}>
-                                  {colaborador.nome}
-                                </span>
-                                {colaborador.aniversario && (
-                                  <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5" data-testid={`text-aniversario-${colaborador.id}`}>
-                                    <Calendar className="w-3 h-3" />
-                                    {formatDate(colaborador.aniversario)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <Badge
-                              variant={colaborador.status === "Ativo" ? "default" : colaborador.status === "Dispensado" ? "destructive" : "secondary"}
-                              data-testid={`badge-status-${colaborador.id}`}
-                            >
-                              {colaborador.status || "Desconhecido"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="space-y-1">
-                              <div className="text-sm font-medium flex items-center gap-1.5" data-testid={`text-cargo-${colaborador.id}`}>
-                                <Briefcase className="w-3 h-3 text-muted-foreground" />
-                                {colaborador.cargo || "-"}
-                              </div>
-                              {colaborador.nivel && (
-                                <div className="text-xs text-muted-foreground flex items-center gap-1.5" data-testid={`text-nivel-${colaborador.id}`}>
-                                  <Award className="w-3 h-3" />
-                                  {mapNivelToNew(colaborador.nivel)}
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="text-sm font-medium" data-testid={`text-salario-${colaborador.id}`}>
-                              {colaborador.salario ? formatCurrency(parseFloat(String(colaborador.salario))) : "-"}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            {colaborador.squad ? (
-                              <Badge
-                                variant="secondary"
-                                className={squadColors[stripEmoji(colaborador.squad)] || "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400"}
-                                data-testid={`badge-squad-${colaborador.id}`}
-                              >
-                                {getSquadWithEmoji(colaborador.squad)}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="text-sm text-muted-foreground" data-testid={`text-setor-${colaborador.id}`}>
-                              {colaborador.setor || "-"}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="text-sm text-muted-foreground" data-testid={`text-meses-turbo-${colaborador.id}`}>
-                              {calcularTempoTurbo(colaborador.admissao, colaborador.demissao, colaborador.status)}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="space-y-1">
-                              {colaborador.ultimoAumento ? (
-                                <>
-                                  <div className="text-sm text-muted-foreground" data-testid={`text-ultimo-aumento-${colaborador.id}`}>
-                                    {formatDate(colaborador.ultimoAumento)}
-                                  </div>
-                                  {(() => {
-                                    const meses = calcularMesesDesdeUltimoAumento(colaborador.ultimoAumento);
-                                    return meses !== null && (
-                                      <div className="text-xs text-muted-foreground" data-testid={`text-meses-ult-aumento-${colaborador.id}`}>
-                                        há {formatDecimal(meses, 1).replace(".", ",")} {meses === 1 ? "mês" : "meses"}
-                                      </div>
-                                    );
-                                  })()}
-                                </>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="flex flex-wrap gap-1" data-testid={`patrimonios-${colaborador.id}`}>
-                              {colaborador.patrimonios && colaborador.patrimonios.length > 0 ? (
-                                colaborador.patrimonios.map((p) => (
-                                  <Link key={p.id} href={`/patrimonio/${p.id}`}>
-                                    <Badge
-                                      variant="outline"
-                                      className="cursor-pointer hover:bg-primary/10"
-                                      title={p.descricao || `Patrimônio #${p.numeroAtivo || p.id}`}
-                                      data-testid={`badge-patrimonio-${p.id}`}
-                                    >
-                                      <Package className="w-3 h-3 mr-1" />
-                                      {p.numeroAtivo || p.id}
-                                    </Badge>
-                                  </Link>
-                                ))
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="space-y-1.5">
-                              {colaborador.emailTurbo && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Mail className="w-3 h-3 text-primary" />
-                                  <span className="text-muted-foreground truncate max-w-[220px]" title={colaborador.emailTurbo} data-testid={`text-email-turbo-${colaborador.id}`}>
-                                    {colaborador.emailTurbo}
-                                  </span>
-                                </div>
-                              )}
-                              {colaborador.emailPessoal && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Mail className="w-3 h-3 text-muted-foreground" />
-                                  <span className="text-muted-foreground truncate max-w-[220px]" title={colaborador.emailPessoal} data-testid={`text-email-pessoal-${colaborador.id}`}>
-                                    {colaborador.emailPessoal}
-                                  </span>
-                                </div>
-                              )}
-                              {colaborador.telefone && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Phone className="w-3 h-3 text-muted-foreground" />
-                                  <span className="text-muted-foreground" data-testid={`text-telefone-${colaborador.id}`}>{colaborador.telefone}</span>
-                                </div>
-                              )}
-                              {!colaborador.emailTurbo && !colaborador.emailPessoal && !colaborador.telefone && (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="text-sm text-muted-foreground font-mono" data-testid={`text-cpf-${colaborador.id}`}>
-                              {colaborador.cpf || "-"}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="text-sm text-muted-foreground font-mono" data-testid={`text-cnpj-${colaborador.id}`}>
-                              {colaborador.cnpj || "-"}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="flex items-center gap-2 text-sm">
-                              {colaborador.pix && (
-                                <>
-                                  <CreditCard className="w-3 h-3 text-muted-foreground" />
-                                  <span className="text-muted-foreground truncate max-w-[160px]" title={colaborador.pix} data-testid={`text-pix-${colaborador.id}`}>
-                                    {colaborador.pix}
-                                  </span>
-                                </>
-                              )}
-                              {!colaborador.pix && <span className="text-muted-foreground">-</span>}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="space-y-1">
-                              {colaborador.estado && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <MapPin className="w-3 h-3 text-muted-foreground" />
-                                  <span className="text-muted-foreground font-medium" data-testid={`text-estado-${colaborador.id}`}>{colaborador.estado}</span>
-                                </div>
-                              )}
-                              {colaborador.endereco && (
-                                <div className="text-xs text-muted-foreground truncate max-w-[180px]" title={colaborador.endereco} data-testid={`text-endereco-${colaborador.id}`}>
-                                  {colaborador.endereco}
-                                </div>
-                              )}
-                              {!colaborador.estado && !colaborador.endereco && (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="text-sm text-muted-foreground" data-testid={`text-admissao-${colaborador.id}`}>
-                              {formatDate(colaborador.admissao)}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="space-y-1">
-                              {colaborador.demissao ? (
-                                <>
-                                  <div className="text-sm text-muted-foreground" data-testid={`text-demissao-${colaborador.id}`}>
-                                    {formatDate(colaborador.demissao)}
-                                  </div>
-                                  {colaborador.tipoDemissao && (
-                                    <div className="text-xs text-muted-foreground" data-testid={`text-tipo-demissao-${colaborador.id}`}>
-                                      {colaborador.tipoDemissao}
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <div className="space-y-1">
-                              {colaborador.motivoDemissao ? (
-                                <div className="text-sm text-muted-foreground max-w-[180px] truncate" title={colaborador.motivoDemissao} data-testid={`text-motivo-demissao-${colaborador.id}`}>
-                                  {colaborador.motivoDemissao}
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3 sticky right-0 bg-background">
-                            <div className="flex items-center gap-1">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingColaborador(colaborador);
-                                }}
-                                data-testid={`button-edit-${colaborador.id}`}
-                                title="Editar colaborador"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeletingColaborador(colaborador);
-                                }}
-                                data-testid={`button-delete-${colaborador.id}`}
-                                title="Excluir colaborador"
-                                className="text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                          colaborador={colaborador}
+                          index={index}
+                          onRowClick={handleRowClick}
+                          onEdit={handleEditColaborador}
+                          onDelete={handleDeleteColaborador}
+                          getColaboradorPhoto={getColaboradorPhoto}
+                          getSquadWithEmoji={getSquadWithEmoji}
+                        />
                       ))
                     )}
                   </TableBody>

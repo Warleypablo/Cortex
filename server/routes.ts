@@ -1049,8 +1049,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/colaboradores/com-patrimonios", async (req, res) => {
     try {
-      const colaboradores = await storage.getColaboradoresComPatrimonios();
-      res.json(colaboradores);
+      const page = req.query.page ? parseInt(req.query.page as string) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const status = req.query.status as string | undefined;
+      const squad = req.query.squad as string | undefined;
+      const setor = req.query.setor as string | undefined;
+      const search = req.query.search as string | undefined;
+      
+      const result = await storage.getColaboradoresComPatrimonios({
+        page,
+        limit,
+        status,
+        squad,
+        setor,
+        search,
+      });
+      res.json(result);
     } catch (error) {
       console.error("[api] Error fetching colaboradores com patrimonios:", error);
       res.status(500).json({ error: "Failed to fetch colaboradores com patrimonios" });
