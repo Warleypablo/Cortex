@@ -511,6 +511,7 @@ export default function Patrimonio() {
         planoOperadora: editingTelefone.planoOperadora,
         telefone: editingTelefone.telefone,
         responsavelNome: editingTelefone.responsavelNome,
+        responsavelId: editingTelefone.responsavelId,
         setor: editingTelefone.setor,
         ultimaRecarga: editingTelefone.ultimaRecarga,
         status: editingTelefone.status,
