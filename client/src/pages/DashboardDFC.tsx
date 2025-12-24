@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { formatDecimal, formatPercent, formatCurrency, formatCurrencyCompact } from "@/lib/utils";
+import { formatDecimal, formatPercent, formatCurrencyNoDecimals, formatCurrencyCompact } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -679,7 +679,7 @@ export default function DashboardDFC() {
                       <XAxis dataKey="mes" tick={{ fill: 'currentColor', fontSize: 10 }} />
                       <YAxis tick={{ fill: 'currentColor', fontSize: 10 }} tickFormatter={formatCurrencyCompact} width={60} />
                       <Tooltip 
-                        formatter={(value: number, name: string) => [formatCurrency(value), name === 'receitas' ? 'Entradas' : 'Saídas']}
+                        formatter={(value: number, name: string) => [formatCurrencyNoDecimals(value), name === 'receitas' ? 'Entradas' : 'Saídas']}
                         contentStyle={{ 
                           backgroundColor: 'hsl(var(--background))', 
                           border: '1px solid hsl(var(--border))', 
@@ -712,7 +712,7 @@ export default function DashboardDFC() {
                       <YAxis yAxisId="right" orientation="right" tick={{ fill: 'currentColor', fontSize: 10 }} tickFormatter={(v) => `${v}%`} width={40} />
                       <Tooltip 
                         formatter={(value: number, name: string) => {
-                          if (name === 'saldo') return [formatCurrency(value), 'Resultado'];
+                          if (name === 'saldo') return [formatCurrencyNoDecimals(value), 'Resultado'];
                           return [formatPercent(value), 'Margem'];
                         }}
                         contentStyle={{ 
@@ -826,7 +826,7 @@ export default function DashboardDFC() {
                           <span className={`text-lg font-bold ${
                             rootNode.categoriaId === 'RECEITAS' ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'
                           }`}>
-                            {formatCurrency(Math.abs(Object.values(rootNode.valuesByMonth).reduce((a, b) => a + b, 0)))}
+                            {formatCurrencyNoDecimals(Math.abs(Object.values(rootNode.valuesByMonth).reduce((a, b) => a + b, 0)))}
                           </span>
                         </div>
                       </div>
@@ -854,7 +854,7 @@ export default function DashboardDFC() {
                                   <div className="min-w-0 flex-1">
                                     <p className="text-sm font-medium truncate">{node.categoriaNome}</p>
                                     <p className={`text-lg font-bold ${isReceitaNode ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                      {formatCurrency(total)}
+                                      {formatCurrencyNoDecimals(total)}
                                     </p>
                                   </div>
                                   <div className={`w-2 h-2 rounded-full mt-2 ${isReceitaNode ? 'bg-emerald-500' : 'bg-rose-500'}`} />
@@ -987,7 +987,7 @@ export default function DashboardDFC() {
                                       <span className={`text-sm tabular-nums ${
                                         isRootNode ? 'font-bold' : !node.isLeaf ? 'font-semibold' : 'font-medium'
                                       } ${isRootNode ? (isReceitaNode ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400') : ''}`}>
-                                        {formatCurrency(absValor)}
+                                        {formatCurrencyNoDecimals(absValor)}
                                       </span>
                                       {node.isLeaf && maxValue > 0 && (
                                         <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
@@ -1048,7 +1048,7 @@ export default function DashboardDFC() {
                                 >
                                   {valor !== 0 ? (
                                     <span className="text-muted-foreground tabular-nums">
-                                      {formatCurrency(Math.abs(valor))}
+                                      {formatCurrencyNoDecimals(Math.abs(valor))}
                                     </span>
                                   ) : (
                                     <span className="text-muted-foreground/20">
@@ -1091,7 +1091,7 @@ export default function DashboardDFC() {
                           <span className={`font-bold text-sm tabular-nums ${
                             isPositivo ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                           }`}>
-                            {isPositivo ? '+' : ''}{formatCurrency(resultado)}
+                            {isPositivo ? '+' : ''}{formatCurrencyNoDecimals(resultado)}
                           </span>
                         </div>
                       );
