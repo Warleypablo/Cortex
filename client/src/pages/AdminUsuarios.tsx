@@ -12,11 +12,13 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus } from "lucide-react";
+import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { AdminLogsContent } from "./AdminLogs";
 
 type SortColumn = 'name' | 'email' | 'role' | 'allowedRoutes';
 type SortDirection = 'asc' | 'desc';
@@ -98,7 +100,6 @@ const AVAILABLE_ROUTES = [
   { path: '/investors-report', label: 'Relatório Investidores', category: 'Investidores' },
   // Administração
   { path: '/admin/usuarios', label: 'Gerenciar Usuários', category: 'Administração' },
-  { path: '/admin/logs', label: 'Logs do Sistema', category: 'Administração' },
 ];
 
 // Pre-defined role presets with access to specific pages
@@ -511,7 +512,7 @@ function AddUserDialog({ open, onOpenChange }: {
       return;
     }
 
-    const uniqueRoutes = [...new Set(selectedRoutes)];
+    const uniqueRoutes = Array.from(new Set(selectedRoutes));
     createUserMutation.mutate({
       name: name.trim(),
       email: email.trim().toLowerCase(),
@@ -856,7 +857,20 @@ export default function AdminUsuarios() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="grid gap-4 md:grid-cols-4">
+      <Tabs defaultValue="usuarios" className="space-y-6">
+        <TabsList data-testid="tabs-admin">
+          <TabsTrigger value="usuarios" data-testid="tab-usuarios">
+            <Users className="h-4 w-4 mr-2" />
+            Usuários
+          </TabsTrigger>
+          <TabsTrigger value="logs" data-testid="tab-logs">
+            <Activity className="h-4 w-4 mr-2" />
+            Logs do Sistema
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="usuarios" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
@@ -1051,6 +1065,12 @@ export default function AdminUsuarios() {
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
       />
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <AdminLogsContent />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
