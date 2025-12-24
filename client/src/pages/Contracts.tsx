@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, FileText, FileCheck, DollarSign, Activity } from "lucide-react";
 import StatsCard from "@/components/StatsCard";
+import { ContractsTableSkeleton } from "@/components/TableSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ContratoCompleto } from "@shared/schema";
@@ -200,10 +202,21 @@ export default function Contracts({
   if (isLoading) {
     return (
       <div className="bg-background">
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
-          <div className="mb-8">
-            <p className="text-muted-foreground">Carregando contratos...</p>
+        <div className="container mx-auto px-4 py-8 max-w-7xl" data-testid="loading-contracts">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-xl p-4 bg-white/60 dark:bg-white/5 border border-white/40 dark:border-white/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <Skeleton className="w-7 h-7 rounded-md" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <div className="pl-9">
+                  <Skeleton className="h-6 w-16" />
+                </div>
+              </div>
+            ))}
           </div>
+          <ContractsTableSkeleton />
         </div>
       </div>
     );
@@ -231,6 +244,9 @@ export default function Contracts({
             value={String(kpis.totalContratos)}
             icon={FileText}
             subtitle={servicoFilter.length > 0 || statusFilter.length > 0 ? "Contratos filtrados" : "Contratos cadastrados"}
+            animateValue
+            rawValue={kpis.totalContratos}
+            formatValue={(v) => String(Math.round(v))}
           />
           <StatsCard
             title="Contratos Operando"
@@ -239,6 +255,9 @@ export default function Contracts({
             variant="info"
             subtitle="Triagem, onboarding, ativo ou em cancelamento"
             tooltipType="help"
+            animateValue
+            rawValue={kpis.contratosOperando}
+            formatValue={(v) => String(Math.round(v))}
           />
           <StatsCard
             title="Contratos Ativos"
@@ -246,6 +265,9 @@ export default function Contracts({
             icon={FileCheck}
             variant="success"
             subtitle="Ativo, onboarding e triagem"
+            animateValue
+            rawValue={kpis.contratosAtivos}
+            formatValue={(v) => String(Math.round(v))}
           />
           <StatsCard
             title="AOV Médio"
@@ -254,6 +276,9 @@ export default function Contracts({
             variant="info"
             subtitle="Ticket médio por contrato"
             tooltipType="help"
+            animateValue
+            rawValue={kpis.aovMedio}
+            formatValue={(v) => formatCurrencyNoDecimals(v)}
           />
         </div>
 
