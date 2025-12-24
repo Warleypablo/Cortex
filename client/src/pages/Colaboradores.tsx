@@ -1780,6 +1780,14 @@ export default function Colaboradores() {
           aVal = calcularTempoTurboMeses(a.admissao, a.demissao, a.status);
           bVal = calcularTempoTurboMeses(b.admissao, b.demissao, b.status);
           break;
+        case 'ultimoAumento':
+          aVal = a.ultimoAumento ? new Date(a.ultimoAumento).getTime() : 0;
+          bVal = b.ultimoAumento ? new Date(b.ultimoAumento).getTime() : 0;
+          break;
+        case 'patrimonios':
+          aVal = a.patrimonios?.length || 0;
+          bVal = b.patrimonios?.length || 0;
+          break;
         default:
           return 0;
       }
@@ -2062,8 +2070,26 @@ export default function Colaboradores() {
                           {getSortIcon('tempoTurbo')}
                         </div>
                       </TableHead>
-                      <TableHead className="min-w-[140px] bg-muted/50">Último Aumento</TableHead>
-                      <TableHead className="min-w-[150px] bg-muted/50">Patrimônios</TableHead>
+                      <TableHead 
+                        className="min-w-[140px] bg-muted/50 cursor-pointer select-none" 
+                        onClick={() => handleSort('ultimoAumento')}
+                        data-testid="table-header-ultimo-aumento"
+                      >
+                        <div className="flex items-center">
+                          Último Aumento
+                          {getSortIcon('ultimoAumento')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="min-w-[150px] bg-muted/50 cursor-pointer select-none" 
+                        onClick={() => handleSort('patrimonios')}
+                        data-testid="table-header-patrimonios"
+                      >
+                        <div className="flex items-center">
+                          Patrimônios
+                          {getSortIcon('patrimonios')}
+                        </div>
+                      </TableHead>
                       <TableHead className="min-w-[280px] bg-muted/50">Contatos</TableHead>
                       <TableHead className="min-w-[120px] bg-muted/50">CPF</TableHead>
                       <TableHead className="min-w-[140px] bg-muted/50">CNPJ</TableHead>
