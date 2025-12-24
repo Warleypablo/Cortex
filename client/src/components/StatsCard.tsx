@@ -5,6 +5,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useCountUpNumber } from "@/hooks/useCountUp";
 
 type CardVariant = "default" | "success" | "warning" | "info" | "status";
 
@@ -20,6 +21,9 @@ interface StatsCardProps {
   statusActive?: boolean;
   subtitle?: string;
   tooltipType?: "info" | "help";
+  animateValue?: boolean;
+  rawValue?: number;
+  formatValue?: (value: number) => string;
 }
 
 const variantStyles: Record<CardVariant, { bg: string; border: string; icon: string; iconBg: string }> = {
@@ -63,10 +67,18 @@ export default function StatsCard({
   trend,
   statusActive,
   subtitle,
-  tooltipType = "info"
+  tooltipType = "info",
+  animateValue = false,
+  rawValue,
+  formatValue
 }: StatsCardProps) {
   const TooltipIcon = tooltipType === "help" ? HelpCircle : Info;
   const styles = variantStyles[variant];
+  
+  const animatedNumber = useCountUpNumber(rawValue ?? 0, 800, animateValue && rawValue !== undefined);
+  const displayValue = animateValue && rawValue !== undefined && formatValue 
+    ? formatValue(animatedNumber) 
+    : value;
   
   const isStatusCard = variant === "status";
   const statusStyles = statusActive 
@@ -146,7 +158,7 @@ export default function StatsCard({
         </div>
         <div className="pl-9">
           <p className="text-lg sm:text-xl font-bold text-foreground leading-tight break-words">
-            {value}
+            {displayValue}
           </p>
           {trend && (
             <p className={cn(

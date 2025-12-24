@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Users, FileText, Search, Filter, X, Check, Save, Bookmark, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePageInfo } from "@/contexts/PageContext";
+import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -74,6 +75,7 @@ const mapClusterToName = (cluster: string | null): string => {
 
 export default function ClientesContratos() {
   const { setPageInfo } = usePageInfo();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("clientes");
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -194,6 +196,7 @@ export default function ClientesContratos() {
     localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(updated));
     setNewFilterName("");
     setShowSaveInput(false);
+    toast({ title: "Filtro salvo com sucesso" });
   };
 
   const loadSavedFilter = (filter: SavedFilter) => {
@@ -212,6 +215,7 @@ export default function ClientesContratos() {
     const updated = savedFilters.filter(f => f.id !== id);
     setSavedFilters(updated);
     localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(updated));
+    toast({ title: "Filtro removido" });
   };
 
   const saveContractFilter = () => {
@@ -230,6 +234,7 @@ export default function ClientesContratos() {
     localStorage.setItem(CONTRACT_SAVED_FILTERS_KEY, JSON.stringify(updated));
     setContractNewFilterName("");
     setContractShowSaveInput(false);
+    toast({ title: "Filtro salvo com sucesso" });
   };
 
   const loadContractSavedFilter = (filter: ContractSavedFilter) => {
@@ -242,6 +247,7 @@ export default function ClientesContratos() {
     const updated = contractSavedFilters.filter(f => f.id !== id);
     setContractSavedFilters(updated);
     localStorage.setItem(CONTRACT_SAVED_FILTERS_KEY, JSON.stringify(updated));
+    toast({ title: "Filtro removido" });
   };
 
   const hasActiveFilters = tipoContratoFilter !== "ambos" || servicoFilter.length > 0 || statusFilter.length > 0 || responsavelFilter.length > 0 || clusterFilter !== "all" || ltOperator !== "all" || aovOperator !== "all";
@@ -274,12 +280,14 @@ export default function ClientesContratos() {
     setLtValue("");
     setAovOperator("all");
     setAovValue("");
+    toast({ title: "Filtros limpos" });
   };
 
   const clearAllContractFilters = () => {
     setContractTipoContratoFilter("ambos");
     setContractServicoFilter([]);
     setContractStatusFilter([]);
+    toast({ title: "Filtros limpos" });
   };
 
   const toggleServicoFilter = (servico: string) => {
@@ -403,7 +411,7 @@ export default function ClientesContratos() {
                         className="h-7 w-7"
                         onClick={() => setShowSaveInput(!showSaveInput)}
                         data-testid="button-save-filter"
-                        title="Salvar filtro"
+                        aria-label="Salvar filtro"
                       >
                         <Save className="w-3.5 h-3.5" />
                       </Button>
@@ -422,10 +430,10 @@ export default function ClientesContratos() {
                           onKeyDown={(e) => e.key === 'Enter' && saveCurrentFilter()}
                           data-testid="input-filter-name"
                         />
-                        <Button size="sm" className="h-8" onClick={saveCurrentFilter} data-testid="button-confirm-save-filter">
+                        <Button size="sm" className="h-8" onClick={saveCurrentFilter} data-testid="button-confirm-save-filter" aria-label="Confirmar salvar filtro">
                           <Check className="w-3.5 h-3.5" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-8" onClick={() => setShowSaveInput(false)}>
+                        <Button size="sm" variant="ghost" className="h-8" onClick={() => setShowSaveInput(false)} aria-label="Cancelar salvar filtro">
                           <X className="w-3.5 h-3.5" />
                         </Button>
                       </div>
@@ -456,6 +464,7 @@ export default function ClientesContratos() {
                                 className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                                 onClick={() => deleteSavedFilter(filter.id)}
                                 data-testid={`button-delete-filter-${filter.id}`}
+                                aria-label={`Deletar filtro ${filter.name}`}
                               >
                                 <Trash2 className="w-3 h-3 text-destructive" />
                               </Button>
@@ -689,7 +698,7 @@ export default function ClientesContratos() {
                         className="h-7 w-7"
                         onClick={() => setContractShowSaveInput(!contractShowSaveInput)}
                         data-testid="button-save-contract-filter"
-                        title="Salvar filtro"
+                        aria-label="Salvar filtro"
                       >
                         <Save className="w-3.5 h-3.5" />
                       </Button>
@@ -708,10 +717,10 @@ export default function ClientesContratos() {
                           onKeyDown={(e) => e.key === 'Enter' && saveContractFilter()}
                           data-testid="input-contract-filter-name"
                         />
-                        <Button size="sm" className="h-8" onClick={saveContractFilter} data-testid="button-confirm-save-contract-filter">
+                        <Button size="sm" className="h-8" onClick={saveContractFilter} data-testid="button-confirm-save-contract-filter" aria-label="Confirmar salvar filtro">
                           <Check className="w-3.5 h-3.5" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-8" onClick={() => setContractShowSaveInput(false)}>
+                        <Button size="sm" variant="ghost" className="h-8" onClick={() => setContractShowSaveInput(false)} aria-label="Cancelar salvar filtro">
                           <X className="w-3.5 h-3.5" />
                         </Button>
                       </div>
@@ -742,6 +751,7 @@ export default function ClientesContratos() {
                                 className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                                 onClick={() => deleteContractSavedFilter(filter.id)}
                                 data-testid={`button-delete-contract-filter-${filter.id}`}
+                                aria-label={`Deletar filtro ${filter.name}`}
                               >
                                 <Trash2 className="w-3 h-3 text-destructive" />
                               </Button>

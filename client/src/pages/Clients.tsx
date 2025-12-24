@@ -3,9 +3,11 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import ClientsTable from "@/components/ClientsTable";
 import { Button } from "@/components/ui/button";
-import { Loader2, Users, UserCheck, TrendingUp, Clock, DollarSign, Activity } from "lucide-react";
+import { Users, UserCheck, TrendingUp, Clock, DollarSign, Activity } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import StatsCard from "@/components/StatsCard";
+import { ClientsTableSkeleton } from "@/components/TableSkeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -225,10 +227,23 @@ export default function Clients({
 
   if (isLoading) {
     return (
-      <div className="bg-background">
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
-          <div className="flex items-center justify-center py-12" data-testid="loading-clients">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="bg-background h-full">
+        <div className="container mx-auto px-4 py-4 max-w-7xl h-full flex flex-col" data-testid="loading-clients">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-xl p-4 bg-white/60 dark:bg-white/5 border border-white/40 dark:border-white/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <Skeleton className="w-7 h-7 rounded-md" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+                <div className="pl-9">
+                  <Skeleton className="h-6 w-16" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex-1 min-h-0">
+            <ClientsTableSkeleton />
           </div>
         </div>
       </div>
@@ -245,6 +260,9 @@ export default function Clients({
             icon={Users}
             subtitle="Quantidade de clientes cadastrados no ClickUp (ativos + inativos)"
             tooltipType="help"
+            animateValue
+            rawValue={kpis.totalClientes}
+            formatValue={(v) => String(Math.round(v))}
           />
           <StatsCard
             title="Clientes Operando"
@@ -253,6 +271,9 @@ export default function Clients({
             variant="info"
             subtitle={`${kpis.totalClientes > 0 ? formatPercent((kpis.clientesOperando / kpis.totalClientes) * 100) : '0%'} dos clientes estão com status Triagem, Onboarding, Ativo ou Em Cancelamento`}
             tooltipType="help"
+            animateValue
+            rawValue={kpis.clientesOperando}
+            formatValue={(v) => String(Math.round(v))}
           />
           <StatsCard
             title="Clientes Ativos"
@@ -261,6 +282,9 @@ export default function Clients({
             variant="success"
             subtitle={`${kpis.totalClientes > 0 ? formatPercent((kpis.clientesAtivos / kpis.totalClientes) * 100) : '0%'} dos clientes estão com status Ativo, Onboarding ou Triagem`}
             tooltipType="help"
+            animateValue
+            rawValue={kpis.clientesAtivos}
+            formatValue={(v) => String(Math.round(v))}
           />
           <StatsCard
             title="LTV Médio"
@@ -269,6 +293,9 @@ export default function Clients({
             variant="info"
             subtitle="Soma de toda a receita paga dividida pelo número de clientes. Quanto maior, mais valor cada cliente gerou."
             tooltipType="help"
+            animateValue
+            rawValue={kpis.ltvMedio}
+            formatValue={(v) => formatCurrencyNoDecimals(v)}
           />
           <StatsCard
             title="LT Médio"
@@ -276,6 +303,9 @@ export default function Clients({
             icon={Clock}
             subtitle="Média de meses que os clientes permanecem pagando. Quanto maior, mais tempo de relacionamento."
             tooltipType="help"
+            animateValue
+            rawValue={kpis.ltMedio}
+            formatValue={(v) => formatDecimal(v)}
           />
           <StatsCard
             title="AOV"
@@ -284,6 +314,9 @@ export default function Clients({
             variant="success"
             subtitle="Ticket médio mensal por cliente. É o LTV dividido pelo LT (tempo de vida)."
             tooltipType="help"
+            animateValue
+            rawValue={kpis.aov}
+            formatValue={(v) => formatCurrencyNoDecimals(v)}
           />
         </div>
 
