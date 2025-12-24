@@ -5860,7 +5860,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/geg/valor-premiacao", async (req, res) => {
     try {
-      const resultado = await storage.getGegValorPremiacao();
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
+
+      const resultado = await storage.getGegValorPremiacao(squad, setor, nivel, cargo);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG valor premiacao:", error);
