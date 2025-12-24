@@ -10181,6 +10181,191 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // Notifications API
+  // ============================================
+
+  // GET notifications
+  app.get("/api/notifications", async (req, res) => {
+    try {
+      const unreadOnly = req.query.unreadOnly === 'true';
+      const notifications = await storage.getNotifications(unreadOnly);
+      res.json(notifications);
+    } catch (error) {
+      console.error("[api] Error fetching notifications:", error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  // PATCH mark notification as read
+  app.patch("/api/notifications/:id/read", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid notification ID" });
+      }
+      await storage.markNotificationRead(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error marking notification as read:", error);
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
+
+  // PATCH mark all notifications as read
+  app.patch("/api/notifications/read-all", async (req, res) => {
+    try {
+      await storage.markAllNotificationsRead();
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error marking all notifications as read:", error);
+      res.status(500).json({ error: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // DELETE dismiss notification
+  app.delete("/api/notifications/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid notification ID" });
+      }
+      await storage.dismissNotification(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error dismissing notification:", error);
+      res.status(500).json({ error: "Failed to dismiss notification" });
+    }
+  });
+
+  // GET generate notifications
+  app.get("/api/notifications/generate", async (req, res) => {
+    try {
+      const created: any[] = [];
+      const today = new Date();
+      
+      // 1. Birthday notifications (today + next 3 days)
+      const birthdayResult = await db.execute(sql`
+        SELECT id, nome, nascimento
+        FROM rh_colaboradores
+        WHERE nascimento IS NOT NULL
+          AND demissao IS NULL
+          AND (
+            (EXTRACT(MONTH FROM nascimento) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(DAY FROM nascimento) = EXTRACT(DAY FROM CURRENT_DATE))
+            OR (EXTRACT(MONTH FROM nascimento) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 day') AND EXTRACT(DAY FROM nascimento) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '1 day'))
+            OR (EXTRACT(MONTH FROM nascimento) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '2 days') AND EXTRACT(DAY FROM nascimento) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '2 days'))
+            OR (EXTRACT(MONTH FROM nascimento) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '3 days') AND EXTRACT(DAY FROM nascimento) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '3 days'))
+          )
+      `);
+      
+      for (const colab of birthdayResult.rows as any[]) {
+        const birthDate = new Date(colab.nascimento);
+        const birthMonth = birthDate.getMonth();
+        const birthDay = birthDate.getDate();
+        const uniqueKey = `aniversario_${colab.id}_${today.getFullYear()}-${String(birthMonth + 1).padStart(2, '0')}-${String(birthDay).padStart(2, '0')}`;
+        
+        const exists = await storage.notificationExists(uniqueKey);
+        if (!exists) {
+          const thisYearBirthday = new Date(today.getFullYear(), birthMonth, birthDay);
+          const diffDays = Math.round((thisYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          let title = '';
+          if (diffDays <= 0) {
+            title = `${colab.nome} faz aniversário hoje!`;
+          } else if (diffDays === 1) {
+            title = `${colab.nome} faz aniversário amanhã!`;
+          } else {
+            title = `${colab.nome} faz aniversário em ${diffDays} dias`;
+          }
+          
+          const notification = await storage.createNotification({
+            type: 'aniversario',
+            title,
+            message: `Não esqueça de parabenizar ${colab.nome}!`,
+            entityId: String(colab.id),
+            entityType: 'colaborador',
+            uniqueKey,
+            expiresAt: new Date(today.getFullYear(), birthMonth, birthDay + 1),
+          });
+          created.push(notification);
+        }
+      }
+      
+      // 2. Contract expiring notifications (next 30 days)
+      const contractResult = await db.execute(sql`
+        SELECT c.id, c.cnpj, c.data_encerramento, cl.name as client_name
+        FROM staging.contratos c
+        LEFT JOIN clients cl ON cl.cnpj = c.cnpj
+        WHERE c.data_encerramento IS NOT NULL
+          AND c.data_encerramento >= CURRENT_DATE
+          AND c.data_encerramento <= CURRENT_DATE + INTERVAL '30 days'
+      `);
+      
+      for (const contract of contractResult.rows as any[]) {
+        const endDate = new Date(contract.data_encerramento);
+        const uniqueKey = `contrato_vencendo_${contract.cnpj}_${endDate.toISOString().split('T')[0]}`;
+        
+        const exists = await storage.notificationExists(uniqueKey);
+        if (!exists) {
+          const diffDays = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          const clientName = contract.client_name || contract.cnpj;
+          
+          const notification = await storage.createNotification({
+            type: 'contrato_vencendo',
+            title: `Contrato vencendo em ${diffDays} dias`,
+            message: `O contrato de ${clientName} vence em ${endDate.toLocaleDateString('pt-BR')}.`,
+            entityId: String(contract.id),
+            entityType: 'contrato',
+            uniqueKey,
+            expiresAt: endDate,
+          });
+          created.push(notification);
+        }
+      }
+      
+      // 3. Overdue payments notifications (>7 days overdue)
+      const overdueResult = await db.execute(sql`
+        SELECT DISTINCT c.cnpj, cl.name as client_name, COUNT(*) as parcelas_vencidas, SUM(p.valor) as total_devido
+        FROM staging.parcelas p
+        JOIN staging.contratos c ON c.id = p.contrato_id
+        LEFT JOIN clients cl ON cl.cnpj = c.cnpj
+        WHERE p.data_vencimento < CURRENT_DATE - INTERVAL '7 days'
+          AND p.status != 'Pago'
+        GROUP BY c.cnpj, cl.name
+      `);
+      
+      const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      
+      for (const overdue of overdueResult.rows as any[]) {
+        const uniqueKey = `inadimplencia_${overdue.cnpj}_${currentMonth}`;
+        
+        const exists = await storage.notificationExists(uniqueKey);
+        if (!exists) {
+          const clientName = overdue.client_name || overdue.cnpj;
+          const totalDevido = Number(overdue.total_devido || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          
+          const notification = await storage.createNotification({
+            type: 'inadimplencia',
+            title: `Inadimplência: ${clientName}`,
+            message: `${overdue.parcelas_vencidas} parcela(s) vencida(s) há mais de 7 dias. Total: ${totalDevido}`,
+            entityId: overdue.cnpj,
+            entityType: 'cliente',
+            uniqueKey,
+          });
+          created.push(notification);
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        created: created.length,
+        notifications: created 
+      });
+    } catch (error) {
+      console.error("[api] Error generating notifications:", error);
+      res.status(500).json({ error: "Failed to generate notifications" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);

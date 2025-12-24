@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, decimal, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, decimal, integer, date, serial, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1481,3 +1481,25 @@ export const insertTelefoneSchema = createInsertSchema(rhTelefones).omit({
 
 export type Telefone = typeof rhTelefones.$inferSelect;
 export type InsertTelefone = z.infer<typeof insertTelefoneSchema>;
+
+// ============================================
+// Notifications Module - System Notifications
+// ============================================
+
+export const notifications = pgTable("staging.notifications", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  entityId: text("entity_id"),
+  entityType: text("entity_type"),
+  read: boolean("read").default(false),
+  dismissed: boolean("dismissed").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  uniqueKey: text("unique_key").unique(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
