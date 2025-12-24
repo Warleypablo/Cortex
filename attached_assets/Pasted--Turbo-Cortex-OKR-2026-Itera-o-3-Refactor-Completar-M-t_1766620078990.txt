@@ -1,0 +1,217 @@
+# Turbo Cortex – OKR 2026 (Iteração 3) | Refactor + Completar Métricas + Iniciativas
+# Plano 2026 (interno): Bigger & Better — Consolidação, Escala e Padronização
+# IMPORTANTE:
+# - NÃO criar tabelas/banco (sem Supabase etc)
+# - Reutilizar queries/tabelas existentes do Turbo Cortex no Google Cloud SQL
+# - Ajustar apenas código/config do módulo OKR 2026 já criado
+
+────────────────────────────────────────────────────────
+1) OBJETIVO DO 3º PROMPT (o que mudar agora)
+────────────────────────────────────────────────────────
+A) Consolidar e “secar” o OKR: KRs menos redundantes, mais executáveis.
+B) Completar o catálogo de métricas (company + TurboOH + Hugz + Vendas).
+C) Amarrar iniciativas aos KRs com um modelo único (read-only em JSON por enquanto).
+D) Melhorar a UI: 1 tela com 3 abas (Dashboard | KRs | Iniciativas), com filtros e evidência da TurboOH.
+E) Garantir que tudo puxe do DB do Cortex (read-only), usando padrões existentes (drizzle/pg.Pool).
+
+────────────────────────────────────────────────────────
+2) OKR 2026 — DEFINIÇÃO (board-level, seco e técnico)
+────────────────────────────────────────────────────────
+Criar/atualizar um arquivo de configuração único:
+server/okr/okrConfig.ts (ou .json) contendo Objetivos + KRs + Targets + Regras de avaliação.
+
+### Objetivos (IDs fixos):
+O1_ECOSYSTEM_SCALE      = Consolidar e escalar o ecossistema com previsibilidade
+O2_EFFICIENCY_CASH      = Aumentar eficiência e geração de caixa
+O3_HUGZ_RETENTION       = Higiene de receita: inadimplência e churn sob controle (Programa Hugz)
+O4_TURBOOH_SCALE        = Escalar TurboOH com resultado positivo e disciplina de execução
+O5_SYSTEMS_TECH         = Sistemas internos e Tech entregando com padrão e margem
+
+### KRs (sem redundância, todos mensuráveis)
+Use estes KRs e targets “oficiais 2026” (realistas / execução limpa):
+
+O1_ECOSYSTEM_SCALE
+- KR1_MRR_EOQ: MRR ativo no fechamento de cada quarter
+  Q1=1338870 | Q2=1611315 | Q3=1871384 | Q4=2122127
+- KR2_NET_REVENUE_YTD: Receita Líquida anual >= 20055091
+- KR3_CLIENTS_EOY: Clientes ativos em Dez/26 >= 511
+- KR4_PRODUCTIVITY_EOY: Receita por cabeça (Dez/26) >= 14184  (ou alternativa: MRR/Head >= 11790)
+  (escolha 1 métrica só para não duplicar)
+
+O2_EFFICIENCY_CASH
+- KR1_EBITDA_YTD: EBITDA anual >= 5269768
+- KR2_CASH_GEN_YTD: Geração de Caixa anual >= 3088047
+- KR3_CASH_END: Saldo de Caixa em Dez/26 >= 3738000 (pode arredondar para 3700000 se preferir)
+- KR4_COST_GUARDRAILS: Guardrails percentuais (calculados sobre Receita Líquida no período):
+  SG&A% <= 20.0
+  CAC%  <= 22.5
+  CSV%  <= 33.0
+
+O3_HUGZ_RETENTION (Programa Hugz)
+- KR1_INADIMPLENCIA_MAX: Inadimplência % (mensal) <= 6.0
+- KR2_GROSS_CHURN_MAX: Gross MRR churn % (mensal) <= 9.0
+- KR3_NET_CHURN_READY: Net churn (gross, expansão, net) calculado e disponível no Cortex até o fim do Q1 (instrumentação/visibilidade)
+- KR4_LOGO_CHURN_READY: Logo churn % disponível no Cortex até o fim do Q1 (instrumentação/visibilidade)
+
+O4_TURBOOH_SCALE (evidenciar no Dashboard)
+- KR1_OH_SCREENS_EOY: Número de telas (Dez/26) >= 600
+- KR2_OH_NETREV_YTD: Receita Líquida TurboOH anual >= 2764800
+- KR3_OH_RESULT_YTD: Resultado TurboOH anual >= 2015000
+- KR4_OH_VACANCY_MAX: Vacância média <= 0.50 (manter como baseline; melhoria vira iniciativa)
+
+O5_SYSTEMS_TECH
+- KR1_TECH_DELIVERED_YTD: Valor projetos entregues Tech anual >= 2370000
+- KR2_TECH_FREELA_GUARDRAIL: Freelancers Tech <= 6.5% do valor entregue no ano
+- KR3_CORTEX_COVERAGE: Cobertura de métricas OKR (auto-fed do DB) >= 95% até fim do Q2
+  (cobertura = métricas que retornam série válida / total de métricas obrigatórias)
+
+Atualizar targets existentes:
+- Atualize server/okr/targets.json OU migre para okrConfig único.
+- GARANTIR que frontend usa okrConfig/targets como “fonte da verdade”.
+
+────────────────────────────────────────────────────────
+3) CATÁLOGO DE MÉTRICAS (o que o sistema precisa acompanhar)
+────────────────────────────────────────────────────────
+Padronizar IDs (string) e garantir série mensal + último valor.
+
+### Company KPIs (obrigatórios no Dashboard)
+- mrr_active
+- revenue_total_billable
+- revenue_net
+- ebitda
+- cash_generation
+- cash_balance_end
+- csv_cost
+- sga_cost
+- cac_cost
+- sga_pct (sga_cost / revenue_net)
+- cac_pct (cac_cost / revenue_net)
+- csv_pct (csv_cost / revenue_net)
+- inadimplencia_pct
+- gross_mrr_churn_pct
+- net_mrr_churn (se disponível) + net_mrr_churn_pct (se disponível)
+- logo_churn_pct (se disponível)
+- sales_new_mrr (Vendas Novas MRR)
+- sales_expansion_mrr (Monetização da base / expansão)
+- sales_oneoff (Vendas Pontual / Projetos)
+- headcount_total
+- revenue_per_head
+- clients_active
+- contracts_active
+
+### TurboOH KPIs (obrigatórios em bloco próprio)
+- oh_screens
+- oh_vacancy
+- oh_gross_revenue
+- oh_net_revenue
+- oh_result
+
+### Tech KPIs (bloco operacional)
+- tech_projects_delivered_value
+- tech_freelancers_cost
+- tech_freelancers_pct
+
+### Regras de dados
+- NÃO destrinchar por produto no MVP (Performance/Creators/etc). Se existir breakdown, deixe escondido atrás de um “Details (collapsed)” opcional.
+- Métricas devem ser buscadas preferencialmente do DB. Se alguma métrica ainda não existir no DB, exibir “Em implementação” + criar iniciativa automática de instrumentação.
+
+────────────────────────────────────────────────────────
+4) IMPLEMENTAÇÃO NO BACKEND (sem DB novo)
+────────────────────────────────────────────────────────
+A) Atualizar server/okr/metricsAdapter.ts
+- Criar um registry:
+  MetricSpec { id, title, unit, direction, required, seriesQuery?, latestQuery?, dependencies? }
+- Funções:
+  getMetricSeries(metricId, {from,to,grain:'month', bu?})
+  getLatestMetric(metricId, {asOf?})
+  getKRProgress(krId, {asOf?}) -> {actual, target, status, delta, trend}
+  getCoverage() -> % de métricas obrigatórias com dados válidos
+
+B) Reutilizar queries existentes do Turbo Cortex
+- Se já existirem métodos no server/storage.ts para receita/despesa/caixa: REUTILIZAR.
+- Somente escrever queries novas quando não existir equivalente.
+
+C) BU / TurboOH
+- NÃO criar tabela nova.
+- Para OH, usar a dimensão existente no DB (se houver).
+- Se não houver dimensão de BU, criar um filtro mínimo por categoria/centro de custo já existentes (ex.: categorias contendo 'OH', 'TURBOOH', 'ADMooh').
+- Colocar os filtros num arquivo configurável:
+  server/okr/buFilters.ts  (somente constantes/listas; fácil de ajustar)
+
+D) Net churn e logo churn
+- Implementar “READY”:
+  - Se houver dados: calcular e exibir.
+  - Se não houver: retornar null + status “Em Implementação”.
+- Para net churn:
+  - gross = churn_mrr_period
+  - expansion = soma de expansão na base (se houver snapshots/mudança valorr)
+  - net = gross - expansion
+- Para logo churn:
+  - count logos cancelados / count logos início
+  - Se faltar tracking, retornar null + iniciativa de instrumentação.
+
+────────────────────────────────────────────────────────
+5) FRONTEND/UI (1 tela, 3 abas, com filtros)
+────────────────────────────────────────────────────────
+Atualizar client/src/pages/OKR2026.tsx:
+
+Layout:
+- Header: “OKR 2026 — Bigger & Better”
+- Filtros: Period (YTD / Q1 / Q2 / Q3 / Q4 / Last 12m) + Toggle BU (All | TurboOH | Tech | Commerce)
+- Abas (tabs):
+  1) Dashboard
+  2) KRs
+  3) Iniciativas
+
+Dashboard:
+- Seções (cards + mini trend):
+  A) Macro: MRR, Receita Líquida, EBITDA, Geração de Caixa, Caixa Final
+  B) Hygiene (Hugz): Inadimplência %, Gross Churn %, Net Churn (se houver), Logo Churn (se houver)
+  C) Sales: New MRR, Expansion MRR, One-off (Pontual)
+  D) TurboOH (evidenciar): Telas, Receita Líquida OH, Resultado OH, Vacância
+  E) People: Headcount, Receita/Head
+
+KRs:
+- Tabela:
+  KR | Actual | Target | Status | Notes
+- Status (dry):
+  ON_TRACK / AT_RISK / OFF_TRACK / NOT_AVAILABLE
+- Clique em KR abre drawer com:
+  - definição da métrica
+  - gráfico (série mensal)
+  - iniciativas relacionadas
+
+Iniciativas:
+- Lista/kanban simples (read-only):
+  - título, objetivo, KRs ligados, owner_role, due_quarter, status, próximo marco
+- Filtrar por Objetivo e por status.
+
+────────────────────────────────────────────────────────
+6) INICIATIVAS (preencher mais, já amarradas por KR)
+────────────────────────────────────────────────────────
+Atualizar server/okr/initiatives.json (read-only) com no mínimo 20 iniciativas.
+Cada item:
+{ id, objectiveId, krIds[], title, type, owner_role, due_quarter, status, success_kpi, notes }
+
+Sugestão de backlog (criar exatamente assim ou equivalente):
+
+O1_ECOSYSTEM_SCALE
+1) “Oferta padronizada (pacotes) para Commerce” -> KR1_MRR_EOQ, KR2_NET_REVENUE_YTD
+2) “Playbook de expansão na base (upsell/cross-sell)” -> sales_expansion_mrr
+3) “Pricing & packaging 2026 (sem granularizar produto no dashboard)” -> KR1, KR2
+4) “Governança de BU: regra clara de repasse e atribuição de receita” -> KR2 + CORTEX_COVERAGE
+5) “Ciclo mensal de forecast vs real (BP x Cortex)” -> KR1, KR2
+
+O2_EFFICIENCY_CASH
+6) “Guardrails automáticos de custos (CSV/CAC/SG&A) no Cortex” -> KR4_COST_GUARDRAILS
+7) “Modelo de alocação mínima de custos por BU (sem travar operação)” -> KR4 + CORTEX_COVERAGE
+8) “Revisão de capacidade: headcount x receita x backlog (mensal)” -> KR4_PRODUCTIVITY_EOY
+9) “Redução de retrabalho: checklist de kickoff e entrega” -> EBITDA/Caixa (indireto)
+10) “Padronizar reporting de margem por BU (alto nível)” -> KR1_EBITDA_YTD
+
+O3_HUGZ_RETENTION
+11) “HUGZ: régua de cobrança e dunning (7/14/21/30)” -> KR1_INADIMPLENCIA_MAX
+12) “HUGZ: early warning churn (sinais + playbook)” -> KR2_GROSS_CHURN_MAX
+13) “Net churn breakdown (gross/expansion/net) no Cortex” -> KR3_NET_CHURN_READY
+14) “Logo churn tracking + definição oficial no Cortex” -> KR4_LOGO_CHURN_READY
+15
