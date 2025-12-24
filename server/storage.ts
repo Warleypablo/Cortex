@@ -4024,10 +4024,23 @@ export class DbStorage implements IStorage {
       ORDER BY cargo
     `);
 
+    // Filter out specific levels and transform "X I" -> "I", "X II" -> "II", etc.
+    const niveisExcluidos = ['Desenvolvedor', 'Designer', 'Gestor de Performance'];
+    const niveisProcessados = nivelResult.rows
+      .map(row => row.nivel as string)
+      .filter(nivel => !niveisExcluidos.includes(nivel))
+      .map(nivel => {
+        // Create an object with original value (for filtering) and display value
+        const display = nivel.startsWith('X ') ? nivel.substring(2) : nivel;
+        return { original: nivel, display };
+      })
+      // Remove duplicates based on display value, keeping the first occurrence
+      .filter((item, index, self) => self.findIndex(i => i.display === item.display) === index);
+
     return {
       squads: squadResult.rows.map(row => row.squad as string),
       setores: setorResult.rows.map(row => row.setor as string),
-      niveis: nivelResult.rows.map(row => row.nivel as string),
+      niveis: niveisProcessados,
       cargos: cargoResult.rows.map(row => row.cargo as string),
     };
   }
