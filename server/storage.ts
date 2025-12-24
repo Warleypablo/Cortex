@@ -182,6 +182,7 @@ export interface IStorage {
   getGegValorMedioSalario(squad: string, setor: string): Promise<{ valorMedio: number; totalColaboradores: number }>;
   getGegCustoFolha(squad: string, setor: string): Promise<{ custoTotal: number; totalColaboradores: number }>;
   getGegValorBeneficio(squad: string, setor: string): Promise<{ valorTotal: number; totalColaboradores: number }>;
+  getGegValorPremiacao(): Promise<{ valorTotal: number }>;
   getGegPatrimonioResumo(): Promise<{ totalAtivos: number; valorTotalPago: number; valorTotalMercado: number; porTipo: { tipo: string; quantidade: number }[] }>;
   getGegUltimasPromocoes(squad: string, setor: string, limit?: number): Promise<any[]>;
   getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
@@ -586,6 +587,10 @@ export class MemStorage implements IStorage {
   }
 
   async getGegValorBeneficio(squad: string, setor: string): Promise<{ valorTotal: number; totalColaboradores: number }> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegValorPremiacao(): Promise<{ valorTotal: number }> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -4028,6 +4033,19 @@ export class DbStorage implements IStorage {
     return {
       valorTotal: parseFloat(row.valor_total || '0'),
       totalColaboradores: parseInt(row.total_colaboradores || '0'),
+    };
+  }
+
+  async getGegValorPremiacao(): Promise<{ valorTotal: number }> {
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(CAST(valor_categoria AS NUMERIC)), 0) as valor_total
+      FROM caz_parcelas
+      WHERE categoria_id LIKE '05.01.10%' OR categoria_id LIKE '06.10.08%'
+    `);
+
+    const row = result.rows[0] as any;
+    return {
+      valorTotal: parseFloat(row.valor_total || '0'),
     };
   }
 
