@@ -970,14 +970,17 @@ export default function ClientDetail() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Responsável (CS)</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select 
+                            onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)} 
+                            value={field.value || "__none__"}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-responsavel">
                                 <SelectValue placeholder="Selecione o CS" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">Nenhum</SelectItem>
+                              <SelectItem value="__none__">Nenhum</SelectItem>
                               {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
                                 <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
                               ))}
@@ -992,14 +995,17 @@ export default function ClientDetail() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Nome Responsável</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <Select 
+                            onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)} 
+                            value={field.value || "__none__"}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-responsavel-geral">
                                 <SelectValue placeholder="Selecione o responsável" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">Nenhum</SelectItem>
+                              <SelectItem value="__none__">Nenhum</SelectItem>
                               {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
                                 <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
                               ))}
@@ -1522,14 +1528,14 @@ export default function ClientDetail() {
                               </TableCell>
                               <TableCell>
                                 <Select
-                                  value={contratoEditForm.watch("responsavel")}
-                                  onValueChange={(val) => contratoEditForm.setValue("responsavel", val)}
+                                  value={contratoEditForm.watch("responsavel") || "__none__"}
+                                  onValueChange={(val) => contratoEditForm.setValue("responsavel", val === "__none__" ? "" : val)}
                                 >
                                   <SelectTrigger className="w-[140px]" data-testid={`select-responsavel-${contrato.idSubtask}`}>
                                     <SelectValue placeholder="Responsável..." />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">Nenhum</SelectItem>
+                                    <SelectItem value="__none__">Nenhum</SelectItem>
                                     {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
                                       <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
                                     ))}
@@ -1538,14 +1544,14 @@ export default function ClientDetail() {
                               </TableCell>
                               <TableCell>
                                 <Select
-                                  value={contratoEditForm.watch("csResponsavel")}
-                                  onValueChange={(val) => contratoEditForm.setValue("csResponsavel", val)}
+                                  value={contratoEditForm.watch("csResponsavel") || "__none__"}
+                                  onValueChange={(val) => contratoEditForm.setValue("csResponsavel", val === "__none__" ? "" : val)}
                                 >
                                   <SelectTrigger className="w-[140px]" data-testid={`select-cs-${contrato.idSubtask}`}>
                                     <SelectValue placeholder="CS..." />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">Nenhum</SelectItem>
+                                    <SelectItem value="__none__">Nenhum</SelectItem>
                                     {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
                                       <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
                                     ))}
