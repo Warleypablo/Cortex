@@ -5715,8 +5715,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const periodo = req.query.periodo as string || 'trimestre';
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const metricas = await storage.getGegMetricas(periodo, squad, setor);
+      const metricas = await storage.getGegMetricas(periodo, squad, setor, nivel, cargo);
       res.json(metricas);
     } catch (error) {
       console.error("[api] Error fetching GEG metricas:", error);
@@ -5729,8 +5731,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const periodo = req.query.periodo as string || 'trimestre';
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const evolucao = await storage.getGegEvolucaoHeadcount(periodo, squad, setor);
+      const evolucao = await storage.getGegEvolucaoHeadcount(periodo, squad, setor, nivel, cargo);
       res.json(evolucao);
     } catch (error) {
       console.error("[api] Error fetching GEG evolucao headcount:", error);
@@ -5743,8 +5747,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const periodo = req.query.periodo as string || 'trimestre';
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const dados = await storage.getGegAdmissoesDemissoes(periodo, squad, setor);
+      const dados = await storage.getGegAdmissoesDemissoes(periodo, squad, setor, nivel, cargo);
       res.json(dados);
     } catch (error) {
       console.error("[api] Error fetching GEG admissoes demissoes:", error);
@@ -5756,8 +5762,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const tempoPromocao = await storage.getGegTempoPromocao(squad, setor);
+      const tempoPromocao = await storage.getGegTempoPromocao(squad, setor, nivel, cargo);
       res.json(tempoPromocao);
     } catch (error) {
       console.error("[api] Error fetching GEG tempo promocao:", error);
@@ -5769,8 +5777,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const aniversariantes = await storage.getGegAniversariantesMes(squad, setor);
+      const aniversariantes = await storage.getGegAniversariantesMes(squad, setor, nivel, cargo);
       res.json(aniversariantes);
     } catch (error) {
       console.error("[api] Error fetching GEG aniversariantes mes:", error);
@@ -5782,8 +5792,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const aniversarios = await storage.getGegAniversariosEmpresa(squad, setor);
+      const aniversarios = await storage.getGegAniversariosEmpresa(squad, setor, nivel, cargo);
       res.json(aniversarios);
     } catch (error) {
       console.error("[api] Error fetching GEG aniversarios empresa:", error);
@@ -5805,8 +5817,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const resultado = await storage.getGegValorMedioSalario(squad, setor);
+      const resultado = await storage.getGegValorMedioSalario(squad, setor, nivel, cargo);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG valor medio salario:", error);
@@ -5818,8 +5832,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const resultado = await storage.getGegCustoFolha(squad, setor);
+      const resultado = await storage.getGegCustoFolha(squad, setor, nivel, cargo);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG custo folha:", error);
@@ -5831,8 +5847,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const resultado = await storage.getGegValorBeneficio(squad, setor);
+      const resultado = await storage.getGegValorBeneficio(squad, setor, nivel, cargo);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG valor beneficio:", error);
@@ -5864,9 +5882,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
       const limit = parseInt(req.query.limit as string) || 10;
 
-      const resultado = await storage.getGegUltimasPromocoes(squad, setor, limit);
+      const resultado = await storage.getGegUltimasPromocoes(squad, setor, nivel, cargo, limit);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG ultimas promocoes:", error);
@@ -5878,8 +5898,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const resultado = await storage.getGegTempoPermanencia(squad, setor);
+      const resultado = await storage.getGegTempoPermanencia(squad, setor, nivel, cargo);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG tempo permanencia:", error);
@@ -5891,8 +5913,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const resultado = await storage.getGegMasContratacoes(squad, setor);
+      const resultado = await storage.getGegMasContratacoes(squad, setor, nivel, cargo);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG mas contratacoes:", error);
@@ -5904,8 +5928,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const resultado = await storage.getGegPessoasPorSetor(squad, setor);
+      const resultado = await storage.getGegPessoasPorSetor(squad, setor, nivel, cargo);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG pessoas por setor:", error);
@@ -5917,8 +5943,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const resultado = await storage.getGegDemissoesPorTipo(squad, setor);
+      const resultado = await storage.getGegDemissoesPorTipo(squad, setor, nivel, cargo);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG demissoes por tipo:", error);
@@ -5930,8 +5958,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const resultado = await storage.getGegHeadcountPorTenure(squad, setor);
+      const resultado = await storage.getGegHeadcountPorTenure(squad, setor, nivel, cargo);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG headcount por tenure:", error);
@@ -5943,8 +5973,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const resultado = await storage.getGegColaboradoresPorSquad(squad, setor);
+      const resultado = await storage.getGegColaboradoresPorSquad(squad, setor, nivel, cargo);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG colaboradores por squad:", error);
@@ -5956,8 +5988,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const resultado = await storage.getGegColaboradoresPorCargo(squad, setor);
+      const resultado = await storage.getGegColaboradoresPorCargo(squad, setor, nivel, cargo);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG colaboradores por cargo:", error);
@@ -5969,8 +6003,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const squad = req.query.squad as string || 'todos';
       const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
 
-      const resultado = await storage.getGegColaboradoresPorNivel(squad, setor);
+      const resultado = await storage.getGegColaboradoresPorNivel(squad, setor, nivel, cargo);
       res.json(resultado);
     } catch (error) {
       console.error("[api] Error fetching GEG colaboradores por nivel:", error);
