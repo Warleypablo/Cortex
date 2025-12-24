@@ -6,9 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, UserPlus, UserMinus, Clock, Cake, Award, Gift, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet, Filter } from "lucide-react";
+import { Users, TrendingUp, TrendingDown, UserPlus, UserMinus, Clock, Cake, Award, Gift, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet, Filter, Info } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ComposedChart } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -159,6 +159,10 @@ interface GegValorBeneficio {
   totalColaboradores: number;
 }
 
+interface GegValorPremiacao {
+  valorTotal: number;
+}
+
 interface UltimaPromocao {
   id: number;
   nome: string;
@@ -255,6 +259,10 @@ export default function DashboardGeG() {
 
   const { data: valorBeneficio, isLoading: isLoadingValorBeneficio } = useQuery<GegValorBeneficio>({
     queryKey: ['/api/geg/valor-beneficio', { squad, setor }],
+  });
+
+  const { data: valorPremiacao, isLoading: isLoadingValorPremiacao } = useQuery<GegValorPremiacao>({
+    queryKey: ['/api/geg/valor-premiacao'],
   });
 
   const { data: ultimasPromocoes, isLoading: isLoadingPromocoes } = useQuery<UltimaPromocao[]>({
@@ -383,10 +391,20 @@ export default function DashboardGeG() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
           <Card data-testid="card-headcount">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Headcount</CardTitle>
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">Headcount</CardTitle>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">Total de colaboradores com status ativo no período selecionado</p>
+                  </TooltipContent>
+                </UITooltip>
+              </div>
               <Users className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -403,7 +421,17 @@ export default function DashboardGeG() {
 
           <Card data-testid="card-turnover">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Turnover</CardTitle>
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">Turnover</CardTitle>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">Taxa de rotatividade calculada como (Demissões / Headcount Médio) × 100</p>
+                  </TooltipContent>
+                </UITooltip>
+              </div>
               <TrendingUp className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -418,9 +446,19 @@ export default function DashboardGeG() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-admissoes">
+          <Card data-testid="card-contratados">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Admissões</CardTitle>
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">Contratados</CardTitle>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">Número de novas contratações no período selecionado</p>
+                  </TooltipContent>
+                </UITooltip>
+              </div>
               <UserPlus className="w-4 h-4 text-green-600" />
             </CardHeader>
             <CardContent>
@@ -428,7 +466,7 @@ export default function DashboardGeG() {
                 <Skeleton className="h-8 w-16" />
               ) : (
                 <>
-                  <div className="text-2xl font-bold text-green-600" data-testid="text-admissoes">{metricas?.admissoes || 0}</div>
+                  <div className="text-2xl font-bold text-green-600" data-testid="text-contratados">{metricas?.admissoes || 0}</div>
                   <p className="text-xs text-muted-foreground mt-1">No período</p>
                 </>
               )}
@@ -437,7 +475,17 @@ export default function DashboardGeG() {
 
           <Card data-testid="card-demissoes">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Demissões</CardTitle>
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">Demissões</CardTitle>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">Número de desligamentos no período selecionado</p>
+                  </TooltipContent>
+                </UITooltip>
+              </div>
               <UserMinus className="w-4 h-4 text-red-600" />
             </CardHeader>
             <CardContent>
@@ -452,9 +500,52 @@ export default function DashboardGeG() {
             </CardContent>
           </Card>
 
+          <Card data-testid="card-crescimento">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">Crescimento</CardTitle>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">Saldo entre contratados e desligados no período</p>
+                  </TooltipContent>
+                </UITooltip>
+              </div>
+              {((metricas?.admissoes || 0) - (metricas?.demissoes || 0)) >= 0 ? (
+                <TrendingUp className="w-4 h-4 text-green-600" />
+              ) : (
+                <TrendingDown className="w-4 h-4 text-red-600" />
+              )}
+            </CardHeader>
+            <CardContent>
+              {isLoadingMetricas ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <>
+                  <div className={`text-2xl font-bold ${((metricas?.admissoes || 0) - (metricas?.demissoes || 0)) >= 0 ? 'text-green-600' : 'text-red-600'}`} data-testid="text-crescimento">
+                    {((metricas?.admissoes || 0) - (metricas?.demissoes || 0)) >= 0 ? '+' : ''}{(metricas?.admissoes || 0) - (metricas?.demissoes || 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">No período</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
           <Card data-testid="card-tempo-medio">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Permanência</CardTitle>
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">Permanência</CardTitle>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">Tempo médio em meses que colaboradores ativos estão na empresa</p>
+                  </TooltipContent>
+                </UITooltip>
+              </div>
               <Clock className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -473,7 +564,17 @@ export default function DashboardGeG() {
 
           <Card data-testid="card-tempo-desligados">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Permanência Desligados</CardTitle>
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">Perm. Desligados</CardTitle>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">Tempo médio em meses que colaboradores desligados ficaram na empresa</p>
+                  </TooltipContent>
+                </UITooltip>
+              </div>
               <UserMinus className="w-4 h-4 text-red-500" />
             </CardHeader>
             <CardContent>
@@ -494,7 +595,17 @@ export default function DashboardGeG() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card data-testid="card-custo-folha">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Custo Folha</CardTitle>
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">Custo Folha</CardTitle>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">Soma total dos salários de todos os colaboradores ativos</p>
+                  </TooltipContent>
+                </UITooltip>
+              </div>
               <Wallet className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -515,7 +626,17 @@ export default function DashboardGeG() {
 
           <Card data-testid="card-valor-beneficio">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Valor Benefício</CardTitle>
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">Valor Benefício</CardTitle>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">Soma total dos benefícios (Caju) de todos os colaboradores ativos</p>
+                  </TooltipContent>
+                </UITooltip>
+              </div>
               <Gift className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -536,22 +657,48 @@ export default function DashboardGeG() {
 
           <Card data-testid="card-valor-premiacao">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Valor Premiação</CardTitle>
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">Valor Premiação</CardTitle>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">Soma total das premiações pagas aos colaboradores (categorias 05.01.10 e 06.10.08)</p>
+                  </TooltipContent>
+                </UITooltip>
+              </div>
               <Award className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-muted-foreground" data-testid="text-valor-premiacao">
-                R$ 0,00
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Em breve
-              </p>
+              {isLoadingValorPremiacao ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold" data-testid="text-valor-premiacao">
+                    R$ {formatCurrency(valorPremiacao?.valorTotal || 0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Categorias 05.01.10 e 06.10.08
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
 
           <Card data-testid="card-valor-medio">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Salário Médio</CardTitle>
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">Salário Médio</CardTitle>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs text-sm">Média salarial dos colaboradores ativos</p>
+                  </TooltipContent>
+                </UITooltip>
+              </div>
               <DollarSign className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -571,63 +718,48 @@ export default function DashboardGeG() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <Card data-testid="card-evolucao-headcount">
+        <div className="mb-8">
+          <Card data-testid="card-evolucao-pessoas">
             <CardHeader>
-              <CardTitle>Evolução do Headcount</CardTitle>
-              <CardDescription>Histórico de colaboradores ativos</CardDescription>
+              <CardTitle>Evolução de Pessoas</CardTitle>
+              <CardDescription>Contratados, desligados e headcount mensal</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoadingEvolucao ? (
+              {(isLoadingEvolucao || isLoadingAdmissoesDemissoes) ? (
                 <div className="flex items-center justify-center h-[300px]">
                   <Skeleton className="h-[300px] w-full" />
                 </div>
-              ) : evolucaoHeadcount && evolucaoHeadcount.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={evolucaoHeadcount}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="mes" tickFormatter={formatMesAno} />
-                    <YAxis />
-                    <Tooltip labelFormatter={formatMesAno} />
-                    <Legend />
-                    <Line type="monotone" dataKey="headcount" name="Headcount" stroke="#0ea5e9" strokeWidth={2} dot={{ fill: '#0ea5e9' }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-[300px]" data-testid="text-no-data-evolucao">
-                  <p className="text-muted-foreground">Nenhum dado disponível</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-admissoes-demissoes">
-            <CardHeader>
-              <CardTitle>Admissões vs Demissões</CardTitle>
-              <CardDescription>Comparação mensal de entradas e saídas</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingAdmissoesDemissoes ? (
-                <div className="flex items-center justify-center h-[300px]">
-                  <Skeleton className="h-[300px] w-full" />
-                </div>
-              ) : admissoesDemissoes && admissoesDemissoes.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={admissoesDemissoes}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="mes" tickFormatter={formatMesAno} />
-                    <YAxis />
-                    <Tooltip labelFormatter={formatMesAno} />
-                    <Legend />
-                    <Bar dataKey="admissoes" name="Admissões" fill="#10b981" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="demissoes" name="Demissões" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-[300px]" data-testid="text-no-data-admissoes-demissoes">
-                  <p className="text-muted-foreground">Nenhum dado disponível</p>
-                </div>
-              )}
+              ) : (() => {
+                const combinedData = (admissoesDemissoes || []).map(ad => {
+                  const hc = evolucaoHeadcount?.find(e => e.mes === ad.mes);
+                  return {
+                    mes: ad.mes,
+                    admissoes: ad.admissoes,
+                    demissoes: ad.demissoes,
+                    headcount: hc?.headcount || 0
+                  };
+                });
+                
+                return combinedData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <ComposedChart data={combinedData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="mes" tickFormatter={formatMesAno} />
+                      <YAxis yAxisId="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <Tooltip labelFormatter={formatMesAno} />
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="admissoes" name="Contratados" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <Bar yAxisId="left" dataKey="demissoes" name="Demissões" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                      <Line yAxisId="right" type="monotone" dataKey="headcount" name="Headcount" stroke="#0ea5e9" strokeWidth={2} dot={{ fill: '#0ea5e9' }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-[300px]" data-testid="text-no-data-evolucao-pessoas">
+                    <p className="text-muted-foreground">Nenhum dado disponível</p>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>

@@ -5840,6 +5840,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/geg/valor-premiacao", async (req, res) => {
+    try {
+      const resultado = await storage.getGegValorPremiacao();
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG valor premiacao:", error);
+      res.status(500).json({ error: "Failed to fetch GEG valor premiacao" });
+    }
+  });
+
   app.get("/api/geg/patrimonio-resumo", async (req, res) => {
     try {
       const resultado = await storage.getGegPatrimonioResumo();
