@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -14,8 +14,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useQuery } from "@tanstack/react-query";
-import { LogOut, Bell, Info, AlertTriangle, CheckCircle, X, Check, Settings, Shield, Activity } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { LogOut, Bell, AlertTriangle, CheckCircle, X, Check, Settings, Shield, Activity, Cake, FileText } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,59 +26,62 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import ThemeToggle from "@/components/ThemeToggle";
 import GlobalSearch from "@/components/GlobalSearch";
 import PresentationModeButton from "@/components/PresentationModeButton";
 import { usePageInfo } from "@/contexts/PageContext";
 
-interface Aviso {
-  id: string;
-  type: 'info' | 'warning' | 'success';
+interface Notification {
+  id: number;
+  type: string;
   title: string;
   message: string;
-  date: string;
+  entityId: string | null;
+  entityType: string | null;
+  read: boolean;
+  dismissed: boolean;
+  createdAt: string;
+  expiresAt: string | null;
+  uniqueKey: string | null;
 }
 
-const AVISOS_MOCK: Aviso[] = [
-  {
-    id: "1",
-    type: "info",
-    title: "Bem-vindo ao Turbo Cortex",
-    message: "Explore todas as funcionalidades da plataforma para gerenciar seus clientes e contratos.",
-    date: "2025-12-22"
-  },
-  {
-    id: "2", 
-    type: "warning",
-    title: "Atualização de Dados",
-    message: "Os dados do Conta Azul serão sincronizados automaticamente a cada hora.",
-    date: "2025-12-21"
-  },
-  {
-    id: "3",
-    type: "success",
-    title: "Sincronização Concluída",
-    message: "Todos os contratos foram atualizados com sucesso.",
-    date: "2025-12-20"
-  }
-];
+interface AvisosModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  notifications: Notification[];
+  isLoading: boolean;
+  markAsRead: (id: number) => void;
+  dismiss: (id: number) => void;
+  markAllRead: () => void;
+  isMarkingRead: boolean;
+  isDismissing: boolean;
+  isMarkingAllRead: boolean;
+}
 
-function AvisosModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const [resolvedIds, setResolvedIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('avisos_resolvidos');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const getIcon = (type: Aviso['type']) => {
+function AvisosModal({ 
+  open, 
+  onOpenChange, 
+  notifications, 
+  isLoading,
+  markAsRead,
+  dismiss,
+  markAllRead,
+  isMarkingRead,
+  isDismissing,
+  isMarkingAllRead
+}: AvisosModalProps) {
+  const getIcon = (type: string) => {
     switch (type) {
-      case 'info':
-        return <Info className="h-5 w-5 text-blue-500" />;
-      case 'warning':
-        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
-      case 'success':
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case 'aniversario':
+        return <Cake className="h-5 w-5 text-pink-500" />;
+      case 'contrato_vencendo':
+        return <FileText className="h-5 w-5 text-yellow-500" />;
+      case 'inadimplencia':
+        return <AlertTriangle className="h-5 w-5 text-red-500" />;
+      default:
+        return <Bell className="h-5 w-5 text-blue-500" />;
     }
   };
 
@@ -90,20 +93,8 @@ function AvisosModal({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
     });
   };
 
-  const handleResolve = (id: string) => {
-    const newResolved = [...resolvedIds, id];
-    setResolvedIds(newResolved);
-    localStorage.setItem('avisos_resolvidos', JSON.stringify(newResolved));
-  };
-
-  const handleUnresolve = (id: string) => {
-    const newResolved = resolvedIds.filter(rid => rid !== id);
-    setResolvedIds(newResolved);
-    localStorage.setItem('avisos_resolvidos', JSON.stringify(newResolved));
-  };
-
-  const pendingAvisos = AVISOS_MOCK.filter(a => !resolvedIds.includes(a.id));
-  const resolvedAvisos = AVISOS_MOCK.filter(a => resolvedIds.includes(a.id));
+  const unreadNotifications = notifications.filter(n => !n.read && !n.dismissed);
+  const readNotifications = notifications.filter(n => n.read && !n.dismissed);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -112,89 +103,120 @@ function AvisosModal({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
           <DialogTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
             Avisos
-            {pendingAvisos.length > 0 && (
+            {unreadNotifications.length > 0 && (
               <span className="ml-auto text-xs font-normal text-muted-foreground">
-                {pendingAvisos.length} pendente{pendingAvisos.length !== 1 ? 's' : ''}
+                {unreadNotifications.length} não lida{unreadNotifications.length !== 1 ? 's' : ''}
               </span>
             )}
           </DialogTitle>
-          <DialogDescription>
-            Notificações e atualizações do sistema
+          <DialogDescription className="flex items-center justify-between">
+            <span>Notificações e atualizações do sistema</span>
+            {unreadNotifications.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => markAllRead()}
+                disabled={isMarkingAllRead}
+                className="h-7 text-xs gap-1"
+                data-testid="button-mark-all-read"
+              >
+                <Check className="h-3 w-3" />
+                Marcar todas como lidas
+              </Button>
+            )}
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[400px] pr-4">
           <div className="space-y-3">
-            {pendingAvisos.length === 0 && resolvedAvisos.length === 0 ? (
+            {isLoading ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2" />
+                <p>Carregando notificações...</p>
+              </div>
+            ) : unreadNotifications.length === 0 && readNotifications.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Bell className="h-12 w-12 mx-auto mb-2 opacity-50" />
                 <p>Nenhum aviso no momento</p>
               </div>
             ) : (
               <>
-                {pendingAvisos.map((aviso) => (
+                {unreadNotifications.map((notification) => (
                   <div 
-                    key={aviso.id}
+                    key={notification.id}
                     className="flex gap-3 p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors"
-                    data-testid={`aviso-${aviso.id}`}
+                    data-testid={`notification-${notification.id}`}
                   >
                     <div className="flex-shrink-0 mt-0.5">
-                      {getIcon(aviso.type)}
+                      {getIcon(notification.type)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-medium text-sm">{aviso.title}</h4>
+                        <h4 className="font-medium text-sm">{notification.title}</h4>
                         <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {formatDate(aviso.date)}
+                          {formatDate(notification.createdAt)}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {aviso.message}
+                        {notification.message}
                       </p>
-                      <div className="mt-2 flex justify-end">
+                      <div className="mt-2 flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => dismiss(notification.id)}
+                          disabled={isDismissing}
+                          className="h-7 text-xs gap-1"
+                          data-testid={`button-dismiss-${notification.id}`}
+                        >
+                          <X className="h-3 w-3" />
+                          Descartar
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleResolve(aviso.id)}
+                          onClick={() => markAsRead(notification.id)}
+                          disabled={isMarkingRead}
                           className="h-7 text-xs gap-1"
-                          data-testid={`button-resolve-${aviso.id}`}
+                          data-testid={`button-mark-read-${notification.id}`}
                         >
                           <Check className="h-3 w-3" />
-                          Resolver
+                          Marcar como lida
                         </Button>
                       </div>
                     </div>
                   </div>
                 ))}
 
-                {resolvedAvisos.length > 0 && (
+                {readNotifications.length > 0 && (
                   <>
                     <div className="text-xs text-muted-foreground font-medium pt-2 pb-1">
-                      Resolvidos ({resolvedAvisos.length})
+                      Lidas ({readNotifications.length})
                     </div>
-                    {resolvedAvisos.map((aviso) => (
+                    {readNotifications.map((notification) => (
                       <div 
-                        key={aviso.id}
+                        key={notification.id}
                         className="flex gap-3 p-3 rounded-lg border border-border bg-muted/30 opacity-60 transition-colors"
-                        data-testid={`aviso-resolved-${aviso.id}`}
+                        data-testid={`notification-read-${notification.id}`}
                       >
                         <div className="flex-shrink-0 mt-0.5">
                           <CheckCircle className="h-5 w-5 text-green-500" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-medium text-sm line-through">{aviso.title}</h4>
+                            <h4 className="font-medium text-sm line-through">{notification.title}</h4>
                             <Button
                               size="icon"
                               variant="ghost"
-                              onClick={() => handleUnresolve(aviso.id)}
+                              onClick={() => dismiss(notification.id)}
+                              disabled={isDismissing}
                               className="h-6 w-6 -mt-1 -mr-1"
-                              data-testid={`button-unresolve-${aviso.id}`}
+                              data-testid={`button-dismiss-read-${notification.id}`}
                             >
                               <X className="h-3 w-3" />
                             </Button>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {formatDate(aviso.date)}
+                            {formatDate(notification.createdAt)}
                           </p>
                         </div>
                       </div>
@@ -202,10 +224,10 @@ function AvisosModal({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
                   </>
                 )}
 
-                {pendingAvisos.length === 0 && resolvedAvisos.length > 0 && (
+                {unreadNotifications.length === 0 && readNotifications.length > 0 && (
                   <div className="text-center py-4 text-muted-foreground">
                     <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                    <p className="text-sm">Todos os avisos foram resolvidos!</p>
+                    <p className="text-sm">Todos os avisos foram lidos!</p>
                   </div>
                 )}
               </>
@@ -232,6 +254,7 @@ export default function TopBar() {
   const [, setLocation] = useLocation();
   const [avisosOpen, setAvisosOpen] = useState(false);
   const { title, subtitle } = usePageInfo();
+  const hasGeneratedNotifications = useRef(false);
   
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
@@ -241,6 +264,53 @@ export default function TopBar() {
     queryKey: ["/api/colaboradores/by-user", user?.id],
     enabled: !!user?.id,
   });
+
+  const { data: notifications = [], isLoading: isLoadingNotifications } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications"],
+  });
+
+  const { refetch: generateNotifications } = useQuery({
+    queryKey: ["/api/notifications/generate"],
+    enabled: false,
+  });
+
+  useEffect(() => {
+    if (!hasGeneratedNotifications.current) {
+      hasGeneratedNotifications.current = true;
+      generateNotifications().then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      });
+    }
+  }, [generateNotifications]);
+
+  const markAsReadMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("PATCH", `/api/notifications/${id}/read`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+    },
+  });
+
+  const dismissMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/notifications/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+    },
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("PATCH", "/api/notifications/read-all");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+    },
+  });
+
+  const unreadCount = notifications.filter(n => !n.read && !n.dismissed).length;
 
   const handleLogout = async () => {
     try {
@@ -291,14 +361,22 @@ export default function TopBar() {
             <TooltipTrigger asChild>
               <button
                 onClick={() => setAvisosOpen(true)}
-                className="flex items-center justify-center h-10 w-10 rounded-full border border-border bg-background hover:bg-muted transition-colors"
+                className="relative flex items-center justify-center h-10 w-10 rounded-full border border-border bg-background hover:bg-muted transition-colors"
                 data-testid="button-notifications"
                 aria-label="Avisos"
               >
                 <Bell className="h-4 w-4 text-muted-foreground" />
+                {unreadCount > 0 && (
+                  <span 
+                    className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full"
+                    data-testid="badge-unread-count"
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </button>
             </TooltipTrigger>
-            <TooltipContent>Avisos</TooltipContent>
+            <TooltipContent>Avisos{unreadCount > 0 ? ` (${unreadCount})` : ''}</TooltipContent>
           </Tooltip>
           
           <PresentationModeButton />
@@ -382,7 +460,18 @@ export default function TopBar() {
         )}
       </div>
       
-      <AvisosModal open={avisosOpen} onOpenChange={setAvisosOpen} />
+      <AvisosModal 
+        open={avisosOpen} 
+        onOpenChange={setAvisosOpen}
+        notifications={notifications}
+        isLoading={isLoadingNotifications}
+        markAsRead={(id) => markAsReadMutation.mutate(id)}
+        dismiss={(id) => dismissMutation.mutate(id)}
+        markAllRead={() => markAllReadMutation.mutate()}
+        isMarkingRead={markAsReadMutation.isPending}
+        isDismissing={dismissMutation.isPending}
+        isMarkingAllRead={markAllReadMutation.isPending}
+      />
     </header>
   );
 }
