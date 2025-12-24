@@ -984,6 +984,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/cliente/:id", async (req, res) => {
+    try {
+      const cliente = await storage.getClienteById(req.params.id);
+      if (!cliente) {
+        return res.status(404).json({ error: "Client not found" });
+      }
+      
+      const cnpj = cliente.cnpjCliente || cliente.cnpj;
+      if (!cnpj) {
+        return res.status(400).json({ error: "Client CNPJ not found" });
+      }
+      
+      const {
+        telefone,
+        responsavel,
+        responsavelGeral,
+        email,
+        site,
+        instagram,
+        linksContrato,
+        linkListaClickup,
+        cluster
+      } = req.body;
+      
+      await db.execute(sql`
+        UPDATE staging.cup_clientes
+        SET 
+          telefone = ${telefone ?? null},
+          responsavel = ${responsavel ?? null},
+          responsavel_geral = ${responsavelGeral ?? null},
+          email = ${email ?? null},
+          site = ${site ?? null},
+          instagram = ${instagram ?? null},
+          links_contrato = ${linksContrato ?? null},
+          link_lista_clickup = ${linkListaClickup ?? null},
+          cluster = ${cluster ?? null}
+        WHERE cnpj = ${cnpj}
+      `);
+      
+      const updatedCliente = await storage.getClienteById(req.params.id);
+      res.json(updatedCliente);
+    } catch (error) {
+      console.error("[api] Error updating client:", error);
+      res.status(500).json({ error: "Failed to update client" });
+    }
+  });
+
   app.get("/api/cliente/:clienteId/receitas", async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
