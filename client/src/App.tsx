@@ -24,6 +24,7 @@ const Patrimonio = lazy(() => import("@/pages/Patrimonio"));
 const PatrimonioDetail = lazy(() => import("@/pages/PatrimonioDetail"));
 const Ferramentas = lazy(() => import("@/pages/Ferramentas"));
 const TurboZap = lazy(() => import("@/pages/TurboZap"));
+const Atendimento = lazy(() => import("@/pages/Atendimento"));
 const VisaoGeral = lazy(() => import("@/pages/VisaoGeral"));
 const DashboardFinanceiro = lazy(() => import("@/pages/DashboardFinanceiro"));
 const DashboardGeG = lazy(() => import("@/pages/DashboardGeG"));
@@ -158,6 +159,7 @@ function ProtectedRouter() {
       {/* Menu Principal - Outros */}
       <Route path="/ferramentas">{() => <ProtectedRoute path="/ferramentas" component={Ferramentas} />}</Route>
       <Route path="/turbozap">{() => <ProtectedRoute path="/turbozap" component={TurboZap} />}</Route>
+      <Route path="/atendimento">{() => <ProtectedRoute path="/atendimento" component={Atendimento} />}</Route>
       <Route path="/acessos">{() => <ProtectedRoute path="/acessos" component={Acessos} />}</Route>
       <Route path="/conhecimentos">{() => <ProtectedRoute path="/conhecimentos" component={Conhecimentos} />}</Route>
       <Route path="/beneficios">{() => <ProtectedRoute path="/beneficios" component={Beneficios} />}</Route>
