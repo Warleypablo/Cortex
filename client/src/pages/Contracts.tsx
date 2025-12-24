@@ -17,6 +17,7 @@ interface Contract {
   id: string;
   service: string;
   produto: string;
+  plano: string;
   clientName: string;
   clientId: string;
   status: string;
@@ -33,6 +34,8 @@ interface ContractsProps {
   servicoFilter: string[];
   statusFilter: string[];
   tipoContratoFilter: string;
+  produtoFilter: string[];
+  planoFilter: string[];
 }
 
 type SortField = "service" | "clientName" | "status" | "squad" | "createdDate" | "lt" | "dataSolicitacaoEncerramento";
@@ -54,6 +57,8 @@ export default function Contracts({
   servicoFilter,
   statusFilter,
   tipoContratoFilter,
+  produtoFilter,
+  planoFilter,
 }: ContractsProps) {
   const [, setLocation] = useLocation();
   const [sortField, setSortField] = useState<SortField>("createdDate");
@@ -79,6 +84,7 @@ export default function Contracts({
         id: c.idSubtask || "",
         service: c.servico || c.produto || "Sem serviço",
         produto: c.produto || c.servico || "",
+        plano: c.plano || "",
         clientName: c.nomeCliente || "Cliente não identificado",
         clientId: c.idCliente || "",
         status: c.status || "Desconhecido",
@@ -109,15 +115,17 @@ export default function Contracts({
       
       const matchesServico = servicoFilter.length === 0 || servicoFilter.includes(contract.produto);
       const matchesStatus = statusFilter.length === 0 || statusFilter.includes(contract.status);
+      const matchesProduto = produtoFilter.length === 0 || produtoFilter.includes(contract.produto);
+      const matchesPlano = planoFilter.length === 0 || planoFilter.includes(contract.plano);
       
       const matchesTipoContrato = 
         tipoContratoFilter === "ambos" ||
         (tipoContratoFilter === "recorrente" && contract.recurringValue > 0) ||
         (tipoContratoFilter === "pontual" && contract.oneTimeValue > 0);
       
-      return matchesSearch && matchesServico && matchesStatus && matchesTipoContrato;
+      return matchesSearch && matchesServico && matchesStatus && matchesProduto && matchesPlano && matchesTipoContrato;
     });
-  }, [contracts, searchQuery, servicoFilter, statusFilter, tipoContratoFilter]);
+  }, [contracts, searchQuery, servicoFilter, statusFilter, produtoFilter, planoFilter, tipoContratoFilter]);
 
   const sortedContracts = useMemo(() => {
     return [...filteredContracts].sort((a, b) => {
@@ -194,7 +202,7 @@ export default function Contracts({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, servicoFilter, statusFilter, tipoContratoFilter]);
+  }, [searchQuery, servicoFilter, statusFilter, tipoContratoFilter, produtoFilter, planoFilter]);
 
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();

@@ -51,6 +51,8 @@ type ContractSavedFilter = {
     servicoFilter: string[];
     statusFilter: string[];
     tipoContratoFilter: string;
+    produtoFilter: string[];
+    planoFilter: string[];
   };
 };
 
@@ -102,6 +104,8 @@ export default function ClientesContratos() {
   const [contractServicoFilter, setContractServicoFilter] = useState<string[]>([]);
   const [contractStatusFilter, setContractStatusFilter] = useState<string[]>([]);
   const [contractTipoContratoFilter, setContractTipoContratoFilter] = useState<string>("ambos");
+  const [contractProdutoFilter, setContractProdutoFilter] = useState<string[]>([]);
+  const [contractPlanoFilter, setContractPlanoFilter] = useState<string[]>([]);
   
   const [contractSavedFilters, setContractSavedFilters] = useState<ContractSavedFilter[]>(() => {
     try {
@@ -184,6 +188,28 @@ export default function ClientesContratos() {
     return Array.from(statusSet).sort();
   }, [contratos]);
 
+  const contractProdutosUnicos = useMemo(() => {
+    if (!contratos) return [];
+    const produtosSet = new Set<string>();
+    contratos.forEach(contract => {
+      if (contract.produto && contract.produto.trim()) {
+        produtosSet.add(contract.produto.trim());
+      }
+    });
+    return Array.from(produtosSet).sort();
+  }, [contratos]);
+
+  const contractPlanosUnicos = useMemo(() => {
+    if (!contratos) return [];
+    const planosSet = new Set<string>();
+    contratos.forEach(contract => {
+      if (contract.plano && contract.plano.trim()) {
+        planosSet.add(contract.plano.trim());
+      }
+    });
+    return Array.from(planosSet).sort();
+  }, [contratos]);
+
   const saveCurrentFilter = () => {
     if (!newFilterName.trim()) return;
     const newFilter: SavedFilter = {
@@ -226,7 +252,9 @@ export default function ClientesContratos() {
       filters: { 
         servicoFilter: contractServicoFilter, 
         statusFilter: contractStatusFilter, 
-        tipoContratoFilter: contractTipoContratoFilter 
+        tipoContratoFilter: contractTipoContratoFilter,
+        produtoFilter: contractProdutoFilter,
+        planoFilter: contractPlanoFilter
       }
     };
     const updated = [...contractSavedFilters, newFilter];
@@ -241,6 +269,8 @@ export default function ClientesContratos() {
     setContractServicoFilter(filter.filters.servicoFilter);
     setContractStatusFilter(filter.filters.statusFilter);
     setContractTipoContratoFilter(filter.filters.tipoContratoFilter);
+    setContractProdutoFilter(filter.filters.produtoFilter || []);
+    setContractPlanoFilter(filter.filters.planoFilter || []);
   };
 
   const deleteContractSavedFilter = (id: string) => {
@@ -262,12 +292,14 @@ export default function ClientesContratos() {
     aovOperator !== "all"
   ].filter(Boolean).length;
 
-  const hasContractActiveFilters = contractTipoContratoFilter !== "ambos" || contractServicoFilter.length > 0 || contractStatusFilter.length > 0;
+  const hasContractActiveFilters = contractTipoContratoFilter !== "ambos" || contractServicoFilter.length > 0 || contractStatusFilter.length > 0 || contractProdutoFilter.length > 0 || contractPlanoFilter.length > 0;
 
   const contractActiveFilterCount = [
     contractTipoContratoFilter !== "ambos",
     contractServicoFilter.length > 0,
     contractStatusFilter.length > 0,
+    contractProdutoFilter.length > 0,
+    contractPlanoFilter.length > 0,
   ].filter(Boolean).length;
 
   const clearAllFilters = () => {
@@ -287,6 +319,8 @@ export default function ClientesContratos() {
     setContractTipoContratoFilter("ambos");
     setContractServicoFilter([]);
     setContractStatusFilter([]);
+    setContractProdutoFilter([]);
+    setContractPlanoFilter([]);
     toast({ title: "Filtros limpos" });
   };
 
@@ -327,6 +361,22 @@ export default function ClientesContratos() {
       prev.includes(status) 
         ? prev.filter(s => s !== status)
         : [...prev, status]
+    );
+  };
+
+  const toggleContractProdutoFilter = (produto: string) => {
+    setContractProdutoFilter(prev => 
+      prev.includes(produto) 
+        ? prev.filter(p => p !== produto)
+        : [...prev, produto]
+    );
+  };
+
+  const toggleContractPlanoFilter = (plano: string) => {
+    setContractPlanoFilter(prev => 
+      prev.includes(plano) 
+        ? prev.filter(p => p !== plano)
+        : [...prev, plano]
     );
   };
   
@@ -827,6 +877,56 @@ export default function ClientesContratos() {
                         ))}
                       </div>
                     </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Produto (múltipla seleção)</Label>
+                        {contractProdutoFilter.length > 0 && (
+                          <Badge variant="secondary" className="text-xs">{contractProdutoFilter.length}</Badge>
+                        )}
+                      </div>
+                      <div className="border rounded-md max-h-32 overflow-y-auto overflow-x-hidden">
+                        {contractProdutosUnicos.map(produto => (
+                          <label
+                            key={produto}
+                            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
+                            data-testid={`checkbox-contract-produto-${produto}`}
+                          >
+                            <Checkbox 
+                              checked={contractProdutoFilter.includes(produto)} 
+                              onCheckedChange={() => toggleContractProdutoFilter(produto)}
+                              className="flex-shrink-0"
+                            />
+                            <span className="text-sm truncate flex-1 min-w-0">{produto}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Plano (múltipla seleção)</Label>
+                        {contractPlanoFilter.length > 0 && (
+                          <Badge variant="secondary" className="text-xs">{contractPlanoFilter.length}</Badge>
+                        )}
+                      </div>
+                      <div className="border rounded-md max-h-32 overflow-y-auto overflow-x-hidden">
+                        {contractPlanosUnicos.map(plano => (
+                          <label
+                            key={plano}
+                            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
+                            data-testid={`checkbox-contract-plano-${plano}`}
+                          >
+                            <Checkbox 
+                              checked={contractPlanoFilter.includes(plano)} 
+                              onCheckedChange={() => toggleContractPlanoFilter(plano)}
+                              className="flex-shrink-0"
+                            />
+                            <span className="text-sm truncate flex-1 min-w-0">{plano}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </ScrollArea>
               </PopoverContent>
@@ -865,6 +965,8 @@ export default function ClientesContratos() {
             servicoFilter={contractServicoFilter}
             statusFilter={contractStatusFilter}
             tipoContratoFilter={contractTipoContratoFilter}
+            produtoFilter={contractProdutoFilter}
+            planoFilter={contractPlanoFilter}
           />
         )}
       </div>
