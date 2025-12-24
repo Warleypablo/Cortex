@@ -7,11 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, TrendingUp, TrendingDown, Target, DollarSign, Users, ShoppingCart, BarChart3, Rocket, Percent, Trophy, CircleDollarSign, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { CalendarIcon, TrendingUp, TrendingDown, Target, DollarSign, Users, ShoppingCart, BarChart3, Rocket, Percent, Trophy, CircleDollarSign, ChevronDown, ChevronRight, Loader2, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { format, subDays, subMonths, eachDayOfInterval, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { formatCurrency, formatDecimal, formatPercent } from "@/lib/utils";
 
 interface KPICardProps {
@@ -23,16 +24,29 @@ interface KPICardProps {
   subtitle?: string;
   icon: React.ReactNode;
   trend?: 'up' | 'down' | 'neutral';
+  infoTooltip?: string;
 }
 
-function KPICard({ title, value, meta, metaPercent, vsLM, subtitle, icon, trend }: KPICardProps) {
+function KPICard({ title, value, meta, metaPercent, vsLM, subtitle, icon, trend, infoTooltip }: KPICardProps) {
   return (
-    <Card className="relative overflow-hidden">
+    <Card className="relative overflow-hidden hover-elevate transition-all">
       <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <p className="text-sm text-muted-foreground font-medium">{title}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide truncate">{title}</p>
+              {infoTooltip && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3.5 h-3.5 text-muted-foreground/60 hover:text-muted-foreground cursor-help flex-shrink-0" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[200px] text-xs">
+                    {infoTooltip}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+            <p className="text-xl font-bold mt-1 truncate">{value}</p>
             {meta && metaPercent !== undefined && (
               <p className="text-xs text-muted-foreground mt-1">
                 <span className={metaPercent > 100 ? "text-green-600" : metaPercent < 100 ? "text-red-500" : ""}>
@@ -53,10 +67,10 @@ function KPICard({ title, value, meta, metaPercent, vsLM, subtitle, icon, trend 
               </div>
             )}
             {subtitle && (
-              <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+              <p className="text-[10px] text-muted-foreground mt-1 truncate">{subtitle}</p>
             )}
           </div>
-          <div className={`p-2 rounded-lg ${trend === 'up' ? 'bg-green-100 text-green-600' : trend === 'down' ? 'bg-red-100 text-red-500' : 'bg-primary/10 text-primary'}`}>
+          <div className={`p-2 rounded-lg flex-shrink-0 ${trend === 'up' ? 'bg-green-100 dark:bg-green-500/20 text-green-600' : trend === 'down' ? 'bg-red-100 dark:bg-red-500/20 text-red-500' : 'bg-primary/10 text-primary'}`}>
             {icon}
           </div>
         </div>
@@ -648,6 +662,7 @@ export default function GrowthVisaoGeral() {
               investimentoSource === 'google' ? 'Google Ads' : investimentoSource === 'meta' ? 'Meta Ads' : undefined}
             icon={<DollarSign className="w-5 h-5" />}
             trend="neutral"
+            infoTooltip="Total investido em campanhas de mídia paga no período selecionado"
           />
           <KPICard
             title="Impressões"
@@ -655,6 +670,7 @@ export default function GrowthVisaoGeral() {
             subtitle={visaoGeralData?.resumo?.ctr ? `CTR: ${formatPercent(visaoGeralData.resumo.ctr)}` : undefined}
             icon={<Users className="w-5 h-5" />}
             trend="neutral"
+            infoTooltip="Número de vezes que os anúncios foram exibidos para os usuários"
           />
           <KPICard
             title="Cliques"
@@ -662,6 +678,7 @@ export default function GrowthVisaoGeral() {
             subtitle={visaoGeralData?.resumo?.cpc ? `CPC: ${formatCurrency(visaoGeralData.resumo.cpc)}` : undefined}
             icon={<Target className="w-5 h-5" />}
             trend="neutral"
+            infoTooltip="Quantidade de cliques nos anúncios. CPC = Custo por Clique médio"
           />
           <KPICard
             title="Negócios Ganhos"
@@ -669,6 +686,7 @@ export default function GrowthVisaoGeral() {
             subtitle={visaoGeralData?.resumo?.negociosGanhos ? `Atribuídos a Ads: ${visaoGeralData.resumo.negociosGanhos}` : undefined}
             icon={<Trophy className="w-5 h-5" />}
             trend={(visaoGeralData?.resumo?.negociosTotais || 0) > 0 ? "up" : "neutral"}
+            infoTooltip="Total de negócios fechados no período. Atribuídos a Ads são os que vieram de campanhas pagas"
           />
           <KPICard
             title="Valor Vendas"
@@ -677,6 +695,7 @@ export default function GrowthVisaoGeral() {
               `Atribuído a Ads: ${formatCurrency(visaoGeralData.resumo.valorVendas)}` : undefined}
             icon={<CircleDollarSign className="w-5 h-5" />}
             trend={(visaoGeralData?.resumo?.valorTotalGeral || 0) > 0 ? "up" : "neutral"}
+            infoTooltip="Valor total das vendas realizadas. Atribuído a Ads mostra quanto veio de mídia paga"
           />
           <KPICard
             title="CAC"
@@ -684,6 +703,7 @@ export default function GrowthVisaoGeral() {
             subtitle="Custo por Aquisição"
             icon={<DollarSign className="w-5 h-5" />}
             trend={visaoGeralData?.resumo?.cac ? "down" : "neutral"}
+            infoTooltip="Custo para adquirir um cliente. Calculado como Investimento ÷ Negócios Ganhos"
           />
           <KPICard
             title="ROI"
@@ -691,6 +711,7 @@ export default function GrowthVisaoGeral() {
             subtitle="Retorno sobre Investimento"
             icon={<Percent className="w-5 h-5" />}
             trend={(visaoGeralData?.resumo?.roi || 0) > 0 ? "up" : "down"}
+            infoTooltip="Retorno percentual sobre o investimento. ROI = (Vendas - Investimento) ÷ Investimento × 100"
           />
           <KPICard
             title="ROAS"
@@ -700,6 +721,7 @@ export default function GrowthVisaoGeral() {
             subtitle="Return on Ad Spend"
             icon={<BarChart3 className="w-5 h-5" />}
             trend={(visaoGeralData?.resumo?.valorVendas || 0) > (visaoGeralData?.resumo?.investimento || 0) ? "up" : "down"}
+            infoTooltip="Retorno sobre gasto em anúncios. ROAS = Valor Vendas ÷ Investimento. Ex: 2.0 = R$2 de retorno para cada R$1 investido"
           />
         </div>
 
@@ -793,7 +815,7 @@ export default function GrowthVisaoGeral() {
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={4} />
                     <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} domain={[0, 'auto']} />
-                    <Tooltip 
+                    <RechartsTooltip 
                       contentStyle={{ 
                         backgroundColor: 'hsl(var(--card))', 
                         border: '1px solid hsl(var(--border))',
