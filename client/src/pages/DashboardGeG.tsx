@@ -104,10 +104,15 @@ interface AniversarioEmpresa {
   diasAteAniversario: number;
 }
 
+interface NivelOption {
+  original: string;
+  display: string;
+}
+
 interface Filtros {
   squads: string[];
   setores: string[];
-  niveis: string[];
+  niveis: NivelOption[];
   cargos: string[];
 }
 
@@ -375,7 +380,7 @@ export default function DashboardGeG() {
                             <SelectContent>
                               <SelectItem value="todos">Todos</SelectItem>
                               {filtros?.niveis.map((n) => (
-                                <SelectItem key={n} value={n}>{n}</SelectItem>
+                                <SelectItem key={n.original} value={n.original}>{n.display}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
