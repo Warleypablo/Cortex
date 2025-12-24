@@ -3786,15 +3786,14 @@ export class DbStorage implements IStorage {
         SELECT 
           TO_CHAR(m.mes, 'YYYY-MM') as mes,
           COUNT(DISTINCT CASE 
-            WHEN r.admissao <= CASE 
-              WHEN m.mes = date_trunc('month', CURRENT_DATE) THEN CURRENT_DATE
-              ELSE m.mes
-            END
-              AND (r.demissao IS NULL OR r.demissao > CASE 
-                WHEN m.mes = date_trunc('month', CURRENT_DATE) THEN CURRENT_DATE
-                ELSE m.mes
-              END)
-            THEN r.id 
+            WHEN m.mes = date_trunc('month', CURRENT_DATE) THEN
+              CASE WHEN r.status = 'Ativo' THEN r.id END
+            ELSE
+              CASE 
+                WHEN r.admissao <= (m.mes + interval '1 month' - interval '1 day')::date
+                  AND (r.demissao IS NULL OR r.demissao > (m.mes + interval '1 month' - interval '1 day')::date)
+                THEN r.id 
+              END
           END) as headcount,
           COUNT(DISTINCT CASE 
             WHEN date_trunc('month', r.admissao) = m.mes
