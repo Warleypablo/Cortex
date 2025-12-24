@@ -6,11 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, TrendingDown, UserPlus, UserMinus, Clock, Cake, Award, Gift, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet, Filter, Info } from "lucide-react";
+import { Users, TrendingUp, TrendingDown, UserPlus, UserMinus, Clock, Cake, Award, Gift, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet, Filter, Info, X } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ComposedChart } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
 
 type PeriodoPreset = "mesAtual" | "trimestre" | "semestre" | "ano";
 
@@ -296,90 +298,121 @@ export default function DashboardGeG() {
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <Card className="mb-6" data-testid="card-filtros">
           <CardContent className="p-4">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Filter className="w-4 h-4" />
-                  <span className="text-sm font-medium">Filtros</span>
-                </div>
-                
-                <div className="flex flex-wrap gap-1.5">
-                  {PERIODO_PRESETS.map((preset) => (
-                    <Button
-                      key={preset.value}
-                      variant={periodoState.preset === preset.value ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handlePeriodoPresetChange(preset.value)}
-                      data-testid={`button-periodo-${preset.value}`}
-                    >
-                      {preset.label}
+            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2" data-testid="button-filtros">
+                      <Filter className="w-4 h-4" />
+                      <span>Filtros</span>
+                      {(squad !== "todos" || setor !== "todos" || nivel !== "todos" || cargo !== "todos") && (
+                        <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-xs">
+                          {[squad !== "todos", setor !== "todos", nivel !== "todos", cargo !== "todos"].filter(Boolean).length}
+                        </Badge>
+                      )}
                     </Button>
-                  ))}
-                </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80" align="start">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-sm">Filtros</h4>
+                        {(squad !== "todos" || setor !== "todos" || nivel !== "todos" || cargo !== "todos") && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              setSquad("todos");
+                              setSetor("todos");
+                              setNivel("todos");
+                              setCargo("todos");
+                            }}
+                            data-testid="button-limpar-filtros"
+                          >
+                            <X className="w-3 h-3 mr-1" />
+                            Limpar
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Squad</Label>
+                          <Select value={squad} onValueChange={setSquad}>
+                            <SelectTrigger className="w-full" data-testid="select-squad">
+                              <SelectValue placeholder="Todos" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="todos">Todos</SelectItem>
+                              {SQUAD_OPTIONS.map(({ value, label }) => (
+                                <SelectItem key={value} value={value}>{label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-muted-foreground whitespace-nowrap">Squad:</label>
-                    <Select value={squad} onValueChange={setSquad}>
-                      <SelectTrigger className="w-[200px]" data-testid="select-squad">
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos</SelectItem>
-                        {SQUAD_OPTIONS.map(({ value, label }) => (
-                          <SelectItem key={value} value={value}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Setor</Label>
+                          <Select value={setor} onValueChange={setSetor}>
+                            <SelectTrigger className="w-full" data-testid="select-setor">
+                              <SelectValue placeholder="Todos" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="todos">Todos</SelectItem>
+                              {filtros?.setores.map((s) => (
+                                <SelectItem key={s} value={s}>{s}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-muted-foreground whitespace-nowrap">Setor:</label>
-                    <Select value={setor} onValueChange={setSetor}>
-                      <SelectTrigger className="w-[180px]" data-testid="select-setor">
-                        <SelectValue placeholder="Todos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos</SelectItem>
-                        {filtros?.setores.map((s) => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Nível</Label>
+                          <Select value={nivel} onValueChange={setNivel}>
+                            <SelectTrigger className="w-full" data-testid="select-nivel">
+                              <SelectValue placeholder="Todos" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="todos">Todos</SelectItem>
+                              {filtros?.niveis.map((n) => (
+                                <SelectItem key={n} value={n}>{n}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Cargo</Label>
+                          <Select value={cargo} onValueChange={setCargo}>
+                            <SelectTrigger className="w-full" data-testid="select-cargo">
+                              <SelectValue placeholder="Todos" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="todos">Todos</SelectItem>
+                              {filtros?.cargos.map((c) => (
+                                <SelectItem key={c} value={c}>{c}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
-
-              <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-muted-foreground whitespace-nowrap">Nível:</label>
-                  <Select value={nivel} onValueChange={setNivel}>
-                    <SelectTrigger className="w-[180px]" data-testid="select-nivel">
-                      <SelectValue placeholder="Todos" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      {filtros?.niveis.map((n) => (
-                        <SelectItem key={n} value={n}>{n}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-muted-foreground whitespace-nowrap">Cargo:</label>
-                  <Select value={cargo} onValueChange={setCargo}>
-                    <SelectTrigger className="w-[180px]" data-testid="select-cargo">
-                      <SelectValue placeholder="Todos" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      {filtros?.cargos.map((c) => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              
+              <div className="flex flex-wrap gap-1.5">
+                {PERIODO_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.value}
+                    variant={periodoState.preset === preset.value ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePeriodoPresetChange(preset.value)}
+                    data-testid={`button-periodo-${preset.value}`}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
               </div>
             </div>
           </CardContent>
