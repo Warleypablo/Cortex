@@ -10247,7 +10247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 1. Birthday notifications (today + next 3 days)
       const birthdayResult = await db.execute(sql`
         SELECT id, nome, nascimento
-        FROM rh_colaboradores
+        FROM staging.rh_pessoal
         WHERE nascimento IS NOT NULL
           AND demissao IS NULL
           AND (
