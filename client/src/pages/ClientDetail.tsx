@@ -250,23 +250,26 @@ export default function ClientDetail() {
   const { data: tasks, isLoading: isLoadingTasks } = useQuery<ClienteTask[]>({
     queryKey: ["/api/cliente", cliente?.cnpj, "tasks"],
     enabled: !!cliente?.cnpj,
+    retry: false,
   });
 
   const { data: comunicacoes, isLoading: isLoadingComunicacoes } = useQuery<ClienteComunicacao[]>({
     queryKey: ["/api/cliente", cliente?.cnpj, "comunicacoes"],
     enabled: !!cliente?.cnpj,
+    retry: false,
   });
 
   const { data: situacaoJuridica, isLoading: isLoadingSituacao } = useQuery<SituacaoJuridica>({
     queryKey: ["/api/cliente", cliente?.cnpj, "situacao-juridica"],
     enabled: !!cliente?.cnpj,
+    retry: false,
   });
 
   const [newComunicacao, setNewComunicacao] = useState({
     tipo: "",
     titulo: "",
     conteudo: "",
-    prioridade: "media",
+    prioridade: "normal",
   });
 
   const createComunicacaoMutation = useMutation({
@@ -276,7 +279,7 @@ export default function ClientDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cliente", cliente?.cnpj, "comunicacoes"] });
-      setNewComunicacao({ tipo: "", titulo: "", conteudo: "", prioridade: "media" });
+      setNewComunicacao({ tipo: "", titulo: "", conteudo: "", prioridade: "normal" });
       toast({
         title: "Sucesso!",
         description: "Comunicação criada com sucesso.",
@@ -2335,7 +2338,7 @@ export default function ClientDetail() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="baixa">Baixa</SelectItem>
-                        <SelectItem value="media">Média</SelectItem>
+                        <SelectItem value="normal">Normal</SelectItem>
                         <SelectItem value="alta">Alta</SelectItem>
                         <SelectItem value="urgente">Urgente</SelectItem>
                       </SelectContent>
