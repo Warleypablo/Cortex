@@ -9105,7 +9105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const credentialsByClientId = new Map<string, any[]>();
       for (const cred of credentialsResult.rows) {
-        const clientId = (cred as any).client_id;
+        const clientId = String((cred as any).client_id);
         if (!credentialsByClientId.has(clientId)) {
           credentialsByClientId.set(clientId, []);
         }
@@ -9114,7 +9114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = clientsResult.rows.map((client: any) => ({
         ...mapClient(client),
-        credentials: credentialsByClientId.get(client.id) || []
+        credentials: credentialsByClientId.get(String(client.id)) || []
       }));
       
       res.json(result);
