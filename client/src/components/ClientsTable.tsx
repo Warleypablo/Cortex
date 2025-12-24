@@ -193,7 +193,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
                 {ltv > 0 ? formatCurrency(ltv) : "-"}
               </div>
               <div className="px-4 py-3 font-medium text-sm" data-testid={`text-lt-${client.ids || client.id}`}>
-                {ltMeses > 0 ? `${formatDecimal(ltMeses)} m` : "-"}
+                {ltMeses > 0 ? `${Math.round(ltMeses)} m` : "-"}
               </div>
               <div className="px-4 py-3 font-medium text-sm" data-testid={`text-aov-${client.ids || client.id}`}>
                 {ltMeses > 0 && ltv > 0 ? formatCurrency(ltv / ltMeses) : "-"}

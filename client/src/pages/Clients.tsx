@@ -234,7 +234,7 @@ export default function Clients({
   if (error) {
     return (
       <div className="bg-background">
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="w-full px-6 py-8">
           <Card className="p-8">
             <div className="text-center">
               <p className="text-destructive font-semibold mb-2">Erro ao carregar clientes</p>
@@ -251,7 +251,7 @@ export default function Clients({
   if (isLoading) {
     return (
       <div className="bg-background h-full">
-        <div className="container mx-auto px-4 py-4 max-w-7xl h-full flex flex-col" data-testid="loading-clients">
+        <div className="w-full px-6 py-4 h-full flex flex-col" data-testid="loading-clients">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="rounded-xl p-4 bg-white/60 dark:bg-white/5 border border-white/40 dark:border-white/10">
@@ -275,7 +275,7 @@ export default function Clients({
 
   return (
     <div className="bg-background h-full">
-      <div className="container mx-auto px-4 py-4 max-w-7xl h-full flex flex-col">
+      <div className="w-full px-6 py-4 h-full flex flex-col">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
           <StatsCard
             title="Total de Clientes"
