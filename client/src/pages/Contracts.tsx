@@ -852,14 +852,14 @@ export default function Contracts({
               <div className="space-y-2">
                 <Label htmlFor="responsavel">Responsável</Label>
                 <Select
-                  value={editForm.responsavel}
-                  onValueChange={(value) => setEditForm({ ...editForm, responsavel: value })}
+                  value={editForm.responsavel || "__none__"}
+                  onValueChange={(value) => setEditForm({ ...editForm, responsavel: value === "__none__" ? "" : value })}
                 >
                   <SelectTrigger data-testid="select-edit-responsavel">
                     <SelectValue placeholder="Selecione o responsável" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="__none__">Nenhum</SelectItem>
                     {sortedColaboradores.map((colab) => (
                       <SelectItem key={colab.id} value={colab.nome}>
                         {colab.nome} {colab.status?.toLowerCase() !== "ativo" ? "(Inativo)" : ""}
@@ -871,14 +871,14 @@ export default function Contracts({
               <div className="space-y-2">
                 <Label htmlFor="csResponsavel">CS Responsável</Label>
                 <Select
-                  value={editForm.csResponsavel}
-                  onValueChange={(value) => setEditForm({ ...editForm, csResponsavel: value })}
+                  value={editForm.csResponsavel || "__none__"}
+                  onValueChange={(value) => setEditForm({ ...editForm, csResponsavel: value === "__none__" ? "" : value })}
                 >
                   <SelectTrigger data-testid="select-edit-cs">
                     <SelectValue placeholder="Selecione o CS" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="__none__">Nenhum</SelectItem>
                     {sortedColaboradores.map((colab) => (
                       <SelectItem key={colab.id} value={colab.nome}>
                         {colab.nome} {colab.status?.toLowerCase() !== "ativo" ? "(Inativo)" : ""}

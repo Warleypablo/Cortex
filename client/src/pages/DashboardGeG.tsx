@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDecimal } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,60 +12,6 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-function normalizeSquadName(squadName: string): string {
-  const codePoints = Array.from(squadName);
-  const result: string[] = [];
-  let foundNonEmoji = false;
-  
-  for (const char of codePoints) {
-    const code = char.codePointAt(0) || 0;
-    const isEmojiOrModifier = (
-      (code >= 0x1F300 && code <= 0x1F9FF) ||
-      (code >= 0x2600 && code <= 0x26FF) ||
-      (code >= 0x2700 && code <= 0x27BF) ||
-      (code >= 0x1F600 && code <= 0x1F64F) ||
-      (code >= 0x1F680 && code <= 0x1F6FF) ||
-      (code >= 0x1F3FB && code <= 0x1F3FF) ||
-      code === 0x2693 ||
-      code === 0xFE0E ||
-      code === 0xFE0F ||
-      code === 0x200D ||
-      (code >= 0xD800 && code <= 0xDFFF)
-    );
-    
-    if (!foundNonEmoji) {
-      if (!isEmojiOrModifier && char !== ' ') {
-        foundNonEmoji = true;
-        result.push(char);
-      }
-    } else {
-      result.push(char);
-    }
-  }
-  
-  let normalized = result.join('').trim();
-  normalized = normalized.replace(/\s*\(OFF\)\s*$/i, '');
-  return normalized.trim();
-}
-
-function getUniqueNormalizedSquads(squads: string[]): { normalized: string; original: string }[] {
-  const seen = new Map<string, string>();
-  const isOffSquad = (s: string) => /\(OFF\)/i.test(s);
-  
-  for (const squad of squads) {
-    const normalized = normalizeSquadName(squad);
-    if (!normalized || normalized === '-') continue;
-    
-    const existing = seen.get(normalized);
-    if (!existing) {
-      seen.set(normalized, squad);
-    } else if (isOffSquad(existing) && !isOffSquad(squad)) {
-      seen.set(normalized, squad);
-    }
-  }
-  return Array.from(seen.entries()).map(([normalized, original]) => ({ normalized, original }));
-}
-
 type PeriodoPreset = "mesAtual" | "trimestre" | "semestre" | "ano";
 
 interface PeriodoState {
@@ -77,6 +23,23 @@ const PERIODO_PRESETS: { value: PeriodoPreset; label: string }[] = [
   { value: "trimestre", label: "Trimestre" },
   { value: "semestre", label: "Semestre" },
   { value: "ano", label: "Ano" },
+];
+
+// Lista de Squads com emojis - consistente com a seção "Distribuição por Squad"
+const SQUAD_OPTIONS: { value: string; label: string }[] = [
+  { value: "Vendas", label: "💰 Vendas" },
+  { value: "Selva", label: "🪖 Selva" },
+  { value: "Squadra", label: "⚓️ Squadra" },
+  { value: "Pulse", label: "💠 Pulse" },
+  { value: "Squad X", label: "👾 Squad X" },
+  { value: "Tech", label: "🖥️ Tech" },
+  { value: "CX&CS", label: "📊 CX&CS" },
+  { value: "Turbo Interno", label: "🚀 Turbo Interno" },
+  { value: "Ventures", label: "⭐️ Ventures" },
+  { value: "Makers", label: "🛠️ Makers" },
+  { value: "Chama", label: "🔥 Chama (OFF)" },
+  { value: "Hunters", label: "🏹 Hunters (OFF)" },
+  { value: "Fragmentados", label: "🧩 Fragmentados (OFF)" },
 ];
 
 function getPeriodoParaQuery(periodoState: PeriodoState): string {
@@ -324,11 +287,6 @@ export default function DashboardGeG() {
     ? custoFolha.custoTotal / metricas.headcount 
     : 0;
 
-  const normalizedSquads = useMemo(() => {
-    if (!filtros?.squads) return [];
-    return getUniqueNormalizedSquads(filtros.squads);
-  }, [filtros?.squads]);
-
   const handlePeriodoPresetChange = (preset: PeriodoPreset) => {
     setPeriodoState({ preset });
   };
@@ -363,13 +321,13 @@ export default function DashboardGeG() {
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-muted-foreground whitespace-nowrap">Squad:</label>
                     <Select value={squad} onValueChange={setSquad}>
-                      <SelectTrigger className="w-[180px]" data-testid="select-squad">
+                      <SelectTrigger className="w-[200px]" data-testid="select-squad">
                         <SelectValue placeholder="Todos" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="todos">Todos</SelectItem>
-                        {normalizedSquads.map(({ normalized, original }) => (
-                          <SelectItem key={original} value={original}>{original}</SelectItem>
+                        {SQUAD_OPTIONS.map(({ value, label }) => (
+                          <SelectItem key={value} value={value}>{label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
