@@ -7918,46 +7918,96 @@ export class DbStorage implements IStorage {
     return results;
   }
 
-  // Telefones (Linhas Telefônicas) - Hardcoded data (same as MemStorage)
-  private telefones: import("@shared/schema").Telefone[] = [
-    { id: 1, conta: "0454365107", planoOperadora: "PÓS / VIVO", telefone: "(27) 99754-7217", responsavelNome: null, responsavelId: null, setor: "Commerce", ultimaRecarga: null, status: "Ativo" },
-    { id: 2, conta: "0450751313", planoOperadora: "PÓS / VIVO", telefone: "(27) 99749-6354", responsavelNome: "Rafael Vilela", responsavelId: null, setor: "Commerce", ultimaRecarga: null, status: "Ativo" },
-    { id: 3, conta: "0450751314", planoOperadora: "PÓS / VIVO", telefone: "(27) 99749-4918", responsavelNome: "Maria Mid CX", responsavelId: null, setor: "Commerce", ultimaRecarga: null, status: "Ativo" },
-    { id: 4, conta: "0450751318", planoOperadora: "PÓS / VIVO", telefone: "(27) 99752-3255", responsavelNome: null, responsavelId: null, setor: "Commerce", ultimaRecarga: null, status: "Ativo" },
-    { id: 5, conta: "0450751315", planoOperadora: "PÓS / VIVO", telefone: "(27) 99753-5768", responsavelNome: "Lenize", responsavelId: null, setor: "Growth Interno", ultimaRecarga: null, status: "Ativo" },
-    { id: 6, conta: "0450751316", planoOperadora: "PÓS / VIVO", telefone: "(27) 99752-9172", responsavelNome: "Isabella", responsavelId: null, setor: "Growth Interno", ultimaRecarga: null, status: "Ativo" },
-    { id: 7, conta: "0450751317", planoOperadora: "PÓS / VIVO", telefone: "(27) 99750-3255", responsavelNome: "João domiciano", responsavelId: null, setor: "Growth Interno", ultimaRecarga: null, status: "Ativo" },
-    { id: 8, conta: "0450751319", planoOperadora: "PÓS / VIVO", telefone: "(27) 99645-1273", responsavelNome: "Fabiely", responsavelId: null, setor: "Growth Interno", ultimaRecarga: null, status: "Ativo" },
-    { id: 9, conta: "0450751320", planoOperadora: "PÓS / VIVO", telefone: "(27) 99755-6776", responsavelNome: "Kaike", responsavelId: null, setor: "Growth Interno", ultimaRecarga: null, status: "Ativo" },
-    { id: 10, conta: null, planoOperadora: "PRÉ / CLARO", telefone: "(27) 99251-3812", responsavelNome: "Andre Luis Séder", responsavelId: null, setor: "Tech", ultimaRecarga: "2025-08-01", status: "Ativo" },
-    { id: 11, conta: null, planoOperadora: "PRÉ / VIVO", telefone: "(27) 99651-2624", responsavelNome: "Lucas Antunes", responsavelId: null, setor: "CX", ultimaRecarga: "2025-07-23", status: "Ativo" },
-    { id: 12, conta: null, planoOperadora: "PRÉ / CLARO", telefone: "(27) 99294-5879", responsavelNome: "Pedro Barreto (I.A CX)", responsavelId: null, setor: "CX", ultimaRecarga: "2025-09-22", status: "Ativo" },
-    { id: 13, conta: null, planoOperadora: "PRÉ / CLARO", telefone: "(27) 98820-1954", responsavelNome: "Maria Clara", responsavelId: null, setor: "CX", ultimaRecarga: null, status: "Ativo" },
-    { id: 14, conta: null, planoOperadora: "PRÉ / CLARO", telefone: "(27) 99311-5805", responsavelNome: "Guilherme Santtos", responsavelId: null, setor: "CX", ultimaRecarga: "2025-06-20", status: "Ativo" },
-    { id: 15, conta: null, planoOperadora: "PRÉ / VIVO", telefone: "(27) 99656-5645", responsavelNome: "Financeiro", responsavelId: null, setor: "Financeiro", ultimaRecarga: "2025-09-16", status: "Ativo" },
-    { id: 16, conta: null, planoOperadora: "PRÉ / VIVO", telefone: "(27) 99661-3559", responsavelNome: "Matheus Scalfoni", responsavelId: null, setor: "Closer", ultimaRecarga: null, status: "Cancelado" },
-    { id: 17, conta: null, planoOperadora: null, telefone: "(27) 98882-2935", responsavelNome: "Aliny", responsavelId: null, setor: "CXCS", ultimaRecarga: "2025-10-15", status: "Ativo" },
-    { id: 18, conta: null, planoOperadora: "PRÉ / VIVO", telefone: "(27) 99883-8103", responsavelNome: null, responsavelId: null, setor: "Pré-Vendas", ultimaRecarga: null, status: "Ativo" },
-    { id: 19, conta: "Cartão Itau", planoOperadora: "FLEX / CLARO", telefone: "(27) 99288-3587", responsavelNome: "Turbooh - Musso", responsavelId: null, setor: "TurboOOH", ultimaRecarga: "2025-11-24", status: "Ativo" },
-    { id: 20, conta: null, planoOperadora: "PRÉ / CLARO", telefone: "(27) 98847-9795", responsavelNome: "Breno - Tech", responsavelId: null, setor: "Tech", ultimaRecarga: "2025-11-25", status: "Ativo" },
-    { id: 21, conta: null, planoOperadora: "PRÉ / CLARO", telefone: "(27) 992475297", responsavelNome: "Matheus Scalfoni", responsavelId: null, setor: "Closer", ultimaRecarga: "2025-12-09", status: "Ativo" },
-  ];
-
+  // Telefones (Linhas Telefônicas) - Database backed
   async getTelefones(): Promise<import("@shared/schema").Telefone[]> {
-    return this.telefones;
+    const result = await db.execute(sql`
+      SELECT 
+        id, 
+        conta, 
+        plano_operadora as "planoOperadora", 
+        telefone, 
+        responsavel_nome as "responsavelNome", 
+        responsavel_id as "responsavelId", 
+        setor, 
+        ultima_recarga as "ultimaRecarga", 
+        status
+      FROM rh_telefones
+      ORDER BY id
+    `);
+    return result.rows.map((row: any) => ({
+      id: row.id,
+      conta: row.conta,
+      planoOperadora: row.planoOperadora,
+      telefone: row.telefone,
+      responsavelNome: row.responsavelNome,
+      responsavelId: row.responsavelId,
+      setor: row.setor,
+      ultimaRecarga: row.ultimaRecarga,
+      status: row.status,
+    }));
   }
 
   async getTelefoneById(id: number): Promise<import("@shared/schema").Telefone | undefined> {
-    return this.telefones.find(t => t.id === id);
+    const result = await db.execute(sql`
+      SELECT 
+        id, 
+        conta, 
+        plano_operadora as "planoOperadora", 
+        telefone, 
+        responsavel_nome as "responsavelNome", 
+        responsavel_id as "responsavelId", 
+        setor, 
+        ultima_recarga as "ultimaRecarga", 
+        status
+      FROM rh_telefones
+      WHERE id = ${id}
+    `);
+    if (result.rows.length === 0) return undefined;
+    const row = result.rows[0] as any;
+    return {
+      id: row.id,
+      conta: row.conta,
+      planoOperadora: row.planoOperadora,
+      telefone: row.telefone,
+      responsavelNome: row.responsavelNome,
+      responsavelId: row.responsavelId,
+      setor: row.setor,
+      ultimaRecarga: row.ultimaRecarga,
+      status: row.status,
+    };
   }
 
   async updateTelefone(id: number, data: Partial<import("@shared/schema").InsertTelefone>): Promise<import("@shared/schema").Telefone> {
-    const index = this.telefones.findIndex(t => t.id === id);
-    if (index === -1) {
+    const setClauses: any[] = [];
+    
+    if (data.responsavelNome !== undefined) {
+      setClauses.push(sql`responsavel_nome = ${data.responsavelNome}`);
+    }
+    if (data.responsavelId !== undefined) {
+      setClauses.push(sql`responsavel_id = ${data.responsavelId}`);
+    }
+    if (data.ultimaRecarga !== undefined) {
+      setClauses.push(sql`ultima_recarga = ${data.ultimaRecarga}`);
+    }
+    if (data.status !== undefined) {
+      setClauses.push(sql`status = ${data.status}`);
+    }
+    
+    if (setClauses.length === 0) {
+      throw new Error("No fields to update");
+    }
+    
+    await db.execute(sql`
+      UPDATE rh_telefones
+      SET ${sql.join(setClauses, sql`, `)}
+      WHERE id = ${id}
+    `);
+    
+    const updated = await this.getTelefoneById(id);
+    if (!updated) {
       throw new Error("Telefone não encontrado");
     }
-    this.telefones[index] = { ...this.telefones[index], ...data };
-    return this.telefones[index];
+    return updated;
   }
 
   async bulkUpdateClientCnpj(mappings: { name: string; cnpj: string }[]): Promise<{ updated: number; notFound: string[] }> {
