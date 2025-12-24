@@ -309,6 +309,42 @@ export default function ClientDetail() {
     return vencimento < hoje && valorPendente > 0;
   }) || false;
 
+  const statusFinanceiro = useMemo(() => {
+    if (!sortedReceitas || sortedReceitas.length === 0) return { status: 'em_dia', diasAtraso: 0 };
+    
+    let maxDiasAtraso = 0;
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    sortedReceitas.forEach(r => {
+      const statusUpper = r.status?.toUpperCase();
+      if (statusUpper === "PAGO" || statusUpper === "ACQUITTED") return;
+      if (!r.dataVencimento) return;
+      
+      const valorPendente = parseFloat(r.naoPago || "0");
+      if (valorPendente <= 0) return;
+      
+      const vencimento = new Date(r.dataVencimento);
+      vencimento.setHours(0, 0, 0, 0);
+      
+      if (vencimento < hoje) {
+        const diffTime = hoje.getTime() - vencimento.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays > maxDiasAtraso) {
+          maxDiasAtraso = diffDays;
+        }
+      }
+    });
+    
+    if (maxDiasAtraso === 0) {
+      return { status: 'em_dia', diasAtraso: 0 };
+    } else if (maxDiasAtraso <= 7) {
+      return { status: 'atrasado', diasAtraso: maxDiasAtraso };
+    } else {
+      return { status: 'inadimplente', diasAtraso: maxDiasAtraso };
+    }
+  }, [sortedReceitas]);
+
   const handleBarClick = (month: string) => {
     setSelectedMonth(prevMonth => prevMonth === month ? null : month);
     setReceitasCurrentPage(1);
@@ -397,8 +433,22 @@ export default function ClientDetail() {
     );
   }
 
-  const getStatusBadge = (status: string | null) => {
+  const getStatusBadge = (status: string | null, dataVencimento?: string | Date | null, naoPago?: string | null) => {
     const normalizedStatus = status?.toUpperCase();
+    
+    // Check if the invoice is overdue (past due date and has pending amount)
+    if (dataVencimento && normalizedStatus !== "PAGO" && normalizedStatus !== "ACQUITTED") {
+      const vencimento = new Date(dataVencimento);
+      const hoje = new Date();
+      vencimento.setHours(0, 0, 0, 0);
+      hoje.setHours(0, 0, 0, 0);
+      const valorPendente = parseFloat(naoPago || "0");
+      
+      if (vencimento < hoje && valorPendente > 0) {
+        return <Badge variant="default" className="bg-amber-700 text-white" data-testid="badge-atrasado">Atrasado</Badge>;
+      }
+    }
+    
     switch (normalizedStatus) {
       case "PAGO":
       case "ACQUITTED":
@@ -522,7 +572,7 @@ export default function ClientDetail() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <StatsCard
             title="Receita Total"
             value={new Intl.NumberFormat('pt-BR', { 
@@ -560,6 +610,13 @@ export default function ClientDetail() {
             variant="status"
             statusActive={temContratoAtivo}
             subtitle={temContratoAtivo ? "Cliente possui contratos ativos" : "Nenhum contrato ativo no momento"}
+          />
+          <StatsCard
+            title="Financeiro"
+            value={statusFinanceiro.status === 'em_dia' ? 'Em dia' : statusFinanceiro.status === 'atrasado' ? 'Atrasado' : 'Inadimplente'}
+            icon={CreditCard}
+            variant={statusFinanceiro.status === 'em_dia' ? 'success' : statusFinanceiro.status === 'atrasado' ? 'warning' : 'error'}
+            subtitle={statusFinanceiro.diasAtraso > 0 ? `${statusFinanceiro.diasAtraso} dias em atraso` : 'Sem faturas pendentes vencidas'}
           />
         </div>
 
@@ -1064,7 +1121,7 @@ export default function ClientDetail() {
                               {receita.descricao || "Sem descrição"}
                             </TableCell>
                             <TableCell>
-                              {getStatusBadge(receita.status)}
+                              {getStatusBadge(receita.status, receita.dataVencimento, receita.naoPago)}
                             </TableCell>
                             <TableCell className="text-muted-foreground">
                               {receita.dataVencimento 
