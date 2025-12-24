@@ -10749,9 +10749,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // OKR 2026 Routes
+  app.get("/api/okr2026/dashboard", isAuthenticated, async (req, res) => {
+    try {
+      const { getDashboardMetrics, getTargets } = await import("./okr2026/metricsAdapter");
+      const metrics = await getDashboardMetrics();
+      const targets = getTargets();
+      res.json({ metrics, targets });
+    } catch (error) {
+      console.error("[api] Error fetching OKR dashboard:", error);
+      res.status(500).json({ error: "Failed to fetch OKR dashboard" });
+    }
+  });
+
+  app.get("/api/okr2026/krs", isAuthenticated, async (req, res) => {
+    try {
+      const { getKRs, getDashboardMetrics, calculateProgress, getStatus } = await import("./okr2026/metricsAdapter");
+      const krsData = getKRs();
+      const metrics = await getDashboardMetrics();
+      
+      const metricsMap: Record<string, number> = {
+        mrr_ativo: metrics.mrr_ativo,
+        receita_liquida: metrics.receita_liquida_ytd,
+        clientes_ativos: metrics.clientes_ativos,
+        ebitda: metrics.ebitda_ytd,
+        geracao_caixa: metrics.geracao_caixa_ytd,
+        caixa: metrics.caixa_atual,
+        inadimplencia: metrics.inadimplencia_percentual,
+        gross_mrr_churn: metrics.gross_mrr_churn_percentual,
+      };
+
+      const enrichedObjectives = krsData.objectives.map((obj: any) => ({
+        ...obj,
+        krs: obj.krs.map((kr: any) => {
+          const atual = metricsMap[kr.metric_key] ?? null;
+          const target = kr.target_type === "quarterly" 
+            ? (kr.targets as any)[getCurrentQuarter()] 
+            : kr.target;
+          const progress = atual !== null && target ? calculateProgress(atual, target, kr.direction) : null;
+          const status = progress !== null ? getStatus(progress, kr.direction) : "gray";
+          
+          return {
+            ...kr,
+            atual,
+            target,
+            progress,
+            status
+          };
+        })
+      }));
+      
+      res.json({ objectives: enrichedObjectives });
+    } catch (error) {
+      console.error("[api] Error fetching OKR KRs:", error);
+      res.status(500).json({ error: "Failed to fetch OKR KRs" });
+    }
+  });
+
+  app.get("/api/okr2026/initiatives", isAuthenticated, async (req, res) => {
+    try {
+      const { getInitiatives } = await import("./okr2026/metricsAdapter");
+      const data = getInitiatives();
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching OKR initiatives:", error);
+      res.status(500).json({ error: "Failed to fetch OKR initiatives" });
+    }
+  });
+
+  app.get("/api/okr2026/targets", isAuthenticated, async (req, res) => {
+    try {
+      const { getTargets } = await import("./okr2026/metricsAdapter");
+      res.json(getTargets());
+    } catch (error) {
+      console.error("[api] Error fetching OKR targets:", error);
+      res.status(500).json({ error: "Failed to fetch OKR targets" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
 
   return httpServer;
+}
+
+function getCurrentQuarter(): string {
+  const month = new Date().getMonth() + 1;
+  if (month <= 3) return "Q1";
+  if (month <= 6) return "Q2";
+  if (month <= 9) return "Q3";
+  return "Q4";
 }
