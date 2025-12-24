@@ -205,6 +205,7 @@ export interface IStorage {
   getGegTempoPermanencia(squad: string, setor: string, nivel: string, cargo: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
   getGegMasContratacoes(squad: string, setor: string, nivel: string, cargo: string): Promise<GegMasContratacoes>;
   getGegPessoasPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<GegPessoasPorSetor[]>;
+  getGegCustoPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<{ setor: string; custoTotal: number; totalColaboradores: number }[]>;
   getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>>;
   getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null } | null>;
   upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
@@ -639,6 +640,10 @@ export class MemStorage implements IStorage {
   }
 
   async getGegPessoasPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<GegPessoasPorSetor[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getGegCustoPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<{ setor: string; custoTotal: number; totalColaboradores: number }[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -4548,6 +4553,45 @@ export class DbStorage implements IStorage {
     return result.rows.map(row => ({
       setor: row.setor as string,
       total: parseInt(row.total as string || '0'),
+    }));
+  }
+
+  async getGegCustoPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<{ setor: string; custoTotal: number; totalColaboradores: number }[]> {
+    const conditions = [
+      sql`status = 'Ativo'`,
+      sql`salario IS NOT NULL`,
+      sql`salario != ''`,
+      sql`salario ~ '^[0-9]+(\.[0-9]+)?$'`
+    ];
+    
+    if (squad !== 'todos') {
+      conditions.push(sql`squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      conditions.push(sql`setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      conditions.push(sql`nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      conditions.push(sql`cargo = ${cargo}`);
+    }
+    
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(setor, 'Não informado') as setor,
+        COALESCE(SUM(salario::numeric), 0) as custo_total,
+        COUNT(*) as total_colaboradores
+      FROM rh_pessoal
+      WHERE ${sql.join(conditions, sql` AND `)}
+      GROUP BY COALESCE(setor, 'Não informado')
+      ORDER BY custo_total DESC
+    `);
+
+    return result.rows.map(row => ({
+      setor: row.setor as string,
+      custoTotal: parseFloat(row.custo_total as string || '0'),
+      totalColaboradores: parseInt(row.total_colaboradores as string || '0'),
     }));
   }
 
