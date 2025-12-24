@@ -29,9 +29,10 @@ export interface DashboardMetrics {
   net_churn_mrr_percentual: number | null;
   logo_churn_percentual: number | null;
   clientes_ativos: number;
-  receita_recorrente_ytd: number;
-  receita_pontual_ytd: number;
-  receita_outras_ytd: number;
+  receita_recorrente_ytd: number | null;
+  receita_pontual_ytd: number | null;
+  receita_outras_ytd: number | null;
+  mix_is_estimated: boolean;
   new_mrr_ytd: number;
   expansion_mrr_ytd: number | null;
   headcount: number;
@@ -103,7 +104,14 @@ export async function getMrrSerie(): Promise<{ month: string; value: number }[]>
   }
 }
 
-export async function getReceitaYTD(): Promise<{ total: number; liquida: number; recorrente: number; pontual: number; outras: number }> {
+export async function getReceitaYTD(): Promise<{ 
+  total: number; 
+  liquida: number; 
+  recorrente: number | null; 
+  pontual: number | null; 
+  outras: number | null;
+  mix_is_estimated: boolean;
+}> {
   try {
     const currentYear = new Date().getFullYear();
     const result = await db.execute(sql`
@@ -122,13 +130,14 @@ export async function getReceitaYTD(): Promise<{ total: number; liquida: number;
     return {
       total,
       liquida,
-      recorrente: liquida * 0.7,
-      pontual: liquida * 0.25,
-      outras: liquida * 0.05
+      recorrente: null,
+      pontual: null,
+      outras: null,
+      mix_is_estimated: true
     };
   } catch (error) {
     console.error("[OKR] Error fetching Receita YTD:", error);
-    return { total: 0, liquida: 0, recorrente: 0, pontual: 0, outras: 0 };
+    return { total: 0, liquida: 0, recorrente: null, pontual: null, outras: null, mix_is_estimated: true };
   }
 }
 
@@ -313,6 +322,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     receita_recorrente_ytd: receitaYTD.recorrente,
     receita_pontual_ytd: receitaYTD.pontual,
     receita_outras_ytd: receitaYTD.outras,
+    mix_is_estimated: receitaYTD.mix_is_estimated,
     new_mrr_ytd: 0,
     expansion_mrr_ytd: null,
     headcount,
