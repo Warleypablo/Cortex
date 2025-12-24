@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
 import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X } from "lucide-react";
@@ -112,6 +113,7 @@ export default function ClientDetail() {
   }
 
   interface EditFormData {
+    endereco: string;
     telefone: string;
     responsavel: string;
     responsavelGeral: string;
@@ -124,8 +126,18 @@ export default function ClientDetail() {
     cluster: string;
   }
 
+  const formatPhoneMask = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length === 0) return '';
+    if (digits.length <= 2) return `+${digits}`;
+    if (digits.length <= 4) return `+${digits.slice(0, 2)} ${digits.slice(2)}`;
+    if (digits.length <= 9) return `+${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4)}`;
+    return `+${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 9)}-${digits.slice(9, 13)}`;
+  };
+
   const editForm = useForm<EditFormData>({
     defaultValues: {
+      endereco: "",
       telefone: "",
       responsavel: "",
       responsavelGeral: "",
@@ -187,7 +199,7 @@ export default function ClientDetail() {
 
   const { data: colaboradoresDropdown } = useQuery<{ id: number; nome: string; status: string | null }[]>({
     queryKey: ["/api/colaboradores/dropdown"],
-    enabled: !!editingContratoId,
+    enabled: !!editingContratoId || isEditingDados,
   });
 
   const updateContratoMutation = useMutation({
@@ -249,7 +261,8 @@ export default function ClientDetail() {
   const handleToggleEdit = () => {
     if (!isEditingDados && cliente) {
       editForm.reset({
-        telefone: cliente.telefone || "",
+        endereco: cliente.endereco || "",
+        telefone: formatPhoneMask(cliente.telefone || ""),
         responsavel: cliente.responsavel || "",
         responsavelGeral: cliente.responsavelGeral || "",
         nomeDono: cliente.nomeDono || "",
@@ -264,8 +277,23 @@ export default function ClientDetail() {
     setIsEditingDados(!isEditingDados);
   };
 
+  const normalizeLink = (link: string | null | undefined): string | null => {
+    if (!link) return null;
+    const trimmed = link.trim();
+    return trimmed === '' ? null : trimmed;
+  };
+
   const onSubmitEdit = (data: EditFormData) => {
-    updateClienteMutation.mutate(data);
+    const normalizedData = {
+      ...data,
+      telefone: data.telefone.replace(/\D/g, '') || null,
+      linksContrato: normalizeLink(data.linksContrato),
+      linkListaClickup: normalizeLink(data.linkListaClickup),
+      site: normalizeLink(data.site),
+      instagram: normalizeLink(data.instagram),
+      email: normalizeLink(data.email),
+    };
+    updateClienteMutation.mutate(normalizedData as any);
   };
 
   const mapSquadNameToCode = (name: string): string => {
@@ -870,26 +898,43 @@ export default function ClientDetail() {
         </div>
 
         <div className="mb-8">
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <div className="flex items-center gap-3">
-              <Building2 className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-semibold">Dados Cadastrais</h2>
-            </div>
-            <Button
-              variant={isEditingDados ? "default" : "outline"}
-              size="sm"
-              onClick={handleToggleEdit}
-              data-testid="button-edit-client"
-            >
-              <Pencil className="w-4 h-4 mr-2" />
-              {isEditingDados ? "Cancelar" : "Editar"}
-            </Button>
-          </div>
-          <Card className="p-6" data-testid="card-client-info">
+          <Card data-testid="card-client-info">
+            <Accordion type="single" collapsible defaultValue="dados-cadastrais">
+              <AccordionItem value="dados-cadastrais" className="border-none">
+                <div className="flex items-center justify-between gap-4 px-6 pt-4">
+                  <AccordionTrigger className="py-0 hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <Building2 className="w-5 h-5 text-primary" />
+                      <h2 className="text-lg font-semibold">Dados Cadastrais</h2>
+                    </div>
+                  </AccordionTrigger>
+                  <Button
+                    variant={isEditingDados ? "default" : "outline"}
+                    size="sm"
+                    onClick={handleToggleEdit}
+                    data-testid="button-edit-client"
+                  >
+                    <Pencil className="w-4 h-4 mr-2" />
+                    {isEditingDados ? "Cancelar" : "Editar"}
+                  </Button>
+                </div>
+                <AccordionContent className="px-6 pb-6 pt-4">
             {isEditingDados ? (
               <Form {...editForm}>
                 <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={editForm.control}
+                      name="endereco"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Endereço</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Endereço completo" {...field} data-testid="input-endereco" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={editForm.control}
                       name="telefone"
@@ -897,7 +942,15 @@ export default function ClientDetail() {
                         <FormItem>
                           <FormLabel>Telefone</FormLabel>
                           <FormControl>
-                            <Input placeholder="(00) 00000-0000" {...field} data-testid="input-telefone" />
+                            <Input 
+                              placeholder="+55 XX XXXXX-XXXX" 
+                              value={field.value}
+                              onChange={(e) => {
+                                const formatted = formatPhoneMask(e.target.value);
+                                field.onChange(formatted);
+                              }}
+                              data-testid="input-telefone" 
+                            />
                           </FormControl>
                         </FormItem>
                       )}
@@ -908,9 +961,19 @@ export default function ClientDetail() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Responsável (CS)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Nome do CS responsável" {...field} data-testid="input-responsavel" />
-                          </FormControl>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-responsavel">
+                                <SelectValue placeholder="Selecione o CS" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">Nenhum</SelectItem>
+                              {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
+                                <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </FormItem>
                       )}
                     />
@@ -920,9 +983,19 @@ export default function ClientDetail() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Nome Responsável</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Nome do responsável do cliente" {...field} data-testid="input-responsavel-geral" />
-                          </FormControl>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-responsavel-geral">
+                                <SelectValue placeholder="Selecione o responsável" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">Nenhum</SelectItem>
+                              {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
+                                <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </FormItem>
                       )}
                     />
@@ -1086,7 +1159,7 @@ export default function ClientDetail() {
                 <Phone className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Telefone</p>
-                  <p className="font-medium" data-testid="text-telefone">{cliente.telefone || "Não informado"}</p>
+                  <p className="font-medium" data-testid="text-telefone">{cliente.telefone ? formatPhoneMask(cliente.telefone) : "Não informado"}</p>
                 </div>
               </div>
 
@@ -1157,7 +1230,7 @@ export default function ClientDetail() {
               </div>
 
               <div className="flex items-start gap-3" data-testid="info-data-cadastro">
-                <Calendar className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <CalendarIcon className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Data de Cadastro</p>
                   <p className="font-medium" data-testid="text-data-cadastro">
@@ -1247,6 +1320,9 @@ export default function ClientDetail() {
               </div>
             </div>
               )}
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </Card>
         </div>
 
