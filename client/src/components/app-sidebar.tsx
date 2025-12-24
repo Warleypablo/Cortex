@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, Activity, BookOpen } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Shield, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, Activity, BookOpen, Lock } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogoLight from "@assets/logo-preta_1766452973532.png";
 import turboLogoDark from "@assets/logo-branca_1766452973531.png";
@@ -63,6 +63,7 @@ const menuItems = [
     title: "TurboZap",
     url: "/turbozap",
     icon: MessageSquare,
+    locked: true,
   },
   {
     title: "GPTurbo",
@@ -294,16 +295,29 @@ export function AppSidebar() {
             <SidebarMenu>
               {visibleMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={location === item.url || (item.url === "/clientes" && (location === "/" || location === "/contratos"))}
-                    data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    <Link href={item.url} onClick={handleItemClick}>
+                  {item.locked ? (
+                    <SidebarMenuButton 
+                      isActive={false}
+                      data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                      className="opacity-50 cursor-not-allowed"
+                      onClick={(e) => e.preventDefault()}
+                    >
                       <item.icon />
                       <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
+                      <Lock className="ml-auto w-3.5 h-3.5 text-muted-foreground" />
+                    </SidebarMenuButton>
+                  ) : (
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={location === item.url || (item.url === "/clientes" && (location === "/" || location === "/contratos"))}
+                      data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      <Link href={item.url} onClick={handleItemClick}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  )}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
