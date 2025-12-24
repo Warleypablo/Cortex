@@ -1012,7 +1012,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } = req.body;
       
       await db.execute(sql`
-        UPDATE staging.cup_clientes
+        UPDATE cup_clientes
         SET 
           telefone = ${telefone ?? null},
           responsavel = ${responsavel ?? null},
