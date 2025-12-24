@@ -10827,6 +10827,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/okr2026/manual-metrics", isAuthenticated, async (req, res) => {
+    try {
+      const { getManualMetrics } = await import("./okr2026/metricsAdapter");
+      res.json(getManualMetrics());
+    } catch (error) {
+      console.error("[api] Error fetching OKR manual metrics:", error);
+      res.status(500).json({ error: "Failed to fetch OKR manual metrics" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);

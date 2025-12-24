@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -64,15 +65,20 @@ interface Objective {
 
 interface Initiative {
   id: string;
+  objetivo: string;
   titulo: string;
+  descricao_curta?: string;
   owner: string;
   bu: string;
+  quarter: string;
   kr_vinculadas: string[];
   status: "backlog" | "doing" | "done" | "blocked";
   due_date: string;
+  kpi_impact?: string;
   impacto_esperado: string;
   confianca: number;
   proximo_marco: string;
+  notes?: string;
 }
 
 function formatCurrency(value: number): string {
@@ -1019,6 +1025,8 @@ function InitiativesTab() {
 }
 
 export default function OKR2026() {
+  const [activeTab, setActiveTab] = useState("dashboard");
+
   return (
     <div className="h-full overflow-auto p-6" data-testid="page-okr-2026">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -1037,7 +1045,31 @@ export default function OKR2026() {
           </Badge>
         </div>
 
-        <DashboardTab />
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsTrigger value="dashboard" data-testid="tab-dashboard">
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="krs" data-testid="tab-krs">
+              KRs
+            </TabsTrigger>
+            <TabsTrigger value="initiatives" data-testid="tab-initiatives">
+              Iniciativas
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="mt-6">
+            <TabsContent value="dashboard" className="mt-0">
+              <DashboardTab />
+            </TabsContent>
+            <TabsContent value="krs" className="mt-0">
+              <KRsTab />
+            </TabsContent>
+            <TabsContent value="initiatives" className="mt-0">
+              <InitiativesTab />
+            </TabsContent>
+          </div>
+        </Tabs>
       </div>
     </div>
   );
