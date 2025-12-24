@@ -99,6 +99,13 @@ export default function ClientDetail() {
   const [receitasSortConfig, setReceitasSortConfig] = useState<SortConfig | null>(null);
   const [isEditingDados, setIsEditingDados] = useState(false);
   const [editingContratoId, setEditingContratoId] = useState<string | null>(null);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+  useEffect(() => {
+    if (!editingContratoId) {
+      setDatePickerOpen(false);
+    }
+  }, [editingContratoId]);
 
   interface EditContratoFormData {
     servico: string;
@@ -211,6 +218,7 @@ export default function ClientDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cliente", clientId, "contratos"] });
       setEditingContratoId(null);
+      setDatePickerOpen(false);
       contratoEditForm.reset();
       toast({
         title: "Sucesso!",
@@ -335,6 +343,7 @@ export default function ClientDetail() {
 
   const handleCancelEditContrato = () => {
     setEditingContratoId(null);
+    setDatePickerOpen(false);
     contratoEditForm.reset();
   };
 
@@ -1544,7 +1553,7 @@ export default function ClientDetail() {
                                 </Select>
                               </TableCell>
                               <TableCell>
-                                <Popover>
+                                <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
                                   <PopoverTrigger asChild>
                                     <Button
                                       variant="outline"
@@ -1565,6 +1574,7 @@ export default function ClientDetail() {
                                       onSelect={(date) => {
                                         if (date) {
                                           contratoEditForm.setValue("dataInicio", date.toISOString().split('T')[0]);
+                                          setDatePickerOpen(false);
                                         }
                                       }}
                                       initialFocus
