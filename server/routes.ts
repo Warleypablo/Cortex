@@ -1075,9 +1075,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { cnpj } = req.params;
       
-      // First get the client name from cup_clientes
+      // First get the client name from caz_clientes
       const clienteResult = await db.execute(sql`
-        SELECT nome FROM cup_clientes WHERE cnpj = ${cnpj}
+        SELECT nome FROM caz_clientes WHERE cnpj = ${cnpj}
       `);
       
       const clienteNome = clienteResult.rows.length > 0 ? (clienteResult.rows[0] as any).nome : null;
