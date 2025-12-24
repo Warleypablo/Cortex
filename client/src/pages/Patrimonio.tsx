@@ -1209,14 +1209,14 @@ export default function Patrimonio() {
                                 <TableCell data-testid={`text-responsavel-${telefone.id}`}>
                                   {telefone.responsavelId ? (
                                     <Link 
-                                      href={`/colaboradores`}
-                                      className="text-primary hover:underline"
+                                      href={`/colaboradores/${telefone.responsavelId}`}
+                                      className="text-blue-500 hover:text-blue-600 hover:underline font-medium"
                                       data-testid={`link-responsavel-${telefone.id}`}
                                     >
                                       {telefone.responsavelNome || "-"}
                                     </Link>
                                   ) : (
-                                    telefone.responsavelNome || "-"
+                                    <span className="text-muted-foreground">{telefone.responsavelNome || "-"}</span>
                                   )}
                                 </TableCell>
                                 <TableCell>
