@@ -7,6 +7,7 @@ import {
   DollarSign, TrendingUp, CheckCircle, X, Users, Phone, Pencil, Check, ChevronsUpDown, Info
 } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import StatsCard from "@/components/StatsCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -338,7 +339,7 @@ export default function Patrimonio() {
   };
 
   const formatCurrencyNumber = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
   };
 
   const clearFilters = () => {
@@ -551,102 +552,44 @@ export default function Patrimonio() {
             <TabsContent value="patrimonios" className="space-y-6 mt-6">
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <Card data-testid="card-total-ativos">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      Total de Ativos
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Total de itens cadastrados no patrimônio</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </span>
-                    <p className="text-2xl font-bold">{stats.totalAtivos}</p>
-                  </div>
-                  <div className="p-3 bg-primary/10 rounded-full">
-                    <Package className="w-6 h-6 text-primary" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-ativos-bom">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ativos em Bom Estado</p>
-                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.ativosBom}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {stats.computadoresNotebooksBom} notebooks
-                    </p>
-                  </div>
-                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
-                    <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-atribuidos">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      Computadores Atribuídos
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Itens com responsável definido</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </span>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.computadoresNotebooksAtribuidos}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      de {stats.computadoresNotebooksBom} disponíveis
-                    </p>
-                  </div>
-                  <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-                    <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-valor-pago">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Valor Pago Total</p>
-                    <p className="text-xl font-bold">{formatCurrencyNumber(stats.valorPago)}</p>
-                  </div>
-                  <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-                    <DollarSign className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-valor-mercado">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Valor de Mercado</p>
-                    <p className="text-xl font-bold">{formatCurrencyNumber(stats.valorMercado)}</p>
-                  </div>
-                  <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full">
-                    <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                <StatsCard
+                  title="Total de Ativos"
+                  value={stats.totalAtivos.toString()}
+                  icon={Package}
+                  variant="default"
+                  subtitle="Itens cadastrados no patrimônio"
+                  tooltipType="info"
+                />
+                <StatsCard
+                  title="Ativos em Bom Estado"
+                  value={stats.ativosBom.toString()}
+                  icon={CheckCircle}
+                  variant="success"
+                  subtitle={`${stats.computadoresNotebooksBom} notebooks`}
+                />
+                <StatsCard
+                  title="Computadores Atribuídos"
+                  value={stats.computadoresNotebooksAtribuidos.toString()}
+                  icon={Users}
+                  variant="info"
+                  subtitle={`de ${stats.computadoresNotebooksBom} disponíveis`}
+                  tooltipType="info"
+                />
+                <StatsCard
+                  title="Valor Pago Total"
+                  value={formatCurrencyNumber(stats.valorPago)}
+                  icon={DollarSign}
+                  variant="default"
+                  subtitle="Investimento total em ativos"
+                />
+                <StatsCard
+                  title="Valor de Mercado"
+                  value={formatCurrencyNumber(stats.valorMercado)}
+                  icon={TrendingUp}
+                  variant="warning"
+                  subtitle="Valor estimado atual dos ativos"
+                />
+              </div>
 
           {/* Main Content Card */}
           <Card>
