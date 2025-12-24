@@ -406,6 +406,10 @@ export default function ClientDetail() {
       case "PENDENTE":
       case "PENDING":
         return <Badge variant="secondary" data-testid="badge-pendente">Pendente</Badge>;
+      case "EM ABERTO":
+        return <Badge variant="default" className="bg-amber-500 text-white" data-testid="badge-em-aberto">Em Aberto</Badge>;
+      case "PREVISTA":
+        return <Badge variant="outline" className="border-blue-400 text-blue-600 dark:text-blue-400" data-testid="badge-prevista">Prevista</Badge>;
       case "VENCIDO":
       case "OVERDUE":
         return <Badge variant="destructive" data-testid="badge-vencido">Vencido</Badge>;
