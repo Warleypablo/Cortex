@@ -2,26 +2,32 @@
   "year": 2026,
   "company": {
     "mrr_ativo": {
-      "Q1": 1338869.55,
-      "Q2": 1611315.27,
-      "Q3": 1871384.46,
-      "Q4": 2122127.06
+      "Q1": 1338870,
+      "Q2": 1611315,
+      "Q3": 1871384,
+      "Q4": 2122127
     },
-    "receita_total_faturavel_anual": 23903270.88,
-    "receita_liquida_anual": 20055090.58,
-    "ebitda_anual": 5269767.58,
-    "geracao_caixa_anual": 3088046.60,
-    "caixa_final_dez": 3738046.60,
+    "receita_liquida_anual": 20055091,
+    "ebitda_anual": 5216669,
+    "geracao_caixa_anual": 3053001,
+    "caixa_final_dez": 3703001,
     "inadimplencia_max": 6.0,
-    "gross_mrr_churn_max": 9.7,
+    "gross_mrr_churn_max": 9.0,
+    "net_churn_max": 6.0,
+    "logo_churn_max": 10.0,
     "sga_max": 20.0,
     "cac_max": 22.0,
     "clientes_eoy": 511
   },
   "turbooh": {
-    "receita_liquida_anual": 2764800.00,
-    "resultado_anual": 2015000.00,
+    "receita_liquida_anual": 1425600,
+    "resultado_anual": 989700,
     "clientes_eoy": 900
+  },
+  "padronizacao": {
+    "data_coverage_okr": 95,
+    "servicos_padronizados": 90,
+    "rituais_em_dia": 90
   },
   "tech": {
     "projetos_mensal": {

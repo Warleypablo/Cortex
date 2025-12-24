@@ -1,0 +1,54 @@
+{
+  "description": "Métricas manuais para O4 - Padronização e Produto (não persistidas em banco)",
+  "lastUpdated": "2026-01-01",
+  "metrics": {
+    "data_coverage_okr": {
+      "label": "Data Coverage OKR",
+      "description": "Percentual de métricas OKR instrumentadas no Cortex",
+      "target": 95,
+      "atual": 70,
+      "unit": "percentage",
+      "status": "em_instrumentacao",
+      "series": [
+        { "month": "Jan", "value": 50 },
+        { "month": "Fev", "value": 55 },
+        { "month": "Mar", "value": 60 },
+        { "month": "Abr", "value": 65 },
+        { "month": "Mai", "value": 68 },
+        { "month": "Jun", "value": 70 }
+      ]
+    },
+    "servicos_padronizados": {
+      "label": "Serviços Padronizados",
+      "description": "Percentual de serviços com contratos e processos padronizados",
+      "target": 90,
+      "atual": 45,
+      "unit": "percentage",
+      "status": "em_instrumentacao",
+      "series": [
+        { "month": "Jan", "value": 30 },
+        { "month": "Fev", "value": 35 },
+        { "month": "Mar", "value": 40 },
+        { "month": "Abr", "value": 42 },
+        { "month": "Mai", "value": 44 },
+        { "month": "Jun", "value": 45 }
+      ]
+    },
+    "rituais_em_dia": {
+      "label": "Rituais em Dia",
+      "description": "Percentual de rituais mensais/trimestrais realizados com ata no Cortex",
+      "target": 90,
+      "atual": 60,
+      "unit": "percentage",
+      "status": "em_instrumentacao",
+      "series": [
+        { "month": "Jan", "value": 40 },
+        { "month": "Fev", "value": 45 },
+        { "month": "Mar", "value": 50 },
+        { "month": "Abr", "value": 55 },
+        { "month": "Mai", "value": 58 },
+        { "month": "Jun", "value": 60 }
+      ]
+    }
+  }
+}
