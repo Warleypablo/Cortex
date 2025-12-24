@@ -1,0 +1,161 @@
+CONTEXTO
+Você está dentro do projeto Turbo Cortex (Replit). Já existe um backend Node/Express e um frontend React com sidebar e rotas, e o banco é Postgres no Google Cloud SQL. O Cortex já puxa métricas (faturamento, etc). Vamos adicionar MAIS 1 item no menu lateral: “OKR 2026”.
+
+NOME INTERNO DO PLANO 2026
+“Bigger & Better — Consolidação, Escala e Padronização”
+(uso interno, seco e técnico)
+
+OBJETIVO DO QUE VOCÊ VAI CONSTRUIR
+Adicionar uma nova página / módulo “OKR 2026” (apenas leitura) com 3 abas:
+1) Dashboard
+2) KRs
+3) Iniciativas
+
+IMPORTANTE (REGRAS DE OURO)
+- NÃO criar banco novo (NADA de Supabase, Prisma migrations, tabelas novas, etc).
+- NÃO criar migrations.
+- NÃO persistir nada novo no Postgres.
+- Apenas READ do banco existente (Google Cloud SQL) usando os padrões do repo (pool/driver/ORM já existente).
+- Iniciativas no MVP podem ser arquivo JSON no server (read-only). Depois a gente troca por DB, mas AGORA NÃO.
+
+SISTEMA EXISTENTE
+- Reuse as funções/queries já existentes no Cortex para faturamento/financeiro/contratos. Se já existe “storage.ts” ou “db.ts” com queries prontas, plugue nelas.
+- Se alguma tabela citada abaixo não existir, você deve localizar no código quais tabelas atuais entregam o mesmo dado e ajustar.
+
+DESENHO DO MÓDULO (UI)
+- Sidebar: +1 item “OKR 2026” com ícone (Target ou similar) e rota /okr-2026
+- Página: OKR2026 com Tabs (Dashboard | KRs | Iniciativas)
+- Sem overengineering. Layout consistente com as páginas atuais (cards de KPIs no topo + gráficos/tabelas abaixo).
+- Uma tela, 3 abas.
+
+ABA 1 — DASHBOARD (KPIs MACRO)
+Mostrar cards + séries mensais (últimos 12 meses ou YTD) e comparação contra TARGETS.
+
+KPIs obrigatórios (macro, sem detalhar por produto):
+FINANCEIRO
+- MRR Ativo (atual + série mensal)
+- Receita Total Faturável (série)
+- Receita Líquida (série)
+- EBITDA (série)
+- Geração de Caixa (série)
+- Caixa (último valor / saldo)
+- SG&A (% da Receita Líquida) (série ou último)
+- CAC (% da Receita Líquida) (série ou último)
+
+RETENÇÃO / RISCO
+- Inadimplência % (série)
+- Gross MRR Churn % (série)
+- Net Churn MRR % (se der pra calcular via snapshots; se não der, exibir como “N/A (em instrumentação)”)
+- Logo Churn % (se houver tracking; senão N/A)
+
+RECEITA / VENDAS (alto nível)
+- Receita Recorrente vs Pontual vs Outras (stack/bar mensal)
+- Vendas Novas (New MRR) (série)
+- Monetização de Base (Expansion MRR) (se der via diff de snapshots; senão N/A)
+
+BUs (EVIDENCIAR)
+- TurboOH: Receita Líquida (série) e Resultado (série), e Clientes/Telas se existirem no DB.
+- (Opcional: Hugo/Hugz aparece como iniciativa, não como KPI se não houver métrica no DB)
+
+TECH (alto nível, só 2 linhas)
+- Valor de Projetos entregues Tech (série)
+- Custo de Freelancers Tech (série)
+- % Freelancers sobre entrega (cálculo)
+
+ABA 2 — KRs (BOARD-LEVEL)
+Exibir Objectives e KRs com:
+- Target (2026 e/ou quarter targets)
+- Atual (do DB)
+- Progresso %
+- Status: Verde/Amarelo/Vermelho com thresholds simples
+
+ABA 3 — INICIATIVAS
+MVP read-only com JSON server-side (sem DB) contendo:
+- id, titulo, owner, BU (Commerce / TurboOH / Ventures / Corporativo), KR vinculada, status (Backlog/Doing/Blocked/Done), due_date (YYYY-MM-DD), impacto esperado (texto curto)
+UI: tabela com filtros (por BU, por status, por KR) + um painel lateral de detalhes ao clicar.
+
+METRICAS — COMO CALCULAR (usar DB existente do Cortex)
+Você deve implementar adapters que buscam séries mensais e “último valor” para cada KPI.
+Se o Cortex já tem tabelas prontas p/ faturamento/receita, REUSE.
+Caso precise, estes são exemplos de fontes (ajuste conforme o repo):
+- Receita / DRE: tabelas de financeiro (ex: parcelas/recebíveis/categorias)
+- Contratos / MRR: tabelas de contratos/snapshots (ex: data_hist / contratos)
+- Inadimplência: contas a receber (parcelas vencidas em aberto)
+- Headcount (se quiser exibir): RH/pessoal
+
+Regras:
+- MRR Ativo: somar valorr recorrente no snapshot do mês (ou sua fonte equivalente).
+- Receita Pontual: valor_p no período (ou sua categoria financeira equivalente).
+- Outras Receitas: categorias “outras” no financeiro (ou regra do Cortex).
+- Receita Líquida: Receita Total - Impostos sobre receita (categorias).
+- EBITDA: Receita Líquida - CSV - SG&A - CAC (de acordo com categorias do financeiro já mapeadas no Cortex).
+- Inadimplência %: valor vencido em aberto / receita faturável do mês.
+- Gross MRR Churn %: (MRR cancelado no mês) / (MRR do mês anterior).
+- Net Churn %: (Gross churn - Expansion) / MRR anterior (se houver expansão por diff de snapshots).
+
+TARGETS 2026 (HARD-CODE EM JSON NO SERVER)
+Crie server/okr2026/targets.json com estes targets.
+
+Company / Core (BP 2026):
+- MRR Ativo (meta por fechamento de quarter):
+  Q1: 1_338_869.55
+  Q2: 1_611_315.27
+  Q3: 1_871_384.46
+  Q4: 2_122_127.06
+
+- Receita Total Faturável (anual): 23_903_270.88
+- Receita Líquida (anual): 20_055_090.58
+- EBITDA (anual): 5_269_767.58
+- Geração de Caixa (anual): 3_088_046.60
+- Caixa final (Dez): 3_738_046.60
+
+- Inadimplência % (máximo): 6.0
+- Gross MRR churn % (máximo mensal): 9.7
+- SG&A % (máximo anual sobre Receita Líquida): 20.0
+- CAC % (máximo anual sobre Receita Líquida): 22.0
+
+- Clientes (EOY): 511
+
+TurboOH (BP TurboOH):
+- Receita Líquida TurboOH (anual): 2_764_800.00
+- Resultado TurboOH (anual): 2_015_000.00
+- Clientes TurboOH (EOY): 900
+(Se não houver essas métricas no DB atual, mostrar N/A e deixar pronto para plugar quando a fonte existir.)
+
+Tech (do BP interno informado):
+- Projetos Tech entregues (mês): [150k Jan–Mar, 200k Abr–Jun, 220k Jul–Dez]
+- Freelancers Projetos Tech (mês): [15k Jan–Mar, 12.5k Abr–Set, 10k Out–Dez]
+- KPI: %Freelancers = freelancers / projetos (mostrar série)
+
+OKR 2026 — OBJETIVOS E KRs (REFINADOS, SEM DUPLICAÇÃO)
+Crie server/okr2026/krs.json com esta estrutura (ids estáveis):
+
+O1 — ESCALA COM PREVISIBILIDADE (core business)
+KR1: MRR Ativo — fechar Q1/Q2/Q3/Q4 nos targets acima
+KR2: Receita Líquida anual >= 20_055_090.58
+KR3: Clientes EOY >= 511
+KR4: Mix saudável de receita (Recorrente + Pontual + Outras) — exibir acompanhamento (sem travar como KR se a fonte for fraca; pode virar KPI se necessário)
+
+O2 — EFICIÊNCIA OPERACIONAL E SISTEMAS (crescer sem quebrar)
+KR1: EBITDA anual >= 5_269_767.58
+KR2: Geração de Caixa anual >= 3_088_046.60
+KR3: Caixa final Dez >= 3_738_046.60
+KR4: SG&A % <= 20.0
+KR5: CAC % <= 22.0
+(Se der: exibir também Receita/Headcount e MRR/Headcount como KPI de produtividade, sem virar KR obrigatório)
+
+O3 — CONSOLIDAÇÃO DO ECOSSISTEMA (BUs + padronização + produto)
+KR1: TurboOH Receita Líquida anual >= 2_764_800.00
+KR2: TurboOH Resultado anual >= 2_015_000.00
+KR3: Disciplina de risco: Inadimplência <= 6.0 e Gross Churn <= 9.7 (pode aparecer como “KR composto” ou dois KRs separados; prefiro separados se for fácil no UI)
+KR4: Padronização / Produto (macro): se existir campo no DB para “produto/plano” em contratos, criar KPI “% MRR com produto/plano preenchido” e target >= 90%. Se não existir, deixar como N/A e cadastrar iniciativa “instrumentar padronização”.
+
+INICIATIVAS (JSON read-only)
+Crie server/okr2026/initiatives.json com pelo menos 10 iniciativas distribuídas entre as KRs (exemplos):
+- “Hugz — lançamento v1 + tracking de receita”
+- “Padronização de contratos (TMA/TSS) — cobertura em 90% do MRR”
+- “Revisão de cobrança e política de corte — reduzir inadimplência”
+- “Playbook de churn — rotina mensal e actioning no Cortex”
+- “TurboOH — expansão de inventário + integração de billing”
+- “Cortex OKR — instrumentação net churn / expansion MRR”
+Inclua owners e due_dates realistas (pode ser placehold_
