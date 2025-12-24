@@ -49,8 +49,8 @@ export default function Clients({
   const [, setLocation] = useLocation();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
-  const [sortField, setSortField] = useState<SortField>("name");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [sortField, setSortField] = useState<SortField>("ltv");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const { data: clientes, isLoading, error } = useQuery<ClienteCompleto[]>({
     queryKey: ["/api/clientes"],
@@ -115,7 +115,22 @@ export default function Clients({
   };
 
   const sortedClients = useMemo(() => {
+    const getStatusPriority = (status: string) => {
+      const s = status.toLowerCase();
+      if (s === "ativo") return 0;
+      if (s === "onboarding") return 1;
+      if (s === "triagem") return 2;
+      if (s === "em cancelamento") return 3;
+      return 4;
+    };
+
     return [...filteredClients].sort((a, b) => {
+      const statusPriorityA = getStatusPriority(a.statusClickup || "");
+      const statusPriorityB = getStatusPriority(b.statusClickup || "");
+      if (statusPriorityA !== statusPriorityB) {
+        return statusPriorityA - statusPriorityB;
+      }
+
       let comparison = 0;
       
       if (sortField === "name") {
