@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
@@ -144,6 +144,7 @@ export interface IStorage {
   createPromocao(promocao: InsertRhPromocao): Promise<RhPromocao>;
   getContratos(): Promise<ContratoCompleto[]>;
   getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]>;
+  updateContrato(idSubtask: string, data: UpdateContrato): Promise<ContratoCompleto | undefined>;
   getPatrimonios(): Promise<Patrimonio[]>;
   getPatrimonioById(id: number): Promise<PatrimonioComResponsavel | undefined>;
   createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio>;
@@ -432,6 +433,10 @@ export class MemStorage implements IStorage {
   }
 
   async getContratosPorCliente(clienteId: string): Promise<ContratoCompleto[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async updateContrato(idSubtask: string, data: UpdateContrato): Promise<ContratoCompleto | undefined> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1724,6 +1729,28 @@ export class DbStorage implements IStorage {
     `);
 
     return result.rows as ContratoCompleto[];
+  }
+
+  async updateContrato(idSubtask: string, data: UpdateContrato): Promise<ContratoCompleto | undefined> {
+    await db.execute(sql`
+      UPDATE cup_contratos SET
+        servico = COALESCE(${data.servico}, servico),
+        produto = COALESCE(${data.produto}, produto),
+        status = COALESCE(${data.status}, status),
+        valorr = COALESCE(${data.valorr}, valorr),
+        valorp = COALESCE(${data.valorp}, valorp),
+        data_inicio = COALESCE(${data.dataInicio ? new Date(data.dataInicio) : null}, data_inicio),
+        data_encerramento = COALESCE(${data.dataEncerramento ? new Date(data.dataEncerramento) : null}, data_encerramento),
+        data_solicitacao_encerramento = COALESCE(${data.dataSolicitacaoEncerramento ? new Date(data.dataSolicitacaoEncerramento) : null}, data_solicitacao_encerramento),
+        plano = COALESCE(${data.plano}, plano),
+        squad = COALESCE(${data.squad}, squad),
+        responsavel = COALESCE(${data.responsavel}, responsavel),
+        cs_responsavel = COALESCE(${data.csResponsavel}, cs_responsavel)
+      WHERE id_subtask = ${idSubtask}
+    `);
+    
+    const contratos = await this.getContratos();
+    return contratos.find(c => c.idSubtask === idSubtask);
   }
 
   async getPatrimonios(): Promise<Patrimonio[]> {

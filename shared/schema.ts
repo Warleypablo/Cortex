@@ -288,6 +288,21 @@ export type ContratoCompleto = {
   responsavelGeral: string | null;
 };
 
+export type UpdateContrato = {
+  servico?: string;
+  produto?: string;
+  status?: string;
+  valorr?: string;
+  valorp?: string;
+  dataInicio?: string;
+  dataEncerramento?: string;
+  dataSolicitacaoEncerramento?: string;
+  plano?: string;
+  squad?: string;
+  responsavel?: string;
+  csResponsavel?: string;
+};
+
 export type ClienteContratoDetail = {
   clienteId: string;
   nomeCliente: string;
