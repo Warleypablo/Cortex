@@ -8965,6 +8965,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET batch clients with credentials (must be before :id route)
+  app.get("/api/acessos/clients/batch", async (req, res) => {
+    try {
+      const idsParam = req.query.ids as string;
+      if (!idsParam) {
+        return res.status(400).json({ error: "ids parameter is required" });
+      }
+      
+      const ids = idsParam.split(',').filter(id => id.trim());
+      if (ids.length === 0) {
+        return res.json([]);
+      }
+      
+      const clientsResult = await db.execute(sql`
+        SELECT * FROM clients WHERE id = ANY(${ids}::text[])
+      `);
+      
+      if (clientsResult.rows.length === 0) {
+        return res.json([]);
+      }
+      
+      const credentialsResult = await db.execute(sql`
+        SELECT * FROM credentials WHERE client_id = ANY(${ids}::text[]) ORDER BY platform
+      `);
+      
+      const credentialsByClientId = new Map<string, any[]>();
+      for (const cred of credentialsResult.rows) {
+        const clientId = (cred as any).client_id;
+        if (!credentialsByClientId.has(clientId)) {
+          credentialsByClientId.set(clientId, []);
+        }
+        credentialsByClientId.get(clientId)!.push(mapCredential(cred));
+      }
+      
+      const result = clientsResult.rows.map((client: any) => ({
+        ...mapClient(client),
+        credentials: credentialsByClientId.get(client.id) || []
+      }));
+      
+      res.json(result);
+    } catch (error) {
+      console.error("[api] Error fetching batch clients:", error);
+      res.status(500).json({ error: "Failed to fetch batch clients" });
+    }
+  });
+
   // GET single client with credentials
   app.get("/api/acessos/clients/:id", async (req, res) => {
     try {
