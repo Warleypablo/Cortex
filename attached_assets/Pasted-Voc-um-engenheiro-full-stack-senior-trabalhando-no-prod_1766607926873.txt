@@ -1,0 +1,159 @@
+Você é um engenheiro full-stack senior trabalhando no produto interno “Turbo Cortex” (app já existente). 
+Tarefa: adicionar um novo módulo no menu lateral para acompanhamento de OKR 2026 (Plano: “Bigger & Better — Consolidação, Escala e Padronização”).
+
+MODO: Comece em PLANNING.
+1) Leia o repo atual e identifique:
+   - como o Turbo Cortex se conecta ao banco do Google Cloud (driver, env vars, pool, ORM/query layer)
+   - padrões de pages/rotas, layout, componentes (cards, tabs, tables) e permissões
+   - como hoje puxamos métricas (ex: faturamento, pessoas, clientes etc). Reutilize isso.
+
+RESTRIÇÕES (OBRIGATÓRIAS):
+- NÃO criar banco novo, NÃO usar Supabase, NÃO criar “db local”. 
+- NÃO criar novas infra/serviços externos.
+- Usar somente o banco já existente no Google Cloud + padrões de queries já existentes no Cortex.
+- Se precisar persistir status de iniciativas, reutilize tabela/estrutura já existente (ex: projects/initiatives/notes). 
+  Se não existir nada equivalente, implemente MVP read-only com iniciativas vindo de um arquivo JSON local no repo (seed), mas deixe pronto para plugar no DB depois (sem DDL).
+
+OBJETIVO DO MÓDULO:
+- +1 item no menu lateral: “OKR 2026”
+- Ao clicar: 1 tela com 3 abas:
+  (A) Dashboard
+  (B) KRs
+  (C) Iniciativas
+
+NOME INTERNO DO PLANO:
+- “Bigger & Better”
+- Subtítulo: “Consolidação, Escala e Padronização”
+- Linguagem seca e técnica (uso interno).
+
+------------------------------------------------------------
+DADOS / KPIs QUE PRECISAM APARECER (prioridade):
+KPIs Macro (Turbo):
+- MRR Ativo (mês e quarter-end)
+- Receita (quebrada em: Recorrente / Pontual / Outras) + Receita Líquida
+- EBITDA
+- Geração de Caixa + Margem de Geração
+- Inadimplência (R$ e %)  -> % = inadimplência / receita total faturável
+- Churn (Gross MRR Churn) (R$ e %) -> % = churn_mrr / mrr_start
+- Net Churn (MRR) (R$ e %) -> net = gross_churn - expansion_mrr
+- Logo Churn (%) -> logos_churned / logos_start
+- Vendas: Novas (New MRR) e Monetização da Base (Expansion MRR)
+- Headcount total + Receita/Head + MRR/Head (se já existir dado)
+
+KPIs BU (evidenciar principalmente TurboOH):
+TurboOH:
+- Receita Líquida TurboOH (mês e acumulado do ano)
+- Resultado TurboOH (mês e acumulado)
+- Vacância (%) (se existir no DB; caso não exista, deixe como “N/A”)
+- (Opcional, se tiver dado) Telas ativas / Clientes / AOV
+
+Tech delivery (sem aprofundar por produto, só valor final):
+- Valor de Projetos entregues Tech (mês)
+- Custo de Freelancers Projetos Tech (mês)
+- KPI: % Freelancers Tech = freelancers_tech / valor_projetos_tech
+
+Observação importante: não queremos granularidade excessiva por produto. O que importa é bater o macro, com visão BU (principalmente TurboOH).
+
+------------------------------------------------------------
+OKR 2026 (ANUAL) — KRs (com revisão trimestral)
+Objetivo O1 — Escalar receita recorrente mantendo coesão do ecossistema
+KRs:
+- KR1: MRR Ativo no fim de cada trimestre:
+  Q1: 1.338.870
+  Q2: 1.611.315
+  Q3: 1.871.384
+  Q4: 2.122.127
+- KR2: Receita Líquida anual >= 20.085.876 (mostrar também por trimestre no dashboard)
+- KR3: #Clientes (EoY) >= 511 (se existir dado consistente no DB)
+- KR4: Mix de Receita (Recorrente / Pontual / Outras) sempre visível (sem target rígido; só tracking)
+
+Objetivo O2 — Eficiência operacional e disciplina financeira (sistemas + execução limpa)
+KRs:
+- KR1: EBITDA anual >= 5.247.454 (tracking mensal e acumulado)
+- KR2: Geração de Caixa anual >= 3.073.320 e Caixa final do ano >= 3,7M (tracking mensal)
+- KR3: SG&A como % da Receita Líquida <= 21% (tracking mensal)
+- KR4: CAC como % da Receita Líquida <= 23% (tracking mensal)
+
+Objetivo O3 — Retenção, qualidade e padronização (produto + entrega)
+KRs:
+- KR1: Inadimplência <= 6,0% ao mês (tracking mensal + YTD)
+- KR2: Gross MRR Churn <= 9,0% ao mês (tracking mensal)
+- KR3: Net Churn (MRR) melhorar progressivamente por trimestre vs baseline (calcular baseline como média dos últimos 3 meses disponíveis antes de 2026; mostrar delta % por trimestre)
+- KR4: Padronização: % de contratos/entregas sob playbook/escopo padrão (se existir flag no sistema). 
+      Se não existir dado hoje, criar métrica “Data Coverage” e exibir como “em implementação” + iniciativa ligada.
+
+Objetivo O4 — TurboOH (crescimento com margem)
+KRs:
+- KR1: Receita Líquida TurboOH anual >= 1.425.600 (com ramp trimestral visível)
+- KR2: Resultado TurboOH anual >= 989.700
+- KR3: (se houver dados) Telas ativas e/ou ocupação: tracking (sem target rígido no MVP)
+
+------------------------------------------------------------
+DASHBOARD (ABA A) — layout e componentes
+- Top bar: título “OKR 2026 — Bigger & Better” + filtros:
+  - Período (Mês, Quarter, YTD, Ano)
+  - BU (All / TurboCommerce / TurboOH / TurboVentures)
+- Seção 1 (cards): MRR atual, Receita Líquida YTD, EBITDA YTD, Caixa YTD, Inadimplência %, Gross Churn %, Net Churn %, Logo Churn %
+- Seção 2 (gráficos linha): 
+  - MRR mensal + marcadores Q1/Q2/Q3/Q4 target
+  - Receita (stack: Recorrente/Pontual/Outras) e Receita Líquida
+  - EBITDA e Geração de Caixa
+- Seção 3 (BU focus): TurboOH cards + gráfico Receita Líquida TurboOH e Resultado TurboOH
+- Seção 4 (Tech delivery): Valor projetos tech vs freelancers tech + % freelancers
+
+Todos os gráficos devem mostrar: atual vs meta (quando houver), e status semáforo (verde/amarelo/vermelho).
+Regra de semáforo:
+- Verde: >= 100% do target do período
+- Amarelo: 90% a 99%
+- Vermelho: < 90%
+(Para métricas “quanto menor melhor” como inadimplência/churn: inverter a lógica.)
+
+------------------------------------------------------------
+KRs (ABA B)
+- Tabela com:
+  - Objetivo, KR, Métrica, Target (Q1/Q2/Q3/Q4 ou anual), Atual (mês/quarter/YTD), Progresso %, Status, Dono (campo), Observação curta.
+- Clique em um KR abre um drawer/modal com:
+  - definição do cálculo
+  - série temporal
+  - últimas 3 decisões mensais relacionadas (se existir log; se não, placeholder “em implementação”)
+
+------------------------------------------------------------
+INICIATIVAS (ABA C)
+- Lista/tabela de iniciativas com:
+  - Nome, BU, KR relacionado (multi-select), Dono, Status (Not started / In progress / At risk / Done), Confiança (0-100), Próximo marco, Prazo
+- Iniciativas mínimas já seedadas (MVP):
+  1) Projeto Hugz — redução de inadimplência e melhoria do ciclo de cobrança (liga em: Inadimplência, Caixa)
+  2) Padronização de serviços core (TSS/Playbooks) — (liga em: Padronização, Churn/Net Churn)
+  3) TurboOH Scale — (liga em: TurboOH Receita/Resultado)
+  4) Data Coverage OKR — garantir 100% das métricas automáticas no Cortex (liga em: Eficiência e gestão)
+- Se o sistema já tiver “projects/initiatives” no DB, usar isso. Se não tiver: carregar de JSON local read-only no MVP.
+
+------------------------------------------------------------
+INTEGRAÇÃO COM DB (sem criar DB novo)
+- Implementar um “Metrics Adapter”:
+  - getMetricSeries(metric_key, start_date, end_date, bu)
+  - getLatestMetric(metric_key, bu)
+  - getTargets(okr_year=2026) -> targets hardcoded em config JSON (não no DB)
+- Mapear metric_keys para queries existentes no Cortex.
+- Onde não existir dado (ex: net churn, logo churn), calcular via dados de contratos/clientes se já existirem:
+  - gross_churn_mrr = soma MRR perdido por cancelamento no período
+  - expansion_mrr = soma aumento de MRR em contratos existentes
+  - net_churn_mrr = gross_churn_mrr - expansion_mrr
+  - logo_churn = count clientes cancelados / clientes no início
+Se não der para calcular por falta de eventos/tabela, mostrar “N/A” no MVP + criar iniciativa “Instrumentação Net/Logo churn”.
+
+------------------------------------------------------------
+ENTREGÁVEIS (no final do Building)
+1) Novo item no menu lateral “OKR 2026”
+2) Página com 3 abas (Dashboard/KRs/Iniciativas) funcionando e responsiva
+3) Targets 2026 configurados (hardcoded) e métricas puxando do DB existente
+4) Semáforo e filtros funcionando
+5) Código limpo seguindo padrões do Turbo Cortex
+
+AGORA, ainda em PLANNING, responda com:
+- checklist do que você vai mexer (arquivos/rotas/componentes)
+- quais tabelas/queries você vai reutilizar do Cortex
+- definição exata de cada métrica (fórmula)
+- lista de gaps (se alguma métrica não existir no DB) + fallback MVP
+
+Depois eu vou mandar: “pode ir pro BUILDING e implementar”.
