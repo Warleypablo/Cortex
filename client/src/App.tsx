@@ -58,6 +58,7 @@ const InvestorsReport = lazy(() => import("@/pages/InvestorsReport"));
 const Acessos = lazy(() => import("@/pages/Acessos"));
 const Conhecimentos = lazy(() => import("@/pages/Conhecimentos"));
 const Beneficios = lazy(() => import("@/pages/Beneficios"));
+const OKR2026 = lazy(() => import("@/pages/OKR2026"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -206,6 +207,9 @@ function ProtectedRouter() {
       
       {/* Investidores */}
       <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
+      
+      {/* OKR 2026 */}
+      <Route path="/okr-2026">{() => <ProtectedRoute path="/okr-2026" component={OKR2026} />}</Route>
       
       {/* Admin */}
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
