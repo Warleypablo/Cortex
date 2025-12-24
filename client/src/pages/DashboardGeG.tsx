@@ -142,6 +142,8 @@ interface AniversarioEmpresa {
 interface Filtros {
   squads: string[];
   setores: string[];
+  niveis: string[];
+  cargos: string[];
 }
 
 interface ValorMedioSalario {
@@ -222,27 +224,29 @@ export default function DashboardGeG() {
   const [periodoState, setPeriodoState] = useState<PeriodoState>({ preset: "trimestre" });
   const [squad, setSquad] = useState("todos");
   const [setor, setSetor] = useState("todos");
+  const [nivel, setNivel] = useState("todos");
+  const [cargo, setCargo] = useState("todos");
 
   const periodo = getPeriodoParaQuery(periodoState);
 
   const { data: metricas, isLoading: isLoadingMetricas } = useQuery<GegMetricas>({
-    queryKey: ['/api/geg/metricas', { periodo, squad, setor }],
+    queryKey: ['/api/geg/metricas', { periodo, squad, setor, nivel, cargo }],
   });
 
   const { data: evolucaoHeadcount, isLoading: isLoadingEvolucao } = useQuery<EvolucaoHeadcount[]>({
-    queryKey: ['/api/geg/evolucao-headcount', { periodo, squad, setor }],
+    queryKey: ['/api/geg/evolucao-headcount', { periodo, squad, setor, nivel, cargo }],
   });
 
   const { data: admissoesDemissoes, isLoading: isLoadingAdmissoesDemissoes } = useQuery<AdmissoesDemissoes[]>({
-    queryKey: ['/api/geg/admissoes-demissoes', { periodo, squad, setor }],
+    queryKey: ['/api/geg/admissoes-demissoes', { periodo, squad, setor, nivel, cargo }],
   });
 
   const { data: aniversariantesMes, isLoading: isLoadingAniversariantes } = useQuery<Aniversariante[]>({
-    queryKey: ['/api/geg/aniversariantes-mes', { squad, setor }],
+    queryKey: ['/api/geg/aniversariantes-mes', { squad, setor, nivel, cargo }],
   });
 
   const { data: aniversariosEmpresa, isLoading: isLoadingAniversariosEmpresa } = useQuery<AniversarioEmpresa[]>({
-    queryKey: ['/api/geg/aniversarios-empresa', { squad, setor }],
+    queryKey: ['/api/geg/aniversarios-empresa', { squad, setor, nivel, cargo }],
   });
 
   const { data: filtros } = useQuery<Filtros>({
@@ -250,15 +254,15 @@ export default function DashboardGeG() {
   });
 
   const { data: valorMedioSalario, isLoading: isLoadingValorMedio } = useQuery<ValorMedioSalario>({
-    queryKey: ['/api/geg/valor-medio-salario', { squad, setor }],
+    queryKey: ['/api/geg/valor-medio-salario', { squad, setor, nivel, cargo }],
   });
 
   const { data: custoFolha, isLoading: isLoadingCustoFolha } = useQuery<CustoFolha>({
-    queryKey: ['/api/geg/custo-folha', { squad, setor }],
+    queryKey: ['/api/geg/custo-folha', { squad, setor, nivel, cargo }],
   });
 
   const { data: valorBeneficio, isLoading: isLoadingValorBeneficio } = useQuery<GegValorBeneficio>({
-    queryKey: ['/api/geg/valor-beneficio', { squad, setor }],
+    queryKey: ['/api/geg/valor-beneficio', { squad, setor, nivel, cargo }],
   });
 
   const { data: valorPremiacao, isLoading: isLoadingValorPremiacao } = useQuery<GegValorPremiacao>({
@@ -266,39 +270,39 @@ export default function DashboardGeG() {
   });
 
   const { data: ultimasPromocoes, isLoading: isLoadingPromocoes } = useQuery<UltimaPromocao[]>({
-    queryKey: ['/api/geg/ultimas-promocoes', { squad, setor, limit: 10 }],
+    queryKey: ['/api/geg/ultimas-promocoes', { squad, setor, nivel, cargo, limit: 10 }],
   });
 
   const { data: tempoPermanencia, isLoading: isLoadingTempoPermanencia } = useQuery<TempoPermanencia>({
-    queryKey: ['/api/geg/tempo-permanencia', { squad, setor }],
+    queryKey: ['/api/geg/tempo-permanencia', { squad, setor, nivel, cargo }],
   });
 
   const { data: masContratacoes, isLoading: isLoadingMasContratacoes } = useQuery<MasContratacoes>({
-    queryKey: ['/api/geg/mas-contratacoes', { squad, setor }],
+    queryKey: ['/api/geg/mas-contratacoes', { squad, setor, nivel, cargo }],
   });
 
   const { data: pessoasPorSetor, isLoading: isLoadingPessoasPorSetor } = useQuery<PessoasPorSetor[]>({
-    queryKey: ['/api/geg/pessoas-por-setor', { squad, setor }],
+    queryKey: ['/api/geg/pessoas-por-setor', { squad, setor, nivel, cargo }],
   });
 
   const { data: demissoesPorTipo, isLoading: isLoadingDemissoesPorTipo } = useQuery<DemissoesPorTipo[]>({
-    queryKey: ['/api/geg/demissoes-por-tipo', { squad, setor }],
+    queryKey: ['/api/geg/demissoes-por-tipo', { squad, setor, nivel, cargo }],
   });
 
   const { data: headcountPorTenure, isLoading: isLoadingHeadcountPorTenure } = useQuery<HeadcountPorTenure[]>({
-    queryKey: ['/api/geg/headcount-por-tenure', { squad, setor }],
+    queryKey: ['/api/geg/headcount-por-tenure', { squad, setor, nivel, cargo }],
   });
 
   const { data: colaboradoresPorSquad, isLoading: isLoadingColaboradoresPorSquad } = useQuery<Distribuicao[]>({
-    queryKey: ['/api/geg/colaboradores-por-squad', { squad, setor }],
+    queryKey: ['/api/geg/colaboradores-por-squad', { squad, setor, nivel, cargo }],
   });
 
   const { data: colaboradoresPorCargo, isLoading: isLoadingColaboradoresPorCargo } = useQuery<Distribuicao[]>({
-    queryKey: ['/api/geg/colaboradores-por-cargo', { squad, setor }],
+    queryKey: ['/api/geg/colaboradores-por-cargo', { squad, setor, nivel, cargo }],
   });
 
   const { data: colaboradoresPorNivel, isLoading: isLoadingColaboradoresPorNivel } = useQuery<Distribuicao[]>({
-    queryKey: ['/api/geg/colaboradores-por-nivel', { squad, setor }],
+    queryKey: ['/api/geg/colaboradores-por-nivel', { squad, setor, nivel, cargo }],
   });
 
   const formatMesAno = (mesAno: string) => {
@@ -365,7 +369,7 @@ export default function DashboardGeG() {
                       <SelectContent>
                         <SelectItem value="todos">Todos</SelectItem>
                         {normalizedSquads.map(({ normalized, original }) => (
-                          <SelectItem key={original} value={original}>{normalized}</SelectItem>
+                          <SelectItem key={original} value={original}>{original}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -385,6 +389,38 @@ export default function DashboardGeG() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-muted-foreground whitespace-nowrap">Nível:</label>
+                  <Select value={nivel} onValueChange={setNivel}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-nivel">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      {filtros?.niveis.map((n) => (
+                        <SelectItem key={n} value={n}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-muted-foreground whitespace-nowrap">Cargo:</label>
+                  <Select value={cargo} onValueChange={setCargo}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-cargo">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      {filtros?.cargos.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
