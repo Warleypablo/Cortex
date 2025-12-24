@@ -1528,14 +1528,20 @@ export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 // ============================================
-// Atendimento Module - WhatsApp Chat Management
+// Atendimento Module - WhatsApp Group Chat Management
 // ============================================
+
+export const canalAtendimentoEnum = ['operacao', 'cxcs', 'financeiro'] as const;
+export type CanalAtendimento = typeof canalAtendimentoEnum[number];
 
 export const atendimentoCanais = pgTable("atendimento_canais", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  codigo: varchar("codigo", { length: 20 }).notNull().unique(),
   nome: varchar("nome", { length: 100 }).notNull(),
-  numero: varchar("numero", { length: 20 }),
+  whatsappNumero: varchar("whatsapp_numero", { length: 20 }),
   descricao: text("descricao"),
+  icone: varchar("icone", { length: 50 }),
+  cor: varchar("cor", { length: 20 }),
   ativo: boolean("ativo").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -1550,15 +1556,21 @@ export type InsertAtendimentoCanal = z.infer<typeof insertAtendimentoCanalSchema
 export const atendimentoConversas = pgTable("atendimento_conversas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   canalId: varchar("canal_id", { length: 100 }).notNull(),
+  clienteId: integer("cliente_id"),
   clienteNome: varchar("cliente_nome", { length: 255 }),
   clienteCnpj: varchar("cliente_cnpj", { length: 20 }),
-  grupoNome: varchar("grupo_nome", { length: 255 }),
-  grupoId: varchar("grupo_id", { length: 100 }),
+  clienteSquad: varchar("cliente_squad", { length: 100 }),
+  clienteResponsavel: varchar("cliente_responsavel", { length: 255 }),
+  whatsappGrupoId: varchar("whatsapp_grupo_id", { length: 100 }),
+  whatsappGrupoNome: varchar("whatsapp_grupo_nome", { length: 255 }),
   ultimaMensagem: text("ultima_mensagem"),
   ultimaMensagemData: timestamp("ultima_mensagem_data"),
+  ultimaMensagemRemetente: varchar("ultima_mensagem_remetente", { length: 255 }),
   naoLidas: integer("nao_lidas").default(0),
   status: varchar("status", { length: 20 }).default("aberta"),
   atribuidoA: varchar("atribuido_a", { length: 255 }),
+  vinculadoEm: timestamp("vinculado_em"),
+  vinculadoPor: varchar("vinculado_por", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1572,11 +1584,16 @@ export type InsertAtendimentoConversa = z.infer<typeof insertAtendimentoConversa
 export const atendimentoMensagens = pgTable("atendimento_mensagens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conversaId: varchar("conversa_id", { length: 100 }).notNull(),
+  whatsappMessageId: varchar("whatsapp_message_id", { length: 100 }),
   remetente: varchar("remetente", { length: 255 }).notNull(),
+  remetenteTelefone: varchar("remetente_telefone", { length: 20 }),
   remetenteTipo: varchar("remetente_tipo", { length: 20 }).notNull(),
   conteudo: text("conteudo").notNull(),
   tipo: varchar("tipo", { length: 20 }).default("text"),
+  anexoUrl: text("anexo_url"),
+  anexoNome: varchar("anexo_nome", { length: 255 }),
   lida: boolean("lida").default(false),
+  messageTimestamp: timestamp("message_timestamp"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
