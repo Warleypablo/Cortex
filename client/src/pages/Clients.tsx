@@ -18,7 +18,7 @@ import {
 import { formatCurrencyNoDecimals, formatDecimal, formatPercent } from "@/lib/utils";
 import type { ClienteCompleto } from "../../../server/storage";
 
-type SortField = "name" | "cnpj" | "ltv" | "lt" | "status" | "startDate";
+type SortField = "name" | "cnpj" | "ltv" | "lt" | "aov" | "status" | "startDate";
 type SortDirection = "asc" | "desc";
 
 interface ClientsProps {
@@ -149,6 +149,14 @@ export default function Clients({
         const ltA = a.ltMeses || 0;
         const ltB = b.ltMeses || 0;
         comparison = ltA - ltB;
+      } else if (sortField === "aov") {
+        const ltvA = ltvMap?.[a.ids || String(a.id)] || 0;
+        const ltvB = ltvMap?.[b.ids || String(b.id)] || 0;
+        const ltA = a.ltMeses || 0;
+        const ltB = b.ltMeses || 0;
+        const aovA = ltA > 0 ? ltvA / ltA : 0;
+        const aovB = ltB > 0 ? ltvB / ltB : 0;
+        comparison = aovA - aovB;
       } else if (sortField === "status") {
         const statusA = a.statusClickup || "";
         const statusB = b.statusClickup || "";
