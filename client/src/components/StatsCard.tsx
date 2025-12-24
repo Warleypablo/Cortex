@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useCountUpNumber } from "@/hooks/useCountUp";
 
-type CardVariant = "default" | "success" | "warning" | "info" | "status";
+type CardVariant = "default" | "success" | "warning" | "error" | "info" | "status";
 
 interface StatsCardProps {
   title: string;
@@ -44,6 +44,12 @@ const variantStyles: Record<CardVariant, { bg: string; border: string; icon: str
     border: "border-amber-200/50 dark:border-amber-500/20",
     icon: "text-amber-600 dark:text-amber-400",
     iconBg: "bg-amber-100 dark:bg-amber-900/40",
+  },
+  error: {
+    bg: "bg-gradient-to-br from-red-50/80 to-white/60 dark:from-red-950/30 dark:to-white/5",
+    border: "border-red-200/50 dark:border-red-500/20",
+    icon: "text-red-600 dark:text-red-400",
+    iconBg: "bg-red-100 dark:bg-red-900/40",
   },
   info: {
     bg: "bg-gradient-to-br from-blue-50/80 to-white/60 dark:from-blue-950/30 dark:to-white/5",
