@@ -9,6 +9,7 @@ export type ClienteCompleto = Cliente & {
   telefone: string | null;
   responsavel: string | null;
   responsavelGeral: string | null;
+  nomeDono: string | null;
   site: string | null;
   email: string | null;
   instagram: string | null;
@@ -1437,6 +1438,7 @@ export class DbStorage implements IStorage {
         instagram: sql<string | null>`${schema.cupClientes.instagram}`,
         linksContrato: sql<string | null>`${schema.cupClientes.linksContrato}`,
         linkListaClickup: sql<string | null>`${schema.cupClientes.linkListaClickup}`,
+        nomeDono: sql<string | null>`${schema.cupClientes.nomeDono}`,
         cluster: schema.cupClientes.cluster,
         cnpjCliente: schema.cupClientes.cnpj,
         servicos: sql<string>`(

@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown } from "lucide-react";
 import { SiInstagram } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -44,6 +44,7 @@ interface ClienteDb {
   telefone: string | null;
   responsavel: string | null;
   responsavelGeral: string | null;
+  nomeDono: string | null;
   site: string | null;
   email: string | null;
   instagram: string | null;
@@ -97,6 +98,7 @@ export default function ClientDetail() {
     telefone: string;
     responsavel: string;
     responsavelGeral: string;
+    nomeDono: string;
     email: string;
     site: string;
     instagram: string;
@@ -110,6 +112,7 @@ export default function ClientDetail() {
       telefone: "",
       responsavel: "",
       responsavelGeral: "",
+      nomeDono: "",
       email: "",
       site: "",
       instagram: "",
@@ -189,6 +192,7 @@ export default function ClientDetail() {
         telefone: cliente.telefone || "",
         responsavel: cliente.responsavel || "",
         responsavelGeral: cliente.responsavelGeral || "",
+        nomeDono: cliente.nomeDono || "",
         email: cliente.email || "",
         site: cliente.site || "",
         instagram: cliente.instagram || "",
@@ -764,6 +768,18 @@ export default function ClientDetail() {
                     />
                     <FormField
                       control={editForm.control}
+                      name="nomeDono"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome do Dono</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Nome do proprietário do negócio" {...field} data-testid="input-nome-dono" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
                       name="email"
                       render={({ field }) => (
                         <FormItem>
@@ -927,6 +943,14 @@ export default function ClientDetail() {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Nome Responsável</p>
                   <p className="font-medium" data-testid="text-responsavel-geral">{cliente.responsavelGeral || "Não informado"}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-nome-dono">
+                <Crown className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Nome do Dono</p>
+                  <p className="font-medium" data-testid="text-nome-dono">{cliente.nomeDono || "Não informado"}</p>
                 </div>
               </div>
 

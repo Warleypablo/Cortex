@@ -119,6 +119,7 @@ export const cupClientes = pgTable("cup_clientes", {
   instagram: text("instagram"),
   linksContrato: text("links_contrato"),
   linkListaClickup: text("link_lista_clickup"),
+  nomeDono: text("nome_dono"),
 });
 
 export const cupContratos = pgTable("cup_contratos", {
