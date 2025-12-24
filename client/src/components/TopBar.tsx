@@ -15,15 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { LogOut, Bell, AlertTriangle, CheckCircle, X, Check, Settings, Shield, Cake, FileText } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { LogOut, Bell, AlertTriangle, CheckCircle, X, Check, Settings, Cake, FileText } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -382,32 +374,20 @@ export default function TopBar() {
           <PresentationModeButton />
           
           {user && user.role === 'admin' && (
-            <DropdownMenu>
+            <Link href="/admin/usuarios">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className="flex items-center justify-center h-10 w-10 rounded-full border border-border bg-background hover:bg-muted transition-colors"
-                      data-testid="button-admin-settings"
-                      aria-label="Configurações"
-                    >
-                      <Settings className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  </DropdownMenuTrigger>
+                  <button
+                    className="flex items-center justify-center h-10 w-10 rounded-full border border-border bg-background hover:bg-muted transition-colors"
+                    data-testid="button-admin-settings"
+                    aria-label="Configurações"
+                  >
+                    <Settings className="h-4 w-4 text-muted-foreground" />
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent>Administração</TooltipContent>
               </Tooltip>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>Administração</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/usuarios" className="flex items-center gap-2 cursor-pointer">
-                    <Shield className="h-4 w-4" />
-                    Gerenciar Usuários
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            </Link>
           )}
           
           {user && (
