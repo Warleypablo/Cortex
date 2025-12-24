@@ -1,0 +1,56 @@
+{
+  "year": 2026,
+  "company": {
+    "mrr_ativo": {
+      "Q1": 1338869.55,
+      "Q2": 1611315.27,
+      "Q3": 1871384.46,
+      "Q4": 2122127.06
+    },
+    "receita_total_faturavel_anual": 23903270.88,
+    "receita_liquida_anual": 20055090.58,
+    "ebitda_anual": 5269767.58,
+    "geracao_caixa_anual": 3088046.60,
+    "caixa_final_dez": 3738046.60,
+    "inadimplencia_max": 6.0,
+    "gross_mrr_churn_max": 9.7,
+    "sga_max": 20.0,
+    "cac_max": 22.0,
+    "clientes_eoy": 511
+  },
+  "turbooh": {
+    "receita_liquida_anual": 2764800.00,
+    "resultado_anual": 2015000.00,
+    "clientes_eoy": 900
+  },
+  "tech": {
+    "projetos_mensal": {
+      "jan": 150000,
+      "fev": 150000,
+      "mar": 150000,
+      "abr": 200000,
+      "mai": 200000,
+      "jun": 200000,
+      "jul": 220000,
+      "ago": 220000,
+      "set": 220000,
+      "out": 220000,
+      "nov": 220000,
+      "dez": 220000
+    },
+    "freelancers_mensal": {
+      "jan": 15000,
+      "fev": 15000,
+      "mar": 15000,
+      "abr": 12500,
+      "mai": 12500,
+      "jun": 12500,
+      "jul": 12500,
+      "ago": 12500,
+      "set": 12500,
+      "out": 10000,
+      "nov": 10000,
+      "dez": 10000
+    }
+  }
+}
