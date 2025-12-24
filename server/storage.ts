@@ -253,6 +253,9 @@ export interface IStorage {
   getTelefones(): Promise<import("@shared/schema").Telefone[]>;
   getTelefoneById(id: number): Promise<import("@shared/schema").Telefone | undefined>;
   updateTelefone(id: number, data: Partial<import("@shared/schema").InsertTelefone>): Promise<import("@shared/schema").Telefone>;
+  
+  // Acessos - Bulk CNPJ Update
+  bulkUpdateClientCnpj(mappings: { name: string; cnpj: string }[]): Promise<{ updated: number; notFound: string[] }>;
 }
 
 // GEG Dashboard Extended Types
@@ -873,6 +876,10 @@ export class MemStorage implements IStorage {
     }
     this.telefones[index] = { ...this.telefones[index], ...data };
     return this.telefones[index];
+  }
+
+  async bulkUpdateClientCnpj(mappings: { name: string; cnpj: string }[]): Promise<{ updated: number; notFound: string[] }> {
+    return { updated: 0, notFound: mappings.map(m => m.name) };
   }
 }
 
@@ -7921,6 +7928,28 @@ export class DbStorage implements IStorage {
     }
     this.telefones[index] = { ...this.telefones[index], ...data };
     return this.telefones[index];
+  }
+
+  async bulkUpdateClientCnpj(mappings: { name: string; cnpj: string }[]): Promise<{ updated: number; notFound: string[] }> {
+    let updated = 0;
+    const notFound: string[] = [];
+    
+    for (const { name, cnpj } of mappings) {
+      const normalizedName = name.toLowerCase().trim();
+      const result = await db.execute(sql`
+        UPDATE clients 
+        SET cnpj = ${cnpj}, updated_at = NOW()
+        WHERE LOWER(TRIM(name)) = ${normalizedName}
+      `);
+      
+      if (result.rowCount && result.rowCount > 0) {
+        updated += result.rowCount;
+      } else {
+        notFound.push(name);
+      }
+    }
+    
+    return { updated, notFound };
   }
 }
 

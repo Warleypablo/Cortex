@@ -9047,6 +9047,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST bulk update client CNPJs by name matching
+  app.post("/api/acessos/clients/bulk-update-cnpj", async (req, res) => {
+    try {
+      const { mappings } = req.body;
+      
+      if (!mappings || !Array.isArray(mappings)) {
+        return res.status(400).json({ error: "mappings array is required" });
+      }
+      
+      if (mappings.length === 0) {
+        return res.json({ updated: 0, notFound: [], message: "No mappings provided" });
+      }
+      
+      // Validate each mapping has name and cnpj
+      for (const mapping of mappings) {
+        if (!mapping.name || typeof mapping.name !== 'string') {
+          return res.status(400).json({ error: "Each mapping must have a 'name' string" });
+        }
+        if (!mapping.cnpj || typeof mapping.cnpj !== 'string') {
+          return res.status(400).json({ error: "Each mapping must have a 'cnpj' string" });
+        }
+      }
+      
+      const result = await storage.bulkUpdateClientCnpj(mappings);
+      
+      res.json({
+        ...result,
+        total: mappings.length,
+        message: `Updated ${result.updated} client(s), ${result.notFound.length} not found`
+      });
+    } catch (error) {
+      console.error("[api] Error bulk updating client CNPJs:", error);
+      res.status(500).json({ error: "Failed to bulk update client CNPJs" });
+    }
+  });
+
   // GET single client with credentials
   app.get("/api/acessos/clients/:id", async (req, res) => {
     try {
