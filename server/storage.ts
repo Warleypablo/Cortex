@@ -172,31 +172,31 @@ export interface IStorage {
   getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]>;
   getTopClientesByLTV(limit?: number): Promise<{ nome: string; ltv: number; ltMeses: number; servicos: string }[]>;
   getDfc(dataInicio?: string, dataFim?: string): Promise<DfcHierarchicalResponse>;
-  getGegMetricas(periodo: string, squad: string, setor: string): Promise<any>;
-  getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string): Promise<any>;
-  getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string): Promise<any>;
-  getGegTempoPromocao(squad: string, setor: string): Promise<any>;
-  getGegAniversariantesMes(squad: string, setor: string): Promise<any>;
-  getGegAniversariosEmpresa(squad: string, setor: string): Promise<any>;
+  getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
+  getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
+  getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
+  getGegTempoPromocao(squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
+  getGegAniversariantesMes(squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
+  getGegAniversariosEmpresa(squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
   getGegFiltros(): Promise<any>;
-  getGegValorMedioSalario(squad: string, setor: string): Promise<{ valorMedio: number; totalColaboradores: number }>;
-  getGegCustoFolha(squad: string, setor: string): Promise<{ custoTotal: number; totalColaboradores: number }>;
-  getGegValorBeneficio(squad: string, setor: string): Promise<{ valorTotal: number; totalColaboradores: number }>;
+  getGegValorMedioSalario(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorMedio: number; totalColaboradores: number }>;
+  getGegCustoFolha(squad: string, setor: string, nivel: string, cargo: string): Promise<{ custoTotal: number; totalColaboradores: number }>;
+  getGegValorBeneficio(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorTotal: number; totalColaboradores: number }>;
   getGegValorPremiacao(): Promise<{ valorTotal: number }>;
   getGegPatrimonioResumo(): Promise<{ totalAtivos: number; valorTotalPago: number; valorTotalMercado: number; porTipo: { tipo: string; quantidade: number }[] }>;
-  getGegUltimasPromocoes(squad: string, setor: string, limit?: number): Promise<any[]>;
-  getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
-  getGegMasContratacoes(squad: string, setor: string): Promise<GegMasContratacoes>;
-  getGegPessoasPorSetor(squad: string, setor: string): Promise<GegPessoasPorSetor[]>;
+  getGegUltimasPromocoes(squad: string, setor: string, nivel: string, cargo: string, limit?: number): Promise<any[]>;
+  getGegTempoPermanencia(squad: string, setor: string, nivel: string, cargo: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }>;
+  getGegMasContratacoes(squad: string, setor: string, nivel: string, cargo: string): Promise<GegMasContratacoes>;
+  getGegPessoasPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<GegPessoasPorSetor[]>;
   getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>>;
   getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null } | null>;
   upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
   upsertContextoJuridico(data: { clienteId: string; contextoJuridico?: string; procedimentoJuridico?: string; statusJuridico?: string; valorAcordado?: number; atualizadoPor: string }): Promise<{ contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>;
-  getGegDemissoesPorTipo(squad: string, setor: string): Promise<GegDemissoesPorTipo[]>;
-  getGegHeadcountPorTenure(squad: string, setor: string): Promise<GegHeadcountPorTenure[]>;
-  getGegColaboradoresPorSquad(squad: string, setor: string): Promise<GegDistribuicao[]>;
-  getGegColaboradoresPorCargo(squad: string, setor: string): Promise<GegDistribuicao[]>;
-  getGegColaboradoresPorNivel(squad: string, setor: string): Promise<GegDistribuicao[]>;
+  getGegDemissoesPorTipo(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDemissoesPorTipo[]>;
+  getGegHeadcountPorTenure(squad: string, setor: string, nivel: string, cargo: string): Promise<GegHeadcountPorTenure[]>;
+  getGegColaboradoresPorSquad(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDistribuicao[]>;
+  getGegColaboradoresPorCargo(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDistribuicao[]>;
+  getGegColaboradoresPorNivel(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDistribuicao[]>;
   getTopResponsaveis(limit?: number, mesAno?: string): Promise<{ nome: string; mrr: number; posicao: number }[]>;
   getTopSquads(limit?: number, mesAno?: string): Promise<{ squad: string; mrr: number; posicao: number }[]>;
   getInhireMetrics(): Promise<InhireMetrics>;
@@ -550,27 +550,27 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegMetricas(periodo: string, squad: string, setor: string): Promise<any> {
+  async getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string): Promise<any> {
+  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string): Promise<any> {
+  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegTempoPromocao(squad: string, setor: string): Promise<any> {
+  async getGegTempoPromocao(squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegAniversariantesMes(squad: string, setor: string): Promise<any> {
+  async getGegAniversariantesMes(squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegAniversariosEmpresa(squad: string, setor: string): Promise<any> {
+  async getGegAniversariosEmpresa(squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -578,15 +578,15 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegValorMedioSalario(squad: string, setor: string): Promise<{ valorMedio: number; totalColaboradores: number }> {
+  async getGegValorMedioSalario(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorMedio: number; totalColaboradores: number }> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegCustoFolha(squad: string, setor: string): Promise<{ custoTotal: number; totalColaboradores: number }> {
+  async getGegCustoFolha(squad: string, setor: string, nivel: string, cargo: string): Promise<{ custoTotal: number; totalColaboradores: number }> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegValorBeneficio(squad: string, setor: string): Promise<{ valorTotal: number; totalColaboradores: number }> {
+  async getGegValorBeneficio(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorTotal: number; totalColaboradores: number }> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -598,39 +598,39 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegUltimasPromocoes(squad: string, setor: string, limit?: number): Promise<any[]> {
+  async getGegUltimasPromocoes(squad: string, setor: string, nivel: string, cargo: string, limit?: number): Promise<any[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }> {
+  async getGegTempoPermanencia(squad: string, setor: string, nivel: string, cargo: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegMasContratacoes(squad: string, setor: string): Promise<GegMasContratacoes> {
+  async getGegMasContratacoes(squad: string, setor: string, nivel: string, cargo: string): Promise<GegMasContratacoes> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegPessoasPorSetor(squad: string, setor: string): Promise<GegPessoasPorSetor[]> {
+  async getGegPessoasPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<GegPessoasPorSetor[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegDemissoesPorTipo(squad: string, setor: string): Promise<GegDemissoesPorTipo[]> {
+  async getGegDemissoesPorTipo(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDemissoesPorTipo[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegHeadcountPorTenure(squad: string, setor: string): Promise<GegHeadcountPorTenure[]> {
+  async getGegHeadcountPorTenure(squad: string, setor: string, nivel: string, cargo: string): Promise<GegHeadcountPorTenure[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegColaboradoresPorSquad(squad: string, setor: string): Promise<GegDistribuicao[]> {
+  async getGegColaboradoresPorSquad(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDistribuicao[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegColaboradoresPorCargo(squad: string, setor: string): Promise<GegDistribuicao[]> {
+  async getGegColaboradoresPorCargo(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDistribuicao[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegColaboradoresPorNivel(squad: string, setor: string): Promise<GegDistribuicao[]> {
+  async getGegColaboradoresPorNivel(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDistribuicao[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -3638,7 +3638,7 @@ export class DbStorage implements IStorage {
     return buildHierarchy(items, meses, parcelasByCategory, categoriaNamesMap);
   }
 
-  async getGegMetricas(periodo: string, squad: string, setor: string): Promise<any> {
+  async getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
     const { dataInicio, dataFim } = this.calcularPeriodo(periodo);
     
     let whereCurrentConditions = [sql`status = 'Ativo'`];
@@ -3647,6 +3647,12 @@ export class DbStorage implements IStorage {
     }
     if (setor !== 'todos') {
       whereCurrentConditions.push(sql`setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      whereCurrentConditions.push(sql`nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      whereCurrentConditions.push(sql`cargo = ${cargo}`);
     }
 
     const headcountResult = await db.execute(sql`
@@ -3675,6 +3681,14 @@ export class DbStorage implements IStorage {
       whereAdmissoesConditions.push(sql`setor = ${setor}`);
       whereDemissoesConditions.push(sql`setor = ${setor}`);
     }
+    if (nivel !== 'todos') {
+      whereAdmissoesConditions.push(sql`nivel = ${nivel}`);
+      whereDemissoesConditions.push(sql`nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      whereAdmissoesConditions.push(sql`cargo = ${cargo}`);
+      whereDemissoesConditions.push(sql`cargo = ${cargo}`);
+    }
 
     const admissoesResult = await db.execute(sql`
       SELECT COUNT(*) as total
@@ -3693,13 +3707,19 @@ export class DbStorage implements IStorage {
 
     let whereHeadcountInicio = [
       sql`admissao < ${dataInicio}`,
-      sql.raw(`(demissao IS NULL OR demissao >= '${dataInicio}')`)
+      sql`(demissao IS NULL OR demissao >= ${dataInicio})`
     ];
     if (squad !== 'todos') {
       whereHeadcountInicio.push(sql`squad = ${squad}`);
     }
     if (setor !== 'todos') {
       whereHeadcountInicio.push(sql`setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      whereHeadcountInicio.push(sql`nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      whereHeadcountInicio.push(sql`cargo = ${cargo}`);
     }
 
     const headcountInicioResult = await db.execute(sql`
@@ -3730,13 +3750,27 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string): Promise<any> {
+  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
     const { dataInicio } = this.calcularPeriodo(periodo);
     
-    const result = await db.execute(sql.raw(`
+    let joinConditions = [sql`1=1`];
+    if (squad !== 'todos') {
+      joinConditions.push(sql`r.squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      joinConditions.push(sql`r.setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      joinConditions.push(sql`r.nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      joinConditions.push(sql`r.cargo = ${cargo}`);
+    }
+    
+    const result = await db.execute(sql`
       WITH meses AS (
         SELECT generate_series(
-          date_trunc('month', '${dataInicio}'::date),
+          date_trunc('month', ${dataInicio}::date),
           date_trunc('month', CURRENT_DATE),
           '1 month'::interval
         )::date AS mes
@@ -3764,14 +3798,12 @@ export class DbStorage implements IStorage {
             THEN r.id 
           END) as demissoes
         FROM meses m
-        LEFT JOIN rh_pessoal r ON 1=1
-          ${squad !== 'todos' ? `AND r.squad = '${squad}'` : ''}
-          ${setor !== 'todos' ? `AND r.setor = '${setor}'` : ''}
+        LEFT JOIN rh_pessoal r ON ${sql.join(joinConditions, sql` AND `)}
         GROUP BY m.mes
         ORDER BY m.mes
       )
       SELECT * FROM dados_mensais
-    `));
+    `);
 
     return result.rows.map(row => ({
       mes: row.mes as string,
@@ -3781,13 +3813,27 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string): Promise<any> {
+  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
     const { dataInicio } = this.calcularPeriodo(periodo);
     
-    const result = await db.execute(sql.raw(`
+    let joinConditions = [sql`1=1`];
+    if (squad !== 'todos') {
+      joinConditions.push(sql`r.squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      joinConditions.push(sql`r.setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      joinConditions.push(sql`r.nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      joinConditions.push(sql`r.cargo = ${cargo}`);
+    }
+    
+    const result = await db.execute(sql`
       WITH meses AS (
         SELECT generate_series(
-          date_trunc('month', '${dataInicio}'::date),
+          date_trunc('month', ${dataInicio}::date),
           date_trunc('month', CURRENT_DATE),
           '1 month'::interval
         )::date AS mes
@@ -3803,12 +3849,10 @@ export class DbStorage implements IStorage {
           THEN r.id 
         END) as demissoes
       FROM meses m
-      LEFT JOIN rh_pessoal r ON 1=1
-        ${squad !== 'todos' ? `AND r.squad = '${squad}'` : ''}
-        ${setor !== 'todos' ? `AND r.setor = '${setor}'` : ''}
+      LEFT JOIN rh_pessoal r ON ${sql.join(joinConditions, sql` AND `)}
       GROUP BY m.mes
       ORDER BY m.mes
-    `));
+    `);
 
     return result.rows.map(row => ({
       mes: row.mes as string,
@@ -3817,7 +3861,12 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getGegTempoPromocao(squad: string, setor: string): Promise<any> {
+  async getGegTempoPromocao(squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
+    const squadFilter = squad !== 'todos' ? `AND r.squad = '${squad}'` : '';
+    const setorFilter = setor !== 'todos' ? `AND r.setor = '${setor}'` : '';
+    const nivelFilter = nivel !== 'todos' ? `AND r.nivel = '${nivel}'` : '';
+    const cargoFilter = cargo !== 'todos' ? `AND r.cargo = '${cargo}'` : '';
+    
     const result = await db.execute(sql.raw(`
       SELECT 
         COALESCE(r.squad, 'Sem Squad') as squad,
@@ -3826,8 +3875,10 @@ export class DbStorage implements IStorage {
       FROM rh_pessoal r
       WHERE r.status = 'Ativo'
         AND r.meses_ult_aumento IS NOT NULL
-        ${squad !== 'todos' ? `AND r.squad = '${squad}'` : ''}
-        ${setor !== 'todos' ? `AND r.setor = '${setor}'` : ''}
+        ${squadFilter}
+        ${setorFilter}
+        ${nivelFilter}
+        ${cargoFilter}
       GROUP BY r.squad
       ORDER BY tempo_medio_meses DESC
     `));
@@ -3839,8 +3890,13 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getGegAniversariantesMes(squad: string, setor: string): Promise<any> {
+  async getGegAniversariantesMes(squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
     const mesAtual = new Date().getMonth() + 1;
+    
+    const squadFilter = squad !== 'todos' ? `AND squad = '${squad}'` : '';
+    const setorFilter = setor !== 'todos' ? `AND setor = '${setor}'` : '';
+    const nivelFilter = nivel !== 'todos' ? `AND nivel = '${nivel}'` : '';
+    const cargoFilter = cargo !== 'todos' ? `AND cargo = '${cargo}'` : '';
     
     const result = await db.execute(sql.raw(`
       SELECT 
@@ -3854,8 +3910,10 @@ export class DbStorage implements IStorage {
       FROM rh_pessoal
       WHERE status = 'Ativo'
         AND EXTRACT(MONTH FROM aniversario) = ${mesAtual}
-        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
-        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+        ${squadFilter}
+        ${setorFilter}
+        ${nivelFilter}
+        ${cargoFilter}
       ORDER BY EXTRACT(DAY FROM aniversario)
     `));
 
@@ -3869,7 +3927,12 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getGegAniversariosEmpresa(squad: string, setor: string): Promise<any> {
+  async getGegAniversariosEmpresa(squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
+    const squadFilter = squad !== 'todos' ? `AND squad = '${squad}'` : '';
+    const setorFilter = setor !== 'todos' ? `AND setor = '${setor}'` : '';
+    const nivelFilter = nivel !== 'todos' ? `AND nivel = '${nivel}'` : '';
+    const cargoFilter = cargo !== 'todos' ? `AND cargo = '${cargo}'` : '';
+    
     const result = await db.execute(sql.raw(`
       WITH aniversarios AS (
         SELECT 
@@ -3892,8 +3955,10 @@ export class DbStorage implements IStorage {
           ) as aniversario_ano_proximo
         FROM rh_pessoal
         WHERE status = 'Ativo'
-          ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
-          ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+          ${squadFilter}
+          ${setorFilter}
+          ${nivelFilter}
+          ${cargoFilter}
           AND admissao IS NOT NULL
       )
       SELECT 
@@ -3961,7 +4026,7 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getGegValorMedioSalario(squad: string, setor: string): Promise<{ valorMedio: number; totalColaboradores: number }> {
+  async getGegValorMedioSalario(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorMedio: number; totalColaboradores: number }> {
     const conditions = [
       sql`status = 'Ativo'`,
       sql`salario IS NOT NULL`,
@@ -3975,6 +4040,12 @@ export class DbStorage implements IStorage {
     }
     if (setor !== 'todos') {
       conditions.push(sql`setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      conditions.push(sql`nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      conditions.push(sql`cargo = ${cargo}`);
     }
     
     const result = await db.execute(sql`
@@ -3992,7 +4063,7 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getGegCustoFolha(squad: string, setor: string): Promise<{ custoTotal: number; totalColaboradores: number }> {
+  async getGegCustoFolha(squad: string, setor: string, nivel: string, cargo: string): Promise<{ custoTotal: number; totalColaboradores: number }> {
     const conditions = [
       sql`status = 'Ativo'`,
       sql`salario IS NOT NULL`,
@@ -4005,6 +4076,12 @@ export class DbStorage implements IStorage {
     }
     if (setor !== 'todos') {
       conditions.push(sql`setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      conditions.push(sql`nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      conditions.push(sql`cargo = ${cargo}`);
     }
     
     const result = await db.execute(sql`
@@ -4022,7 +4099,7 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getGegValorBeneficio(squad: string, setor: string): Promise<{ valorTotal: number; totalColaboradores: number }> {
+  async getGegValorBeneficio(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorTotal: number; totalColaboradores: number }> {
     const conditions = [
       sql`status = 'Ativo'`,
       sql`proporcional_caju IS NOT NULL`,
@@ -4035,6 +4112,12 @@ export class DbStorage implements IStorage {
     }
     if (setor !== 'todos') {
       conditions.push(sql`setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      conditions.push(sql`nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      conditions.push(sql`cargo = ${cargo}`);
     }
     
     const result = await db.execute(sql`
@@ -4097,7 +4180,12 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getGegUltimasPromocoes(squad: string, setor: string, limit: number = 10): Promise<any[]> {
+  async getGegUltimasPromocoes(squad: string, setor: string, nivel: string, cargo: string, limit: number = 10): Promise<any[]> {
+    const squadFilter = squad !== 'todos' ? `AND squad = '${squad}'` : '';
+    const setorFilter = setor !== 'todos' ? `AND setor = '${setor}'` : '';
+    const nivelFilter = nivel !== 'todos' ? `AND nivel = '${nivel}'` : '';
+    const cargoFilter = cargo !== 'todos' ? `AND cargo = '${cargo}'` : '';
+    
     const result = await db.execute(sql.raw(`
       SELECT 
         id,
@@ -4111,8 +4199,10 @@ export class DbStorage implements IStorage {
       FROM rh_pessoal
       WHERE status = 'Ativo'
         AND ultimo_aumento IS NOT NULL
-        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
-        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+        ${squadFilter}
+        ${setorFilter}
+        ${nivelFilter}
+        ${cargoFilter}
       ORDER BY ultimo_aumento DESC
       LIMIT ${limit}
     `));
@@ -4129,8 +4219,22 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getGegTempoPermanencia(squad: string, setor: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }> {
-    const result = await db.execute(sql.raw(`
+  async getGegTempoPermanencia(squad: string, setor: string, nivel: string, cargo: string): Promise<{ tempoMedioAtivos: number; tempoMedioDesligados: number }> {
+    let conditions = [sql`admissao IS NOT NULL`];
+    if (squad !== 'todos') {
+      conditions.push(sql`squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      conditions.push(sql`setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      conditions.push(sql`nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      conditions.push(sql`cargo = ${cargo}`);
+    }
+    
+    const result = await db.execute(sql`
       SELECT 
         AVG(CASE WHEN status = 'Ativo' THEN 
           EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + 
@@ -4141,10 +4245,8 @@ export class DbStorage implements IStorage {
           EXTRACT(MONTH FROM AGE(demissao, admissao))
         END) as tempo_medio_desligados
       FROM rh_pessoal
-      WHERE admissao IS NOT NULL
-        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
-        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
-    `));
+      WHERE ${sql.join(conditions, sql` AND `)}
+    `);
 
     const row = result.rows[0] as any;
     return {
@@ -4153,8 +4255,27 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getGegMasContratacoes(squad: string, setor: string): Promise<GegMasContratacoes> {
-    const result = await db.execute(sql.raw(`
+  async getGegMasContratacoes(squad: string, setor: string, nivel: string, cargo: string): Promise<GegMasContratacoes> {
+    let conditions = [
+      sql`admissao IS NOT NULL`,
+      sql`demissao IS NOT NULL`,
+      sql`(demissao::date - admissao::date) <= 90`,
+      sql`(demissao::date - admissao::date) >= 0`
+    ];
+    if (squad !== 'todos') {
+      conditions.push(sql`squad = ${squad}`);
+    }
+    if (setor !== 'todos') {
+      conditions.push(sql`setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      conditions.push(sql`nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      conditions.push(sql`cargo = ${cargo}`);
+    }
+    
+    const result = await db.execute(sql`
       SELECT 
         id,
         nome,
@@ -4164,14 +4285,9 @@ export class DbStorage implements IStorage {
         TO_CHAR(demissao, 'YYYY-MM-DD') as demissao,
         (demissao::date - admissao::date) as dias_ate_desligamento
       FROM rh_pessoal
-      WHERE admissao IS NOT NULL
-        AND demissao IS NOT NULL
-        AND (demissao::date - admissao::date) <= 90
-        AND (demissao::date - admissao::date) >= 0
-        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
-        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+      WHERE ${sql.join(conditions, sql` AND `)}
       ORDER BY demissao DESC
-    `));
+    `);
 
     const colaboradores = result.rows.map(row => ({
       id: row.id as number,
@@ -4189,15 +4305,22 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getGegPessoasPorSetor(squad: string, setor: string): Promise<GegPessoasPorSetor[]> {
+  async getGegPessoasPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<GegPessoasPorSetor[]> {
+    const squadFilter = squad !== 'todos' ? `AND squad = '${squad}'` : '';
+    const setorFilter = setor !== 'todos' ? `AND setor = '${setor}'` : '';
+    const nivelFilter = nivel !== 'todos' ? `AND nivel = '${nivel}'` : '';
+    const cargoFilter = cargo !== 'todos' ? `AND cargo = '${cargo}'` : '';
+    
     const result = await db.execute(sql.raw(`
       SELECT 
         COALESCE(setor, 'Não informado') as setor,
         COUNT(*) as total
       FROM rh_pessoal
       WHERE status = 'Ativo'
-        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
-        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+        ${squadFilter}
+        ${setorFilter}
+        ${nivelFilter}
+        ${cargoFilter}
       GROUP BY COALESCE(setor, 'Não informado')
       ORDER BY total DESC
     `));
@@ -4208,15 +4331,22 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getGegDemissoesPorTipo(squad: string, setor: string): Promise<GegDemissoesPorTipo[]> {
+  async getGegDemissoesPorTipo(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDemissoesPorTipo[]> {
+    const squadFilter = squad !== 'todos' ? `AND squad = '${squad}'` : '';
+    const setorFilter = setor !== 'todos' ? `AND setor = '${setor}'` : '';
+    const nivelFilter = nivel !== 'todos' ? `AND nivel = '${nivel}'` : '';
+    const cargoFilter = cargo !== 'todos' ? `AND cargo = '${cargo}'` : '';
+    
     const result = await db.execute(sql.raw(`
       SELECT 
         COALESCE(tipo_demissao, 'Não informado') as tipo,
         COUNT(*) as total
       FROM rh_pessoal
       WHERE LOWER(status) IN ('inativo', 'em desligamento', 'dispensado')
-        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
-        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+        ${squadFilter}
+        ${setorFilter}
+        ${nivelFilter}
+        ${cargoFilter}
       GROUP BY COALESCE(tipo_demissao, 'Não informado')
       ORDER BY total DESC
     `));
@@ -4233,7 +4363,12 @@ export class DbStorage implements IStorage {
     });
   }
 
-  async getGegHeadcountPorTenure(squad: string, setor: string): Promise<GegHeadcountPorTenure[]> {
+  async getGegHeadcountPorTenure(squad: string, setor: string, nivel: string, cargo: string): Promise<GegHeadcountPorTenure[]> {
+    const squadFilter = squad !== 'todos' ? `AND squad = '${squad}'` : '';
+    const setorFilter = setor !== 'todos' ? `AND setor = '${setor}'` : '';
+    const nivelFilter = nivel !== 'todos' ? `AND nivel = '${nivel}'` : '';
+    const cargoFilter = cargo !== 'todos' ? `AND cargo = '${cargo}'` : '';
+    
     const result = await db.execute(sql.raw(`
       SELECT 
         CASE 
@@ -4258,8 +4393,10 @@ export class DbStorage implements IStorage {
       FROM rh_pessoal
       WHERE status = 'Ativo'
         AND admissao IS NOT NULL
-        ${squad !== 'todos' ? `AND squad = '${squad}'` : ''}
-        ${setor !== 'todos' ? `AND setor = '${setor}'` : ''}
+        ${squadFilter}
+        ${setorFilter}
+        ${nivelFilter}
+        ${cargoFilter}
       GROUP BY 
         CASE 
           WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12 + EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) < 3 THEN 'Menos de 3 meses'
@@ -4289,7 +4426,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getGegColaboradoresPorSquad(squad: string, setor: string): Promise<GegDistribuicao[]> {
+  async getGegColaboradoresPorSquad(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDistribuicao[]> {
     const conditions = [
       sql`status = 'Ativo'`,
       sql`squad IS NOT NULL`,
@@ -4301,6 +4438,12 @@ export class DbStorage implements IStorage {
     }
     if (setor !== 'todos') {
       conditions.push(sql`setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      conditions.push(sql`nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      conditions.push(sql`cargo = ${cargo}`);
     }
     
     const result = await db.execute(sql`
@@ -4319,7 +4462,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getGegColaboradoresPorCargo(squad: string, setor: string): Promise<GegDistribuicao[]> {
+  async getGegColaboradoresPorCargo(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDistribuicao[]> {
     const conditions = [
       sql`status = 'Ativo'`,
       sql`cargo IS NOT NULL`,
@@ -4331,6 +4474,12 @@ export class DbStorage implements IStorage {
     }
     if (setor !== 'todos') {
       conditions.push(sql`setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      conditions.push(sql`nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      conditions.push(sql`cargo = ${cargo}`);
     }
     
     const result = await db.execute(sql`
@@ -4349,7 +4498,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getGegColaboradoresPorNivel(squad: string, setor: string): Promise<GegDistribuicao[]> {
+  async getGegColaboradoresPorNivel(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDistribuicao[]> {
     const conditions = [
       sql`status = 'Ativo'`,
       sql`nivel IS NOT NULL`,
@@ -4361,6 +4510,12 @@ export class DbStorage implements IStorage {
     }
     if (setor !== 'todos') {
       conditions.push(sql`setor = ${setor}`);
+    }
+    if (nivel !== 'todos') {
+      conditions.push(sql`nivel = ${nivel}`);
+    }
+    if (cargo !== 'todos') {
+      conditions.push(sql`cargo = ${cargo}`);
     }
     
     const result = await db.execute(sql`
