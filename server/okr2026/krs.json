@@ -1,0 +1,171 @@
+{
+  "objectives": [
+    {
+      "id": "O1",
+      "title": "Escala com Previsibilidade",
+      "description": "Core business - escalar receita recorrente mantendo coesão do ecossistema",
+      "krs": [
+        {
+          "id": "O1-KR1",
+          "title": "MRR Ativo",
+          "metric_key": "mrr_ativo",
+          "target_type": "quarterly",
+          "targets": {
+            "Q1": 1338869.55,
+            "Q2": 1611315.27,
+            "Q3": 1871384.46,
+            "Q4": 2122127.06
+          },
+          "unit": "currency",
+          "direction": "higher_is_better",
+          "owner": "Comercial"
+        },
+        {
+          "id": "O1-KR2",
+          "title": "Receita Líquida Anual",
+          "metric_key": "receita_liquida",
+          "target_type": "annual",
+          "target": 20055090.58,
+          "unit": "currency",
+          "direction": "higher_is_better",
+          "owner": "Financeiro"
+        },
+        {
+          "id": "O1-KR3",
+          "title": "Clientes EOY",
+          "metric_key": "clientes_ativos",
+          "target_type": "annual",
+          "target": 511,
+          "unit": "number",
+          "direction": "higher_is_better",
+          "owner": "Comercial"
+        },
+        {
+          "id": "O1-KR4",
+          "title": "Mix de Receita",
+          "metric_key": "mix_receita",
+          "target_type": "tracking",
+          "target": null,
+          "unit": "percentage",
+          "direction": "tracking",
+          "owner": "Financeiro"
+        }
+      ]
+    },
+    {
+      "id": "O2",
+      "title": "Eficiência Operacional e Sistemas",
+      "description": "Crescer sem quebrar - eficiência operacional e disciplina financeira",
+      "krs": [
+        {
+          "id": "O2-KR1",
+          "title": "EBITDA Anual",
+          "metric_key": "ebitda",
+          "target_type": "annual",
+          "target": 5269767.58,
+          "unit": "currency",
+          "direction": "higher_is_better",
+          "owner": "Financeiro"
+        },
+        {
+          "id": "O2-KR2",
+          "title": "Geração de Caixa Anual",
+          "metric_key": "geracao_caixa",
+          "target_type": "annual",
+          "target": 3088046.60,
+          "unit": "currency",
+          "direction": "higher_is_better",
+          "owner": "Financeiro"
+        },
+        {
+          "id": "O2-KR3",
+          "title": "Caixa Final Dezembro",
+          "metric_key": "caixa",
+          "target_type": "annual",
+          "target": 3738046.60,
+          "unit": "currency",
+          "direction": "higher_is_better",
+          "owner": "Financeiro"
+        },
+        {
+          "id": "O2-KR4",
+          "title": "SG&A % Receita Líquida",
+          "metric_key": "sga_percentual",
+          "target_type": "annual",
+          "target": 20.0,
+          "unit": "percentage",
+          "direction": "lower_is_better",
+          "owner": "Financeiro"
+        },
+        {
+          "id": "O2-KR5",
+          "title": "CAC % Receita Líquida",
+          "metric_key": "cac_percentual",
+          "target_type": "annual",
+          "target": 22.0,
+          "unit": "percentage",
+          "direction": "lower_is_better",
+          "owner": "Comercial"
+        }
+      ]
+    },
+    {
+      "id": "O3",
+      "title": "Consolidação do Ecossistema",
+      "description": "BUs + padronização + produto - retenção, qualidade e padronização",
+      "krs": [
+        {
+          "id": "O3-KR1",
+          "title": "TurboOH Receita Líquida Anual",
+          "metric_key": "turbooh_receita_liquida",
+          "target_type": "annual",
+          "target": 2764800.00,
+          "unit": "currency",
+          "direction": "higher_is_better",
+          "owner": "TurboOH"
+        },
+        {
+          "id": "O3-KR2",
+          "title": "TurboOH Resultado Anual",
+          "metric_key": "turbooh_resultado",
+          "target_type": "annual",
+          "target": 2015000.00,
+          "unit": "currency",
+          "direction": "higher_is_better",
+          "owner": "TurboOH"
+        },
+        {
+          "id": "O3-KR3",
+          "title": "Inadimplência Máxima",
+          "metric_key": "inadimplencia",
+          "target_type": "monthly",
+          "target": 6.0,
+          "unit": "percentage",
+          "direction": "lower_is_better",
+          "owner": "Financeiro"
+        },
+        {
+          "id": "O3-KR4",
+          "title": "Gross MRR Churn Máximo",
+          "metric_key": "gross_mrr_churn",
+          "target_type": "monthly",
+          "target": 9.7,
+          "unit": "percentage",
+          "direction": "lower_is_better",
+          "owner": "CS"
+        },
+        {
+          "id": "O3-KR5",
+          "title": "Padronização de Contratos",
+          "metric_key": "padronizacao",
+          "target_type": "annual",
+          "target": 90.0,
+          "unit": "percentage",
+          "direction": "higher_is_better",
+          "owner": "Operações",
+          "status": "em_instrumentacao"
+        }
+      ]
+    }
+  ]
+}

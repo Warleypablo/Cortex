@@ -1,0 +1,124 @@
+{
+  "initiatives": [
+    {
+      "id": "INI-001",
+      "titulo": "Projeto Hugz - Lançamento v1 + Tracking de Receita",
+      "owner": "Produto",
+      "bu": "Ventures",
+      "kr_vinculadas": ["O3-KR3", "O2-KR2"],
+      "status": "doing",
+      "due_date": "2026-06-30",
+      "impacto_esperado": "Reduzir inadimplência em 2pp e aumentar geração de caixa",
+      "confianca": 70,
+      "proximo_marco": "MVP em produção"
+    },
+    {
+      "id": "INI-002",
+      "titulo": "Padronização de Contratos (TMA/TSS)",
+      "owner": "Operações",
+      "bu": "Corporativo",
+      "kr_vinculadas": ["O3-KR5", "O3-KR4"],
+      "status": "doing",
+      "due_date": "2026-09-30",
+      "impacto_esperado": "90% do MRR sob contratos padronizados",
+      "confianca": 60,
+      "proximo_marco": "Definição de templates finais"
+    },
+    {
+      "id": "INI-003",
+      "titulo": "Revisão de Cobrança e Política de Corte",
+      "owner": "Financeiro",
+      "bu": "Corporativo",
+      "kr_vinculadas": ["O3-KR3", "O2-KR2"],
+      "status": "doing",
+      "due_date": "2026-03-31",
+      "impacto_esperado": "Reduzir inadimplência para menos de 6%",
+      "confianca": 80,
+      "proximo_marco": "Nova política implementada"
+    },
+    {
+      "id": "INI-004",
+      "titulo": "Playbook de Churn - Rotina Mensal",
+      "owner": "CS",
+      "bu": "Commerce",
+      "kr_vinculadas": ["O3-KR4"],
+      "status": "backlog",
+      "due_date": "2026-04-30",
+      "impacto_esperado": "Reduzir gross churn em 1.5pp",
+      "confianca": 65,
+      "proximo_marco": "Documentação do playbook"
+    },
+    {
+      "id": "INI-005",
+      "titulo": "TurboOH - Expansão de Inventário + Billing",
+      "owner": "TurboOH",
+      "bu": "TurboOH",
+      "kr_vinculadas": ["O3-KR1", "O3-KR2"],
+      "status": "doing",
+      "due_date": "2026-12-31",
+      "impacto_esperado": "Atingir 900 clientes e R$ 2.7M de receita líquida",
+      "confianca": 75,
+      "proximo_marco": "Integração billing automatizado"
+    },
+    {
+      "id": "INI-006",
+      "titulo": "Cortex OKR - Instrumentação Net Churn / Expansion MRR",
+      "owner": "Tech",
+      "bu": "Corporativo",
+      "kr_vinculadas": ["O3-KR4"],
+      "status": "doing",
+      "due_date": "2026-02-28",
+      "impacto_esperado": "100% das métricas de churn automáticas no Cortex",
+      "confianca": 85,
+      "proximo_marco": "Deploy da feature"
+    },
+    {
+      "id": "INI-007",
+      "titulo": "Automação de Vendas - CRM + Pipelines",
+      "owner": "Comercial",
+      "bu": "Commerce",
+      "kr_vinculadas": ["O1-KR1", "O1-KR3"],
+      "status": "backlog",
+      "due_date": "2026-05-31",
+      "impacto_esperado": "Aumentar conversão de leads em 15%",
+      "confianca": 55,
+      "proximo_marco": "Definição de requisitos"
+    },
+    {
+      "id": "INI-008",
+      "titulo": "Otimização de CAC - Marketing Performance",
+      "owner": "Marketing",
+      "bu": "Commerce",
+      "kr_vinculadas": ["O2-KR5"],
+      "status": "doing",
+      "due_date": "2026-06-30",
+      "impacto_esperado": "Reduzir CAC para menos de 22% da receita líquida",
+      "confianca": 70,
+      "proximo_marco": "Nova estrutura de campanhas"
+    },
+    {
+      "id": "INI-009",
+      "titulo": "Redução de SG&A - Revisão de Custos Fixos",
+      "owner": "Financeiro",
+      "bu": "Corporativo",
+      "kr_vinculadas": ["O2-KR4"],
+      "status": "backlog",
+      "due_date": "2026-08-31",
+      "impacto_esperado": "SG&A abaixo de 20% da receita líquida",
+      "confianca": 60,
+      "proximo_marco": "Mapeamento de custos"
+    },
+    {
+      "id": "INI-010",
+      "titulo": "Data Coverage OKR - Métricas Automáticas",
+      "owner": "Tech",
+      "bu": "Corporativo",
+      "kr_vinculadas": ["O2-KR1", "O3-KR5"],
+      "status": "doing",
+      "due_date": "2026-03-31",
+      "impacto_esperado": "100% das métricas OKR instrumentadas no Cortex",
+      "confianca": 90,
+      "proximo_marco": "Dashboard OKR em produção"
+    }
+  ]
+}
