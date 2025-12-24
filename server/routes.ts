@@ -9089,7 +9089,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const clientsResult = await db.execute(sql`
-        SELECT * FROM clients WHERE id = ANY(${ids}::text[])
+        SELECT * FROM clients WHERE id::text = ANY(${ids})
       `);
       
       if (clientsResult.rows.length === 0) {
@@ -9097,7 +9097,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const credentialsResult = await db.execute(sql`
-        SELECT * FROM credentials WHERE client_id = ANY(${ids}::text[]) ORDER BY platform
+        SELECT * FROM credentials WHERE client_id::text = ANY(${ids}) ORDER BY platform
       `);
       
       const credentialsByClientId = new Map<string, any[]>();
