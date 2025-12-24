@@ -9,9 +9,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Activity, Database, Shield, Zap, RefreshCw, CheckCircle2, XCircle, AlertCircle, Server, HardDrive, Clock, ArrowDownUp, GitCompare, Play } from "lucide-react";
+
+// Safe date formatter that handles invalid dates
+function safeFormat(dateValue: string | Date | null | undefined, formatStr: string): string {
+  if (!dateValue) return "-";
+  try {
+    const date = typeof dateValue === "string" ? parseISO(dateValue) : dateValue;
+    if (!isValid(date)) return "-";
+    return format(date, formatStr, { locale: ptBR });
+  } catch {
+    return "-";
+  }
+}
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDecimal } from "@/lib/utils";
@@ -340,7 +352,7 @@ export default function AdminLogs() {
                       {authLogsData?.items.map((log) => (
                         <TableRow key={log.id} data-testid={`row-auth-log-${log.id}`}>
                           <TableCell className="text-sm">
-                            {format(new Date(log.timestamp), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
+                            {safeFormat(log.timestamp, "dd/MM/yyyy HH:mm:ss")}
                           </TableCell>
                           <TableCell>
                             <div>
@@ -438,7 +450,7 @@ export default function AdminLogs() {
                       {systemLogsData?.items.map((log) => (
                         <TableRow key={log.id} data-testid={`row-system-log-${log.id}`}>
                           <TableCell className="text-sm">
-                            {format(new Date(log.timestamp), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
+                            {safeFormat(log.timestamp, "dd/MM/yyyy HH:mm:ss")}
                           </TableCell>
                           <TableCell>
                             {getMethodBadge(log.method)}
@@ -637,7 +649,7 @@ export default function AdminLogs() {
                         </div>
                         {integration.lastSync && (
                           <p className="text-xs text-muted-foreground mt-2">
-                            Última sincronização: {format(new Date(integration.lastSync), "dd/MM HH:mm", { locale: ptBR })}
+                            Última sincronização: {safeFormat(integration.lastSync, "dd/MM HH:mm")}
                           </p>
                         )}
                       </CardContent>
@@ -696,7 +708,7 @@ export default function AdminLogs() {
                       </p>
                       {summary.last_sync && (
                         <p className="text-xs text-muted-foreground">
-                          Última: {format(new Date(summary.last_sync), "dd/MM HH:mm", { locale: ptBR })}
+                          Última: {safeFormat(summary.last_sync, "dd/MM HH:mm")}
                         </p>
                       )}
                     </div>
@@ -742,7 +754,7 @@ export default function AdminLogs() {
                       {syncLogsData?.items.map((log) => (
                         <TableRow key={log.id} data-testid={`row-sync-log-${log.id}`}>
                           <TableCell className="text-sm">
-                            {format(new Date(log.timestamp), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
+                            {safeFormat(log.timestamp, "dd/MM/yyyy HH:mm:ss")}
                           </TableCell>
                           <TableCell className="font-medium">{log.integration}</TableCell>
                           <TableCell className="text-sm">{log.operation}</TableCell>
@@ -916,7 +928,7 @@ export default function AdminLogs() {
                       {reconciliationData?.items.map((item) => (
                         <TableRow key={item.id} data-testid={`row-reconciliation-${item.id}`}>
                           <TableCell className="text-sm">
-                            {format(new Date(item.timestamp), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                            {safeFormat(item.timestamp, "dd/MM/yyyy HH:mm")}
                           </TableCell>
                           <TableCell>
                             <div>
