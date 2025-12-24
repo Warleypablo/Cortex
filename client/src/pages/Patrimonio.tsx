@@ -1210,7 +1210,7 @@ export default function Patrimonio() {
                                 <TableCell data-testid={`text-responsavel-${telefone.id}`}>
                                   {telefone.responsavelId ? (
                                     <Link 
-                                      href={`/colaboradores/${telefone.responsavelId}`}
+                                      href={`/colaborador/${telefone.responsavelId}`}
                                       className="text-blue-500 hover:text-blue-600 hover:underline font-medium"
                                       data-testid={`link-responsavel-${telefone.id}`}
                                     >
