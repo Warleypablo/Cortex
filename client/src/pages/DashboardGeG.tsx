@@ -1,15 +1,98 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDecimal } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, UserPlus, UserMinus, Clock, Cake, Award, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, TrendingUp, UserPlus, UserMinus, Clock, Cake, Award, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet, Filter } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+function normalizeSquadName(squadName: string): string {
+  const codePoints = Array.from(squadName);
+  const result: string[] = [];
+  let foundNonEmoji = false;
+  
+  for (const char of codePoints) {
+    const code = char.codePointAt(0) || 0;
+    const isEmojiOrModifier = (
+      (code >= 0x1F300 && code <= 0x1F9FF) ||
+      (code >= 0x2600 && code <= 0x26FF) ||
+      (code >= 0x2700 && code <= 0x27BF) ||
+      (code >= 0x1F600 && code <= 0x1F64F) ||
+      (code >= 0x1F680 && code <= 0x1F6FF) ||
+      (code >= 0x1F3FB && code <= 0x1F3FF) ||
+      code === 0x2693 ||
+      code === 0xFE0E ||
+      code === 0xFE0F ||
+      code === 0x200D ||
+      (code >= 0xD800 && code <= 0xDFFF)
+    );
+    
+    if (!foundNonEmoji) {
+      if (!isEmojiOrModifier && char !== ' ') {
+        foundNonEmoji = true;
+        result.push(char);
+      }
+    } else {
+      result.push(char);
+    }
+  }
+  
+  let normalized = result.join('').trim();
+  normalized = normalized.replace(/\s*\(OFF\)\s*$/i, '');
+  return normalized.trim();
+}
+
+function getUniqueNormalizedSquads(squads: string[]): { normalized: string; original: string }[] {
+  const seen = new Map<string, string>();
+  const isOffSquad = (s: string) => /\(OFF\)/i.test(s);
+  
+  for (const squad of squads) {
+    const normalized = normalizeSquadName(squad);
+    if (!normalized || normalized === '-') continue;
+    
+    const existing = seen.get(normalized);
+    if (!existing) {
+      seen.set(normalized, squad);
+    } else if (isOffSquad(existing) && !isOffSquad(squad)) {
+      seen.set(normalized, squad);
+    }
+  }
+  return Array.from(seen.entries()).map(([normalized, original]) => ({ normalized, original }));
+}
+
+type PeriodoPreset = "mesAtual" | "trimestre" | "semestre" | "ano";
+
+interface PeriodoState {
+  preset: PeriodoPreset;
+}
+
+const PERIODO_PRESETS: { value: PeriodoPreset; label: string }[] = [
+  { value: "mesAtual", label: "Mês Atual" },
+  { value: "trimestre", label: "Trimestre" },
+  { value: "semestre", label: "Semestre" },
+  { value: "ano", label: "Ano" },
+];
+
+function getPeriodoParaQuery(periodoState: PeriodoState): string {
+  switch (periodoState.preset) {
+    case "mesAtual":
+      return "mes";
+    case "trimestre":
+      return "trimestre";
+    case "semestre":
+      return "semestre";
+    case "ano":
+      return "ano";
+    default:
+      return "trimestre";
+  }
+}
 
 interface GegMetricas {
   headcount: number;
@@ -127,9 +210,11 @@ const CHART_COLORS = [
 export default function DashboardGeG() {
   useSetPageInfo("Dashboard GEG", "Gestão Estratégica de Pessoas");
   
-  const [periodo, setPeriodo] = useState("trimestre");
+  const [periodoState, setPeriodoState] = useState<PeriodoState>({ preset: "trimestre" });
   const [squad, setSquad] = useState("todos");
   const [setor, setSetor] = useState("todos");
+
+  const periodo = getPeriodoParaQuery(periodoState);
 
   const { data: metricas, isLoading: isLoadingMetricas } = useQuery<GegMetricas>({
     queryKey: ['/api/geg/metricas', { periodo, squad, setor }],
@@ -218,55 +303,76 @@ export default function DashboardGeG() {
     ? custoFolha.custoTotal / metricas.headcount 
     : 0;
 
+  const normalizedSquads = useMemo(() => {
+    if (!filtros?.squads) return [];
+    return getUniqueNormalizedSquads(filtros.squads);
+  }, [filtros?.squads]);
+
+  const handlePeriodoPresetChange = (preset: PeriodoPreset) => {
+    setPeriodoState({ preset });
+  };
+
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div>
-            <label className="text-sm font-medium mb-2 block">Período</label>
-            <Select value={periodo} onValueChange={setPeriodo}>
-              <SelectTrigger data-testid="select-periodo">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mes">Mês</SelectItem>
-                <SelectItem value="trimestre">Trimestre</SelectItem>
-                <SelectItem value="semestre">Semestre</SelectItem>
-                <SelectItem value="ano">Ano</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <Card className="mb-6" data-testid="card-filtros">
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Filter className="w-4 h-4" />
+                  <span className="text-sm font-medium">Filtros</span>
+                </div>
+                
+                <div className="flex flex-wrap gap-1.5">
+                  {PERIODO_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.value}
+                      variant={periodoState.preset === preset.value ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePeriodoPresetChange(preset.value)}
+                      data-testid={`button-periodo-${preset.value}`}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
 
-          <div>
-            <label className="text-sm font-medium mb-2 block">Squad</label>
-            <Select value={squad} onValueChange={setSquad}>
-              <SelectTrigger data-testid="select-squad">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                {filtros?.squads.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                <div className="flex flex-wrap items-center gap-3 lg:ml-auto">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-muted-foreground whitespace-nowrap">Squad:</label>
+                    <Select value={squad} onValueChange={setSquad}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-squad">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {normalizedSquads.map(({ normalized, original }) => (
+                          <SelectItem key={original} value={original}>{normalized}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-          <div>
-            <label className="text-sm font-medium mb-2 block">Setor</label>
-            <Select value={setor} onValueChange={setSetor}>
-              <SelectTrigger data-testid="select-setor">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                {filtros?.setores.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-muted-foreground whitespace-nowrap">Setor:</label>
+                    <Select value={setor} onValueChange={setSetor}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-setor">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {filtros?.setores.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           <Card data-testid="card-headcount">
