@@ -11,9 +11,10 @@ import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -83,6 +84,43 @@ interface RevenueData {
 interface SortConfig {
   key: string;
   direction: 'asc' | 'desc';
+}
+
+interface ClienteTask {
+  id: string;
+  nome: string;
+  status: string;
+  prioridade: string;
+  responsavel: string | null;
+  dataLimite: string | null;
+  projeto: string | null;
+}
+
+interface ClienteComunicacao {
+  id: number;
+  tipo: string;
+  titulo: string;
+  conteudo: string;
+  prioridade: string;
+  data: string;
+  criadoPor: string | null;
+}
+
+interface SituacaoJuridica {
+  hasInadimplencia: boolean;
+  hasJuridico: boolean;
+  inadimplencia: {
+    acao: string | null;
+    statusFinanceiro: string | null;
+    contexto: string | null;
+    valorAcordado: string | null;
+  } | null;
+  juridico: {
+    procedimento: string | null;
+    statusJuridico: string | null;
+    advogadoResponsavel: string | null;
+    protocoloProcesso: string | null;
+  } | null;
 }
 
 export default function ClientDetail() {
@@ -207,6 +245,50 @@ export default function ClientDetail() {
   const { data: colaboradoresDropdown } = useQuery<{ id: number; nome: string; status: string | null }[]>({
     queryKey: ["/api/colaboradores/dropdown"],
     enabled: !!editingContratoId || isEditingDados,
+  });
+
+  const { data: tasks, isLoading: isLoadingTasks } = useQuery<ClienteTask[]>({
+    queryKey: ["/api/cliente", cliente?.cnpj, "tasks"],
+    enabled: !!cliente?.cnpj,
+  });
+
+  const { data: comunicacoes, isLoading: isLoadingComunicacoes } = useQuery<ClienteComunicacao[]>({
+    queryKey: ["/api/cliente", cliente?.cnpj, "comunicacoes"],
+    enabled: !!cliente?.cnpj,
+  });
+
+  const { data: situacaoJuridica, isLoading: isLoadingSituacao } = useQuery<SituacaoJuridica>({
+    queryKey: ["/api/cliente", cliente?.cnpj, "situacao-juridica"],
+    enabled: !!cliente?.cnpj,
+  });
+
+  const [newComunicacao, setNewComunicacao] = useState({
+    tipo: "",
+    titulo: "",
+    conteudo: "",
+    prioridade: "media",
+  });
+
+  const createComunicacaoMutation = useMutation({
+    mutationFn: async (data: typeof newComunicacao) => {
+      const response = await apiRequest("POST", `/api/cliente/${cliente?.cnpj}/comunicacoes`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente", cliente?.cnpj, "comunicacoes"] });
+      setNewComunicacao({ tipo: "", titulo: "", conteudo: "", prioridade: "media" });
+      toast({
+        title: "Sucesso!",
+        description: "Comunicação criada com sucesso.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao criar comunicação",
+        description: error.message || "Não foi possível criar a comunicação.",
+        variant: "destructive",
+      });
+    },
   });
 
   const updateContratoMutation = useMutation({
@@ -906,6 +988,27 @@ export default function ClientDetail() {
           />
         </div>
 
+        <Tabs defaultValue="dados-cadastrais" className="w-full" data-testid="client-detail-tabs">
+          <TabsList className="grid w-full grid-cols-4 mb-6" data-testid="tabs-list">
+            <TabsTrigger value="dados-cadastrais" data-testid="tab-dados-cadastrais">
+              <Building2 className="w-4 h-4 mr-2" />
+              Dados Cadastrais
+            </TabsTrigger>
+            <TabsTrigger value="tarefas" data-testid="tab-tarefas">
+              <ListTodo className="w-4 h-4 mr-2" />
+              Tarefas
+            </TabsTrigger>
+            <TabsTrigger value="comunicacao" data-testid="tab-comunicacao">
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Comunicação
+            </TabsTrigger>
+            <TabsTrigger value="situacao-financeira" data-testid="tab-situacao-financeira">
+              <Scale className="w-4 h-4 mr-2" />
+              Situação Financeira
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="dados-cadastrais" data-testid="tabcontent-dados-cadastrais">
         <div className="mb-8">
           <Card data-testid="card-client-info">
             <Accordion type="single" collapsible defaultValue="dados-cadastrais">
@@ -2111,6 +2214,367 @@ export default function ClientDetail() {
             )}
           </Card>
         </div>
+          </TabsContent>
+
+          <TabsContent value="tarefas" data-testid="tabcontent-tarefas">
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <ListTodo className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-semibold">Tarefas do Cliente</h2>
+              </div>
+              {isLoadingTasks ? (
+                <div className="flex items-center justify-center py-8" data-testid="loading-tasks">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : tasks && tasks.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30 border-b">
+                      <TableHead className="bg-muted/30" data-testid="header-task-nome">Nome</TableHead>
+                      <TableHead className="bg-muted/30" data-testid="header-task-status">Status</TableHead>
+                      <TableHead className="bg-muted/30" data-testid="header-task-prioridade">Prioridade</TableHead>
+                      <TableHead className="bg-muted/30" data-testid="header-task-responsavel">Responsável</TableHead>
+                      <TableHead className="bg-muted/30" data-testid="header-task-data">Data Limite</TableHead>
+                      <TableHead className="bg-muted/30" data-testid="header-task-projeto">Projeto</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tasks.map((task) => (
+                      <TableRow key={task.id} className="hover-elevate" data-testid={`task-row-${task.id}`}>
+                        <TableCell className="font-medium" data-testid={`task-nome-${task.id}`}>
+                          {task.nome}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            className={
+                              task.status?.toLowerCase() === 'done' || task.status?.toLowerCase() === 'concluído' || task.status?.toLowerCase() === 'complete'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                : task.status?.toLowerCase() === 'in progress' || task.status?.toLowerCase() === 'em progresso' || task.status?.toLowerCase() === 'em andamento'
+                                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                            }
+                            variant="outline"
+                            data-testid={`task-status-${task.id}`}
+                          >
+                            {task.status || 'Pendente'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            className={
+                              task.prioridade?.toLowerCase() === 'alta' || task.prioridade?.toLowerCase() === 'urgent' || task.prioridade?.toLowerCase() === 'high'
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                : task.prioridade?.toLowerCase() === 'média' || task.prioridade?.toLowerCase() === 'normal' || task.prioridade?.toLowerCase() === 'medium'
+                                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                            }
+                            variant="outline"
+                            data-testid={`task-prioridade-${task.id}`}
+                          >
+                            <Flag className="w-3 h-3 mr-1" />
+                            {task.prioridade || 'Baixa'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground" data-testid={`task-responsavel-${task.id}`}>
+                          {task.responsavel || '-'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground" data-testid={`task-data-${task.id}`}>
+                          {task.dataLimite ? new Date(task.dataLimite).toLocaleDateString('pt-BR') : '-'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground" data-testid={`task-projeto-${task.id}`}>
+                          {task.projeto || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center" data-testid="no-tasks">
+                  <ListTodo className="w-12 h-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground text-lg">Nenhuma tarefa encontrada</p>
+                  <p className="text-muted-foreground text-sm mt-1">As tarefas do ClickUp aparecerão aqui quando disponíveis</p>
+                </div>
+              )}
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="comunicacao" data-testid="tabcontent-comunicacao">
+            <div className="space-y-6">
+              <Card className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Plus className="w-5 h-5 text-primary" />
+                  <h2 className="text-lg font-semibold">Nova Comunicação</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Tipo</label>
+                    <Select
+                      value={newComunicacao.tipo}
+                      onValueChange={(val) => setNewComunicacao(prev => ({ ...prev, tipo: val }))}
+                    >
+                      <SelectTrigger data-testid="select-comunicacao-tipo">
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="telefone">Telefone</SelectItem>
+                        <SelectItem value="reuniao">Reunião</SelectItem>
+                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                        <SelectItem value="nota">Nota Interna</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Prioridade</label>
+                    <Select
+                      value={newComunicacao.prioridade}
+                      onValueChange={(val) => setNewComunicacao(prev => ({ ...prev, prioridade: val }))}
+                    >
+                      <SelectTrigger data-testid="select-comunicacao-prioridade">
+                        <SelectValue placeholder="Selecione a prioridade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="baixa">Baixa</SelectItem>
+                        <SelectItem value="media">Média</SelectItem>
+                        <SelectItem value="alta">Alta</SelectItem>
+                        <SelectItem value="urgente">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <label className="text-sm font-medium mb-2 block">Título</label>
+                  <Input
+                    placeholder="Título da comunicação"
+                    value={newComunicacao.titulo}
+                    onChange={(e) => setNewComunicacao(prev => ({ ...prev, titulo: e.target.value }))}
+                    data-testid="input-comunicacao-titulo"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="text-sm font-medium mb-2 block">Conteúdo</label>
+                  <Textarea
+                    placeholder="Descreva a comunicação..."
+                    className="min-h-[100px]"
+                    value={newComunicacao.conteudo}
+                    onChange={(e) => setNewComunicacao(prev => ({ ...prev, conteudo: e.target.value }))}
+                    data-testid="textarea-comunicacao-conteudo"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => createComunicacaoMutation.mutate(newComunicacao)}
+                    disabled={!newComunicacao.tipo || !newComunicacao.titulo || createComunicacaoMutation.isPending}
+                    data-testid="button-criar-comunicacao"
+                  >
+                    {createComunicacaoMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Criando...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Criar Comunicação
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <MessageSquare className="w-5 h-5 text-primary" />
+                  <h2 className="text-lg font-semibold">Histórico de Comunicações</h2>
+                </div>
+                {isLoadingComunicacoes ? (
+                  <div className="flex items-center justify-center py-8" data-testid="loading-comunicacoes">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : comunicacoes && comunicacoes.length > 0 ? (
+                  <div className="space-y-4">
+                    {comunicacoes.map((com) => (
+                      <div 
+                        key={com.id} 
+                        className="border rounded-md p-4 hover-elevate"
+                        data-testid={`comunicacao-item-${com.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-4 mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge 
+                              className={
+                                com.tipo === 'email' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                com.tipo === 'telefone' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+                                com.tipo === 'reuniao' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
+                                com.tipo === 'whatsapp' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' :
+                                'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                              }
+                              variant="outline"
+                              data-testid={`comunicacao-tipo-${com.id}`}
+                            >
+                              {com.tipo}
+                            </Badge>
+                            <Badge 
+                              className={
+                                com.prioridade === 'urgente' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                                com.prioridade === 'alta' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
+                                com.prioridade === 'media' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                                'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                              }
+                              variant="outline"
+                              data-testid={`comunicacao-prioridade-${com.id}`}
+                            >
+                              {com.prioridade}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Clock className="w-4 h-4" />
+                            <span data-testid={`comunicacao-data-${com.id}`}>
+                              {new Date(com.data).toLocaleDateString('pt-BR')}
+                            </span>
+                          </div>
+                        </div>
+                        <h3 className="font-semibold mb-1" data-testid={`comunicacao-titulo-${com.id}`}>
+                          {com.titulo}
+                        </h3>
+                        <p className="text-muted-foreground text-sm line-clamp-2" data-testid={`comunicacao-conteudo-${com.id}`}>
+                          {com.conteudo}
+                        </p>
+                        {com.criadoPor && (
+                          <p className="text-xs text-muted-foreground mt-2" data-testid={`comunicacao-criador-${com.id}`}>
+                            Criado por: {com.criadoPor}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center" data-testid="no-comunicacoes">
+                    <MessageSquare className="w-12 h-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground text-lg">Nenhuma comunicação registrada</p>
+                    <p className="text-muted-foreground text-sm mt-1">Crie uma nova comunicação usando o formulário acima</p>
+                  </div>
+                )}
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="situacao-financeira" data-testid="tabcontent-situacao-financeira">
+            {isLoadingSituacao ? (
+              <div className="flex items-center justify-center py-8" data-testid="loading-situacao">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="p-6" data-testid="card-inadimplencia">
+                  <div className="flex items-center gap-3 mb-6">
+                    <AlertTriangle className={`w-5 h-5 ${situacaoJuridica?.hasInadimplencia ? 'text-red-500' : 'text-muted-foreground'}`} />
+                    <h2 className="text-lg font-semibold">Inadimplência</h2>
+                  </div>
+                  {situacaoJuridica?.hasInadimplencia && situacaoJuridica.inadimplencia ? (
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Ação</p>
+                        <Badge 
+                          className={
+                            situacaoJuridica.inadimplencia.acao?.toLowerCase().includes('resolvido') || 
+                            situacaoJuridica.inadimplencia.acao?.toLowerCase().includes('quitado')
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                          }
+                          variant="outline"
+                          data-testid="inadimplencia-acao"
+                        >
+                          {situacaoJuridica.inadimplencia.acao || 'Não definido'}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Status Financeiro</p>
+                        <p className="font-medium" data-testid="inadimplencia-status">
+                          {situacaoJuridica.inadimplencia.statusFinanceiro || 'Não informado'}
+                        </p>
+                      </div>
+                      {situacaoJuridica.inadimplencia.contexto && (
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Contexto</p>
+                          <p className="text-sm text-muted-foreground" data-testid="inadimplencia-contexto">
+                            {situacaoJuridica.inadimplencia.contexto}
+                          </p>
+                        </div>
+                      )}
+                      {situacaoJuridica.inadimplencia.valorAcordado && (
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Valor Acordado</p>
+                          <p className="font-semibold text-green-600" data-testid="inadimplencia-valor">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(situacaoJuridica.inadimplencia.valorAcordado))}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center" data-testid="no-inadimplencia">
+                      <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
+                      <p className="text-muted-foreground">Nenhum registro de inadimplência</p>
+                    </div>
+                  )}
+                </Card>
+
+                <Card className="p-6" data-testid="card-juridico">
+                  <div className="flex items-center gap-3 mb-6">
+                    <Scale className={`w-5 h-5 ${situacaoJuridica?.hasJuridico ? 'text-red-500' : 'text-muted-foreground'}`} />
+                    <h2 className="text-lg font-semibold">Jurídico</h2>
+                  </div>
+                  {situacaoJuridica?.hasJuridico && situacaoJuridica.juridico ? (
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Procedimento</p>
+                        <Badge 
+                          className={
+                            situacaoJuridica.juridico.statusJuridico?.toLowerCase().includes('encerrado') || 
+                            situacaoJuridica.juridico.statusJuridico?.toLowerCase().includes('arquivado')
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                          }
+                          variant="outline"
+                          data-testid="juridico-procedimento"
+                        >
+                          {situacaoJuridica.juridico.procedimento || 'Não definido'}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Status Jurídico</p>
+                        <p className="font-medium" data-testid="juridico-status">
+                          {situacaoJuridica.juridico.statusJuridico || 'Não informado'}
+                        </p>
+                      </div>
+                      {situacaoJuridica.juridico.advogadoResponsavel && (
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Advogado Responsável</p>
+                          <p className="font-medium" data-testid="juridico-advogado">
+                            {situacaoJuridica.juridico.advogadoResponsavel}
+                          </p>
+                        </div>
+                      )}
+                      {situacaoJuridica.juridico.protocoloProcesso && (
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Protocolo do Processo</p>
+                          <p className="font-mono text-sm" data-testid="juridico-protocolo">
+                            {situacaoJuridica.juridico.protocoloProcesso}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center" data-testid="no-juridico">
+                      <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
+                      <p className="text-muted-foreground">Nenhum registro jurídico</p>
+                    </div>
+                  )}
+                </Card>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
 
       </div>
     </div>
