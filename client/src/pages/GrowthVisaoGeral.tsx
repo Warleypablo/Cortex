@@ -620,14 +620,14 @@ export default function GrowthVisaoGeral() {
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
               <div className="flex">
-                <div className="border-r p-2 space-y-1">
+                <div className="border-r p-2 space-y-0.5 min-w-[120px]">
                   <p className="text-xs font-medium text-muted-foreground px-2 pb-1">Atalhos</p>
                   {datePresets.map((preset) => (
                     <Button
                       key={preset.label}
                       variant="ghost"
                       size="sm"
-                      className="w-full justify-start text-sm font-normal"
+                      className="w-full justify-start text-xs font-normal h-7 px-2"
                       onClick={() => setDateRange(preset.getRange())}
                       data-testid={`button-preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
                     >
@@ -645,6 +645,29 @@ export default function GrowthVisaoGeral() {
                   }}
                   locale={ptBR}
                   numberOfMonths={2}
+                  className="p-2"
+                  classNames={{
+                    months: "flex gap-2",
+                    month: "space-y-2",
+                    caption: "flex justify-center pt-1 relative items-center text-sm",
+                    caption_label: "text-sm font-medium",
+                    nav: "space-x-1 flex items-center",
+                    nav_button: "h-6 w-6 bg-transparent p-0 opacity-50 hover:opacity-100",
+                    nav_button_previous: "absolute left-1",
+                    nav_button_next: "absolute right-1",
+                    table: "w-full border-collapse",
+                    head_row: "flex",
+                    head_cell: "text-muted-foreground rounded-md w-7 font-normal text-[0.7rem]",
+                    row: "flex w-full mt-1",
+                    cell: "text-center text-xs p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20 h-7 w-7",
+                    day: "h-7 w-7 p-0 font-normal aria-selected:opacity-100 hover:bg-accent hover:text-accent-foreground rounded-md text-xs",
+                    day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                    day_today: "bg-accent text-accent-foreground",
+                    day_outside: "text-muted-foreground opacity-50",
+                    day_disabled: "text-muted-foreground opacity-50",
+                    day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                    day_hidden: "invisible",
+                  }}
                 />
               </div>
             </PopoverContent>
