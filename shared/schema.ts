@@ -1526,3 +1526,63 @@ export const notifications = pgTable("staging.notifications", {
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// ============================================
+// Atendimento Module - WhatsApp Chat Management
+// ============================================
+
+export const atendimentoCanais = pgTable("atendimento_canais", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nome: varchar("nome", { length: 100 }).notNull(),
+  numero: varchar("numero", { length: 20 }),
+  descricao: text("descricao"),
+  ativo: boolean("ativo").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAtendimentoCanalSchema = createInsertSchema(atendimentoCanais).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type AtendimentoCanal = typeof atendimentoCanais.$inferSelect;
+export type InsertAtendimentoCanal = z.infer<typeof insertAtendimentoCanalSchema>;
+
+export const atendimentoConversas = pgTable("atendimento_conversas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  canalId: varchar("canal_id", { length: 100 }).notNull(),
+  clienteNome: varchar("cliente_nome", { length: 255 }),
+  clienteCnpj: varchar("cliente_cnpj", { length: 20 }),
+  grupoNome: varchar("grupo_nome", { length: 255 }),
+  grupoId: varchar("grupo_id", { length: 100 }),
+  ultimaMensagem: text("ultima_mensagem"),
+  ultimaMensagemData: timestamp("ultima_mensagem_data"),
+  naoLidas: integer("nao_lidas").default(0),
+  status: varchar("status", { length: 20 }).default("aberta"),
+  atribuidoA: varchar("atribuido_a", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAtendimentoConversaSchema = createInsertSchema(atendimentoConversas).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type AtendimentoConversa = typeof atendimentoConversas.$inferSelect;
+export type InsertAtendimentoConversa = z.infer<typeof insertAtendimentoConversaSchema>;
+
+export const atendimentoMensagens = pgTable("atendimento_mensagens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversaId: varchar("conversa_id", { length: 100 }).notNull(),
+  remetente: varchar("remetente", { length: 255 }).notNull(),
+  remetenteTipo: varchar("remetente_tipo", { length: 20 }).notNull(),
+  conteudo: text("conteudo").notNull(),
+  tipo: varchar("tipo", { length: 20 }).default("text"),
+  lida: boolean("lida").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAtendimentoMensagemSchema = createInsertSchema(atendimentoMensagens).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type AtendimentoMensagem = typeof atendimentoMensagens.$inferSelect;
+export type InsertAtendimentoMensagem = z.infer<typeof insertAtendimentoMensagemSchema>;
