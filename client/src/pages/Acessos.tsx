@@ -81,6 +81,13 @@ import { useToast } from "@/hooks/use-toast";
 type ClientWithCredentialCount = Client & { credential_count: number; cazClienteId?: number | null; platforms?: string[] };
 type ClientWithCredentials = Client & { credentials: Credential[] };
 
+type AggregatedClient = ClientWithCredentialCount & {
+  aggregatedIds: string[];
+  aggregatedPlatforms: string[];
+  aggregatedCredentialCount: number;
+  displayName: string;
+};
+
 type LogActionType = 'view_password' | 'copy_password' | 'add_credential' | 'edit_credential' | 'delete_credential' | 'add_client' | 'edit_client' | 'delete_client';
 
 interface CreateLogParams {
@@ -1444,11 +1451,13 @@ function TurboToolsSection() {
 }
 
 function ClientCredentialsSection({ 
-  clientId, 
-  clientName 
+  clientIds, 
+  clientName,
+  primaryClientId
 }: { 
-  clientId: string;
+  clientIds: string[];
   clientName: string;
+  primaryClientId: string;
 }) {
   const [addCredentialOpen, setAddCredentialOpen] = useState(false);
   const [editingCredential, setEditingCredential] = useState<Credential | null>(null);
@@ -1456,9 +1465,17 @@ function ClientCredentialsSection({
   const { toast } = useToast();
   const createLog = useCreateLog();
 
-  const { data: clientWithCredentials, isLoading } = useQuery<ClientWithCredentials>({
-    queryKey: ["/api/acessos/clients", clientId],
+  const sortedIds = [...clientIds].sort().join(',');
+  const { data: batchData, isLoading } = useQuery<ClientWithCredentials[]>({
+    queryKey: ["/api/acessos/clients/batch", sortedIds],
+    queryFn: async () => {
+      const response = await fetch(`/api/acessos/clients/batch?ids=${encodeURIComponent(sortedIds)}`);
+      if (!response.ok) throw new Error("Failed to fetch clients");
+      return response.json();
+    },
   });
+
+  const allCredentials = batchData?.flatMap(client => client.credentials || []) || [];
 
   const deleteCredentialMutation = useMutation({
     mutationFn: async (credentialId: string) => {
@@ -1466,7 +1483,7 @@ function ClientCredentialsSection({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/acessos/clients/batch", sortedIds] });
       queryClient.invalidateQueries({ queryKey: ["/api/acessos/logs"] });
       if (deletingCredential) {
         createLog.mutate({
@@ -1474,7 +1491,7 @@ function ClientCredentialsSection({
           entityType: "credential",
           entityId: deletingCredential.id,
           entityName: deletingCredential.platform,
-          clientId,
+          clientId: primaryClientId,
           clientName,
         });
       }
@@ -1493,8 +1510,6 @@ function ClientCredentialsSection({
     },
   });
 
-  const credentials = clientWithCredentials?.credentials || [];
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -1508,20 +1523,20 @@ function ClientCredentialsSection({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Lock className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Credenciais ({credentials.length})</span>
+          <span className="text-sm font-medium">Credenciais ({allCredentials.length})</span>
         </div>
         <Button
           size="sm"
           variant="outline"
           onClick={() => setAddCredentialOpen(true)}
-          data-testid={`button-add-credential-${clientId}`}
+          data-testid={`button-add-credential-${primaryClientId}`}
         >
           <Plus className="w-4 h-4 mr-2" />
           Adicionar Credencial
         </Button>
       </div>
 
-      {credentials.length === 0 ? (
+      {allCredentials.length === 0 ? (
         <div className="text-center py-6 text-muted-foreground">
           <Key className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p className="text-sm">Nenhuma credencial cadastrada</p>
@@ -1538,11 +1553,11 @@ function ClientCredentialsSection({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {credentials.map((credential) => (
+            {allCredentials.map((credential) => (
               <CredentialRow
                 key={credential.id}
                 credential={credential}
-                clientId={clientId}
+                clientId={primaryClientId}
                 clientName={clientName}
                 onEdit={() => setEditingCredential(credential)}
                 onDelete={() => setDeletingCredential(credential)}
@@ -1553,7 +1568,7 @@ function ClientCredentialsSection({
       )}
 
       <AddCredentialDialog
-        clientId={clientId}
+        clientId={primaryClientId}
         clientName={clientName}
         open={addCredentialOpen}
         onOpenChange={setAddCredentialOpen}
@@ -1562,7 +1577,7 @@ function ClientCredentialsSection({
       {editingCredential && (
         <EditCredentialDialog
           credential={editingCredential}
-          clientId={clientId}
+          clientId={primaryClientId}
           clientName={clientName}
           open={!!editingCredential}
           onOpenChange={(open) => !open && setEditingCredential(null)}
@@ -2066,27 +2081,71 @@ function ClientsTab() {
     return name?.toLowerCase().trim() === 'turbo partners';
   };
 
-  const sortedAndFilteredClients = useMemo(() => {
-    let filtered = clients;
+  const normalizeClientName = (name: string | null | undefined): string => {
+    if (!name) return '';
+    return name.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  };
+
+  const sortedAndFilteredClients = useMemo((): AggregatedClient[] => {
+    const clientsToProcess = showOnlyLinked && !searchQuery
+      ? clients.filter((client) => client.cazClienteId != null)
+      : clients;
+
+    const groupedByName = new Map<string, ClientWithCredentialCount[]>();
     
-    // Ao buscar, ignora o filtro de linkados
+    clientsToProcess.forEach(client => {
+      const normalizedName = normalizeClientName(client.name);
+      if (!groupedByName.has(normalizedName)) {
+        groupedByName.set(normalizedName, []);
+      }
+      groupedByName.get(normalizedName)!.push(client);
+    });
+
+    const aggregated: AggregatedClient[] = [];
+    
+    groupedByName.forEach((clientGroup) => {
+      const primary = clientGroup.reduce((best, current) => {
+        if (current.status === 'ativo' && best.status !== 'ativo') return current;
+        if ((current.credential_count || 0) > (best.credential_count || 0)) return current;
+        return best;
+      }, clientGroup[0]);
+
+      const allIds = clientGroup.map(c => c.id);
+      const allPlatforms = Array.from(new Set(clientGroup.flatMap(c => c.platforms || [])));
+      const totalCredentials = clientGroup.reduce((sum, c) => sum + (c.credential_count || 0), 0);
+      const hasActiveStatus = clientGroup.some(c => c.status === 'ativo');
+      const hasLinked = clientGroup.some(c => c.cazClienteId != null);
+      const linkedCnpj = clientGroup.find(c => c.linkedClientCnpj)?.linkedClientCnpj;
+
+      aggregated.push({
+        ...primary,
+        id: allIds.join(','),
+        aggregatedIds: allIds,
+        aggregatedPlatforms: allPlatforms,
+        aggregatedCredentialCount: totalCredentials,
+        credential_count: totalCredentials,
+        platforms: allPlatforms,
+        status: hasActiveStatus ? 'ativo' : 'cancelado',
+        cazClienteId: hasLinked ? (primary.cazClienteId || clientGroup.find(c => c.cazClienteId)?.cazClienteId) : null,
+        linkedClientCnpj: linkedCnpj || null,
+        displayName: primary.name || '',
+      });
+    });
+
+    let filtered = aggregated;
+    
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = clients.filter(
+      filtered = aggregated.filter(
         (client) =>
           client.name?.toLowerCase().includes(query) ||
           client.cnpj?.toLowerCase().includes(query) ||
-          // Buscar também por plataforma
-          (client.platforms && client.platforms.some(platform => 
+          (client.aggregatedPlatforms && client.aggregatedPlatforms.some(platform => 
             platform.toLowerCase().includes(query)
           ))
       );
-    } else if (showOnlyLinked) {
-      // Mostra apenas clientes linkados (que têm cazClienteId)
-      filtered = clients.filter((client) => client.cazClienteId != null);
     }
     
-    // Definir ordem de status: ativo primeiro, depois cancelado
     const statusOrder: Record<string, number> = {
       'ativo': 0,
       'cancelado': 1,
@@ -2108,13 +2167,12 @@ function ClientsTab() {
           bVal = b.name?.toLowerCase() || '';
           break;
         case 'status':
-          // Ordenar por prioridade de status (ativos primeiro)
           aVal = statusOrder[a.status || 'ativo'] ?? 99;
           bVal = statusOrder[b.status || 'ativo'] ?? 99;
           break;
         case 'credential_count':
-          aVal = a.credential_count || 0;
-          bVal = b.credential_count || 0;
+          aVal = a.aggregatedCredentialCount || 0;
+          bVal = b.aggregatedCredentialCount || 0;
           break;
         case 'createdAt':
           aVal = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -2368,8 +2426,9 @@ function ClientsTab() {
                           <TurboToolsSection />
                         ) : (
                           <ClientCredentialsSection 
-                            clientId={client.id} 
+                            clientIds={client.aggregatedIds} 
                             clientName={client.name}
+                            primaryClientId={client.aggregatedIds[0]}
                           />
                         )}
                       </TableCell>
