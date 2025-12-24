@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -1020,8 +1019,6 @@ function InitiativesTab() {
 }
 
 export default function OKR2026() {
-  const [activeTab, setActiveTab] = useState("dashboard");
-
   return (
     <div className="h-full overflow-auto p-6" data-testid="page-okr-2026">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -1040,31 +1037,7 @@ export default function OKR2026() {
           </Badge>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-3">
-            <TabsTrigger value="dashboard" data-testid="tab-dashboard">
-              Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="krs" data-testid="tab-krs">
-              KRs
-            </TabsTrigger>
-            <TabsTrigger value="initiatives" data-testid="tab-initiatives">
-              Iniciativas
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="mt-6">
-            <TabsContent value="dashboard" className="mt-0">
-              <DashboardTab />
-            </TabsContent>
-            <TabsContent value="krs" className="mt-0">
-              <KRsTab />
-            </TabsContent>
-            <TabsContent value="initiatives" className="mt-0">
-              <InitiativesTab />
-            </TabsContent>
-          </div>
-        </Tabs>
+        <DashboardTab />
       </div>
     </div>
   );
