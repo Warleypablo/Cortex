@@ -66,6 +66,12 @@ const menuItems = [
     locked: true,
   },
   {
+    title: "Atendimento",
+    url: "/atendimento",
+    icon: Headphones,
+    locked: true,
+  },
+  {
     title: "GPTurbo",
     url: "/cases/chat",
     icon: Sparkles,
