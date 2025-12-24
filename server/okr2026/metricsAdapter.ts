@@ -4,6 +4,7 @@ import * as schema from "@shared/schema";
 import targets from "./targets.json";
 import krs from "./krs.json";
 import initiatives from "./initiatives.json";
+import manualMetrics from "./manualMetrics.json";
 
 export interface MetricValue {
   value: number | null;
@@ -346,6 +347,10 @@ export function getKRs() {
 
 export function getInitiatives() {
   return initiatives;
+}
+
+export function getManualMetrics() {
+  return manualMetrics;
 }
 
 export function calculateProgress(atual: number, target: number, direction: string): number {
