@@ -3939,9 +3939,25 @@ export class DbStorage implements IStorage {
       ORDER BY setor
     `);
 
+    const nivelResult = await db.execute(sql`
+      SELECT DISTINCT nivel
+      FROM rh_pessoal
+      WHERE nivel IS NOT NULL AND nivel != ''
+      ORDER BY nivel
+    `);
+
+    const cargoResult = await db.execute(sql`
+      SELECT DISTINCT cargo
+      FROM rh_pessoal
+      WHERE cargo IS NOT NULL AND cargo != ''
+      ORDER BY cargo
+    `);
+
     return {
       squads: squadResult.rows.map(row => row.squad as string),
       setores: setorResult.rows.map(row => row.setor as string),
+      niveis: nivelResult.rows.map(row => row.nivel as string),
+      cargos: cargoResult.rows.map(row => row.cargo as string),
     };
   }
 
