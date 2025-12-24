@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -92,7 +91,7 @@ export default function ClientDetail() {
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [contratosSortConfig, setContratosSortConfig] = useState<SortConfig | null>(null);
   const [receitasSortConfig, setReceitasSortConfig] = useState<SortConfig | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isEditingDados, setIsEditingDados] = useState(false);
 
   interface EditFormData {
     telefone: string;
@@ -159,7 +158,7 @@ export default function ClientDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cliente", clientId] });
-      setIsEditDialogOpen(false);
+      setIsEditingDados(false);
       toast({
         title: "Sucesso!",
         description: "Dados do cliente atualizados com sucesso.",
@@ -184,8 +183,8 @@ export default function ClientDetail() {
     }
   };
 
-  const handleOpenEditDialog = () => {
-    if (cliente) {
+  const handleToggleEdit = () => {
+    if (!isEditingDados && cliente) {
       editForm.reset({
         telefone: cliente.telefone || "",
         responsavel: cliente.responsavel || "",
@@ -197,8 +196,8 @@ export default function ClientDetail() {
         linkListaClickup: cliente.linkListaClickup || "",
         cluster: cliente.cluster || "",
       });
-      setIsEditDialogOpen(true);
     }
+    setIsEditingDados(!isEditingDados);
   };
 
   const onSubmitEdit = (data: EditFormData) => {
@@ -713,17 +712,172 @@ export default function ClientDetail() {
               <h2 className="text-lg font-semibold">Dados Cadastrais</h2>
             </div>
             <Button
-              variant="outline"
+              variant={isEditingDados ? "default" : "outline"}
               size="sm"
-              onClick={handleOpenEditDialog}
+              onClick={handleToggleEdit}
               data-testid="button-edit-client"
             >
               <Pencil className="w-4 h-4 mr-2" />
-              Editar
+              {isEditingDados ? "Cancelar" : "Editar"}
             </Button>
           </div>
           <Card className="p-6" data-testid="card-client-info">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {isEditingDados ? (
+              <Form {...editForm}>
+                <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={editForm.control}
+                      name="telefone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Telefone</FormLabel>
+                          <FormControl>
+                            <Input placeholder="(00) 00000-0000" {...field} data-testid="input-telefone" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="responsavel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Responsável (CS)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Nome do CS responsável" {...field} data-testid="input-responsavel" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="responsavelGeral"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nome Responsável</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Nome do responsável do cliente" {...field} data-testid="input-responsavel-geral" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="email@exemplo.com" {...field} data-testid="input-email" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="site"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Site</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://exemplo.com" {...field} data-testid="input-site" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="instagram"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Instagram</FormLabel>
+                          <FormControl>
+                            <Input placeholder="@usuario" {...field} data-testid="input-instagram" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="linkListaClickup"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Link Lista ClickUp</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://app.clickup.com/..." {...field} data-testid="input-link-clickup" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="cluster"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cluster</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-cluster">
+                                <SelectValue placeholder="Selecione o cluster" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="0">NFNC</SelectItem>
+                              <SelectItem value="1">Regulares</SelectItem>
+                              <SelectItem value="2">Chaves</SelectItem>
+                              <SelectItem value="3">Imperdíveis</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={editForm.control}
+                    name="linksContrato"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Links Contrato</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Links dos contratos (um por linha)" 
+                            className="min-h-[80px]"
+                            {...field} 
+                            data-testid="textarea-links-contrato" 
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsEditingDados(false)}
+                      data-testid="button-cancel-edit"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={updateClienteMutation.isPending}
+                      data-testid="button-save-edit"
+                    >
+                      {updateClienteMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Salvando...
+                        </>
+                      ) : (
+                        "Salvar"
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="flex items-start gap-3" data-testid="info-cnpj">
                 <Building2 className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -908,6 +1062,7 @@ export default function ClientDetail() {
                 </div>
               </div>
             </div>
+              )}
           </Card>
         </div>
 
@@ -1461,166 +1616,6 @@ export default function ClientDetail() {
           </Card>
         </div>
 
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Editar Dados Cadastrais</DialogTitle>
-            </DialogHeader>
-            <Form {...editForm}>
-              <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={editForm.control}
-                    name="telefone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Telefone</FormLabel>
-                        <FormControl>
-                          <Input placeholder="(00) 00000-0000" {...field} data-testid="input-telefone" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={editForm.control}
-                    name="responsavel"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Responsável (CS)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Nome do CS responsável" {...field} data-testid="input-responsavel" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={editForm.control}
-                    name="responsavelGeral"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome Responsável</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Nome do responsável do cliente" {...field} data-testid="input-responsavel-geral" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={editForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="email@exemplo.com" {...field} data-testid="input-email" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={editForm.control}
-                    name="site"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Site</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://exemplo.com" {...field} data-testid="input-site" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={editForm.control}
-                    name="instagram"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Instagram</FormLabel>
-                        <FormControl>
-                          <Input placeholder="@usuario" {...field} data-testid="input-instagram" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={editForm.control}
-                    name="linkListaClickup"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Link Lista ClickUp</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://app.clickup.com/..." {...field} data-testid="input-link-clickup" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={editForm.control}
-                    name="cluster"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Cluster</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-cluster">
-                              <SelectValue placeholder="Selecione o cluster" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="0">NFNC</SelectItem>
-                            <SelectItem value="1">Regulares</SelectItem>
-                            <SelectItem value="2">Chaves</SelectItem>
-                            <SelectItem value="3">Imperdíveis</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={editForm.control}
-                  name="linksContrato"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Links Contrato</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Links dos contratos (um por linha)" 
-                          className="min-h-[80px]"
-                          {...field} 
-                          data-testid="textarea-links-contrato" 
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsEditDialogOpen(false)}
-                    data-testid="button-cancel-edit"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={updateClienteMutation.isPending}
-                    data-testid="button-save-edit"
-                  >
-                    {updateClienteMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Salvando...
-                      </>
-                    ) : (
-                      "Salvar"
-                    )}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
       </div>
     </div>
   );
