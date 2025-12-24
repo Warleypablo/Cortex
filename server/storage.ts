@@ -126,6 +126,22 @@ export interface VisaoGeralMetricas {
   pausados: number;
 }
 
+export interface ColaboradoresComPatrimoniosFilters {
+  page?: number;
+  limit?: number;
+  status?: string;
+  squad?: string;
+  setor?: string;
+  search?: string;
+}
+
+export interface ColaboradoresComPatrimoniosResponse {
+  data: (Colaborador & { patrimonios: { id: number; numeroAtivo: string | null; descricao: string | null }[] })[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -137,7 +153,7 @@ export interface IStorage {
   getContasPagarByFornecedor(fornecedorId: string, limit?: number): Promise<ContaPagar[]>;
   getClienteRevenue(clienteId: string): Promise<{ mes: string; valor: number }[]>;
   getColaboradores(): Promise<Colaborador[]>;
-  getColaboradoresComPatrimonios(): Promise<(Colaborador & { patrimonios: { id: number; descricao: string | null }[] })[]>;
+  getColaboradoresComPatrimonios(filters?: ColaboradoresComPatrimoniosFilters): Promise<ColaboradoresComPatrimoniosResponse>;
   createColaborador(colaborador: InsertColaborador): Promise<Colaborador>;
   updateColaborador(id: number, colaborador: Partial<InsertColaborador>, criadoPor?: string): Promise<Colaborador>;
   deleteColaborador(id: number): Promise<void>;
@@ -413,7 +429,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getColaboradoresComPatrimonios(): Promise<(Colaborador & { patrimonios: { id: number; descricao: string | null }[] })[]> {
+  async getColaboradoresComPatrimonios(filters?: ColaboradoresComPatrimoniosFilters): Promise<ColaboradoresComPatrimoniosResponse> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1706,8 +1722,59 @@ export class DbStorage implements IStorage {
     return result;
   }
 
-  async getColaboradoresComPatrimonios(): Promise<(Colaborador & { patrimonios: { id: number; numeroAtivo: string | null; descricao: string | null }[] })[]> {
-    const colaboradores = await db.select().from(schema.rhPessoal).orderBy(schema.rhPessoal.nome);
+  async getColaboradoresComPatrimonios(filters?: ColaboradoresComPatrimoniosFilters): Promise<ColaboradoresComPatrimoniosResponse> {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 0;
+    const offset = limit > 0 ? (page - 1) * limit : 0;
+    const { status, squad, setor, search } = filters || {};
+    
+    const conditions: any[] = [];
+    
+    if (status) {
+      conditions.push(sql`LOWER(${schema.rhPessoal.status}) = LOWER(${status})`);
+    }
+    if (squad) {
+      conditions.push(sql`LOWER(${schema.rhPessoal.squad}) = LOWER(${squad})`);
+    }
+    if (setor) {
+      conditions.push(sql`LOWER(${schema.rhPessoal.setor}) = LOWER(${setor})`);
+    }
+    if (search) {
+      conditions.push(sql`LOWER(${schema.rhPessoal.nome}) LIKE LOWER(${`%${search}%`})`);
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const countResult = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(schema.rhPessoal)
+      .where(whereClause);
+    
+    const total = Number(countResult[0]?.count || 0);
+    
+    let colaboradoresQuery = db.select().from(schema.rhPessoal);
+    if (whereClause) {
+      colaboradoresQuery = colaboradoresQuery.where(whereClause) as any;
+    }
+    colaboradoresQuery = colaboradoresQuery.orderBy(schema.rhPessoal.nome) as any;
+    
+    if (limit > 0) {
+      colaboradoresQuery = colaboradoresQuery.limit(limit).offset(offset) as any;
+    }
+    
+    const colaboradores = await colaboradoresQuery;
+    
+    if (colaboradores.length === 0) {
+      return {
+        data: [],
+        total,
+        page,
+        limit: limit || total,
+      };
+    }
+    
+    const colaboradorIds = colaboradores.map(c => c.id);
+    const colaboradorNomes = colaboradores.map(c => (c.nome || '').trim());
     
     const patrimonios = await db
       .select({
@@ -1718,7 +1785,12 @@ export class DbStorage implements IStorage {
         responsavelId: schema.rhPatrimonio.responsavelId,
       })
       .from(schema.rhPatrimonio)
-      .where(sql`(${schema.rhPatrimonio.responsavelId} IS NOT NULL) OR (${schema.rhPatrimonio.responsavelAtual} IS NOT NULL AND ${schema.rhPatrimonio.responsavelAtual} != '')`);
+      .where(
+        or(
+          inArray(schema.rhPatrimonio.responsavelId, colaboradorIds),
+          sql`TRIM(${schema.rhPatrimonio.responsavelAtual}) IN (${sql.join(colaboradorNomes.map(n => sql`${n}`), sql`, `)})`
+        )
+      );
     
     const patrimoniosPorId = new Map<number, { id: number; numeroAtivo: string | null; descricao: string | null }[]>();
     const patrimoniosPorNome = new Map<string, { id: number; numeroAtivo: string | null; descricao: string | null }[]>();
@@ -1738,7 +1810,7 @@ export class DbStorage implements IStorage {
       }
     }
     
-    return colaboradores.map(col => {
+    const data = colaboradores.map(col => {
       const byId = patrimoniosPorId.get(col.id) || [];
       if (byId.length > 0) {
         return { ...col, patrimonios: byId };
@@ -1747,6 +1819,13 @@ export class DbStorage implements IStorage {
       const byName = patrimoniosPorNome.get(colName) || [];
       return { ...col, patrimonios: byName };
     });
+    
+    return {
+      data,
+      total,
+      page,
+      limit: limit || total,
+    };
   }
 
   async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
