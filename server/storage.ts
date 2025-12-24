@@ -272,6 +272,14 @@ export interface IStorage {
   
   // Acessos - Bulk CNPJ Update
   bulkUpdateClientCnpj(mappings: { name: string; cnpj: string }[]): Promise<{ updated: number; notFound: string[] }>;
+  
+  // Notifications
+  getNotifications(unreadOnly?: boolean): Promise<import("@shared/schema").Notification[]>;
+  markNotificationRead(id: number): Promise<void>;
+  markAllNotificationsRead(): Promise<void>;
+  dismissNotification(id: number): Promise<void>;
+  createNotification(notification: import("@shared/schema").InsertNotification): Promise<import("@shared/schema").Notification>;
+  notificationExists(uniqueKey: string): Promise<boolean>;
 }
 
 // GEG Dashboard Extended Types
@@ -896,6 +904,30 @@ export class MemStorage implements IStorage {
 
   async bulkUpdateClientCnpj(mappings: { name: string; cnpj: string }[]): Promise<{ updated: number; notFound: string[] }> {
     return { updated: 0, notFound: mappings.map(m => m.name) };
+  }
+
+  async getNotifications(unreadOnly?: boolean): Promise<import("@shared/schema").Notification[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async markNotificationRead(id: number): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async dismissNotification(id: number): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async createNotification(notification: import("@shared/schema").InsertNotification): Promise<import("@shared/schema").Notification> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async notificationExists(uniqueKey: string): Promise<boolean> {
+    throw new Error("Not implemented in MemStorage");
   }
 }
 
@@ -8180,6 +8212,100 @@ export class DbStorage implements IStorage {
     }
     
     return { updated, notFound };
+  }
+
+  async getNotifications(unreadOnly?: boolean): Promise<import("@shared/schema").Notification[]> {
+    let query;
+    if (unreadOnly) {
+      query = sql`
+        SELECT 
+          id, type, title, message, 
+          entity_id as "entityId", 
+          entity_type as "entityType", 
+          read, dismissed, 
+          created_at as "createdAt", 
+          expires_at as "expiresAt",
+          unique_key as "uniqueKey"
+        FROM staging.notifications
+        WHERE dismissed = false AND read = false
+        ORDER BY created_at DESC
+      `;
+    } else {
+      query = sql`
+        SELECT 
+          id, type, title, message, 
+          entity_id as "entityId", 
+          entity_type as "entityType", 
+          read, dismissed, 
+          created_at as "createdAt", 
+          expires_at as "expiresAt",
+          unique_key as "uniqueKey"
+        FROM staging.notifications
+        WHERE dismissed = false
+        ORDER BY created_at DESC
+      `;
+    }
+    const result = await db.execute(query);
+    return result.rows as import("@shared/schema").Notification[];
+  }
+
+  async markNotificationRead(id: number): Promise<void> {
+    await db.execute(sql`
+      UPDATE staging.notifications
+      SET read = true
+      WHERE id = ${id}
+    `);
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    await db.execute(sql`
+      UPDATE staging.notifications
+      SET read = true
+      WHERE read = false
+    `);
+  }
+
+  async dismissNotification(id: number): Promise<void> {
+    await db.execute(sql`
+      UPDATE staging.notifications
+      SET dismissed = true
+      WHERE id = ${id}
+    `);
+  }
+
+  async createNotification(notification: import("@shared/schema").InsertNotification): Promise<import("@shared/schema").Notification> {
+    const result = await db.execute(sql`
+      INSERT INTO staging.notifications (type, title, message, entity_id, entity_type, read, dismissed, expires_at, unique_key)
+      VALUES (
+        ${notification.type}, 
+        ${notification.title}, 
+        ${notification.message}, 
+        ${notification.entityId || null}, 
+        ${notification.entityType || null}, 
+        ${notification.read ?? false}, 
+        ${notification.dismissed ?? false}, 
+        ${notification.expiresAt || null},
+        ${notification.uniqueKey || null}
+      )
+      RETURNING 
+        id, type, title, message, 
+        entity_id as "entityId", 
+        entity_type as "entityType", 
+        read, dismissed, 
+        created_at as "createdAt", 
+        expires_at as "expiresAt",
+        unique_key as "uniqueKey"
+    `);
+    return result.rows[0] as import("@shared/schema").Notification;
+  }
+
+  async notificationExists(uniqueKey: string): Promise<boolean> {
+    const result = await db.execute(sql`
+      SELECT 1 FROM staging.notifications
+      WHERE unique_key = ${uniqueKey}
+      LIMIT 1
+    `);
+    return result.rows.length > 0;
   }
 }
 
