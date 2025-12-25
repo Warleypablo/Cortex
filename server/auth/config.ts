@@ -100,7 +100,8 @@ export function configurePassport() {
             '/dashboard/retencao',
             '/dashboard/dfc',
             '/dashboard/auditoria-sistemas',
-            '/admin/usuarios'
+            '/admin/usuarios',
+            '/admin/regras-notificacoes'
           ]
         };
         return done(null, devUser);

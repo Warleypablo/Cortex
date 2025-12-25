@@ -133,6 +133,7 @@ const AVAILABLE_ROUTES = [
   { path: '/investors-report', label: 'Relatório Investidores', category: 'Investidores' },
   // Administração
   { path: '/admin/usuarios', label: 'Gerenciar Usuários', category: 'Administração' },
+  { path: '/admin/regras-notificacoes', label: 'Regras de Notificação', category: 'Administração' },
 ];
 
 // Pre-defined role presets with access to specific pages

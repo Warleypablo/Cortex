@@ -173,6 +173,7 @@ const ALL_ROUTES = [
   '/juridico/clientes',
   '/investors-report',
   '/admin/usuarios',
+  '/admin/regras-notificacoes',
   '/admin/logs'
 ];
 

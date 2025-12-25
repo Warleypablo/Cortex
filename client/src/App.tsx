@@ -60,6 +60,7 @@ const Acessos = lazy(() => import("@/pages/Acessos"));
 const Conhecimentos = lazy(() => import("@/pages/Conhecimentos"));
 const Beneficios = lazy(() => import("@/pages/Beneficios"));
 const OKR2026 = lazy(() => import("@/pages/OKR2026"));
+const AdminNotificationRules = lazy(() => import("@/pages/AdminNotificationRules"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -215,6 +216,7 @@ function ProtectedRouter() {
       
       {/* Admin */}
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
+      <Route path="/admin/regras-notificacoes">{() => <ProtectedRoute path="/admin/regras-notificacoes" component={AdminNotificationRules} />}</Route>
       
       <Route>
         {() => (

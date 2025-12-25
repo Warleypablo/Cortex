@@ -11010,133 +11010,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET generate notifications
+  // GET generate notifications - uses notification_rules from database
   app.get("/api/notifications/generate", async (req, res) => {
     try {
       const created: any[] = [];
       const today = new Date();
       
-      // 1. Birthday notifications (today + next 3 days)
-      const birthdayResult = await db.execute(sql`
-        SELECT id, nome, aniversario as nascimento
-        FROM rh_pessoal
-        WHERE aniversario IS NOT NULL
-          AND demissao IS NULL
-          AND (
-            (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE))
-            OR (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 day') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '1 day'))
-            OR (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '2 days') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '2 days'))
-            OR (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '3 days') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '3 days'))
-          )
+      // Load enabled rules from database
+      const rulesResult = await db.execute(sql`
+        SELECT rule_type, name, config, is_enabled FROM notification_rules WHERE is_enabled = true
       `);
+      const rules = rulesResult.rows as { rule_type: string; name: string; config: string; is_enabled: boolean }[];
       
-      for (const colab of birthdayResult.rows as any[]) {
-        const birthDate = new Date(colab.nascimento);
-        const birthMonth = birthDate.getMonth();
-        const birthDay = birthDate.getDate();
-        const uniqueKey = `aniversario_${colab.id}_${today.getFullYear()}-${String(birthMonth + 1).padStart(2, '0')}-${String(birthDay).padStart(2, '0')}`;
+      const getConfig = (ruleType: string) => {
+        const rule = rules.find(r => r.rule_type === ruleType);
+        if (!rule) return null;
+        try {
+          return JSON.parse(rule.config || '{}');
+        } catch {
+          return {};
+        }
+      };
+      
+      // 1. Birthday notifications - if rule is enabled
+      const aniversarioConfig = getConfig('aniversario');
+      if (aniversarioConfig) {
+        const diasAntecedencia = aniversarioConfig.diasAntecedencia || 3;
+        const priority = aniversarioConfig.priority || 'low';
         
-        const exists = await storage.notificationExists(uniqueKey);
-        if (!exists) {
-          const thisYearBirthday = new Date(today.getFullYear(), birthMonth, birthDay);
-          const diffDays = Math.round((thisYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-          let title = '';
-          if (diffDays <= 0) {
-            title = `${colab.nome} faz aniversário hoje!`;
-          } else if (diffDays === 1) {
-            title = `${colab.nome} faz aniversário amanhã!`;
-          } else {
-            title = `${colab.nome} faz aniversário em ${diffDays} dias`;
+        // Build dynamic query for days ahead
+        const conditions: string[] = [];
+        for (let i = 0; i <= diasAntecedencia; i++) {
+          conditions.push(`(EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '${i} days') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '${i} days'))`);
+        }
+        
+        const birthdayResult = await db.execute(sql`
+          SELECT id, nome, aniversario as nascimento
+          FROM rh_pessoal
+          WHERE aniversario IS NOT NULL
+            AND demissao IS NULL
+            AND (
+              (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE))
+              OR (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 day') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '1 day'))
+              OR (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '2 days') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '2 days'))
+              OR (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '3 days') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '3 days'))
+            )
+        `);
+        
+        for (const colab of birthdayResult.rows as any[]) {
+          const birthDate = new Date(colab.nascimento);
+          const birthMonth = birthDate.getMonth();
+          const birthDay = birthDate.getDate();
+          const uniqueKey = `aniversario_${colab.id}_${today.getFullYear()}-${String(birthMonth + 1).padStart(2, '0')}-${String(birthDay).padStart(2, '0')}`;
+          
+          const exists = await storage.notificationExists(uniqueKey);
+          if (!exists) {
+            const thisYearBirthday = new Date(today.getFullYear(), birthMonth, birthDay);
+            const diffDays = Math.round((thisYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            let title = '';
+            if (diffDays <= 0) {
+              title = `${colab.nome} faz aniversário hoje!`;
+            } else if (diffDays === 1) {
+              title = `${colab.nome} faz aniversário amanhã!`;
+            } else {
+              title = `${colab.nome} faz aniversário em ${diffDays} dias`;
+            }
+            
+            const notification = await storage.createNotification({
+              type: 'aniversario',
+              title,
+              message: `Não esqueça de parabenizar ${colab.nome}!`,
+              entityId: String(colab.id),
+              entityType: 'colaborador',
+              priority,
+              uniqueKey,
+              expiresAt: new Date(today.getFullYear(), birthMonth, birthDay + 1),
+            });
+            created.push(notification);
           }
-          
-          const notification = await storage.createNotification({
-            type: 'aniversario',
-            title,
-            message: `Não esqueça de parabenizar ${colab.nome}!`,
-            entityId: String(colab.id),
-            entityType: 'colaborador',
-            uniqueKey,
-            expiresAt: new Date(today.getFullYear(), birthMonth, birthDay + 1),
-          });
-          created.push(notification);
         }
       }
       
-      // 2. Contract expiring notifications (next 30 days)
-      // Using cup_contratos table with JOIN to cup_clientes
-      const contractResult = await db.execute(sql`
-        SELECT c.id_subtask as id, cl.cnpj, c.data_encerramento, cl.nome as client_name, c.servico
-        FROM cup_contratos c
-        LEFT JOIN cup_clientes cl ON cl.task_id = c.id_task
-        WHERE c.data_encerramento IS NOT NULL
-          AND c.data_encerramento >= CURRENT_DATE
-          AND c.data_encerramento <= CURRENT_DATE + INTERVAL '30 days'
-          AND c.status IN ('ativo', 'onboarding')
-      `);
-      
-      for (const contract of contractResult.rows as any[]) {
-        const endDate = new Date(contract.data_encerramento);
-        const uniqueKey = `contrato_vencendo_${contract.id}_${endDate.toISOString().split('T')[0]}`;
+      // 2. Contract expiring notifications - if rule is enabled
+      const contratoConfig = getConfig('contrato_vencendo');
+      if (contratoConfig) {
+        const diasAntecedencia = contratoConfig.diasAntecedencia || 30;
+        const priority = contratoConfig.priority || 'medium';
         
-        const exists = await storage.notificationExists(uniqueKey);
-        if (!exists) {
-          const diffDays = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-          const clientName = contract.client_name || contract.cnpj || 'Cliente';
+        const contractResult = await db.execute(sql`
+          SELECT c.id_subtask as id, cl.cnpj, c.data_encerramento, cl.nome as client_name, c.servico
+          FROM cup_contratos c
+          LEFT JOIN cup_clientes cl ON cl.task_id = c.id_task
+          WHERE c.data_encerramento IS NOT NULL
+            AND c.data_encerramento >= CURRENT_DATE
+            AND c.data_encerramento <= CURRENT_DATE + INTERVAL '1 day' * ${diasAntecedencia}
+            AND c.status IN ('ativo', 'onboarding')
+        `);
+        
+        for (const contract of contractResult.rows as any[]) {
+          const endDate = new Date(contract.data_encerramento);
+          const uniqueKey = `contrato_vencendo_${contract.id}_${endDate.toISOString().split('T')[0]}`;
           
-          const notification = await storage.createNotification({
-            type: 'contrato_vencendo',
-            title: `Contrato vencendo em ${diffDays} dias`,
-            message: `O contrato de ${clientName} vence em ${endDate.toLocaleDateString('pt-BR')}.`,
-            entityId: String(contract.id),
-            entityType: 'contrato',
-            uniqueKey,
-            expiresAt: endDate,
-          });
-          created.push(notification);
+          const exists = await storage.notificationExists(uniqueKey);
+          if (!exists) {
+            const diffDays = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            const clientName = contract.client_name || contract.cnpj || 'Cliente';
+            
+            const notification = await storage.createNotification({
+              type: 'contrato_vencendo',
+              title: `Contrato vencendo em ${diffDays} dias`,
+              message: `O contrato de ${clientName} (${contract.servico || 'serviço'}) vence em ${endDate.toLocaleDateString('pt-BR')}.`,
+              entityId: String(contract.id),
+              entityType: 'contrato',
+              priority,
+              uniqueKey,
+              expiresAt: endDate,
+            });
+            created.push(notification);
+          }
         }
       }
       
-      // 3. Overdue payments notifications (>7 days overdue)
-      // Using caz_parcelas table with id_cliente for grouping
-      const overdueResult = await db.execute(sql`
-        SELECT 
-          p.id_cliente, 
-          COUNT(*) as parcelas_vencidas, 
-          SUM(p.valor_bruto) as total_devido
-        FROM caz_parcelas p
-        WHERE p.data_vencimento < CURRENT_DATE - INTERVAL '7 days'
-          AND p.status != 'Pago'
-          AND p.id_cliente IS NOT NULL
-        GROUP BY p.id_cliente
-        HAVING COUNT(*) >= 1
-      `);
-      
-      const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-      
-      for (const overdue of overdueResult.rows as any[]) {
-        const clientId = overdue.id_cliente || 'unknown';
-        const uniqueKey = `inadimplencia_${clientId}_${currentMonth}`;
+      // 3. Overdue payments notifications - if rule is enabled
+      const inadimplenciaConfig = getConfig('inadimplencia');
+      if (inadimplenciaConfig) {
+        const diasAtraso = inadimplenciaConfig.diasAtraso || 7;
+        const valorMinimo = inadimplenciaConfig.valorMinimo || 0;
+        const priority = inadimplenciaConfig.priority || 'high';
         
-        const exists = await storage.notificationExists(uniqueKey);
-        if (!exists) {
-          const totalDevido = Number(overdue.total_devido || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const overdueResult = await db.execute(sql`
+          SELECT 
+            p.id_cliente, 
+            COUNT(*) as parcelas_vencidas, 
+            SUM(p.valor_bruto) as total_devido
+          FROM caz_parcelas p
+          WHERE p.data_vencimento < CURRENT_DATE - INTERVAL '1 day' * ${diasAtraso}
+            AND p.status != 'Pago'
+            AND p.id_cliente IS NOT NULL
+          GROUP BY p.id_cliente
+          HAVING SUM(COALESCE(p.valor_bruto, 0)) >= ${valorMinimo}
+        `);
+        
+        const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+        
+        for (const overdue of overdueResult.rows as any[]) {
+          const clientId = overdue.id_cliente || 'unknown';
+          const uniqueKey = `inadimplencia_${clientId}_${currentMonth}`;
           
-          const notification = await storage.createNotification({
-            type: 'inadimplencia',
-            title: `Inadimplência detectada`,
-            message: `${overdue.parcelas_vencidas} parcela(s) vencida(s) há mais de 7 dias. Total: ${totalDevido}`,
-            entityId: clientId,
-            entityType: 'cliente',
-            uniqueKey,
-          });
-          created.push(notification);
+          const exists = await storage.notificationExists(uniqueKey);
+          if (!exists) {
+            const totalDevido = Number(overdue.total_devido || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            
+            const notification = await storage.createNotification({
+              type: 'inadimplencia',
+              title: `Inadimplência detectada`,
+              message: `${overdue.parcelas_vencidas} parcela(s) vencida(s) há mais de ${diasAtraso} dias. Total: ${totalDevido}`,
+              entityId: clientId,
+              entityType: 'cliente',
+              priority,
+              uniqueKey,
+            });
+            created.push(notification);
+          }
         }
       }
       
       res.json({ 
         success: true, 
         created: created.length,
-        notifications: created 
+        notifications: created,
+        rulesUsed: rules.map(r => r.rule_type)
       });
     } catch (error) {
       console.error("[api] Error generating notifications:", error);
@@ -11800,21 +11843,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const defaultRules = [
         {
           ruleType: 'inadimplencia',
-          name: 'Inadimplência (+7 dias)',
-          description: 'Alerta quando um cliente está com pagamento em atraso por mais de 7 dias',
-          config: JSON.stringify({ minDaysOverdue: 7, minValue: 0 })
+          name: 'Inadimplência',
+          description: 'Alerta quando um cliente está com pagamento em atraso',
+          config: JSON.stringify({ diasAtraso: 7, valorMinimo: 0, priority: 'high' })
         },
         {
           ruleType: 'contrato_vencendo',
-          name: 'Contrato Vencendo (30 dias)',
-          description: 'Alerta quando um contrato está próximo do vencimento (30 dias)',
-          config: JSON.stringify({ daysBeforeExpiry: 30 })
+          name: 'Contrato Vencendo',
+          description: 'Alerta quando um contrato está próximo do vencimento',
+          config: JSON.stringify({ diasAntecedencia: 30, priority: 'medium' })
         },
         {
           ruleType: 'aniversario',
           name: 'Aniversário de Colaborador',
           description: 'Alerta quando é aniversário de um colaborador',
-          config: JSON.stringify({ enabled: true })
+          config: JSON.stringify({ diasAntecedencia: 3, priority: 'low' })
         }
       ];
       

@@ -8307,28 +8307,34 @@ export class DbStorage implements IStorage {
         SELECT 
           id, type, title, message, 
           entity_id as "entityId", 
-          entity_type as "entityType", 
+          entity_type as "entityType",
+          COALESCE(priority, 'medium') as priority,
           read, dismissed, 
           created_at as "createdAt", 
           expires_at as "expiresAt",
           unique_key as "uniqueKey"
         FROM staging.notifications
         WHERE dismissed = false AND read = false
-        ORDER BY created_at DESC
+        ORDER BY 
+          CASE COALESCE(priority, 'medium') WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
+          created_at DESC
       `;
     } else {
       query = sql`
         SELECT 
           id, type, title, message, 
           entity_id as "entityId", 
-          entity_type as "entityType", 
+          entity_type as "entityType",
+          COALESCE(priority, 'medium') as priority,
           read, dismissed, 
           created_at as "createdAt", 
           expires_at as "expiresAt",
           unique_key as "uniqueKey"
         FROM staging.notifications
         WHERE dismissed = false
-        ORDER BY created_at DESC
+        ORDER BY 
+          CASE COALESCE(priority, 'medium') WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
+          created_at DESC
       `;
     }
     const result = await db.execute(query);
@@ -8361,13 +8367,14 @@ export class DbStorage implements IStorage {
 
   async createNotification(notification: import("@shared/schema").InsertNotification): Promise<import("@shared/schema").Notification> {
     const result = await db.execute(sql`
-      INSERT INTO staging.notifications (type, title, message, entity_id, entity_type, read, dismissed, expires_at, unique_key)
+      INSERT INTO staging.notifications (type, title, message, entity_id, entity_type, priority, read, dismissed, expires_at, unique_key)
       VALUES (
         ${notification.type}, 
         ${notification.title}, 
         ${notification.message}, 
         ${notification.entityId || null}, 
-        ${notification.entityType || null}, 
+        ${notification.entityType || null},
+        ${notification.priority || 'medium'},
         ${notification.read ?? false}, 
         ${notification.dismissed ?? false}, 
         ${notification.expiresAt || null},
@@ -8376,7 +8383,8 @@ export class DbStorage implements IStorage {
       RETURNING 
         id, type, title, message, 
         entity_id as "entityId", 
-        entity_type as "entityType", 
+        entity_type as "entityType",
+        priority,
         read, dismissed, 
         created_at as "createdAt", 
         expires_at as "expiresAt",
