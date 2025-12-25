@@ -61,6 +61,7 @@ const Conhecimentos = lazy(() => import("@/pages/Conhecimentos"));
 const Beneficios = lazy(() => import("@/pages/Beneficios"));
 const OKR2026 = lazy(() => import("@/pages/OKR2026"));
 const AdminNotificationRules = lazy(() => import("@/pages/AdminNotificationRules"));
+const Calendario = lazy(() => import("@/pages/Calendario"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -213,6 +214,9 @@ function ProtectedRouter() {
       
       {/* OKR 2026 */}
       <Route path="/okr-2026">{() => <ProtectedRoute path="/okr-2026" component={OKR2026} />}</Route>
+      
+      {/* Calendário */}
+      <Route path="/calendario">{() => <ProtectedRoute path="/calendario" component={Calendario} />}</Route>
       
       {/* Admin */}
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
