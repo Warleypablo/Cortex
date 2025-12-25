@@ -12,7 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SelectWithAdd } from "@/components/ui/select-with-add";
-import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Colaborador, InsertColaborador, RhPromocao } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
@@ -120,6 +122,53 @@ interface SystemUser {
   name: string;
   picture: string | null;
   role: string;
+}
+
+interface OneOnOneAcao {
+  id: number;
+  oneOnOneId: number;
+  descricao: string;
+  responsavel: string | null;
+  prazo: string | null;
+  status: string | null;
+  concluidaEm: string | null;
+}
+
+interface OneOnOneItem {
+  id: number;
+  colaboradorId: number;
+  gestorId: number | null;
+  data: string;
+  pauta: string | null;
+  notas: string | null;
+  criadoEm: string | null;
+  criadoPor: string | null;
+  acoes?: OneOnOneAcao[];
+}
+
+interface EnpsItem {
+  id: number;
+  colaboradorId: number;
+  score: number;
+  comentario: string | null;
+  data: string;
+  criadoEm: string | null;
+  criadoPor: string | null;
+}
+
+interface PdiItem {
+  id: number;
+  colaboradorId: number;
+  titulo: string;
+  descricao: string | null;
+  competencia: string | null;
+  recursos: string | null;
+  prazo: string | null;
+  progresso: number;
+  status: string | null;
+  criadoEm: string | null;
+  criadoPor: string | null;
+  atualizadoEm: string | null;
 }
 
 type ColaboradorDetail = Colaborador & {
@@ -1350,6 +1399,560 @@ function InfoCard({ icon: Icon, label, value, iconBgColor = "bg-primary/10", ico
   );
 }
 
+function getEnpsCategory(score: number): { label: string; color: string; bgColor: string } {
+  if (score >= 9) return { label: "Promotor", color: "text-green-600 dark:text-green-400", bgColor: "bg-green-100 dark:bg-green-900/30" };
+  if (score >= 7) return { label: "Neutro", color: "text-yellow-600 dark:text-yellow-400", bgColor: "bg-yellow-100 dark:bg-yellow-900/30" };
+  return { label: "Detrator", color: "text-red-600 dark:text-red-400", bgColor: "bg-red-100 dark:bg-red-900/30" };
+}
+
+function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
+  const { toast } = useToast();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [addAcaoDialogOpen, setAddAcaoDialogOpen] = useState(false);
+  const [selectedOneOnOneId, setSelectedOneOnOneId] = useState<number | null>(null);
+  const [expandedMeetings, setExpandedMeetings] = useState<Set<number>>(new Set());
+  const [formData, setFormData] = useState({ data: new Date().toISOString().split("T")[0], pauta: "", notas: "" });
+  const [acaoFormData, setAcaoFormData] = useState({ descricao: "", responsavel: "", prazo: "" });
+
+  const { data: oneOnOnes = [], isLoading } = useQuery<OneOnOneItem[]>({
+    queryKey: ["/api/colaboradores", colaboradorId, "one-on-one"],
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (data: { data: string; pauta: string; notas: string }) => {
+      const response = await apiRequest("POST", `/api/colaboradores/${colaboradorId}/one-on-one`, data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaboradorId, "one-on-one"] });
+      toast({ title: "1x1 registrado", description: "A reunião foi adicionada com sucesso." });
+      setDialogOpen(false);
+      setFormData({ data: new Date().toISOString().split("T")[0], pauta: "", notas: "" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao registrar 1x1", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addAcaoMutation = useMutation({
+    mutationFn: async (data: { descricao: string; responsavel: string; prazo: string }) => {
+      const response = await apiRequest("POST", `/api/one-on-one/${selectedOneOnOneId}/acoes`, data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaboradorId, "one-on-one"] });
+      toast({ title: "Ação adicionada", description: "A ação foi registrada com sucesso." });
+      setAddAcaoDialogOpen(false);
+      setAcaoFormData({ descricao: "", responsavel: "", prazo: "" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao adicionar ação", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const toggleAcaoMutation = useMutation({
+    mutationFn: async ({ acaoId, status }: { acaoId: number; status: string }) => {
+      const response = await apiRequest("PATCH", `/api/one-on-one/acoes/${acaoId}`, { status });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaboradorId, "one-on-one"] });
+      toast({ title: "Ação atualizada", description: "Status da ação foi alterado." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar ação", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const toggleMeeting = (id: number) => {
+    setExpandedMeetings(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
+  };
+
+  return (
+    <Card className="p-6" data-testid="card-1x1">
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+            <MessageSquare className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+          </div>
+          <h3 className="text-lg font-semibold">Reuniões 1x1</h3>
+        </div>
+        <Button size="sm" onClick={() => setDialogOpen(true)} data-testid="button-add-1x1">
+          <Plus className="w-4 h-4 mr-1" /> Nova
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : oneOnOnes.length === 0 ? (
+        <p className="text-muted-foreground text-sm text-center py-6">Nenhuma reunião 1x1 registrada</p>
+      ) : (
+        <div className="space-y-3 max-h-[400px] overflow-y-auto">
+          {oneOnOnes.map((meeting) => (
+            <Collapsible key={meeting.id} open={expandedMeetings.has(meeting.id)} onOpenChange={() => toggleMeeting(meeting.id)}>
+              <div className="border rounded-lg p-3" data-testid={`meeting-${meeting.id}`}>
+                <CollapsibleTrigger asChild>
+                  <button className="flex items-center justify-between w-full text-left">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-medium">{formatDateFns(meeting.data)}</span>
+                      {meeting.acoes && meeting.acoes.length > 0 && (
+                        <Badge variant="secondary" className="text-xs">{meeting.acoes.length} ações</Badge>
+                      )}
+                    </div>
+                    {expandedMeetings.has(meeting.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-3 space-y-3">
+                  {meeting.pauta && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase mb-1">Pauta</p>
+                      <p className="text-sm">{meeting.pauta}</p>
+                    </div>
+                  )}
+                  {meeting.notas && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase mb-1">Notas</p>
+                      <p className="text-sm whitespace-pre-wrap">{meeting.notas}</p>
+                    </div>
+                  )}
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-muted-foreground uppercase">Ações</p>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => { setSelectedOneOnOneId(meeting.id); setAddAcaoDialogOpen(true); }}
+                        data-testid={`button-add-acao-${meeting.id}`}
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Ação
+                      </Button>
+                    </div>
+                    {meeting.acoes && meeting.acoes.length > 0 ? (
+                      <div className="space-y-2">
+                        {meeting.acoes.map((acao) => (
+                          <div key={acao.id} className="flex items-start gap-2 text-sm" data-testid={`acao-${acao.id}`}>
+                            <button
+                              onClick={() => toggleAcaoMutation.mutate({ acaoId: acao.id, status: acao.status === "concluida" ? "pendente" : "concluida" })}
+                              className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${acao.status === "concluida" ? "bg-green-500 border-green-500 text-white" : "border-muted-foreground"}`}
+                              data-testid={`toggle-acao-${acao.id}`}
+                            >
+                              {acao.status === "concluida" && <Check className="w-3 h-3" />}
+                            </button>
+                            <span className={acao.status === "concluida" ? "line-through text-muted-foreground" : ""}>{acao.descricao}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Nenhuma ação registrada</p>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Reunião 1x1</DialogTitle>
+            <DialogDescription>Registre uma nova reunião one-on-one</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Data *</label>
+              <Input type="date" value={formData.data} onChange={(e) => setFormData({ ...formData, data: e.target.value })} data-testid="input-1x1-data" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Pauta</label>
+              <Textarea value={formData.pauta} onChange={(e) => setFormData({ ...formData, pauta: e.target.value })} placeholder="Tópicos a serem discutidos..." data-testid="input-1x1-pauta" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Notas</label>
+              <Textarea value={formData.notas} onChange={(e) => setFormData({ ...formData, notas: e.target.value })} placeholder="Anotações da reunião..." rows={4} data-testid="input-1x1-notas" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => addMutation.mutate(formData)} disabled={addMutation.isPending || !formData.data} data-testid="button-save-1x1">
+              {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addAcaoDialogOpen} onOpenChange={setAddAcaoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Ação</DialogTitle>
+            <DialogDescription>Adicione uma ação para esta reunião</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Descrição *</label>
+              <Input value={acaoFormData.descricao} onChange={(e) => setAcaoFormData({ ...acaoFormData, descricao: e.target.value })} placeholder="O que precisa ser feito..." data-testid="input-acao-descricao" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Responsável</label>
+              <Input value={acaoFormData.responsavel} onChange={(e) => setAcaoFormData({ ...acaoFormData, responsavel: e.target.value })} placeholder="Quem é responsável..." data-testid="input-acao-responsavel" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Prazo</label>
+              <Input type="date" value={acaoFormData.prazo} onChange={(e) => setAcaoFormData({ ...acaoFormData, prazo: e.target.value })} data-testid="input-acao-prazo" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddAcaoDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => addAcaoMutation.mutate(acaoFormData)} disabled={addAcaoMutation.isPending || !acaoFormData.descricao} data-testid="button-save-acao">
+              {addAcaoMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Adicionar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+function EnpsCard({ colaboradorId }: { colaboradorId: string }) {
+  const { toast } = useToast();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedScore, setSelectedScore] = useState<number | null>(null);
+  const [comentario, setComentario] = useState("");
+
+  const { data: enpsResponses = [], isLoading } = useQuery<EnpsItem[]>({
+    queryKey: ["/api/colaboradores", colaboradorId, "enps"],
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (data: { score: number; comentario: string; data: string }) => {
+      const response = await apiRequest("POST", `/api/colaboradores/${colaboradorId}/enps`, data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaboradorId, "enps"] });
+      toast({ title: "e-NPS registrado", description: "A resposta foi adicionada com sucesso." });
+      setDialogOpen(false);
+      setSelectedScore(null);
+      setComentario("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao registrar e-NPS", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const lastResponse = enpsResponses.length > 0 ? enpsResponses[0] : null;
+  const category = lastResponse ? getEnpsCategory(lastResponse.score) : null;
+
+  return (
+    <Card className="p-6" data-testid="card-enps">
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+            <BarChart2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <h3 className="text-lg font-semibold">e-NPS</h3>
+        </div>
+        <Button size="sm" onClick={() => setDialogOpen(true)} data-testid="button-add-enps">
+          <Plus className="w-4 h-4 mr-1" /> Nova
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : lastResponse ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className={`text-4xl font-bold ${category?.color}`}>{lastResponse.score}</div>
+            <div>
+              <Badge className={category?.bgColor}>{category?.label}</Badge>
+              <p className="text-xs text-muted-foreground mt-1">{formatDateFns(lastResponse.data)}</p>
+            </div>
+          </div>
+          {lastResponse.comentario && (
+            <p className="text-sm text-muted-foreground italic">"{lastResponse.comentario}"</p>
+          )}
+          {enpsResponses.length > 1 && (
+            <div className="pt-3 border-t">
+              <p className="text-xs text-muted-foreground uppercase mb-2">Histórico ({enpsResponses.length} respostas)</p>
+              <div className="flex items-end gap-1 h-12">
+                {enpsResponses.slice(0, 12).reverse().map((resp, idx) => {
+                  const cat = getEnpsCategory(resp.score);
+                  const height = (resp.score + 1) * 10;
+                  return (
+                    <div 
+                      key={resp.id} 
+                      className={`w-4 rounded-t ${cat.bgColor}`} 
+                      style={{ height: `${height}%` }}
+                      title={`${resp.score} - ${formatDateFns(resp.data)}`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="text-muted-foreground text-sm text-center py-6">Nenhuma resposta e-NPS registrada</p>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Resposta e-NPS</DialogTitle>
+            <DialogDescription>Em uma escala de 0 a 10, quanto você recomendaria a Turbo como lugar para trabalhar?</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2 justify-center">
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => {
+                const cat = getEnpsCategory(score);
+                return (
+                  <button
+                    key={score}
+                    onClick={() => setSelectedScore(score)}
+                    className={`w-10 h-10 rounded-lg font-bold transition-all ${selectedScore === score ? `${cat.bgColor} ${cat.color} ring-2 ring-offset-2` : "bg-muted hover:bg-muted/80"}`}
+                    data-testid={`button-score-${score}`}
+                  >
+                    {score}
+                  </button>
+                );
+              })}
+            </div>
+            <div>
+              <label className="text-sm font-medium">Comentário (opcional)</label>
+              <Textarea 
+                value={comentario} 
+                onChange={(e) => setComentario(e.target.value)} 
+                placeholder="Conte-nos mais sobre sua experiência..." 
+                rows={3}
+                data-testid="input-enps-comentario" 
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button 
+              onClick={() => addMutation.mutate({ score: selectedScore!, comentario, data: new Date().toISOString().split("T")[0] })} 
+              disabled={addMutation.isPending || selectedScore === null} 
+              data-testid="button-save-enps"
+            >
+              {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+function PdiCard({ colaboradorId }: { colaboradorId: string }) {
+  const { toast } = useToast();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingPdi, setEditingPdi] = useState<PdiItem | null>(null);
+  const [formData, setFormData] = useState({ titulo: "", descricao: "", competencia: "", recursos: "", prazo: "" });
+
+  const { data: pdiGoals = [], isLoading } = useQuery<PdiItem[]>({
+    queryKey: ["/api/colaboradores", colaboradorId, "pdi"],
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (data: { titulo: string; descricao: string; competencia: string; recursos: string; prazo: string }) => {
+      const response = await apiRequest("POST", `/api/colaboradores/${colaboradorId}/pdi`, { ...data, colaboradorId: Number(colaboradorId) });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaboradorId, "pdi"] });
+      toast({ title: "Objetivo adicionado", description: "O objetivo PDI foi criado com sucesso." });
+      setDialogOpen(false);
+      setFormData({ titulo: "", descricao: "", competencia: "", recursos: "", prazo: "" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao criar objetivo", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: number; progresso?: number; status?: string }) => {
+      const response = await apiRequest("PUT", `/api/colaboradores/${colaboradorId}/pdi/${id}`, data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaboradorId, "pdi"] });
+      toast({ title: "Objetivo atualizado", description: "O progresso foi salvo." });
+      setEditingPdi(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const getStatusBadge = (status: string | null) => {
+    switch (status) {
+      case "concluido": return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Concluído</Badge>;
+      case "pausado": return <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">Pausado</Badge>;
+      case "cancelado": return <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Cancelado</Badge>;
+      default: return <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Em Andamento</Badge>;
+    }
+  };
+
+  return (
+    <Card className="p-6" data-testid="card-pdi">
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-lg bg-green-100 dark:bg-green-900/30">
+            <Target className="w-6 h-6 text-green-600 dark:text-green-400" />
+          </div>
+          <h3 className="text-lg font-semibold">PDI</h3>
+        </div>
+        <Button size="sm" onClick={() => setDialogOpen(true)} data-testid="button-add-pdi">
+          <Plus className="w-4 h-4 mr-1" /> Novo
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : pdiGoals.length === 0 ? (
+        <p className="text-muted-foreground text-sm text-center py-6">Nenhum objetivo PDI registrado</p>
+      ) : (
+        <div className="space-y-4 max-h-[400px] overflow-y-auto">
+          {pdiGoals.map((pdi) => (
+            <div key={pdi.id} className="border rounded-lg p-4 space-y-3" data-testid={`pdi-${pdi.id}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <h4 className="font-medium">{pdi.titulo}</h4>
+                  {pdi.competencia && <p className="text-xs text-muted-foreground">{pdi.competencia}</p>}
+                </div>
+                {getStatusBadge(pdi.status)}
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Progresso</span>
+                  <span className="font-medium">{pdi.progresso}%</span>
+                </div>
+                <Progress value={pdi.progresso} className="h-2" />
+              </div>
+              {pdi.prazo && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Calendar className="w-3 h-3" /> Prazo: {formatDateFns(pdi.prazo)}
+                </p>
+              )}
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => setEditingPdi(pdi)}
+                  data-testid={`button-edit-pdi-${pdi.id}`}
+                >
+                  Atualizar Progresso
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo Objetivo PDI</DialogTitle>
+            <DialogDescription>Adicione um objetivo de desenvolvimento individual</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Título *</label>
+              <Input value={formData.titulo} onChange={(e) => setFormData({ ...formData, titulo: e.target.value })} placeholder="Ex: Desenvolver habilidades de liderança" data-testid="input-pdi-titulo" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Descrição</label>
+              <Textarea value={formData.descricao} onChange={(e) => setFormData({ ...formData, descricao: e.target.value })} placeholder="Descreva o objetivo em detalhes..." data-testid="input-pdi-descricao" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Competência</label>
+              <Input value={formData.competencia} onChange={(e) => setFormData({ ...formData, competencia: e.target.value })} placeholder="Ex: Liderança, Comunicação, Técnico" data-testid="input-pdi-competencia" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Recursos</label>
+              <Textarea value={formData.recursos} onChange={(e) => setFormData({ ...formData, recursos: e.target.value })} placeholder="Cursos, mentoria, livros..." data-testid="input-pdi-recursos" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Prazo</label>
+              <Input type="date" value={formData.prazo} onChange={(e) => setFormData({ ...formData, prazo: e.target.value })} data-testid="input-pdi-prazo" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => addMutation.mutate(formData)} disabled={addMutation.isPending || !formData.titulo} data-testid="button-save-pdi">
+              {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Criar Objetivo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingPdi} onOpenChange={(open) => !open && setEditingPdi(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Atualizar Progresso</DialogTitle>
+            <DialogDescription>{editingPdi?.titulo}</DialogDescription>
+          </DialogHeader>
+          {editingPdi && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Progresso: {editingPdi.progresso}%</label>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="100" 
+                  step="5"
+                  value={editingPdi.progresso} 
+                  onChange={(e) => setEditingPdi({ ...editingPdi, progresso: Number(e.target.value) })}
+                  className="w-full mt-2"
+                  data-testid="slider-pdi-progresso"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Status</label>
+                <Select value={editingPdi.status || "em_andamento"} onValueChange={(v) => setEditingPdi({ ...editingPdi, status: v })}>
+                  <SelectTrigger data-testid="select-pdi-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                    <SelectItem value="concluido">Concluído</SelectItem>
+                    <SelectItem value="pausado">Pausado</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingPdi(null)}>Cancelar</Button>
+            <Button 
+              onClick={() => editingPdi && updateMutation.mutate({ id: editingPdi.id, progresso: editingPdi.progresso, status: editingPdi.status || "em_andamento" })} 
+              disabled={updateMutation.isPending}
+              data-testid="button-update-pdi"
+            >
+              {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 export default function DetailColaborador() {
   const { setPageInfo } = usePageInfo();
   const [, params] = useRoute("/colaborador/:id");
@@ -2000,57 +2603,9 @@ export default function DetailColaborador() {
 
           <TabsContent value="desenvolvimento" data-testid="tab-content-desenvolvimento">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="p-6 opacity-70" data-testid="card-enps">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                    <BarChart2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-lg font-semibold">e-NPS</h3>
-                      <Badge variant="secondary" className="text-xs">Em breve</Badge>
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                      Em breve - Avaliação de engajamento do colaborador
-                    </p>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-6 opacity-70" data-testid="card-pdi">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-lg bg-green-100 dark:bg-green-900/30">
-                    <Target className="w-6 h-6 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-lg font-semibold">PDI</h3>
-                      <Badge variant="secondary" className="text-xs">Em breve</Badge>
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                      Em breve - Plano de desenvolvimento individual
-                    </p>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-6 opacity-70" data-testid="card-1x1">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                    <MessageSquare className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-lg font-semibold">1x1</h3>
-                      <Badge variant="secondary" className="text-xs">Em breve</Badge>
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                      Em breve - Histórico de reuniões one-on-one
-                    </p>
-                  </div>
-                </div>
-              </Card>
-
+              <EnpsCard colaboradorId={colaboradorId} />
+              <PdiCard colaboradorId={colaboradorId} />
+              <OneOnOneCard colaboradorId={colaboradorId} />
               <Card className="p-6 opacity-70" data-testid="card-comentarios">
                 <div className="flex items-start gap-4">
                   <div className="p-3 rounded-lg bg-amber-100 dark:bg-amber-900/30">
