@@ -1749,3 +1749,71 @@ export const updateNotificationRuleSchema = z.object({
 export type NotificationRule = typeof notificationRules.$inferSelect;
 export type InsertNotificationRule = z.infer<typeof insertNotificationRuleSchema>;
 export type UpdateNotificationRule = z.infer<typeof updateNotificationRuleSchema>;
+
+// ==================== 1x1 (ONE-ON-ONE) ====================
+
+export const oneOnOne = pgTable("rh_one_on_one", {
+  id: serial("id").primaryKey(),
+  colaboradorId: integer("colaborador_id").notNull(),
+  gestorId: integer("gestor_id"),
+  data: date("data").notNull(),
+  pauta: text("pauta"),
+  notas: text("notas"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  criadoPor: text("criado_por"),
+});
+
+export const oneOnOneAcoes = pgTable("rh_one_on_one_acoes", {
+  id: serial("id").primaryKey(),
+  oneOnOneId: integer("one_on_one_id").notNull(),
+  descricao: text("descricao").notNull(),
+  responsavel: text("responsavel"),
+  prazo: date("prazo"),
+  status: text("status").default("pendente"),
+  concluidaEm: timestamp("concluida_em"),
+});
+
+export const insertOneOnOneSchema = createInsertSchema(oneOnOne).omit({ id: true, criadoEm: true });
+export const insertOneOnOneAcaoSchema = createInsertSchema(oneOnOneAcoes).omit({ id: true });
+
+export type OneOnOne = typeof oneOnOne.$inferSelect;
+export type InsertOneOnOne = z.infer<typeof insertOneOnOneSchema>;
+export type OneOnOneAcao = typeof oneOnOneAcoes.$inferSelect;
+export type InsertOneOnOneAcao = z.infer<typeof insertOneOnOneAcaoSchema>;
+
+// ==================== E-NPS ====================
+
+export const enpsResponses = pgTable("rh_enps", {
+  id: serial("id").primaryKey(),
+  colaboradorId: integer("colaborador_id").notNull(),
+  score: integer("score").notNull(),
+  comentario: text("comentario"),
+  data: date("data").notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  criadoPor: text("criado_por"),
+});
+
+export const insertEnpsSchema = createInsertSchema(enpsResponses).omit({ id: true, criadoEm: true });
+export type EnpsResponse = typeof enpsResponses.$inferSelect;
+export type InsertEnps = z.infer<typeof insertEnpsSchema>;
+
+// ==================== PDI (PLANO DE DESENVOLVIMENTO INDIVIDUAL) ====================
+
+export const pdiGoals = pgTable("rh_pdi", {
+  id: serial("id").primaryKey(),
+  colaboradorId: integer("colaborador_id").notNull(),
+  titulo: text("titulo").notNull(),
+  descricao: text("descricao"),
+  competencia: text("competencia"),
+  recursos: text("recursos"),
+  prazo: date("prazo"),
+  progresso: integer("progresso").default(0),
+  status: text("status").default("em_andamento"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  criadoPor: text("criado_por"),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const insertPdiSchema = createInsertSchema(pdiGoals).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type PdiGoal = typeof pdiGoals.$inferSelect;
+export type InsertPdi = z.infer<typeof insertPdiSchema>;
