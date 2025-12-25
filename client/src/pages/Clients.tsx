@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatCurrencyNoDecimals, formatDecimal, formatPercent } from "@/lib/utils";
+import { formatCurrencyWithDecimals, formatDecimal, formatPercent } from "@/lib/utils";
 import type { ClienteCompleto } from "../../../server/storage";
 
 type SortField = "name" | "cnpj" | "ltv" | "lt" | "aov" | "status" | "startDate";
@@ -311,14 +311,14 @@ export default function Clients({
           />
           <StatsCard
             title="LTV Médio"
-            value={formatCurrencyNoDecimals(kpis.ltvMedio)}
+            value={formatCurrencyWithDecimals(kpis.ltvMedio)}
             icon={TrendingUp}
             variant="info"
             subtitle="Soma de toda a receita paga dividida pelo número de clientes. Quanto maior, mais valor cada cliente gerou."
             tooltipType="help"
             animateValue
             rawValue={kpis.ltvMedio}
-            formatValue={(v) => formatCurrencyNoDecimals(v)}
+            formatValue={(v) => formatCurrencyWithDecimals(v)}
           />
           <StatsCard
             title="LT Médio"
@@ -332,14 +332,14 @@ export default function Clients({
           />
           <StatsCard
             title="AOV"
-            value={formatCurrencyNoDecimals(kpis.aov)}
+            value={formatCurrencyWithDecimals(kpis.aov)}
             icon={DollarSign}
             variant="success"
             subtitle="Ticket médio mensal por cliente. É o LTV dividido pelo LT (tempo de vida)."
             tooltipType="help"
             animateValue
             rawValue={kpis.aov}
-            formatValue={(v) => formatCurrencyNoDecimals(v)}
+            formatValue={(v) => formatCurrencyWithDecimals(v)}
           />
         </div>
 
