@@ -10837,6 +10837,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/okr2026/coverage", isAuthenticated, async (req, res) => {
+    try {
+      const { getCoverage } = await import("./okr2026/metricsAdapter");
+      const coverage = getCoverage();
+      res.json(coverage);
+    } catch (error) {
+      console.error("[api] Error fetching OKR coverage:", error);
+      res.status(500).json({ error: "Failed to fetch OKR coverage" });
+    }
+  });
+
+  app.get("/api/okr2026/config", isAuthenticated, async (req, res) => {
+    try {
+      const { getOKRConfig, getObjectives } = await import("./okr2026/metricsAdapter");
+      res.json({
+        config: getOKRConfig(),
+        objectives: getObjectives()
+      });
+    } catch (error) {
+      console.error("[api] Error fetching OKR config:", error);
+      res.status(500).json({ error: "Failed to fetch OKR config" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);

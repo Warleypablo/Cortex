@@ -1,10 +1,11 @@
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import * as schema from "@shared/schema";
-import targets from "./targets.json";
-import krs from "./krs.json";
+import krsJson from "./krs.json";
 import initiatives from "./initiatives.json";
 import manualMetrics from "./manualMetrics.json";
+import { OKR_CONFIG, getAllKRs, getKRsByObjective, getAllObjectives } from "./okrConfig";
+import { METRICS_REGISTRY, getRequiredMetrics, getMetricSpec } from "./metricsRegistry";
 
 export interface MetricValue {
   value: number | null;
@@ -56,7 +57,8 @@ function getCurrentQuarter(): string {
 
 function getQuarterTarget(metric: string): number {
   const quarter = getCurrentQuarter();
-  const mrrTargets = targets.company.mrr_ativo as Record<string, number>;
+  const kr = OKR_CONFIG.krs.KR1_MRR_EOQ;
+  const mrrTargets = kr.targets || {};
   return mrrTargets[quarter] || 0;
 }
 
@@ -118,7 +120,7 @@ export async function getReceitaYTD(): Promise<{
     const result = await db.execute(sql`
       SELECT 
         COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as total,
-        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND categoria_dfc NOT ILIKE '%imposto%' THEN valor_pago::numeric ELSE 0 END), 0) as liquida
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND categoria_nome NOT ILIKE '%imposto%' THEN valor_pago::numeric ELSE 0 END), 0) as liquida
       FROM caz_parcelas
       WHERE EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento)) = ${currentYear}
         AND tipo_evento = 'RECEITA'
@@ -163,9 +165,9 @@ export async function getEbitdaYTD(): Promise<number> {
 export async function getCaixaAtual(): Promise<number> {
   try {
     const result = await db.execute(sql`
-      SELECT COALESCE(SUM(saldo::numeric), 0) as saldo
+      SELECT COALESCE(SUM(balance::numeric), 0) as saldo
       FROM caz_bancos
-      WHERE ativo = true
+      WHERE ativo = 'true' OR ativo = 't' OR ativo IS NULL
     `);
     return parseFloat((result.rows[0] as any)?.saldo || "0");
   } catch (error) {
@@ -256,7 +258,7 @@ export async function getChurnMRR(): Promise<{ gross: number; grossPercentual: n
 export async function getClientesAtivos(): Promise<number> {
   try {
     const result = await db.execute(sql`
-      SELECT COUNT(DISTINCT cliente) as total
+      SELECT COUNT(DISTINCT id_task) as total
       FROM ${schema.cupContratos}
       WHERE status IN ('ativo', 'onboarding', 'triagem')
     `);
@@ -338,11 +340,43 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
 }
 
 export function getTargets() {
-  return targets;
+  const krs = OKR_CONFIG.krs;
+  return {
+    year: OKR_CONFIG.year,
+    company: {
+      mrr_ativo: krs.KR1_MRR_EOQ.targets || {},
+      receita_liquida_anual: krs.KR2_NET_REVENUE_YTD.target || 0,
+      ebitda_anual: krs.KR1_EBITDA_YTD.target || 0,
+      inadimplencia_max: krs.KR1_INADIMPLENCIA_MAX.target || 0,
+      gross_mrr_churn_max: krs.KR2_GROSS_CHURN_MAX.target || 0,
+      clientes_eoy: krs.KR3_CLIENTS_EOY.target || 0
+    },
+    turbooh: {
+      receita_liquida_anual: krs.KR2_OH_NETREV_YTD.target || 0,
+      resultado_anual: krs.KR3_OH_RESULT_YTD.target || 0,
+      clientes_eoy: krs.KR1_OH_SCREENS_EOY.target || 0
+    },
+    tech: {
+      projetos_anual: krs.KR1_TECH_DELIVERED_YTD.target || 0,
+      freelancers_max_pct: krs.KR2_TECH_FREELA_GUARDRAIL.target || 0
+    }
+  };
 }
 
 export function getKRs() {
-  return krs;
+  return krsJson;
+}
+
+export function getOKRConfig() {
+  return OKR_CONFIG;
+}
+
+export function getObjectives() {
+  return getAllObjectives();
+}
+
+export function getKRsByObjectiveCode(code: string) {
+  return getKRsByObjective(code);
 }
 
 export function getInitiatives() {
@@ -355,7 +389,7 @@ export function getManualMetrics() {
 
 export function calculateProgress(atual: number, target: number, direction: string): number {
   if (target === 0) return 0;
-  if (direction === "lower_is_better") {
+  if (direction === "lower" || direction === "lower_is_better") {
     if (atual <= target) return 100;
     return Math.max(0, 100 - ((atual - target) / target) * 100);
   }
@@ -363,7 +397,7 @@ export function calculateProgress(atual: number, target: number, direction: stri
 }
 
 export function getStatus(progress: number, direction: string): "green" | "yellow" | "red" {
-  if (direction === "lower_is_better") {
+  if (direction === "lower" || direction === "lower_is_better") {
     if (progress >= 100) return "green";
     if (progress >= 90) return "yellow";
     return "red";
@@ -371,4 +405,100 @@ export function getStatus(progress: number, direction: string): "green" | "yello
   if (progress >= 100) return "green";
   if (progress >= 90) return "yellow";
   return "red";
+}
+
+export interface KRProgress {
+  krId: string;
+  actual: number | null;
+  target: number | null;
+  progress: number | null;
+  status: "green" | "yellow" | "red" | "gray";
+  delta: number | null;
+  direction: string;
+}
+
+export async function getKRProgress(krId: string): Promise<KRProgress> {
+  const kr = Object.values(OKR_CONFIG.krs).find(k => k.id === krId);
+  if (!kr) {
+    return { krId, actual: null, target: null, progress: null, status: "gray", delta: null, direction: "higher" };
+  }
+
+  const metrics = await getDashboardMetrics();
+  let actual: number | null = null;
+  let target: number | null = null;
+
+  switch (kr.metric_key) {
+    case "mrr_active":
+      actual = metrics.mrr_ativo;
+      const quarter = getCurrentQuarter();
+      target = (kr.targets as Record<string, number>)?.[quarter] || (kr.target as number) || null;
+      break;
+    case "revenue_net":
+      actual = metrics.receita_liquida_ytd;
+      target = kr.target as number || null;
+      break;
+    case "clients_active":
+      actual = metrics.clientes_ativos;
+      target = kr.target as number || null;
+      break;
+    case "revenue_per_head":
+      actual = metrics.receita_por_head;
+      target = kr.target as number || null;
+      break;
+    case "ebitda":
+      actual = metrics.ebitda_ytd;
+      target = kr.target as number || null;
+      break;
+    case "cash_balance_end":
+      actual = metrics.caixa_atual;
+      target = kr.target as number || null;
+      break;
+    case "inadimplencia_pct":
+      actual = metrics.inadimplencia_percentual;
+      target = kr.target as number || null;
+      break;
+    case "gross_mrr_churn_pct":
+      actual = metrics.gross_mrr_churn_percentual;
+      target = kr.target as number || null;
+      break;
+    default:
+      actual = null;
+      target = kr.target as number || null;
+  }
+
+  if (actual === null || target === null) {
+    return { krId, actual, target, progress: null, status: "gray", delta: null, direction: kr.direction };
+  }
+
+  const progress = calculateProgress(actual, target, kr.direction);
+  const status = getStatus(progress, kr.direction);
+  const delta = actual - target;
+
+  return { krId, actual, target, progress, status, delta, direction: kr.direction };
+}
+
+export function getCoverage(): { covered: number; total: number; percentage: number; missing: string[] } {
+  const required = getRequiredMetrics();
+  const availableMetrics = new Set([
+    "mrr_active", "revenue_net", "revenue_total_billable", "ebitda", "cash_balance_end",
+    "inadimplencia_pct", "gross_mrr_churn_pct", "clients_active", "headcount_total", "revenue_per_head"
+  ]);
+
+  const missing: string[] = [];
+  let covered = 0;
+
+  for (const metric of required) {
+    if (availableMetrics.has(metric.id)) {
+      covered++;
+    } else {
+      missing.push(metric.id);
+    }
+  }
+
+  return {
+    covered,
+    total: required.length,
+    percentage: required.length > 0 ? (covered / required.length) * 100 : 0,
+    missing
+  };
 }
