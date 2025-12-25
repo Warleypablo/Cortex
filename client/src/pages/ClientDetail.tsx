@@ -162,6 +162,7 @@ export default function ClientDetail() {
   }
 
   interface EditFormData {
+    cnpj: string;
     endereco: string;
     telefone: string;
     responsavel: string;
@@ -173,6 +174,11 @@ export default function ClientDetail() {
     linksContrato: string;
     linkListaClickup: string;
     cluster: string;
+    statusCliente: string;
+    statusConta: string;
+    tipoNegocio: string;
+    faturamentoMensal: string;
+    investimentoAds: string;
   }
 
   const formatPhoneMask = (value: string): string => {
@@ -184,8 +190,35 @@ export default function ClientDetail() {
     return `+${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 9)}-${digits.slice(9, 13)}`;
   };
 
+  const formatCnpjCpfMask = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length === 0) return '';
+    if (digits.length <= 11) {
+      if (digits.length <= 3) return digits;
+      if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+      if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+      return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+    }
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+    if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
+    if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12, 14)}`;
+  };
+
+  const formatCurrencyMask = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (!digits) return '';
+    const floatVal = parseFloat(digits) / 100;
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(floatVal);
+  };
+
   const editForm = useForm<EditFormData>({
     defaultValues: {
+      cnpj: "",
       endereco: "",
       telefone: "",
       responsavel: "",
@@ -197,6 +230,11 @@ export default function ClientDetail() {
       linksContrato: "",
       linkListaClickup: "",
       cluster: "",
+      statusCliente: "",
+      statusConta: "",
+      tipoNegocio: "",
+      faturamentoMensal: "",
+      investimentoAds: "",
     },
   });
 
@@ -395,7 +433,14 @@ export default function ClientDetail() {
 
   const handleToggleEdit = () => {
     if (!isEditingDados && cliente) {
+      const formatStoredCurrency = (val: string | null) => {
+        if (!val) return "";
+        const num = parseFloat(val.replace(/[^\d.,]/g, '').replace(',', '.'));
+        if (isNaN(num)) return val;
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
+      };
       editForm.reset({
+        cnpj: cliente.cnpj || "",
         endereco: cliente.endereco || "",
         telefone: formatPhoneMask(cliente.telefone || ""),
         responsavel: cliente.responsavel || "",
@@ -407,6 +452,11 @@ export default function ClientDetail() {
         linksContrato: cliente.linksContrato || "",
         linkListaClickup: cliente.linkListaClickup || "",
         cluster: cliente.cluster || "",
+        statusCliente: cliente.ativo || "",
+        statusConta: cliente.statusConta || "",
+        tipoNegocio: cliente.tipoNegocio || "",
+        faturamentoMensal: formatStoredCurrency(cliente.faturamentoMensal),
+        investimentoAds: formatStoredCurrency(cliente.investimentoAds),
       });
     }
     setIsEditingDados(!isEditingDados);
@@ -419,14 +469,26 @@ export default function ClientDetail() {
   };
 
   const onSubmitEdit = (data: EditFormData) => {
+    const parseCurrencyToFloat = (val: string): string | null => {
+      if (!val) return null;
+      const cleaned = val.replace(/[R$\s.]/g, '').replace(',', '.');
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? null : num.toString();
+    };
     const normalizedData = {
       ...data,
+      cnpj: data.cnpj || null,
       telefone: data.telefone.replace(/\D/g, '') || null,
       linksContrato: normalizeLink(data.linksContrato),
       linkListaClickup: normalizeLink(data.linkListaClickup),
       site: normalizeLink(data.site),
       instagram: normalizeLink(data.instagram),
       email: normalizeLink(data.email),
+      statusCliente: data.statusCliente || null,
+      statusConta: data.statusConta === "__none__" ? null : (data.statusConta || null),
+      tipoNegocio: data.tipoNegocio === "__none__" ? null : (data.tipoNegocio || null),
+      faturamentoMensal: parseCurrencyToFloat(data.faturamentoMensal),
+      investimentoAds: parseCurrencyToFloat(data.investimentoAds),
     };
     updateClienteMutation.mutate(normalizedData as any);
   };
@@ -1401,6 +1463,26 @@ export default function ClientDetail() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     <FormField
                       control={editForm.control}
+                      name="cnpj"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CNPJ/CPF</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="XX.XXX.XXX/XXXX-XX" 
+                              value={field.value}
+                              onChange={(e) => {
+                                const formatted = formatCnpjCpfMask(e.target.value);
+                                field.onChange(formatted);
+                              }}
+                              data-testid="input-cnpj"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
                       name="endereco"
                       render={({ field }) => (
                         <FormItem>
@@ -1560,6 +1642,116 @@ export default function ClientDetail() {
                               <SelectItem value="3">Imperdíveis</SelectItem>
                             </SelectContent>
                           </Select>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="statusCliente"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status do Cliente</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || "__none__"}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-status-cliente">
+                                <SelectValue placeholder="Selecione o status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="__none__">Nenhum</SelectItem>
+                              <SelectItem value="triagem">Triagem</SelectItem>
+                              <SelectItem value="onboarding">Onboarding</SelectItem>
+                              <SelectItem value="ativo">Ativo</SelectItem>
+                              <SelectItem value="em cancelamento">Em Cancelamento</SelectItem>
+                              <SelectItem value="pausado">Pausado</SelectItem>
+                              <SelectItem value="cancelado/inativo">Cancelado/Inativo</SelectItem>
+                              <SelectItem value="entregue">Entregue</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="statusConta"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status da Conta</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || "__none__"}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-status-conta-edit">
+                                <SelectValue placeholder="Selecione o status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="__none__">Não definido</SelectItem>
+                              <SelectItem value="saudavel">Saudável</SelectItem>
+                              <SelectItem value="requer_atencao">Requer Atenção</SelectItem>
+                              <SelectItem value="insatisfeito">Insatisfeito</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="tipoNegocio"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tipo de Negócio</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || "__none__"}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-tipo-negocio">
+                                <SelectValue placeholder="Selecione o tipo" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="__none__">Não definido</SelectItem>
+                              <SelectItem value="ecommerce">Ecommerce</SelectItem>
+                              <SelectItem value="lead">Lead</SelectItem>
+                              <SelectItem value="info">Info</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="faturamentoMensal"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Faturamento Mensal</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="R$ 0,00" 
+                              value={field.value}
+                              onChange={(e) => {
+                                const formatted = formatCurrencyMask(e.target.value);
+                                field.onChange(formatted);
+                              }}
+                              data-testid="input-faturamento-mensal"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="investimentoAds"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Investimento em Ads</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="R$ 0,00" 
+                              value={field.value}
+                              onChange={(e) => {
+                                const formatted = formatCurrencyMask(e.target.value);
+                                field.onChange(formatted);
+                              }}
+                              data-testid="input-investimento-ads"
+                            />
+                          </FormControl>
                         </FormItem>
                       )}
                     />

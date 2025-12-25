@@ -1092,6 +1092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const {
+        cnpj: newCnpj,
         telefone,
         responsavel,
         responsavelGeral,
@@ -1101,12 +1102,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         instagram,
         linksContrato,
         linkListaClickup,
-        cluster
+        cluster,
+        statusCliente,
+        statusConta,
+        tipoNegocio,
+        faturamentoMensal,
+        investimentoAds
       } = req.body;
       
       await db.execute(sql`
         UPDATE cup_clientes
         SET 
+          cnpj = COALESCE(${newCnpj ?? null}, cnpj),
           telefone = ${telefone ?? null},
           responsavel = ${responsavel ?? null},
           responsavel_geral = ${responsavelGeral ?? null},
@@ -1116,7 +1123,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           instagram = ${instagram ?? null},
           links_contrato = ${linksContrato ?? null},
           link_lista_clickup = ${linkListaClickup ?? null},
-          cluster = ${cluster ?? null}
+          cluster = ${cluster ?? null},
+          status = ${statusCliente ?? null},
+          status_conta = ${statusConta ?? null},
+          tipo_negocio = ${tipoNegocio ?? null},
+          faturamento_mensal = ${faturamentoMensal ?? null},
+          investimento_ads = ${investimentoAds ?? null}
         WHERE cnpj = ${cnpj}
       `);
       
