@@ -19,6 +19,7 @@ import * as fs from "fs";
 import { registerAcessosRoutes } from "./routes/acessos";
 import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
+import { registerMetasRoutes } from "./routes/metas";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== 'admin') {
@@ -8164,6 +8165,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Growth Module - registered from separate file
   registerGrowthRoutes(app, db, storage);
+
+  // Metas & Notifications Module - registered from separate file
+  await registerMetasRoutes(app, db, storage);
 
   // ============================================
   // Access Logs API

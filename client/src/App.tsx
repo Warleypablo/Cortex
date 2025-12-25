@@ -62,6 +62,7 @@ const Beneficios = lazy(() => import("@/pages/Beneficios"));
 const OKR2026 = lazy(() => import("@/pages/OKR2026"));
 const AdminNotificationRules = lazy(() => import("@/pages/AdminNotificationRules"));
 const Calendario = lazy(() => import("@/pages/Calendario"));
+const MetasSquad = lazy(() => import("@/pages/MetasSquad"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -217,6 +218,9 @@ function ProtectedRouter() {
       
       {/* Calendário */}
       <Route path="/calendario">{() => <ProtectedRoute path="/calendario" component={Calendario} />}</Route>
+      
+      {/* Metas por Squad */}
+      <Route path="/metas-squad">{() => <ProtectedRoute path="/metas-squad" component={MetasSquad} />}</Route>
       
       {/* Admin */}
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>

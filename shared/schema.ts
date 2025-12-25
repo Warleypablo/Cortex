@@ -1853,3 +1853,45 @@ export const turboEventos = pgTable("turbo_eventos", {
 export const insertTurboEventoSchema = createInsertSchema(turboEventos).omit({ id: true, criadoEm: true });
 export type TurboEvento = typeof turboEventos.$inferSelect;
 export type InsertTurboEvento = z.infer<typeof insertTurboEventoSchema>;
+
+// ==================== METAS POR SQUAD ====================
+
+export const squadMetas = pgTable("squad_metas", {
+  id: serial("id").primaryKey(),
+  squad: varchar("squad", { length: 100 }).notNull(),
+  ano: integer("ano").notNull(),
+  mes: integer("mes").notNull(),
+  metaMrr: decimal("meta_mrr"),
+  metaNovosClientes: integer("meta_novos_clientes"),
+  metaRetencao: decimal("meta_retencao"),
+  metaTicketMedio: decimal("meta_ticket_medio"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+  criadoPor: text("criado_por"),
+});
+
+export const insertSquadMetaSchema = createInsertSchema(squadMetas).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type SquadMeta = typeof squadMetas.$inferSelect;
+export type InsertSquadMeta = z.infer<typeof insertSquadMetaSchema>;
+
+// ==================== USER NOTIFICATIONS ====================
+
+export const userNotifications = pgTable("user_notifications", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 100 }),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"),
+  entityId: text("entity_id"),
+  entityType: text("entity_type"),
+  priority: text("priority").default("medium"),
+  read: boolean("read").default(false),
+  dismissed: boolean("dismissed").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+});
+
+export const insertUserNotificationSchema = createInsertSchema(userNotifications).omit({ id: true, createdAt: true });
+export type UserNotification = typeof userNotifications.$inferSelect;
+export type InsertUserNotification = z.infer<typeof insertUserNotificationSchema>;
