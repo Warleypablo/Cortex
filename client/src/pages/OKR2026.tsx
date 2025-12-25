@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,11 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Target, TrendingUp, TrendingDown, Users, DollarSign, Percent, AlertTriangle, Calendar, ArrowUpRight, ArrowDownRight, Minus, Info, Flag, Rocket, Clock, CheckCircle2, XCircle, ChevronRight, Zap, BarChart3, Activity } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, AreaChart, BarChart, Bar, Tooltip as RechartsTooltip, Legend } from "recharts";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { 
+  Target, TrendingUp, TrendingDown, Users, DollarSign, Percent, AlertTriangle, 
+  ArrowUpRight, ArrowDownRight, Info, Flag, Rocket, Clock, CheckCircle2, 
+  XCircle, ChevronRight, Zap, BarChart3, Activity, Banknote, PiggyBank,
+  CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, ShoppingCart
+} from "lucide-react";
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, 
+  AreaChart, Area, BarChart, Bar, Tooltip as RechartsTooltip, Legend 
+} from "recharts";
 
 interface DashboardMetrics {
   mrr_ativo: number;
@@ -28,75 +36,98 @@ interface DashboardMetrics {
   headcount: number;
   receita_por_head: number;
   mrr_por_head: number;
+  turbooh_receita: number | null;
   turbooh_receita_liquida_ytd: number | null;
+  turbooh_resultado: number | null;
   turbooh_resultado_ytd: number | null;
+  turbooh_margem_pct: number | null;
   tech_projetos_entregues: number;
   tech_freelancers_custo: number;
   tech_freelancers_percentual: number;
-}
-
-interface Targets {
-  year: number;
-  company: {
-    mrr_ativo: Record<string, number>;
-    receita_liquida_anual: number;
-    ebitda_anual: number;
-    inadimplencia_max: number;
-    gross_mrr_churn_max: number;
-    clientes_eoy: number;
-  };
-  turbooh?: {
-    receita_liquida_anual: number;
-    resultado_anual: number;
-    clientes_eoy: number;
-  };
-  tech?: {
-    projetos_mensal: Record<string, number>;
-    freelancers_mensal: Record<string, number>;
-  };
-}
-
-interface KR {
-  id: string;
-  title: string;
-  metric_key: string;
-  target_type: string;
-  target: number | null;
-  targets?: Record<string, number>;
-  unit: string;
-  direction: string;
-  owner: string;
-  atual: number | null;
-  progress: number | null;
-  status: "green" | "yellow" | "red" | "gray";
+  new_mrr: number;
+  new_mrr_ytd: number;
+  expansion_mrr: number;
+  expansion_mrr_ytd: number | null;
 }
 
 interface Objective {
   id: string;
   title: string;
-  description: string;
-  krs: KR[];
+  ownerRole: string;
+  narrative: string;
+  order: number;
+}
+
+interface KR {
+  id: string;
+  objectiveId: string;
+  title: string;
+  metricKey: string;
+  operator: string;
+  cadence: string;
+  targetType: string;
+  targets: Record<string, number>;
+  description?: string;
+  owner: string;
+  status: "green" | "yellow" | "red" | "gray";
+  unit: string;
+  direction: string;
+  currentValue: number | null;
+  target: number | null;
+  progress: number | null;
 }
 
 interface Initiative {
   id: string;
-  objetivo: string;
-  titulo: string;
-  descricao_curta?: string;
-  owner: string;
-  bu: string;
-  quarter: string;
-  kr_vinculadas: string[];
-  status: "backlog" | "doing" | "done" | "blocked";
-  due_date: string;
-  kpi_impact?: string;
-  impacto_esperado: string;
-  confianca: number;
-  proximo_marco: string;
+  objectiveId: string;
+  name: string;
+  ownerRole: string;
+  start: string;
+  end: string;
+  status: "not_started" | "in_progress" | "completed" | "blocked";
+  type: string;
+  krIds: string[];
+  successMetricKeys: string[];
+  successKpi: string;
   notes?: string;
 }
 
+interface Highlights {
+  mrr: { value: number; target: number | null; progress: number | null };
+  revenue: { value: number; target: number | null; progress: number | null };
+  ebitda: { value: number; target: number | null; progress: number | null };
+  inadimplencia: { value: number; target: number | null; status: string };
+  net_churn: { value: number | null; target: number | null; status: string };
+}
+
+interface Series {
+  mrr: { month: string; value: number }[];
+  ebitda: { month: string; value: number }[];
+  churn: { month: string; value: number }[];
+}
+
+interface SummaryResponse {
+  objectives: Objective[];
+  krs: KR[];
+  metrics: DashboardMetrics;
+  initiatives: Initiative[];
+  highlights: Highlights;
+  series: Series;
+  meta: {
+    generatedAt: string;
+    period: string;
+    bu: string;
+    cacheHit: boolean;
+  };
+}
+
 function formatCurrency(value: number): string {
+  if (Math.abs(value) >= 1000000) {
+    return `R$ ${(value / 1000000).toFixed(2)}M`;
+  }
+  if (Math.abs(value) >= 1000) {
+    return `R$ ${(value / 1000).toFixed(1)}K`;
+  }
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
@@ -116,47 +147,51 @@ function getCurrentQuarter(): string {
   return "Q4";
 }
 
-function getStatusColor(progress: number | null, hasTarget: boolean): { bg: string; text: string; border: string; status: "on-track" | "warning" | "off-track" | "no-target" } {
-  if (!hasTarget || progress === null) {
-    return { bg: "bg-slate-500/10", text: "text-slate-500", border: "border-slate-500/20", status: "no-target" };
+function getKRStatusColor(kr: KR): { bg: string; text: string; border: string; label: string } {
+  const { progress, direction, currentValue, target, operator } = kr;
+  
+  if (progress === null || currentValue === null || target === null) {
+    return { bg: "bg-muted", text: "text-muted-foreground", border: "border-muted", label: "Sem dados" };
+  }
+
+  if (direction === "lower" || operator === "<=") {
+    if (currentValue <= target) {
+      return { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", border: "border-green-500/30", label: "No alvo" };
+    }
+    const overshoot = ((currentValue - target) / target) * 100;
+    if (overshoot <= 10) {
+      return { bg: "bg-yellow-500/10", text: "text-yellow-600 dark:text-yellow-400", border: "border-yellow-500/30", label: "Atenção" };
+    }
+    return { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400", border: "border-red-500/30", label: "Fora do alvo" };
+  }
+  
+  if (progress >= 100) {
+    return { bg: "bg-green-500/10", text: "text-green-600 dark:text-green-400", border: "border-green-500/30", label: "No alvo" };
   }
   if (progress >= 90) {
-    return { bg: "bg-green-500/10", text: "text-green-500", border: "border-green-500/20", status: "on-track" };
+    return { bg: "bg-yellow-500/10", text: "text-yellow-600 dark:text-yellow-400", border: "border-yellow-500/30", label: "Atenção" };
   }
-  if (progress >= 70) {
-    return { bg: "bg-yellow-500/10", text: "text-yellow-500", border: "border-yellow-500/20", status: "warning" };
-  }
-  return { bg: "bg-red-500/10", text: "text-red-500", border: "border-red-500/20", status: "off-track" };
+  return { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400", border: "border-red-500/30", label: "Fora do alvo" };
 }
 
-function StatusIndicator({ status }: { status: "on-track" | "warning" | "off-track" | "no-target" }) {
-  const configs = {
-    "on-track": { icon: CheckCircle2, label: "No alvo", color: "text-green-500" },
-    "warning": { icon: AlertTriangle, label: "Atenção", color: "text-yellow-500" },
-    "off-track": { icon: XCircle, label: "Fora do alvo", color: "text-red-500" },
-    "no-target": { icon: Minus, label: "Sem meta", color: "text-slate-400" },
-  };
-  const config = configs[status];
-  const Icon = config.icon;
-  return (
-    <div className={`flex items-center gap-1 text-xs ${config.color}`}>
-      <Icon className="w-3.5 h-3.5" />
-      <span className="font-medium">{config.label}</span>
-    </div>
-  );
-}
-
-function MetricCard({ title, value, target, format, direction, icon: Icon, tooltip, trend, onDrillDown, description }: {
+function HeroCard({ 
+  title, 
+  value, 
+  target, 
+  format, 
+  direction = "higher",
+  icon: Icon, 
+  tooltip,
+  status
+}: {
   title: string;
   value: number | null;
   target: number | null;
   format: "currency" | "number" | "percent";
-  direction: "higher" | "lower";
+  direction?: "higher" | "lower";
   icon: typeof TrendingUp;
   tooltip?: string;
-  trend?: { value: number; label: string };
-  onDrillDown?: () => void;
-  description?: string;
+  status?: "green" | "yellow" | "red";
 }) {
   const formatValue = (v: number) => {
     if (format === "currency") return formatCurrency(v);
@@ -164,25 +199,37 @@ function MetricCard({ title, value, target, format, direction, icon: Icon, toolt
     return formatNumber(v);
   };
 
-  const progress = value !== null && target !== null && target > 0
-    ? direction === "higher"
-      ? Math.min(100, (value / target) * 100)
-      : value <= target ? 100 : Math.max(0, 100 - ((value - target) / target) * 100)
-    : null;
+  let progress: number | null = null;
+  if (value !== null && target !== null && target > 0) {
+    if (direction === "higher") {
+      progress = Math.min(100, (value / target) * 100);
+    } else {
+      progress = value <= target ? 100 : Math.max(0, 100 - ((value - target) / target) * 100);
+    }
+  }
 
-  const statusColors = getStatusColor(progress, target !== null);
-  const hasInteraction = !!onDrillDown;
+  const getStatusColor = () => {
+    if (status === "green") return { bg: "bg-green-500/10", border: "border-l-green-500", text: "text-green-600 dark:text-green-400" };
+    if (status === "yellow") return { bg: "bg-yellow-500/10", border: "border-l-yellow-500", text: "text-yellow-600 dark:text-yellow-400" };
+    if (status === "red") return { bg: "bg-red-500/10", border: "border-l-red-500", text: "text-red-600 dark:text-red-400" };
+    
+    if (progress === null) return { bg: "bg-muted/50", border: "border-l-muted-foreground/30", text: "text-muted-foreground" };
+    if (progress >= 90) return { bg: "bg-green-500/10", border: "border-l-green-500", text: "text-green-600 dark:text-green-400" };
+    if (progress >= 70) return { bg: "bg-yellow-500/10", border: "border-l-yellow-500", text: "text-yellow-600 dark:text-yellow-400" };
+    return { bg: "bg-red-500/10", border: "border-l-red-500", text: "text-red-600 dark:text-red-400" };
+  };
+
+  const colors = getStatusColor();
 
   return (
     <Card 
-      className={`relative overflow-visible transition-all duration-200 ${hasInteraction ? "cursor-pointer hover-elevate" : ""} ${statusColors.border} border-l-4`}
-      onClick={onDrillDown}
-      data-testid={`card-metric-${title.toLowerCase().replace(/\s+/g, "-")}`}
+      className={`relative overflow-visible border-l-4 ${colors.border}`}
+      data-testid={`card-hero-${title.toLowerCase().replace(/\s+/g, "-")}`}
     >
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-          <div className={`p-1.5 rounded-md ${statusColors.bg}`}>
-            <Icon className={`w-3.5 h-3.5 ${statusColors.text}`} />
+          <div className={`p-1.5 rounded-md ${colors.bg}`}>
+            <Icon className={`w-3.5 h-3.5 ${colors.text}`} />
           </div>
           {title}
           {tooltip && (
@@ -194,66 +241,214 @@ function MetricCard({ title, value, target, format, direction, icon: Icon, toolt
             </Tooltip>
           )}
         </CardTitle>
-        {hasInteraction && (
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        )}
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <div className="text-2xl font-bold" data-testid={`value-${title.toLowerCase().replace(/\s+/g, "-")}`}>
-            {value !== null ? formatValue(value) : "—"}
-          </div>
-          {trend && (
-            <div className={`flex items-center gap-0.5 text-xs font-medium ${trend.value >= 0 ? "text-green-500" : "text-red-500"}`}>
-              {trend.value >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-              {Math.abs(trend.value).toFixed(1)}%
-              <span className="text-muted-foreground ml-0.5">{trend.label}</span>
-            </div>
-          )}
+      <CardContent className="space-y-2">
+        <div className="text-2xl font-bold" data-testid={`value-${title.toLowerCase().replace(/\s+/g, "-")}`}>
+          {value !== null ? formatValue(value) : "—"}
         </div>
         {target !== null && (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Meta: {formatValue(target)}</span>
-              <StatusIndicator status={statusColors.status} />
+              {progress !== null && (
+                <span className={`font-medium ${colors.text}`}>{progress.toFixed(0)}%</span>
+              )}
             </div>
             {progress !== null && (
-              <div className="relative">
-                <Progress value={progress} className="h-2" />
-                <div className="absolute right-0 -top-0.5 text-[10px] font-medium text-muted-foreground">
-                  {progress.toFixed(0)}%
-                </div>
-              </div>
+              <Progress value={progress} className="h-1.5" />
             )}
           </div>
-        )}
-        {description && (
-          <p className="text-xs text-muted-foreground line-clamp-2">{description}</p>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function StatusBadge({ status }: { status: "green" | "yellow" | "red" | "gray" }) {
+function TurboOHBlock({ metrics }: { metrics: DashboardMetrics }) {
+  const margem = metrics.turbooh_margem_pct;
+  const margemStatus = margem !== null && margem >= 25 ? "green" : margem !== null && margem >= 20 ? "yellow" : "red";
+  
+  return (
+    <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <MonitorPlay className="w-5 h-5 text-primary" />
+          TurboOH
+        </CardTitle>
+        <CardDescription>Performance do segmento Out-of-Home</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-1">
+            <div className="text-sm text-muted-foreground">Receita OH</div>
+            <div className="text-xl font-bold">
+              {metrics.turbooh_receita !== null ? formatCurrency(metrics.turbooh_receita) : "—"}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <div className="text-sm text-muted-foreground">Resultado OH</div>
+            <div className="text-xl font-bold">
+              {metrics.turbooh_resultado !== null ? formatCurrency(metrics.turbooh_resultado) : "—"}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <div className="text-sm text-muted-foreground flex items-center gap-1">
+              Margem OH %
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-3 h-3 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>Meta: {">"}= 25%</TooltipContent>
+              </Tooltip>
+            </div>
+            <div className={`text-xl font-bold ${
+              margemStatus === "green" ? "text-green-600 dark:text-green-400" : 
+              margemStatus === "yellow" ? "text-yellow-600 dark:text-yellow-400" : 
+              "text-red-600 dark:text-red-400"
+            }`}>
+              {margem !== null ? formatPercent(margem) : "—"}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function VendasBlock({ metrics }: { metrics: DashboardMetrics }) {
+  const newMrr = metrics.new_mrr || 0;
+  const expansion = metrics.expansion_mrr || 0;
+  const total = newMrr + expansion;
+  const newPct = total > 0 ? (newMrr / total) * 100 : 50;
+  
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <ShoppingCart className="w-5 h-5 text-primary" />
+          Vendas: New MRR vs Expansão
+        </CardTitle>
+        <CardDescription>Comparativo de aquisição vs monetização base</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <div className="text-sm text-muted-foreground flex items-center gap-1">
+              <ArrowUpRight className="w-3 h-3 text-blue-500" />
+              New MRR
+            </div>
+            <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
+              {formatCurrency(newMrr)}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <div className="text-sm text-muted-foreground flex items-center gap-1">
+              <TrendingUp className="w-3 h-3 text-green-500" />
+              Expansion MRR
+            </div>
+            <div className="text-xl font-bold text-green-600 dark:text-green-400">
+              {formatCurrency(expansion)}
+            </div>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>New MRR ({newPct.toFixed(0)}%)</span>
+            <span>Expansion ({(100 - newPct).toFixed(0)}%)</span>
+          </div>
+          <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+            <div 
+              className="bg-blue-500 transition-all" 
+              style={{ width: `${newPct}%` }} 
+            />
+            <div 
+              className="bg-green-500 transition-all" 
+              style={{ width: `${100 - newPct}%` }} 
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MRRChart({ data }: { data: { month: string; value: number }[] }) {
+  if (!data || data.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Evolução MRR</CardTitle>
+        </CardHeader>
+        <CardContent className="h-48 flex items-center justify-center text-muted-foreground">
+          Sem dados disponíveis
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-primary" />
+          Evolução MRR
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data}>
+              <defs>
+                <linearGradient id="mrrGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <XAxis dataKey="month" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
+              <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10 }} width={50} />
+              <RechartsTooltip 
+                formatter={(value: number) => [formatCurrency(value), "MRR"]}
+                labelFormatter={(label) => `Mês: ${label}`}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="value" 
+                stroke="hsl(var(--primary))" 
+                strokeWidth={2} 
+                fill="url(#mrrGradient)" 
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatusBadge({ status, size = "sm" }: { status: "green" | "yellow" | "red" | "gray"; size?: "sm" | "md" }) {
   const config = {
-    green: { label: "No alvo", className: "bg-green-500/10 text-green-600 border-green-500/20" },
-    yellow: { label: "Atenção", className: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20" },
-    red: { label: "Fora do alvo", className: "bg-red-500/10 text-red-600 border-red-500/20" },
-    gray: { label: "Sem dados", className: "bg-muted text-muted-foreground" },
+    green: { label: "No alvo", className: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30" },
+    yellow: { label: "Atenção", className: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30" },
+    red: { label: "Fora do alvo", className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30" },
+    gray: { label: "Sem dados", className: "bg-muted text-muted-foreground border-muted" },
   };
-  const { label, className } = config[status];
-  return <Badge variant="outline" className={className}>{label}</Badge>;
+  const { label, className } = config[status] || config.gray;
+  return (
+    <Badge variant="outline" className={`${className} ${size === "sm" ? "text-xs" : "text-sm"}`}>
+      {label}
+    </Badge>
+  );
 }
 
 function InitiativeStatusBadge({ status }: { status: string }) {
   const config: Record<string, { label: string; icon: typeof Rocket; className: string }> = {
-    backlog: { label: "Backlog", icon: Clock, className: "bg-slate-500/10 text-slate-600 border-slate-500/20" },
-    doing: { label: "Em andamento", icon: Rocket, className: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
-    done: { label: "Concluído", icon: CheckCircle2, className: "bg-green-500/10 text-green-600 border-green-500/20" },
-    blocked: { label: "Bloqueado", icon: XCircle, className: "bg-red-500/10 text-red-600 border-red-500/20" },
+    not_started: { label: "Backlog", icon: Clock, className: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30" },
+    in_progress: { label: "Em andamento", icon: Rocket, className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+    completed: { label: "Concluído", icon: CheckCircle2, className: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30" },
+    blocked: { label: "Bloqueado", icon: XCircle, className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30" },
   };
-  const { label, icon: Icon, className } = config[status] || config.backlog;
+  const { label, icon: Icon, className } = config[status] || config.not_started;
   return (
     <Badge variant="outline" className={`${className} gap-1`}>
       <Icon className="w-3 h-3" />
@@ -262,614 +457,106 @@ function InitiativeStatusBadge({ status }: { status: string }) {
   );
 }
 
-interface DrillDownData {
-  title: string;
-  value: number;
-  target: number | null;
-  format: "currency" | "number" | "percent";
-  description: string;
-  insights: string[];
-  chartData?: { month: string; value: number }[];
-}
-
-function MetricDrillDownModal({ open, onClose, data }: { open: boolean; onClose: () => void; data: DrillDownData | null }) {
-  if (!data) return null;
-  
-  const formatValue = (v: number) => {
-    if (data.format === "currency") return formatCurrency(v);
-    if (data.format === "percent") return formatPercent(v);
-    return formatNumber(v);
-  };
-
-  const progress = data.target !== null && data.target > 0 
-    ? Math.min(100, (data.value / data.target) * 100)
-    : null;
-
-  return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-primary" />
-            {data.title}
-          </DialogTitle>
-          <DialogDescription>{data.description}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-6 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">Valor Atual</div>
-                <div className="text-3xl font-bold mt-1">{formatValue(data.value)}</div>
-              </CardContent>
-            </Card>
-            {data.target !== null && (
-              <Card>
-                <CardContent className="pt-4">
-                  <div className="text-sm text-muted-foreground">Meta</div>
-                  <div className="text-3xl font-bold mt-1">{formatValue(data.target)}</div>
-                  {progress !== null && (
-                    <div className="mt-2">
-                      <Progress value={progress} className="h-2" />
-                      <div className="text-xs text-muted-foreground mt-1">{progress.toFixed(1)}% atingido</div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {data.chartData && data.chartData.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Evolução Histórica</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data.chartData}>
-                      <defs>
-                        <linearGradient id="drilldownGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                      <YAxis tickFormatter={(v) => data.format === "currency" ? `${(v/1000000).toFixed(1)}M` : String(v)} tick={{ fontSize: 11 }} />
-                      <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#drilldownGradient)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {data.insights.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-yellow-500" />
-                  Insights
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {data.insights.map((insight, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm">
-                      <Activity className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <span>{insight}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function HealthScore({ metrics, targets }: { metrics: DashboardMetrics; targets: Targets }) {
+function DashboardTab({ data }: { data: SummaryResponse }) {
+  const { metrics, highlights, series } = data;
   const quarter = getCurrentQuarter();
-  const mrrTarget = targets.company.mrr_ativo[quarter];
-  
-  const scores: { label: string; score: number; weight: number }[] = [
-    { 
-      label: "MRR", 
-      score: mrrTarget > 0 ? Math.min(100, (metrics.mrr_ativo / mrrTarget) * 100) : 0,
-      weight: 25
-    },
-    { 
-      label: "Receita", 
-      score: targets.company.receita_liquida_anual > 0 ? Math.min(100, (metrics.receita_liquida_ytd / targets.company.receita_liquida_anual) * 100) : 0,
-      weight: 20
-    },
-    { 
-      label: "EBITDA", 
-      score: targets.company.ebitda_anual > 0 ? Math.min(100, (metrics.ebitda_ytd / targets.company.ebitda_anual) * 100) : 0,
-      weight: 20
-    },
-    { 
-      label: "Clientes", 
-      score: targets.company.clientes_eoy > 0 ? Math.min(100, (metrics.clientes_ativos / targets.company.clientes_eoy) * 100) : 0,
-      weight: 15
-    },
-    { 
-      label: "Inadimplência", 
-      score: metrics.inadimplencia_percentual <= targets.company.inadimplencia_max ? 100 : Math.max(0, 100 - ((metrics.inadimplencia_percentual - targets.company.inadimplencia_max) * 10)),
-      weight: 10
-    },
-    { 
-      label: "Churn", 
-      score: metrics.gross_mrr_churn_percentual <= targets.company.gross_mrr_churn_max ? 100 : Math.max(0, 100 - ((metrics.gross_mrr_churn_percentual - targets.company.gross_mrr_churn_max) * 5)),
-      weight: 10
-    },
-  ];
 
-  const totalWeight = scores.reduce((sum, s) => sum + s.weight, 0);
-  const overallScore = scores.reduce((sum, s) => sum + (s.score * s.weight), 0) / totalWeight;
-
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return "text-green-500";
-    if (score >= 70) return "text-yellow-500";
-    return "text-red-500";
-  };
-
-  const getScoreBg = (score: number) => {
-    if (score >= 90) return "bg-green-500";
-    if (score >= 70) return "bg-yellow-500";
-    return "bg-red-500";
-  };
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-primary" />
-            Health Score Geral
-          </span>
-          <span className={`text-2xl font-bold ${getScoreColor(overallScore)}`}>
-            {overallScore.toFixed(0)}%
-          </span>
-        </CardTitle>
-        <CardDescription>Saúde geral dos OKRs baseado em pesos das métricas</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {scores.map((s) => (
-            <div key={s.label} className="space-y-1">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{s.label}</span>
-                <span className={`font-medium ${getScoreColor(s.score)}`}>{s.score.toFixed(0)}%</span>
-              </div>
-              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                <div className={`h-full ${getScoreBg(s.score)} rounded-full transition-all`} style={{ width: `${Math.min(100, s.score)}%` }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-interface FilterProps {
-  period: string;
-  bu: string;
-}
-
-function DashboardTab({ period, bu }: FilterProps) {
-  const [drillDownData, setDrillDownData] = useState<DrillDownData | null>(null);
-  const { data, isLoading } = useQuery<{ metrics: DashboardMetrics; targets: Targets }>({
-    queryKey: ["/api/okr2026/dashboard", period, bu],
-  });
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => (
-            <Skeleton key={i} className="h-36 rounded-xl" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const { metrics, targets } = data || { metrics: null, targets: null };
-  if (!metrics || !targets) return null;
-
-  const quarter = getCurrentQuarter();
-  const mrrTarget = targets.company.mrr_ativo[quarter];
-
-  const openMrrDrillDown = () => {
-    setDrillDownData({
-      title: "MRR Ativo",
-      value: metrics.mrr_ativo,
-      target: mrrTarget,
-      format: "currency",
-      description: "Monthly Recurring Revenue - receita mensal recorrente de contratos ativos",
-      chartData: metrics.mrr_serie,
-      insights: [
-        metrics.mrr_serie.length >= 2 
-          ? `Variação mensal: ${((metrics.mrr_serie[metrics.mrr_serie.length-1]?.value / metrics.mrr_serie[metrics.mrr_serie.length-2]?.value - 1) * 100).toFixed(1)}%`
-          : "Dados insuficientes para calcular variação",
-        `Média últimos 3 meses: ${formatCurrency(metrics.mrr_serie.slice(-3).reduce((s,m) => s + m.value, 0) / 3)}`,
-        `Meta ${quarter}: ${formatCurrency(mrrTarget)} (${((metrics.mrr_ativo / mrrTarget) * 100).toFixed(1)}% atingido)`
-      ]
-    });
-  };
-
-  const openReceitaDrillDown = () => {
-    const currentMonth = new Date().getMonth() + 1;
-    const projecaoAnual = currentMonth > 0 ? (metrics.receita_liquida_ytd * 12) / currentMonth : 0;
-    setDrillDownData({
-      title: "Receita Líquida YTD",
-      value: metrics.receita_liquida_ytd,
-      target: targets.company.receita_liquida_anual,
-      format: "currency",
-      description: "Receita líquida acumulada no ano (Year-to-Date)",
-      insights: [
-        `Receita por colaborador: ${formatCurrency(metrics.receita_por_head)}/mês`,
-        `Projeção anual linear: ${formatCurrency(projecaoAnual)}`,
-        `Gap para meta: ${formatCurrency(targets.company.receita_liquida_anual - metrics.receita_liquida_ytd)}`
-      ]
-    });
-  };
-
-  const openEbitdaDrillDown = () => {
-    const currentMonth = new Date().getMonth() + 1;
-    const projecaoAnual = currentMonth > 0 ? (metrics.ebitda_ytd * 12) / currentMonth : 0;
-    const margemEbitda = metrics.receita_liquida_ytd > 0 ? ((metrics.ebitda_ytd / metrics.receita_liquida_ytd) * 100) : 0;
-    setDrillDownData({
-      title: "EBITDA YTD",
-      value: metrics.ebitda_ytd,
-      target: targets.company.ebitda_anual,
-      format: "currency",
-      description: "Lucro antes de juros, impostos, depreciação e amortização",
-      insights: [
-        `Margem EBITDA: ${margemEbitda.toFixed(1)}%`,
-        `Projeção anual linear: ${formatCurrency(projecaoAnual)}`,
-        `Gap para meta: ${formatCurrency(targets.company.ebitda_anual - metrics.ebitda_ytd)}`
-      ]
-    });
-  };
+  const inadStatus = highlights.inadimplencia?.status === "green" ? "green" : "red";
+  const churnStatus = highlights.net_churn?.status === "green" ? "green" : "red";
 
   return (
     <div className="space-y-6">
-      <MetricDrillDownModal 
-        open={drillDownData !== null} 
-        onClose={() => setDrillDownData(null)} 
-        data={drillDownData} 
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <HeroCard
           title="MRR Ativo"
           value={metrics.mrr_ativo}
-          target={mrrTarget}
+          target={highlights.mrr?.target}
           format="currency"
           direction="higher"
           icon={TrendingUp}
-          tooltip={`Meta ${quarter}: ${formatCurrency(mrrTarget)}`}
-          onDrillDown={openMrrDrillDown}
-          description="Clique para ver evolução"
+          tooltip={`Meta ${quarter}: ${highlights.mrr?.target ? formatCurrency(highlights.mrr.target) : "—"}`}
         />
-        <MetricCard
-          title="Receita Líquida YTD"
+        <HeroCard
+          title="Receita Líquida"
           value={metrics.receita_liquida_ytd}
-          target={targets.company.receita_liquida_anual}
+          target={highlights.revenue?.target}
           format="currency"
           direction="higher"
           icon={DollarSign}
-          onDrillDown={openReceitaDrillDown}
-          description="Clique para ver detalhes"
+          tooltip="Receita líquida acumulada no ano"
         />
-        <MetricCard
-          title="EBITDA YTD"
+        <HeroCard
+          title="EBITDA"
           value={metrics.ebitda_ytd}
-          target={targets.company.ebitda_anual}
+          target={highlights.ebitda?.target}
           format="currency"
           direction="higher"
-          icon={TrendingUp}
-          onDrillDown={openEbitdaDrillDown}
-          description="Clique para ver análise"
+          icon={Banknote}
         />
-        <MetricCard
-          title="Caixa Atual"
+        <HeroCard
+          title="Caixa"
           value={metrics.caixa_atual}
           target={null}
           format="currency"
           direction="higher"
-          icon={DollarSign}
+          icon={PiggyBank}
           tooltip="Saldo disponível em contas bancárias"
         />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Clientes Ativos"
-          value={metrics.clientes_ativos}
-          target={targets.company.clientes_eoy}
-          format="number"
-          direction="higher"
-          icon={Users}
-          tooltip="Clientes com contratos ativos, onboarding ou triagem"
-        />
-        <MetricCard
-          title="Inadimplência"
+        <HeroCard
+          title="Inadimplência %"
           value={metrics.inadimplencia_percentual}
-          target={targets.company.inadimplencia_max}
+          target={highlights.inadimplencia?.target}
           format="percent"
           direction="lower"
-          icon={AlertTriangle}
-          tooltip="Meta: máximo 6%. Parcelas vencidas / receita mensal"
+          icon={CreditCard}
+          tooltip="Meta: <= 6%"
+          status={inadStatus as "green" | "red"}
         />
-        <MetricCard
-          title="Gross MRR Churn"
-          value={metrics.gross_mrr_churn_percentual}
-          target={targets.company.gross_mrr_churn_max}
+        <HeroCard
+          title="Net Churn %"
+          value={metrics.net_churn_mrr_percentual}
+          target={highlights.net_churn?.target}
           format="percent"
           direction="lower"
-          icon={TrendingDown}
-          tooltip="Meta: máximo 9.7%. Contratos encerrados / MRR anterior"
-        />
-        <MetricCard
-          title="Headcount"
-          value={metrics.headcount}
-          target={null}
-          format="number"
-          direction="higher"
-          icon={Users}
-          tooltip="Total de colaboradores ativos"
+          icon={TrendingDownIcon}
+          tooltip="Meta: <= 9%"
+          status={churnStatus as "green" | "red"}
         />
       </div>
 
-      {metrics.mrr_serie && metrics.mrr_serie.length > 0 && (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <TurboOHBlock metrics={metrics} />
+        <VendasBlock metrics={metrics} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <MRRChart data={series.mrr || metrics.mrr_serie || []} />
+        
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Evolução do MRR</CardTitle>
-            <CardDescription>Últimos 12 meses</CardDescription>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Activity className="w-4 h-4 text-primary" />
+              Resumo Operacional
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={metrics.mrr_serie}>
-                  <defs>
-                    <linearGradient id="mrrGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} className="text-muted-foreground" />
-                  <YAxis tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`} tick={{ fontSize: 12 }} className="text-muted-foreground" />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    fill="url(#mrrGradient)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-yellow-500" />
-            Top Alertas
-          </CardTitle>
-          <CardDescription>Métricas que requerem atenção imediata</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {(() => {
-              const alerts: { title: string; atual: string; target: string; status: "red" | "yellow"; recommendation: string }[] = [];
-              
-              const mrrProgress = mrrTarget > 0 ? (metrics.mrr_ativo / mrrTarget) * 100 : 100;
-              if (mrrProgress < 90) {
-                alerts.push({
-                  title: "MRR Ativo",
-                  atual: formatCurrency(metrics.mrr_ativo),
-                  target: formatCurrency(mrrTarget),
-                  status: mrrProgress < 70 ? "red" : "yellow",
-                  recommendation: "Acelerar aquisição de novos clientes e expansões"
-                });
-              }
-              
-              if (metrics.inadimplencia_percentual > targets.company.inadimplencia_max) {
-                alerts.push({
-                  title: "Inadimplência",
-                  atual: formatPercent(metrics.inadimplencia_percentual),
-                  target: `máx ${formatPercent(targets.company.inadimplencia_max)}`,
-                  status: metrics.inadimplencia_percentual > 8 ? "red" : "yellow",
-                  recommendation: "Intensificar régua de cobrança e renegociações"
-                });
-              }
-              
-              if (metrics.gross_mrr_churn_percentual > targets.company.gross_mrr_churn_max) {
-                alerts.push({
-                  title: "Gross MRR Churn",
-                  atual: formatPercent(metrics.gross_mrr_churn_percentual),
-                  target: `máx ${formatPercent(targets.company.gross_mrr_churn_max)}`,
-                  status: metrics.gross_mrr_churn_percentual > 12 ? "red" : "yellow",
-                  recommendation: "Revisar health-check e onboarding de clientes"
-                });
-              }
-              
-              const receitaProgress = targets.company.receita_liquida_anual > 0 
-                ? (metrics.receita_liquida_ytd / targets.company.receita_liquida_anual) * 100 
-                : 100;
-              const currentMonth = new Date().getMonth() + 1;
-              const expectedProgress = (currentMonth / 12) * 100;
-              if (receitaProgress < expectedProgress * 0.9) {
-                alerts.push({
-                  title: "Receita Líquida",
-                  atual: formatCurrency(metrics.receita_liquida_ytd),
-                  target: formatCurrency(targets.company.receita_liquida_anual),
-                  status: receitaProgress < expectedProgress * 0.7 ? "red" : "yellow",
-                  recommendation: "Revisar pipeline e acelerar fechamentos"
-                });
-              }
-              
-              if (alerts.length === 0) {
-                return (
-                  <div className="flex items-center gap-2 text-sm text-green-600">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Todas as métricas principais estão no alvo!</span>
-                  </div>
-                );
-              }
-              
-              return alerts.slice(0, 4).map((alert, i) => (
-                <div key={i} className={`p-3 rounded-lg border ${alert.status === "red" ? "bg-red-500/5 border-red-500/20" : "bg-yellow-500/5 border-yellow-500/20"}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-medium ${alert.status === "red" ? "text-red-600" : "text-yellow-600"}`}>
-                          {alert.title}
-                        </span>
-                        <Badge variant="outline" className={`text-[10px] ${alert.status === "red" ? "bg-red-500/10 text-red-600 border-red-500/20" : "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"}`}>
-                          {alert.status === "red" ? "Crítico" : "Atenção"}
-                        </Badge>
-                      </div>
-                      <div className="text-sm mt-1">
-                        <span className="text-muted-foreground">Atual: </span>
-                        <span className="font-medium">{alert.atual}</span>
-                        <span className="text-muted-foreground"> | Meta: </span>
-                        <span className="font-medium">{alert.target}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {alert.recommendation}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ));
-            })()}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Rocket className="w-4 h-4 text-blue-500" />
-                TurboOH
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-xs text-muted-foreground">Receita Líquida YTD</div>
-                <div className="text-xl font-bold mt-1">
-                  {metrics.turbooh_receita_liquida_ytd !== null 
-                    ? formatCurrency(metrics.turbooh_receita_liquida_ytd) 
-                    : <span className="text-muted-foreground text-sm">Em instrumentação</span>}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Meta: {formatCurrency(targets.turbooh?.receita_liquida_anual || 1425600)}
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1 p-3 rounded-lg bg-muted/50">
+                <div className="text-xs text-muted-foreground">Clientes Ativos</div>
+                <div className="text-xl font-bold">{formatNumber(metrics.clientes_ativos)}</div>
               </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Resultado YTD</div>
-                <div className="text-xl font-bold mt-1">
-                  {metrics.turbooh_resultado_ytd !== null 
-                    ? formatCurrency(metrics.turbooh_resultado_ytd) 
-                    : <span className="text-muted-foreground text-sm">Em instrumentação</span>}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Meta: {formatCurrency(targets.turbooh?.resultado_anual || 989700)}
-                </div>
+              <div className="space-y-1 p-3 rounded-lg bg-muted/50">
+                <div className="text-xs text-muted-foreground">Headcount</div>
+                <div className="text-xl font-bold">{formatNumber(metrics.headcount)}</div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Activity className="w-4 h-4 text-purple-500" />
-                Tech
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-xs text-muted-foreground">Projetos Entregues</div>
-                <div className="text-xl font-bold mt-1">
-                  {metrics.tech_projetos_entregues > 0 
-                    ? formatNumber(metrics.tech_projetos_entregues) 
-                    : <span className="text-muted-foreground text-sm">Em instrumentação</span>}
-                </div>
+              <div className="space-y-1 p-3 rounded-lg bg-muted/50">
+                <div className="text-xs text-muted-foreground">Receita/Head</div>
+                <div className="text-xl font-bold">{formatCurrency(metrics.receita_por_head)}</div>
               </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Custo Freelancers</div>
-                <div className="text-xl font-bold mt-1">
-                  {metrics.tech_freelancers_custo > 0 
-                    ? formatCurrency(metrics.tech_freelancers_custo) 
-                    : <span className="text-muted-foreground text-sm">Em instrumentação</span>}
-                </div>
+              <div className="space-y-1 p-3 rounded-lg bg-muted/50">
+                <div className="text-xs text-muted-foreground">MRR/Head</div>
+                <div className="text-xl font-bold">{formatCurrency(metrics.mrr_por_head)}</div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <HealthScore metrics={metrics} targets={targets} />
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="w-4 h-4 text-primary" />
-              Eficiência por Head
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Receita / Head</span>
-              <span className="font-semibold">{formatCurrency(metrics.receita_por_head)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">MRR / Head</span>
-              <span className="font-semibold">{formatCurrency(metrics.mrr_por_head)}</span>
-            </div>
-            <div className="border-t pt-3 mt-3">
-              <div className="text-xs text-muted-foreground">Benchmark: R$ 15.000/head</div>
-              <Progress value={Math.min(100, (metrics.receita_por_head / 15000) * 100)} className="h-1.5 mt-1" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              Em Instrumentação
-            </CardTitle>
-            <CardDescription>Métricas pendentes de integração</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Minus className="w-4 h-4" />
-              <span>Net Churn MRR</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Minus className="w-4 h-4" />
-              <span>Logo Churn %</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Minus className="w-4 h-4" />
-              <span>Padronização %</span>
             </div>
           </CardContent>
         </Card>
@@ -878,326 +565,386 @@ function DashboardTab({ period, bu }: FilterProps) {
   );
 }
 
-function ObjectiveSummary({ objectives }: { objectives: Objective[] }) {
-  const allKRs = objectives.flatMap(o => o.krs);
-  const greenCount = allKRs.filter(kr => kr.status === "green").length;
-  const yellowCount = allKRs.filter(kr => kr.status === "yellow").length;
-  const redCount = allKRs.filter(kr => kr.status === "red").length;
-  const grayCount = allKRs.filter(kr => kr.status === "gray").length;
-  const avgProgress = allKRs.filter(kr => kr.progress !== null).reduce((sum, kr) => sum + (kr.progress || 0), 0) / 
-    (allKRs.filter(kr => kr.progress !== null).length || 1);
+function KRsTab({ data }: { data: SummaryResponse }) {
+  const { objectives, krs } = data;
+  const [objectiveFilter, setObjectiveFilter] = useState<string>("all");
+  const [cadenceFilter, setCadenceFilter] = useState<string>("all");
 
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-      <Card className="border-l-4 border-l-green-500">
-        <CardContent className="pt-4 pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-green-500">{greenCount}</div>
-              <div className="text-xs text-muted-foreground">No alvo</div>
-            </div>
-            <CheckCircle2 className="w-6 h-6 text-green-500/50" />
-          </div>
-        </CardContent>
-      </Card>
-      <Card className="border-l-4 border-l-yellow-500">
-        <CardContent className="pt-4 pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-yellow-500">{yellowCount}</div>
-              <div className="text-xs text-muted-foreground">Atenção</div>
-            </div>
-            <AlertTriangle className="w-6 h-6 text-yellow-500/50" />
-          </div>
-        </CardContent>
-      </Card>
-      <Card className="border-l-4 border-l-red-500">
-        <CardContent className="pt-4 pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-red-500">{redCount}</div>
-              <div className="text-xs text-muted-foreground">Fora do alvo</div>
-            </div>
-            <XCircle className="w-6 h-6 text-red-500/50" />
-          </div>
-        </CardContent>
-      </Card>
-      <Card className="border-l-4 border-l-slate-400">
-        <CardContent className="pt-4 pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-slate-400">{grayCount}</div>
-              <div className="text-xs text-muted-foreground">Sem dados</div>
-            </div>
-            <Minus className="w-6 h-6 text-slate-400/50" />
-          </div>
-        </CardContent>
-      </Card>
-      <Card className="border-l-4 border-l-primary">
-        <CardContent className="pt-4 pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold">{avgProgress.toFixed(0)}%</div>
-              <div className="text-xs text-muted-foreground">Progresso médio</div>
-            </div>
-            <Activity className="w-6 h-6 text-primary/50" />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+  const filteredKRs = useMemo(() => {
+    return krs.filter(kr => {
+      if (objectiveFilter !== "all" && kr.objectiveId !== objectiveFilter) return false;
+      if (cadenceFilter !== "all" && kr.cadence !== cadenceFilter) return false;
+      return true;
+    });
+  }, [krs, objectiveFilter, cadenceFilter]);
 
-function KRRow({ kr, formatKRValue, formatKRTarget }: { kr: KR; formatKRValue: (kr: KR) => string; formatKRTarget: (kr: KR) => string }) {
-  const statusColors = {
-    green: { bg: "bg-green-500/5", border: "border-l-green-500", icon: CheckCircle2, iconColor: "text-green-500" },
-    yellow: { bg: "bg-yellow-500/5", border: "border-l-yellow-500", icon: AlertTriangle, iconColor: "text-yellow-500" },
-    red: { bg: "bg-red-500/5", border: "border-l-red-500", icon: XCircle, iconColor: "text-red-500" },
-    gray: { bg: "bg-muted/30", border: "border-l-slate-400", icon: Minus, iconColor: "text-slate-400" },
-  };
-  const style = statusColors[kr.status];
-  const StatusIcon = style.icon;
-
-  return (
-    <div className={`p-4 rounded-lg ${style.bg} border-l-4 ${style.border} transition-all hover-elevate`} data-testid={`row-kr-${kr.id}`}>
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <StatusIcon className={`w-4 h-4 ${style.iconColor}`} />
-            <span className="font-semibold text-sm">{kr.id}</span>
-            <span className="text-muted-foreground">•</span>
-            <span className="text-sm">{kr.title}</span>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="secondary" className="text-xs">{kr.owner}</Badge>
-            {kr.target_type === "quarterly" && (
-              <Badge variant="outline" className="text-xs">{getCurrentQuarter()}</Badge>
-            )}
-            <span className={`text-xs font-medium ${style.iconColor}`}>
-              {kr.direction === "higher" ? "↑ Maior melhor" : "↓ Menor melhor"}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 flex-shrink-0">
-          <div className="text-right min-w-[100px]">
-            <div className="font-bold text-lg">{formatKRValue(kr)}</div>
-            <div className="text-xs text-muted-foreground">Meta: {formatKRTarget(kr)}</div>
-          </div>
-          <div className="w-32 space-y-1">
-            {kr.progress !== null && (
-              <>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Progresso</span>
-                  <span className={`font-medium ${style.iconColor}`}>{kr.progress.toFixed(0)}%</span>
-                </div>
-                <Progress value={kr.progress} className="h-2" />
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function KRsTab() {
-  const { data, isLoading } = useQuery<{ objectives: Objective[] }>({
-    queryKey: ["/api/okr2026/krs"],
-  });
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-20 rounded-xl" />
-          ))}
-        </div>
-        {[...Array(3)].map((_, i) => (
-          <Skeleton key={i} className="h-64 rounded-xl" />
-        ))}
-      </div>
-    );
-  }
-
-  const objectives = data?.objectives || [];
+  const krsGroupedByObjective = useMemo(() => {
+    const grouped: Record<string, KR[]> = {};
+    filteredKRs.forEach(kr => {
+      if (!grouped[kr.objectiveId]) grouped[kr.objectiveId] = [];
+      grouped[kr.objectiveId].push(kr);
+    });
+    return grouped;
+  }, [filteredKRs]);
 
   const formatKRValue = (kr: KR) => {
-    if (kr.atual === null) return "—";
-    if (kr.unit === "currency") return formatCurrency(kr.atual);
-    if (kr.unit === "percentage") return formatPercent(kr.atual);
-    return formatNumber(kr.atual);
+    if (kr.currentValue === null) return "—";
+    if (kr.unit === "currency") return formatCurrency(kr.currentValue);
+    if (kr.unit === "percentage") return formatPercent(kr.currentValue);
+    return formatNumber(kr.currentValue);
   };
 
   const formatKRTarget = (kr: KR) => {
-    const target = kr.target_type === "quarterly" && kr.targets
-      ? kr.targets[getCurrentQuarter()]
-      : kr.target;
-    if (target === null || target === undefined) return "—";
-    if (kr.unit === "currency") return formatCurrency(target);
-    if (kr.unit === "percentage") return formatPercent(target);
-    return formatNumber(target);
+    if (kr.target === null) return "—";
+    if (kr.unit === "currency") return formatCurrency(kr.target);
+    if (kr.unit === "percentage") return formatPercent(kr.target);
+    return formatNumber(kr.target);
   };
 
-  const getObjectiveProgress = (obj: Objective) => {
-    const krsWithProgress = obj.krs.filter(kr => kr.progress !== null);
-    if (krsWithProgress.length === 0) return null;
-    return krsWithProgress.reduce((sum, kr) => sum + (kr.progress || 0), 0) / krsWithProgress.length;
+  const getObjectiveTitle = (objId: string) => {
+    const obj = objectives.find(o => o.id === objId);
+    return obj ? `${obj.id}: ${obj.title}` : objId;
+  };
+
+  const getObjectiveProgress = (objId: string) => {
+    const objKRs = krsGroupedByObjective[objId] || [];
+    const withProgress = objKRs.filter(kr => kr.progress !== null);
+    if (withProgress.length === 0) return null;
+    return withProgress.reduce((sum, kr) => sum + (kr.progress || 0), 0) / withProgress.length;
   };
 
   return (
     <div className="space-y-6">
-      <ObjectiveSummary objectives={objectives} />
-      
-      {objectives.map((obj) => {
-        const objProgress = getObjectiveProgress(obj);
-        const greenKRs = obj.krs.filter(kr => kr.status === "green").length;
-        const totalKRs = obj.krs.length;
-        
-        return (
-          <Card key={obj.id} data-testid={`card-objective-${obj.id}`}>
-            <CardHeader className="pb-3">
-              <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
-                <div className="flex-1">
-                  <CardTitle className="text-lg flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={objectiveFilter} onValueChange={setObjectiveFilter}>
+          <SelectTrigger className="w-[180px]" data-testid="filter-objective">
+            <SelectValue placeholder="Objetivo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos Objetivos</SelectItem>
+            {objectives.map(obj => (
+              <SelectItem key={obj.id} value={obj.id}>{obj.id}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={cadenceFilter} onValueChange={setCadenceFilter}>
+          <SelectTrigger className="w-[150px]" data-testid="filter-cadence">
+            <SelectValue placeholder="Cadência" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="quarterly">Trimestral</SelectItem>
+            <SelectItem value="annual">Anual</SelectItem>
+            <SelectItem value="monthly">Mensal</SelectItem>
+            <SelectItem value="snapshot">Snapshot</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="text-sm text-muted-foreground">
+          {filteredKRs.length} KR(s) encontrado(s)
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {objectives.map(obj => {
+          const objKRs = krsGroupedByObjective[obj.id] || [];
+          const greenCount = objKRs.filter(kr => kr.status === "green").length;
+          const progress = getObjectiveProgress(obj.id);
+          
+          return (
+            <Card 
+              key={obj.id} 
+              className={`hover-elevate cursor-pointer ${objectiveFilter === obj.id ? "ring-2 ring-primary" : ""}`}
+              onClick={() => setObjectiveFilter(objectiveFilter === obj.id ? "all" : obj.id)}
+              data-testid={`card-objective-summary-${obj.id}`}
+            >
+              <CardContent className="pt-4 pb-3 px-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className="text-xs">{obj.id}</Badge>
+                  <span className="text-xs text-muted-foreground">{greenCount}/{objKRs.length}</span>
+                </div>
+                {progress !== null && (
+                  <Progress value={progress} className="h-1.5" />
+                )}
+                <div className="text-xs text-muted-foreground line-clamp-1">{obj.title}</div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Accordion type="multiple" defaultValue={objectives.map(o => o.id)} className="space-y-4">
+        {objectives.map(obj => {
+          const objKRs = krsGroupedByObjective[obj.id];
+          if (!objKRs || objKRs.length === 0) return null;
+
+          const progress = getObjectiveProgress(obj.id);
+          const greenCount = objKRs.filter(kr => kr.status === "green").length;
+
+          return (
+            <AccordionItem 
+              key={obj.id} 
+              value={obj.id} 
+              className="border rounded-lg overflow-hidden"
+              data-testid={`accordion-objective-${obj.id}`}
+            >
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+                <div className="flex items-center justify-between w-full pr-4">
+                  <div className="flex items-center gap-3">
                     <div className="p-1.5 rounded-md bg-primary/10">
                       <Target className="w-4 h-4 text-primary" />
                     </div>
-                    {obj.id}: {obj.title}
-                  </CardTitle>
-                  <CardDescription className="mt-1">{obj.description}</CardDescription>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="text-xs text-muted-foreground">Progresso Objetivo</div>
-                    <div className="text-lg font-bold">{objProgress !== null ? `${objProgress.toFixed(0)}%` : "—"}</div>
+                    <div className="text-left">
+                      <div className="font-medium">{obj.id}: {obj.title}</div>
+                      <div className="text-xs text-muted-foreground">{obj.narrative}</div>
+                    </div>
                   </div>
-                  <Badge variant={greenKRs === totalKRs ? "default" : "secondary"} className="text-xs">
-                    {greenKRs}/{totalKRs} KRs no alvo
-                  </Badge>
+                  <div className="flex items-center gap-3">
+                    <Badge variant={greenCount === objKRs.length ? "default" : "secondary"} className="text-xs">
+                      {greenCount}/{objKRs.length} KRs
+                    </Badge>
+                    {progress !== null && (
+                      <span className="text-sm font-medium">{progress.toFixed(0)}%</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              {objProgress !== null && (
-                <Progress value={objProgress} className="h-1.5 mt-3" />
-              )}
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {obj.krs.map((kr) => (
-                <KRRow key={kr.id} kr={kr} formatKRValue={formatKRValue} formatKRTarget={formatKRTarget} />
-              ))}
-            </CardContent>
-          </Card>
-        );
-      })}
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="space-y-2 mt-2">
+                  {objKRs.map(kr => {
+                    const statusColor = getKRStatusColor(kr);
+                    
+                    return (
+                      <div 
+                        key={kr.id}
+                        className={`flex items-center justify-between p-3 rounded-lg border ${statusColor.border} ${statusColor.bg}`}
+                        data-testid={`row-kr-${kr.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm">{kr.id}</span>
+                            <span className="text-sm">{kr.title}</span>
+                            <Badge variant="outline" className="text-[10px]">
+                              {kr.cadence === "quarterly" ? "Trimestral" : 
+                               kr.cadence === "annual" ? "Anual" : 
+                               kr.cadence === "monthly" ? "Mensal" : "Snapshot"}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {kr.owner} • {kr.direction === "higher" ? "Maior melhor" : "Menor melhor"}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right min-w-[100px]">
+                            <div className="font-bold">{formatKRValue(kr)}</div>
+                            <div className="text-xs text-muted-foreground">Meta: {formatKRTarget(kr)}</div>
+                          </div>
+                          <div className="w-24">
+                            {kr.progress !== null && (
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground">Progresso</span>
+                                  <span className={`font-medium ${statusColor.text}`}>{kr.progress.toFixed(0)}%</span>
+                                </div>
+                                <Progress value={Math.min(100, kr.progress)} className="h-1.5" />
+                              </div>
+                            )}
+                          </div>
+                          <StatusBadge status={kr.status} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
     </div>
   );
 }
 
-function InitiativesTab() {
-  const { data, isLoading } = useQuery<{ initiatives: Initiative[] }>({
-    queryKey: ["/api/okr2026/initiatives"],
-  });
+function InitiativesTab({ data }: { data: SummaryResponse }) {
+  const { initiatives, objectives, krs } = data;
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [objectiveFilter, setObjectiveFilter] = useState<string>("all");
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} className="h-24 rounded-xl" />
-        ))}
-      </div>
-    );
-  }
+  const filteredInitiatives = useMemo(() => {
+    return initiatives.filter(ini => {
+      if (statusFilter !== "all" && ini.status !== statusFilter) return false;
+      if (objectiveFilter !== "all" && ini.objectiveId !== objectiveFilter) return false;
+      return true;
+    });
+  }, [initiatives, statusFilter, objectiveFilter]);
 
-  const initiatives = data?.initiatives || [];
-
-  const statusOrder = { doing: 0, blocked: 1, backlog: 2, done: 3 };
-  const sortedInitiatives = [...initiatives].sort((a, b) => 
+  const statusOrder: Record<string, number> = { in_progress: 0, blocked: 1, not_started: 2, completed: 3 };
+  const sortedInitiatives = [...filteredInitiatives].sort((a, b) => 
     (statusOrder[a.status] ?? 99) - (statusOrder[b.status] ?? 99)
   );
 
-  const doingCount = initiatives.filter((i) => i.status === "doing").length;
-  const backlogCount = initiatives.filter((i) => i.status === "backlog").length;
-  const avgConfianca = initiatives.length > 0
-    ? initiatives.reduce((sum, i) => sum + i.confianca, 0) / initiatives.length
-    : 0;
+  const stats = useMemo(() => ({
+    in_progress: initiatives.filter(i => i.status === "in_progress").length,
+    not_started: initiatives.filter(i => i.status === "not_started").length,
+    completed: initiatives.filter(i => i.status === "completed").length,
+    blocked: initiatives.filter(i => i.status === "blocked").length,
+  }), [initiatives]);
+
+  const getObjectiveTitle = (objId: string) => {
+    const obj = objectives.find(o => o.id === objId);
+    return obj ? obj.id : objId;
+  };
+
+  const getKRTitle = (krId: string) => {
+    const kr = krs.find(k => k.id === krId);
+    return kr ? kr.title : krId;
+  };
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="hover-elevate cursor-pointer" onClick={() => setStatusFilter(statusFilter === "in_progress" ? "all" : "in_progress")}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold">{doingCount}</div>
+                <div className="text-2xl font-bold">{stats.in_progress}</div>
                 <div className="text-sm text-muted-foreground">Em andamento</div>
               </div>
               <Rocket className="w-8 h-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover-elevate cursor-pointer" onClick={() => setStatusFilter(statusFilter === "not_started" ? "all" : "not_started")}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold">{backlogCount}</div>
-                <div className="text-sm text-muted-foreground">No backlog</div>
+                <div className="text-2xl font-bold">{stats.not_started}</div>
+                <div className="text-sm text-muted-foreground">Backlog</div>
               </div>
               <Clock className="w-8 h-8 text-slate-500" />
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover-elevate cursor-pointer" onClick={() => setStatusFilter(statusFilter === "completed" ? "all" : "completed")}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-2xl font-bold">{avgConfianca.toFixed(0)}%</div>
-                <div className="text-sm text-muted-foreground">Confiança média</div>
+                <div className="text-2xl font-bold">{stats.completed}</div>
+                <div className="text-sm text-muted-foreground">Concluídas</div>
               </div>
-              <Flag className="w-8 h-8 text-primary" />
+              <CheckCircle2 className="w-8 h-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="hover-elevate cursor-pointer" onClick={() => setStatusFilter(statusFilter === "blocked" ? "all" : "blocked")}>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold">{stats.blocked}</div>
+                <div className="text-sm text-muted-foreground">Bloqueadas</div>
+              </div>
+              <XCircle className="w-8 h-8 text-red-500" />
             </div>
           </CardContent>
         </Card>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[150px]" data-testid="filter-initiative-status">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos Status</SelectItem>
+            <SelectItem value="in_progress">Em andamento</SelectItem>
+            <SelectItem value="not_started">Backlog</SelectItem>
+            <SelectItem value="completed">Concluídas</SelectItem>
+            <SelectItem value="blocked">Bloqueadas</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={objectiveFilter} onValueChange={setObjectiveFilter}>
+          <SelectTrigger className="w-[180px]" data-testid="filter-initiative-objective">
+            <SelectValue placeholder="Objetivo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos Objetivos</SelectItem>
+            {objectives.map(obj => (
+              <SelectItem key={obj.id} value={obj.id}>{obj.id}: {obj.title.substring(0, 30)}...</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="text-sm text-muted-foreground">
+          {sortedInitiatives.length} iniciativa(s)
+        </div>
+      </div>
+
       <div className="space-y-3">
-        {sortedInitiatives.map((ini) => (
+        {sortedInitiatives.map(ini => (
           <Card key={ini.id} className="hover-elevate" data-testid={`card-initiative-${ini.id}`}>
             <CardContent className="py-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-medium">{ini.id}</span>
-                    <span className="text-muted-foreground">—</span>
-                    <span className="font-medium">{ini.titulo}</span>
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                      {getObjectiveTitle(ini.objectiveId)}
+                    </Badge>
+                    <span className="font-medium">{ini.name}</span>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
-                    <Badge variant="outline">{ini.owner}</Badge>
-                    <Badge variant="secondary">{ini.bu}</Badge>
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      {new Date(ini.due_date).toLocaleDateString("pt-BR")}
-                    </span>
+                  
+                  <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground mt-2">
+                    <Badge variant="secondary" className="text-xs">{ini.ownerRole}</Badge>
                     <span>|</span>
-                    <span>KRs: {ini.kr_vinculadas.join(", ")}</span>
+                    <span>{ini.start} → {ini.end}</span>
                   </div>
-                  <div className="mt-2 text-sm">
-                    <span className="text-muted-foreground">Próximo marco: </span>
-                    <span>{ini.proximo_marco}</span>
-                  </div>
+
+                  {ini.krIds && ini.krIds.length > 0 && (
+                    <div className="mt-2">
+                      <span className="text-xs text-muted-foreground">KRs impactados: </span>
+                      <span className="text-xs">
+                        {ini.krIds.map((krId, idx) => (
+                          <span key={krId}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-primary cursor-help">{krId}</span>
+                              </TooltipTrigger>
+                              <TooltipContent>{getKRTitle(krId)}</TooltipContent>
+                            </Tooltip>
+                            {idx < ini.krIds.length - 1 && ", "}
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                  )}
+
+                  {ini.successMetricKeys && ini.successMetricKeys.length > 0 && (
+                    <div className="mt-1">
+                      <span className="text-xs text-muted-foreground">Métricas: </span>
+                      <span className="text-xs">
+                        {ini.successMetricKeys.slice(0, 4).join(", ")}
+                        {ini.successMetricKeys.length > 4 && ` +${ini.successMetricKeys.length - 4}`}
+                      </span>
+                    </div>
+                  )}
+
+                  {ini.successKpi && (
+                    <div className="mt-2 text-sm">
+                      <span className="text-muted-foreground">KPI: </span>
+                      <span className="text-foreground">{ini.successKpi}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <InitiativeStatusBadge status={ini.status} />
-                  <div className="flex items-center gap-1 text-sm">
-                    <span className="text-muted-foreground">Confiança:</span>
-                    <span className={`font-medium ${ini.confianca >= 70 ? "text-green-500" : ini.confianca >= 50 ? "text-yellow-500" : "text-red-500"}`}>
-                      {ini.confianca}%
-                    </span>
-                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
         ))}
+
+        {sortedInitiatives.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            Nenhuma iniciativa encontrada com os filtros selecionados
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1215,6 +962,53 @@ export default function OKR2026() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedPeriod, setSelectedPeriod] = useState("YTD");
   const [selectedBU, setSelectedBU] = useState("all");
+
+  const { data, isLoading, error } = useQuery<SummaryResponse>({
+    queryKey: ["/api/okr2026/summary", { period: selectedPeriod, bu: selectedBU }],
+  });
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-32 rounded-xl" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Skeleton className="h-40 rounded-xl" />
+            <Skeleton className="h-40 rounded-xl" />
+          </div>
+        </div>
+      );
+    }
+
+    if (error || !data) {
+      return (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">Erro ao carregar dados</h3>
+            <p className="text-muted-foreground">
+              Não foi possível carregar os dados do OKR 2026. Tente novamente mais tarde.
+            </p>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    switch (activeTab) {
+      case "dashboard":
+        return <DashboardTab data={data} />;
+      case "krs":
+        return <KRsTab data={data} />;
+      case "initiatives":
+        return <InitiativesTab data={data} />;
+      default:
+        return <DashboardTab data={data} />;
+    }
+  };
 
   return (
     <div className="h-full overflow-auto p-6" data-testid="page-okr-2026">
@@ -1270,15 +1064,7 @@ export default function OKR2026() {
           </TabsList>
 
           <div className="mt-6">
-            <TabsContent value="dashboard" className="mt-0">
-              <DashboardTab period={selectedPeriod} bu={selectedBU} />
-            </TabsContent>
-            <TabsContent value="krs" className="mt-0">
-              <KRsTab />
-            </TabsContent>
-            <TabsContent value="initiatives" className="mt-0">
-              <InitiativesTab />
-            </TabsContent>
+            {renderContent()}
           </div>
         </Tabs>
       </div>

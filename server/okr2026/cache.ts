@@ -36,7 +36,8 @@ export function clearAllCache(): void {
 
 export function invalidateCacheByPattern(pattern: string): number {
   let count = 0;
-  for (const key of cache.keys()) {
+  const keys = Array.from(cache.keys());
+  for (const key of keys) {
     if (key.includes(pattern)) {
       cache.delete(key);
       count++;
