@@ -8422,14 +8422,16 @@ export class DbStorage implements IStorage {
     const result = await db.execute(sql`
       WITH client_base AS (
         -- Get clients with their creation month (cohort)
+        -- caz_clientes.id is INTEGER, cast to TEXT to match caz_parcelas.id_cliente
         SELECT 
-          c.id::text as client_id,
+          CAST(c.id AS TEXT) as client_id,
           DATE_TRUNC('month', c.created_at)::date as cohort_month
         FROM caz_clientes c
         WHERE ${cohortDateFilter}
       ),
       first_payment AS (
         -- Get each client's first payment date
+        -- caz_parcelas.id_cliente is TEXT
         SELECT 
           p.id_cliente as client_id,
           DATE_TRUNC('month', MIN(COALESCE(p.data_quitacao, p.data_vencimento)))::date as first_payment_month
@@ -8440,7 +8442,7 @@ export class DbStorage implements IStorage {
         GROUP BY p.id_cliente
       ),
       clients_with_payments AS (
-        -- Join clients with their first payment
+        -- Join clients with their first payment (both are TEXT now)
         SELECT 
           cb.client_id,
           cb.cohort_month,
