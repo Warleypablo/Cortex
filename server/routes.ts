@@ -2681,6 +2681,191 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============ 1x1 (One-on-One) Endpoints ============
+  app.get("/api/colaboradores/:id/one-on-one", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid colaborador ID" });
+      }
+      const meetings = await storage.getOneOnOneMeetings(id);
+      res.json(meetings);
+    } catch (error) {
+      console.error("[api] Error fetching one-on-one meetings:", error);
+      res.status(500).json({ error: "Failed to fetch one-on-one meetings" });
+    }
+  });
+
+  app.post("/api/colaboradores/:id/one-on-one", async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.id);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "Invalid colaborador ID" });
+      }
+      const meeting = await storage.createOneOnOneMeeting({ ...req.body, colaboradorId });
+      res.status(201).json(meeting);
+    } catch (error) {
+      console.error("[api] Error creating one-on-one meeting:", error);
+      res.status(500).json({ error: "Failed to create one-on-one meeting" });
+    }
+  });
+
+  app.put("/api/one-on-one/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid meeting ID" });
+      }
+      const meeting = await storage.updateOneOnOneMeeting(id, req.body);
+      res.json(meeting);
+    } catch (error) {
+      console.error("[api] Error updating one-on-one meeting:", error);
+      res.status(500).json({ error: "Failed to update one-on-one meeting" });
+    }
+  });
+
+  app.delete("/api/one-on-one/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid meeting ID" });
+      }
+      await storage.deleteOneOnOneMeeting(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[api] Error deleting one-on-one meeting:", error);
+      res.status(500).json({ error: "Failed to delete one-on-one meeting" });
+    }
+  });
+
+  app.get("/api/one-on-one/:id/acoes", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid meeting ID" });
+      }
+      const acoes = await storage.getOneOnOneAcoes(id);
+      res.json(acoes);
+    } catch (error) {
+      console.error("[api] Error fetching one-on-one acoes:", error);
+      res.status(500).json({ error: "Failed to fetch one-on-one acoes" });
+    }
+  });
+
+  app.post("/api/one-on-one/:id/acoes", async (req, res) => {
+    try {
+      const oneOnOneId = parseInt(req.params.id);
+      if (isNaN(oneOnOneId)) {
+        return res.status(400).json({ error: "Invalid meeting ID" });
+      }
+      const acao = await storage.createOneOnOneAcao({ ...req.body, oneOnOneId });
+      res.status(201).json(acao);
+    } catch (error) {
+      console.error("[api] Error creating one-on-one acao:", error);
+      res.status(500).json({ error: "Failed to create one-on-one acao" });
+    }
+  });
+
+  app.patch("/api/one-on-one/acoes/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid acao ID" });
+      }
+      const acao = await storage.updateOneOnOneAcao(id, { status: req.body.status });
+      res.json(acao);
+    } catch (error) {
+      console.error("[api] Error updating one-on-one acao:", error);
+      res.status(500).json({ error: "Failed to update one-on-one acao" });
+    }
+  });
+
+  // ============ E-NPS Endpoints ============
+  app.get("/api/colaboradores/:id/enps", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid colaborador ID" });
+      }
+      const responses = await storage.getEnpsResponses(id);
+      res.json(responses);
+    } catch (error) {
+      console.error("[api] Error fetching E-NPS responses:", error);
+      res.status(500).json({ error: "Failed to fetch E-NPS responses" });
+    }
+  });
+
+  app.post("/api/colaboradores/:id/enps", async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.id);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "Invalid colaborador ID" });
+      }
+      const response = await storage.createEnpsResponse({ ...req.body, colaboradorId });
+      res.status(201).json(response);
+    } catch (error) {
+      console.error("[api] Error creating E-NPS response:", error);
+      res.status(500).json({ error: "Failed to create E-NPS response" });
+    }
+  });
+
+  // ============ PDI (Plano de Desenvolvimento Individual) Endpoints ============
+  app.get("/api/colaboradores/:id/pdi", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid colaborador ID" });
+      }
+      const goals = await storage.getPdiGoals(id);
+      res.json(goals);
+    } catch (error) {
+      console.error("[api] Error fetching PDI goals:", error);
+      res.status(500).json({ error: "Failed to fetch PDI goals" });
+    }
+  });
+
+  app.post("/api/colaboradores/:id/pdi", async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.id);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "Invalid colaborador ID" });
+      }
+      const goal = await storage.createPdiGoal({ ...req.body, colaboradorId });
+      res.status(201).json(goal);
+    } catch (error) {
+      console.error("[api] Error creating PDI goal:", error);
+      res.status(500).json({ error: "Failed to create PDI goal" });
+    }
+  });
+
+  app.put("/api/pdi/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid PDI goal ID" });
+      }
+      const goal = await storage.updatePdiGoal(id, req.body);
+      res.json(goal);
+    } catch (error) {
+      console.error("[api] Error updating PDI goal:", error);
+      res.status(500).json({ error: "Failed to update PDI goal" });
+    }
+  });
+
+  app.delete("/api/pdi/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid PDI goal ID" });
+      }
+      await storage.deletePdiGoal(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[api] Error deleting PDI goal:", error);
+      res.status(500).json({ error: "Failed to delete PDI goal" });
+    }
+  });
+
   // ============ Geo Endpoints (Estados e Cidades) ============
   const estadosBrasileiros = [
     { uf: 'AC', nome: 'Acre' }, { uf: 'AL', nome: 'Alagoas' }, { uf: 'AP', nome: 'Amapá' },
