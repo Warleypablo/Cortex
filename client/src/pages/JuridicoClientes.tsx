@@ -114,6 +114,8 @@ interface ClienteJuridico {
   cliente: ClienteInadimplente;
   contexto: Contexto;
   parcelas: Parcela[];
+  suggestedProcedimento?: string | null;
+  needsEscalation?: boolean;
 }
 
 
@@ -712,15 +714,19 @@ export default function JuridicoClientes() {
             {sortedClientes.map((item, index) => {
               const urgency = getUrgencyLevel(item.cliente.diasAtrasoMax);
               const procedimento = getProcedimentoInfo(item.contexto?.procedimentoJuridico);
+              const suggestedProc = getProcedimentoInfo(item.suggestedProcedimento);
               const status = getStatusInfo(item.contexto?.statusJuridico);
               const isExpanded = expandedClient === item.cliente.idCliente;
               const ProcIcon = procedimento?.icon;
               const StatusIcon = status?.icon;
+              const SuggestedIcon = suggestedProc?.icon;
 
               return (
                 <Card 
                   key={item.cliente.idCliente} 
                   className={`shadow-sm hover:shadow-md transition-all ${
+                    item.needsEscalation ? 'ring-2 ring-yellow-400 ring-offset-2 dark:ring-offset-background' : ''
+                  } ${
                     item.cliente.diasAtrasoMax > 90 ? 'border-l-4 border-l-red-500' : 
                     item.cliente.diasAtrasoMax > 60 ? 'border-l-4 border-l-orange-400' : ''
                   }`}
@@ -783,6 +789,15 @@ export default function JuridicoClientes() {
                         ) : (
                           <Badge variant="outline" className="border-dashed border-2 text-slate-400 px-3 py-1.5">
                             Sem ação
+                          </Badge>
+                        )}
+                        {suggestedProc && item.needsEscalation && (
+                          <Badge 
+                            className="bg-yellow-100 text-yellow-800 border border-yellow-400 text-sm px-3 py-1.5 animate-pulse"
+                            data-testid={`badge-escalation-${index}`}
+                          >
+                            <Zap className="h-4 w-4 mr-1.5" />
+                            Sugestão: {suggestedProc.label}
                           </Badge>
                         )}
                         {status && (

@@ -87,7 +87,8 @@ router.post("/auth/dev-login", (req, res) => {
     picture: "",
     createdAt: new Date().toISOString(),
     role: "admin",
-    allowedRoutes: []
+    allowedRoutes: [],
+    department: "admin"
   };
   
   req.login(devUser, (err) => {
@@ -105,6 +106,21 @@ router.get("/api/auth/me", (req, res) => {
     return res.status(401).json({ message: "Not authenticated" });
   }
   res.json(req.user as User);
+});
+
+router.get("/api/user/profile", (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+  const user = req.user as User;
+  res.json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    department: user.department || (user.role === 'admin' ? 'admin' : null),
+    picture: user.picture
+  });
 });
 
 // Login externo para investidores (sem Google OAuth, com senha)

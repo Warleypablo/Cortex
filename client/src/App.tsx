@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import { AssistantWidget } from "@/components/AssistantWidget";
 
+const Homepage = lazy(() => import("@/pages/Homepage"));
 const Clients = lazy(() => import("@/pages/Clients"));
 const Contracts = lazy(() => import("@/pages/Contracts"));
 const ClientesContratos = lazy(() => import("@/pages/ClientesContratos"));
@@ -63,6 +64,7 @@ const OKR2026 = lazy(() => import("@/pages/OKR2026"));
 const AdminNotificationRules = lazy(() => import("@/pages/AdminNotificationRules"));
 const Calendario = lazy(() => import("@/pages/Calendario"));
 const MetasSquad = lazy(() => import("@/pages/MetasSquad"));
+const OnboardingRH = lazy(() => import("@/pages/OnboardingRH"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -126,15 +128,6 @@ function ProtectedRouter() {
     }
   }, [isLoading, error, user, setLocation]);
 
-  useEffect(() => {
-    if (!isLoading && user && location === '/') {
-      if (user.role !== 'admin' && (!user.allowedRoutes || !user.allowedRoutes.includes('/clientes'))) {
-        if (user.allowedRoutes && user.allowedRoutes.length > 0) {
-          setLocation(user.allowedRoutes[0]);
-        }
-      }
-    }
-  }, [isLoading, user, location, setLocation]);
 
   if (isLoading) {
     return <PageLoader />;
@@ -147,7 +140,6 @@ function ProtectedRouter() {
   return (
     <Switch>
       {/* Menu Principal - Clientes/Contratos */}
-      <Route path="/">{() => <ProtectedRoute path="/clientes" component={ClientesContratos} />}</Route>
       <Route path="/clientes">{() => <ProtectedRoute path="/clientes" component={ClientesContratos} />}</Route>
       <Route path="/contratos">{() => <ProtectedRoute path="/contratos" component={ClientesContratos} />}</Route>
       <Route path="/cliente/:id">{() => <ProtectedRoute path="/clientes" component={ClientDetail} />}</Route>
@@ -188,6 +180,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/geg">{() => <ProtectedRoute path="/dashboard/geg" component={DashboardGeG} />}</Route>
       <Route path="/dashboard/inhire">{() => <ProtectedRoute path="/dashboard/inhire" component={DashboardInhire} />}</Route>
       <Route path="/dashboard/recrutamento">{() => <ProtectedRoute path="/dashboard/recrutamento" component={DashboardRecrutamento} />}</Route>
+      <Route path="/rh/onboarding">{() => <ProtectedRoute path="/rh/onboarding" component={OnboardingRH} />}</Route>
       
       {/* Tech */}
       <Route path="/dashboard/tech">{() => <ProtectedRoute path="/dashboard/tech" component={DashboardTech} />}</Route>
@@ -225,6 +218,13 @@ function ProtectedRouter() {
       {/* Admin */}
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/admin/regras-notificacoes">{() => <ProtectedRoute path="/admin/regras-notificacoes" component={AdminNotificationRules} />}</Route>
+      
+      {/* Homepage - Dashboard baseado no perfil do usuário (placed at end to avoid shadowing other routes) */}
+      <Route path="/">{() => (
+        <Suspense fallback={<PageSkeleton />}>
+          <Homepage />
+        </Suspense>
+      )}</Route>
       
       <Route>
         {() => (
