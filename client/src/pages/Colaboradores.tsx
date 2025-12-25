@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, memo } from "react";
+import { usePersistentFilters } from "@/hooks/use-persistent-filters";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
@@ -64,6 +65,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 const squadColors: Record<string, string> = {
   "Performance": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
@@ -74,7 +76,8 @@ const squadColors: Record<string, string> = {
 };
 
 const stripEmoji = (text: string): string => {
-  return text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{231A}-\u{231B}\u{23E9}-\u{23F3}\u{23F8}-\u{23FA}\u{25AA}-\u{25AB}\u{25B6}\u{25C0}\u{25FB}-\u{25FE}\u{2614}-\u{2615}\u{2648}-\u{2653}\u{267F}\u{2693}\u{26A1}\u{26AA}-\u{26AB}\u{26BD}-\u{26BE}\u{26C4}-\u{26C5}\u{26CE}\u{26D4}\u{26EA}\u{26F2}-\u{26F3}\u{26F5}\u{26FA}\u{26FD}\u{2702}\u{2705}\u{2708}-\u{270D}\u{270F}\u{2712}\u{2714}\u{2716}\u{271D}\u{2721}\u{2728}\u{2733}-\u{2734}\u{2744}\u{2747}\u{274C}\u{274E}\u{2753}-\u{2755}\u{2757}\u{2763}-\u{2764}\u{2795}-\u{2797}\u{27A1}\u{27B0}\u{27BF}\u{2934}-\u{2935}\u{2B05}-\u{2B07}\u{2B1B}-\u{2B1C}\u{2B50}\u{2B55}\u{3030}\u{303D}\u{3297}\u{3299}\u{00A9}\u{00AE}\u{203C}\u{2049}\u{20E3}\u{200D}\u{FE0F}]/gu, '').trim();
+  // Remove common emoji characters using a simpler regex pattern
+  return text.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27BF]|[\uFE00-\uFE0F]/g, '').trim();
 };
 
 const findMatchingSquad = (colaboradorSquad: string | null, squads: SquadOption[]): string => {
@@ -1929,7 +1932,7 @@ export default function Colaboradores() {
   useSetPageInfo("Colaboradores", "Gerencie os colaboradores da sua equipe");
   const [, setLocation] = useLocation();
   
-  const [filters, setFilters] = useState<FilterState>(initialFilterState);
+  const [filters, setFilters] = usePersistentFilters<FilterState>("colaboradores-filters", initialFilterState);
   const [editingColaborador, setEditingColaborador] = useState<ColaboradorComPatrimonios | null>(null);
   const [deletingColaborador, setDeletingColaborador] = useState<ColaboradorComPatrimonios | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -2175,8 +2178,23 @@ export default function Colaboradores() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" data-testid="loading-colaboradores" />
+      <div className="bg-background min-h-screen">
+        <div className="container mx-auto px-4 py-6 max-w-7xl">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Users className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold">Colaboradores</h1>
+                  <p className="text-sm text-muted-foreground">Gerencie os colaboradores da sua equipe</p>
+                </div>
+              </div>
+            </div>
+            <TableSkeleton rows={10} columns={8} />
+          </div>
+        </div>
       </div>
     );
   }

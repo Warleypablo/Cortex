@@ -1,4 +1,5 @@
 import { useState, useMemo, Fragment, useEffect } from "react";
+import { usePersistentFilters } from "@/hooks/use-persistent-filters";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import type { Client, Credential, InsertClient, InsertCredential, AccessLog, ClientStatus } from "@shared/schema";
@@ -77,6 +78,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 type ClientWithCredentialCount = Client & { credential_count: number; cazClienteId?: number | null; platforms?: string[] };
 type ClientWithCredentials = Client & { credentials: Credential[] };
@@ -1996,13 +1998,13 @@ interface CupCliente {
 }
 
 function ClientsTab() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = usePersistentFilters("acessos-search", "");
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
   const [sortField, setSortField] = useState<SortField>('status');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [showOnlyLinked, setShowOnlyLinked] = useState(true);
+  const [showOnlyLinked, setShowOnlyLinked] = usePersistentFilters("acessos-linked-only", true);
   const { toast } = useToast();
   const createLog = useCreateLog();
 
@@ -2206,11 +2208,7 @@ function ClientsTab() {
   );
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <TableSkeleton rows={10} columns={5} />;
   }
 
   const linkedCount = clients.filter(c => c.cazClienteId != null).length;
