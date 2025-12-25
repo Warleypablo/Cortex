@@ -1,11 +1,8 @@
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import * as schema from "@shared/schema";
-import krsJson from "./krs.json";
-import initiatives from "./initiatives.json";
+import { objectiveRegistry, krRegistry, metricRegistry, type KR, type MetricSpec } from "./okrRegistry";
 import manualMetrics from "./manualMetrics.json";
-import { OKR_CONFIG, getAllKRs, getKRsByObjective, getAllObjectives } from "./okrConfig";
-import { METRICS_REGISTRY, getRequiredMetrics, getMetricSpec } from "./metricsRegistry";
 
 export interface MetricValue {
   value: number | null;
@@ -26,24 +23,37 @@ export interface DashboardMetrics {
   ebitda_ytd: number;
   geracao_caixa_ytd: number;
   caixa_atual: number;
+  inadimplencia_valor: number;
   inadimplencia_percentual: number;
+  gross_churn_mrr: number;
   gross_mrr_churn_percentual: number;
+  net_churn_mrr: number | null;
   net_churn_mrr_percentual: number | null;
+  logo_churn: number;
   logo_churn_percentual: number | null;
   clientes_ativos: number;
+  clientes_inicio_mes: number;
   receita_recorrente_ytd: number | null;
   receita_pontual_ytd: number | null;
   receita_outras_ytd: number | null;
   mix_is_estimated: boolean;
+  new_mrr: number;
   new_mrr_ytd: number;
+  expansion_mrr: number;
   expansion_mrr_ytd: number | null;
+  vendas_pontual: number;
   headcount: number;
   receita_por_head: number;
   mrr_por_head: number;
+  turbooh_receita: number | null;
   turbooh_receita_liquida_ytd: number | null;
+  turbooh_custos: number | null;
+  turbooh_resultado: number | null;
   turbooh_resultado_ytd: number | null;
+  turbooh_margem_pct: number | null;
   tech_projetos_entregues: number;
   tech_freelancers_custo: number;
+  tech_projetos_valor: number;
   tech_freelancers_percentual: number;
 }
 
@@ -55,11 +65,11 @@ function getCurrentQuarter(): string {
   return "Q4";
 }
 
-function getQuarterTarget(metric: string): number {
+function getQuarterTarget(krId: string): number {
   const quarter = getCurrentQuarter();
-  const kr = OKR_CONFIG.krs.KR1_MRR_EOQ;
-  const mrrTargets = kr.targets || {};
-  return mrrTargets[quarter] || 0;
+  const kr = krRegistry.find(k => k.id === krId);
+  if (!kr) return 0;
+  return kr.targets[quarter as keyof typeof kr.targets] || kr.targets.annual || 0;
 }
 
 export async function getMrrAtivo(): Promise<number> {
@@ -67,10 +77,10 @@ export async function getMrrAtivo(): Promise<number> {
     const result = await db.execute(sql`
       WITH ultimo_snapshot AS (
         SELECT MAX(data_snapshot) as data_ultimo
-        FROM ${schema.cupDataHist}
+        FROM cup_data_hist
       )
       SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
-      FROM ${schema.cupDataHist} h
+      FROM cup_data_hist h
       JOIN ultimo_snapshot us ON h.data_snapshot = us.data_ultimo
       WHERE status IN ('ativo', 'onboarding', 'triagem')
         AND valorr IS NOT NULL
@@ -83,19 +93,49 @@ export async function getMrrAtivo(): Promise<number> {
   }
 }
 
-export async function getMrrSerie(): Promise<{ month: string; value: number }[]> {
+export async function getMrrInicioMes(): Promise<number> {
   try {
     const result = await db.execute(sql`
-      SELECT 
-        TO_CHAR(data_snapshot, 'YYYY-MM') as month,
-        COALESCE(SUM(valorr::numeric), 0) as mrr
-      FROM ${schema.cupDataHist}
+      WITH primeiro_snapshot_mes AS (
+        SELECT MIN(data_snapshot) as data_primeiro
+        FROM cup_data_hist
+        WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+      )
+      SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
+      FROM cup_data_hist h
+      JOIN primeiro_snapshot_mes ps ON h.data_snapshot = ps.data_primeiro
       WHERE status IN ('ativo', 'onboarding', 'triagem')
         AND valorr IS NOT NULL
         AND valorr > 0
-        AND data_snapshot >= NOW() - INTERVAL '12 months'
-      GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
-      ORDER BY month
+    `);
+    return parseFloat((result.rows[0] as any)?.mrr || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching MRR Inicio Mes:", error);
+    return 0;
+  }
+}
+
+export async function getMrrSerie(): Promise<{ month: string; value: number }[]> {
+  try {
+    const result = await db.execute(sql`
+      WITH monthly_snapshots AS (
+        SELECT 
+          TO_CHAR(data_snapshot, 'YYYY-MM') as month,
+          MAX(data_snapshot) as last_snapshot
+        FROM cup_data_hist
+        WHERE data_snapshot >= NOW() - INTERVAL '12 months'
+        GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
+      )
+      SELECT 
+        ms.month,
+        COALESCE(SUM(h.valorr::numeric), 0) as mrr
+      FROM monthly_snapshots ms
+      JOIN cup_data_hist h ON h.data_snapshot = ms.last_snapshot
+      WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+        AND h.valorr IS NOT NULL
+        AND h.valorr > 0
+      GROUP BY ms.month
+      ORDER BY ms.month
     `);
     return (result.rows as any[]).map(row => ({
       month: row.month,
@@ -176,7 +216,23 @@ export async function getCaixaAtual(): Promise<number> {
   }
 }
 
-export async function getInadimplencia(): Promise<{ valor: number; percentual: number }> {
+export async function getInadimplenciaValor(): Promise<number> {
+  try {
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(nao_pago::numeric + COALESCE(perda::numeric, 0)), 0) as valor_inadimplente
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND status NOT IN ('QUITADO', 'PERDIDO')
+        AND data_vencimento < NOW()
+    `);
+    return parseFloat((result.rows[0] as any)?.valor_inadimplente || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Inadimplência Valor:", error);
+    return 0;
+  }
+}
+
+export async function getInadimplenciaPct(): Promise<number> {
   try {
     const result = await db.execute(sql`
       WITH inadimplente AS (
@@ -193,65 +249,216 @@ export async function getInadimplencia(): Promise<{ valor: number; percentual: n
           AND TO_CHAR(data_vencimento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
       )
       SELECT 
-        i.valor_inadimplente,
         CASE WHEN r.receita_total > 0 
           THEN (i.valor_inadimplente / r.receita_total) * 100 
           ELSE 0 
         END as percentual
       FROM inadimplente i, receita_mes r
     `);
-    return {
-      valor: parseFloat((result.rows[0] as any)?.valor_inadimplente || "0"),
-      percentual: parseFloat((result.rows[0] as any)?.percentual || "0")
-    };
+    return parseFloat((result.rows[0] as any)?.percentual || "0");
   } catch (error) {
-    console.error("[OKR] Error fetching Inadimplência:", error);
-    return { valor: 0, percentual: 0 };
+    console.error("[OKR] Error fetching Inadimplência Pct:", error);
+    return 0;
   }
 }
 
-export async function getChurnMRR(): Promise<{ gross: number; grossPercentual: number; net: number | null; netPercentual: number | null }> {
+export async function getInadimplencia(): Promise<{ valor: number; percentual: number }> {
+  const [valor, percentual] = await Promise.all([
+    getInadimplenciaValor(),
+    getInadimplenciaPct()
+  ]);
+  return { valor, percentual };
+}
+
+export async function getGrossChurnMrr(): Promise<number> {
+  try {
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(valorr::numeric), 0) as churn_mrr
+      FROM cup_contratos
+      WHERE status = 'cancelado'
+        AND data_encerramento IS NOT NULL
+        AND TO_CHAR(data_encerramento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+        AND valorr IS NOT NULL
+        AND valorr > 0
+    `);
+    return parseFloat((result.rows[0] as any)?.churn_mrr || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Gross Churn MRR:", error);
+    return 0;
+  }
+}
+
+export async function getGrossChurnPct(grossChurn?: number, mrrInicioMes?: number): Promise<number> {
+  try {
+    const gross = grossChurn ?? await getGrossChurnMrr();
+    const mrrInicio = mrrInicioMes ?? await getMrrInicioMes();
+    
+    if (mrrInicio === 0) return 0;
+    return (gross / mrrInicio) * 100;
+  } catch (error) {
+    console.error("[OKR] Error calculating Gross Churn Pct:", error);
+    return 0;
+  }
+}
+
+export async function getExpansionMrr(): Promise<number> {
   try {
     const result = await db.execute(sql`
       WITH mes_atual AS (
         SELECT 
-          COALESCE(SUM(valorr::numeric), 0) as churn_mrr
-        FROM ${schema.cupContratos}
-        WHERE data_encerramento IS NOT NULL
-          AND TO_CHAR(data_encerramento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+          id_task,
+          id_subtask,
+          valorr::numeric as valorr_atual
+        FROM cup_data_hist
+        WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+          AND status IN ('ativo', 'onboarding', 'triagem')
           AND valorr IS NOT NULL
           AND valorr > 0
       ),
       mes_anterior AS (
-        SELECT COALESCE(SUM(valorr::numeric), 0) as mrr_anterior
-        FROM ${schema.cupDataHist}
+        SELECT 
+          id_task,
+          id_subtask,
+          valorr::numeric as valorr_anterior
+        FROM cup_data_hist
         WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW() - INTERVAL '1 month', 'YYYY-MM')
           AND status IN ('ativo', 'onboarding', 'triagem')
           AND valorr IS NOT NULL
           AND valorr > 0
       )
-      SELECT 
-        ma.churn_mrr,
-        CASE WHEN ant.mrr_anterior > 0 
-          THEN (ma.churn_mrr / ant.mrr_anterior) * 100 
+      SELECT COALESCE(SUM(
+        CASE 
+          WHEN ma.valorr_atual > ant.valorr_anterior 
+          THEN ma.valorr_atual - ant.valorr_anterior 
           ELSE 0 
-        END as churn_percentual,
-        ant.mrr_anterior
-      FROM mes_atual ma, mes_anterior ant
+        END
+      ), 0) as expansion_mrr
+      FROM mes_atual ma
+      JOIN mes_anterior ant ON ma.id_subtask = ant.id_subtask
     `);
+    return parseFloat((result.rows[0] as any)?.expansion_mrr || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Expansion MRR:", error);
+    return 0;
+  }
+}
+
+export async function getNetChurnMrr(grossChurn?: number, expansionMrr?: number): Promise<number> {
+  try {
+    const gross = grossChurn ?? await getGrossChurnMrr();
+    const expansion = expansionMrr ?? await getExpansionMrr();
+    return gross - expansion;
+  } catch (error) {
+    console.error("[OKR] Error calculating Net Churn MRR:", error);
+    return 0;
+  }
+}
+
+export async function getNetChurnPct(netChurn?: number, mrrInicioMes?: number): Promise<number> {
+  try {
+    const net = netChurn ?? await getNetChurnMrr();
+    const mrrInicio = mrrInicioMes ?? await getMrrInicioMes();
     
-    const grossChurn = parseFloat((result.rows[0] as any)?.churn_mrr || "0");
-    const grossPercentual = parseFloat((result.rows[0] as any)?.churn_percentual || "0");
+    if (mrrInicio === 0) return 0;
+    return (net / mrrInicio) * 100;
+  } catch (error) {
+    console.error("[OKR] Error calculating Net Churn Pct:", error);
+    return 0;
+  }
+}
+
+export async function getLogoChurn(): Promise<number> {
+  try {
+    const result = await db.execute(sql`
+      WITH clientes_cancelados AS (
+        SELECT DISTINCT c.id_task
+        FROM cup_contratos c
+        WHERE c.status = 'cancelado'
+          AND c.data_encerramento IS NOT NULL
+          AND TO_CHAR(c.data_encerramento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+      ),
+      clientes_ainda_ativos AS (
+        SELECT DISTINCT id_task
+        FROM cup_contratos
+        WHERE status IN ('ativo', 'onboarding', 'triagem')
+      )
+      SELECT COUNT(DISTINCT cc.id_task) as logo_churn
+      FROM clientes_cancelados cc
+      WHERE cc.id_task NOT IN (SELECT id_task FROM clientes_ainda_ativos WHERE id_task IS NOT NULL)
+    `);
+    return parseInt((result.rows[0] as any)?.logo_churn || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Logo Churn:", error);
+    return 0;
+  }
+}
+
+export async function getClientesInicioMes(): Promise<number> {
+  try {
+    const result = await db.execute(sql`
+      WITH primeiro_snapshot_mes AS (
+        SELECT MIN(data_snapshot) as data_primeiro
+        FROM cup_data_hist
+        WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+      )
+      SELECT COUNT(DISTINCT h.id_task) as total
+      FROM cup_data_hist h
+      JOIN primeiro_snapshot_mes ps ON h.data_snapshot = ps.data_primeiro
+      WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+    `);
+    return parseInt((result.rows[0] as any)?.total || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Clientes Inicio Mes:", error);
+    return 0;
+  }
+}
+
+export async function getLogoChurnPct(logoChurn?: number, clientesInicioMes?: number): Promise<number> {
+  try {
+    const logos = logoChurn ?? await getLogoChurn();
+    const clientes = clientesInicioMes ?? await getClientesInicioMes();
+    
+    if (clientes === 0) return 0;
+    return (logos / clientes) * 100;
+  } catch (error) {
+    console.error("[OKR] Error calculating Logo Churn Pct:", error);
+    return 0;
+  }
+}
+
+export async function getChurnMRR(): Promise<{ 
+  gross: number; 
+  grossPercentual: number; 
+  net: number; 
+  netPercentual: number;
+  logoChurn: number;
+  logoChurnPct: number;
+}> {
+  try {
+    const [grossChurn, mrrInicioMes, expansionMrr, logoChurn, clientesInicioMes] = await Promise.all([
+      getGrossChurnMrr(),
+      getMrrInicioMes(),
+      getExpansionMrr(),
+      getLogoChurn(),
+      getClientesInicioMes()
+    ]);
+    
+    const grossPercentual = await getGrossChurnPct(grossChurn, mrrInicioMes);
+    const netChurn = await getNetChurnMrr(grossChurn, expansionMrr);
+    const netPercentual = await getNetChurnPct(netChurn, mrrInicioMes);
+    const logoChurnPct = await getLogoChurnPct(logoChurn, clientesInicioMes);
     
     return {
       gross: grossChurn,
       grossPercentual,
-      net: null,
-      netPercentual: null
+      net: netChurn,
+      netPercentual,
+      logoChurn,
+      logoChurnPct
     };
   } catch (error) {
     console.error("[OKR] Error fetching Churn MRR:", error);
-    return { gross: 0, grossPercentual: 0, net: null, netPercentual: null };
+    return { gross: 0, grossPercentual: 0, net: 0, netPercentual: 0, logoChurn: 0, logoChurnPct: 0 };
   }
 }
 
@@ -259,7 +466,7 @@ export async function getClientesAtivos(): Promise<number> {
   try {
     const result = await db.execute(sql`
       SELECT COUNT(DISTINCT id_task) as total
-      FROM ${schema.cupContratos}
+      FROM cup_contratos
       WHERE status IN ('ativo', 'onboarding', 'triagem')
     `);
     return parseInt((result.rows[0] as any)?.total || "0");
@@ -273,7 +480,7 @@ export async function getHeadcount(): Promise<number> {
   try {
     const result = await db.execute(sql`
       SELECT COUNT(*) as total
-      FROM ${schema.rhPessoal}
+      FROM rh_pessoal
       WHERE status = 'Ativo'
     `);
     return parseInt((result.rows[0] as any)?.total || "0");
@@ -283,9 +490,248 @@ export async function getHeadcount(): Promise<number> {
   }
 }
 
+export async function getNewMrr(): Promise<number> {
+  try {
+    const result = await db.execute(sql`
+      WITH novos_clientes AS (
+        SELECT DISTINCT id_task
+        FROM cup_contratos
+        WHERE data_inicio IS NOT NULL
+          AND TO_CHAR(data_inicio, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+          AND status IN ('ativo', 'onboarding', 'triagem')
+      ),
+      clientes_existentes AS (
+        SELECT DISTINCT id_task
+        FROM cup_data_hist
+        WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW() - INTERVAL '1 month', 'YYYY-MM')
+          AND status IN ('ativo', 'onboarding', 'triagem')
+      )
+      SELECT COALESCE(SUM(c.valorr::numeric), 0) as new_mrr
+      FROM cup_contratos c
+      JOIN novos_clientes nc ON c.id_task = nc.id_task
+      WHERE c.status IN ('ativo', 'onboarding', 'triagem')
+        AND c.valorr IS NOT NULL
+        AND c.valorr > 0
+        AND c.id_task NOT IN (SELECT id_task FROM clientes_existentes WHERE id_task IS NOT NULL)
+    `);
+    return parseFloat((result.rows[0] as any)?.new_mrr || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching New MRR:", error);
+    return 0;
+  }
+}
+
+export async function getNewMrrYTD(): Promise<number> {
+  try {
+    const currentYear = new Date().getFullYear();
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(valorr::numeric), 0) as new_mrr_ytd
+      FROM cup_contratos
+      WHERE data_inicio IS NOT NULL
+        AND EXTRACT(YEAR FROM data_inicio) = ${currentYear}
+        AND status IN ('ativo', 'onboarding', 'triagem')
+        AND valorr IS NOT NULL
+        AND valorr > 0
+    `);
+    return parseFloat((result.rows[0] as any)?.new_mrr_ytd || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching New MRR YTD:", error);
+    return 0;
+  }
+}
+
+export async function getVendasPontual(): Promise<number> {
+  try {
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(valorp::numeric), 0) as vendas_pontual
+      FROM cup_contratos
+      WHERE data_inicio IS NOT NULL
+        AND TO_CHAR(data_inicio, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+        AND valorp IS NOT NULL
+        AND valorp > 0
+    `);
+    return parseFloat((result.rows[0] as any)?.vendas_pontual || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Vendas Pontual:", error);
+    return 0;
+  }
+}
+
+export async function getTurboohReceita(): Promise<number | null> {
+  try {
+    const currentYear = new Date().getFullYear();
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(valor_pago::numeric), 0) as receita
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND status = 'QUITADO'
+        AND EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento)) = ${currentYear}
+        AND (
+          categoria_nome ILIKE '%oh%' 
+          OR categoria_nome ILIKE '%turbo oh%'
+          OR categoria_nome ILIKE '%turbooh%'
+          OR categoria_nome ILIKE '%outdoor%'
+        )
+    `);
+    return parseFloat((result.rows[0] as any)?.receita || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching TurboOH Receita:", error);
+    return null;
+  }
+}
+
+export async function getTurboohCustos(): Promise<number | null> {
+  try {
+    const currentYear = new Date().getFullYear();
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(valor_pago::numeric), 0) as custos
+      FROM caz_parcelas
+      WHERE tipo_evento = 'DESPESA'
+        AND status = 'QUITADO'
+        AND EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento)) = ${currentYear}
+        AND (
+          categoria_nome ILIKE '%oh%' 
+          OR categoria_nome ILIKE '%turbo oh%'
+          OR categoria_nome ILIKE '%turbooh%'
+          OR categoria_nome ILIKE '%outdoor%'
+        )
+    `);
+    return parseFloat((result.rows[0] as any)?.custos || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching TurboOH Custos:", error);
+    return null;
+  }
+}
+
+export async function getTurboohResultado(): Promise<number | null> {
+  try {
+    const [receita, custos] = await Promise.all([
+      getTurboohReceita(),
+      getTurboohCustos()
+    ]);
+    
+    if (receita === null || custos === null) return null;
+    return receita - custos;
+  } catch (error) {
+    console.error("[OKR] Error calculating TurboOH Resultado:", error);
+    return null;
+  }
+}
+
+export async function getTurboohMargemPct(): Promise<number | null> {
+  try {
+    const [receita, resultado] = await Promise.all([
+      getTurboohReceita(),
+      getTurboohResultado()
+    ]);
+    
+    if (receita === null || resultado === null || receita === 0) return null;
+    return (resultado / receita) * 100;
+  } catch (error) {
+    console.error("[OKR] Error calculating TurboOH Margem:", error);
+    return null;
+  }
+}
+
+export async function getTechProjetosEntregues(): Promise<number> {
+  try {
+    const result = await db.execute(sql`
+      SELECT COUNT(*) as total
+      FROM cup_contratos
+      WHERE servico ILIKE '%tech%'
+        AND status = 'concluido'
+        AND EXTRACT(YEAR FROM data_encerramento) = EXTRACT(YEAR FROM NOW())
+    `);
+    const dbCount = parseInt((result.rows[0] as any)?.total || "0");
+    
+    if (dbCount > 0) return dbCount;
+    
+    const manual = (manualMetrics as any)?.tech_projetos_entregues;
+    return manual?.value || 0;
+  } catch (error) {
+    console.error("[OKR] Error fetching Tech Projetos Entregues:", error);
+    const manual = (manualMetrics as any)?.tech_projetos_entregues;
+    return manual?.value || 0;
+  }
+}
+
+export async function getTechFreelancersCusto(): Promise<number> {
+  try {
+    const currentYear = new Date().getFullYear();
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(valor_pago::numeric), 0) as custo
+      FROM caz_parcelas
+      WHERE tipo_evento = 'DESPESA'
+        AND status = 'QUITADO'
+        AND EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento)) = ${currentYear}
+        AND (
+          categoria_nome ILIKE '%freelancer%'
+          OR categoria_nome ILIKE '%freela%'
+          OR descricao ILIKE '%freelancer%'
+          OR descricao ILIKE '%freela%'
+        )
+        AND (
+          categoria_nome ILIKE '%tech%'
+          OR categoria_nome ILIKE '%desenvolvimento%'
+          OR categoria_nome ILIKE '%dev%'
+          OR descricao ILIKE '%tech%'
+          OR descricao ILIKE '%desenvolvimento%'
+        )
+    `);
+    const dbValue = parseFloat((result.rows[0] as any)?.custo || "0");
+    
+    if (dbValue > 0) return dbValue;
+    
+    const manual = (manualMetrics as any)?.tech_freelancers_custo;
+    return manual?.value || 0;
+  } catch (error) {
+    console.error("[OKR] Error fetching Tech Freelancers Custo:", error);
+    const manual = (manualMetrics as any)?.tech_freelancers_custo;
+    return manual?.value || 0;
+  }
+}
+
+export async function getTechProjetosValor(): Promise<number> {
+  try {
+    const currentYear = new Date().getFullYear();
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(COALESCE(valorr::numeric, 0) + COALESCE(valorp::numeric, 0)), 0) as valor
+      FROM cup_contratos
+      WHERE servico ILIKE '%tech%'
+        AND EXTRACT(YEAR FROM data_inicio) = ${currentYear}
+    `);
+    const dbValue = parseFloat((result.rows[0] as any)?.valor || "0");
+    
+    if (dbValue > 0) return dbValue;
+    
+    const manual = (manualMetrics as any)?.tech_projetos_valor;
+    return manual?.value || 0;
+  } catch (error) {
+    console.error("[OKR] Error fetching Tech Projetos Valor:", error);
+    const manual = (manualMetrics as any)?.tech_projetos_valor;
+    return manual?.value || 0;
+  }
+}
+
+export async function getTechFreelancersPct(): Promise<number> {
+  try {
+    const [freelancersCusto, projetosValor] = await Promise.all([
+      getTechFreelancersCusto(),
+      getTechProjetosValor()
+    ]);
+    
+    if (projetosValor === 0) return 0;
+    return (freelancersCusto / projetosValor) * 100;
+  } catch (error) {
+    console.error("[OKR] Error calculating Tech Freelancers Pct:", error);
+    return 0;
+  }
+}
+
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const [
     mrrAtivo,
+    mrrInicioMes,
     mrrSerie,
     receitaYTD,
     ebitdaYTD,
@@ -293,9 +739,23 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     inadimplencia,
     churnMRR,
     clientesAtivos,
-    headcount
+    clientesInicioMes,
+    headcount,
+    newMrr,
+    newMrrYTD,
+    expansionMrr,
+    vendasPontual,
+    turboohReceita,
+    turboohCustos,
+    turboohResultado,
+    turboohMargemPct,
+    techProjetosEntregues,
+    techFreelancersCusto,
+    techProjetosValor,
+    techFreelancersPct
   ] = await Promise.all([
     getMrrAtivo(),
+    getMrrInicioMes(),
     getMrrSerie(),
     getReceitaYTD(),
     getEbitdaYTD(),
@@ -303,7 +763,20 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     getInadimplencia(),
     getChurnMRR(),
     getClientesAtivos(),
-    getHeadcount()
+    getClientesInicioMes(),
+    getHeadcount(),
+    getNewMrr(),
+    getNewMrrYTD(),
+    getExpansionMrr(),
+    getVendasPontual(),
+    getTurboohReceita(),
+    getTurboohCustos(),
+    getTurboohResultado(),
+    getTurboohMargemPct(),
+    getTechProjetosEntregues(),
+    getTechFreelancersCusto(),
+    getTechProjetosValor(),
+    getTechFreelancersPct()
   ]);
 
   const receitaPorHead = headcount > 0 ? receitaYTD.liquida / headcount : 0;
@@ -317,70 +790,107 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     ebitda_ytd: ebitdaYTD,
     geracao_caixa_ytd: ebitdaYTD * 0.6,
     caixa_atual: caixaAtual,
+    inadimplencia_valor: inadimplencia.valor,
     inadimplencia_percentual: inadimplencia.percentual,
+    gross_churn_mrr: churnMRR.gross,
     gross_mrr_churn_percentual: churnMRR.grossPercentual,
+    net_churn_mrr: churnMRR.net,
     net_churn_mrr_percentual: churnMRR.netPercentual,
-    logo_churn_percentual: null,
+    logo_churn: churnMRR.logoChurn,
+    logo_churn_percentual: churnMRR.logoChurnPct,
     clientes_ativos: clientesAtivos,
+    clientes_inicio_mes: clientesInicioMes,
     receita_recorrente_ytd: receitaYTD.recorrente,
     receita_pontual_ytd: receitaYTD.pontual,
     receita_outras_ytd: receitaYTD.outras,
     mix_is_estimated: receitaYTD.mix_is_estimated,
-    new_mrr_ytd: 0,
-    expansion_mrr_ytd: null,
+    new_mrr: newMrr,
+    new_mrr_ytd: newMrrYTD,
+    expansion_mrr: expansionMrr,
+    expansion_mrr_ytd: expansionMrr,
+    vendas_pontual: vendasPontual,
     headcount,
     receita_por_head: receitaPorHead,
     mrr_por_head: mrrPorHead,
-    turbooh_receita_liquida_ytd: null,
-    turbooh_resultado_ytd: null,
-    tech_projetos_entregues: 0,
-    tech_freelancers_custo: 0,
-    tech_freelancers_percentual: 0
+    turbooh_receita: turboohReceita,
+    turbooh_receita_liquida_ytd: turboohReceita,
+    turbooh_custos: turboohCustos,
+    turbooh_resultado: turboohResultado,
+    turbooh_resultado_ytd: turboohResultado,
+    turbooh_margem_pct: turboohMargemPct,
+    tech_projetos_entregues: techProjetosEntregues,
+    tech_freelancers_custo: techFreelancersCusto,
+    tech_projetos_valor: techProjetosValor,
+    tech_freelancers_percentual: techFreelancersPct
   };
 }
 
 export function getTargets() {
-  const krs = OKR_CONFIG.krs;
+  const getTarget = (metricKey: string) => {
+    const kr = krRegistry.find(k => k.metricKey === metricKey);
+    if (!kr) return 0;
+    return kr.targets.annual || kr.targets.monthly || 0;
+  };
+
+  const getQuarterlyTargets = (metricKey: string) => {
+    const kr = krRegistry.find(k => k.metricKey === metricKey);
+    if (!kr) return {};
+    return {
+      Q1: kr.targets.Q1,
+      Q2: kr.targets.Q2,
+      Q3: kr.targets.Q3,
+      Q4: kr.targets.Q4
+    };
+  };
+
   return {
-    year: OKR_CONFIG.year,
+    year: 2026,
     company: {
-      mrr_ativo: krs.KR1_MRR_EOQ.targets || {},
-      receita_liquida_anual: krs.KR2_NET_REVENUE_YTD.target || 0,
-      ebitda_anual: krs.KR1_EBITDA_YTD.target || 0,
-      inadimplencia_max: krs.KR1_INADIMPLENCIA_MAX.target || 0,
-      gross_mrr_churn_max: krs.KR2_GROSS_CHURN_MAX.target || 0,
-      clientes_eoy: krs.KR3_CLIENTS_EOY.target || 0
+      mrr_ativo: getQuarterlyTargets("mrr_active"),
+      receita_liquida_anual: getTarget("revenue_net"),
+      ebitda_anual: getTarget("ebitda"),
+      inadimplencia_max: getTarget("inadimplencia_pct"),
+      gross_mrr_churn_max: getTarget("gross_churn_pct"),
+      net_churn_max: getTarget("net_churn_pct"),
+      logo_churn_max: getTarget("logo_churn_pct"),
+      clientes_eoy: getTarget("clients_active")
     },
     turbooh: {
-      receita_liquida_anual: krs.KR2_OH_NETREV_YTD.target || 0,
-      resultado_anual: krs.KR3_OH_RESULT_YTD.target || 0,
-      clientes_eoy: krs.KR1_OH_SCREENS_EOY.target || 0
+      receita_liquida_anual: getTarget("turbooh_receita"),
+      resultado_anual: getTarget("turbooh_resultado"),
+      margem_min: getTarget("turbooh_margem_pct"),
+      telas_eoy: getTarget("oh_screens")
     },
     tech: {
-      projetos_anual: krs.KR1_TECH_DELIVERED_YTD.target || 0,
-      freelancers_max_pct: krs.KR2_TECH_FREELA_GUARDRAIL.target || 0
+      projetos_anual: getTarget("tech_projetos_entregues"),
+      freelancers_max_pct: getTarget("tech_freelancers_pct")
     }
   };
 }
 
-export function getKRs() {
-  return krsJson;
+export function getKRs(): KR[] {
+  return krRegistry;
 }
 
 export function getOKRConfig() {
-  return OKR_CONFIG;
+  return {
+    year: 2026,
+    objectives: objectiveRegistry,
+    krs: krRegistry,
+    metrics: metricRegistry
+  };
 }
 
 export function getObjectives() {
-  return getAllObjectives();
+  return objectiveRegistry;
 }
 
-export function getKRsByObjectiveCode(code: string) {
-  return getKRsByObjective(code);
+export function getKRsByObjectiveCode(code: string): KR[] {
+  return krRegistry.filter(kr => kr.objectiveId === code);
 }
 
 export function getInitiatives() {
-  return initiatives;
+  return [];
 }
 
 export function getManualMetrics() {
@@ -418,7 +928,7 @@ export interface KRProgress {
 }
 
 export async function getKRProgress(krId: string): Promise<KRProgress> {
-  const kr = Object.values(OKR_CONFIG.krs).find(k => k.id === krId);
+  const kr = krRegistry.find(k => k.id === krId);
   if (!kr) {
     return { krId, actual: null, target: null, progress: null, status: "gray", delta: null, direction: "higher" };
   }
@@ -427,43 +937,77 @@ export async function getKRProgress(krId: string): Promise<KRProgress> {
   let actual: number | null = null;
   let target: number | null = null;
 
-  switch (kr.metric_key) {
+  const quarter = getCurrentQuarter();
+  const quarterKey = quarter as keyof typeof kr.targets;
+
+  switch (kr.metricKey) {
     case "mrr_active":
       actual = metrics.mrr_ativo;
-      const quarter = getCurrentQuarter();
-      target = (kr.targets as Record<string, number>)?.[quarter] || (kr.target as number) || null;
+      target = kr.targets[quarterKey] || kr.targets.annual || null;
       break;
     case "revenue_net":
       actual = metrics.receita_liquida_ytd;
-      target = kr.target as number || null;
+      target = kr.targets.annual || null;
       break;
     case "clients_active":
       actual = metrics.clientes_ativos;
-      target = kr.target as number || null;
+      target = kr.targets.annual || null;
       break;
     case "revenue_per_head":
       actual = metrics.receita_por_head;
-      target = kr.target as number || null;
+      target = kr.targets.annual || null;
       break;
     case "ebitda":
       actual = metrics.ebitda_ytd;
-      target = kr.target as number || null;
+      target = kr.targets.annual || null;
       break;
-    case "cash_balance_end":
+    case "cash_balance":
       actual = metrics.caixa_atual;
-      target = kr.target as number || null;
+      target = kr.targets.annual || null;
       break;
     case "inadimplencia_pct":
       actual = metrics.inadimplencia_percentual;
-      target = kr.target as number || null;
+      target = kr.targets.monthly || null;
       break;
-    case "gross_mrr_churn_pct":
+    case "gross_churn_pct":
       actual = metrics.gross_mrr_churn_percentual;
-      target = kr.target as number || null;
+      target = kr.targets.monthly || null;
+      break;
+    case "net_churn_pct":
+      actual = metrics.net_churn_mrr_percentual;
+      target = kr.targets.monthly || null;
+      break;
+    case "logo_churn_pct":
+      actual = metrics.logo_churn_percentual;
+      target = kr.targets.monthly || null;
+      break;
+    case "turbooh_receita":
+      actual = metrics.turbooh_receita;
+      target = kr.targets.annual || null;
+      break;
+    case "turbooh_resultado":
+      actual = metrics.turbooh_resultado;
+      target = kr.targets.annual || null;
+      break;
+    case "turbooh_margem_pct":
+      actual = metrics.turbooh_margem_pct;
+      target = kr.targets.annual || null;
+      break;
+    case "tech_projetos_entregues":
+      actual = metrics.tech_projetos_entregues;
+      target = kr.targets.annual || null;
+      break;
+    case "tech_freelancers_pct":
+      actual = metrics.tech_freelancers_percentual;
+      target = kr.targets.annual || null;
+      break;
+    case "mrr_por_head":
+      actual = metrics.mrr_por_head;
+      target = kr.targets.annual || null;
       break;
     default:
       actual = null;
-      target = kr.target as number || null;
+      target = kr.targets.annual || kr.targets.monthly || null;
   }
 
   if (actual === null || target === null) {
@@ -478,16 +1022,21 @@ export async function getKRProgress(krId: string): Promise<KRProgress> {
 }
 
 export function getCoverage(): { covered: number; total: number; percentage: number; missing: string[] } {
-  const required = getRequiredMetrics();
   const availableMetrics = new Set([
-    "mrr_active", "revenue_net", "revenue_total_billable", "ebitda", "cash_balance_end",
-    "inadimplencia_pct", "gross_mrr_churn_pct", "clients_active", "headcount_total", "revenue_per_head"
+    "mrr_active", "revenue_net", "revenue_total", "ebitda", "cash_balance",
+    "inadimplencia_pct", "inadimplencia_valor", "gross_churn_pct", "gross_churn_mrr",
+    "net_churn_pct", "net_churn_mrr", "logo_churn", "logo_churn_pct",
+    "clients_active", "headcount_total", "revenue_per_head", "mrr_por_head",
+    "new_mrr", "expansion_mrr", "vendas_pontual",
+    "turbooh_receita", "turbooh_resultado", "turbooh_margem_pct",
+    "tech_projetos_entregues", "tech_freelancers_custo", "tech_freelancers_pct"
   ]);
 
+  const requiredMetrics = Object.values(metricRegistry).filter(m => m.required);
   const missing: string[] = [];
   let covered = 0;
 
-  for (const metric of required) {
+  for (const metric of requiredMetrics) {
     if (availableMetrics.has(metric.id)) {
       covered++;
     } else {
@@ -497,8 +1046,48 @@ export function getCoverage(): { covered: number; total: number; percentage: num
 
   return {
     covered,
-    total: required.length,
-    percentage: required.length > 0 ? (covered / required.length) * 100 : 0,
+    total: requiredMetrics.length,
+    percentage: requiredMetrics.length > 0 ? (covered / requiredMetrics.length) * 100 : 0,
     missing
   };
+}
+
+export async function getMetricValue(metricKey: string): Promise<MetricValue> {
+  const metrics = await getDashboardMetrics();
+  const now = new Date().toISOString().split('T')[0];
+  
+  const metricMap: Record<string, number | null> = {
+    mrr_active: metrics.mrr_ativo,
+    revenue_net: metrics.receita_liquida_ytd,
+    revenue_total: metrics.receita_total_ytd,
+    ebitda: metrics.ebitda_ytd,
+    cash_balance: metrics.caixa_atual,
+    inadimplencia_pct: metrics.inadimplencia_percentual,
+    inadimplencia_valor: metrics.inadimplencia_valor,
+    gross_churn_pct: metrics.gross_mrr_churn_percentual,
+    gross_churn_mrr: metrics.gross_churn_mrr,
+    net_churn_pct: metrics.net_churn_mrr_percentual,
+    net_churn_mrr: metrics.net_churn_mrr,
+    logo_churn: metrics.logo_churn,
+    logo_churn_pct: metrics.logo_churn_percentual,
+    clients_active: metrics.clientes_ativos,
+    new_mrr: metrics.new_mrr,
+    expansion_mrr: metrics.expansion_mrr,
+    vendas_pontual: metrics.vendas_pontual,
+    turbooh_receita: metrics.turbooh_receita,
+    turbooh_resultado: metrics.turbooh_resultado,
+    turbooh_margem_pct: metrics.turbooh_margem_pct,
+    tech_projetos_entregues: metrics.tech_projetos_entregues,
+    tech_freelancers_custo: metrics.tech_freelancers_custo,
+    tech_freelancers_pct: metrics.tech_freelancers_percentual,
+    revenue_per_head: metrics.receita_por_head,
+    mrr_por_head: metrics.mrr_por_head,
+    headcount_total: metrics.headcount
+  };
+
+  const value = metricMap[metricKey] ?? null;
+  const spec = metricRegistry[metricKey];
+  const formatted = value !== null && spec ? spec.format(value) : undefined;
+
+  return { value, date: now, formatted };
 }
