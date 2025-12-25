@@ -1679,3 +1679,24 @@ export const cohortFiltersSchema = z.object({
   squad: z.string().optional(),
   metricType: z.enum(['logo_retention', 'revenue_retention', 'nrr']).default('revenue_retention'),
 });
+
+// ==================== SYSTEM FIELD OPTIONS ====================
+
+export const systemFieldOptions = pgTable("system_field_options", {
+  id: serial("id").primaryKey(),
+  fieldType: text("field_type").notNull(),
+  value: text("value").notNull(),
+  label: text("label").notNull(),
+  color: text("color"),
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSystemFieldOptionSchema = createInsertSchema(systemFieldOptions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type SystemFieldOption = typeof systemFieldOptions.$inferSelect;
+export type InsertSystemFieldOption = z.infer<typeof insertSystemFieldOptionSchema>;

@@ -6,7 +6,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { Pool } from "pg";
-import { initializeNotificationsTable } from "./db";
+import { initializeNotificationsTable, initializeSystemFieldOptionsTable } from "./db";
 
 const app = express();
 
@@ -88,6 +88,7 @@ app.use((req, res, next) => {
 
 (async () => {
   await initializeNotificationsTable();
+  await initializeSystemFieldOptionsTable();
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
