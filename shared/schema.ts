@@ -1518,6 +1518,7 @@ export const notifications = pgTable("staging.notifications", {
   message: text("message").notNull(),
   entityId: text("entity_id"),
   entityType: text("entity_type"),
+  priority: text("priority").default("medium"),
   read: boolean("read").default(false),
   dismissed: boolean("dismissed").default(false),
   createdAt: timestamp("created_at").defaultNow(),
@@ -1528,6 +1529,24 @@ export const notifications = pgTable("staging.notifications", {
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+export type NotificationPriority = "high" | "medium" | "low";
+
+export interface NotificationRuleConfig {
+  inadimplencia?: {
+    diasAtraso: number;
+    valorMinimo: number;
+    priority: NotificationPriority;
+  };
+  contrato_vencendo?: {
+    diasAntecedencia: number;
+    priority: NotificationPriority;
+  };
+  aniversario?: {
+    diasAntecedencia: number;
+    priority: NotificationPriority;
+  };
+}
 
 // ============================================
 // Atendimento Module - WhatsApp Group Chat Management
