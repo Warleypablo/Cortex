@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { usePageInfo } from "@/contexts/PageContext";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, isToday } from "date-fns";
@@ -305,7 +305,9 @@ export default function Calendario() {
   const [editingEvento, setEditingEvento] = useState<TurboEvento | null>(null);
   const [filterType, setFilterType] = useState<string>("all");
   
-  setPageInfo("Calendário Turbo", "Eventos, confraternizações e reuniões");
+  useEffect(() => {
+    setPageInfo("Calendário Turbo", "Eventos, confraternizações e reuniões");
+  }, [setPageInfo]);
   
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
