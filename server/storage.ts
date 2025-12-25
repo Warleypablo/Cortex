@@ -23,6 +23,7 @@ export type ClienteCompleto = Cliente & {
   ltDias: number | null;
   totalRecorrente: number | null;
   totalPontual: number | null;
+  statusFinanceiro: string | null;
 };
 
 export interface AniversariantesMes {
@@ -1412,9 +1413,11 @@ export class DbStorage implements IStorage {
           WHERE id_task = cc.task_id
             AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
             AND valorp IS NOT NULL
-        ), 0) as "totalPontual"
+        ), 0) as "totalPontual",
+        ic.status_financeiro as "statusFinanceiro"
       FROM cup_clientes cc
       LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
+      LEFT JOIN inadimplencia_contexto ic ON ic.cliente_id = COALESCE(caz.ids, COALESCE(caz.id, ('x' || substr(md5(cc.task_id), 1, 8))::bit(32)::int)::text)
       ORDER BY cc.task_id, caz.id DESC NULLS LAST, cc.nome
     `);
 
@@ -1490,6 +1493,11 @@ export class DbStorage implements IStorage {
             AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
             AND valorp IS NOT NULL
         ), 0)`,
+        statusFinanceiro: sql<string | null>`(
+          SELECT status_financeiro
+          FROM inadimplencia_contexto
+          WHERE cliente_id = COALESCE(${schema.cazClientes.ids}, COALESCE(${schema.cazClientes.id}, ('x' || substr(md5(${schema.cupClientes.taskId}), 1, 8))::bit(32)::int)::text)
+        )`,
       })
       .from(schema.cupClientes)
       .leftJoin(
@@ -1542,7 +1550,12 @@ export class DbStorage implements IStorage {
         ), 0) as "ltMeses",
         0 as "ltDias",
         0 as "totalRecorrente",
-        0 as "totalPontual"
+        0 as "totalPontual",
+        (
+          SELECT status_financeiro
+          FROM inadimplencia_contexto
+          WHERE cliente_id = COALESCE(caz_clientes.ids, caz_clientes.id::text)
+        ) as "statusFinanceiro"
       FROM caz_clientes
       WHERE id::text = ${id} 
         OR ids = ${id}
