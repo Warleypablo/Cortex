@@ -1425,9 +1425,9 @@ export class DbStorage implements IStorage {
             AND valorp IS NOT NULL
         ), 0) as "totalPontual",
         NULL::text as "statusFinanceiro",
-        cc.tipo_negocio as "tipoNegocio",
-        cc.faturamento_mensal as "faturamentoMensal",
-        cc.investimento_ads as "investimentoAds"
+        NULL::text as "tipoNegocio",
+        NULL::text as "faturamentoMensal",
+        NULL::text as "investimentoAds"
       FROM cup_clientes cc
       LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
       ORDER BY cc.task_id, caz.id DESC NULLS LAST, cc.nome
@@ -1512,9 +1512,9 @@ export class DbStorage implements IStorage {
             AND valorp IS NOT NULL
         ), 0)`,
         statusFinanceiro: sql<string | null>`NULL`,
-        tipoNegocio: schema.cupClientes.tipoNegocio,
-        faturamentoMensal: schema.cupClientes.faturamentoMensal,
-        investimentoAds: schema.cupClientes.investimentoAds,
+        tipoNegocio: sql<string | null>`NULL`,
+        faturamentoMensal: sql<string | null>`NULL`,
+        investimentoAds: sql<string | null>`NULL`,
       })
       .from(schema.cupClientes)
       .leftJoin(
