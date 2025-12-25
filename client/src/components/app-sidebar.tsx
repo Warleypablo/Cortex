@@ -178,10 +178,7 @@ const dashboardCategories = [
   {
     title: "OKR 2026",
     icon: Trophy,
-    baseUrl: "/okr-2026",
-    subItems: [
-      { title: "Dashboard", url: "/okr-2026", icon: Target },
-    ],
+    url: "/okr-2026",
   },
 ];
 
@@ -195,8 +192,10 @@ export function AppSidebar() {
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     dashboardCategories.forEach(cat => {
-      const isActive = cat.subItems.some(sub => location === sub.url || location.startsWith(sub.url));
-      initial[cat.title] = isActive;
+      if (cat.subItems) {
+        const isActive = cat.subItems.some(sub => location === sub.url || location.startsWith(sub.url));
+        initial[cat.title] = isActive;
+      }
     });
     return initial;
   });
@@ -246,11 +245,32 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {dashboardCategories.map((category) => {
-                const visibleSubItems = category.subItems.filter(sub => hasAccess(sub.url));
+                // Direct link items (no subItems)
+                if (category.url) {
+                  if (!hasAccess(category.url)) return null;
+                  const isActive = location === category.url || location.startsWith(category.url + "/");
+                  return (
+                    <SidebarMenuItem key={category.title}>
+                      <SidebarMenuButton 
+                        asChild
+                        isActive={isActive}
+                        data-testid={`nav-${category.title.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        <Link href={category.url} onClick={handleItemClick}>
+                          <category.icon />
+                          <span>{category.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                }
+
+                // Items with subItems (collapsible)
+                const visibleSubItems = category.subItems?.filter(sub => hasAccess(sub.url)) || [];
                 if (visibleSubItems.length === 0) return null;
                 
                 const isOpen = openCategories[category.title] || false;
-                const isActive = category.subItems.some(sub => location === sub.url);
+                const isActive = category.subItems?.some(sub => location === sub.url) || false;
 
                 return (
                   <Collapsible
