@@ -552,4 +552,61 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       res.status(500).json({ error: "Failed to delete PDI goal" });
     }
   });
+
+  // ============ PDI Checkpoints Endpoints ============
+  app.get("/api/pdi/:pdiId/checkpoints", async (req, res) => {
+    try {
+      const pdiId = parseInt(req.params.pdiId);
+      if (isNaN(pdiId)) {
+        return res.status(400).json({ error: "Invalid PDI ID" });
+      }
+      const checkpoints = await storage.getPdiCheckpoints(pdiId);
+      res.json(checkpoints);
+    } catch (error) {
+      console.error("[api] Error fetching PDI checkpoints:", error);
+      res.status(500).json({ error: "Failed to fetch checkpoints" });
+    }
+  });
+
+  app.post("/api/pdi/:pdiId/checkpoints", async (req, res) => {
+    try {
+      const pdiId = parseInt(req.params.pdiId);
+      if (isNaN(pdiId)) {
+        return res.status(400).json({ error: "Invalid PDI ID" });
+      }
+      const checkpoint = await storage.createPdiCheckpoint({ ...req.body, pdiId });
+      res.status(201).json(checkpoint);
+    } catch (error) {
+      console.error("[api] Error creating PDI checkpoint:", error);
+      res.status(500).json({ error: "Failed to create checkpoint" });
+    }
+  });
+
+  app.put("/api/pdi/checkpoints/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid checkpoint ID" });
+      }
+      const checkpoint = await storage.updatePdiCheckpoint(id, req.body);
+      res.json(checkpoint);
+    } catch (error) {
+      console.error("[api] Error updating PDI checkpoint:", error);
+      res.status(500).json({ error: "Failed to update checkpoint" });
+    }
+  });
+
+  app.delete("/api/pdi/checkpoints/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid checkpoint ID" });
+      }
+      await storage.deletePdiCheckpoint(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[api] Error deleting PDI checkpoint:", error);
+      res.status(500).json({ error: "Failed to delete checkpoint" });
+    }
+  });
 }

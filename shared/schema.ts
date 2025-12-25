@@ -1805,6 +1805,7 @@ export const pdiGoals = pgTable("rh_pdi", {
   titulo: text("titulo").notNull(),
   descricao: text("descricao"),
   competencia: text("competencia"),
+  categoria: text("categoria"),
   recursos: text("recursos"),
   prazo: date("prazo"),
   progresso: integer("progresso").default(0),
@@ -1814,6 +1815,20 @@ export const pdiGoals = pgTable("rh_pdi", {
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
 
+export const pdiCheckpoints = pgTable("rh_pdi_checkpoints", {
+  id: serial("id").primaryKey(),
+  pdiId: integer("pdi_id").notNull(),
+  descricao: text("descricao").notNull(),
+  dataAlvo: date("data_alvo"),
+  concluido: text("concluido").default("false"),
+  concluidoEm: timestamp("concluido_em"),
+  ordem: integer("ordem").default(0),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
 export const insertPdiSchema = createInsertSchema(pdiGoals).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export const insertPdiCheckpointSchema = createInsertSchema(pdiCheckpoints).omit({ id: true, criadoEm: true, concluidoEm: true });
 export type PdiGoal = typeof pdiGoals.$inferSelect;
 export type InsertPdi = z.infer<typeof insertPdiSchema>;
+export type PdiCheckpoint = typeof pdiCheckpoints.$inferSelect;
+export type InsertPdiCheckpoint = z.infer<typeof insertPdiCheckpointSchema>;
