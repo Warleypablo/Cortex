@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao, type OneOnOne, type InsertOneOnOne, type OneOnOneAcao, type InsertOneOnOneAcao, type EnpsResponse, type InsertEnps, type PdiGoal, type InsertPdi, type PdiCheckpoint, type InsertPdiCheckpoint } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao, type OneOnOne, type InsertOneOnOne, type OneOnOneAcao, type InsertOneOnOneAcao, type EnpsResponse, type InsertEnps, type PdiGoal, type InsertPdi, type PdiCheckpoint, type InsertPdiCheckpoint, type TurboEvento, type InsertTurboEvento } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
@@ -316,6 +316,13 @@ export interface IStorage {
   createPdiCheckpoint(data: InsertPdiCheckpoint): Promise<PdiCheckpoint>;
   updatePdiCheckpoint(id: number, data: { concluido?: string; concluidoEm?: Date }): Promise<PdiCheckpoint>;
   deletePdiCheckpoint(id: number): Promise<void>;
+  
+  // Turbo Calendar
+  getTurboEventos(startDate?: string, endDate?: string): Promise<TurboEvento[]>;
+  getTurboEvento(id: number): Promise<TurboEvento | null>;
+  createTurboEvento(data: InsertTurboEvento): Promise<TurboEvento>;
+  updateTurboEvento(id: number, data: Partial<InsertTurboEvento>): Promise<TurboEvento>;
+  deleteTurboEvento(id: number): Promise<void>;
 }
 
 // GEG Dashboard Extended Types
@@ -1023,6 +1030,23 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
   async deletePdiCheckpoint(id: number): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  // Turbo Calendar - MemStorage stubs
+  async getTurboEventos(startDate?: string, endDate?: string): Promise<TurboEvento[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getTurboEvento(id: number): Promise<TurboEvento | null> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async createTurboEvento(data: InsertTurboEvento): Promise<TurboEvento> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async updateTurboEvento(id: number, data: Partial<InsertTurboEvento>): Promise<TurboEvento> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async deleteTurboEvento(id: number): Promise<void> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -8837,6 +8861,91 @@ export class DbStorage implements IStorage {
 
   async deletePdiCheckpoint(id: number): Promise<void> {
     await db.execute(sql`DELETE FROM rh_pdi_checkpoints WHERE id = ${id}`);
+  }
+
+  // Turbo Calendar
+  async getTurboEventos(startDate?: string, endDate?: string): Promise<TurboEvento[]> {
+    let query = sql`
+      SELECT id, titulo, descricao, tipo, 
+        data_inicio as "dataInicio", data_fim as "dataFim",
+        local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
+        cor, criado_em as "criadoEm", criado_por as "criadoPor"
+      FROM turbo_eventos
+    `;
+    
+    if (startDate && endDate) {
+      query = sql`
+        SELECT id, titulo, descricao, tipo, 
+          data_inicio as "dataInicio", data_fim as "dataFim",
+          local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
+          cor, criado_em as "criadoEm", criado_por as "criadoPor"
+        FROM turbo_eventos
+        WHERE data_inicio >= ${startDate}::timestamp AND data_inicio <= ${endDate}::timestamp
+        ORDER BY data_inicio
+      `;
+    } else {
+      query = sql`
+        SELECT id, titulo, descricao, tipo, 
+          data_inicio as "dataInicio", data_fim as "dataFim",
+          local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
+          cor, criado_em as "criadoEm", criado_por as "criadoPor"
+        FROM turbo_eventos
+        ORDER BY data_inicio
+      `;
+    }
+    
+    const result = await db.execute(query);
+    return result.rows as TurboEvento[];
+  }
+
+  async getTurboEvento(id: number): Promise<TurboEvento | null> {
+    const result = await db.execute(sql`
+      SELECT id, titulo, descricao, tipo, 
+        data_inicio as "dataInicio", data_fim as "dataFim",
+        local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
+        cor, criado_em as "criadoEm", criado_por as "criadoPor"
+      FROM turbo_eventos
+      WHERE id = ${id}
+    `);
+    return (result.rows[0] as TurboEvento) || null;
+  }
+
+  async createTurboEvento(data: InsertTurboEvento): Promise<TurboEvento> {
+    const result = await db.execute(sql`
+      INSERT INTO turbo_eventos (titulo, descricao, tipo, data_inicio, data_fim, local, organizador_id, organizador_nome, cor, criado_por)
+      VALUES (${data.titulo}, ${data.descricao || null}, ${data.tipo}, ${data.dataInicio}, ${data.dataFim || null}, ${data.local || null}, ${data.organizadorId || null}, ${data.organizadorNome || null}, ${data.cor || '#f97316'}, ${data.criadoPor || null})
+      RETURNING id, titulo, descricao, tipo, 
+        data_inicio as "dataInicio", data_fim as "dataFim",
+        local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
+        cor, criado_em as "criadoEm", criado_por as "criadoPor"
+    `);
+    return result.rows[0] as TurboEvento;
+  }
+
+  async updateTurboEvento(id: number, data: Partial<InsertTurboEvento>): Promise<TurboEvento> {
+    const result = await db.execute(sql`
+      UPDATE turbo_eventos 
+      SET 
+        titulo = COALESCE(${data.titulo ?? null}, titulo),
+        descricao = COALESCE(${data.descricao ?? null}, descricao),
+        tipo = COALESCE(${data.tipo ?? null}, tipo),
+        data_inicio = COALESCE(${data.dataInicio ?? null}, data_inicio),
+        data_fim = COALESCE(${data.dataFim ?? null}, data_fim),
+        local = COALESCE(${data.local ?? null}, local),
+        organizador_id = COALESCE(${data.organizadorId ?? null}, organizador_id),
+        organizador_nome = COALESCE(${data.organizadorNome ?? null}, organizador_nome),
+        cor = COALESCE(${data.cor ?? null}, cor)
+      WHERE id = ${id}
+      RETURNING id, titulo, descricao, tipo, 
+        data_inicio as "dataInicio", data_fim as "dataFim",
+        local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
+        cor, criado_em as "criadoEm", criado_por as "criadoPor"
+    `);
+    return result.rows[0] as TurboEvento;
+  }
+
+  async deleteTurboEvento(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM turbo_eventos WHERE id = ${id}`);
   }
 }
 
