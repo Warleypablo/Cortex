@@ -8405,50 +8405,28 @@ export class DbStorage implements IStorage {
   async getCohortData(filters: import("@shared/schema").CohortFilters): Promise<import("@shared/schema").CohortData> {
     const { startDate, endDate, produto, squad, metricType } = filters;
     
-    // Build date filter for client creation date (cohort month)
-    let cohortDateFilter = sql`c.created_at IS NOT NULL`;
+    // Build date filter for first payment (cohort month)
+    let dateFilter = sql`p.status = 'QUITADO' AND p.id_cliente IS NOT NULL AND p.valor_pago IS NOT NULL`;
     if (startDate) {
-      cohortDateFilter = sql`${cohortDateFilter} AND c.created_at >= ${startDate}::date`;
+      dateFilter = sql`${dateFilter} AND COALESCE(p.data_quitacao, p.data_vencimento) >= ${startDate}::date`;
     }
     if (endDate) {
-      cohortDateFilter = sql`${cohortDateFilter} AND c.created_at <= ${endDate}::date`;
+      dateFilter = sql`${dateFilter} AND COALESCE(p.data_quitacao, p.data_vencimento) <= ${endDate}::date`;
     }
     
-    // New cohort logic:
-    // 1. Safra (cohort) = mês de criação do cliente (caz_clientes.created_at)
-    // 2. Primeiro pagamento = MIN(COALESCE(data_quitacao, data_vencimento)) WHERE status = 'QUITADO'
-    // 3. Month offset = meses desde o primeiro pagamento
-    // 4. Retenção = clientes que pagaram em cada mês offset
+    // Cohort logic based on first payment date:
+    // 1. Safra (cohort) = mês do primeiro pagamento do cliente
+    // 2. Month offset = meses desde o primeiro pagamento
+    // 3. Retenção = clientes que pagaram em cada mês offset
     const result = await db.execute(sql`
-      WITH client_base AS (
-        -- Get clients with their creation month (cohort)
-        -- caz_clientes.id is INTEGER, cast to TEXT to match caz_parcelas.id_cliente
-        SELECT 
-          CAST(c.id AS TEXT) as client_id,
-          DATE_TRUNC('month', c.created_at)::date as cohort_month
-        FROM caz_clientes c
-        WHERE ${cohortDateFilter}
-      ),
-      first_payment AS (
-        -- Get each client's first payment date
-        -- caz_parcelas.id_cliente is TEXT
+      WITH first_payment AS (
+        -- Get each client's first payment date as cohort month
         SELECT 
           p.id_cliente as client_id,
-          DATE_TRUNC('month', MIN(COALESCE(p.data_quitacao, p.data_vencimento)))::date as first_payment_month
+          DATE_TRUNC('month', MIN(COALESCE(p.data_quitacao, p.data_vencimento)))::date as cohort_month
         FROM caz_parcelas p
-        WHERE p.status = 'QUITADO' 
-          AND p.id_cliente IS NOT NULL 
-          AND p.valor_pago IS NOT NULL
+        WHERE ${dateFilter}
         GROUP BY p.id_cliente
-      ),
-      clients_with_payments AS (
-        -- Join clients with their first payment (both are TEXT now)
-        SELECT 
-          cb.client_id,
-          cb.cohort_month,
-          fp.first_payment_month
-        FROM client_base cb
-        INNER JOIN first_payment fp ON cb.client_id = fp.client_id
       ),
       monthly_payments AS (
         -- Get all monthly payments per client
@@ -8463,17 +8441,17 @@ export class DbStorage implements IStorage {
         GROUP BY p.id_cliente, DATE_TRUNC('month', COALESCE(p.data_quitacao, p.data_vencimento))
       ),
       cohort_data AS (
-        -- Calculate month offset from first payment
+        -- Calculate month offset from first payment (cohort month)
         SELECT 
-          cwp.cohort_month,
-          cwp.client_id,
+          fp.cohort_month,
+          fp.client_id,
           mp.payment_month,
           mp.revenue,
-          GREATEST(0, (EXTRACT(YEAR FROM age(mp.payment_month, cwp.first_payment_month)) * 12 +
-           EXTRACT(MONTH FROM age(mp.payment_month, cwp.first_payment_month))))::integer as month_offset
-        FROM clients_with_payments cwp
-        INNER JOIN monthly_payments mp ON cwp.client_id = mp.client_id
-        WHERE mp.payment_month >= cwp.first_payment_month
+          GREATEST(0, (EXTRACT(YEAR FROM age(mp.payment_month, fp.cohort_month)) * 12 +
+           EXTRACT(MONTH FROM age(mp.payment_month, fp.cohort_month))))::integer as month_offset
+        FROM first_payment fp
+        INNER JOIN monthly_payments mp ON fp.client_id = mp.client_id
+        WHERE mp.payment_month >= fp.cohort_month
       )
       SELECT 
         TO_CHAR(cohort_month, 'YYYY-MM') as cohort_month,
