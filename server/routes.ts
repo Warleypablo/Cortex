@@ -11105,7 +11105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(*) as parcelas_vencidas, 
           SUM(p.valor_bruto) as total_devido
         FROM caz_parcelas p
-        LEFT JOIN caz_clientes c ON p.id_cliente::integer = c.id
+        LEFT JOIN caz_clientes c ON p.id_cliente = c.id::text
         WHERE p.data_vencimento < CURRENT_DATE - INTERVAL '7 days'
           AND p.status != 'Pago'
           AND p.id_cliente IS NOT NULL
