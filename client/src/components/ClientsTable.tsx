@@ -3,7 +3,7 @@ import { ArrowUpDown, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { ServiceIcons } from "@/components/ServiceIcons";
-import { formatCurrency, formatDecimal } from "@/lib/utils";
+import { formatCurrencyWithDecimals, formatDecimal } from "@/lib/utils";
 import type { ClienteCompleto } from "../../../server/storage";
 
 type SortField = "name" | "cnpj" | "ltv" | "lt" | "aov" | "status" | "startDate";
@@ -190,13 +190,13 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
                 <ServiceIcons services={client.servicos} />
               </div>
               <div className="px-4 py-3 font-medium text-sm" data-testid={`text-ltv-${client.ids || client.id}`}>
-                {ltv > 0 ? formatCurrency(ltv) : "-"}
+                {ltv > 0 ? formatCurrencyWithDecimals(ltv) : "-"}
               </div>
               <div className="px-4 py-3 font-medium text-sm" data-testid={`text-lt-${client.ids || client.id}`}>
                 {ltMeses > 0 ? `${Math.round(ltMeses)} m` : "-"}
               </div>
               <div className="px-4 py-3 font-medium text-sm" data-testid={`text-aov-${client.ids || client.id}`}>
-                {ltMeses > 0 && ltv > 0 ? formatCurrency(ltv / ltMeses) : "-"}
+                {ltMeses > 0 && ltv > 0 ? formatCurrencyWithDecimals(ltv / ltMeses) : "-"}
               </div>
               <div className="px-4 py-3 text-sm" data-testid={`text-status-${client.ids || client.id}`}>
                 <Badge className={`${getStatusColor(client.statusClickup)}`} variant="outline">
