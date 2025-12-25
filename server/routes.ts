@@ -10861,6 +10861,215 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/okr2026/summary", isAuthenticated, async (req, res) => {
+    try {
+      const { getCached, setCache } = await import("./okr2026/cache");
+      const { 
+        getDashboardMetrics, 
+        getObjectives, 
+        getKRs, 
+        getTargets, 
+        calculateProgress, 
+        getStatus,
+        getMrrSerie
+      } = await import("./okr2026/metricsAdapter");
+      const { objectiveRegistry, krRegistry } = await import("./okr2026/okrRegistry");
+      
+      const period = (req.query.period as string) || "YTD";
+      const bu = (req.query.bu as string) || "all";
+      
+      const validPeriods = ["YTD", "Q1", "Q2", "Q3", "Q4", "Last12m"];
+      const validBUs = ["all", "turbooh", "tech", "commerce"];
+      
+      const normalizedPeriod = validPeriods.includes(period) ? period : "YTD";
+      const normalizedBU = validBUs.includes(bu) ? bu : "all";
+      
+      const cacheKey = `okr_summary_${normalizedPeriod}_${normalizedBU}`;
+      
+      const cached = getCached<any>(cacheKey);
+      if (cached) {
+        return res.json({
+          ...cached,
+          meta: { ...cached.meta, cacheHit: true }
+        });
+      }
+      
+      const initiativesData = await import("./okr2026/initiatives.json");
+      const initiatives = initiativesData.initiatives || [];
+      
+      const metrics = await getDashboardMetrics();
+      const targets = getTargets();
+      const objectives = objectiveRegistry;
+      const krsRaw = krRegistry;
+      
+      const quarter = getCurrentQuarter();
+      
+      const krs = krsRaw.map(kr => {
+        let atual: number | null = null;
+        let target: number | null = null;
+        
+        const metricMap: Record<string, number | null> = {
+          mrr_active: metrics.mrr_ativo,
+          revenue_net: metrics.receita_liquida_ytd,
+          clients_active: metrics.clientes_ativos,
+          revenue_per_head: metrics.receita_por_head,
+          ebitda: metrics.ebitda_ytd,
+          cash_generation: metrics.geracao_caixa_ytd,
+          cash_balance: metrics.caixa_atual,
+          inadimplencia_pct: metrics.inadimplencia_percentual,
+          gross_churn_pct: metrics.gross_mrr_churn_percentual,
+          net_churn_pct: metrics.net_churn_mrr_percentual,
+          logo_churn_pct: metrics.logo_churn_percentual,
+          turbooh_receita: metrics.turbooh_receita,
+          turbooh_resultado: metrics.turbooh_resultado,
+          turbooh_margem_pct: metrics.turbooh_margem_pct,
+          tech_projetos_entregues: metrics.tech_projetos_entregues,
+          tech_freelancers_pct: metrics.tech_freelancers_percentual,
+          mrr_por_head: metrics.mrr_por_head
+        };
+        
+        atual = metricMap[kr.metricKey] ?? null;
+        
+        if (kr.targetType === "quarterly") {
+          target = kr.targets[quarter as keyof typeof kr.targets] || kr.targets.annual || null;
+        } else if (kr.targetType === "monthly") {
+          target = kr.targets.monthly || null;
+        } else {
+          target = kr.targets.annual || null;
+        }
+        
+        const progress = atual !== null && target !== null 
+          ? calculateProgress(atual, target, kr.direction) 
+          : null;
+        const status = progress !== null ? getStatus(progress, kr.direction) : "gray";
+        
+        return {
+          ...kr,
+          currentValue: atual,
+          target,
+          progress,
+          status
+        };
+      });
+      
+      const getMrrTarget = () => {
+        const kr = krRegistry.find(k => k.metricKey === "mrr_active");
+        if (!kr) return null;
+        return kr.targets[quarter as keyof typeof kr.targets] || kr.targets.annual || null;
+      };
+      
+      const getRevenueTarget = () => {
+        const kr = krRegistry.find(k => k.metricKey === "revenue_net");
+        return kr?.targets.annual || null;
+      };
+      
+      const getEbitdaTarget = () => {
+        const kr = krRegistry.find(k => k.metricKey === "ebitda");
+        return kr?.targets.annual || null;
+      };
+      
+      const getInadimplenciaTarget = () => {
+        const kr = krRegistry.find(k => k.metricKey === "inadimplencia_pct");
+        return kr?.targets.monthly || null;
+      };
+      
+      const getNetChurnTarget = () => {
+        const kr = krRegistry.find(k => k.metricKey === "net_churn_pct");
+        return kr?.targets.monthly || null;
+      };
+      
+      const mrrTarget = getMrrTarget();
+      const revenueTarget = getRevenueTarget();
+      const ebitdaTarget = getEbitdaTarget();
+      const inadTarget = getInadimplenciaTarget();
+      const netChurnTarget = getNetChurnTarget();
+      
+      const highlights = {
+        mrr: {
+          value: metrics.mrr_ativo,
+          target: mrrTarget,
+          progress: mrrTarget ? calculateProgress(metrics.mrr_ativo, mrrTarget, "higher") : null
+        },
+        revenue: {
+          value: metrics.receita_liquida_ytd,
+          target: revenueTarget,
+          progress: revenueTarget ? calculateProgress(metrics.receita_liquida_ytd, revenueTarget, "higher") : null
+        },
+        ebitda: {
+          value: metrics.ebitda_ytd,
+          target: ebitdaTarget,
+          progress: ebitdaTarget ? calculateProgress(metrics.ebitda_ytd, ebitdaTarget, "higher") : null
+        },
+        inadimplencia: {
+          value: metrics.inadimplencia_percentual,
+          target: inadTarget,
+          status: inadTarget && metrics.inadimplencia_percentual <= inadTarget ? "green" : "red"
+        },
+        net_churn: {
+          value: metrics.net_churn_mrr_percentual,
+          target: netChurnTarget,
+          status: netChurnTarget && metrics.net_churn_mrr_percentual !== null && metrics.net_churn_mrr_percentual <= netChurnTarget ? "green" : "red"
+        }
+      };
+      
+      const series = {
+        mrr: metrics.mrr_serie || [],
+        ebitda: [],
+        churn: []
+      };
+      
+      const summaryData = {
+        objectives,
+        krs,
+        metrics,
+        initiatives,
+        highlights,
+        series,
+        meta: {
+          generatedAt: new Date().toISOString(),
+          period: normalizedPeriod,
+          bu: normalizedBU,
+          cacheHit: false
+        }
+      };
+      
+      setCache(cacheKey, summaryData);
+      
+      res.json(summaryData);
+    } catch (error) {
+      console.error("[api] Error fetching OKR summary:", error);
+      res.status(500).json({ error: "Failed to fetch OKR summary" });
+    }
+  });
+
+  app.post("/api/okr2026/cache/invalidate", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { clearAllCache, invalidateCacheByPattern, getCacheStats } = await import("./okr2026/cache");
+      const { pattern } = req.body;
+      
+      if (pattern) {
+        const count = invalidateCacheByPattern(pattern);
+        res.json({ success: true, invalidated: count });
+      } else {
+        clearAllCache();
+        res.json({ success: true, message: "All cache cleared" });
+      }
+    } catch (error) {
+      console.error("[api] Error invalidating cache:", error);
+      res.status(500).json({ error: "Failed to invalidate cache" });
+    }
+  });
+
+  app.get("/api/okr2026/cache/stats", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { getCacheStats } = await import("./okr2026/cache");
+      res.json(getCacheStats());
+    } catch (error) {
+      console.error("[api] Error fetching cache stats:", error);
+      res.status(500).json({ error: "Failed to fetch cache stats" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
