@@ -73,7 +73,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
     <div className="rounded-lg border border-border bg-card overflow-auto h-full">
       {/* Sticky Header */}
       <div className="sticky top-0 z-10 bg-background border-b">
-        <div className="grid grid-cols-[minmax(250px,2fr)_minmax(100px,0.8fr)_minmax(110px,0.9fr)_minmax(110px,0.9fr)_minmax(70px,0.6fr)_minmax(100px,0.8fr)_minmax(90px,0.7fr)_minmax(100px,0.8fr)_minmax(180px,1.5fr)_minmax(160px,1.2fr)] text-sm font-medium text-muted-foreground">
+        <div className="grid grid-cols-[minmax(250px,2fr)_minmax(100px,0.8fr)_minmax(70px,0.6fr)_minmax(110px,0.9fr)_minmax(110px,0.9fr)_minmax(100px,0.8fr)_minmax(90px,0.7fr)_minmax(100px,0.8fr)_minmax(180px,1.5fr)_minmax(160px,1.2fr)] text-sm font-medium text-muted-foreground">
           {/* Nome do Cliente */}
           <div className="h-12 flex items-center px-4">
             <Button 
@@ -100,16 +100,26 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
               <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
           </div>
-          {/* Data Início */}
+          {/* LT */}
           <div className="h-12 flex items-center px-4">
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => onSort("startDate")}
+              onClick={() => onSort("lt")}
               className="hover-elevate -ml-3"
-              data-testid="sort-date"
+              data-testid="sort-lt"
             >
-              Data Início
+              <span className="flex items-center gap-1">
+                LT
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Lifetime: meses ativos com receita paga</p>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
               <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -136,26 +146,16 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
               <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
           </div>
-          {/* LT */}
+          {/* Data Início */}
           <div className="h-12 flex items-center px-4">
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => onSort("lt")}
+              onClick={() => onSort("startDate")}
               className="hover-elevate -ml-3"
-              data-testid="sort-lt"
+              data-testid="sort-date"
             >
-              <span className="flex items-center gap-1">
-                LT
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="w-3.5 h-3.5 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Lifetime: meses ativos com receita paga</p>
-                  </TooltipContent>
-                </Tooltip>
-              </span>
+              Data Início
               <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -236,7 +236,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
           return (
             <div 
               key={client.ids || client.id} 
-              className="grid grid-cols-[minmax(250px,2fr)_minmax(100px,0.8fr)_minmax(110px,0.9fr)_minmax(110px,0.9fr)_minmax(70px,0.6fr)_minmax(100px,0.8fr)_minmax(90px,0.7fr)_minmax(100px,0.8fr)_minmax(180px,1.5fr)_minmax(160px,1.2fr)] cursor-pointer hover-elevate"
+              className="grid grid-cols-[minmax(250px,2fr)_minmax(100px,0.8fr)_minmax(70px,0.6fr)_minmax(110px,0.9fr)_minmax(110px,0.9fr)_minmax(100px,0.8fr)_minmax(90px,0.7fr)_minmax(100px,0.8fr)_minmax(180px,1.5fr)_minmax(160px,1.2fr)] cursor-pointer hover-elevate"
               onClick={() => onClientClick(client.ids || String(client.id))}
               data-testid={`client-row-${client.ids || client.id}`}
             >
@@ -250,17 +250,17 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
                   {client.statusClickup || "N/A"}
                 </Badge>
               </div>
-              {/* Data Início */}
-              <div className="px-4 py-3 text-muted-foreground text-sm" data-testid={`text-date-${client.ids || client.id}`}>
-                {client.dataInicio ? new Date(client.dataInicio).toLocaleDateString('pt-BR') : "-"}
+              {/* LT */}
+              <div className="px-4 py-3 font-medium text-sm" data-testid={`text-lt-${client.ids || client.id}`}>
+                {ltMeses > 0 ? `${Math.round(ltMeses)} m` : "-"}
               </div>
               {/* LTV */}
               <div className="px-4 py-3 font-medium text-sm" data-testid={`text-ltv-${client.ids || client.id}`}>
                 {ltv > 0 ? formatCurrencyNoDecimals(ltv) : "-"}
               </div>
-              {/* LT */}
-              <div className="px-4 py-3 font-medium text-sm" data-testid={`text-lt-${client.ids || client.id}`}>
-                {ltMeses > 0 ? `${Math.round(ltMeses)} m` : "-"}
+              {/* Data Início */}
+              <div className="px-4 py-3 text-muted-foreground text-sm" data-testid={`text-date-${client.ids || client.id}`}>
+                {client.dataInicio ? new Date(client.dataInicio).toLocaleDateString('pt-BR') : "-"}
               </div>
               {/* AOV */}
               <div className="px-4 py-3 font-medium text-sm" data-testid={`text-aov-${client.ids || client.id}`}>
