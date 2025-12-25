@@ -31,6 +31,7 @@ export async function initializeNotificationsTable(): Promise<void> {
         message TEXT NOT NULL,
         entity_id TEXT,
         entity_type TEXT,
+        priority TEXT DEFAULT 'medium',
         read BOOLEAN DEFAULT false,
         dismissed BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT NOW(),
@@ -38,6 +39,13 @@ export async function initializeNotificationsTable(): Promise<void> {
         unique_key TEXT UNIQUE
       )
     `);
+    
+    // Add priority column if not exists (for existing tables)
+    await db.execute(sql`
+      ALTER TABLE staging.notifications 
+      ADD COLUMN IF NOT EXISTS priority TEXT DEFAULT 'medium'
+    `);
+    
     console.log('[database] Notifications table initialized');
   } catch (error) {
     console.error('[database] Error initializing notifications table:', error);
