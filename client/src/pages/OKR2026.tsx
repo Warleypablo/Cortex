@@ -145,7 +145,8 @@ interface CollaboratorsResponse {
   collaborators: Collaborator[];
 }
 
-function formatCurrency(value: number): string {
+function formatCurrency(value: number | null | undefined): string {
+  if (value == null) return "—";
   if (Math.abs(value) >= 1000000) {
     return `R$ ${(value / 1000000).toFixed(2)}M`;
   }
@@ -155,11 +156,13 @@ function formatCurrency(value: number): string {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
-function formatNumber(value: number): string {
+function formatNumber(value: number | null | undefined): string {
+  if (value == null) return "—";
   return value.toLocaleString("pt-BR");
 }
 
-function formatPercent(value: number): string {
+function formatPercent(value: number | null | undefined): string {
+  if (value == null) return "—";
   return `${value.toFixed(1)}%`;
 }
 
@@ -378,10 +381,11 @@ function HugzBlock({
   ).length;
   const blockedCount = hugzInitiatives.filter(i => i.status === "blocked").length;
   
-  const inadStatus = metrics.inadimplencia_percentual <= 6 ? "green" : 
-                     metrics.inadimplencia_percentual <= 7 ? "yellow" : "red";
-  const churnStatus = (metrics.net_churn_mrr_percentual ?? 0) <= 9 ? "green" : 
-                      (metrics.net_churn_mrr_percentual ?? 0) <= 10 ? "yellow" : "red";
+  const inadPct = metrics.inadimplencia_percentual ?? 0;
+  const churnPct = metrics.net_churn_mrr_percentual ?? 0;
+  
+  const inadStatus = inadPct <= 6 ? "green" : inadPct <= 7 ? "yellow" : "red";
+  const churnStatus = churnPct <= 9 ? "green" : churnPct <= 10 ? "yellow" : "red";
 
   return (
     <Card>
