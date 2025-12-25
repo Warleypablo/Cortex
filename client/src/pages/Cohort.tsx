@@ -42,13 +42,6 @@ export default function Cohort() {
 
   const { data, isLoading, error } = useQuery<CohortData>({
     queryKey: ['/api/cohort', { metricType }],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.append('metricType', metricType);
-      const res = await fetch(`/api/cohort?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to fetch cohort data");
-      return res.json();
-    },
   });
 
   if (error) {
