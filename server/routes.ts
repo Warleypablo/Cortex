@@ -10674,10 +10674,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // 2. Contract expiring notifications (next 30 days)
-      // Using cup_contratos table which exists in the database
+      // Using cup_contratos table with JOIN to cup_clientes
       const contractResult = await db.execute(sql`
-        SELECT c.id_subtask as id, c.cnpj, c.data_encerramento, c.cliente as client_name
+        SELECT c.id_subtask as id, cl.cnpj, c.data_encerramento, cl.nome as client_name, c.servico
         FROM cup_contratos c
+        LEFT JOIN cup_clientes cl ON cl.task_id = c.id_task
         WHERE c.data_encerramento IS NOT NULL
           AND c.data_encerramento >= CURRENT_DATE
           AND c.data_encerramento <= CURRENT_DATE + INTERVAL '30 days'
@@ -10686,7 +10687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const contract of contractResult.rows as any[]) {
         const endDate = new Date(contract.data_encerramento);
-        const uniqueKey = `contrato_vencendo_${contract.cnpj || contract.id}_${endDate.toISOString().split('T')[0]}`;
+        const uniqueKey = `contrato_vencendo_${contract.id}_${endDate.toISOString().split('T')[0]}`;
         
         const exists = await storage.notificationExists(uniqueKey);
         if (!exists) {
