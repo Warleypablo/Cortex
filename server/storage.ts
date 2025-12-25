@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao, type OneOnOne, type InsertOneOnOne, type OneOnOneAcao, type InsertOneOnOneAcao, type EnpsResponse, type InsertEnps, type PdiGoal, type InsertPdi } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao, type OneOnOne, type InsertOneOnOne, type OneOnOneAcao, type InsertOneOnOneAcao, type EnpsResponse, type InsertEnps, type PdiGoal, type InsertPdi, type PdiCheckpoint, type InsertPdiCheckpoint } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
@@ -310,6 +310,12 @@ export interface IStorage {
   createPdiGoal(data: InsertPdi): Promise<PdiGoal>;
   updatePdiGoal(id: number, data: Partial<InsertPdi>): Promise<PdiGoal>;
   deletePdiGoal(id: number): Promise<void>;
+  
+  // PDI Checkpoints
+  getPdiCheckpoints(pdiId: number): Promise<PdiCheckpoint[]>;
+  createPdiCheckpoint(data: InsertPdiCheckpoint): Promise<PdiCheckpoint>;
+  updatePdiCheckpoint(id: number, data: { concluido?: string; concluidoEm?: Date }): Promise<PdiCheckpoint>;
+  deletePdiCheckpoint(id: number): Promise<void>;
 }
 
 // GEG Dashboard Extended Types
@@ -1005,6 +1011,18 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
   async deletePdiGoal(id: number): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getPdiCheckpoints(pdiId: number): Promise<PdiCheckpoint[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async createPdiCheckpoint(data: InsertPdiCheckpoint): Promise<PdiCheckpoint> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async updatePdiCheckpoint(id: number, data: { concluido?: string; concluidoEm?: Date }): Promise<PdiCheckpoint> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async deletePdiCheckpoint(id: number): Promise<void> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -8737,7 +8755,7 @@ export class DbStorage implements IStorage {
   async getPdiGoals(colaboradorId: number): Promise<PdiGoal[]> {
     const result = await db.execute(sql`
       SELECT 
-        id, colaborador_id as "colaboradorId", titulo, descricao, competencia, recursos, prazo,
+        id, colaborador_id as "colaboradorId", titulo, descricao, competencia, categoria, recursos, prazo,
         progresso, status, criado_em as "criadoEm", criado_por as "criadoPor", atualizado_em as "atualizadoEm"
       FROM rh_pdi 
       WHERE colaborador_id = ${colaboradorId}
@@ -8748,10 +8766,10 @@ export class DbStorage implements IStorage {
 
   async createPdiGoal(data: InsertPdi): Promise<PdiGoal> {
     const result = await db.execute(sql`
-      INSERT INTO rh_pdi (colaborador_id, titulo, descricao, competencia, recursos, prazo, progresso, status, criado_por)
+      INSERT INTO rh_pdi (colaborador_id, titulo, descricao, competencia, categoria, recursos, prazo, progresso, status, criado_por)
       VALUES (${data.colaboradorId}, ${data.titulo}, ${data.descricao || null}, ${data.competencia || null}, 
-        ${data.recursos || null}, ${data.prazo || null}, ${data.progresso || 0}, ${data.status || 'em_andamento'}, ${data.criadoPor || null})
-      RETURNING id, colaborador_id as "colaboradorId", titulo, descricao, competencia, recursos, prazo,
+        ${(data as any).categoria || null}, ${data.recursos || null}, ${data.prazo || null}, ${data.progresso || 0}, ${data.status || 'em_andamento'}, ${data.criadoPor || null})
+      RETURNING id, colaborador_id as "colaboradorId", titulo, descricao, competencia, categoria, recursos, prazo,
         progresso, status, criado_em as "criadoEm", criado_por as "criadoPor", atualizado_em as "atualizadoEm"
     `);
     return result.rows[0] as PdiGoal;
@@ -8764,20 +8782,61 @@ export class DbStorage implements IStorage {
         titulo = COALESCE(${data.titulo ?? null}, titulo),
         descricao = COALESCE(${data.descricao ?? null}, descricao),
         competencia = COALESCE(${data.competencia ?? null}, competencia),
+        categoria = COALESCE(${(data as any).categoria ?? null}, categoria),
         recursos = COALESCE(${data.recursos ?? null}, recursos),
         prazo = COALESCE(${data.prazo ?? null}, prazo),
         progresso = COALESCE(${data.progresso ?? null}, progresso),
         status = COALESCE(${data.status ?? null}, status),
         atualizado_em = NOW()
       WHERE id = ${id}
-      RETURNING id, colaborador_id as "colaboradorId", titulo, descricao, competencia, recursos, prazo,
+      RETURNING id, colaborador_id as "colaboradorId", titulo, descricao, competencia, categoria, recursos, prazo,
         progresso, status, criado_em as "criadoEm", criado_por as "criadoPor", atualizado_em as "atualizadoEm"
     `);
     return result.rows[0] as PdiGoal;
   }
 
   async deletePdiGoal(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM rh_pdi_checkpoints WHERE pdi_id = ${id}`);
     await db.execute(sql`DELETE FROM rh_pdi WHERE id = ${id}`);
+  }
+
+  async getPdiCheckpoints(pdiId: number): Promise<PdiCheckpoint[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        id, pdi_id as "pdiId", descricao, data_alvo as "dataAlvo", 
+        concluido, concluido_em as "concluidoEm", ordem, criado_em as "criadoEm"
+      FROM rh_pdi_checkpoints 
+      WHERE pdi_id = ${pdiId}
+      ORDER BY ordem, criado_em
+    `);
+    return result.rows as PdiCheckpoint[];
+  }
+
+  async createPdiCheckpoint(data: InsertPdiCheckpoint): Promise<PdiCheckpoint> {
+    const result = await db.execute(sql`
+      INSERT INTO rh_pdi_checkpoints (pdi_id, descricao, data_alvo, concluido, ordem)
+      VALUES (${data.pdiId}, ${data.descricao}, ${data.dataAlvo || null}, ${data.concluido || 'false'}, ${data.ordem || 0})
+      RETURNING id, pdi_id as "pdiId", descricao, data_alvo as "dataAlvo", 
+        concluido, concluido_em as "concluidoEm", ordem, criado_em as "criadoEm"
+    `);
+    return result.rows[0] as PdiCheckpoint;
+  }
+
+  async updatePdiCheckpoint(id: number, data: { concluido?: string; concluidoEm?: Date }): Promise<PdiCheckpoint> {
+    const concluidoEm = data.concluido === 'true' ? sql`NOW()` : sql`NULL`;
+    const result = await db.execute(sql`
+      UPDATE rh_pdi_checkpoints 
+      SET concluido = COALESCE(${data.concluido ?? null}, concluido),
+          concluido_em = ${concluidoEm}
+      WHERE id = ${id}
+      RETURNING id, pdi_id as "pdiId", descricao, data_alvo as "dataAlvo", 
+        concluido, concluido_em as "concluidoEm", ordem, criado_em as "criadoEm"
+    `);
+    return result.rows[0] as PdiCheckpoint;
+  }
+
+  async deletePdiCheckpoint(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM rh_pdi_checkpoints WHERE id = ${id}`);
   }
 }
 
