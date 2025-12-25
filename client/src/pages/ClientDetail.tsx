@@ -1154,24 +1154,28 @@ export default function ClientDetail() {
             {/* WhatsApp */}
             <Button
               variant="outline"
-              className="flex flex-col items-center gap-1 h-auto py-3 px-4 min-w-[80px]"
+              size="sm"
               disabled={!cliente.telefone}
               onClick={() => {
                 if (cliente.telefone) {
-                  const phoneDigits = cliente.telefone.replace(/\D/g, '');
+                  let phoneDigits = cliente.telefone.replace(/\D/g, '');
+                  // Add Brazil country code if not present
+                  if (phoneDigits.length <= 11 && !phoneDigits.startsWith('55')) {
+                    phoneDigits = '55' + phoneDigits;
+                  }
                   window.open(`https://wa.me/${phoneDigits}`, '_blank');
                 }
               }}
               data-testid="quick-action-whatsapp"
             >
-              <MessageSquare className="w-5 h-5" />
+              <MessageSquare className="w-4 h-4" />
               <span className="text-xs">WhatsApp</span>
             </Button>
 
             {/* Email */}
             <Button
               variant="outline"
-              className="flex flex-col items-center gap-1 h-auto py-3 px-4 min-w-[80px]"
+              size="sm"
               disabled={!cliente.email}
               onClick={() => {
                 if (cliente.email) {
@@ -1180,14 +1184,14 @@ export default function ClientDetail() {
               }}
               data-testid="quick-action-email"
             >
-              <Mail className="w-5 h-5" />
+              <Mail className="w-4 h-4" />
               <span className="text-xs">Email</span>
             </Button>
 
             {/* ClickUp */}
             <Button
               variant="outline"
-              className="flex flex-col items-center gap-1 h-auto py-3 px-4 min-w-[80px]"
+              size="sm"
               disabled={!cliente.linkListaClickup}
               onClick={() => {
                 if (cliente.linkListaClickup) {
@@ -1196,14 +1200,14 @@ export default function ClientDetail() {
               }}
               data-testid="quick-action-clickup"
             >
-              <ListTodo className="w-5 h-5" />
+              <ListTodo className="w-4 h-4" />
               <span className="text-xs">ClickUp</span>
             </Button>
 
             {/* Novo Contrato */}
             <Button
               variant="outline"
-              className="flex flex-col items-center gap-1 h-auto py-3 px-4 min-w-[80px]"
+              size="sm"
               onClick={() => {
                 toast({
                   title: "Novo Contrato",
@@ -1212,14 +1216,14 @@ export default function ClientDetail() {
               }}
               data-testid="quick-action-novo-contrato"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
               <span className="text-xs">Novo Contrato</span>
             </Button>
 
             {/* Adicionar Nota */}
             <Button
               variant="outline"
-              className="flex flex-col items-center gap-1 h-auto py-3 px-4 min-w-[80px]"
+              size="sm"
               onClick={() => {
                 const tabElement = document.querySelector('[data-testid="tab-comunicacao"]') as HTMLElement;
                 if (tabElement) {
@@ -1231,8 +1235,8 @@ export default function ClientDetail() {
               }}
               data-testid="quick-action-adicionar-nota"
             >
-              <FileText className="w-5 h-5" />
-              <span className="text-xs">Adicionar Nota</span>
+              <FileText className="w-4 h-4" />
+              <span className="text-xs">Nota</span>
             </Button>
           </div>
         </Card>
