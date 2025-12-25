@@ -1734,6 +1734,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/contratos/produtos-distintos", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT produto 
+        FROM cup_contratos 
+        WHERE produto IS NOT NULL AND produto != ''
+        ORDER BY produto
+      `);
+      res.json(result.rows.map((row: any) => row.produto));
+    } catch (error) {
+      console.error("[api] Error fetching distinct produtos:", error);
+      res.status(500).json({ error: "Failed to fetch distinct produtos" });
+    }
+  });
+
   app.get("/api/patrimonio", async (req, res) => {
     try {
       const patrimonios = await storage.getPatrimonios();
