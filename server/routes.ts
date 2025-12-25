@@ -1423,18 +1423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       const clienteStatus = statusResult.rows.length > 0 ? (statusResult.rows[0] as any).status : null;
 
-      // Check for inactive client
-      if (clienteStatus && clienteStatus !== 'Ativo') {
-        alerts.push({
-          id: 'cliente_inativo',
-          type: 'cliente_inativo',
-          severity: 'info',
-          title: 'Cliente Inativo',
-          message: `Status atual: ${clienteStatus}`,
-          metadata: { status: clienteStatus }
-        });
-      }
-
+      
       if (clienteNome) {
         // Check for overdue payments (inadimplência)
         const overdueResult = await db.execute(sql`
