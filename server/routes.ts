@@ -10708,31 +10708,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // 3. Overdue payments notifications (>7 days overdue)
-      // Using caz_parcelas and cup_clientes tables
+      // Using caz_parcelas table with id_cliente for grouping
       const overdueResult = await db.execute(sql`
-        SELECT DISTINCT p.cnpj, cl.nome as client_name, COUNT(*) as parcelas_vencidas, SUM(p.valor) as total_devido
+        SELECT DISTINCT p.id_cliente, COUNT(*) as parcelas_vencidas, SUM(p.valor_bruto) as total_devido
         FROM caz_parcelas p
-        LEFT JOIN cup_clientes cl ON cl.cnpj = p.cnpj
         WHERE p.data_vencimento < CURRENT_DATE - INTERVAL '7 days'
           AND p.status != 'Pago'
-        GROUP BY p.cnpj, cl.nome
+          AND p.id_cliente IS NOT NULL
+        GROUP BY p.id_cliente
+        HAVING COUNT(*) >= 1
       `);
       
       const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
       
       for (const overdue of overdueResult.rows as any[]) {
-        const uniqueKey = `inadimplencia_${overdue.cnpj}_${currentMonth}`;
+        const clientId = overdue.id_cliente || 'unknown';
+        const uniqueKey = `inadimplencia_${clientId}_${currentMonth}`;
         
         const exists = await storage.notificationExists(uniqueKey);
         if (!exists) {
-          const clientName = overdue.client_name || overdue.cnpj;
           const totalDevido = Number(overdue.total_devido || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
           
           const notification = await storage.createNotification({
             type: 'inadimplencia',
-            title: `Inadimplência: ${clientName}`,
+            title: `Inadimplência detectada`,
             message: `${overdue.parcelas_vencidas} parcela(s) vencida(s) há mais de 7 dias. Total: ${totalDevido}`,
-            entityId: overdue.cnpj,
+            entityId: clientId,
             entityType: 'cliente',
             uniqueKey,
           });
