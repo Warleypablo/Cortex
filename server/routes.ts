@@ -9834,12 +9834,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const turboToolsCount = await db.execute(sql`SELECT COUNT(*) as count FROM turbo_tools`);
       const turboCount = parseInt((turboToolsCount.rows[0] as any)?.count) || 0;
       
-      // Get caz_clientes status map for lookup
+      // Get caz_clientes status map for lookup (by CNPJ)
       const cazStatusResult = await db.execute(sql`SELECT cnpj, ativo, id FROM caz_clientes WHERE cnpj IS NOT NULL`);
       const cazStatusMap = new Map<string, { ativo: string; id: number }>();
       for (const row of cazStatusResult.rows as any[]) {
         if (row.cnpj) {
           cazStatusMap.set(row.cnpj.toLowerCase().replace(/[^\d]/g, ''), { ativo: row.ativo, id: row.id });
+        }
+      }
+      
+      // Get cup_clientes status map for lookup (by CNPJ) - this has the real client status
+      const cupStatusResult = await db.execute(sql`SELECT cnpj, status FROM cup_clientes WHERE cnpj IS NOT NULL`);
+      const cupStatusMap = new Map<string, string>();
+      for (const row of cupStatusResult.rows as any[]) {
+        if (row.cnpj) {
+          cupStatusMap.set(row.cnpj.toLowerCase().replace(/[^\d]/g, ''), row.status);
         }
       }
       
@@ -9879,20 +9888,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `);
       }
       
-      // Map with status from caz_clientes
+      // Map with status from cup_clientes (priority) or caz_clientes (fallback)
       const mapped = result.rows.map((row: any) => {
-        let status = row.status || 'ativo';
+        let status = row.status || null;
         let cazClienteId: number | null = null;
         
-        // Look up status by linked_client_cnpj
-        if (row.linked_client_cnpj) {
-          const normalizedCnpj = row.linked_client_cnpj.toLowerCase().replace(/[^\d]/g, '');
+        // Look up status by linked_client_cnpj or row.cnpj
+        const cnpjToLookup = row.linked_client_cnpj || row.cnpj;
+        if (cnpjToLookup) {
+          const normalizedCnpj = cnpjToLookup.toLowerCase().replace(/[^\d]/g, '');
+          
+          // Priority 1: Get status from cup_clientes (real operational status)
+          const cupStatus = cupStatusMap.get(normalizedCnpj);
+          if (cupStatus) {
+            status = cupStatus;
+          }
+          
+          // Also get cazClienteId for reference
           const cazData = cazStatusMap.get(normalizedCnpj);
           if (cazData) {
-            // Check if ativo field indicates active status (case-insensitive)
-            const ativoValue = String(cazData.ativo || '').toLowerCase().trim();
-            status = (ativoValue === 'ativo' || ativoValue === 'sim' || ativoValue === 'true' || ativoValue === '1') ? 'ativo' : 'cancelado';
             cazClienteId = cazData.id;
+            // Fallback: if no cup_clientes status, use caz_clientes.ativo
+            if (!status) {
+              const ativoValue = String(cazData.ativo || '').toLowerCase().trim();
+              status = (ativoValue === 'ativo' || ativoValue === 'sim' || ativoValue === 'true' || ativoValue === '1') ? 'Ativo' : 'Cancelado/Inativo';
+            }
           }
         }
         
