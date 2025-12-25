@@ -29,6 +29,7 @@ const VisaoGeral = lazy(() => import("@/pages/VisaoGeral"));
 const DashboardFinanceiro = lazy(() => import("@/pages/DashboardFinanceiro"));
 const DashboardGeG = lazy(() => import("@/pages/DashboardGeG"));
 const DashboardRetencao = lazy(() => import("@/pages/DashboardRetencao"));
+const Cohort = lazy(() => import("@/pages/Cohort"));
 const DashboardDFC = lazy(() => import("@/pages/DashboardDFC"));
 const DashboardInadimplencia = lazy(() => import("@/pages/DashboardInadimplencia"));
 const DashboardInhire = lazy(() => import("@/pages/DashboardInhire"));
@@ -169,6 +170,7 @@ function ProtectedRouter() {
       {/* Operação */}
       <Route path="/visao-geral">{() => <ProtectedRoute path="/visao-geral" component={VisaoGeral} />}</Route>
       <Route path="/dashboard/retencao">{() => <ProtectedRoute path="/dashboard/retencao" component={DashboardRetencao} />}</Route>
+      <Route path="/dashboard/cohort">{() => <ProtectedRoute path="/dashboard/cohort" component={Cohort} />}</Route>
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
       
       {/* Financeiro */}
