@@ -1128,6 +1128,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/clientes/:cnpj/status-conta", async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      const { statusConta } = req.body;
+      
+      const validStatuses = ['saudavel', 'requer_atencao', 'insatisfeito', null];
+      if (statusConta !== undefined && !validStatuses.includes(statusConta)) {
+        return res.status(400).json({ error: "Invalid statusConta value. Must be one of: saudavel, requer_atencao, insatisfeito" });
+      }
+      
+      await db.execute(sql`
+        UPDATE cup_clientes
+        SET status_conta = ${statusConta ?? null}
+        WHERE cnpj = ${cnpj}
+      `);
+      
+      res.json({ success: true, statusConta: statusConta ?? null });
+    } catch (error) {
+      console.error("[api] Error updating client status_conta:", error);
+      res.status(500).json({ error: "Failed to update client status" });
+    }
+  });
+
   app.get("/api/cliente/:clienteId/receitas", async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
