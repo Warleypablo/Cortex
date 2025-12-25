@@ -8880,6 +8880,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // 4. Churn risk notifications - clients with active contracts but no payment in 2+ months
+      const churnRiskConfig = getConfig('churn_risk');
+      if (churnRiskConfig !== null) {
+        const mesesSemReceita = churnRiskConfig?.mesesSemReceita || 2;
+        const churnPriority = churnRiskConfig?.priority || 'high';
+        
+        const churnResult = await db.execute(sql`
+          SELECT 
+            c.id_subtask,
+            c.servico,
+            c.valorr,
+            c.squad,
+            cl.nome as cliente_nome,
+            cl.cnpj
+          FROM cup_contratos c
+          LEFT JOIN cup_clientes cl ON c.id_task = cl.task_id
+          WHERE c.status = 'Ativo'
+            AND NOT EXISTS (
+              SELECT 1 FROM caz_parcelas p
+              WHERE (p.id_cliente = cl.cnpj OR p.id_cliente = c.id_task)
+                AND p.tipo_evento = 'RECEITA'
+                AND p.status = 'Pago'
+                AND p.data_quitacao >= CURRENT_DATE - INTERVAL '1 month' * ${mesesSemReceita}
+            )
+          LIMIT 50
+        `);
+        
+        for (const contrato of churnResult.rows as any[]) {
+          const uniqueKey = `churn_risk_${contrato.id_subtask}_${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+          
+          const exists = await storage.notificationExists(uniqueKey);
+          if (!exists) {
+            const valor = parseFloat(contrato.valorr) || 0;
+            const valorFormatted = valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            
+            const notification = await storage.createNotification({
+              type: 'churn_risk',
+              title: 'Risco de churn detectado',
+              message: `${contrato.cliente_nome || 'Cliente'} (${contrato.servico}) - Sem receita há ${mesesSemReceita}+ meses. MRR: ${valorFormatted}`,
+              entityId: contrato.id_subtask,
+              entityType: 'contrato',
+              priority: churnPriority,
+              uniqueKey,
+            });
+            created.push(notification);
+          }
+        }
+      }
+      
       res.json({ 
         success: true, 
         created: created.length,
