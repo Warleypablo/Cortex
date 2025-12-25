@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Target, TrendingUp, TrendingDown, Users, DollarSign, Percent, AlertTriangle, Calendar, ArrowUpRight, ArrowDownRight, Minus, Info, Flag, Rocket, Clock, CheckCircle2, XCircle, ChevronRight, Zap, BarChart3, Activity } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, AreaChart, BarChart, Bar, Tooltip as RechartsTooltip, Legend } from "recharts";
 
@@ -455,10 +456,15 @@ function HealthScore({ metrics, targets }: { metrics: DashboardMetrics; targets:
   );
 }
 
-function DashboardTab() {
+interface FilterProps {
+  period: string;
+  bu: string;
+}
+
+function DashboardTab({ period, bu }: FilterProps) {
   const [drillDownData, setDrillDownData] = useState<DrillDownData | null>(null);
   const { data, isLoading } = useQuery<{ metrics: DashboardMetrics; targets: Targets }>({
-    queryKey: ["/api/okr2026/dashboard"],
+    queryKey: ["/api/okr2026/dashboard", period, bu],
   });
 
   if (isLoading) {
@@ -1197,25 +1203,57 @@ function InitiativesTab() {
   );
 }
 
+const PERIODS = ["YTD", "Q1", "Q2", "Q3", "Q4", "Last12m"];
+const BUSINESS_UNITS = [
+  { id: "all", label: "Todas" },
+  { id: "turbooh", label: "TurboOH" },
+  { id: "tech", label: "Tech" },
+  { id: "commerce", label: "Commerce" }
+];
+
 export default function OKR2026() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [selectedPeriod, setSelectedPeriod] = useState("YTD");
+  const [selectedBU, setSelectedBU] = useState("all");
 
   return (
     <div className="h-full overflow-auto p-6" data-testid="page-okr-2026">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="text-page-title">
               <Target className="w-8 h-8 text-primary" />
-              OKR 2026
+              OKR 2026 — Bigger & Better
             </h1>
             <p className="text-muted-foreground mt-1">
-              Acompanhamento de Objetivos e Key Results
+              Consolidação, Escala e Padronização
             </p>
           </div>
-          <Badge variant="outline" className="text-sm">
-            {getCurrentQuarter()} 2026
-          </Badge>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+              <SelectTrigger className="w-[120px]" data-testid="select-period">
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                {PERIODS.map(p => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedBU} onValueChange={setSelectedBU}>
+              <SelectTrigger className="w-[130px]" data-testid="select-bu">
+                <SelectValue placeholder="Unidade" />
+              </SelectTrigger>
+              <SelectContent>
+                {BUSINESS_UNITS.map(bu => (
+                  <SelectItem key={bu.id} value={bu.id}>{bu.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Badge variant="outline" className="text-sm">
+              {getCurrentQuarter()} 2026
+            </Badge>
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -1233,7 +1271,7 @@ export default function OKR2026() {
 
           <div className="mt-6">
             <TabsContent value="dashboard" className="mt-0">
-              <DashboardTab />
+              <DashboardTab period={selectedPeriod} bu={selectedBU} />
             </TabsContent>
             <TabsContent value="krs" className="mt-0">
               <KRsTab />
