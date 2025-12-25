@@ -64,3 +64,23 @@ export async function initializeSystemFieldOptionsTable(): Promise<void> {
     console.error('[database] Error initializing system field options table:', error);
   }
 }
+
+export async function initializeNotificationRulesTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS notification_rules (
+        id SERIAL PRIMARY KEY,
+        rule_type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        is_enabled BOOLEAN DEFAULT true,
+        config TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('[database] Notification rules table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing notification rules table:', error);
+  }
+}

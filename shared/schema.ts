@@ -1700,3 +1700,33 @@ export const insertSystemFieldOptionSchema = createInsertSchema(systemFieldOptio
 
 export type SystemFieldOption = typeof systemFieldOptions.$inferSelect;
 export type InsertSystemFieldOption = z.infer<typeof insertSystemFieldOptionSchema>;
+
+// ==================== NOTIFICATION RULES ====================
+
+export const notificationRules = pgTable("notification_rules", {
+  id: serial("id").primaryKey(),
+  ruleType: text("rule_type").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isEnabled: boolean("is_enabled").default(true),
+  config: text("config"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertNotificationRuleSchema = createInsertSchema(notificationRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateNotificationRuleSchema = z.object({
+  name: z.string().optional(),
+  description: z.string().optional(),
+  isEnabled: z.boolean().optional(),
+  config: z.string().optional(),
+});
+
+export type NotificationRule = typeof notificationRules.$inferSelect;
+export type InsertNotificationRule = z.infer<typeof insertNotificationRuleSchema>;
+export type UpdateNotificationRule = z.infer<typeof updateNotificationRuleSchema>;
