@@ -59,6 +59,9 @@ interface ClienteDb {
   cluster: string | null;
   servicos: string | null;
   dataInicio: Date | null;
+  tipoNegocio: string | null;
+  faturamentoMensal: string | null;
+  investimentoAds: string | null;
 }
 
 interface ContaReceber {
@@ -546,12 +549,43 @@ export default function ClientDetail() {
   const mapClusterToName = (cluster: string | null): string => {
     if (!cluster) return "Não definido";
     switch (cluster) {
-      case "0": return "NFNC";
-      case "1": return "Regulares";
-      case "2": return "Chaves";
-      case "3": return "Imperdíveis";
+      case "1": return "NFNC";
+      case "2": return "Regulares";
+      case "3": return "Chaves";
+      case "4": return "Imperdíveis";
       default: return cluster;
     }
+  };
+
+  const getClusterBadgeColor = (cluster: string | null): string => {
+    if (!cluster) return "bg-muted text-muted-foreground";
+    switch (cluster) {
+      case "1": return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+      case "2": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      case "3": return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300";
+      case "4": return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const getTipoNegocioBadge = (tipo: string | null): { label: string; color: string } => {
+    if (!tipo) return { label: "Não definido", color: "bg-muted text-muted-foreground" };
+    const tipoLower = tipo.toLowerCase();
+    if (tipoLower === "ecommerce" || tipoLower === "e-commerce") {
+      return { label: "Ecommerce", color: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300" };
+    } else if (tipoLower === "lead") {
+      return { label: "Lead", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" };
+    } else if (tipoLower === "info" || tipoLower === "infoproduto") {
+      return { label: "Info", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" };
+    }
+    return { label: tipo, color: "bg-muted text-muted-foreground" };
+  };
+
+  const formatCurrency = (value: string | null): string => {
+    if (!value) return "Não informado";
+    const num = parseFloat(value.replace(/[^\d.,]/g, '').replace(',', '.'));
+    if (isNaN(num)) return value;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
   };
 
   const sortedContratos = useMemo(() => {
@@ -1379,7 +1413,44 @@ export default function ClientDetail() {
                 <Layers className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Cluster</p>
-                  <p className="font-medium" data-testid="text-cluster">{mapClusterToName(cliente.cluster)}</p>
+                  <Badge className={`${getClusterBadgeColor(cliente.cluster)}`} variant="outline" data-testid="badge-cluster">
+                    {mapClusterToName(cliente.cluster)}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-tipo-negocio">
+                <Briefcase className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Tipo de Negócio</p>
+                  {(() => {
+                    const badge = getTipoNegocioBadge(cliente.tipoNegocio);
+                    return (
+                      <Badge className={badge.color} variant="outline" data-testid="badge-tipo-negocio">
+                        {badge.label}
+                      </Badge>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-faturamento-mensal">
+                <DollarSign className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Faturamento Mensal</p>
+                  <p className="font-medium" data-testid="text-faturamento-mensal">
+                    {formatCurrency(cliente.faturamentoMensal)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="info-investimento-ads">
+                <TrendingUp className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Investimento em Ads</p>
+                  <p className="font-medium" data-testid="text-investimento-ads">
+                    {formatCurrency(cliente.investimentoAds)}
+                  </p>
                 </div>
               </div>
 

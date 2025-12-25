@@ -120,6 +120,9 @@ export const cupClientes = pgTable("cup_clientes", {
   linksContrato: text("links_contrato"),
   linkListaClickup: text("link_lista_clickup"),
   nomeDono: text("nome_dono"),
+  tipoNegocio: text("tipo_negocio"),
+  faturamentoMensal: text("faturamento_mensal"),
+  investimentoAds: text("investimento_ads"),
 });
 
 export const cupContratos = pgTable("cup_contratos", {

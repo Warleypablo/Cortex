@@ -18,18 +18,20 @@ interface ClientsTableProps {
   onSort: (field: SortField) => void;
 }
 
-const clusterLabels: Record<string, string> = {
-  "1": "NFNC",
-  "2": "Regulares",
-  "3": "Chaves",
-  "4": "Imperdíveis",
+const clusterConfig: Record<string, { label: string; color: string }> = {
+  "1": { label: "NFNC", color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300" },
+  "2": { label: "Regulares", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" },
+  "3": { label: "Chaves", color: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300" },
+  "4": { label: "Imperdíveis", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
 };
 
 export default function ClientsTable({ clients, onClientClick, ltvMap, sortField, sortDirection, onSort }: ClientsTableProps) {
 
-  const getClusterLabel = (cluster: string | null) => {
-    if (!cluster) return "-";
-    return clusterLabels[cluster] || cluster;
+  const getClusterBadge = (cluster: string | null) => {
+    if (!cluster) return null;
+    const config = clusterConfig[cluster];
+    if (!config) return cluster;
+    return config;
   };
 
   const getStatusColor = (status: string | null) => {
@@ -275,8 +277,17 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
                 {ltMeses > 0 && ltv > 0 ? formatCurrencyNoDecimals(ltv / ltMeses) : "-"}
               </div>
               {/* Cluster */}
-              <div className="px-4 py-3 text-sm text-muted-foreground" data-testid={`text-cluster-${clientId}`}>
-                {getClusterLabel(client.cluster)}
+              <div className="px-4 py-3 text-sm" data-testid={`text-cluster-${clientId}`}>
+                {(() => {
+                  const config = getClusterBadge(client.cluster);
+                  if (!config) return "-";
+                  if (typeof config === 'string') return config;
+                  return (
+                    <Badge className={`${config.color} text-xs`} variant="outline">
+                      {config.label}
+                    </Badge>
+                  );
+                })()}
               </div>
               {/* Financeiro */}
               <div className="px-4 py-3 text-sm" data-testid={`text-financeiro-${clientId}`}>

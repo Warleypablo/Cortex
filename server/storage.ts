@@ -25,6 +25,9 @@ export type ClienteCompleto = Cliente & {
   totalRecorrente: number | null;
   totalPontual: number | null;
   statusFinanceiro: string | null;
+  tipoNegocio: string | null;
+  faturamentoMensal: string | null;
+  investimentoAds: string | null;
 };
 
 export interface AniversariantesMes {
@@ -1421,7 +1424,10 @@ export class DbStorage implements IStorage {
             AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
             AND valorp IS NOT NULL
         ), 0) as "totalPontual",
-        NULL::text as "statusFinanceiro"
+        NULL::text as "statusFinanceiro",
+        cc.tipo_negocio as "tipoNegocio",
+        cc.faturamento_mensal as "faturamentoMensal",
+        cc.investimento_ads as "investimentoAds"
       FROM cup_clientes cc
       LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
       ORDER BY cc.task_id, caz.id DESC NULLS LAST, cc.nome
@@ -1506,6 +1512,9 @@ export class DbStorage implements IStorage {
             AND valorp IS NOT NULL
         ), 0)`,
         statusFinanceiro: sql<string | null>`NULL`,
+        tipoNegocio: schema.cupClientes.tipoNegocio,
+        faturamentoMensal: schema.cupClientes.faturamentoMensal,
+        investimentoAds: schema.cupClientes.investimentoAds,
       })
       .from(schema.cupClientes)
       .leftJoin(
@@ -1565,7 +1574,10 @@ export class DbStorage implements IStorage {
         0 as "ltDias",
         0 as "totalRecorrente",
         0 as "totalPontual",
-        NULL::text as "statusFinanceiro"
+        NULL::text as "statusFinanceiro",
+        NULL::text as "tipoNegocio",
+        NULL::text as "faturamentoMensal",
+        NULL::text as "investimentoAds"
       FROM caz_clientes
       WHERE id::text = ${id} 
         OR ids = ${id}
