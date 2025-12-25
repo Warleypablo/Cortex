@@ -1025,6 +1025,95 @@ export default function ClientDetail() {
           />
         </div>
 
+        {/* Quick Actions Bar */}
+        <Card className="mb-8 p-4" data-testid="quick-actions-bar">
+          <div className="flex flex-wrap items-center justify-start gap-4">
+            {/* WhatsApp */}
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-1 h-auto py-3 px-4 min-w-[80px]"
+              disabled={!cliente.telefone}
+              onClick={() => {
+                if (cliente.telefone) {
+                  const phoneDigits = cliente.telefone.replace(/\D/g, '');
+                  window.open(`https://wa.me/${phoneDigits}`, '_blank');
+                }
+              }}
+              data-testid="quick-action-whatsapp"
+            >
+              <MessageSquare className="w-5 h-5" />
+              <span className="text-xs">WhatsApp</span>
+            </Button>
+
+            {/* Email */}
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-1 h-auto py-3 px-4 min-w-[80px]"
+              disabled={!cliente.email}
+              onClick={() => {
+                if (cliente.email) {
+                  window.location.href = `mailto:${cliente.email}`;
+                }
+              }}
+              data-testid="quick-action-email"
+            >
+              <Mail className="w-5 h-5" />
+              <span className="text-xs">Email</span>
+            </Button>
+
+            {/* ClickUp */}
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-1 h-auto py-3 px-4 min-w-[80px]"
+              disabled={!cliente.linkListaClickup}
+              onClick={() => {
+                if (cliente.linkListaClickup) {
+                  window.open(cliente.linkListaClickup, '_blank');
+                }
+              }}
+              data-testid="quick-action-clickup"
+            >
+              <ListTodo className="w-5 h-5" />
+              <span className="text-xs">ClickUp</span>
+            </Button>
+
+            {/* Novo Contrato */}
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-1 h-auto py-3 px-4 min-w-[80px]"
+              onClick={() => {
+                toast({
+                  title: "Novo Contrato",
+                  description: "Funcionalidade em desenvolvimento.",
+                });
+              }}
+              data-testid="quick-action-novo-contrato"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="text-xs">Novo Contrato</span>
+            </Button>
+
+            {/* Adicionar Nota */}
+            <Button
+              variant="outline"
+              className="flex flex-col items-center gap-1 h-auto py-3 px-4 min-w-[80px]"
+              onClick={() => {
+                const tabElement = document.querySelector('[data-testid="tab-comunicacao"]') as HTMLElement;
+                if (tabElement) {
+                  tabElement.click();
+                  setTimeout(() => {
+                    tabElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 100);
+                }
+              }}
+              data-testid="quick-action-adicionar-nota"
+            >
+              <FileText className="w-5 h-5" />
+              <span className="text-xs">Adicionar Nota</span>
+            </Button>
+          </div>
+        </Card>
+
         <Tabs defaultValue="dados-cadastrais" className="w-full" data-testid="client-detail-tabs">
           <TabsList className="grid w-full grid-cols-4 mb-6" data-testid="tabs-list">
             <TabsTrigger value="dados-cadastrais" data-testid="tab-dados-cadastrais">
