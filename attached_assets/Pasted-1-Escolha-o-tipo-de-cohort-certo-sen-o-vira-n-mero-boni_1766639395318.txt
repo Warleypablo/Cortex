@@ -1,0 +1,233 @@
+1) Escolha o tipo de cohort certo (senão vira número bonito e inútil)
+
+Você tem 3 âncoras possíveis — escolhe 1 como “oficial” e mantém consistência:
+
+Cohort por início de receita (recomendado)
+
+cohort_month = mês do 1º MRR reconhecido/pago
+
+Vantagem: reflete “cliente que entrou de verdade”, não só contrato assinado.
+
+Cohort por assinatura/assinatura do contrato
+
+Bom se seu ciclo de implantação é longo, mas pode inflar (cliente assina e nunca paga).
+
+Cohort por go-live (início da entrega)
+
+Bom se tem setup/ramp e só começa a valer depois.
+
+Provocação: agência costuma se enganar com “assinou” (pipeline) e “começou” (operação). Cohort bom é o que mede sobrevivência financeira: pagou MRR.
+
+2) Defina “cliente ativo” e “churn” sem ambiguidade
+
+Para SaaS é simples; pra agência precisa regra:
+
+Cliente ativo (mês M)
+
+Um cliente é ativo no mês se:
+
+MRR_mês > 0 (regra principal)
+ou, se você quiser tolerância operacional:
+
+contrato ativo mesmo com atraso (ex: até 30 dias) → mas aí separa ativo financeiro vs ativo operacional.
+
+Churn (logo churn)
+
+Um cliente é churn quando:
+
+MRR = 0 por X dias e não existe nenhum outro contrato ativo no cliente (mesmo Cliente ID).
+
+X dias: eu usaria 30 como padrão.
+
+Revenue churn
+
+Quando o MRR total do cliente cai (downgrade/escopo reduzido), mesmo sem cancelar.
+
+3) Padronize MRR (senão o cohort quebra)
+
+Agência tem mix: mensalidade + setup + projeto.
+
+Regra ouro: Cohort é de recorrência.
+
+MRR: somente receita recorrente mensal (mensalidade).
+
+NRR/GRR: calculados em cima do MRR.
+
+Receita pontual (setup/projeto): analisa separado (cohort de projetos é outro dashboard).
+
+Se tiver contrato trimestral/semestral pago à vista: normalize em MRR (divide pelos meses).
+
+4) Modelo de dados mínimo (pra não virar Frankenstein)
+
+Você precisa de uma tabela “snapshot mensal” por cliente, igual SaaS faz.
+
+Tabelas base
+
+clientes: cliente_id, nome, segmento, owner (CS/AM), canal, etc.
+
+contratos: contrato_id, cliente_id, produto, mrr, start_date, end_date, status, squad.
+
+faturamento/pagamentos (ideal): invoice_id, cliente_id, competencia_mes, valor_recorrente, valor_pontual, pago?, data_pagamento.
+
+Snapshot mensal (tabela derivada)
+
+Para cada cliente_id e mes:
+
+mrr_mes (soma dos contratos recorrentes ativos naquele mês)
+
+ativo_mes = mrr_mes > 0
+
+produto_principal (opcional)
+
+owner/squad (pra cortar por responsável)
+
+Essa snapshot é o “segredo” do cohort. Sem isso, você fica fazendo gambiarra por contrato.
+
+5) Como construir o cohort (a parte que interessa)
+Passo A — Defina o cohort month de cada cliente
+
+cohort_month(cliente) = primeiro mês em que mrr_mes > 0
+
+Passo B — Calcule “idade do cliente” em meses
+
+age = meses_entre(mes_atual_da_linha, cohort_month)
+
+Passo C — Monte a matriz
+
+Linhas = cohort_month (ex: 2025-01, 2025-02…)
+Colunas = age (M0, M1, M2… M12)
+
+E em cada célula você coloca métricas.
+
+6) Métricas padrão SaaS que você DEVE usar (adaptadas pra Turbo)
+6.1 Logo retention (retenção de clientes)
+
+Em cada célula (cohort, age):
+
+clientes_ativos = count(cliente_id com mrr_mes > 0)
+
+cohort_size = clientes_ativos no M0
+
+Logo Retention % = clientes_ativos / cohort_size
+
+Isso te diz quantos sobreviveram.
+
+6.2 Gross Revenue Retention (GRR)
+
+Mede retenção de receita sem contar expansão.
+
+baseline_mrr = soma do MRR do cohort em M0
+
+retained_mrr_gross = soma( min(mrr_mes_cliente, mrr_baseline_cliente) )
+
+GRR% = retained_mrr_gross / baseline_mrr
+
+Isso te diz se você perde receita da base (cancelamento + downgrade).
+
+6.3 Net Revenue Retention (NRR)
+
+Conta expansão (upsell/cross-sell).
+
+current_mrr = soma(mrr_mes_cliente)
+
+NRR% = current_mrr / baseline_mrr
+
+Isso te diz se sua base cresce sozinha.
+
+Para agência boa: NRR > 100% é o sonho; GRR alto mostra qualidade/entrega.
+
+6.4 Expansion / Contraction / Churn MRR
+
+No mês:
+
+expansion_mrr = soma(max(mrr_mes - mrr_prev, 0))
+
+contraction_mrr = soma(max(mrr_prev - mrr_mes, 0))
+
+churn_mrr = soma(mrr_prev onde mrr_mes = 0)
+
+Isso vira “motor do MRR”.
+
+7) Cortes que dão insight de dono (não só relatório)
+
+Cohort sem segmentação é só um heatmap bonito. Corte por:
+
+Produto/BU (Performance, CRM, Social, Dev, etc.)
+
+Plano/ticket (faixas de MRR)
+
+Squad/owner responsável
+
+Canal de aquisição (indicação, outbound, conteúdo)
+
+Tempo de onboarding (dias até 1ª entrega real)
+
+Tipo de contrato (mensal flexível vs fidelidade)
+
+Perguntas que você quer responder:
+
+Qual produto tem pior retenção em M2–M4? (onde churn geralmente acontece)
+
+Qual squad retém melhor? É processo ou gente?
+
+Ticket baixo churna mais? Então por que você continua vendendo?
+
+8) Ajustes específicos de agência (pra não mentir pra si mesmo)
+8.1 Cliente com múltiplos contratos (seu caso)
+
+Você já definiu a regra certa: agrupa por Cliente ID.
+Churn só acontece quando MRR total do cliente zera.
+
+8.2 “Pausa” vs churn
+
+Se existe “pausa” (ex: segurou 1 mês):
+
+trate como churn se MRR = 0, mas crie métrica de reativação:
+
+reativado = cliente que voltou a ter MRR > 0 depois de ficar 1+ meses zerado
+
+Isso é ouro pra estratégia comercial.
+
+8.3 Inadimplência
+
+Separar:
+
+Retention operacional (contrato ativo)
+
+Retention financeira (pagou)
+
+Senão você acha que está retendo e só está financiando cliente.
+
+9) O output final (como deve ficar)
+
+Você quer 3 visões:
+
+Cohort de Logo Retention (clientes) — matriz M0..M12
+
+Cohort de GRR e NRR (receita) — matriz M0..M12
+
+Bridge de MRR mensal (New + Expansion - Contraction - Churn)
+
+Se você tiver só uma: faça NRR por cohort. É a mais “CEO-ready”.
+
+10) Checklist rápido pra você passar pra IA/dev
+
+ Criar snapshot mensal por cliente_id com mrr_mes
+
+ Definir cohort_month = primeiro mes com mrr_mes > 0
+
+ Calcular age = diff_em_meses(mes, cohort_month)
+
+ Gerar matriz com:
+
+logo_retention
+
+GRR
+
+NRR
+
+expansion/contraction/churn MRR
+
+ Permitir filtros por: produto, squad, owner, ticket, canal, fidelidade
+
+ Tratar reativação e inadimplência (flags)

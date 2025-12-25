@@ -243,13 +243,13 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
 
       {/* Table Body */}
       <div>
-        {clients.map((client) => {
+        {clients.map((client, index) => {
           const ltv = ltvMap?.[client.ids || String(client.id)] || 0;
           const ltMeses = typeof client.ltMeses === 'number' ? client.ltMeses : 0;
           const clientId = client.ids || String(client.id);
           return (
             <div 
-              key={clientId} 
+              key={`${clientId}-${index}`} 
               className="grid grid-cols-[minmax(220px,2fr)_minmax(90px,0.7fr)_minmax(100px,0.8fr)_minmax(60px,0.5fr)_minmax(90px,0.7fr)_minmax(80px,0.6fr)_minmax(80px,0.6fr)_minmax(95px,0.75fr)_minmax(95px,0.75fr)_minmax(160px,1.3fr)_minmax(150px,1.1fr)] cursor-pointer hover-elevate"
               onClick={() => onClientClick(clientId)}
               data-testid={`client-row-${clientId}`}
