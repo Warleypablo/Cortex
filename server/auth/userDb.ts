@@ -177,7 +177,15 @@ const ALL_ROUTES = [
   '/admin/logs'
 ];
 
-const DEFAULT_USER_ROUTES = ['/ferramentas'];
+// Rotas padrão para novos usuários @turbopartners.com.br
+const DEFAULT_USER_ROUTES = [
+  '/patrimonio',           // Patrimônio
+  '/ferramentas',          // Turbo Tools
+  '/cases/chat',           // GPTurbo
+  '/conhecimentos',        // Conhecimento
+  '/beneficios',           // Clube de Benefícios
+  '/colaboradores/portal'  // Portal do Colaborador (acesso próprio)
+];
 
 // Migra permissões antigas ("/" -> "/clientes") automaticamente
 function migrateAllowedRoutes(routes: string[] | null): string[] {
