@@ -9,14 +9,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { 
-  Target, TrendingUp, DollarSign, AlertTriangle, 
+  Target, TrendingUp, DollarSign, AlertTriangle, AlertCircle,
   ArrowUpRight, Info, Rocket, Clock, CheckCircle2, 
   XCircle, Banknote, PiggyBank,
   CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building
 } from "lucide-react";
 import { 
   ResponsiveContainer, 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
+  LineChart, Line
 } from "recharts";
 
 interface DashboardMetrics {
@@ -204,6 +205,62 @@ function getKRStatus(
   }
 }
 
+interface SparklineData {
+  month: string;
+  value: number;
+}
+
+function Sparkline({ 
+  data, 
+  height = 32 
+}: { 
+  data: SparklineData[]; 
+  height?: number;
+}) {
+  if (!data || data.length < 2) return null;
+
+  const lastSix = data.slice(-6);
+  const firstValue = lastSix[0]?.value ?? 0;
+  const lastValue = lastSix[lastSix.length - 1]?.value ?? 0;
+  
+  const gradientId = `sparklineGradient-${Math.round(firstValue)}-${Math.round(lastValue)}-${lastSix.length}`;
+  
+  let trendColor = "hsl(var(--muted-foreground))";
+  let fillColor = "hsl(var(--muted-foreground))";
+  
+  if (lastValue > firstValue) {
+    trendColor = "#22c55e";
+    fillColor = "#22c55e";
+  } else if (lastValue < firstValue) {
+    trendColor = "#ef4444";
+    fillColor = "#ef4444";
+  }
+
+  return (
+    <div className="w-full" style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={lastSix} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={fillColor} stopOpacity={0.2} />
+              <stop offset="95%" stopColor={fillColor} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke={trendColor}
+            strokeWidth={1.5}
+            fill={`url(#${gradientId})`}
+            dot={false}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 function HeroCard({ 
   title, 
   value, 
@@ -213,7 +270,8 @@ function HeroCard({
   icon: Icon, 
   tooltip,
   status,
-  quarterLabel
+  quarterLabel,
+  series
 }: {
   title: string;
   value: number | null;
@@ -224,6 +282,7 @@ function HeroCard({
   tooltip?: string;
   status?: "green" | "yellow" | "red";
   quarterLabel?: string;
+  series?: SparklineData[];
 }) {
   const formatValue = (v: number) => {
     if (format === "currency") return formatCurrency(v);
@@ -253,6 +312,18 @@ function HeroCard({
 
   const colors = getStatusColor();
 
+  const getAlertStatus = (): "critical" | "warning" | null => {
+    if (status === "red") return "critical";
+    if (status === "yellow") return "warning";
+    if (progress !== null) {
+      if (progress < 90) return "critical";
+      if (progress < 100) return "warning";
+    }
+    return null;
+  };
+
+  const alertStatus = getAlertStatus();
+
   return (
     <Card 
       className={`relative overflow-visible border-l-4 ${colors.border}`}
@@ -273,9 +344,27 @@ function HeroCard({
             </Tooltip>
           )}
         </CardTitle>
-        {quarterLabel && (
-          <Badge variant="outline" className="text-[10px]">{quarterLabel}</Badge>
-        )}
+        <div className="flex items-center gap-1.5">
+          {alertStatus === "critical" && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AlertCircle className="w-4 h-4 text-red-500 animate-pulse" data-testid={`alert-critical-${title.toLowerCase().replace(/\s+/g, "-")}`} />
+              </TooltipTrigger>
+              <TooltipContent>Métrica crítica: abaixo de 90% da meta</TooltipContent>
+            </Tooltip>
+          )}
+          {alertStatus === "warning" && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AlertTriangle className="w-4 h-4 text-yellow-500" data-testid={`alert-warning-${title.toLowerCase().replace(/\s+/g, "-")}`} />
+              </TooltipTrigger>
+              <TooltipContent>Atenção: entre 90-99% da meta</TooltipContent>
+            </Tooltip>
+          )}
+          {quarterLabel && (
+            <Badge variant="outline" className="text-[10px]">{quarterLabel}</Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-2">
         <div className="text-2xl font-bold" data-testid={`value-${title.toLowerCase().replace(/\s+/g, "-")}`}>
@@ -292,6 +381,11 @@ function HeroCard({
             {progress !== null && (
               <Progress value={progress} className="h-1.5" />
             )}
+          </div>
+        )}
+        {series && series.length >= 2 && (
+          <div className="pt-1">
+            <Sparkline data={series} height={32} />
           </div>
         )}
       </CardContent>
@@ -540,6 +634,125 @@ function InitiativeStatusBadge({ status }: { status: string }) {
   );
 }
 
+interface AlertItem {
+  name: string;
+  currentValue: number | null;
+  target: number;
+  percentage: number;
+  severity: "critical" | "warning";
+  direction: "higher" | "lower";
+  format: "currency" | "percent" | "number";
+}
+
+function AlertsSection({ 
+  alerts,
+  selectedQuarter 
+}: { 
+  alerts: AlertItem[];
+  selectedQuarter: string;
+}) {
+  if (alerts.length === 0) {
+    return null;
+  }
+
+  const criticalAlerts = alerts.filter(a => a.severity === "critical");
+  const warningAlerts = alerts.filter(a => a.severity === "warning");
+
+  const formatAlertValue = (value: number | null, format: "currency" | "percent" | "number") => {
+    if (value === null) return "—";
+    if (format === "currency") return formatCurrency(value);
+    if (format === "percent") return formatPercent(value);
+    return formatNumber(value);
+  };
+
+  return (
+    <Card data-testid="section-alerts">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-amber-500" />
+          Alertas de Métricas ({alerts.length})
+        </CardTitle>
+        <CardDescription>
+          Métricas que requerem atenção no {selectedQuarter}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {criticalAlerts.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-red-600 dark:text-red-400">
+              <AlertCircle className="w-4 h-4" />
+              Críticos ({criticalAlerts.length})
+            </div>
+            <div className="space-y-2">
+              {criticalAlerts.map((alert, idx) => (
+                <div 
+                  key={idx}
+                  className="flex items-center justify-between p-3 rounded-lg bg-red-500/10 border border-red-500/20"
+                  data-testid={`alert-item-critical-${idx}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="w-4 h-4 text-red-500" />
+                    <div>
+                      <div className="font-medium text-sm">{alert.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {alert.direction === "lower" ? "Meta: ≤" : "Meta:"} {formatAlertValue(alert.target, alert.format)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-red-600 dark:text-red-400">
+                      {formatAlertValue(alert.currentValue, alert.format)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {alert.percentage.toFixed(0)}% da meta
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {warningAlerts.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-yellow-600 dark:text-yellow-400">
+              <AlertTriangle className="w-4 h-4" />
+              Atenção ({warningAlerts.length})
+            </div>
+            <div className="space-y-2">
+              {warningAlerts.map((alert, idx) => (
+                <div 
+                  key={idx}
+                  className="flex items-center justify-between p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20"
+                  data-testid={`alert-item-warning-${idx}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                    <div>
+                      <div className="font-medium text-sm">{alert.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {alert.direction === "lower" ? "Meta: ≤" : "Meta:"} {formatAlertValue(alert.target, alert.format)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-yellow-600 dark:text-yellow-400">
+                      {formatAlertValue(alert.currentValue, alert.format)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {alert.percentage.toFixed(0)}% da meta
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function DashboardTab({ data }: { data: SummaryResponse }) {
   const { metrics, highlights, series, initiatives, krs } = data;
   const currentQuarter = getCurrentQuarter();
@@ -565,6 +778,57 @@ function DashboardTab({ data }: { data: SummaryResponse }) {
   const inadStatus = inadPct <= inadTarget ? "green" : inadPct <= (inadTarget * 1.1) ? "yellow" : "red";
   const netChurnStatus = netChurnPct <= netChurnTarget ? "green" : netChurnPct <= (netChurnTarget * 1.1) ? "yellow" : "red";
   const logoChurnStatus = logoChurnPct <= logoChurnTarget ? "green" : logoChurnPct <= (logoChurnTarget * 1.2) ? "yellow" : "red";
+
+  const computeAlerts = useMemo((): AlertItem[] => {
+    const alerts: AlertItem[] = [];
+    
+    const checkHigherMetric = (
+      name: string, 
+      value: number | null, 
+      target: number | null, 
+      format: "currency" | "percent" | "number"
+    ) => {
+      if (value === null || target === null || target === 0) return;
+      const percentage = (value / target) * 100;
+      if (percentage < 90) {
+        alerts.push({ name, currentValue: value, target, percentage, severity: "critical", direction: "higher", format });
+      } else if (percentage < 100) {
+        alerts.push({ name, currentValue: value, target, percentage, severity: "warning", direction: "higher", format });
+      }
+    };
+    
+    const checkLowerMetric = (
+      name: string, 
+      value: number | null, 
+      target: number, 
+      format: "currency" | "percent" | "number"
+    ) => {
+      if (value === null) return;
+      if (value <= target) return;
+      const overshoot = ((value - target) / target) * 100;
+      const percentage = Math.max(0, 100 - overshoot);
+      if (overshoot > 10) {
+        alerts.push({ name, currentValue: value, target, percentage, severity: "critical", direction: "lower", format });
+      } else {
+        alerts.push({ name, currentValue: value, target, percentage, severity: "warning", direction: "lower", format });
+      }
+    };
+    
+    checkHigherMetric("MRR Ativo", metrics.mrr_ativo, mrrTarget, "currency");
+    checkHigherMetric("EBITDA", metrics.ebitda_ytd, ebitdaTarget, "currency");
+    checkHigherMetric("Geração Caixa", metrics.geracao_caixa_ytd, cashGenTarget, "currency");
+    checkLowerMetric("Inadimplência %", metrics.inadimplencia_percentual, inadTarget, "percent");
+    checkLowerMetric("Net Churn %", metrics.net_churn_mrr_percentual, netChurnTarget, "percent");
+    checkLowerMetric("Logo Churn %", metrics.logo_churn_percentual, logoChurnTarget, "percent");
+    
+    alerts.sort((a, b) => {
+      if (a.severity === "critical" && b.severity === "warning") return -1;
+      if (a.severity === "warning" && b.severity === "critical") return 1;
+      return a.percentage - b.percentage;
+    });
+    
+    return alerts;
+  }, [metrics, mrrTarget, ebitdaTarget, cashGenTarget, inadTarget, netChurnTarget, logoChurnTarget]);
 
   return (
     <div className="space-y-6">
@@ -599,6 +863,7 @@ function DashboardTab({ data }: { data: SummaryResponse }) {
           icon={TrendingUp}
           tooltip={`Meta ${selectedQuarter}: ${mrrTarget ? formatCurrency(mrrTarget) : "—"}`}
           quarterLabel={selectedQuarter}
+          series={series.mrr || metrics.mrr_serie}
         />
         <HeroCard
           title="EBITDA"
@@ -609,6 +874,7 @@ function DashboardTab({ data }: { data: SummaryResponse }) {
           icon={Banknote}
           tooltip={`Meta ${selectedQuarter}: ${ebitdaTarget ? formatCurrency(ebitdaTarget) : "—"}`}
           quarterLabel={selectedQuarter}
+          series={series.ebitda}
         />
         <HeroCard
           title="Geração Caixa"
@@ -639,6 +905,7 @@ function DashboardTab({ data }: { data: SummaryResponse }) {
           icon={TrendingDownIcon}
           tooltip={`Meta ${selectedQuarter}: <= ${netChurnTarget}%`}
           status={netChurnStatus}
+          series={series.churn}
         />
         <HeroCard
           title="Logo Churn %"
@@ -651,6 +918,10 @@ function DashboardTab({ data }: { data: SummaryResponse }) {
           status={logoChurnStatus}
         />
       </div>
+
+      {computeAlerts.length > 0 && (
+        <AlertsSection alerts={computeAlerts} selectedQuarter={selectedQuarter} />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TurboOHBlock metrics={metrics} quarter={selectedQuarter} />
