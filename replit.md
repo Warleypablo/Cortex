@@ -40,6 +40,15 @@ Preferred communication style: Simple, everyday language.
     - **Commercial SDR/Closer Detail Pages**: Detailed analytics for individual sales team members, including performance metrics, source/pipeline distribution, and trend analysis (DetailClosers.tsx and DetailSDRs.tsx).
     - **Jurídico (Legal) Dashboard**: Legal department module for tracking clients with "cobrar" (collect) status from inadimplência (delinquency) system. Features client accordion list with full details, overdue parcelas table, and legal procedure management (notificação, protesto, ação judicial, acordo, baixa). Data stored in `juridico_clientes` table with tracking for procedure type, status, agreement details, and protocol numbers.
     - **Patrimônio (Assets)**: Asset management with two tabs - "Patrimônios" for physical assets and "Linhas Telefônicas" for phone lines. Phone lines tab includes: conta, plano/operadora (Pós/Pré/Flex), telefone, responsável, setor, última recarga, and status. Features filters by setor and plano, search, and stats cards. Data stored in `rh_telefones` table with responsável linking to colaboradores.
+    - **OKR 2026 Module**: Strategic objectives and key results tracking for "Bigger & Better — Consolidação, Escala e Padronização" plan. Features:
+      - **5 Objectives**: O1 Ecosystem Scale, O2 Efficiency/Cash, O3 Hugz Retention, O4 TurboOH Scale, O5 Systems/Tech
+      - **22 KRs** with BP 2026 targets (MRR R$2.1M Q4, Revenue R$20M, EBITDA R$5.3M, etc.)
+      - **28 Metrics** across 6 categories (company, turbooh, hugz, sales, tech, people)
+      - **18 Initiatives** with standardized model (krIds, successMetricKeys, ownerRole)
+      - **3 Tabs**: Dashboard (hero cards, TurboOH block, Vendas block, charts), KRs (status colors, filters), Initiatives (status chips, KR mapping)
+      - **Config-driven registry**: okrRegistry.ts as single source of truth
+      - **5-min cache**: In-memory caching for /api/okr2026/* endpoints
+      - **Read-only**: No DB writes, uses existing tables (cup_data_hist, caz_parcelas, rh_pessoal, etc.)
 - **Theming**: Dark mode support; light mode is primary.
 
 ### Backend Architecture
