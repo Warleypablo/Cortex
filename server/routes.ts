@@ -2081,6 +2081,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/colaboradores/:id/health-history", async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.id);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "Invalid colaborador ID" });
+      }
+
+      const now = new Date();
+      const months: { month: string; endDate: Date }[] = [];
+      
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
+        const monthLabel = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        months.push({ month: monthLabel, endDate: endOfMonth });
+      }
+
+      const healthHistory = await Promise.all(months.map(async ({ month, endDate }) => {
+        const endDateStr = endDate.toISOString().split('T')[0];
+        
+        let enpsScore = 0;
+        try {
+          const enpsResult = await db.execute(sql`
+            SELECT score FROM rh_enps 
+            WHERE colaborador_id = ${colaboradorId} 
+              AND data <= ${endDateStr}
+            ORDER BY data DESC LIMIT 1
+          `);
+          if (enpsResult.rows.length > 0) {
+            const score = (enpsResult.rows[0] as { score: number }).score;
+            if (score >= 9) enpsScore = 30;
+            else if (score >= 7) enpsScore = 20;
+            else if (score >= 5) enpsScore = 10;
+          }
+        } catch (e) { }
+
+        let oneOnOneScore = 0;
+        try {
+          const oneOnOneResult = await db.execute(sql`
+            SELECT data FROM rh_one_on_one 
+            WHERE colaborador_id = ${colaboradorId} 
+              AND data <= ${endDateStr}
+            ORDER BY data DESC LIMIT 1
+          `);
+          if (oneOnOneResult.rows.length > 0) {
+            const lastDate = new Date((oneOnOneResult.rows[0] as { data: string }).data);
+            const daysDiff = Math.floor((endDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysDiff <= 14) oneOnOneScore = 25;
+            else if (daysDiff <= 30) oneOnOneScore = 15;
+            else if (daysDiff <= 45) oneOnOneScore = 5;
+          }
+        } catch (e) { }
+
+        let pdiScore = 0;
+        try {
+          const pdiResult = await db.execute(sql`
+            SELECT AVG(progresso) as avg_progress FROM rh_pdi 
+            WHERE colaborador_id = ${colaboradorId}
+              AND (criado_em IS NULL OR criado_em <= ${endDateStr})
+          `);
+          if (pdiResult.rows.length > 0 && (pdiResult.rows[0] as any).avg_progress !== null) {
+            const avgProgress = parseFloat((pdiResult.rows[0] as any).avg_progress) || 0;
+            pdiScore = Math.round((avgProgress / 100) * 25);
+          }
+        } catch (e) { }
+
+        let pendingActionsScore = 20;
+        try {
+          const actionsResult = await db.execute(sql`
+            SELECT COUNT(*) as count FROM rh_one_on_one_acoes a
+            JOIN rh_one_on_one o ON a.one_on_one_id = o.id
+            WHERE o.colaborador_id = ${colaboradorId} 
+              AND o.data <= ${endDateStr}
+              AND (a.status IS NULL OR a.status != 'concluida')
+              AND (a.concluida_em IS NULL OR a.concluida_em > ${endDateStr})
+          `);
+          if (actionsResult.rows.length > 0) {
+            const count = parseInt((actionsResult.rows[0] as any).count) || 0;
+            if (count === 0) pendingActionsScore = 20;
+            else if (count <= 2) pendingActionsScore = 15;
+            else if (count <= 5) pendingActionsScore = 10;
+            else if (count <= 8) pendingActionsScore = 5;
+            else pendingActionsScore = 0;
+          }
+        } catch (e) { }
+
+        const healthScore = enpsScore + oneOnOneScore + pdiScore + pendingActionsScore;
+
+        return { month, healthScore };
+      }));
+
+      res.json(healthHistory);
+    } catch (error) {
+      console.error("[api] Error fetching health history:", error);
+      res.status(500).json({ error: "Failed to fetch health history" });
+    }
+  });
+
   // Endpoint para importar datas de último aumento em batch
   app.post("/api/colaboradores/import-ultimo-aumento", isAuthenticated, isAdmin, async (req, res) => {
     try {
