@@ -1618,3 +1618,16 @@ export interface TimelineEvent {
   amount?: number;
   metadata?: Record<string, any>;
 }
+
+export type ClientAlertType = 'inadimplencia' | 'vencimento_proximo' | 'contrato_expirando' | 'cliente_inativo';
+export type ClientAlertSeverity = 'critical' | 'warning' | 'info';
+
+export interface ClientAlert {
+  id: string;
+  type: ClientAlertType;
+  severity: ClientAlertSeverity;
+  title: string;
+  message: string;
+  actionUrl?: string;
+  metadata?: Record<string, any>;
+}
