@@ -11018,6 +11018,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         churn: []
       };
       
+      const { getQuarterSummary } = await import("./okr2026/metricsAdapter");
+      const quarterSummary = await getQuarterSummary(new Date().getFullYear());
+      
       const summaryData = {
         objectives,
         krs,
@@ -11025,6 +11028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         initiatives,
         highlights,
         series,
+        quarterSummary,
         meta: {
           generatedAt: new Date().toISOString(),
           period: normalizedPeriod,
@@ -11067,6 +11071,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching cache stats:", error);
       res.status(500).json({ error: "Failed to fetch cache stats" });
+    }
+  });
+
+  app.get("/api/okr2026/quarter-summary", isAuthenticated, async (req, res) => {
+    try {
+      const year = parseInt(req.query.year as string) || 2026;
+      const { getQuarterSummary } = await import("./okr2026/metricsAdapter");
+      const metrics = await getQuarterSummary(year);
+      res.json({
+        year,
+        metrics
+      });
+    } catch (error) {
+      console.error("[api] Error fetching quarter summary:", error);
+      res.status(500).json({ error: "Failed to fetch quarter summary" });
+    }
+  });
+
+  app.get("/api/okr2026/collaborators", isAuthenticated, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, nome, email_turbo as email, setor 
+        FROM rh_pessoal 
+        WHERE LOWER(status) = 'ativo' 
+        ORDER BY nome
+      `);
+      res.json({
+        collaborators: result.rows.map((row: any) => ({
+          id: row.id,
+          nome: row.nome,
+          email: row.email,
+          setor: row.setor
+        }))
+      });
+    } catch (error) {
+      console.error("[api] Error fetching collaborators:", error);
+      res.status(500).json({ error: "Failed to fetch collaborators" });
+    }
+  });
+
+  app.get("/api/okr2026/metric-series", isAuthenticated, async (req, res) => {
+    try {
+      const metricKey = req.query.metricKey as string;
+      const start = req.query.start as string;
+      const end = req.query.end as string;
+      
+      if (!metricKey) {
+        return res.status(400).json({ error: "metricKey is required" });
+      }
+      if (!start || !end) {
+        return res.status(400).json({ error: "start and end date params are required (YYYY-MM format)" });
+      }
+      
+      const startDate = `${start}-01`;
+      const endDate = `${end}-28`;
+      
+      const { getMetricSeries } = await import("./okr2026/metricsAdapter");
+      const series = await getMetricSeries(metricKey, startDate, endDate);
+      
+      res.json({
+        metricKey,
+        series
+      });
+    } catch (error) {
+      console.error("[api] Error fetching metric series:", error);
+      res.status(500).json({ error: "Failed to fetch metric series" });
     }
   });
 
