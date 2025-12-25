@@ -8397,6 +8397,8 @@ export class DbStorage implements IStorage {
   async getCohortData(filters: import("@shared/schema").CohortFilters): Promise<import("@shared/schema").CohortData> {
     const { startDate, endDate, produto, squad, metricType } = filters;
     
+    const hasFilters = !!(produto || squad);
+    
     let whereConditions = sql`p.status IN ('Pago', 'Baixado') AND p.data_quitacao IS NOT NULL AND p.id_cliente IS NOT NULL`;
     
     if (startDate) {
@@ -8406,15 +8408,17 @@ export class DbStorage implements IStorage {
       whereConditions = sql`${whereConditions} AND p.data_quitacao <= ${endDate}::date`;
     }
     
-    let clientFilterConditions = sql`TRUE`;
-    if (produto || squad) {
-      if (produto) {
-        clientFilterConditions = sql`${clientFilterConditions} AND c.produto = ${produto}`;
-      }
-      if (squad) {
-        clientFilterConditions = sql`${clientFilterConditions} AND c.squad = ${squad}`;
-      }
+    let produtoCondition = sql`TRUE`;
+    let squadCondition = sql`TRUE`;
+    
+    if (produto) {
+      produtoCondition = sql`c.produto = ${produto}`;
     }
+    if (squad) {
+      squadCondition = sql`c.squad = ${squad}`;
+    }
+    
+    const joinType = hasFilters ? sql`INNER JOIN` : sql`LEFT JOIN`;
     
     const result = await db.execute(sql`
       WITH client_cohorts AS (
@@ -8422,9 +8426,10 @@ export class DbStorage implements IStorage {
           p.id_cliente,
           DATE_TRUNC('month', MIN(p.data_quitacao))::date as cohort_month
         FROM caz_parcelas p
-        LEFT JOIN cup_contratos c ON p.id_cliente = c.id_task
+        ${joinType} cup_contratos c ON p.id_cliente = c.id_task
         WHERE ${whereConditions}
-          AND ${clientFilterConditions}
+          AND ${produtoCondition}
+          AND ${squadCondition}
         GROUP BY p.id_cliente
       ),
       monthly_revenue AS (
@@ -8433,9 +8438,10 @@ export class DbStorage implements IStorage {
           DATE_TRUNC('month', p.data_quitacao)::date as revenue_month,
           SUM(COALESCE(p.valor_pago::numeric, 0)) as revenue
         FROM caz_parcelas p
-        LEFT JOIN cup_contratos c ON p.id_cliente = c.id_task
+        ${joinType} cup_contratos c ON p.id_cliente = c.id_task
         WHERE ${whereConditions}
-          AND ${clientFilterConditions}
+          AND ${produtoCondition}
+          AND ${squadCondition}
         GROUP BY p.id_cliente, DATE_TRUNC('month', p.data_quitacao)
       ),
       cohort_data AS (
@@ -8493,23 +8499,40 @@ export class DbStorage implements IStorage {
         cohortRow.baselineRevenue = totalRevenue;
       }
       
-      const baselineValue = metricType === 'logo_retention' ? cohortRow.baselineClients : cohortRow.baselineRevenue;
-      const currentValue = metricType === 'logo_retention' ? clientCount : totalRevenue;
-      const percentage = baselineValue > 0 ? (currentValue / baselineValue) * 100 : 0;
-      
-      let color: 'green' | 'yellow' | 'red' | 'neutral' = 'neutral';
-      if (monthOffset > 0) {
-        if (percentage >= 80) color = 'green';
-        else if (percentage >= 50) color = 'yellow';
-        else color = 'red';
-      }
-      
       cohortRow.cells[monthOffset] = {
-        value: currentValue,
-        percentage: Math.round(percentage * 10) / 10,
+        value: metricType === 'logo_retention' ? clientCount : totalRevenue,
+        percentage: 0,
         clientCount,
-        color
+        color: 'neutral' as const
       };
+    }
+    
+    for (const cohortRow of cohortMap.values()) {
+      for (const monthOffsetStr of Object.keys(cohortRow.cells)) {
+        const monthOffset = Number(monthOffsetStr);
+        const cell = cohortRow.cells[monthOffset];
+        
+        let percentage: number;
+        if (metricType === 'logo_retention') {
+          percentage = cohortRow.baselineClients > 0 
+            ? (cell.clientCount / cohortRow.baselineClients) * 100 
+            : 0;
+        } else {
+          percentage = cohortRow.baselineRevenue > 0 
+            ? (cell.value / cohortRow.baselineRevenue) * 100 
+            : 0;
+        }
+        
+        let color: 'green' | 'yellow' | 'red' | 'neutral' = 'neutral';
+        if (monthOffset > 0) {
+          if (percentage >= 80) color = 'green';
+          else if (percentage >= 50) color = 'yellow';
+          else color = 'red';
+        }
+        
+        cell.percentage = Math.round(percentage * 10) / 10;
+        cell.color = color;
+      }
     }
     
     const cohortRows = Array.from(cohortMap.values());
@@ -8524,7 +8547,13 @@ export class DbStorage implements IStorage {
     return {
       rows: cohortRows,
       maxMonthOffset,
-      filters,
+      filters: {
+        startDate,
+        endDate,
+        produto,
+        squad,
+        metricType
+      },
       summary: {
         totalCohorts: cohortRows.length,
         avgRetentionM1: getAvgRetention(1),
