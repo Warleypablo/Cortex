@@ -23,7 +23,7 @@ import { SiInstagram } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { ContratoCompleto } from "@shared/schema";
+import type { ContratoCompleto, TimelineEvent } from "@shared/schema";
 
 interface CredentialGroup {
   id: string;
@@ -267,6 +267,14 @@ export default function ClientDetail() {
     enabled: !!cliente?.cnpj,
     retry: false,
   });
+
+  const { data: timeline, isLoading: isLoadingTimeline } = useQuery<TimelineEvent[]>({
+    queryKey: ["/api/clientes", cliente?.cnpj, "timeline"],
+    enabled: !!cliente?.cnpj,
+    retry: false,
+  });
+
+  const [showAllTimeline, setShowAllTimeline] = useState(false);
 
   const [newComunicacao, setNewComunicacao] = useState({
     tipo: "",
@@ -1112,6 +1120,119 @@ export default function ClientDetail() {
               <span className="text-xs">Adicionar Nota</span>
             </Button>
           </div>
+        </Card>
+
+        {/* Timeline de Eventos */}
+        <Card className="mb-8 p-6" data-testid="timeline-section">
+          <div className="flex items-center gap-3 mb-4">
+            <Clock className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold">Timeline de Eventos</h2>
+          </div>
+          
+          {isLoadingTimeline ? (
+            <div className="flex items-center justify-center py-8" data-testid="timeline-loading">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : !timeline || timeline.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground" data-testid="timeline-empty">
+              <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p>Nenhum evento encontrado para este cliente.</p>
+            </div>
+          ) : (
+            <div className="relative" data-testid="timeline-container">
+              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
+              <div className="space-y-4">
+                {(showAllTimeline ? timeline : timeline.slice(0, 10)).map((event) => {
+                  const getEventIcon = () => {
+                    switch (event.type) {
+                      case 'payment_received':
+                        return <Check className="w-4 h-4" />;
+                      case 'payment_due':
+                        return <CalendarIcon className="w-4 h-4" />;
+                      case 'payment_overdue':
+                        return <AlertTriangle className="w-4 h-4" />;
+                      case 'contract_started':
+                      case 'contract_ended':
+                      case 'contract_cancelled':
+                        return <FileText className="w-4 h-4" />;
+                      default:
+                        return <Clock className="w-4 h-4" />;
+                    }
+                  };
+
+                  const getEventColor = () => {
+                    switch (event.type) {
+                      case 'payment_received':
+                        return 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400';
+                      case 'payment_overdue':
+                        return 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400';
+                      case 'contract_started':
+                        return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400';
+                      case 'contract_ended':
+                        return 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400';
+                      case 'contract_cancelled':
+                        return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
+                      case 'payment_due':
+                      default:
+                        return 'bg-muted text-muted-foreground';
+                    }
+                  };
+
+                  const eventDate = new Date(event.date);
+                  const formattedDate = format(eventDate, "dd 'de' MMM, yyyy", { locale: ptBR });
+
+                  return (
+                    <div key={event.id} className="relative flex items-start gap-4 pl-8" data-testid={`timeline-event-${event.id}`}>
+                      <div className={`absolute left-2 w-5 h-5 rounded-full flex items-center justify-center ${getEventColor()}`}>
+                        {getEventIcon()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span className="text-sm font-medium" data-testid={`timeline-event-title-${event.id}`}>
+                            {event.title}
+                          </span>
+                          {event.amount !== undefined && event.amount > 0 && (
+                            <Badge variant="outline" className="text-xs" data-testid={`timeline-event-amount-${event.id}`}>
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(event.amount)}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate" data-testid={`timeline-event-description-${event.id}`}>
+                          {event.description}
+                        </p>
+                        <span className="text-xs text-muted-foreground" data-testid={`timeline-event-date-${event.id}`}>
+                          {formattedDate}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {timeline.length > 10 && (
+                <div className="mt-4 text-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAllTimeline(!showAllTimeline)}
+                    data-testid="button-toggle-timeline"
+                  >
+                    {showAllTimeline ? (
+                      <>
+                        <ChevronUp className="w-4 h-4 mr-1" />
+                        Ver menos
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4 mr-1" />
+                        Ver mais ({timeline.length - 10} eventos)
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
         <Tabs defaultValue="dados-cadastrais" className="w-full" data-testid="client-detail-tabs">
