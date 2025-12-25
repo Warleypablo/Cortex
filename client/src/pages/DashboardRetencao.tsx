@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Users, TrendingDown, TrendingUp, Calendar, DollarSign, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Users, TrendingDown, TrendingUp, Calendar, DollarSign, ChevronDown, ChevronUp, AlertTriangle, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -13,8 +13,21 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { ClienteContratoDetail, ChurnPorServico, ChurnPorResponsavel } from "@shared/schema";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps, Cell } from "recharts";
+import { isAnomaly, getAnomalyDirection } from "@/components/ui/chart-tooltip";
 
 interface CohortRetentionRow {
   cohortMonth: string;
@@ -73,6 +86,19 @@ export default function DashboardRetencao() {
   
   // Estados para minimizar cards
   const [isCohortMinimized, setIsCohortMinimized] = useState<boolean>(true);
+  
+  // Estado para drill-down dialog
+  const [drillDownData, setDrillDownData] = useState<{
+    isOpen: boolean;
+    title: string;
+    type: "churn_responsavel" | "cohort" | "churn_servico" | null;
+    data: ChurnPorResponsavel | CohortRetentionRow | ChurnPorServico | null;
+  }>({
+    isOpen: false,
+    title: "",
+    type: null,
+    data: null,
+  });
   const [isChurnMinimized, setIsChurnMinimized] = useState<boolean>(true);
   const [isChurnRespMinimized, setIsChurnRespMinimized] = useState<boolean>(true);
 
@@ -241,6 +267,74 @@ export default function DashboardRetencao() {
 
     return { servicos, meses, dataMap };
   }, [churnData]);
+
+  const churnAnomalies = useMemo(() => {
+    if (!churnData || churnData.length === 0) {
+      return { avgQuantidade: 0, avgValor: 0, avgPercentual: 0, anomalyMap: new Map<string, boolean>() };
+    }
+
+    const valores = churnData.map(item => item.valorTotal);
+    const quantidades = churnData.map(item => item.quantidade);
+    const percentuais = churnData.map(item => item.percentualChurn);
+
+    const avgQuantidade = quantidades.reduce((a, b) => a + b, 0) / quantidades.length;
+    const avgValor = valores.reduce((a, b) => a + b, 0) / valores.length;
+    const avgPercentual = percentuais.reduce((a, b) => a + b, 0) / percentuais.length;
+
+    const anomalyMap = new Map<string, boolean>();
+    churnData.forEach(item => {
+      const key = `${item.servico}-${item.mes}`;
+      const isAnomalyValue = isAnomaly(item.valorTotal, avgValor, 0.2);
+      const isAnomalyQty = isAnomaly(item.quantidade, avgQuantidade, 0.2);
+      anomalyMap.set(key, isAnomalyValue || isAnomalyQty);
+    });
+
+    return { avgQuantidade, avgValor, avgPercentual, anomalyMap };
+  }, [churnData]);
+
+  const churnRespAnomalies = useMemo(() => {
+    if (!churnRespData || churnRespData.length === 0) {
+      return { avgQuantidade: 0, avgValor: 0, anomalyMap: new Map<string, { isAnomaly: boolean; direction: "up" | "down" }>() };
+    }
+
+    const valores = churnRespData.map(item => item.valorTotal);
+    const quantidades = churnRespData.map(item => item.quantidade);
+
+    const avgQuantidade = quantidades.reduce((a, b) => a + b, 0) / quantidades.length;
+    const avgValor = valores.reduce((a, b) => a + b, 0) / valores.length;
+
+    const anomalyMap = new Map<string, { isAnomaly: boolean; direction: "up" | "down" }>();
+    churnRespData.forEach(item => {
+      const key = item.responsavel;
+      const isAnomalyValue = isAnomaly(item.valorTotal, avgValor, 0.2);
+      if (isAnomalyValue) {
+        anomalyMap.set(key, { 
+          isAnomaly: true, 
+          direction: getAnomalyDirection(item.valorTotal, avgValor) 
+        });
+      }
+    });
+
+    return { avgQuantidade, avgValor, anomalyMap };
+  }, [churnRespData]);
+
+  const handleBarClick = (data: ChurnPorResponsavel) => {
+    setDrillDownData({
+      isOpen: true,
+      title: `Detalhes de Churn - ${data.responsavel}`,
+      type: "churn_responsavel",
+      data,
+    });
+  };
+
+  const closeDrillDown = () => {
+    setDrillDownData({
+      isOpen: false,
+      title: "",
+      type: null,
+      data: null,
+    });
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -689,13 +783,26 @@ export default function DashboardRetencao() {
                                 ? data.valorTotal
                                 : data.percentualChurn
                               : 0;
+                            const isAnomalyCell = data && churnAnomalies.anomalyMap.get(`${servico}-${mes}`);
+                            const anomalyDir = data && isAnomalyCell 
+                              ? getAnomalyDirection(data.valorTotal, churnAnomalies.avgValor) 
+                              : null;
 
                             return (
                               <td key={mes} className="p-3 text-center" data-testid={`cell-churn-${servico}-${mes}`}>
                                 {data ? (
                                   <HoverCard>
                                     <HoverCardTrigger asChild>
-                                      <span className="cursor-help font-semibold hover-elevate px-2 py-1 rounded">
+                                      <span className={`cursor-help font-semibold hover-elevate px-2 py-1 rounded inline-flex items-center gap-1 ${
+                                        isAnomalyCell && anomalyDir === "up" 
+                                          ? "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300" 
+                                          : isAnomalyCell && anomalyDir === "down"
+                                          ? "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300"
+                                          : ""
+                                      }`}>
+                                        {isAnomalyCell && anomalyDir === "up" && (
+                                          <AlertTriangle className="h-3 w-3 text-red-500" />
+                                        )}
                                         {churnViewMode === "quantidade" 
                                           ? valor
                                           : churnViewMode === "valorTotal"
@@ -706,9 +813,20 @@ export default function DashboardRetencao() {
                                     </HoverCardTrigger>
                                     <HoverCardContent className="w-80" data-testid={`hover-churn-${servico}-${mes}`}>
                                       <div className="space-y-2">
-                                        <h4 className="font-semibold text-sm">
-                                          {servico} - {mes}
-                                        </h4>
+                                        <div className="flex items-center gap-2">
+                                          <h4 className="font-semibold text-sm">
+                                            {servico} - {mes}
+                                          </h4>
+                                          {isAnomalyCell && (
+                                            <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                              anomalyDir === "up" 
+                                                ? "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300"
+                                                : "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300"
+                                            }`}>
+                                              {anomalyDir === "up" ? "Acima do normal" : "Abaixo do normal"}
+                                            </span>
+                                          )}
+                                        </div>
                                         <div className="space-y-1 text-sm">
                                           <p className="flex justify-between">
                                             <span className="text-muted-foreground">Contratos:</span>
@@ -726,7 +844,19 @@ export default function DashboardRetencao() {
                                             <span className="text-muted-foreground">Valor ativo mês:</span>
                                             <span className="font-medium">{formatCurrency(data.valorAtivoMes)}</span>
                                           </p>
+                                          <p className="flex justify-between">
+                                            <span className="text-muted-foreground">Média de valor:</span>
+                                            <span className="font-medium">{formatCurrency(churnAnomalies.avgValor)}</span>
+                                          </p>
                                         </div>
+                                        {isAnomalyCell && (
+                                          <div className="mt-2 pt-2 border-t border-border">
+                                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                              <Info className="h-3 w-3" />
+                                              Valor desvia mais de 20% da média
+                                            </p>
+                                          </div>
+                                        )}
                                       </div>
                                     </HoverCardContent>
                                   </HoverCard>
@@ -923,9 +1053,22 @@ export default function DashboardRetencao() {
                             }
                             
                             const data = props.payload[0].payload as ChurnPorResponsavel;
+                            const anomaly = churnRespAnomalies.anomalyMap.get(data.responsavel);
+                            
                             return (
-                              <div className="bg-background border border-border rounded-lg shadow-lg p-4">
-                                <h4 className="font-semibold text-sm mb-2">{data.responsavel}</h4>
+                              <div className="bg-background border border-border rounded-lg shadow-lg p-4 min-w-[220px]">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h4 className="font-semibold text-sm">{data.responsavel}</h4>
+                                  {anomaly?.isAnomaly && (
+                                    <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                      anomaly.direction === "up" 
+                                        ? "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300"
+                                        : "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300"
+                                    }`}>
+                                      {anomaly.direction === "up" ? "Alto churn" : "Baixo churn"}
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="space-y-1 text-sm">
                                   <p className="flex justify-between gap-4">
                                     <span className="text-muted-foreground">Contratos:</span>
@@ -933,7 +1076,7 @@ export default function DashboardRetencao() {
                                   </p>
                                   <p className="flex justify-between gap-4">
                                     <span className="text-muted-foreground">Valor Total:</span>
-                                    <span className="font-medium">
+                                    <span className={`font-medium ${anomaly?.isAnomaly && anomaly.direction === "up" ? "text-red-600 dark:text-red-400" : ""}`}>
                                       {formatCurrency(data.valorTotal)}
                                     </span>
                                   </p>
@@ -947,6 +1090,18 @@ export default function DashboardRetencao() {
                                       {formatCurrency(data.valorAtivoTotal)}
                                     </span>
                                   </p>
+                                  <p className="flex justify-between gap-4">
+                                    <span className="text-muted-foreground">Média geral:</span>
+                                    <span className="font-medium">
+                                      {formatCurrency(churnRespAnomalies.avgValor)}
+                                    </span>
+                                  </p>
+                                </div>
+                                <div className="mt-2 pt-2 border-t border-border">
+                                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Info className="h-3 w-3" />
+                                    Clique para ver detalhes
+                                  </p>
                                 </div>
                               </div>
                             );
@@ -954,9 +1109,21 @@ export default function DashboardRetencao() {
                         />
                         <Bar 
                           dataKey="valorTotal" 
-                          fill="hsl(var(--primary))" 
                           radius={[4, 4, 0, 0]}
-                        />
+                          cursor="pointer"
+                          onClick={(data) => handleBarClick(data as ChurnPorResponsavel)}
+                        >
+                          {churnRespData?.map((entry, index) => {
+                            const anomaly = churnRespAnomalies.anomalyMap.get(entry.responsavel);
+                            let fillColor = "hsl(var(--primary))";
+                            if (anomaly?.isAnomaly) {
+                              fillColor = anomaly.direction === "up" 
+                                ? "hsl(0, 84%, 60%)" 
+                                : "hsl(142, 71%, 45%)";
+                            }
+                            return <Cell key={`cell-${index}`} fill={fillColor} />;
+                          })}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -1006,6 +1173,96 @@ export default function DashboardRetencao() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={drillDownData.isOpen} onOpenChange={(open) => !open && closeDrillDown()}>
+        <DialogContent className="max-w-lg" data-testid="dialog-drill-down">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {drillDownData.type === "churn_responsavel" && <TrendingDown className="h-5 w-5 text-red-500" />}
+              {drillDownData.title}
+            </DialogTitle>
+            <DialogDescription>
+              Detalhamento completo do churn para análise
+            </DialogDescription>
+          </DialogHeader>
+          
+          {drillDownData.type === "churn_responsavel" && drillDownData.data && (
+            <div className="space-y-4">
+              {(() => {
+                const data = drillDownData.data as ChurnPorResponsavel;
+                const anomaly = churnRespAnomalies.anomalyMap.get(data.responsavel);
+                
+                return (
+                  <>
+                    {anomaly?.isAnomaly && (
+                      <div className={`p-3 rounded-lg flex items-center gap-2 ${
+                        anomaly.direction === "up" 
+                          ? "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300"
+                          : "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300"
+                      }`}>
+                        <AlertTriangle className="h-4 w-4" />
+                        <span className="text-sm font-medium">
+                          {anomaly.direction === "up" 
+                            ? "Este responsável apresenta churn acima do normal (+20%)" 
+                            : "Este responsável apresenta churn abaixo do normal (-20%)"}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground">Contratos Encerrados</p>
+                        <p className="text-2xl font-bold">{data.quantidadeContratos}</p>
+                      </div>
+                      <div className="p-4 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground">Valor Total Perdido</p>
+                        <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                          {formatCurrency(data.valorTotal)}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground">Taxa de Churn</p>
+                        <p className="text-2xl font-bold">{formatPercent(data.percentualChurn)}</p>
+                      </div>
+                      <div className="p-4 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground">Valor Ativo Total</p>
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                          {formatCurrency(data.valorAtivoTotal)}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="pt-4 border-t border-border">
+                      <h4 className="font-semibold text-sm mb-2">Comparação com Média</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Média de churn (valor):</span>
+                          <span className="font-medium">{formatCurrency(churnRespAnomalies.avgValor)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Média de contratos:</span>
+                          <span className="font-medium">{churnRespAnomalies.avgQuantidade.toFixed(1)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Desvio do valor:</span>
+                          <span className={`font-medium ${
+                            data.valorTotal > churnRespAnomalies.avgValor
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-green-600 dark:text-green-400"
+                          }`}>
+                            {data.valorTotal > churnRespAnomalies.avgValor ? "+" : ""}
+                            {(((data.valorTotal - churnRespAnomalies.avgValor) / churnRespAnomalies.avgValor) * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

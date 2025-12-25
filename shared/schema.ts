@@ -18,6 +18,7 @@ export const authUsers = pgTable("auth_users", {
   createdAt: timestamp("created_at").defaultNow(),
   role: varchar("role", { length: 20 }).notNull().default("user"),
   allowedRoutes: text("allowed_routes").array(),
+  department: varchar("department", { length: 50 }),
 });
 
 export type AuthUser = typeof authUsers.$inferSelect;
@@ -1895,3 +1896,72 @@ export const userNotifications = pgTable("user_notifications", {
 export const insertUserNotificationSchema = createInsertSchema(userNotifications).omit({ id: true, createdAt: true });
 export type UserNotification = typeof userNotifications.$inferSelect;
 export type InsertUserNotification = z.infer<typeof insertUserNotificationSchema>;
+
+// ==================== JURÍDICO - REGRAS DE ESCALONAMENTO ====================
+
+export const juridicoRegrasEscalonamento = pgTable("juridico_regras_escalonamento", {
+  id: serial("id").primaryKey(),
+  diasAtrasoMin: integer("dias_atraso_min").notNull(),
+  diasAtrasoMax: integer("dias_atraso_max"),
+  procedimentoSugerido: text("procedimento_sugerido").notNull(),
+  prioridade: integer("prioridade").notNull().default(1),
+  ativo: boolean("ativo").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertJuridicoRegraSchema = createInsertSchema(juridicoRegrasEscalonamento).omit({ id: true, createdAt: true });
+export type JuridicoRegraEscalonamento = typeof juridicoRegrasEscalonamento.$inferSelect;
+export type InsertJuridicoRegraEscalonamento = z.infer<typeof insertJuridicoRegraSchema>;
+
+// ==================== ONBOARDING RH ====================
+
+export const onboardingTemplates = pgTable("onboarding_templates", {
+  id: serial("id").primaryKey(),
+  nome: varchar("nome", { length: 200 }).notNull(),
+  descricao: text("descricao"),
+  ativo: boolean("ativo").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const onboardingEtapas = pgTable("onboarding_etapas", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").notNull(),
+  ordem: integer("ordem").notNull(),
+  titulo: varchar("titulo", { length: 200 }).notNull(),
+  descricao: text("descricao"),
+  responsavelPadrao: varchar("responsavel_padrao", { length: 100 }),
+  prazoDias: integer("prazo_dias"),
+});
+
+export const onboardingColaborador = pgTable("onboarding_colaborador", {
+  id: serial("id").primaryKey(),
+  colaboradorId: integer("colaborador_id").notNull(),
+  templateId: integer("template_id").notNull(),
+  dataInicio: date("data_inicio").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const onboardingProgresso = pgTable("onboarding_progresso", {
+  id: serial("id").primaryKey(),
+  onboardingColaboradorId: integer("onboarding_colaborador_id").notNull(),
+  etapaId: integer("etapa_id").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  responsavelId: integer("responsavel_id"),
+  dataConclusao: timestamp("data_conclusao"),
+  observacoes: text("observacoes"),
+});
+
+export const insertOnboardingTemplateSchema = createInsertSchema(onboardingTemplates).omit({ id: true, createdAt: true });
+export const insertOnboardingEtapaSchema = createInsertSchema(onboardingEtapas).omit({ id: true });
+export const insertOnboardingColaboradorSchema = createInsertSchema(onboardingColaborador).omit({ id: true, createdAt: true });
+export const insertOnboardingProgressoSchema = createInsertSchema(onboardingProgresso).omit({ id: true });
+
+export type OnboardingTemplate = typeof onboardingTemplates.$inferSelect;
+export type InsertOnboardingTemplate = z.infer<typeof insertOnboardingTemplateSchema>;
+export type OnboardingEtapa = typeof onboardingEtapas.$inferSelect;
+export type InsertOnboardingEtapa = z.infer<typeof insertOnboardingEtapaSchema>;
+export type OnboardingColaborador = typeof onboardingColaborador.$inferSelect;
+export type InsertOnboardingColaborador = z.infer<typeof insertOnboardingColaboradorSchema>;
+export type OnboardingProgresso = typeof onboardingProgresso.$inferSelect;
+export type InsertOnboardingProgresso = z.infer<typeof insertOnboardingProgressoSchema>;

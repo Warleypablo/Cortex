@@ -11,6 +11,7 @@ export interface User {
   createdAt: string;
   role: 'admin' | 'user';
   allowedRoutes: string[];
+  department: 'admin' | 'comercial' | 'financeiro' | 'operacao' | null;
 }
 
 const USER_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -205,7 +206,27 @@ function dbUserToUser(dbUser: typeof authUsers.$inferSelect): User {
     createdAt: dbUser.createdAt?.toISOString() || new Date().toISOString(),
     role: dbUser.role as 'admin' | 'user',
     allowedRoutes: migrateAllowedRoutes(dbUser.allowedRoutes),
+    department: (dbUser.department as 'admin' | 'comercial' | 'financeiro' | 'operacao') || null,
   };
+}
+
+export async function updateUserDepartment(userId: string, department: 'admin' | 'comercial' | 'financeiro' | 'operacao' | null): Promise<User | null> {
+  try {
+    const result = await db
+      .update(authUsers)
+      .set({ department })
+      .where(eq(authUsers.id, userId))
+      .returning();
+    
+    if (result.length === 0) return null;
+    
+    const user = dbUserToUser(result[0]);
+    setCachedUser(user);
+    return user;
+  } catch (error) {
+    console.error("Erro ao atualizar department:", error);
+    return null;
+  }
 }
 
 export async function updateUserPermissions(userId: string, allowedRoutes: string[]): Promise<User | null> {

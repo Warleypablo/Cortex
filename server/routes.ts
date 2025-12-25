@@ -3376,6 +3376,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== JURÍDICO - Clientes para ação legal ====================
   
+  // Ensure juridico_regras_escalonamento table exists and has default rules
+  async function ensureEscalationRulesTable() {
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS juridico_regras_escalonamento (
+          id SERIAL PRIMARY KEY,
+          dias_atraso_min INTEGER NOT NULL,
+          dias_atraso_max INTEGER,
+          procedimento_sugerido TEXT NOT NULL,
+          prioridade INTEGER NOT NULL DEFAULT 1,
+          ativo BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      
+      // Check if table has rules, seed defaults if empty
+      const countResult = await db.execute(sql`SELECT COUNT(*) as count FROM juridico_regras_escalonamento`);
+      const count = parseInt((countResult.rows[0] as any)?.count || '0');
+      
+      if (count === 0) {
+        await db.execute(sql`
+          INSERT INTO juridico_regras_escalonamento (dias_atraso_min, dias_atraso_max, procedimento_sugerido, prioridade, ativo)
+          VALUES 
+            (30, 59, 'notificacao', 1, true),
+            (60, 89, 'protesto', 2, true),
+            (90, NULL, 'acao_judicial', 3, true)
+        `);
+        console.log("[juridico] Default escalation rules seeded");
+      }
+    } catch (error) {
+      console.log("[juridico] Warning: Could not ensure escalation rules table:", (error as Error).message);
+    }
+  }
+  
+  // Initialize table on startup
+  ensureEscalationRulesTable();
+  
   // Jurídico - Listar clientes inadimplentes + clientes com histórico jurídico (mesmo após pagamento)
   app.get("/api/juridico/clientes", async (req, res) => {
     try {
@@ -3392,19 +3429,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 3. Buscar contextos jurídicos
       const contextos = await storage.getInadimplenciaContextos(todosIds);
       
+      // 4. Buscar regras de escalonamento (handle table not existing gracefully)
+      let escalationRules: Array<{
+        diasAtrasoMin: number;
+        diasAtrasoMax: number | null;
+        procedimentoSugerido: string;
+        prioridade: number;
+      }> = [];
+      
+      try {
+        const escalationRulesResult = await db.execute(sql`
+          SELECT 
+            dias_atraso_min as "diasAtrasoMin",
+            dias_atraso_max as "diasAtrasoMax",
+            procedimento_sugerido as "procedimentoSugerido",
+            prioridade
+          FROM juridico_regras_escalonamento
+          WHERE ativo = true
+          ORDER BY prioridade ASC
+        `);
+        escalationRules = escalationRulesResult.rows as typeof escalationRules;
+      } catch (rulesError) {
+        console.log("[juridico] Escalation rules table not available:", (rulesError as Error).message);
+      }
+      
+      // Helper function to get suggested procedimento based on dias_atraso
+      const getSuggestedProcedimento = (diasAtraso: number) => {
+        for (const rule of escalationRules) {
+          const min = rule.diasAtrasoMin;
+          const max = rule.diasAtrasoMax;
+          if (diasAtraso >= min && (max === null || diasAtraso <= max)) {
+            return {
+              procedimento: rule.procedimentoSugerido,
+              prioridade: rule.prioridade
+            };
+          }
+        }
+        return null;
+      };
+      
+      // Procedimento priority mapping
+      const PROCEDIMENTO_PRIORITY: Record<string, number> = {
+        'notificacao': 1,
+        'protesto': 2,
+        'acao_judicial': 3,
+        'acordo': 4,
+        'baixa': 5
+      };
+      
       // 4. Buscar parcelas em paralelo
       const parcelasPromises = clientesFiltrados.map(cliente => 
         storage.getInadimplenciaDetalheParcelas(cliente.idCliente, dataInicio, dataFim)
       );
       const parcelasResults = await Promise.all(parcelasPromises);
       
-      // 5. Montar resposta
-      const clientesComDados = clientesFiltrados.map((cliente, index) => ({
-        cliente,
-        contexto: contextos[cliente.idCliente] || {},
-        parcelas: parcelasResults[index].parcelas,
-        isHistorico: false,
-      }));
+      // 5. Montar resposta com sugestão de escalonamento
+      const clientesComDados = clientesFiltrados.map((cliente, index) => {
+        const contexto = contextos[cliente.idCliente] || {};
+        const suggestion = getSuggestedProcedimento(cliente.diasAtrasoMax);
+        
+        const currentProcedimento = contexto.procedimentoJuridico;
+        const currentPriority = currentProcedimento ? (PROCEDIMENTO_PRIORITY[currentProcedimento] || 0) : 0;
+        const suggestedPriority = suggestion?.prioridade || 0;
+        
+        // Determine if escalation is needed (suggested is higher priority than current)
+        // Lower prioridade number means earlier stage, higher number = more severe
+        // needsEscalation = current procedure is LOWER stage than suggested
+        const needsEscalation = suggestion && currentPriority < suggestedPriority;
+        
+        return {
+          cliente,
+          contexto,
+          parcelas: parcelasResults[index].parcelas,
+          isHistorico: false,
+          suggestedProcedimento: suggestion?.procedimento || null,
+          needsEscalation,
+        };
+      });
       
       console.log("[api] Juridico clientes - Total:", clientesFiltrados.length);
       
@@ -3438,6 +3539,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error updating contexto juridico:", error);
       res.status(500).json({ error: "Failed to update contexto juridico" });
+    }
+  });
+
+  // ==================== JURÍDICO - Regras de Escalonamento ====================
+  // Note: Table creation and seeding is handled by ensureEscalationRulesTable() above
+
+  // GET escalation rules
+  app.get("/api/juridico/regras-escalonamento", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          id, 
+          dias_atraso_min as "diasAtrasoMin", 
+          dias_atraso_max as "diasAtrasoMax", 
+          procedimento_sugerido as "procedimentoSugerido", 
+          prioridade, 
+          ativo, 
+          created_at as "createdAt"
+        FROM juridico_regras_escalonamento
+        WHERE ativo = true
+        ORDER BY prioridade ASC
+      `);
+      
+      res.json({ regras: result.rows });
+    } catch (error) {
+      console.error("[api] Error fetching escalation rules:", error);
+      res.status(500).json({ error: "Failed to fetch escalation rules" });
     }
   });
 
@@ -8926,6 +9054,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             created.push(notification);
           }
+        }
+      }
+      
+      // 5. Jurídico Escalation notifications - clients needing procedure escalation
+      const juridicoEscalationConfig = getConfig('juridico_escalation');
+      if (juridicoEscalationConfig !== null) {
+        const priority = juridicoEscalationConfig?.priority || 'high';
+        
+        try {
+          // Get escalation rules
+          const escalationRulesResult = await db.execute(sql`
+            SELECT 
+              dias_atraso_min,
+              dias_atraso_max,
+              procedimento_sugerido,
+              prioridade
+            FROM juridico_regras_escalonamento
+            WHERE ativo = true
+            ORDER BY prioridade ASC
+          `);
+          
+          const escalationRules = escalationRulesResult.rows as Array<{
+            dias_atraso_min: number;
+            dias_atraso_max: number | null;
+            procedimento_sugerido: string;
+            prioridade: number;
+          }>;
+          
+          if (escalationRules.length > 0) {
+            // Get clients with overdue payments who may need escalation
+            const clientsResult = await db.execute(sql`
+              SELECT 
+                ic.cliente_id,
+                ic.procedimento_juridico,
+                p.max_atraso,
+                c.nome as cliente_nome
+              FROM inadimplencia_contextos ic
+              JOIN caz_clientes c ON ic.cliente_id = c.ids OR ic.cliente_id = CAST(c.id AS TEXT)
+              JOIN (
+                SELECT 
+                  id_cliente,
+                  MAX(CURRENT_DATE - data_vencimento::date) as max_atraso
+                FROM caz_parcelas
+                WHERE status != 'Pago' AND data_vencimento < CURRENT_DATE
+                GROUP BY id_cliente
+              ) p ON ic.cliente_id = p.id_cliente
+              WHERE p.max_atraso >= 30
+              LIMIT 100
+            `);
+            
+            const PROCEDIMENTO_PRIORITY: Record<string, number> = {
+              'notificacao': 1,
+              'protesto': 2,
+              'acao_judicial': 3,
+              'acordo': 4,
+              'baixa': 5
+            };
+            
+            for (const cliente of clientsResult.rows as any[]) {
+              const diasAtraso = parseInt(cliente.max_atraso) || 0;
+              const currentProcedimento = cliente.procedimento_juridico;
+              const currentPriority = currentProcedimento ? (PROCEDIMENTO_PRIORITY[currentProcedimento] || 0) : 0;
+              
+              // Find suggested procedimento
+              let suggestedPriority = 0;
+              let suggestedProcedimento = null;
+              for (const rule of escalationRules) {
+                const min = rule.dias_atraso_min;
+                const max = rule.dias_atraso_max;
+                if (diasAtraso >= min && (max === null || diasAtraso <= max)) {
+                  suggestedPriority = rule.prioridade;
+                  suggestedProcedimento = rule.procedimento_sugerido;
+                  break;
+                }
+              }
+              
+              // Check if escalation is needed
+              if (suggestedProcedimento && currentPriority < suggestedPriority) {
+                const uniqueKey = `juridico_escalation_${cliente.cliente_id}_${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+                
+                const exists = await storage.notificationExists(uniqueKey);
+                if (!exists) {
+                  const procedimentoLabels: Record<string, string> = {
+                    'notificacao': 'Notificação',
+                    'protesto': 'Protesto',
+                    'acao_judicial': 'Ação Judicial',
+                    'acordo': 'Acordo',
+                    'baixa': 'Baixa'
+                  };
+                  
+                  const notification = await storage.createNotification({
+                    type: 'juridico_escalation',
+                    title: `Escalonamento jurídico necessário`,
+                    message: `${cliente.cliente_nome || 'Cliente'} - ${diasAtraso} dias de atraso. Sugestão: ${procedimentoLabels[suggestedProcedimento] || suggestedProcedimento}`,
+                    entityId: cliente.cliente_id,
+                    entityType: 'cliente',
+                    priority,
+                    uniqueKey,
+                    link: '/juridico/clientes',
+                  });
+                  created.push(notification);
+                }
+              }
+            }
+          }
+        } catch (escalationError) {
+          console.log("[api] Juridico escalation notifications skipped - table may not exist:", (escalationError as Error).message);
         }
       }
       

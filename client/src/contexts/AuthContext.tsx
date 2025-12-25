@@ -10,6 +10,7 @@ export interface User {
   createdAt: string;
   role: 'admin' | 'user';
   allowedRoutes: string[];
+  department: 'admin' | 'comercial' | 'financeiro' | 'operacao' | null;
 }
 
 interface AuthContextType {

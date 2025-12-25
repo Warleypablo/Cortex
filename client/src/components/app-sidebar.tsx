@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen, Lock, CalendarDays } from "lucide-react";
+import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen, Lock, CalendarDays, ClipboardList } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogoLight from "@assets/logo-preta_1766452973532.png";
 import turboLogoDark from "@assets/logo-branca_1766452973531.png";
@@ -158,6 +158,7 @@ const dashboardCategories = [
     subItems: [
       { title: "Visão Geral", url: "/dashboard/geg", icon: UsersRound },
       { title: "Recrutamento", url: "/dashboard/recrutamento", icon: UserPlus },
+      { title: "Onboarding", url: "/rh/onboarding", icon: ClipboardList },
     ],
   },
   {
