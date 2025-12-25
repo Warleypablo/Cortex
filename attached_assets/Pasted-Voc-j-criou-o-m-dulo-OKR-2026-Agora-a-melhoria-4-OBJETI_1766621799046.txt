@@ -1,0 +1,267 @@
+Você já criou o módulo OKR 2026. Agora é a melhoria #4.
+
+OBJETIVO: deixar OKR 2026 pronto pra uso interno, com:
+1) Metas por QUARTER (Q1..Q4) para todos os KRs
+2) KRs definidos com (metric_key, agregação, direção, unidade) e cálculo automático do status
+3) Iniciativas com responsável OBRIGATÓRIO, linkado ao colaborador do nosso DB (Google Cloud) — sem criar tabela nova
+4) Dashboard com evidência de TurboOH + Hugz + KPIs macro (receita, churn, inadimplência etc)
+5) ZERO Supabase / ZERO novas tabelas / ZERO seeds em banco. Só leitura do nosso DB e JSON local para configuração.
+
+IMPORTANTE:
+- NÃO criar nenhuma tabela no banco.
+- Se precisar armazenar definição de OKR, KRs, targets e iniciativas: usar arquivos versionados no repo (JSON/TS).
+- Responsável das iniciativas deve ser linkado por owner_email (ou owner_id) com lookup em rh_pessoal (ou endpoint já existente de colaboradores).
+- O sistema já tem tabelas e queries — reaproveitar.
+
+========================================================
+1) PADRÃO DE DADOS: KR DEFINITIONS + TARGETS QUARTER
+========================================================
+
+Crie/ajuste um arquivo único de definição (preferência TS/JSON):
+server/okr/okr2026.ts  (ou okr2026.json)
+
+Estrutura EXATA:
+
+type KRDirection = "gte" | "lte";
+type KRAggregation = "quarter_end" | "quarter_sum" | "quarter_avg" | "quarter_max" | "quarter_min";
+
+interface KRDef {
+  id: string;                  // ex: "KR_MRR_Q_END"
+  objectiveId: string;         // ex: "O1"
+  title: string;               // seco e técnico
+  metricKey: string;           // ex: "mrr_active"
+  unit: "BRL" | "PCT" | "COUNT";
+  direction: KRDirection;      // gte/lte
+  aggregation: KRAggregation;  // como agregar mês -> quarter
+  targets: { Q1: number; Q2: number; Q3: number; Q4: number; FY?: number };
+  notes?: string;              // opcional
+}
+
+interface ObjectiveDef {
+  id: string;      // "O1"..."O4"
+  title: string;   // "Bigger & Better — Consolidação, Escala e Padronização"
+  subtitle?: string;
+}
+
+Exportar:
+- objectives: ObjectiveDef[]
+- krs: KRDef[]
+
+========================================================
+2) KRs OFICIAIS 2026 (REALISTAS) — QUEBRADOS POR QUARTER
+========================================================
+
+Use esses KRs (evitar duplicação; padronização + produto entram como 1 KR operacional medido por % iniciativas concluídas):
+
+OBJECTIVE O1 — Ecossistema (Consolidação + Escala)
+- KR1: MRR Ativo no fim do quarter (quarter_end, gte)
+  targets: Q1 1338870 | Q2 1611315 | Q3 1871384 | Q4 2122127
+  metricKey: mrr_active
+
+- KR2: Receita Total Faturável (quarter_sum, gte)
+  targets: Q1 4566375 | Q2 5502104 | Q3 6460412 | Q4 7374380
+  metricKey: revenue_total_billable
+
+- KR3: Clientes ativos no fim do quarter (quarter_end, gte)
+  targets: Q1 346 | Q2 401 | Q3 456 | Q4 511
+  metricKey: active_customers
+
+- KR4: Vendas Novas MRR (quarter_sum, gte)  [novas vendas]
+  targets: Q1 600000 | Q2 660000 | Q3 720000 | Q4 780000
+  metricKey: new_mrr_sales
+
+- KR5: Expansão / Monetização da Base (quarter_sum, gte)  [upsell / expansão]
+  targets: se não existir no DB ainda, deixar como "N/A" e status "not_ready" + iniciativa de instrumentação.
+  metricKey: expansion_mrr
+
+OBJECTIVE O2 — Eficiência & Sistemas (execução limpa)
+- KR1: EBITDA (quarter_sum, gte)
+  targets: Q1 746055 | Q2 1152814 | Q3 1398628 | Q4 1972271
+  metricKey: ebitda
+
+- KR2: Geração de Caixa (quarter_sum, gte)
+  targets: Q1 394897 | Q2 663357 | Q3 825594 | Q4 1204199
+  metricKey: cash_generation
+
+- KR3: Caixa no fim do quarter (quarter_end, gte)
+  targets: Q1 1044897 | Q2 1708254 | Q3 2533848 | Q4 3738047
+  metricKey: cash_balance
+
+- KR4: SG&A % (quarter_avg, lte)
+  target: Q1 21 | Q2 21 | Q3 21 | Q4 21
+  metricKey: sga_pct
+
+- KR5: CAC % (quarter_avg, lte)
+  target: Q1 23 | Q2 23 | Q3 23 | Q4 23
+  metricKey: cac_pct
+
+OBJECTIVE O3 — Saúde da Receita (Hugz: inadimplência + churn)
+- KR1: Inadimplência % (quarter_avg, lte)
+  target: Q1 6.0 | Q2 6.0 | Q3 6.0 | Q4 6.0
+  metricKey: delinquency_pct
+
+- KR2: Net MRR Churn % (quarter_avg, lte)
+  target: Q1 9.0 | Q2 9.0 | Q3 9.0 | Q4 9.0
+  metricKey: net_mrr_churn_pct
+
+- KR3: Logo Churn % (quarter_avg, lte)
+  target: Q1 10.0 | Q2 10.0 | Q3 10.0 | Q4 10.0
+  metricKey: logo_churn_pct
+
+- KR4: Gross MRR Churn (R$) (quarter_sum, lte) [opcional se existir]
+  targets: Q1 337129 | Q2 412074 | Q3 483337 | Q4 551824
+  metricKey: gross_mrr_churn_brl
+
+OBJECTIVE O4 — TurboOH (evidenciar no dashboard)
+- KR1: Receita Líquida TurboOH (quarter_sum, gte)
+  targets: Q1 86400 | Q2 259200 | Q3 432000 | Q4 648000
+  metricKey: turbooh_revenue_net
+
+- KR2: Resultado TurboOH (quarter_sum, gte)
+  targets: Q1 43650 | Q2 168950 | Q3 304900 | Q4 472200
+  metricKey: turbooh_result
+
+- KR3: Vacância TurboOH % (quarter_avg, lte) [se houver dado]
+  se não existir no DB, mostrar N/A e criar iniciativa de instrumentação.
+  metricKey: turbooh_vacancy_pct
+
+OBJECTIVE O5 — Padronização & Produto (sem virar “achismo”)
+- KR1: % de iniciativas de padronização concluídas no quarter (quarter_avg ou regra simples)
+  targets: Q1 0.25 | Q2 0.50 | Q3 0.75 | Q4 1.00
+  metricKey: standardization_completion_pct
+  OBS: esse metricKey NÃO vem do DB; vem do cálculo baseado em iniciativas com tag "padronizacao".
+
+========================================================
+3) METRIC KEYS (MAPEAMENTO) — SEM CRIAR DB
+========================================================
+
+No server/okr/metricsAdapter.ts, padronize:
+
+- getMetricSeries(metricKey, start, end) -> [{date, value}]
+- getQuarterAgg(metricKey, year, aggregation) -> {Q1, Q2, Q3, Q4}
+
+Usar DB (somente leitura) para estes metricKeys:
+mrr_active
+revenue_total_billable
+revenue_net
+ebitda
+cash_generation
+cash_balance
+sga_pct
+cac_pct
+delinquency_pct
+net_mrr_churn_pct
+logo_churn_pct
+gross_mrr_churn_brl
+new_mrr_sales
+active_customers
+turbooh_revenue_net
+turbooh_result
+turbooh_vacancy_pct (se existir)
+
+Para metricKey que não existir ainda:
+- retornar status "not_ready" + value null
+- frontend mostra badge: "Em instrumentação"
+
+Para standardization_completion_pct:
+- calcular a partir de initiatives.json (tag padronizacao) por quarter (done/total)
+
+========================================================
+4) INICIATIVAS — MAIS COMPLETO + RESPONSÁVEL LINKADO AO COLABORADOR
+========================================================
+
+Atualize server/okr/initiatives.json para incluir:
+- id
+- objectiveId (O1..O5)
+- title (seco)
+- quarter (Q1/Q2/Q3/Q4)
+- status: planned | doing | blocked | done
+- owner_email (obrigatório)  // será linkado com colaborador
+- tags: ["hugnz","padronizacao","turbooh","produto","eficiencia","dados"] etc
+- krs: ["KR_ID_1","KR_ID_2"]  // ligação direta
+
+Exemplos de iniciativas (adicione todas):
+
+O1 (Ecossistema)
+- “Pacotes padrão por BU (Commerce/OH/Ventures)”
+- “Cross-sell: Commerce → TurboOH playbook + oferta”
+- “Revisão de pricing e tiers (Starter/Scale/Enterprise)”
+- “Pipeline de parcerias nacionais (Brasil)”
+- “Governança de portfólio: o que entra/saí do catálogo”
+
+O2 (Eficiência & Sistemas)
+- “SOP de entrega por squad + checklist de qualidade”
+- “Custo por área (CSV/CAC/SG&A) no Cortex (automático)”
+- “Rotina de fechamento mensal (finance + operações)”
+- “Padronização de propostas/escopos (TSS/TMA) no sistema”
+- “Dashboard executivo: KPI weekly + monthly decision log”
+
+O3 (Hugz: Receita saudável)
+- “Régua de cobrança (pré-vencimento, vencido, 7d, 15d)”
+- “Política de cortes por inadimplência (com exceções aprovadas)”
+- “Análise churn: motivo + playbook de retenção”
+- “Renovação/upsell: rotina mensal em base top 100”
+- “Health score de clientes (MVP)”
+
+O4 (TurboOH)
+- “Mapa de inventário + classificação de locais (tier)”
+- “Modelo comercial padrão (planos por 4/12 semanas)”
+- “Rotina de ocupação/vacância (instrumentação se faltar dado)”
+- “Operação: SLA de veiculação + QA criativo”
+- “Relatório TurboOH para cliente (template)”
+
+O5 (Padronização & Produto)
+- “Taxonomia de produtos/serviços (1 dicionário oficial)”
+- “Campos obrigatórios em contratos (Produto drop-down, status, owner)”
+- “Padronizar inputs de projetos no Cortex (mínimo viável)”
+- “Documentação ‘como operamos’ (playbooks)”
+
+IMPORTANTE: Owner deve ser linkável.
+Crie endpoint (ou reaproveite existente):
+GET /api/okr/collaborators
+-> lista colaboradores ativos do DB (id, name, email, area)
+Frontend: resolver owner_email -> exibir nome + link para página /colaboradores/:id (se existir).
+
+Se não existir coluna email em rh_pessoal:
+- usar o que existir (ex: usuario, login) e adaptar ownerRef.
+
+========================================================
+5) UI/UX — 1 TELA + 3 ABAS (como você já fez) MAS MELHOR
+========================================================
+
+Aba 1: Dashboard
+- Cards grandes: MRR (atual vs target quarter), EBITDA (YTD), Geração de Caixa (YTD), Inadimplência %, Net Churn %, Logo Churn %
+- Bloco TurboOH destacado: Receita Líquida OH (quarter) + Resultado OH (quarter) + Vacância (se existir)
+- Mini bloco Hugz: inadimplência + churn + status iniciativas Hugz (doing/blocked)
+
+Aba 2: KRs
+- Tabela por Objective
+- Colunas: KR | Q1 atual/meta | Q2 atual/meta | Q3 atual/meta | Q4 atual/meta | Status atual
+- Status = vermelho/amarelo/verde baseado em regra simples:
+  - quarter atual: compara atual vs target do quarter
+  - se metric not_ready -> badge cinza “Em instrumentação”
+
+Aba 3: Iniciativas
+- Lista com filtros: Objective | Quarter | Status | Owner
+- Cada card: título, tags, KRs ligados, owner (nome), status, quarter
+- Mostrar contagem: planned/doing/blocked/done por objective
+
+========================================================
+6) ENDPOINTS
+========================================================
+
+GET /api/okr/okr2026 -> retorna objectives + krs defs + targets
+GET /api/okr/metric-series?metricKey=... -> série mensal
+GET /api/okr/quarter-summary -> valores Q1..Q4 agregados por metricKey
+GET /api/okr/initiatives -> lista iniciativas
+GET /api/okr/collaborators -> colaboradores ativos (para resolver owner)
+
+========================================================
+7) NÃO QUEBRAR O QUE EXISTE
+========================================================
+
+- Não criar tabelas.
+- Não trocar padrão de conexão.
+- Usar queries existentes sempre que possível.
+- Onde faltar dado, retornar not_ready e exibir no UI.
+- Objetivo: OKR 2026 funcionar como “painel executivo + execução” dentro do Turbo Cortex.
