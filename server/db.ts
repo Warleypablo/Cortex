@@ -43,3 +43,24 @@ export async function initializeNotificationsTable(): Promise<void> {
     console.error('[database] Error initializing notifications table:', error);
   }
 }
+
+export async function initializeSystemFieldOptionsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS system_field_options (
+        id SERIAL PRIMARY KEY,
+        field_type TEXT NOT NULL,
+        value TEXT NOT NULL,
+        label TEXT NOT NULL,
+        color TEXT,
+        sort_order INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(field_type, value)
+      )
+    `);
+    console.log('[database] System field options table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing system field options table:', error);
+  }
+}

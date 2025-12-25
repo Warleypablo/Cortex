@@ -11497,6 +11497,191 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== SYSTEM FIELD OPTIONS ====================
+  
+  app.get("/api/system-fields", isAuthenticated, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT field_type FROM system_field_options
+        WHERE is_active = true
+        ORDER BY field_type
+      `);
+      res.json({ fieldTypes: result.rows.map((r: any) => r.field_type) });
+    } catch (error) {
+      console.error("[api] Error fetching system field types:", error);
+      res.status(500).json({ error: "Failed to fetch field types" });
+    }
+  });
+
+  app.get("/api/system-fields/:fieldType", isAuthenticated, async (req, res) => {
+    try {
+      const { fieldType } = req.params;
+      const result = await db.execute(sql`
+        SELECT id, field_type, value, label, color, sort_order, is_active, created_at
+        FROM system_field_options
+        WHERE field_type = ${fieldType}
+        ORDER BY sort_order ASC, label ASC
+      `);
+      res.json({ 
+        fieldType,
+        options: result.rows.map((r: any) => ({
+          id: r.id,
+          fieldType: r.field_type,
+          value: r.value,
+          label: r.label,
+          color: r.color,
+          sortOrder: r.sort_order,
+          isActive: r.is_active,
+          createdAt: r.created_at
+        }))
+      });
+    } catch (error) {
+      console.error("[api] Error fetching system field options:", error);
+      res.status(500).json({ error: "Failed to fetch field options" });
+    }
+  });
+
+  app.post("/api/system-fields", isAuthenticated, async (req, res) => {
+    try {
+      const { fieldType, value, label, color, sortOrder, isActive } = req.body;
+      
+      if (!fieldType || !value || !label) {
+        return res.status(400).json({ error: "fieldType, value and label are required" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO system_field_options (field_type, value, label, color, sort_order, is_active)
+        VALUES (${fieldType}, ${value}, ${label}, ${color || null}, ${sortOrder || 0}, ${isActive !== false})
+        ON CONFLICT (field_type, value) DO UPDATE SET
+          label = EXCLUDED.label,
+          color = EXCLUDED.color,
+          sort_order = EXCLUDED.sort_order,
+          is_active = EXCLUDED.is_active
+        RETURNING id, field_type, value, label, color, sort_order, is_active, created_at
+      `);
+      
+      const row = result.rows[0] as any;
+      res.json({
+        id: row.id,
+        fieldType: row.field_type,
+        value: row.value,
+        label: row.label,
+        color: row.color,
+        sortOrder: row.sort_order,
+        isActive: row.is_active,
+        createdAt: row.created_at
+      });
+    } catch (error) {
+      console.error("[api] Error creating system field option:", error);
+      res.status(500).json({ error: "Failed to create field option" });
+    }
+  });
+
+  app.patch("/api/system-fields/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { fieldType, value, label, color, sortOrder, isActive } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE system_field_options
+        SET 
+          field_type = COALESCE(${fieldType || null}, field_type),
+          value = COALESCE(${value || null}, value),
+          label = COALESCE(${label || null}, label),
+          color = ${color !== undefined ? color : null},
+          sort_order = COALESCE(${sortOrder !== undefined ? sortOrder : null}, sort_order),
+          is_active = COALESCE(${isActive !== undefined ? isActive : null}, is_active)
+        WHERE id = ${parseInt(id)}
+        RETURNING id, field_type, value, label, color, sort_order, is_active, created_at
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Field option not found" });
+      }
+      
+      const row = result.rows[0] as any;
+      res.json({
+        id: row.id,
+        fieldType: row.field_type,
+        value: row.value,
+        label: row.label,
+        color: row.color,
+        sortOrder: row.sort_order,
+        isActive: row.is_active,
+        createdAt: row.created_at
+      });
+    } catch (error) {
+      console.error("[api] Error updating system field option:", error);
+      res.status(500).json({ error: "Failed to update field option" });
+    }
+  });
+
+  app.delete("/api/system-fields/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      await db.execute(sql`
+        UPDATE system_field_options
+        SET is_active = false
+        WHERE id = ${parseInt(id)}
+      `);
+      
+      res.json({ success: true, message: "Field option deactivated" });
+    } catch (error) {
+      console.error("[api] Error deleting system field option:", error);
+      res.status(500).json({ error: "Failed to delete field option" });
+    }
+  });
+
+  app.post("/api/system-fields/seed", isAuthenticated, async (req, res) => {
+    try {
+      const { 
+        CLIENT_STATUS_OPTIONS,
+        BUSINESS_TYPE_OPTIONS,
+        ACCOUNT_STATUS_OPTIONS,
+        CLUSTER_OPTIONS,
+        SQUAD_OPTIONS,
+        CONTRACT_STATUS_OPTIONS,
+        COLLABORATOR_STATUS_OPTIONS
+      } = await import("@shared/constants");
+      
+      const countResult = await db.execute(sql`SELECT COUNT(*) as count FROM system_field_options`);
+      const count = parseInt((countResult.rows[0] as any).count || '0');
+      
+      if (count > 0) {
+        return res.json({ message: "Table already has data, skipping seed", count });
+      }
+      
+      const seedData: { fieldType: string; options: { value: string; label: string; color?: string }[] }[] = [
+        { fieldType: 'client_status', options: CLIENT_STATUS_OPTIONS },
+        { fieldType: 'business_type', options: BUSINESS_TYPE_OPTIONS },
+        { fieldType: 'account_status', options: ACCOUNT_STATUS_OPTIONS },
+        { fieldType: 'cluster', options: CLUSTER_OPTIONS },
+        { fieldType: 'squad', options: SQUAD_OPTIONS },
+        { fieldType: 'contract_status', options: CONTRACT_STATUS_OPTIONS },
+        { fieldType: 'collaborator_status', options: COLLABORATOR_STATUS_OPTIONS },
+      ];
+      
+      let inserted = 0;
+      for (const { fieldType, options } of seedData) {
+        for (let i = 0; i < options.length; i++) {
+          const opt = options[i];
+          await db.execute(sql`
+            INSERT INTO system_field_options (field_type, value, label, color, sort_order, is_active)
+            VALUES (${fieldType}, ${opt.value}, ${opt.label}, ${opt.color || null}, ${i}, true)
+            ON CONFLICT (field_type, value) DO NOTHING
+          `);
+          inserted++;
+        }
+      }
+      
+      res.json({ success: true, message: `Seeded ${inserted} field options` });
+    } catch (error) {
+      console.error("[api] Error seeding system field options:", error);
+      res.status(500).json({ error: "Failed to seed field options" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
