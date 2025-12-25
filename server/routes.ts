@@ -11035,40 +11035,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 1. Birthday notifications - if rule is enabled
       const aniversarioConfig = getConfig('aniversario');
       if (aniversarioConfig) {
-        const diasAntecedencia = aniversarioConfig.diasAntecedencia || 3;
+        const diasAntecedencia = Math.min(Math.max(aniversarioConfig.diasAntecedencia || 3, 0), 14);
         const priority = aniversarioConfig.priority || 'low';
         
-        // Build dynamic query for days ahead
-        const conditions: string[] = [];
-        for (let i = 0; i <= diasAntecedencia; i++) {
-          conditions.push(`(EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '${i} days') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '${i} days'))`);
-        }
-        
+        // Fetch all active employees with birthdays, then filter in code
         const birthdayResult = await db.execute(sql`
           SELECT id, nome, aniversario as nascimento
           FROM rh_pessoal
-          WHERE aniversario IS NOT NULL
-            AND demissao IS NULL
-            AND (
-              (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE))
-              OR (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 day') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '1 day'))
-              OR (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '2 days') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '2 days'))
-              OR (EXTRACT(MONTH FROM aniversario) = EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '3 days') AND EXTRACT(DAY FROM aniversario) = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '3 days'))
-            )
+          WHERE aniversario IS NOT NULL AND demissao IS NULL
         `);
         
         for (const colab of birthdayResult.rows as any[]) {
           const birthDate = new Date(colab.nascimento);
           const birthMonth = birthDate.getMonth();
           const birthDay = birthDate.getDate();
+          
+          // Calculate this year's birthday
+          const thisYearBirthday = new Date(today.getFullYear(), birthMonth, birthDay);
+          const diffDays = Math.round((thisYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // Only create notification if within configured days ahead
+          if (diffDays < 0 || diffDays > diasAntecedencia) continue;
+          
           const uniqueKey = `aniversario_${colab.id}_${today.getFullYear()}-${String(birthMonth + 1).padStart(2, '0')}-${String(birthDay).padStart(2, '0')}`;
           
           const exists = await storage.notificationExists(uniqueKey);
           if (!exists) {
-            const thisYearBirthday = new Date(today.getFullYear(), birthMonth, birthDay);
-            const diffDays = Math.round((thisYearBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
             let title = '';
-            if (diffDays <= 0) {
+            if (diffDays === 0) {
               title = `${colab.nome} faz aniversário hoje!`;
             } else if (diffDays === 1) {
               title = `${colab.nome} faz aniversário amanhã!`;
