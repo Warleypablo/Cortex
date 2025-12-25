@@ -1514,10 +1514,10 @@ export class DbStorage implements IStorage {
             AND valorp IS NOT NULL
         ), 0)`,
         statusFinanceiro: sql<string | null>`NULL`,
-        tipoNegocio: schema.cupClientes.tipoNegocio,
-        faturamentoMensal: schema.cupClientes.faturamentoMensal,
-        investimentoAds: schema.cupClientes.investimentoAds,
-        statusConta: sql<string | null>`COALESCE(${schema.cupClientes.statusConta}, NULL)`,
+        tipoNegocio: sql<string | null>`NULL`,
+        faturamentoMensal: sql<string | null>`NULL`,
+        investimentoAds: sql<string | null>`NULL`,
+        statusConta: sql<string | null>`NULL`,
       })
       .from(schema.cupClientes)
       .leftJoin(
@@ -2069,20 +2069,20 @@ export class DbStorage implements IStorage {
   }
 
   async updateContrato(idSubtask: string, data: UpdateContrato): Promise<ContratoCompleto | undefined> {
+    // Use safe parameterized query with sql template literals
     await db.execute(sql`
       UPDATE cup_contratos SET
-        servico = COALESCE(${data.servico}, servico),
-        produto = COALESCE(${data.produto}, produto),
-        status = COALESCE(${data.status}, status),
-        valorr = COALESCE(${data.valorr}, valorr),
-        valorp = COALESCE(${data.valorp}, valorp),
+        servico = COALESCE(${data.servico ?? null}, servico),
+        produto = COALESCE(${data.produto ?? null}, produto),
+        status = COALESCE(${data.status ?? null}, status),
+        valorr = COALESCE(${data.valorr ?? null}, valorr),
+        valorp = COALESCE(${data.valorp ?? null}, valorp),
         data_inicio = COALESCE(${data.dataInicio ? new Date(data.dataInicio) : null}, data_inicio),
         data_encerramento = COALESCE(${data.dataEncerramento ? new Date(data.dataEncerramento) : null}, data_encerramento),
         data_solicitacao_encerramento = COALESCE(${data.dataSolicitacaoEncerramento ? new Date(data.dataSolicitacaoEncerramento) : null}, data_solicitacao_encerramento),
-        plano = COALESCE(${data.plano}, plano),
-        squad = COALESCE(${data.squad}, squad),
-        responsavel = COALESCE(${data.responsavel}, responsavel),
-        cs_responsavel = COALESCE(${data.csResponsavel}, cs_responsavel)
+        squad = COALESCE(${data.squad ?? null}, squad),
+        responsavel = COALESCE(${data.responsavel ?? null}, responsavel),
+        cs_responsavel = COALESCE(${data.csResponsavel ?? null}, cs_responsavel)
       WHERE id_subtask = ${idSubtask}
     `);
     
