@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import { objectiveRegistry, krRegistry, metricRegistry, type KR, type MetricSpec } from "./okrRegistry";
 import manualMetrics from "./manualMetrics.json";
+import initiatives from "./initiatives.json";
 
 export interface MetricValue {
   value: number | null;
@@ -55,6 +56,33 @@ export interface DashboardMetrics {
   tech_freelancers_custo: number;
   tech_projetos_valor: number;
   tech_freelancers_percentual: number;
+  quarter_summary?: QuarterSummaryMetric[];
+  standardization_completion_pct?: number | null;
+}
+
+export type AggregationType = "quarter_end" | "quarter_sum" | "quarter_avg" | "quarter_max" | "quarter_min";
+
+export interface MetricResult {
+  status: "ready" | "not_ready";
+  value: number | null;
+}
+
+export interface QuarterAggResult {
+  Q1: number | null;
+  Q2: number | null;
+  Q3: number | null;
+  Q4: number | null;
+}
+
+export interface MetricSeriesPoint {
+  date: string;
+  value: number;
+}
+
+export interface QuarterSummaryMetric {
+  metricKey: string;
+  quarters: QuarterAggResult;
+  status: "ready" | "not_ready" | "partial";
 }
 
 function getCurrentQuarter(): string {
@@ -728,6 +756,521 @@ export async function getTechFreelancersPct(): Promise<number> {
   }
 }
 
+function getQuarterMonths(quarter: "Q1" | "Q2" | "Q3" | "Q4"): number[] {
+  switch (quarter) {
+    case "Q1": return [1, 2, 3];
+    case "Q2": return [4, 5, 6];
+    case "Q3": return [7, 8, 9];
+    case "Q4": return [10, 11, 12];
+  }
+}
+
+function getQuarterEndMonth(quarter: "Q1" | "Q2" | "Q3" | "Q4"): number {
+  switch (quarter) {
+    case "Q1": return 3;
+    case "Q2": return 6;
+    case "Q3": return 9;
+    case "Q4": return 12;
+  }
+}
+
+export function getStandardizationCompletionPct(): MetricResult {
+  try {
+    const initList = (initiatives as any).initiatives || [];
+    const standardizationInitiatives = initList.filter((init: any) => 
+      init.type === "capability" || 
+      init.name?.toLowerCase().includes("padroniza") ||
+      init.name?.toLowerCase().includes("standardiz")
+    );
+    
+    if (standardizationInitiatives.length === 0) {
+      return { status: "not_ready", value: null };
+    }
+    
+    const completed = standardizationInitiatives.filter((init: any) => 
+      init.status === "done" || init.status === "completed"
+    ).length;
+    
+    const pct = (completed / standardizationInitiatives.length) * 100;
+    return { status: "ready", value: pct };
+  } catch (error) {
+    console.error("[OKR] Error calculating Standardization Completion:", error);
+    return { status: "not_ready", value: null };
+  }
+}
+
+async function getMrrSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      WITH monthly_snapshots AS (
+        SELECT 
+          TO_CHAR(data_snapshot, 'YYYY-MM') as month,
+          MAX(data_snapshot) as last_snapshot
+        FROM cup_data_hist
+        WHERE data_snapshot >= ${startDate}::date 
+          AND data_snapshot <= ${endDate}::date
+        GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
+      )
+      SELECT 
+        ms.month as date,
+        COALESCE(SUM(h.valorr::numeric), 0) as value
+      FROM monthly_snapshots ms
+      JOIN cup_data_hist h ON h.data_snapshot = ms.last_snapshot
+      WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+        AND h.valorr IS NOT NULL
+        AND h.valorr > 0
+      GROUP BY ms.month
+      ORDER BY ms.month
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching MRR series for range:", error);
+    return [];
+  }
+}
+
+async function getRevenueSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT 
+        TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
+        COALESCE(SUM(valor_pago::numeric), 0) as value
+      FROM caz_parcelas
+      WHERE COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
+        AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
+        AND tipo_evento = 'RECEITA'
+        AND status = 'QUITADO'
+      GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+      ORDER BY date
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching Revenue series for range:", error);
+    return [];
+  }
+}
+
+async function getActiveCustomersSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      WITH monthly_snapshots AS (
+        SELECT 
+          TO_CHAR(data_snapshot, 'YYYY-MM') as month,
+          MAX(data_snapshot) as last_snapshot
+        FROM cup_data_hist
+        WHERE data_snapshot >= ${startDate}::date 
+          AND data_snapshot <= ${endDate}::date
+        GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
+      )
+      SELECT 
+        ms.month as date,
+        COUNT(DISTINCT h.id_task) as value
+      FROM monthly_snapshots ms
+      JOIN cup_data_hist h ON h.data_snapshot = ms.last_snapshot
+      WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+      GROUP BY ms.month
+      ORDER BY ms.month
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseInt(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching Active Customers series for range:", error);
+    return [];
+  }
+}
+
+async function getEbitdaSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT 
+        TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as value
+      FROM caz_parcelas
+      WHERE COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
+        AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
+        AND status = 'QUITADO'
+      GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+      ORDER BY date
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching EBITDA series for range:", error);
+    return [];
+  }
+}
+
+async function getChurnSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT 
+        TO_CHAR(data_encerramento, 'YYYY-MM') as date,
+        COALESCE(SUM(valorr::numeric), 0) as value
+      FROM cup_contratos
+      WHERE status = 'cancelado'
+        AND data_encerramento IS NOT NULL
+        AND data_encerramento >= ${startDate}::date 
+        AND data_encerramento <= ${endDate}::date
+        AND valorr IS NOT NULL
+        AND valorr > 0
+      GROUP BY TO_CHAR(data_encerramento, 'YYYY-MM')
+      ORDER BY date
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching Churn series for range:", error);
+    return [];
+  }
+}
+
+async function getTurboohRevenueSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT 
+        TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
+        COALESCE(SUM(valor_pago::numeric), 0) as value
+      FROM caz_parcelas
+      WHERE COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
+        AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
+        AND tipo_evento = 'RECEITA'
+        AND status = 'QUITADO'
+        AND (
+          categoria_nome ILIKE '%oh%' 
+          OR categoria_nome ILIKE '%turbo oh%'
+          OR categoria_nome ILIKE '%turbooh%'
+          OR categoria_nome ILIKE '%outdoor%'
+        )
+      GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+      ORDER BY date
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching TurboOH Revenue series for range:", error);
+    return [];
+  }
+}
+
+async function getNewMrrSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT 
+        TO_CHAR(data_inicio, 'YYYY-MM') as date,
+        COALESCE(SUM(valorr::numeric), 0) as value
+      FROM cup_contratos
+      WHERE data_inicio >= ${startDate}::date 
+        AND data_inicio <= ${endDate}::date
+        AND status IN ('ativo', 'onboarding', 'triagem')
+        AND valorr IS NOT NULL
+        AND valorr > 0
+      GROUP BY TO_CHAR(data_inicio, 'YYYY-MM')
+      ORDER BY date
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching New MRR series for range:", error);
+    return [];
+  }
+}
+
+async function getInadimplenciaSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      WITH monthly_inad AS (
+        SELECT 
+          TO_CHAR(data_vencimento, 'YYYY-MM') as date,
+          COALESCE(SUM(nao_pago::numeric + COALESCE(perda::numeric, 0)), 0) as valor_inadimplente
+        FROM caz_parcelas
+        WHERE tipo_evento = 'RECEITA'
+          AND status NOT IN ('QUITADO', 'PERDIDO')
+          AND data_vencimento < NOW()
+          AND data_vencimento >= ${startDate}::date 
+          AND data_vencimento <= ${endDate}::date
+        GROUP BY TO_CHAR(data_vencimento, 'YYYY-MM')
+      ),
+      monthly_receita AS (
+        SELECT 
+          TO_CHAR(data_vencimento, 'YYYY-MM') as date,
+          COALESCE(SUM(valor_bruto::numeric), 0) as receita_total
+        FROM caz_parcelas
+        WHERE tipo_evento = 'RECEITA'
+          AND data_vencimento >= ${startDate}::date 
+          AND data_vencimento <= ${endDate}::date
+        GROUP BY TO_CHAR(data_vencimento, 'YYYY-MM')
+      )
+      SELECT 
+        mr.date,
+        CASE WHEN mr.receita_total > 0 
+          THEN COALESCE((mi.valor_inadimplente / mr.receita_total) * 100, 0)
+          ELSE 0 
+        END as value
+      FROM monthly_receita mr
+      LEFT JOIN monthly_inad mi ON mr.date = mi.date
+      ORDER BY mr.date
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching Inadimplencia series for range:", error);
+    return [];
+  }
+}
+
+async function getCashBalanceSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT 
+        TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE -valor_pago::numeric END), 0) as value
+      FROM caz_parcelas
+      WHERE COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
+        AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
+        AND status = 'QUITADO'
+      GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+      ORDER BY date
+    `);
+    let runningBalance = 0;
+    return (result.rows as any[]).map(row => {
+      runningBalance += parseFloat(row.value || "0");
+      return {
+        date: row.date,
+        value: runningBalance
+      };
+    });
+  } catch (error) {
+    console.error("[OKR] Error fetching Cash Balance series for range:", error);
+    return [];
+  }
+}
+
+async function getTurboohResultSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT 
+        TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as value
+      FROM caz_parcelas
+      WHERE COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
+        AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
+        AND status = 'QUITADO'
+        AND (
+          categoria_nome ILIKE '%oh%' 
+          OR categoria_nome ILIKE '%turbo oh%'
+          OR categoria_nome ILIKE '%turbooh%'
+          OR categoria_nome ILIKE '%outdoor%'
+        )
+      GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+      ORDER BY date
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching TurboOH Result series for range:", error);
+    return [];
+  }
+}
+
+export async function getMetricSeries(
+  metricKey: string, 
+  startDate: string, 
+  endDate: string
+): Promise<MetricSeriesPoint[]> {
+  try {
+    switch (metricKey) {
+      case "mrr_active":
+        return await getMrrSeriesForRange(startDate, endDate);
+      case "revenue_total_billable":
+      case "revenue_total":
+      case "revenue_net":
+        return await getRevenueSeriesForRange(startDate, endDate);
+      case "active_customers":
+      case "clients_active":
+        return await getActiveCustomersSeriesForRange(startDate, endDate);
+      case "ebitda":
+        return await getEbitdaSeriesForRange(startDate, endDate);
+      case "gross_mrr_churn_brl":
+      case "gross_churn_mrr":
+        return await getChurnSeriesForRange(startDate, endDate);
+      case "turbooh_revenue_net":
+      case "turbooh_receita":
+        return await getTurboohRevenueSeriesForRange(startDate, endDate);
+      case "new_mrr_sales":
+      case "new_mrr":
+        return await getNewMrrSeriesForRange(startDate, endDate);
+      case "delinquency_pct":
+      case "inadimplencia_pct":
+        return await getInadimplenciaSeriesForRange(startDate, endDate);
+      case "cash_balance":
+      case "cash_generation":
+        return await getCashBalanceSeriesForRange(startDate, endDate);
+      case "turbooh_result":
+      case "turbooh_resultado":
+        return await getTurboohResultSeriesForRange(startDate, endDate);
+      case "expansion_mrr":
+      case "sga_pct":
+      case "cac_pct":
+      case "net_mrr_churn_pct":
+      case "logo_churn_pct":
+      case "turbooh_vacancy_pct":
+        console.warn(`[OKR] Metric ${metricKey} not yet implemented for series`);
+        return [];
+      default:
+        console.warn(`[OKR] No series implementation for metric: ${metricKey}`);
+        return [];
+    }
+  } catch (error) {
+    console.error(`[OKR] Error fetching metric series for ${metricKey}:`, error);
+    return [];
+  }
+}
+
+function aggregateQuarterValues(
+  values: number[], 
+  aggregation: AggregationType
+): number | null {
+  if (values.length === 0) return null;
+  
+  switch (aggregation) {
+    case "quarter_end":
+      return values[values.length - 1];
+    case "quarter_sum":
+      return values.reduce((sum, v) => sum + v, 0);
+    case "quarter_avg":
+      return values.reduce((sum, v) => sum + v, 0) / values.length;
+    case "quarter_max":
+      return Math.max(...values);
+    case "quarter_min":
+      return Math.min(...values);
+    default:
+      return null;
+  }
+}
+
+export async function getQuarterAgg(
+  metricKey: string,
+  year: number,
+  aggregation: AggregationType
+): Promise<QuarterAggResult> {
+  const quarters: ("Q1" | "Q2" | "Q3" | "Q4")[] = ["Q1", "Q2", "Q3", "Q4"];
+  const result: QuarterAggResult = { Q1: null, Q2: null, Q3: null, Q4: null };
+  
+  if (metricKey === "turbooh_vacancy_pct") {
+    return result;
+  }
+  
+  if (metricKey === "standardization_completion_pct") {
+    const stdResult = getStandardizationCompletionPct();
+    if (stdResult.status === "ready" && stdResult.value !== null) {
+      result.Q1 = stdResult.value;
+      result.Q2 = stdResult.value;
+      result.Q3 = stdResult.value;
+      result.Q4 = stdResult.value;
+    }
+    return result;
+  }
+  
+  try {
+    const startDate = `${year}-01-01`;
+    const endDate = `${year}-12-31`;
+    const series = await getMetricSeries(metricKey, startDate, endDate);
+    
+    if (series.length === 0) {
+      return result;
+    }
+    
+    for (const quarter of quarters) {
+      const months = getQuarterMonths(quarter);
+      const quarterValues = series
+        .filter(point => {
+          const month = parseInt(point.date.split("-")[1]);
+          return months.includes(month);
+        })
+        .map(point => point.value);
+      
+      result[quarter] = aggregateQuarterValues(quarterValues, aggregation);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error(`[OKR] Error fetching quarter aggregation for ${metricKey}:`, error);
+    return result;
+  }
+}
+
+const ALL_METRIC_KEYS = [
+  "mrr_active",
+  "revenue_total_billable",
+  "active_customers",
+  "new_mrr_sales",
+  "expansion_mrr",
+  "ebitda",
+  "cash_generation",
+  "cash_balance",
+  "sga_pct",
+  "cac_pct",
+  "delinquency_pct",
+  "net_mrr_churn_pct",
+  "logo_churn_pct",
+  "gross_mrr_churn_brl",
+  "turbooh_revenue_net",
+  "turbooh_result",
+  "turbooh_vacancy_pct",
+  "standardization_completion_pct"
+];
+
+export async function getQuarterSummary(
+  year: number,
+  aggregation: AggregationType = "quarter_end"
+): Promise<QuarterSummaryMetric[]> {
+  const summaryPromises = ALL_METRIC_KEYS.map(async (metricKey) => {
+    const quarters = await getQuarterAgg(metricKey, year, aggregation);
+    
+    const hasAnyData = Object.values(quarters).some(v => v !== null);
+    const hasAllData = Object.values(quarters).every(v => v !== null);
+    
+    let status: "ready" | "not_ready" | "partial";
+    if (hasAllData) {
+      status = "ready";
+    } else if (hasAnyData) {
+      status = "partial";
+    } else {
+      status = "not_ready";
+    }
+    
+    return {
+      metricKey,
+      quarters,
+      status
+    };
+  });
+  
+  return Promise.all(summaryPromises);
+}
+
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const [
     mrrAtivo,
@@ -821,7 +1364,20 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     tech_projetos_entregues: techProjetosEntregues,
     tech_freelancers_custo: techFreelancersCusto,
     tech_projetos_valor: techProjetosValor,
-    tech_freelancers_percentual: techFreelancersPct
+    tech_freelancers_percentual: techFreelancersPct,
+    standardization_completion_pct: getStandardizationCompletionPct().value
+  };
+}
+
+export async function getDashboardMetricsWithQuarters(): Promise<DashboardMetrics> {
+  const [baseMetrics, quarterSummary] = await Promise.all([
+    getDashboardMetrics(),
+    getQuarterSummary(new Date().getFullYear())
+  ]);
+  
+  return {
+    ...baseMetrics,
+    quarter_summary: quarterSummary
   };
 }
 

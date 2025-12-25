@@ -1,0 +1,171 @@
+Você já criou o módulo OKR 2026 no Turbo Cortex. Agora vamos apenas MELHORAR.
+
+REGRAS
+1) NÃO criar tabelas novas. NÃO usar supabase. NÃO persistir nada em DB externo.
+2) Ler somente do Google Cloud DB já conectado (pg.Pool / drizzle).
+3) Iniciativas continuam seed em JSON (read-only), mas devem ter responsável linkado a colaborador existente via ID ou e-mail (resolver no backend).
+4) Metas (targets) precisam ser POR QUARTER (Q1–Q4). O sistema deve comparar “valor atual do quarter” vs “meta do quarter”.
+
+NOME DO PLANO
+Plano 2026 (interno): Bigger & Better — Consolidação, Escala e Padronização
+
+---------------------------------------------
+A) MODELO DE KR (agora por quarter)
+---------------------------------------------
+Crie um catálogo de KRs com metadados:
+- id, objectiveId, title, metricKey, type: "snapshot" | "flow" | "ratio"
+- direction: "up" | "down"
+- unit: "BRL" | "PCT" | "COUNT"
+- calculationRule:
+  - snapshot: usar último valor do período (ex: MRR no último mês do quarter)
+  - flow: somar meses do quarter (ex: Receita Líquida no quarter)
+  - ratio: calcular sobre o quarter (ex: Inadimplência %)
+
+O endpoint /api/okr/krs deve retornar:
+- quarter selecionado (Q1/Q2/Q3/Q4)
+- lista de KRs com target do quarter, actual do quarter, delta, status (green/yellow/red)
+- status rule padrão:
+  - direction up: green >= 100% target; yellow 90–99%; red < 90%
+  - direction down (teto): green <= target; yellow <= target*1.1; red > target*1.1
+(Deixar thresholds fáceis de ajustar)
+
+---------------------------------------------
+B) TARGETS POR QUARTER (BP 2026)
+---------------------------------------------
+Atualize server/okr/targets.json para o formato por quarter:
+
+{
+  "quarters": ["Q1","Q2","Q3","Q4"],
+  "targets": {
+    "MRR_EOQ": { "Q1": 1338870, "Q2": 1611315, "Q3": 1871384, "Q4": 2122127 },
+
+    "RECEITA_LIQ_Q": { "Q1": 3826241, "Q2": 4614205, "Q3": 5422500, "Q4": 6192146 },
+    "EBITDA_Q":      { "Q1": 746055,  "Q2": 1152814, "Q3": 1398628, "Q4": 1972271 },
+    "CAIXA_GER_Q":   { "Q1": 394897,  "Q2": 663357,  "Q3": 825594,  "Q4": 1204199 },
+
+    "CAIXA_EOQ":     { "Q1": 1044897, "Q2": 1708254, "Q3": 2533848, "Q4": 3703001 },
+
+    "CLIENTES_EOQ":  { "Q1": 346, "Q2": 401, "Q3": 456, "Q4": 511 },
+
+    "INAD_PCT_MAX":  { "Q1": 6.0, "Q2": 6.0, "Q3": 6.0, "Q4": 6.0 },
+    "GROSS_CHURN_PCT_MAX": { "Q1": 9.0, "Q2": 9.0, "Q3": 9.0, "Q4": 9.0 },
+
+    "SCALED_SGA_PCT_MAX": { "Q1": 25.2, "Q2": 18.8, "Q3": 19.3, "Q4": 15.8 },
+    "SCALED_CAC_PCT_MAX": { "Q1": 23.3, "Q2": 24.1, "Q3": 21.7, "Q4": 19.5 },
+
+    "OH_RECEITA_BRUTA_Q": { "Q1": 115200, "Q2": 345600, "Q3": 576000, "Q4": 864000 },
+    "OH_RESULTADO_Q":     { "Q1": 43650,  "Q2": 168950, "Q3": 304900, "Q4": 472200 },
+
+    "TECH_PROJETOS_Q":    { "Q1": 450000, "Q2": 540000, "Q3": 600000, "Q4": 660000 },
+    "TECH_FREELA_PCT_MAX":{ "Q1": 10.0,   "Q2": 6.95,   "Q3": 6.25,   "Q4": 4.55 }
+  }
+}
+
+Obs:
+- CAIXA_EOQ Q4 usar o valor final do BP (3.703.001 aprox). Manter como 3.703.001 (sem arredondar demais).
+- Net churn e logo churn devem existir como KPI, mas meta inicial pode ficar como “N/A” se não houver base sólida no DB ainda. Se conseguir calcular com confiança, criar targets também.
+
+---------------------------------------------
+C) LISTA DE KRs (enxuta, seca, interna)
+---------------------------------------------
+Monte os Objectives e KRs assim (sem redundância):
+
+O1 — Escala do Ecossistema (Receita com previsibilidade)
+KR1: MRR (end of quarter) — target MRR_EOQ
+KR2: Receita Líquida do quarter — target RECEITA_LIQ_Q
+KR3: Clientes ativos (end of quarter) — target CLIENTES_EOQ
+KR4: Vendas Novas (New MRR do quarter) — se existir no DB, senão mostrar KPI sem target
+
+O2 — Eficiência & Caixa (sistemas + execução limpa)
+KR1: EBITDA do quarter — target EBITDA_Q
+KR2: Geração de Caixa do quarter — target CAIXA_GER_Q
+KR3: Caixa (end of quarter) — target CAIXA_EOQ
+KR4: SG&A % do quarter — teto SCALED_SGA_PCT_MAX
+KR5: CAC % do quarter — teto SCALED_CAC_PCT_MAX
+
+O3 — Qualidade da Receita (Hugz: churn & inadimplência)
+KR1: Inadimplência % — teto INAD_PCT_MAX
+KR2: Gross MRR Churn % — teto GROSS_CHURN_PCT_MAX
+KPI extra (sem target obrigatório no MVP): Net MRR Churn %, Logo Churn %
+
+O4 — TurboOH (crescimento com resultado)
+KR1: Receita Bruta TurboOH do quarter — target OH_RECEITA_BRUTA_Q
+KR2: Resultado TurboOH do quarter — target OH_RESULTADO_Q
+KPI extra: Vacância (se não existir, mostrar N/A)
+
+O5 — Tech (produto/entrega com eficiência de terceiros)
+KR1: Valor de Projetos Tech entregues no quarter — target TECH_PROJETOS_Q
+KR2: % custo de Freelancers Tech / Projetos Tech — teto TECH_FREELA_PCT_MAX
+
+---------------------------------------------
+D) INICIATIVAS (mais completas + responsável linkado)
+---------------------------------------------
+Manter iniciativas como JSON read-only, mas incluir:
+- id, title, objectiveId, bu, linkedKrIds[], ownerRef, dueQuarter, status, notes
+
+ownerRef deve ser resolvido em runtime:
+- se ownerRef for e-mail → buscar no rh_pessoal (ou users) por email
+- se ownerRef for id → buscar por id
+Retornar owner: { id, name, role, area } para UI.
+
+Crie server/okr/ownerResolver.ts:
+- resolveOwner(ownerRef) com cache in-memory (TTL 5 min)
+- se não achar, owner = { name: "Não atribuído" }
+
+Atualize server/okr/initiatives.json com pelo menos 16 iniciativas (exemplos abaixo). Use ownerRef com placeholder do tipo:
+- "ownerRef": "email:alguem@turbopartners.com.br"
+ou
+- "ownerRef": "id:123"
+
+INICIATIVAS (sugestão — você pode ajustar nomes mas manter intenção):
+1) Hugz — Playbook de Cobrança + régua automática (inadimplência)
+2) Hugz — “Churn War Room” mensal por cluster (logo/gross/net churn)
+3) Padronização de Entregas — catálogo de outputs por serviço (SOP)
+4) Padronização de Dados — “OKR Coverage” (garantir métricas 100% disponíveis)
+5) Produto: Gestão de Performance — revisão de escopo e volumetria (Starter/Scale/Ent)
+6) Produto: TurboOH — oferta, precificação e pacote padrão (com SLA)
+7) Comercial — rotina de forecast (New MRR vs expansão base)
+8) CS/Operação — rotina de QBR com top contas (reduzir churn)
+9) Finance — fechamento + DRE/DFC até D+5 (ritual de eficiência)
+10) Tech — entrega de projetos com checklists (reduzir retrabalho)
+11) Tech — reduzir dependência de freelancer (% freela)
+12) People — headcount por BU vs receita (produtividade)
+13) Growth — melhoria do funil de aquisição (CAC%)
+14) Ventures — pipeline e tese (só KPI, sem destrinchar produto)
+15) Turbo Cortex — melhorias no dashboard e confiabilidade de dados
+16) TurboOH — instrumentação de vacância (se hoje não existe no DB)
+
+---------------------------------------------
+E) UI/UX (1 tela, 3 abas, com quarter selector)
+---------------------------------------------
+Página OKR 2026 deve ter:
+- seletor de quarter no topo (Q1/Q2/Q3/Q4)
+- 3 abas:
+  1) Dashboard: cards macro + seções destacadas TurboOH e Hugz
+     Cards mínimos:
+     - MRR (atual vs target Q)
+     - Receita Líquida (Q)
+     - EBITDA (Q)
+     - Caixa (EOQ)
+     - Inadimplência %
+     - Gross Churn %
+     - Headcount + MRR/Head (KPI)
+     - TurboOH Receita + Resultado (Q)
+     - Tech Projetos + % Freelancers (Q)
+  2) KRs: tabela KR | actual Q | target Q | status | tendência
+  3) Iniciativas: lista com filtros (Objective, BU, Status) + owner exibido (nome/área)
+
+Sem drill-down por produto. Só macro + BU (principalmente TurboOH).
+
+---------------------------------------------
+F) BACKEND
+---------------------------------------------
+- /api/okr/metricas?quarter=Qx → séries e últimos valores relevantes do quarter
+- /api/okr/krs?quarter=Qx → KRs calculados e status
+- /api/okr/iniciativas → iniciativas + owners resolvidos
+
+IMPORTANTE: Se alguma métrica não conseguir ser calculada com confiança no DB atual:
+- retornar null e label “N/A” no front, sem quebrar a tela
+- criar iniciativa “Instrumentar métrica X” automaticamente no seed (opcional)
+
+Agora implemente as mudanças acima sem refazer o módulo do zero.
