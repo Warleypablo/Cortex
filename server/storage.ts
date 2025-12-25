@@ -8426,7 +8426,7 @@ export class DbStorage implements IStorage {
           p.id_cliente,
           DATE_TRUNC('month', MIN(p.data_quitacao))::date as cohort_month
         FROM caz_parcelas p
-        ${joinType} cup_contratos c ON p.id_cliente = c.id_task
+        ${joinType} cup_contratos c ON p.id_cliente = c.id_task::text
         WHERE ${whereConditions}
           AND ${produtoCondition}
           AND ${squadCondition}
@@ -8438,7 +8438,7 @@ export class DbStorage implements IStorage {
           DATE_TRUNC('month', p.data_quitacao)::date as revenue_month,
           SUM(COALESCE(p.valor_pago::numeric, 0)) as revenue
         FROM caz_parcelas p
-        ${joinType} cup_contratos c ON p.id_cliente = c.id_task
+        ${joinType} cup_contratos c ON p.id_cliente = c.id_task::text
         WHERE ${whereConditions}
           AND ${produtoCondition}
           AND ${squadCondition}
