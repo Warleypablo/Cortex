@@ -541,89 +541,119 @@ function InitiativeStatusBadge({ status }: { status: string }) {
 }
 
 function DashboardTab({ data }: { data: SummaryResponse }) {
-  const { metrics, highlights, series, initiatives } = data;
-  const quarter = getCurrentQuarter();
+  const { metrics, highlights, series, initiatives, krs } = data;
+  const currentQuarter = getCurrentQuarter();
+  const [selectedQuarter, setSelectedQuarter] = useState<"Q1" | "Q2" | "Q3" | "Q4">(currentQuarter);
 
-  const inadStatus = metrics.inadimplencia_percentual <= 6 ? "green" : 
-                     metrics.inadimplencia_percentual <= 7 ? "yellow" : "red";
-  const netChurnStatus = (metrics.net_churn_mrr_percentual ?? 0) <= 9 ? "green" : 
-                         (metrics.net_churn_mrr_percentual ?? 0) <= 10 ? "yellow" : "red";
-  const logoChurnStatus = (metrics.logo_churn_percentual ?? 0) <= 10 ? "green" : 
-                          (metrics.logo_churn_percentual ?? 0) <= 12 ? "yellow" : "red";
+  const getTargetForMetric = (metricKey: string): number | null => {
+    const kr = krs?.find(k => k.metricKey === metricKey);
+    if (!kr?.targets) return null;
+    return kr.targets[selectedQuarter] ?? null;
+  };
+
+  const mrrTarget = getTargetForMetric("mrr_active");
+  const ebitdaTarget = getTargetForMetric("ebitda");
+  const cashGenTarget = getTargetForMetric("cash_generation");
+  const inadTarget = getTargetForMetric("delinquency_pct") ?? 6;
+  const netChurnTarget = getTargetForMetric("net_mrr_churn_pct") ?? 9;
+  const logoChurnTarget = getTargetForMetric("logo_churn_pct") ?? 10;
+
+  const inadPct = metrics.inadimplencia_percentual ?? 0;
+  const netChurnPct = metrics.net_churn_mrr_percentual ?? 0;
+  const logoChurnPct = metrics.logo_churn_percentual ?? 0;
+
+  const inadStatus = inadPct <= inadTarget ? "green" : inadPct <= (inadTarget * 1.1) ? "yellow" : "red";
+  const netChurnStatus = netChurnPct <= netChurnTarget ? "green" : netChurnPct <= (netChurnTarget * 1.1) ? "yellow" : "red";
+  const logoChurnStatus = logoChurnPct <= logoChurnTarget ? "green" : logoChurnPct <= (logoChurnTarget * 1.2) ? "yellow" : "red";
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Building className="w-4 h-4" />
-        Contexto atual: <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">{quarter} 2026</Badge>
-        <span>({getQuarterLabel(quarter)})</span>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Building className="w-4 h-4" />
+          <span>Metas do trimestre:</span>
+        </div>
+        <Select value={selectedQuarter} onValueChange={(v) => setSelectedQuarter(v as "Q1" | "Q2" | "Q3" | "Q4")}>
+          <SelectTrigger className="w-[150px]" data-testid="filter-dashboard-quarter">
+            <SelectValue placeholder="Trimestre" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
+            <SelectItem value="Q2">Q2 (Abr-Jun)</SelectItem>
+            <SelectItem value="Q3">Q3 (Jul-Set)</SelectItem>
+            <SelectItem value="Q4">Q4 (Out-Dez)</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-muted-foreground">
+          ({getQuarterLabel(selectedQuarter)}) {selectedQuarter === currentQuarter && <Badge variant="outline" className="ml-1 text-[10px]">Atual</Badge>}
+        </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <HeroCard
           title="MRR Ativo"
           value={metrics.mrr_ativo}
-          target={highlights.mrr?.target}
+          target={mrrTarget}
           format="currency"
           direction="higher"
           icon={TrendingUp}
-          tooltip={`Meta ${quarter}: ${highlights.mrr?.target ? formatCurrency(highlights.mrr.target) : "—"}`}
-          quarterLabel={quarter}
+          tooltip={`Meta ${selectedQuarter}: ${mrrTarget ? formatCurrency(mrrTarget) : "—"}`}
+          quarterLabel={selectedQuarter}
         />
         <HeroCard
           title="EBITDA"
           value={metrics.ebitda_ytd}
-          target={highlights.ebitda?.target}
+          target={ebitdaTarget}
           format="currency"
           direction="higher"
           icon={Banknote}
-          tooltip="EBITDA acumulado no ano (YTD)"
-          quarterLabel="YTD"
+          tooltip={`Meta ${selectedQuarter}: ${ebitdaTarget ? formatCurrency(ebitdaTarget) : "—"}`}
+          quarterLabel={selectedQuarter}
         />
         <HeroCard
           title="Geração Caixa"
           value={metrics.geracao_caixa_ytd}
-          target={null}
+          target={cashGenTarget}
           format="currency"
           direction="higher"
           icon={PiggyBank}
-          tooltip="Geração de caixa acumulada no ano (YTD)"
-          quarterLabel="YTD"
+          tooltip={`Meta ${selectedQuarter}: ${cashGenTarget ? formatCurrency(cashGenTarget) : "—"}`}
+          quarterLabel={selectedQuarter}
         />
         <HeroCard
           title="Inadimplência %"
           value={metrics.inadimplencia_percentual}
-          target={6}
+          target={inadTarget}
           format="percent"
           direction="lower"
           icon={CreditCard}
-          tooltip="Meta: <= 6%"
+          tooltip={`Meta ${selectedQuarter}: <= ${inadTarget}%`}
           status={inadStatus}
         />
         <HeroCard
           title="Net Churn %"
           value={metrics.net_churn_mrr_percentual}
-          target={9}
+          target={netChurnTarget}
           format="percent"
           direction="lower"
           icon={TrendingDownIcon}
-          tooltip="Meta: <= 9%"
+          tooltip={`Meta ${selectedQuarter}: <= ${netChurnTarget}%`}
           status={netChurnStatus}
         />
         <HeroCard
           title="Logo Churn %"
           value={metrics.logo_churn_percentual}
-          target={10}
+          target={logoChurnTarget}
           format="percent"
           direction="lower"
           icon={Users}
-          tooltip="Meta: <= 10%"
+          tooltip={`Meta ${selectedQuarter}: <= ${logoChurnTarget}%`}
           status={logoChurnStatus}
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <TurboOHBlock metrics={metrics} quarter={quarter} />
+        <TurboOHBlock metrics={metrics} quarter={selectedQuarter} />
         <HugzBlock metrics={metrics} initiatives={initiatives} />
       </div>
 
