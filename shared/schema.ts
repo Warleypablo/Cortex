@@ -1630,3 +1630,52 @@ export interface ClientAlert {
   actionUrl?: string;
   metadata?: Record<string, any>;
 }
+
+// ==================== COHORT TYPES ====================
+
+export type CohortMetricType = 'logo_retention' | 'revenue_retention' | 'nrr';
+export type CohortViewMode = 'percentage' | 'absolute';
+
+export interface CohortCell {
+  value: number;
+  percentage: number;
+  clientCount: number;
+  color: 'green' | 'yellow' | 'red' | 'neutral';
+}
+
+export interface CohortRow {
+  cohortMonth: string;
+  cohortLabel: string;
+  baselineClients: number;
+  baselineRevenue: number;
+  cells: Record<number, CohortCell>;
+}
+
+export interface CohortData {
+  rows: CohortRow[];
+  maxMonthOffset: number;
+  filters: CohortFilters;
+  summary: {
+    totalCohorts: number;
+    avgRetentionM1: number;
+    avgRetentionM3: number;
+    avgRetentionM6: number;
+    avgRetentionM12: number;
+  };
+}
+
+export interface CohortFilters {
+  startDate?: string;
+  endDate?: string;
+  produto?: string;
+  squad?: string;
+  metricType: CohortMetricType;
+}
+
+export const cohortFiltersSchema = z.object({
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  produto: z.string().optional(),
+  squad: z.string().optional(),
+  metricType: z.enum(['logo_retention', 'revenue_retention', 'nrr']).default('revenue_retention'),
+});
