@@ -500,11 +500,14 @@ export default function Contracts({
                       size="sm" 
                       onClick={() => handleSort("service")}
                       className="hover-elevate -ml-3"
-                      data-testid="sort-service"
+                      data-testid="sort-produto"
                     >
-                      Serviço
+                      Produto
                       <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
+                  </TableHead>
+                  <TableHead className="bg-background">
+                    <span className="text-sm font-medium">Cliente</span>
                   </TableHead>
                   <TableHead className="bg-background">
                     <Button 
@@ -621,7 +624,7 @@ export default function Contracts({
               <TableBody>
                 {paginatedContracts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={14} className="text-center text-muted-foreground py-8">
                       {searchQuery ? "Nenhum contrato encontrado com esse critério de busca." : "Nenhum contrato cadastrado."}
                     </TableCell>
                   </TableRow>
@@ -644,8 +647,11 @@ export default function Contracts({
                           <Edit2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
-                      <TableCell className="font-medium" data-testid={`text-service-${contract.id}`}>
-                        {contract.service}
+                      <TableCell className="font-medium" data-testid={`text-produto-${contract.id}`}>
+                        {contract.produto || '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-[150px] truncate" data-testid={`text-cliente-${contract.id}`}>
+                        {contract.clientName || '-'}
                       </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(contract.status)} variant="outline" data-testid={`badge-status-${contract.id}`}>
