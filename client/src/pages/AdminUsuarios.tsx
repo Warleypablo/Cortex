@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity } from "lucide-react";
+import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSetPageInfo } from "@/contexts/PageContext";
@@ -22,6 +22,27 @@ import { AdminLogsContent } from "./AdminLogs";
 
 type SortColumn = 'name' | 'email' | 'role' | 'allowedRoutes';
 type SortDirection = 'asc' | 'desc';
+
+interface SystemFieldOption {
+  id: number;
+  field_type: string;
+  value: string;
+  label: string;
+  color: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+const FIELD_TYPES = [
+  { key: 'client_status', label: 'Status do Cliente', icon: Activity },
+  { key: 'business_type', label: 'Tipo de Negócio', icon: Briefcase },
+  { key: 'cluster', label: 'Cluster', icon: Layers },
+  { key: 'squad', label: 'Squad', icon: Users },
+  { key: 'account_status', label: 'Status da Conta', icon: Flag },
+  { key: 'collaborator_status', label: 'Status Colaborador', icon: UserCog },
+  { key: 'contract_status', label: 'Status do Contrato', icon: Database },
+];
 
 interface ColaboradorVinculado {
   id: number;
@@ -693,6 +714,336 @@ function AddUserDialog({ open, onOpenChange }: {
   );
 }
 
+function AddEditFieldOptionDialog({ 
+  open, 
+  onOpenChange, 
+  fieldType, 
+  fieldLabel,
+  editingOption 
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  fieldType: string;
+  fieldLabel: string;
+  editingOption: SystemFieldOption | null;
+}) {
+  const { toast } = useToast();
+  const [value, setValue] = useState("");
+  const [label, setLabel] = useState("");
+  const [color, setColor] = useState("");
+  const [sortOrder, setSortOrder] = useState("0");
+
+  useEffect(() => {
+    if (open) {
+      if (editingOption) {
+        setValue(editingOption.value || "");
+        setLabel(editingOption.label || "");
+        setColor(editingOption.color || "");
+        setSortOrder(editingOption.sort_order?.toString() || "0");
+      } else {
+        setValue("");
+        setLabel("");
+        setColor("");
+        setSortOrder("0");
+      }
+    }
+  }, [open, editingOption]);
+
+  const resetForm = () => {
+    setValue("");
+    setLabel("");
+    setColor("");
+    setSortOrder("0");
+  };
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { fieldType: string; value: string; label: string; color: string; sortOrder: number }) => {
+      return await apiRequest('POST', '/api/system-fields', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/system-fields', fieldType] });
+      toast({ title: "Opção criada", description: "A opção foi adicionada com sucesso." });
+      resetForm();
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao criar opção", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { id: number; value: string; label: string; color: string; sortOrder: number }) => {
+      return await apiRequest('PATCH', `/api/system-fields/${data.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/system-fields', fieldType] });
+      toast({ title: "Opção atualizada", description: "A opção foi atualizada com sucesso." });
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao atualizar opção", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    if (!value.trim() || !label.trim()) {
+      toast({ title: "Campos obrigatórios", description: "Valor e Label são obrigatórios.", variant: "destructive" });
+      return;
+    }
+
+    if (editingOption) {
+      updateMutation.mutate({ id: editingOption.id, value, label, color, sortOrder: parseInt(sortOrder) || 0 });
+    } else {
+      createMutation.mutate({ fieldType, value, label, color, sortOrder: parseInt(sortOrder) || 0 });
+    }
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open) resetForm();
+    onOpenChange(open);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{editingOption ? "Editar Opção" : "Adicionar Opção"}</DialogTitle>
+          <DialogDescription>
+            {editingOption ? "Edite os dados da opção" : `Adicione uma nova opção para ${fieldLabel}`}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="field-value">Valor (interno) *</Label>
+            <Input
+              id="field-value"
+              placeholder="valor_interno"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              data-testid="input-field-value"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="field-label">Label (exibição) *</Label>
+            <Input
+              id="field-label"
+              placeholder="Nome de Exibição"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              data-testid="input-field-label"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="field-color">Cor (opcional)</Label>
+            <Input
+              id="field-color"
+              placeholder="bg-green-100 text-green-800"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              data-testid="input-field-color"
+            />
+            {color && (
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-sm text-muted-foreground">Preview:</span>
+                <Badge className={color}>{label || "Preview"}</Badge>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="field-sort-order">Ordem</Label>
+            <Input
+              id="field-sort-order"
+              type="number"
+              placeholder="0"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              data-testid="input-field-sort-order"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} data-testid="button-field-cancel">
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={createMutation.isPending || updateMutation.isPending}
+            data-testid="button-field-save"
+          >
+            {createMutation.isPending || updateMutation.isPending ? "Salvando..." : "Salvar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FieldTypeCard({ fieldType }: { fieldType: { key: string; label: string; icon: any } }) {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingOption, setEditingOption] = useState<SystemFieldOption | null>(null);
+  const Icon = fieldType.icon;
+
+  const { data, isLoading } = useQuery<{ fieldType: string; options: SystemFieldOption[] }>({
+    queryKey: ['/api/system-fields', fieldType.key],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest('DELETE', `/api/system-fields/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/system-fields', fieldType.key] });
+      toast({ title: "Opção removida", description: "A opção foi desativada com sucesso." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao remover opção", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleEdit = (option: SystemFieldOption) => {
+    setEditingOption(option);
+    setIsDialogOpen(true);
+  };
+
+  const handleAdd = () => {
+    setEditingOption(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = (option: SystemFieldOption) => {
+    if (confirm(`Deseja realmente remover a opção "${option.label}"?`)) {
+      deleteMutation.mutate(option.id);
+    }
+  };
+
+  const options = data?.options || [];
+
+  return (
+    <Card data-testid={`card-field-${fieldType.key}`}>
+      <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+        <div className="flex items-center gap-2">
+          <Icon className="h-5 w-5 text-muted-foreground" />
+          <CardTitle className="text-base">{fieldType.label}</CardTitle>
+        </div>
+        <Button size="sm" onClick={handleAdd} data-testid={`button-add-${fieldType.key}`}>
+          <Plus className="h-4 w-4 mr-1" />
+          Adicionar
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        ) : options.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Nenhuma opção cadastrada
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {options.map((option) => (
+              <div 
+                key={option.id} 
+                className="flex items-center justify-between p-2 rounded-md border bg-muted/30"
+                data-testid={`option-${option.id}`}
+              >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {option.color ? (
+                    <Badge className={option.color}>{option.label}</Badge>
+                  ) : (
+                    <span className="text-sm font-medium">{option.label}</span>
+                  )}
+                  <span className="text-xs text-muted-foreground truncate">({option.value})</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    onClick={() => handleEdit(option)}
+                    data-testid={`button-edit-option-${option.id}`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    onClick={() => handleDelete(option)}
+                    data-testid={`button-delete-option-${option.id}`}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      <AddEditFieldOptionDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        fieldType={fieldType.key}
+        fieldLabel={fieldType.label}
+        editingOption={editingOption}
+      />
+    </Card>
+  );
+}
+
+function SystemFieldsContent() {
+  const { toast } = useToast();
+
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/system-fields/seed');
+    },
+    onSuccess: (data: any) => {
+      FIELD_TYPES.forEach(ft => {
+        queryClient.invalidateQueries({ queryKey: ['/api/system-fields', ft.key] });
+      });
+      toast({ 
+        title: "Dados iniciais populados", 
+        description: `${data.insertedCount || 'Todos'} opções foram inseridas com sucesso.` 
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao popular dados", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Campos do Sistema</h2>
+          <p className="text-sm text-muted-foreground">
+            Gerencie as opções disponíveis para os campos de seleção do sistema
+          </p>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={() => seedMutation.mutate()}
+          disabled={seedMutation.isPending}
+          data-testid="button-seed-data"
+        >
+          <Database className="h-4 w-4 mr-2" />
+          {seedMutation.isPending ? "Populando..." : "Popular Dados Iniciais"}
+        </Button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {FIELD_TYPES.map((fieldType) => (
+          <FieldTypeCard key={fieldType.key} fieldType={fieldType} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SortableTableHead({ 
   column, 
   label, 
@@ -866,6 +1217,10 @@ export default function AdminUsuarios() {
           <TabsTrigger value="logs" data-testid="tab-logs">
             <Activity className="h-4 w-4 mr-2" />
             Logs do Sistema
+          </TabsTrigger>
+          <TabsTrigger value="fields" data-testid="tab-fields">
+            <Settings className="h-4 w-4 mr-2" />
+            Campos do Sistema
           </TabsTrigger>
         </TabsList>
 
@@ -1069,6 +1424,10 @@ export default function AdminUsuarios() {
 
         <TabsContent value="logs">
           <AdminLogsContent />
+        </TabsContent>
+
+        <TabsContent value="fields">
+          <SystemFieldsContent />
         </TabsContent>
       </Tabs>
     </div>
