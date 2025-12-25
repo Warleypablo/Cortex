@@ -25,6 +25,26 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { ContratoCompleto, TimelineEvent, ClientAlert } from "@shared/schema";
+
+type LogActionType = 'view_password' | 'copy_password' | 'add_credential' | 'edit_credential' | 'delete_credential' | 'add_client' | 'edit_client' | 'delete_client';
+
+interface CreateLogParams {
+  action: LogActionType;
+  entityType: string;
+  entityId?: string;
+  entityName?: string;
+  clientId?: string;
+  clientName?: string;
+  details?: string;
+}
+
+function useCreateLog() {
+  return useMutation({
+    mutationFn: async (params: CreateLogParams) => {
+      await apiRequest("POST", "/api/acessos/logs", params);
+    },
+  });
+}
 import { 
   CONTRACT_STATUS_OPTIONS,
   SQUAD_OPTIONS,
@@ -147,6 +167,7 @@ export default function ClientDetail() {
   const [monthsFilter, setMonthsFilter] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  const createLog = useCreateLog();
   const [contratosSortConfig, setContratosSortConfig] = useState<SortConfig | null>(null);
   const [receitasSortConfig, setReceitasSortConfig] = useState<SortConfig | null>(null);
   const [isEditingDados, setIsEditingDados] = useState(false);
@@ -608,7 +629,20 @@ export default function ClientDetail() {
     }));
   };
 
-  const togglePasswordVisibility = (credentialId: string) => {
+  const togglePasswordVisibility = (credentialId: string, platform?: string, groupName?: string) => {
+    const isCurrentlyVisible = visiblePasswords.has(credentialId);
+    
+    if (!isCurrentlyVisible && platform) {
+      createLog.mutate({
+        action: "view_password",
+        entityType: "credential",
+        entityId: credentialId,
+        entityName: platform,
+        clientId: clientId,
+        clientName: groupName || cliente?.nome || undefined,
+      });
+    }
+    
     setVisiblePasswords(prev => {
       const newSet = new Set(prev);
       if (newSet.has(credentialId)) {
@@ -620,9 +654,21 @@ export default function ClientDetail() {
     });
   };
 
-  const copyToClipboard = async (text: string, type: string) => {
+  const copyToClipboard = async (text: string, type: string, credentialId?: string, platform?: string, groupName?: string) => {
     try {
       await navigator.clipboard.writeText(text);
+      
+      if (type === "Senha" && credentialId && platform) {
+        createLog.mutate({
+          action: "copy_password",
+          entityType: "credential",
+          entityId: credentialId,
+          entityName: platform,
+          clientId: clientId,
+          clientName: groupName || cliente?.nome || undefined,
+        });
+      }
+      
       toast({
         title: "Copiado!",
         description: `${type} copiado para a área de transferência.`,
@@ -2914,7 +2960,7 @@ export default function ClientDetail() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => togglePasswordVisibility(cred.id)}
+                                    onClick={() => togglePasswordVisibility(cred.id, cred.platform, group.name)}
                                     data-testid={`button-toggle-password-${cred.id}`}
                                   >
                                     {visiblePasswords.has(cred.id) ? (
@@ -2926,7 +2972,7 @@ export default function ClientDetail() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => copyToClipboard(cred.password, "Senha")}
+                                    onClick={() => copyToClipboard(cred.password, "Senha", cred.id, cred.platform, group.name)}
                                     data-testid={`button-copy-password-${cred.id}`}
                                   >
                                     <Copy className="w-3.5 h-3.5" />
