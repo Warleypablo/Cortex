@@ -2827,6 +2827,13 @@ function HealthCard({ colaboradorId }: { colaboradorId: string }) {
         </div>
       </div>
 
+      {!historyLoading && healthHistory.length === 0 && (
+        <div className="mt-6 pt-6 border-t" data-testid="health-no-history">
+          <p className="text-xs text-muted-foreground uppercase font-medium mb-2">Evolução</p>
+          <p className="text-xs text-muted-foreground italic">Sem histórico suficiente para exibir gráfico</p>
+        </div>
+      )}
+
       {!historyLoading && healthHistory.length > 0 && (
         <div className="mt-6 pt-6 border-t" data-testid="health-evolution-chart">
           <p className="text-xs text-muted-foreground uppercase font-medium mb-3">Evolução</p>

@@ -203,9 +203,18 @@ export default function ColaboradoresAnalise() {
     return filtered;
   }, [healthData, healthSquadFilter, healthSortOrder]);
 
-  const criticalCount = useMemo(() => 
-    healthData.filter((c) => c.healthScore < 50).length, 
-  [healthData]);
+  const criticalColabs = useMemo(() => 
+    filteredHealthData.filter((c) => c.healthScore < 50).sort((a, b) => a.healthScore - b.healthScore), 
+  [filteredHealthData]);
+
+  const criticalCount = criticalColabs.length;
+
+  const healthStats = useMemo(() => ({
+    total: filteredHealthData.length,
+    healthy: filteredHealthData.filter((c) => c.healthScore >= 80).length,
+    attention: filteredHealthData.filter((c) => c.healthScore >= 50 && c.healthScore < 80).length,
+    critical: criticalCount,
+  }), [filteredHealthData, criticalCount]);
 
   const handleSort = (column: PromocaoSortColumn) => {
     if (sortColumn === column) {
@@ -331,6 +340,56 @@ export default function ColaboradoresAnalise() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Critical Alert Banner */}
+              {criticalCount > 0 && (
+                <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50" data-testid="alert-critical-banner">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-red-800 dark:text-red-300 text-sm">
+                        {criticalCount} colaborador{criticalCount !== 1 ? 'es' : ''} precisa{criticalCount === 1 ? '' : 'm'} de atenção urgente
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {criticalColabs.slice(0, 5).map((c) => (
+                          <Link key={c.id} href={`/colaborador/${c.id}`}>
+                            <Badge 
+                              variant="outline" 
+                              className="text-xs bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-300 dark:border-red-800 cursor-pointer hover:bg-red-200 dark:hover:bg-red-900/60"
+                              data-testid={`badge-critical-${c.id}`}
+                            >
+                              {c.nome.split(' ')[0]} ({c.healthScore})
+                            </Badge>
+                          </Link>
+                        ))}
+                        {criticalCount > 5 && (
+                          <Badge variant="outline" className="text-xs text-red-600 dark:text-red-400">
+                            +{criticalCount - 5} mais
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Stats Summary Row */}
+              {!isLoadingHealth && healthData.length > 0 && (
+                <div className="flex flex-wrap gap-3 mb-4" data-testid="stats-row">
+                  <Badge variant="outline" className="text-xs px-2 py-1">
+                    <Users className="w-3 h-3 mr-1" />
+                    Total: {healthStats.total}
+                  </Badge>
+                  <Badge className="text-xs px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    Saudáveis: {healthStats.healthy}
+                  </Badge>
+                  <Badge className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                    Atenção: {healthStats.attention}
+                  </Badge>
+                  <Badge className="text-xs px-2 py-1 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                    Críticos: {healthStats.critical}
+                  </Badge>
+                </div>
+              )}
               {isLoadingHealth ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -343,12 +402,21 @@ export default function ColaboradoresAnalise() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {filteredHealthData.map((colab) => {
                     const formattedSquad = formatSquadName(colab.squad);
+                    const isCritical = colab.healthScore < 50;
                     return (
                       <Link key={colab.id} href={`/colaborador/${colab.id}`}>
                         <Card
-                          className="hover-elevate cursor-pointer transition-all"
+                          className={`hover-elevate cursor-pointer transition-all relative ${isCritical ? 'ring-2 ring-red-400 dark:ring-red-600 ring-offset-2 ring-offset-background' : ''}`}
                           data-testid={`card-health-${colab.id}`}
                         >
+                          {isCritical && (
+                            <Badge 
+                              className="absolute -top-2 -right-2 text-[9px] px-1.5 py-0 bg-red-500 text-white border-0 z-10"
+                              data-testid={`badge-critico-${colab.id}`}
+                            >
+                              Crítico
+                            </Badge>
+                          )}
                           <CardContent className="p-4">
                             <div className="flex items-start gap-3">
                               <Avatar className="h-10 w-10">
