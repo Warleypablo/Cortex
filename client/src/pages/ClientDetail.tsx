@@ -23,7 +23,7 @@ import { SiInstagram } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { ContratoCompleto, TimelineEvent } from "@shared/schema";
+import type { ContratoCompleto, TimelineEvent, ClientAlert } from "@shared/schema";
 
 interface CredentialGroup {
   id: string;
@@ -274,7 +274,14 @@ export default function ClientDetail() {
     retry: false,
   });
 
+  const { data: alertas } = useQuery<ClientAlert[]>({
+    queryKey: ["/api/clientes", cliente?.cnpj, "alertas"],
+    enabled: !!cliente?.cnpj,
+    retry: false,
+  });
+
   const [showAllTimeline, setShowAllTimeline] = useState(false);
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
 
   const [newComunicacao, setNewComunicacao] = useState({
     tipo: "",
@@ -984,6 +991,76 @@ export default function ClientDetail() {
             </div>
           </div>
         </div>
+
+        {/* Client Alerts Section */}
+        {alertas && alertas.length > 0 && (
+          <div className="mb-6" data-testid="alerts-container">
+            <div className="flex flex-wrap gap-4">
+              {(showAllAlerts ? alertas : alertas.slice(0, 3)).map((alert) => {
+                const getAlertStyles = () => {
+                  switch (alert.severity) {
+                    case 'critical':
+                      return 'border-l-4 border-l-red-500 bg-red-50 dark:bg-red-950/20';
+                    case 'warning':
+                      return 'border-l-4 border-l-amber-500 bg-amber-50 dark:bg-amber-950/20';
+                    case 'info':
+                    default:
+                      return 'border-l-4 border-l-gray-400 bg-gray-50 dark:bg-gray-800/50';
+                  }
+                };
+                const getIconColor = () => {
+                  switch (alert.severity) {
+                    case 'critical':
+                      return 'text-red-500';
+                    case 'warning':
+                      return 'text-amber-500';
+                    case 'info':
+                    default:
+                      return 'text-gray-500';
+                  }
+                };
+                const getIcon = () => {
+                  switch (alert.type) {
+                    case 'inadimplencia':
+                      return <AlertTriangle className={`w-5 h-5 ${getIconColor()}`} />;
+                    case 'vencimento_proximo':
+                      return <Clock className={`w-5 h-5 ${getIconColor()}`} />;
+                    case 'contrato_expirando':
+                      return <CalendarIcon className={`w-5 h-5 ${getIconColor()}`} />;
+                    case 'cliente_inativo':
+                      return <AlertTriangle className={`w-5 h-5 ${getIconColor()}`} />;
+                    default:
+                      return <AlertTriangle className={`w-5 h-5 ${getIconColor()}`} />;
+                  }
+                };
+                return (
+                  <Card
+                    key={alert.id}
+                    className={`flex items-center gap-3 p-3 min-w-[280px] flex-1 max-w-md ${getAlertStyles()}`}
+                    data-testid={`alert-${alert.type}`}
+                  >
+                    {getIcon()}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">{alert.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{alert.message}</p>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+            {alertas.length > 3 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-2"
+                onClick={() => setShowAllAlerts(!showAllAlerts)}
+                data-testid="button-toggle-alerts"
+              >
+                {showAllAlerts ? 'Mostrar menos' : `Ver todos os alertas (${alertas.length})`}
+              </Button>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <StatsCard
