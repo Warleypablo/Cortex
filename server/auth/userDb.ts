@@ -184,7 +184,7 @@ const DEFAULT_USER_ROUTES = [
   '/cases/chat',           // GPTurbo
   '/conhecimentos',        // Conhecimento
   '/beneficios',           // Clube de Benefícios
-  '/colaboradores/portal'  // Portal do Colaborador (acesso próprio)
+  '/colaborador'           // Portal do Colaborador (acesso próprio via /colaborador/:id)
 ];
 
 // Migra permissões antigas ("/" -> "/clientes") automaticamente
