@@ -28,6 +28,7 @@ export type ClienteCompleto = Cliente & {
   tipoNegocio: string | null;
   faturamentoMensal: string | null;
   investimentoAds: string | null;
+  statusConta: string | null;
 };
 
 export interface AniversariantesMes {
@@ -1427,7 +1428,8 @@ export class DbStorage implements IStorage {
         NULL::text as "statusFinanceiro",
         NULL::text as "tipoNegocio",
         NULL::text as "faturamentoMensal",
-        NULL::text as "investimentoAds"
+        NULL::text as "investimentoAds",
+        cc.status_conta as "statusConta"
       FROM cup_clientes cc
       LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
       ORDER BY cc.task_id, caz.id DESC NULLS LAST, cc.nome
@@ -1512,9 +1514,10 @@ export class DbStorage implements IStorage {
             AND valorp IS NOT NULL
         ), 0)`,
         statusFinanceiro: sql<string | null>`NULL`,
-        tipoNegocio: sql<string | null>`NULL`,
-        faturamentoMensal: sql<string | null>`NULL`,
-        investimentoAds: sql<string | null>`NULL`,
+        tipoNegocio: schema.cupClientes.tipoNegocio,
+        faturamentoMensal: schema.cupClientes.faturamentoMensal,
+        investimentoAds: schema.cupClientes.investimentoAds,
+        statusConta: sql<string | null>`COALESCE(${schema.cupClientes.statusConta}, NULL)`,
       })
       .from(schema.cupClientes)
       .leftJoin(
@@ -1577,7 +1580,8 @@ export class DbStorage implements IStorage {
         NULL::text as "statusFinanceiro",
         NULL::text as "tipoNegocio",
         NULL::text as "faturamentoMensal",
-        NULL::text as "investimentoAds"
+        NULL::text as "investimentoAds",
+        NULL::text as "statusConta"
       FROM caz_clientes
       WHERE id::text = ${id} 
         OR ids = ${id}
