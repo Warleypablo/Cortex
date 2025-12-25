@@ -304,7 +304,6 @@ export const updateContratoSchema = z.object({
   dataInicio: z.string().optional(),
   dataEncerramento: z.string().optional(),
   dataSolicitacaoEncerramento: z.string().optional(),
-  plano: z.string().optional(),
   squad: z.string().optional(),
   responsavel: z.string().optional(),
   csResponsavel: z.string().optional(),
