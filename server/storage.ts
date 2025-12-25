@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao, type OneOnOne, type InsertOneOnOne, type OneOnOneAcao, type InsertOneOnOneAcao, type EnpsResponse, type InsertEnps, type PdiGoal, type InsertPdi } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
@@ -291,6 +291,25 @@ export interface IStorage {
   
   // Cohort Analysis
   getCohortData(filters: import("@shared/schema").CohortFilters): Promise<import("@shared/schema").CohortData>;
+  
+  // 1x1 (One-on-One)
+  getOneOnOneMeetings(colaboradorId: number): Promise<OneOnOne[]>;
+  createOneOnOneMeeting(data: InsertOneOnOne): Promise<OneOnOne>;
+  updateOneOnOneMeeting(id: number, data: Partial<InsertOneOnOne>): Promise<OneOnOne>;
+  deleteOneOnOneMeeting(id: number): Promise<void>;
+  getOneOnOneAcoes(oneOnOneId: number): Promise<OneOnOneAcao[]>;
+  createOneOnOneAcao(data: InsertOneOnOneAcao): Promise<OneOnOneAcao>;
+  updateOneOnOneAcao(id: number, data: { status: string }): Promise<OneOnOneAcao>;
+  
+  // E-NPS
+  getEnpsResponses(colaboradorId: number): Promise<EnpsResponse[]>;
+  createEnpsResponse(data: InsertEnps): Promise<EnpsResponse>;
+  
+  // PDI (Plano de Desenvolvimento Individual)
+  getPdiGoals(colaboradorId: number): Promise<PdiGoal[]>;
+  createPdiGoal(data: InsertPdi): Promise<PdiGoal>;
+  updatePdiGoal(id: number, data: Partial<InsertPdi>): Promise<PdiGoal>;
+  deletePdiGoal(id: number): Promise<void>;
 }
 
 // GEG Dashboard Extended Types
@@ -942,6 +961,50 @@ export class MemStorage implements IStorage {
   }
 
   async notificationExists(uniqueKey: string): Promise<boolean> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  
+  async getCohortData(filters: import("@shared/schema").CohortFilters): Promise<import("@shared/schema").CohortData> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getOneOnOneMeetings(colaboradorId: number): Promise<OneOnOne[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async createOneOnOneMeeting(data: InsertOneOnOne): Promise<OneOnOne> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async updateOneOnOneMeeting(id: number, data: Partial<InsertOneOnOne>): Promise<OneOnOne> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async deleteOneOnOneMeeting(id: number): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getOneOnOneAcoes(oneOnOneId: number): Promise<OneOnOneAcao[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async createOneOnOneAcao(data: InsertOneOnOneAcao): Promise<OneOnOneAcao> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async updateOneOnOneAcao(id: number, data: { status: string }): Promise<OneOnOneAcao> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getEnpsResponses(colaboradorId: number): Promise<EnpsResponse[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async createEnpsResponse(data: InsertEnps): Promise<EnpsResponse> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getPdiGoals(colaboradorId: number): Promise<PdiGoal[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async createPdiGoal(data: InsertPdi): Promise<PdiGoal> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async updatePdiGoal(id: number, data: Partial<InsertPdi>): Promise<PdiGoal> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async deletePdiGoal(id: number): Promise<void> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -8560,6 +8623,161 @@ export class DbStorage implements IStorage {
         avgRetentionM12: getAvgRetention(12)
       }
     };
+  }
+
+  // ==================== 1x1 (One-on-One) ====================
+
+  async getOneOnOneMeetings(colaboradorId: number): Promise<OneOnOne[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        id, colaborador_id as "colaboradorId", gestor_id as "gestorId",
+        data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor"
+      FROM rh_one_on_one 
+      WHERE colaborador_id = ${colaboradorId} 
+      ORDER BY data DESC
+    `);
+    return result.rows as OneOnOne[];
+  }
+
+  async createOneOnOneMeeting(data: InsertOneOnOne): Promise<OneOnOne> {
+    const result = await db.execute(sql`
+      INSERT INTO rh_one_on_one (colaborador_id, gestor_id, data, pauta, notas, criado_por)
+      VALUES (${data.colaboradorId}, ${data.gestorId || null}, ${data.data}, ${data.pauta || null}, ${data.notas || null}, ${data.criadoPor || null})
+      RETURNING id, colaborador_id as "colaboradorId", gestor_id as "gestorId",
+        data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor"
+    `);
+    return result.rows[0] as OneOnOne;
+  }
+
+  async updateOneOnOneMeeting(id: number, data: Partial<InsertOneOnOne>): Promise<OneOnOne> {
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    
+    if (data.gestorId !== undefined) { setClauses.push('gestor_id'); values.push(data.gestorId); }
+    if (data.data !== undefined) { setClauses.push('data'); values.push(data.data); }
+    if (data.pauta !== undefined) { setClauses.push('pauta'); values.push(data.pauta); }
+    if (data.notas !== undefined) { setClauses.push('notas'); values.push(data.notas); }
+    
+    const result = await db.execute(sql`
+      UPDATE rh_one_on_one 
+      SET 
+        gestor_id = COALESCE(${data.gestorId ?? null}, gestor_id),
+        data = COALESCE(${data.data ?? null}, data),
+        pauta = COALESCE(${data.pauta ?? null}, pauta),
+        notas = COALESCE(${data.notas ?? null}, notas)
+      WHERE id = ${id}
+      RETURNING id, colaborador_id as "colaboradorId", gestor_id as "gestorId",
+        data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor"
+    `);
+    return result.rows[0] as OneOnOne;
+  }
+
+  async deleteOneOnOneMeeting(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM rh_one_on_one_acoes WHERE one_on_one_id = ${id}`);
+    await db.execute(sql`DELETE FROM rh_one_on_one WHERE id = ${id}`);
+  }
+
+  async getOneOnOneAcoes(oneOnOneId: number): Promise<OneOnOneAcao[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        id, one_on_one_id as "oneOnOneId", descricao, responsavel, prazo, status, concluida_em as "concluidaEm"
+      FROM rh_one_on_one_acoes 
+      WHERE one_on_one_id = ${oneOnOneId}
+      ORDER BY id ASC
+    `);
+    return result.rows as OneOnOneAcao[];
+  }
+
+  async createOneOnOneAcao(data: InsertOneOnOneAcao): Promise<OneOnOneAcao> {
+    const result = await db.execute(sql`
+      INSERT INTO rh_one_on_one_acoes (one_on_one_id, descricao, responsavel, prazo, status)
+      VALUES (${data.oneOnOneId}, ${data.descricao}, ${data.responsavel || null}, ${data.prazo || null}, ${data.status || 'pendente'})
+      RETURNING id, one_on_one_id as "oneOnOneId", descricao, responsavel, prazo, status, concluida_em as "concluidaEm"
+    `);
+    return result.rows[0] as OneOnOneAcao;
+  }
+
+  async updateOneOnOneAcao(id: number, data: { status: string }): Promise<OneOnOneAcao> {
+    const concluidaEm = data.status === 'concluida' ? sql`NOW()` : sql`NULL`;
+    const result = await db.execute(sql`
+      UPDATE rh_one_on_one_acoes 
+      SET status = ${data.status}, concluida_em = ${data.status === 'concluida' ? sql`NOW()` : null}
+      WHERE id = ${id}
+      RETURNING id, one_on_one_id as "oneOnOneId", descricao, responsavel, prazo, status, concluida_em as "concluidaEm"
+    `);
+    return result.rows[0] as OneOnOneAcao;
+  }
+
+  // ==================== E-NPS ====================
+
+  async getEnpsResponses(colaboradorId: number): Promise<EnpsResponse[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        id, colaborador_id as "colaboradorId", score, comentario, data, 
+        criado_em as "criadoEm", criado_por as "criadoPor"
+      FROM rh_enps 
+      WHERE colaborador_id = ${colaboradorId}
+      ORDER BY data DESC
+    `);
+    return result.rows as EnpsResponse[];
+  }
+
+  async createEnpsResponse(data: InsertEnps): Promise<EnpsResponse> {
+    const result = await db.execute(sql`
+      INSERT INTO rh_enps (colaborador_id, score, comentario, data, criado_por)
+      VALUES (${data.colaboradorId}, ${data.score}, ${data.comentario || null}, ${data.data}, ${data.criadoPor || null})
+      RETURNING id, colaborador_id as "colaboradorId", score, comentario, data, 
+        criado_em as "criadoEm", criado_por as "criadoPor"
+    `);
+    return result.rows[0] as EnpsResponse;
+  }
+
+  // ==================== PDI (Plano de Desenvolvimento Individual) ====================
+
+  async getPdiGoals(colaboradorId: number): Promise<PdiGoal[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        id, colaborador_id as "colaboradorId", titulo, descricao, competencia, recursos, prazo,
+        progresso, status, criado_em as "criadoEm", criado_por as "criadoPor", atualizado_em as "atualizadoEm"
+      FROM rh_pdi 
+      WHERE colaborador_id = ${colaboradorId}
+      ORDER BY criado_em DESC
+    `);
+    return result.rows as PdiGoal[];
+  }
+
+  async createPdiGoal(data: InsertPdi): Promise<PdiGoal> {
+    const result = await db.execute(sql`
+      INSERT INTO rh_pdi (colaborador_id, titulo, descricao, competencia, recursos, prazo, progresso, status, criado_por)
+      VALUES (${data.colaboradorId}, ${data.titulo}, ${data.descricao || null}, ${data.competencia || null}, 
+        ${data.recursos || null}, ${data.prazo || null}, ${data.progresso || 0}, ${data.status || 'em_andamento'}, ${data.criadoPor || null})
+      RETURNING id, colaborador_id as "colaboradorId", titulo, descricao, competencia, recursos, prazo,
+        progresso, status, criado_em as "criadoEm", criado_por as "criadoPor", atualizado_em as "atualizadoEm"
+    `);
+    return result.rows[0] as PdiGoal;
+  }
+
+  async updatePdiGoal(id: number, data: Partial<InsertPdi>): Promise<PdiGoal> {
+    const result = await db.execute(sql`
+      UPDATE rh_pdi 
+      SET 
+        titulo = COALESCE(${data.titulo ?? null}, titulo),
+        descricao = COALESCE(${data.descricao ?? null}, descricao),
+        competencia = COALESCE(${data.competencia ?? null}, competencia),
+        recursos = COALESCE(${data.recursos ?? null}, recursos),
+        prazo = COALESCE(${data.prazo ?? null}, prazo),
+        progresso = COALESCE(${data.progresso ?? null}, progresso),
+        status = COALESCE(${data.status ?? null}, status),
+        atualizado_em = NOW()
+      WHERE id = ${id}
+      RETURNING id, colaborador_id as "colaboradorId", titulo, descricao, competencia, recursos, prazo,
+        progresso, status, criado_em as "criadoEm", criado_por as "criadoPor", atualizado_em as "atualizadoEm"
+    `);
+    return result.rows[0] as PdiGoal;
+  }
+
+  async deletePdiGoal(id: number): Promise<void> {
+    await db.execute(sql`DELETE FROM rh_pdi WHERE id = ${id}`);
   }
 }
 
