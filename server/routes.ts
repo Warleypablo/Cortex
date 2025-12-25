@@ -11682,6 +11682,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== NOTIFICATION RULES ROUTES ====================
+
+  app.get("/api/notification-rules", isAuthenticated, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM notification_rules ORDER BY id ASC
+      `);
+      
+      const rules = (result.rows as any[]).map(row => ({
+        id: row.id,
+        ruleType: row.rule_type,
+        name: row.name,
+        description: row.description,
+        isEnabled: row.is_enabled,
+        config: row.config,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+      
+      res.json(rules);
+    } catch (error) {
+      console.error("[api] Error fetching notification rules:", error);
+      res.status(500).json({ error: "Failed to fetch notification rules" });
+    }
+  });
+
+  app.post("/api/notification-rules", isAuthenticated, async (req, res) => {
+    try {
+      const { ruleType, name, description, isEnabled, config } = req.body;
+      
+      if (!ruleType || !name) {
+        return res.status(400).json({ error: "ruleType and name are required" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO notification_rules (rule_type, name, description, is_enabled, config)
+        VALUES (${ruleType}, ${name}, ${description || null}, ${isEnabled !== false}, ${config || null})
+        RETURNING *
+      `);
+      
+      const row = result.rows[0] as any;
+      res.json({
+        id: row.id,
+        ruleType: row.rule_type,
+        name: row.name,
+        description: row.description,
+        isEnabled: row.is_enabled,
+        config: row.config,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      });
+    } catch (error) {
+      console.error("[api] Error creating notification rule:", error);
+      res.status(500).json({ error: "Failed to create notification rule" });
+    }
+  });
+
+  app.patch("/api/notification-rules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, isEnabled, config } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE notification_rules
+        SET 
+          name = COALESCE(${name}, name),
+          description = COALESCE(${description}, description),
+          is_enabled = COALESCE(${isEnabled}, is_enabled),
+          config = COALESCE(${config}, config),
+          updated_at = NOW()
+        WHERE id = ${parseInt(id)}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Rule not found" });
+      }
+      
+      const row = result.rows[0] as any;
+      res.json({
+        id: row.id,
+        ruleType: row.rule_type,
+        name: row.name,
+        description: row.description,
+        isEnabled: row.is_enabled,
+        config: row.config,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      });
+    } catch (error) {
+      console.error("[api] Error updating notification rule:", error);
+      res.status(500).json({ error: "Failed to update notification rule" });
+    }
+  });
+
+  app.delete("/api/notification-rules/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      await db.execute(sql`
+        DELETE FROM notification_rules WHERE id = ${parseInt(id)}
+      `);
+      
+      res.json({ success: true, message: "Notification rule deleted" });
+    } catch (error) {
+      console.error("[api] Error deleting notification rule:", error);
+      res.status(500).json({ error: "Failed to delete notification rule" });
+    }
+  });
+
+  app.post("/api/notification-rules/seed", isAuthenticated, async (req, res) => {
+    try {
+      const defaultRules = [
+        {
+          ruleType: 'inadimplencia',
+          name: 'Inadimplência (+7 dias)',
+          description: 'Alerta quando um cliente está com pagamento em atraso por mais de 7 dias',
+          config: JSON.stringify({ minDaysOverdue: 7, minValue: 0 })
+        },
+        {
+          ruleType: 'contrato_vencendo',
+          name: 'Contrato Vencendo (30 dias)',
+          description: 'Alerta quando um contrato está próximo do vencimento (30 dias)',
+          config: JSON.stringify({ daysBeforeExpiry: 30 })
+        },
+        {
+          ruleType: 'aniversario',
+          name: 'Aniversário de Colaborador',
+          description: 'Alerta quando é aniversário de um colaborador',
+          config: JSON.stringify({ enabled: true })
+        }
+      ];
+      
+      let inserted = 0;
+      for (const rule of defaultRules) {
+        const existsResult = await db.execute(sql`
+          SELECT id FROM notification_rules WHERE rule_type = ${rule.ruleType}
+        `);
+        
+        if (existsResult.rows.length === 0) {
+          await db.execute(sql`
+            INSERT INTO notification_rules (rule_type, name, description, is_enabled, config)
+            VALUES (${rule.ruleType}, ${rule.name}, ${rule.description}, true, ${rule.config})
+          `);
+          inserted++;
+        }
+      }
+      
+      res.json({ success: true, message: `Seeded ${inserted} notification rules`, insertedCount: inserted });
+    } catch (error) {
+      console.error("[api] Error seeding notification rules:", error);
+      res.status(500).json({ error: "Failed to seed notification rules" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);

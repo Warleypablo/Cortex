@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil } from "lucide-react";
+import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSetPageInfo } from "@/contexts/PageContext";
@@ -32,6 +33,17 @@ interface SystemFieldOption {
   sort_order: number;
   is_active: boolean;
   created_at: string;
+}
+
+interface NotificationRule {
+  id: number;
+  ruleType: string;
+  name: string;
+  description: string | null;
+  isEnabled: boolean;
+  config: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const FIELD_TYPES = [
@@ -1044,6 +1056,333 @@ function SystemFieldsContent() {
   );
 }
 
+function NotificationRulesContent() {
+  const { toast } = useToast();
+  const [editingRule, setEditingRule] = useState<NotificationRule | null>(null);
+
+  const { data: rules = [], isLoading } = useQuery<NotificationRule[]>({
+    queryKey: ['/api/notification-rules'],
+  });
+
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/notification-rules/seed');
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notification-rules'] });
+      toast({ 
+        title: "Regras populadas", 
+        description: `${data.insertedCount || 0} regras foram criadas com sucesso.` 
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao popular regras", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ id, isEnabled }: { id: number; isEnabled: boolean }) => {
+      return await apiRequest('PATCH', `/api/notification-rules/${id}`, { isEnabled });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notification-rules'] });
+      toast({ title: "Regra atualizada" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao atualizar regra", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest('DELETE', `/api/notification-rules/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notification-rules'] });
+      toast({ title: "Regra removida" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao remover regra", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const getRuleTypeLabel = (ruleType: string) => {
+    const labels: Record<string, string> = {
+      'inadimplencia': 'Inadimplência',
+      'contrato_vencendo': 'Contrato Vencendo',
+      'aniversario': 'Aniversário',
+    };
+    return labels[ruleType] || ruleType;
+  };
+
+  const parseConfig = (config: string | null) => {
+    if (!config) return null;
+    try {
+      return JSON.parse(config);
+    } catch {
+      return null;
+    }
+  };
+
+  const formatConfigDisplay = (rule: NotificationRule) => {
+    const config = parseConfig(rule.config);
+    if (!config) return null;
+    
+    switch (rule.ruleType) {
+      case 'inadimplencia':
+        return `Mínimo ${config.minDaysOverdue || 7} dias de atraso`;
+      case 'contrato_vencendo':
+        return `${config.daysBeforeExpiry || 30} dias antes do vencimento`;
+      case 'aniversario':
+        return config.enabled ? 'Habilitado' : 'Desabilitado';
+      default:
+        return JSON.stringify(config);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Regras de Notificação</h2>
+          <p className="text-sm text-muted-foreground">
+            Configure quais alertas são gerados automaticamente pelo sistema
+          </p>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={() => seedMutation.mutate()}
+          disabled={seedMutation.isPending}
+          data-testid="button-seed-notification-rules"
+        >
+          <Database className="h-4 w-4 mr-2" />
+          {seedMutation.isPending ? "Populando..." : "Popular Regras Padrão"}
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-48" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : rules.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <BellRing className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground text-center mb-4">
+              Nenhuma regra de notificação configurada
+            </p>
+            <Button 
+              onClick={() => seedMutation.mutate()}
+              disabled={seedMutation.isPending}
+              data-testid="button-seed-rules-empty"
+            >
+              {seedMutation.isPending ? "Populando..." : "Criar Regras Padrão"}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {rules.map((rule) => (
+            <Card key={rule.id} data-testid={`card-rule-${rule.id}`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base">{rule.name}</CardTitle>
+                  <Badge variant="outline">{getRuleTypeLabel(rule.ruleType)}</Badge>
+                </div>
+                {rule.description && (
+                  <CardDescription className="text-sm">
+                    {rule.description}
+                  </CardDescription>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {formatConfigDisplay(rule) && (
+                  <p className="text-sm text-muted-foreground">
+                    {formatConfigDisplay(rule)}
+                  </p>
+                )}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={rule.isEnabled}
+                      onCheckedChange={(checked) => 
+                        toggleMutation.mutate({ id: rule.id, isEnabled: checked })
+                      }
+                      disabled={toggleMutation.isPending}
+                      data-testid={`switch-rule-${rule.id}`}
+                    />
+                    <Label className="text-sm">
+                      {rule.isEnabled ? 'Ativo' : 'Inativo'}
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setEditingRule(rule)}
+                      data-testid={`button-edit-rule-${rule.id}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (confirm('Tem certeza que deseja remover esta regra?')) {
+                          deleteMutation.mutate(rule.id);
+                        }
+                      }}
+                      data-testid={`button-delete-rule-${rule.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <EditRuleDialog
+        rule={editingRule}
+        open={!!editingRule}
+        onOpenChange={(open) => !open && setEditingRule(null)}
+      />
+    </div>
+  );
+}
+
+function EditRuleDialog({ 
+  rule, 
+  open, 
+  onOpenChange 
+}: { 
+  rule: NotificationRule | null; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [config, setConfig] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    if (rule?.config) {
+      try {
+        setConfig(JSON.parse(rule.config));
+      } catch {
+        setConfig({});
+      }
+    }
+  }, [rule]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { config: string }) => {
+      return await apiRequest('PATCH', `/api/notification-rules/${rule?.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notification-rules'] });
+      toast({ title: "Configuração atualizada" });
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    updateMutation.mutate({ config: JSON.stringify(config) });
+  };
+
+  if (!rule) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Editar Regra: {rule.name}</DialogTitle>
+          <DialogDescription>
+            Configure os parâmetros desta regra de notificação
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          {rule.ruleType === 'inadimplencia' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="minDaysOverdue">Dias mínimos de atraso</Label>
+                <Input
+                  id="minDaysOverdue"
+                  type="number"
+                  value={config.minDaysOverdue || 7}
+                  onChange={(e) => setConfig({ ...config, minDaysOverdue: parseInt(e.target.value) || 0 })}
+                  data-testid="input-min-days-overdue"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="minValue">Valor mínimo (R$)</Label>
+                <Input
+                  id="minValue"
+                  type="number"
+                  value={config.minValue || 0}
+                  onChange={(e) => setConfig({ ...config, minValue: parseFloat(e.target.value) || 0 })}
+                  data-testid="input-min-value"
+                />
+              </div>
+            </>
+          )}
+
+          {rule.ruleType === 'contrato_vencendo' && (
+            <div className="space-y-2">
+              <Label htmlFor="daysBeforeExpiry">Dias antes do vencimento</Label>
+              <Input
+                id="daysBeforeExpiry"
+                type="number"
+                value={config.daysBeforeExpiry || 30}
+                onChange={(e) => setConfig({ ...config, daysBeforeExpiry: parseInt(e.target.value) || 0 })}
+                data-testid="input-days-before-expiry"
+              />
+            </div>
+          )}
+
+          {rule.ruleType === 'aniversario' && (
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={config.enabled !== false}
+                onCheckedChange={(checked) => setConfig({ ...config, enabled: checked })}
+                data-testid="switch-aniversario-enabled"
+              />
+              <Label>Notificações de aniversário habilitadas</Label>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-edit-rule">
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={updateMutation.isPending}
+            data-testid="button-save-rule"
+          >
+            {updateMutation.isPending ? "Salvando..." : "Salvar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function SortableTableHead({ 
   column, 
   label, 
@@ -1221,6 +1560,10 @@ export default function AdminUsuarios() {
           <TabsTrigger value="fields" data-testid="tab-fields">
             <Settings className="h-4 w-4 mr-2" />
             Campos do Sistema
+          </TabsTrigger>
+          <TabsTrigger value="notifications" data-testid="tab-notifications">
+            <BellRing className="h-4 w-4 mr-2" />
+            Regras de Notificação
           </TabsTrigger>
         </TabsList>
 
@@ -1428,6 +1771,10 @@ export default function AdminUsuarios() {
 
         <TabsContent value="fields">
           <SystemFieldsContent />
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <NotificationRulesContent />
         </TabsContent>
       </Tabs>
     </div>
