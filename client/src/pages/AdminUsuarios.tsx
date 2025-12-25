@@ -14,12 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing } from "lucide-react";
+import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { AdminLogsContent } from "./AdminLogs";
+import { ColorPicker } from "@/components/ui/color-picker";
 
 type SortColumn = 'name' | 'email' | 'role' | 'allowedRoutes';
 type SortDirection = 'asc' | 'desc';
@@ -54,6 +55,8 @@ const FIELD_TYPES = [
   { key: 'account_status', label: 'Status da Conta', icon: Flag },
   { key: 'collaborator_status', label: 'Status Colaborador', icon: UserCog },
   { key: 'contract_status', label: 'Status do Contrato', icon: Database },
+  { key: 'product', label: 'Produto', icon: Package },
+  { key: 'plan', label: 'Plano', icon: FileText },
 ];
 
 interface ColaboradorVinculado {
@@ -847,22 +850,12 @@ function AddEditFieldOptionDialog({
               data-testid="input-field-label"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="field-color">Cor (opcional)</Label>
-            <Input
-              id="field-color"
-              placeholder="bg-green-100 text-green-800"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              data-testid="input-field-color"
-            />
-            {color && (
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-sm text-muted-foreground">Preview:</span>
-                <Badge className={color}>{label || "Preview"}</Badge>
-              </div>
-            )}
-          </div>
+          <ColorPicker
+            value={color}
+            onChange={setColor}
+            label="Cor (opcional)"
+            previewLabel={label || "Preview"}
+          />
           <div className="space-y-2">
             <Label htmlFor="field-sort-order">Ordem</Label>
             <Input
