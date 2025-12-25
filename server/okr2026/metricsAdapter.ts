@@ -97,7 +97,7 @@ function getQuarterTarget(krId: string): number {
   const quarter = getCurrentQuarter();
   const kr = krRegistry.find(k => k.id === krId);
   if (!kr) return 0;
-  return kr.targets[quarter as keyof typeof kr.targets] || kr.targets.annual || 0;
+  return kr.targets[quarter as keyof typeof kr.targets] || kr.targets.FY || kr.targets.Q4 || 0;
 }
 
 export async function getMrrAtivo(): Promise<number> {
@@ -1094,6 +1094,362 @@ async function getTurboohResultSeriesForRange(startDate: string, endDate: string
   }
 }
 
+async function getExpansionMrrSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      WITH monthly_data AS (
+        SELECT DISTINCT ON (id_subtask, TO_CHAR(data_snapshot, 'YYYY-MM'))
+          id_subtask,
+          TO_CHAR(data_snapshot, 'YYYY-MM') as month,
+          valorr::numeric as valorr,
+          status
+        FROM cup_data_hist
+        WHERE data_snapshot >= ${startDate}::date 
+          AND data_snapshot <= ${endDate}::date
+          AND status IN ('ativo', 'onboarding', 'triagem')
+          AND valorr IS NOT NULL
+          AND valorr > 0
+        ORDER BY id_subtask, TO_CHAR(data_snapshot, 'YYYY-MM'), data_snapshot DESC
+      ),
+      expansion_calc AS (
+        SELECT 
+          curr.month as date,
+          COALESCE(SUM(
+            CASE 
+              WHEN curr.valorr > prev.valorr 
+              THEN curr.valorr - prev.valorr 
+              ELSE 0 
+            END
+          ), 0) as value
+        FROM monthly_data curr
+        JOIN monthly_data prev ON curr.id_subtask = prev.id_subtask
+          AND prev.month = TO_CHAR((curr.month || '-01')::date - INTERVAL '1 month', 'YYYY-MM')
+        GROUP BY curr.month
+      )
+      SELECT date, value FROM expansion_calc ORDER BY date
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching Expansion MRR series for range:", error);
+    return [];
+  }
+}
+
+async function getSgaPctSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      WITH monthly_sga AS (
+        SELECT 
+          TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
+          COALESCE(SUM(valor_pago::numeric), 0) as sga_total
+        FROM caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND status = 'QUITADO'
+          AND COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
+          AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
+          AND (
+            categoria_nome ILIKE '%administrativ%'
+            OR categoria_nome ILIKE '%admin%'
+            OR categoria_nome ILIKE '%geral%'
+            OR categoria_nome ILIKE '%despesas gerais%'
+            OR categoria_nome ILIKE '%escritório%'
+            OR categoria_nome ILIKE '%office%'
+            OR categoria_nome ILIKE '%aluguel%'
+            OR categoria_nome ILIKE '%utilities%'
+            OR categoria_nome ILIKE '%telefone%'
+            OR categoria_nome ILIKE '%internet%'
+          )
+        GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+      ),
+      monthly_receita AS (
+        SELECT 
+          TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
+          COALESCE(SUM(valor_pago::numeric), 0) as receita_total
+        FROM caz_parcelas
+        WHERE tipo_evento = 'RECEITA'
+          AND status = 'QUITADO'
+          AND COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
+          AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
+        GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+      )
+      SELECT 
+        mr.date,
+        CASE WHEN mr.receita_total > 0 
+          THEN COALESCE((ms.sga_total / mr.receita_total) * 100, 0)
+          ELSE 0 
+        END as value
+      FROM monthly_receita mr
+      LEFT JOIN monthly_sga ms ON mr.date = ms.date
+      ORDER BY mr.date
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching SG&A Pct series for range:", error);
+    return [];
+  }
+}
+
+async function getCacPctSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      WITH monthly_cac AS (
+        SELECT 
+          TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
+          COALESCE(SUM(valor_pago::numeric), 0) as cac_total
+        FROM caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND status = 'QUITADO'
+          AND COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
+          AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
+          AND (
+            categoria_nome ILIKE '%marketing%'
+            OR categoria_nome ILIKE '%publicidade%'
+            OR categoria_nome ILIKE '%propaganda%'
+            OR categoria_nome ILIKE '%mídia%'
+            OR categoria_nome ILIKE '%midia%'
+            OR categoria_nome ILIKE '%media%'
+            OR categoria_nome ILIKE '%ads%'
+            OR categoria_nome ILIKE '%google%'
+            OR categoria_nome ILIKE '%facebook%'
+            OR categoria_nome ILIKE '%meta%'
+            OR categoria_nome ILIKE '%instagram%'
+            OR categoria_nome ILIKE '%tiktok%'
+            OR categoria_nome ILIKE '%linkedin%'
+            OR categoria_nome ILIKE '%vendas%'
+            OR categoria_nome ILIKE '%comercial%'
+            OR categoria_nome ILIKE '%sales%'
+            OR categoria_nome ILIKE '%growth%'
+            OR categoria_nome ILIKE '%aquisição%'
+            OR categoria_nome ILIKE '%aquisicao%'
+            OR categoria_nome ILIKE '%acquisition%'
+            OR categoria_nome ILIKE '%tráfego%'
+            OR categoria_nome ILIKE '%trafego%'
+            OR categoria_nome ILIKE '%traffic%'
+            OR categoria_nome ILIKE '%lead%'
+            OR categoria_nome ILIKE '%sdr%'
+            OR categoria_nome ILIKE '%closer%'
+            OR categoria_nome ILIKE '%comissão%'
+            OR categoria_nome ILIKE '%comissao%'
+            OR categoria_nome ILIKE '%commission%'
+            OR categoria_nome ILIKE '%campanha%'
+            OR categoria_nome ILIKE '%campaign%'
+            OR categoria_nome ILIKE '%anúncio%'
+            OR categoria_nome ILIKE '%anuncio%'
+            OR categoria_nome ILIKE '%patrocinado%'
+            OR categoria_nome ILIKE '%sponsored%'
+          )
+        GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+      ),
+      monthly_new_mrr AS (
+        SELECT 
+          TO_CHAR(data_inicio, 'YYYY-MM') as date,
+          COALESCE(SUM(valorr::numeric), 0) as new_mrr
+        FROM cup_contratos
+        WHERE data_inicio >= ${startDate}::date 
+          AND data_inicio <= ${endDate}::date
+          AND status IN ('ativo', 'onboarding', 'triagem')
+          AND valorr IS NOT NULL
+          AND valorr > 0
+        GROUP BY TO_CHAR(data_inicio, 'YYYY-MM')
+      ),
+      all_months AS (
+        SELECT DISTINCT date FROM monthly_new_mrr
+        UNION
+        SELECT DISTINCT date FROM monthly_cac
+      )
+      SELECT 
+        am.date,
+        CASE WHEN COALESCE(mn.new_mrr, 0) > 0 
+          THEN COALESCE((COALESCE(mc.cac_total, 0) / mn.new_mrr) * 100, 0)
+          ELSE 0 
+        END as value
+      FROM all_months am
+      LEFT JOIN monthly_cac mc ON am.date = mc.date
+      LEFT JOIN monthly_new_mrr mn ON am.date = mn.date
+      ORDER BY am.date
+    `);
+    const rows = result.rows as any[];
+    if (rows.length === 0) {
+      console.warn("[OKR] CAC% series returned no data - no matching expense categories found. Check categoria_nome values in caz_parcelas.");
+    } else {
+      const nonZeroCount = rows.filter(r => parseFloat(r.value || "0") > 0).length;
+      if (nonZeroCount === 0) {
+        console.warn("[OKR] CAC% series has all zero values - marketing/sales expenses may not be categorized correctly.");
+      }
+    }
+    return rows.map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching CAC Pct series for range:", error);
+    return [];
+  }
+}
+
+async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      WITH all_months AS (
+        SELECT DISTINCT TO_CHAR(data_snapshot, 'YYYY-MM') as month
+        FROM cup_data_hist
+        WHERE data_snapshot >= ${startDate}::date 
+          AND data_snapshot <= ${endDate}::date
+      ),
+      prior_month_mrr AS (
+        SELECT 
+          am.month as current_month,
+          TO_CHAR((am.month || '-01')::date - INTERVAL '1 month', 'YYYY-MM') as prior_month
+        FROM all_months am
+      ),
+      monthly_snapshots AS (
+        SELECT 
+          TO_CHAR(data_snapshot, 'YYYY-MM') as month,
+          MAX(data_snapshot) as last_snapshot
+        FROM cup_data_hist
+        WHERE data_snapshot >= (${startDate}::date - INTERVAL '1 month')
+          AND data_snapshot <= ${endDate}::date
+        GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
+      ),
+      mrr_by_customer AS (
+        SELECT 
+          ms.month,
+          h.id_subtask,
+          COALESCE(MAX(h.valorr::numeric), 0) as valorr
+        FROM monthly_snapshots ms
+        JOIN cup_data_hist h ON h.data_snapshot = ms.last_snapshot
+        WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+          AND h.valorr IS NOT NULL
+          AND h.valorr > 0
+        GROUP BY ms.month, h.id_subtask
+      ),
+      mrr_beginning AS (
+        SELECT 
+          pm.current_month as month,
+          COALESCE(SUM(mbc.valorr), 0) as mrr_inicio
+        FROM prior_month_mrr pm
+        LEFT JOIN mrr_by_customer mbc ON mbc.month = pm.prior_month
+        GROUP BY pm.current_month
+      ),
+      churn_by_month AS (
+        SELECT 
+          TO_CHAR(data_encerramento, 'YYYY-MM') as month,
+          COALESCE(SUM(valorr::numeric), 0) as churn_mrr
+        FROM cup_contratos
+        WHERE status = 'cancelado'
+          AND data_encerramento IS NOT NULL
+          AND data_encerramento >= ${startDate}::date 
+          AND data_encerramento <= ${endDate}::date
+          AND valorr IS NOT NULL
+          AND valorr > 0
+        GROUP BY TO_CHAR(data_encerramento, 'YYYY-MM')
+      ),
+      expansion_calc AS (
+        SELECT 
+          curr.month as month,
+          COALESCE(SUM(
+            CASE 
+              WHEN curr.valorr > COALESCE(prev.valorr, 0) 
+              THEN curr.valorr - COALESCE(prev.valorr, 0)
+              ELSE 0 
+            END
+          ), 0) as expansion_mrr
+        FROM mrr_by_customer curr
+        LEFT JOIN mrr_by_customer prev ON curr.id_subtask = prev.id_subtask
+          AND prev.month = TO_CHAR((curr.month || '-01')::date - INTERVAL '1 month', 'YYYY-MM')
+        WHERE curr.month >= TO_CHAR(${startDate}::date, 'YYYY-MM')
+        GROUP BY curr.month
+      )
+      SELECT 
+        mb.month as date,
+        CASE WHEN mb.mrr_inicio > 0 
+          THEN ((COALESCE(cb.churn_mrr, 0) - COALESCE(ec.expansion_mrr, 0)) / mb.mrr_inicio) * 100
+          ELSE NULL
+        END as value
+      FROM mrr_beginning mb
+      LEFT JOIN churn_by_month cb ON mb.month = cb.month
+      LEFT JOIN expansion_calc ec ON mb.month = ec.month
+      WHERE mb.mrr_inicio > 0
+      ORDER BY mb.month
+    `);
+    const rows = (result.rows as any[]).filter(row => row.value !== null);
+    if (rows.length === 0) {
+      console.warn("[OKR] Net MRR Churn series returned no valid data - check cup_data_hist snapshots");
+    }
+    return rows.map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching Net MRR Churn Pct series for range:", error);
+    return [];
+  }
+}
+
+async function getLogoChurnPctSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      WITH monthly_clients_inicio AS (
+        SELECT DISTINCT ON (TO_CHAR(data_snapshot, 'YYYY-MM'))
+          TO_CHAR(data_snapshot, 'YYYY-MM') as month,
+          data_snapshot
+        FROM cup_data_hist
+        WHERE data_snapshot >= ${startDate}::date 
+          AND data_snapshot <= ${endDate}::date
+        ORDER BY TO_CHAR(data_snapshot, 'YYYY-MM'), data_snapshot ASC
+      ),
+      clients_inicio_count AS (
+        SELECT 
+          mi.month,
+          COUNT(DISTINCT h.id_task) as clientes_inicio
+        FROM monthly_clients_inicio mi
+        JOIN cup_data_hist h ON h.data_snapshot = mi.data_snapshot
+        WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+        GROUP BY mi.month
+      ),
+      monthly_logo_churn AS (
+        SELECT 
+          TO_CHAR(data_encerramento, 'YYYY-MM') as date,
+          COUNT(DISTINCT id_task) as logos_churned
+        FROM cup_contratos
+        WHERE status = 'cancelado'
+          AND data_encerramento IS NOT NULL
+          AND data_encerramento >= ${startDate}::date 
+          AND data_encerramento <= ${endDate}::date
+          AND id_task NOT IN (
+            SELECT DISTINCT id_task 
+            FROM cup_contratos 
+            WHERE status IN ('ativo', 'onboarding', 'triagem')
+              AND id_task IS NOT NULL
+          )
+        GROUP BY TO_CHAR(data_encerramento, 'YYYY-MM')
+      )
+      SELECT 
+        ci.month as date,
+        CASE WHEN ci.clientes_inicio > 0 
+          THEN (COALESCE(lc.logos_churned, 0)::numeric / ci.clientes_inicio) * 100
+          ELSE 0 
+        END as value
+      FROM clients_inicio_count ci
+      LEFT JOIN monthly_logo_churn lc ON ci.month = lc.date
+      ORDER BY ci.month
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching Logo Churn Pct series for range:", error);
+    return [];
+  }
+}
+
 export async function getMetricSeries(
   metricKey: string, 
   startDate: string, 
@@ -1131,10 +1487,15 @@ export async function getMetricSeries(
       case "turbooh_resultado":
         return await getTurboohResultSeriesForRange(startDate, endDate);
       case "expansion_mrr":
+        return await getExpansionMrrSeriesForRange(startDate, endDate);
       case "sga_pct":
+        return await getSgaPctSeriesForRange(startDate, endDate);
       case "cac_pct":
+        return await getCacPctSeriesForRange(startDate, endDate);
       case "net_mrr_churn_pct":
+        return await getNetMrrChurnPctSeriesForRange(startDate, endDate);
       case "logo_churn_pct":
+        return await getLogoChurnPctSeriesForRange(startDate, endDate);
       case "turbooh_vacancy_pct":
         console.warn(`[OKR] Metric ${metricKey} not yet implemented for series`);
         return [];
@@ -1385,7 +1746,7 @@ export function getTargets() {
   const getTarget = (metricKey: string) => {
     const kr = krRegistry.find(k => k.metricKey === metricKey);
     if (!kr) return 0;
-    return kr.targets.annual || kr.targets.monthly || 0;
+    return kr.targets.FY || kr.targets.Q4 || 0;
   };
 
   const getQuarterlyTargets = (metricKey: string) => {
@@ -1499,71 +1860,71 @@ export async function getKRProgress(krId: string): Promise<KRProgress> {
   switch (kr.metricKey) {
     case "mrr_active":
       actual = metrics.mrr_ativo;
-      target = kr.targets[quarterKey] || kr.targets.annual || null;
+      target = kr.targets[quarterKey] || kr.targets.FY || null;
       break;
     case "revenue_net":
       actual = metrics.receita_liquida_ytd;
-      target = kr.targets.annual || null;
+      target = kr.targets.FY || kr.targets.Q4 || null;
       break;
     case "clients_active":
       actual = metrics.clientes_ativos;
-      target = kr.targets.annual || null;
+      target = kr.targets.FY || kr.targets.Q4 || null;
       break;
     case "revenue_per_head":
       actual = metrics.receita_por_head;
-      target = kr.targets.annual || null;
+      target = kr.targets.FY || kr.targets.Q4 || null;
       break;
     case "ebitda":
       actual = metrics.ebitda_ytd;
-      target = kr.targets.annual || null;
+      target = kr.targets.FY || kr.targets.Q4 || null;
       break;
     case "cash_balance":
       actual = metrics.caixa_atual;
-      target = kr.targets.annual || null;
+      target = kr.targets.FY || kr.targets.Q4 || null;
       break;
     case "inadimplencia_pct":
       actual = metrics.inadimplencia_percentual;
-      target = kr.targets.monthly || null;
+      target = kr.targets[quarterKey] || kr.targets.FY || null;
       break;
     case "gross_churn_pct":
       actual = metrics.gross_mrr_churn_percentual;
-      target = kr.targets.monthly || null;
+      target = kr.targets[quarterKey] || kr.targets.FY || null;
       break;
     case "net_churn_pct":
       actual = metrics.net_churn_mrr_percentual;
-      target = kr.targets.monthly || null;
+      target = kr.targets[quarterKey] || kr.targets.FY || null;
       break;
     case "logo_churn_pct":
       actual = metrics.logo_churn_percentual;
-      target = kr.targets.monthly || null;
+      target = kr.targets[quarterKey] || kr.targets.FY || null;
       break;
     case "turbooh_receita":
       actual = metrics.turbooh_receita;
-      target = kr.targets.annual || null;
+      target = kr.targets.FY || kr.targets.Q4 || null;
       break;
     case "turbooh_resultado":
       actual = metrics.turbooh_resultado;
-      target = kr.targets.annual || null;
+      target = kr.targets.FY || kr.targets.Q4 || null;
       break;
     case "turbooh_margem_pct":
       actual = metrics.turbooh_margem_pct;
-      target = kr.targets.annual || null;
+      target = kr.targets.FY || kr.targets.Q4 || null;
       break;
     case "tech_projetos_entregues":
       actual = metrics.tech_projetos_entregues;
-      target = kr.targets.annual || null;
+      target = kr.targets.FY || kr.targets.Q4 || null;
       break;
     case "tech_freelancers_pct":
       actual = metrics.tech_freelancers_percentual;
-      target = kr.targets.annual || null;
+      target = kr.targets.FY || kr.targets.Q4 || null;
       break;
     case "mrr_por_head":
       actual = metrics.mrr_por_head;
-      target = kr.targets.annual || null;
+      target = kr.targets.FY || kr.targets.Q4 || null;
       break;
     default:
       actual = null;
-      target = kr.targets.annual || kr.targets.monthly || null;
+      target = kr.targets[quarterKey] || kr.targets.FY || kr.targets.Q4 || null;
   }
 
   if (actual === null || target === null) {
