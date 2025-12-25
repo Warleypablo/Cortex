@@ -123,6 +123,7 @@ export const cupClientes = pgTable("cup_clientes", {
   tipoNegocio: text("tipo_negocio"),
   faturamentoMensal: text("faturamento_mensal"),
   investimentoAds: text("investimento_ads"),
+  statusConta: text("status_conta"),
 });
 
 export const cupContratos = pgTable("cup_contratos", {
