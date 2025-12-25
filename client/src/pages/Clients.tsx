@@ -18,7 +18,7 @@ import {
 import { formatCurrencyNoDecimals, formatDecimal, formatPercent } from "@/lib/utils";
 import type { ClienteCompleto } from "../../../server/storage";
 
-type SortField = "name" | "cnpj" | "ltv" | "lt" | "aov" | "status" | "startDate" | "cluster" | "financeiro";
+type SortField = "name" | "cnpj" | "ltv" | "lt" | "aov" | "status" | "startDate" | "cluster" | "financeiro" | "firstPayment";
 type SortDirection = "asc" | "desc";
 
 interface ClientsProps {
@@ -173,6 +173,10 @@ export default function Clients({
         const finA = a.statusFinanceiro || "";
         const finB = b.statusFinanceiro || "";
         comparison = finA.localeCompare(finB);
+      } else if (sortField === "firstPayment") {
+        const dateA = a.dataPrimeiroPagamento ? new Date(a.dataPrimeiroPagamento).getTime() : 0;
+        const dateB = b.dataPrimeiroPagamento ? new Date(b.dataPrimeiroPagamento).getTime() : 0;
+        comparison = dateA - dateB;
       }
       
       return sortDirection === "asc" ? comparison : -comparison;

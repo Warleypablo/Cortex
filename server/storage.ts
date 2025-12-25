@@ -19,6 +19,7 @@ export type ClienteCompleto = Cliente & {
   cnpjCliente: string | null;
   servicos: string | null;
   dataInicio: Date | null;
+  dataPrimeiroPagamento: Date | null;
   ltMeses: number | null;
   ltDias: number | null;
   totalRecorrente: number | null;
@@ -1380,6 +1381,12 @@ export class DbStorage implements IStorage {
           FROM cup_contratos
           WHERE id_task = cc.task_id
         ) as "dataInicio",
+        (
+          SELECT MIN(COALESCE(cr.data_vencimento, cr.data_criacao))
+          FROM caz_receber cr
+          WHERE cr.cliente_id = caz.ids
+            AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
+        ) as "dataPrimeiroPagamento",
         COALESCE((
           SELECT COUNT(DISTINCT TO_CHAR(
             COALESCE(cr.data_vencimento, cr.data_criacao), 
@@ -1458,6 +1465,12 @@ export class DbStorage implements IStorage {
           FROM ${schema.cupContratos}
           WHERE ${schema.cupContratos.idTask} = ${schema.cupClientes.taskId}
         )`,
+        dataPrimeiroPagamento: sql<Date | null>`(
+          SELECT MIN(COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}))
+          FROM ${schema.cazReceber}
+          WHERE ${schema.cazReceber.clienteId} = ${schema.cazClientes.ids}
+            AND UPPER(${schema.cazReceber.status}) IN ('PAGO', 'ACQUITTED')
+        )`,
         ltMeses: sql<number>`COALESCE((
           SELECT COUNT(DISTINCT TO_CHAR(
             COALESCE(${schema.cazReceber.dataVencimento}, ${schema.cazReceber.dataCriacao}), 
@@ -1533,6 +1546,12 @@ export class DbStorage implements IStorage {
         cnpj as "cnpjCliente",
         NULL as servicos,
         NULL as "dataInicio",
+        (
+          SELECT MIN(COALESCE(data_vencimento, data_criacao))
+          FROM caz_receber
+          WHERE cliente_id = COALESCE(caz_clientes.ids, caz_clientes.id::text)
+            AND UPPER(status) IN ('PAGO', 'ACQUITTED')
+        ) as "dataPrimeiroPagamento",
         COALESCE((
           SELECT COUNT(DISTINCT TO_CHAR(
             COALESCE(data_vencimento, data_criacao), 
