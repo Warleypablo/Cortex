@@ -4913,6 +4913,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/cohort", async (req, res) => {
+    try {
+      const { cohortFiltersSchema } = await import("@shared/schema");
+      
+      const filters = cohortFiltersSchema.parse({
+        startDate: req.query.startDate as string | undefined,
+        endDate: req.query.endDate as string | undefined,
+        produto: req.query.produto as string | undefined,
+        squad: req.query.squad as string | undefined,
+        metricType: (req.query.metricType as string) || 'revenue_retention',
+      });
+
+      const cohortData = await storage.getCohortData(filters);
+      res.json(cohortData);
+    } catch (error) {
+      console.error("[api] Error fetching cohort data:", error);
+      res.status(500).json({ error: "Failed to fetch cohort data" });
+    }
+  });
+
   app.get("/api/visao-geral/metricas", async (req, res) => {
     try {
       const mesAno = req.query.mesAno as string;

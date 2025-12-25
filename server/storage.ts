@@ -288,6 +288,9 @@ export interface IStorage {
   dismissNotification(id: number): Promise<void>;
   createNotification(notification: import("@shared/schema").InsertNotification): Promise<import("@shared/schema").Notification>;
   notificationExists(uniqueKey: string): Promise<boolean>;
+  
+  // Cohort Analysis
+  getCohortData(filters: import("@shared/schema").CohortFilters): Promise<import("@shared/schema").CohortData>;
 }
 
 // GEG Dashboard Extended Types
@@ -8389,6 +8392,147 @@ export class DbStorage implements IStorage {
       LIMIT 1
     `);
     return result.rows.length > 0;
+  }
+
+  async getCohortData(filters: import("@shared/schema").CohortFilters): Promise<import("@shared/schema").CohortData> {
+    const { startDate, endDate, produto, squad, metricType } = filters;
+    
+    let whereConditions = sql`p.status IN ('Pago', 'Baixado') AND p.data_quitacao IS NOT NULL AND p.id_cliente IS NOT NULL`;
+    
+    if (startDate) {
+      whereConditions = sql`${whereConditions} AND p.data_quitacao >= ${startDate}::date`;
+    }
+    if (endDate) {
+      whereConditions = sql`${whereConditions} AND p.data_quitacao <= ${endDate}::date`;
+    }
+    
+    let clientFilterConditions = sql`TRUE`;
+    if (produto || squad) {
+      if (produto) {
+        clientFilterConditions = sql`${clientFilterConditions} AND c.produto = ${produto}`;
+      }
+      if (squad) {
+        clientFilterConditions = sql`${clientFilterConditions} AND c.squad = ${squad}`;
+      }
+    }
+    
+    const result = await db.execute(sql`
+      WITH client_cohorts AS (
+        SELECT 
+          p.id_cliente,
+          DATE_TRUNC('month', MIN(p.data_quitacao))::date as cohort_month
+        FROM caz_parcelas p
+        LEFT JOIN cup_contratos c ON p.id_cliente = c.id_task
+        WHERE ${whereConditions}
+          AND ${clientFilterConditions}
+        GROUP BY p.id_cliente
+      ),
+      monthly_revenue AS (
+        SELECT 
+          p.id_cliente,
+          DATE_TRUNC('month', p.data_quitacao)::date as revenue_month,
+          SUM(COALESCE(p.valor_pago::numeric, 0)) as revenue
+        FROM caz_parcelas p
+        LEFT JOIN cup_contratos c ON p.id_cliente = c.id_task
+        WHERE ${whereConditions}
+          AND ${clientFilterConditions}
+        GROUP BY p.id_cliente, DATE_TRUNC('month', p.data_quitacao)
+      ),
+      cohort_data AS (
+        SELECT 
+          cc.cohort_month,
+          mr.revenue_month,
+          mr.id_cliente,
+          mr.revenue,
+          (EXTRACT(YEAR FROM age(mr.revenue_month, cc.cohort_month)) * 12 +
+           EXTRACT(MONTH FROM age(mr.revenue_month, cc.cohort_month)))::integer as month_offset
+        FROM client_cohorts cc
+        JOIN monthly_revenue mr ON cc.id_cliente = mr.id_cliente
+      )
+      SELECT 
+        TO_CHAR(cohort_month, 'YYYY-MM') as cohort_month,
+        TO_CHAR(cohort_month, 'MM/YYYY') as cohort_label,
+        month_offset,
+        COUNT(DISTINCT id_cliente)::integer as client_count,
+        SUM(revenue)::numeric as total_revenue
+      FROM cohort_data
+      WHERE month_offset >= 0 AND month_offset <= 12
+      GROUP BY cohort_month, month_offset
+      ORDER BY cohort_month DESC, month_offset
+    `);
+    
+    const rows = result.rows as { cohort_month: string; cohort_label: string; month_offset: number; client_count: number; total_revenue: string }[];
+    
+    const cohortMap = new Map<string, import("@shared/schema").CohortRow>();
+    let maxMonthOffset = 0;
+    
+    for (const row of rows) {
+      const cohortMonth = row.cohort_month;
+      const monthOffset = Number(row.month_offset);
+      const clientCount = Number(row.client_count);
+      const totalRevenue = Number(row.total_revenue) || 0;
+      
+      if (monthOffset > maxMonthOffset) {
+        maxMonthOffset = monthOffset;
+      }
+      
+      if (!cohortMap.has(cohortMonth)) {
+        cohortMap.set(cohortMonth, {
+          cohortMonth,
+          cohortLabel: row.cohort_label,
+          baselineClients: 0,
+          baselineRevenue: 0,
+          cells: {}
+        });
+      }
+      
+      const cohortRow = cohortMap.get(cohortMonth)!;
+      
+      if (monthOffset === 0) {
+        cohortRow.baselineClients = clientCount;
+        cohortRow.baselineRevenue = totalRevenue;
+      }
+      
+      const baselineValue = metricType === 'logo_retention' ? cohortRow.baselineClients : cohortRow.baselineRevenue;
+      const currentValue = metricType === 'logo_retention' ? clientCount : totalRevenue;
+      const percentage = baselineValue > 0 ? (currentValue / baselineValue) * 100 : 0;
+      
+      let color: 'green' | 'yellow' | 'red' | 'neutral' = 'neutral';
+      if (monthOffset > 0) {
+        if (percentage >= 80) color = 'green';
+        else if (percentage >= 50) color = 'yellow';
+        else color = 'red';
+      }
+      
+      cohortRow.cells[monthOffset] = {
+        value: currentValue,
+        percentage: Math.round(percentage * 10) / 10,
+        clientCount,
+        color
+      };
+    }
+    
+    const cohortRows = Array.from(cohortMap.values());
+    
+    const getAvgRetention = (monthOffset: number): number => {
+      const validRows = cohortRows.filter(r => r.cells[monthOffset] && r.cells[0]);
+      if (validRows.length === 0) return 0;
+      const sum = validRows.reduce((acc, r) => acc + (r.cells[monthOffset]?.percentage || 0), 0);
+      return Math.round((sum / validRows.length) * 10) / 10;
+    };
+    
+    return {
+      rows: cohortRows,
+      maxMonthOffset,
+      filters,
+      summary: {
+        totalCohorts: cohortRows.length,
+        avgRetentionM1: getAvgRetention(1),
+        avgRetentionM3: getAvgRetention(3),
+        avgRetentionM6: getAvgRetention(6),
+        avgRetentionM12: getAvgRetention(12)
+      }
+    };
   }
 }
 
