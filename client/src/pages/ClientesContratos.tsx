@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { usePersistentFilters } from "@/hooks/use-persistent-filters";
 import { Users, FileText, Search, Filter, X, Check, Save, Bookmark, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePageInfo } from "@/contexts/PageContext";
@@ -79,16 +80,16 @@ export default function ClientesContratos() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("clientes");
   
-  const [searchQuery, setSearchQuery] = useState("");
-  const [servicoFilter, setServicoFilter] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [tipoContratoFilter, setTipoContratoFilter] = useState<string>("ambos");
-  const [responsavelFilter, setResponsavelFilter] = useState<string[]>([]);
-  const [clusterFilter, setClusterFilter] = useState<string>("all");
-  const [ltOperator, setLtOperator] = useState<string>("all");
-  const [ltValue, setLtValue] = useState<string>("");
-  const [aovOperator, setAovOperator] = useState<string>("all");
-  const [aovValue, setAovValue] = useState<string>("");
+  const [searchQuery, setSearchQuery] = usePersistentFilters("clientes-search", "");
+  const [servicoFilter, setServicoFilter] = usePersistentFilters<string[]>("clientes-servico", []);
+  const [statusFilter, setStatusFilter] = usePersistentFilters<string[]>("clientes-status", []);
+  const [tipoContratoFilter, setTipoContratoFilter] = usePersistentFilters("clientes-tipo-contrato", "ambos");
+  const [responsavelFilter, setResponsavelFilter] = usePersistentFilters<string[]>("clientes-responsavel", []);
+  const [clusterFilter, setClusterFilter] = usePersistentFilters("clientes-cluster", "all");
+  const [ltOperator, setLtOperator] = usePersistentFilters("clientes-lt-operator", "all");
+  const [ltValue, setLtValue] = usePersistentFilters("clientes-lt-value", "");
+  const [aovOperator, setAovOperator] = usePersistentFilters("clientes-aov-operator", "all");
+  const [aovValue, setAovValue] = usePersistentFilters("clientes-aov-value", "");
   
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>(() => {
     try {
@@ -99,11 +100,11 @@ export default function ClientesContratos() {
   const [newFilterName, setNewFilterName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
 
-  const [contractSearchQuery, setContractSearchQuery] = useState("");
-  const [contractServicoFilter, setContractServicoFilter] = useState<string[]>([]);
-  const [contractStatusFilter, setContractStatusFilter] = useState<string[]>([]);
-  const [contractTipoContratoFilter, setContractTipoContratoFilter] = useState<string>("ambos");
-  const [contractProdutoFilter, setContractProdutoFilter] = useState<string[]>([]);
+  const [contractSearchQuery, setContractSearchQuery] = usePersistentFilters("contratos-search", "");
+  const [contractServicoFilter, setContractServicoFilter] = usePersistentFilters<string[]>("contratos-servico", []);
+  const [contractStatusFilter, setContractStatusFilter] = usePersistentFilters<string[]>("contratos-status", []);
+  const [contractTipoContratoFilter, setContractTipoContratoFilter] = usePersistentFilters("contratos-tipo-contrato", "ambos");
+  const [contractProdutoFilter, setContractProdutoFilter] = usePersistentFilters<string[]>("contratos-produto", []);
   
   const [contractSavedFilters, setContractSavedFilters] = useState<ContractSavedFilter[]>(() => {
     try {
