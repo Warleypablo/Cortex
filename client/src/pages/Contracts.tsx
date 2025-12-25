@@ -296,7 +296,7 @@ export default function Contracts({
 
   const kpis = useMemo(() => {
     if (!filteredContracts || filteredContracts.length === 0) {
-      return { totalContratos: 0, contratosOperando: 0, contratosAtivos: 0, aovMedio: 0 };
+      return { totalContratos: 0, contratosOperando: 0, contratosAtivos: 0, aovMedio: 0, ativosRecorrentes: 0, ativosPontuais: 0 };
     }
     
     const totalContratos = filteredContracts.length;
@@ -306,9 +306,21 @@ export default function Contracts({
       return status === "ativo" || status === "onboarding" || status === "triagem" || status === "em cancelamento";
     }).length;
     
-    const contratosAtivos = filteredContracts.filter(c => {
+    const contratosAtivosArray = filteredContracts.filter(c => {
       const status = c.status.toLowerCase();
       return status === "ativo" || status === "onboarding" || status === "triagem";
+    });
+    
+    const contratosAtivos = contratosAtivosArray.length;
+    
+    const ativosRecorrentes = contratosAtivosArray.filter(c => {
+      const plano = c.plano?.toLowerCase() || "";
+      return plano.includes("recorrente") || plano.includes("mensal") || plano.includes("trimestral") || plano.includes("semestral") || plano.includes("anual");
+    }).length;
+    
+    const ativosPontuais = contratosAtivosArray.filter(c => {
+      const plano = c.plano?.toLowerCase() || "";
+      return plano.includes("pontual") || plano.includes("projeto") || plano.includes("único");
     }).length;
     
     const somaValorTotal = filteredContracts.reduce((acc, contract) => {
@@ -317,7 +329,7 @@ export default function Contracts({
     
     const aovMedio = totalContratos > 0 ? somaValorTotal / totalContratos : 0;
     
-    return { totalContratos, contratosOperando, contratosAtivos, aovMedio };
+    return { totalContratos, contratosOperando, contratosAtivos, aovMedio, ativosRecorrentes, ativosPontuais };
   }, [filteredContracts]);
 
   const totalPages = Math.ceil(sortedContracts.length / itemsPerPage);
@@ -347,6 +359,8 @@ export default function Contracts({
       return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
     } else if (statusLower.includes("cancelado") || statusLower.includes("inativo")) {
       return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+    } else if (statusLower.includes("entregue")) {
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
     }
     return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
   };
@@ -441,7 +455,8 @@ export default function Contracts({
             value={String(kpis.contratosAtivos)}
             icon={FileCheck}
             variant="success"
-            subtitle="Ativo, onboarding e triagem"
+            subtitle={`Recorrentes: ${kpis.ativosRecorrentes} | Pontuais: ${kpis.ativosPontuais}`}
+            tooltipType="help"
             animateValue
             rawValue={kpis.contratosAtivos}
             formatValue={(v) => String(Math.round(v))}
