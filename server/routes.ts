@@ -9539,6 +9539,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== TURBO CALENDAR ====================
+  
+  app.get("/api/calendario/eventos", isAuthenticated, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const eventos = await storage.getTurboEventos(
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+      res.json(eventos);
+    } catch (error) {
+      console.error("Error fetching eventos:", error);
+      res.status(500).json({ error: "Failed to fetch eventos" });
+    }
+  });
+
+  app.get("/api/calendario/eventos/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const evento = await storage.getTurboEvento(id);
+      if (!evento) {
+        return res.status(404).json({ error: "Evento not found" });
+      }
+      res.json(evento);
+    } catch (error) {
+      console.error("Error fetching evento:", error);
+      res.status(500).json({ error: "Failed to fetch evento" });
+    }
+  });
+
+  app.post("/api/calendario/eventos", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const data = {
+        ...req.body,
+        criadoPor: user?.email || 'system',
+        organizadorNome: req.body.organizadorNome || user?.name || null
+      };
+      const evento = await storage.createTurboEvento(data);
+      res.json(evento);
+    } catch (error) {
+      console.error("Error creating evento:", error);
+      res.status(500).json({ error: "Failed to create evento" });
+    }
+  });
+
+  app.patch("/api/calendario/eventos/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const evento = await storage.updateTurboEvento(id, req.body);
+      res.json(evento);
+    } catch (error) {
+      console.error("Error updating evento:", error);
+      res.status(500).json({ error: "Failed to update evento" });
+    }
+  });
+
+  app.delete("/api/calendario/eventos/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteTurboEvento(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting evento:", error);
+      res.status(500).json({ error: "Failed to delete evento" });
+    }
+  });
+
   app.post("/api/notification-rules/seed", isAuthenticated, async (req, res) => {
     try {
       const defaultRules = [

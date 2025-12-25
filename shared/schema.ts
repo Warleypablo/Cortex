@@ -1832,3 +1832,24 @@ export type PdiGoal = typeof pdiGoals.$inferSelect;
 export type InsertPdi = z.infer<typeof insertPdiSchema>;
 export type PdiCheckpoint = typeof pdiCheckpoints.$inferSelect;
 export type InsertPdiCheckpoint = z.infer<typeof insertPdiCheckpointSchema>;
+
+// ==================== TURBO CALENDAR ====================
+
+export const turboEventos = pgTable("turbo_eventos", {
+  id: serial("id").primaryKey(),
+  titulo: text("titulo").notNull(),
+  descricao: text("descricao"),
+  tipo: text("tipo").notNull(), // 'confraternizacao', 'reuniao_resultado', 'workshop', 'outro'
+  dataInicio: timestamp("data_inicio").notNull(),
+  dataFim: timestamp("data_fim"),
+  local: text("local"),
+  organizadorId: integer("organizador_id"),
+  organizadorNome: text("organizador_nome"),
+  cor: text("cor").default("#f97316"), // Orange as default (Turbo brand)
+  criadoEm: timestamp("criado_em").defaultNow(),
+  criadoPor: text("criado_por"),
+});
+
+export const insertTurboEventoSchema = createInsertSchema(turboEventos).omit({ id: true, criadoEm: true });
+export type TurboEvento = typeof turboEventos.$inferSelect;
+export type InsertTurboEvento = z.infer<typeof insertTurboEventoSchema>;
