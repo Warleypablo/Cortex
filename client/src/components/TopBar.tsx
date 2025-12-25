@@ -33,6 +33,7 @@ interface Notification {
   message: string;
   entityId: string | null;
   entityType: string | null;
+  priority: 'high' | 'medium' | 'low';
   read: boolean;
   dismissed: boolean;
   createdAt: string;
@@ -91,6 +92,19 @@ function AvisosModal({
         return { label: 'Inadimplência', variant: 'default' as const, className: 'bg-red-500/10 text-red-600 border-red-500/20' };
       default:
         return { label: 'Sistema', variant: 'default' as const, className: 'bg-blue-500/10 text-blue-600 border-blue-500/20' };
+    }
+  };
+
+  const getPriorityIndicator = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return { color: 'bg-red-500', label: 'Alta' };
+      case 'medium':
+        return { color: 'bg-yellow-500', label: 'Média' };
+      case 'low':
+        return { color: 'bg-green-500', label: 'Baixa' };
+      default:
+        return { color: 'bg-gray-400', label: 'Normal' };
     }
   };
 
@@ -172,6 +186,14 @@ function AvisosModal({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-2 flex-wrap">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className={`w-2 h-2 rounded-full ${getPriorityIndicator(notification.priority).color}`} />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Prioridade {getPriorityIndicator(notification.priority).label}
+                              </TooltipContent>
+                            </Tooltip>
                             <h4 className="font-semibold text-base">{notification.title}</h4>
                             <Badge variant="outline" className={typeInfo.className}>
                               {typeInfo.label}
