@@ -4,11 +4,11 @@ import { useLocation } from "wouter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, FileText, FileCheck, DollarSign, Activity, Edit2 } from "lucide-react";
+import { ArrowUpDown, FileText, FileCheck, DollarSign, Activity, Edit2, Check, ChevronsUpDown } from "lucide-react";
 import StatsCard from "@/components/StatsCard";
 import { ContractsTableSkeleton } from "@/components/TableSkeleton";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatCurrencyNoDecimals } from "@/lib/utils";
+import { formatCurrencyNoDecimals, cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { differenceInMonths, differenceInDays, format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { ContratoCompleto } from "@shared/schema";
 
 interface Contract {
@@ -102,6 +104,18 @@ export default function Contracts({
   const { data: colaboradores = [] } = useQuery<{ id: number; nome: string; status: string | null }[]>({
     queryKey: ["/api/colaboradores/dropdown"],
   });
+
+  const { data: squads = [] } = useQuery<{ id: number; nome: string; codigo: string | null }[]>({
+    queryKey: ["/api/rh/squads"],
+  });
+
+  const { data: produtos = [] } = useQuery<string[]>({
+    queryKey: ["/api/contratos/produtos-distintos"],
+  });
+
+  const [produtoOpen, setProdutoOpen] = useState(false);
+  const [responsavelOpen, setResponsavelOpen] = useState(false);
+  const [csResponsavelOpen, setCsResponsavelOpen] = useState(false);
 
   const sortedColaboradores = useMemo(() => {
     return [...colaboradores].sort((a, b) => {
@@ -770,12 +784,43 @@ export default function Contracts({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="produto">Produto</Label>
-                <Input
-                  id="produto"
-                  value={editForm.produto}
-                  onChange={(e) => setEditForm({ ...editForm, produto: e.target.value })}
-                  data-testid="input-edit-produto"
-                />
+                <Popover open={produtoOpen} onOpenChange={setProdutoOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={produtoOpen}
+                      className="w-full justify-between font-normal"
+                      data-testid="combobox-edit-produto"
+                    >
+                      {editForm.produto || "Selecione o produto..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar produto..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {produtos.map((produto) => (
+                            <CommandItem
+                              key={produto}
+                              value={produto}
+                              onSelect={(value) => {
+                                setEditForm({ ...editForm, produto: value });
+                                setProdutoOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", editForm.produto === produto ? "opacity-100" : "opacity-0")} />
+                              {produto}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
@@ -806,10 +851,20 @@ export default function Contracts({
                     <SelectValue placeholder="Selecione o squad" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">Supreme</SelectItem>
-                    <SelectItem value="1">Forja</SelectItem>
-                    <SelectItem value="2">Squadra</SelectItem>
-                    <SelectItem value="3">Chama</SelectItem>
+                    {squads.length > 0 ? (
+                      squads.map((squad) => (
+                        <SelectItem key={squad.id} value={squad.codigo || squad.id.toString()}>
+                          {squad.nome}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <>
+                        <SelectItem value="0">Supreme</SelectItem>
+                        <SelectItem value="1">Forja</SelectItem>
+                        <SelectItem value="2">Squadra</SelectItem>
+                        <SelectItem value="3">Chama</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -866,41 +921,103 @@ export default function Contracts({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="responsavel">Responsável</Label>
-                <Select
-                  value={editForm.responsavel || "__none__"}
-                  onValueChange={(value) => setEditForm({ ...editForm, responsavel: value === "__none__" ? "" : value })}
-                >
-                  <SelectTrigger data-testid="select-edit-responsavel">
-                    <SelectValue placeholder="Selecione o responsável" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Nenhum</SelectItem>
-                    {sortedColaboradores.map((colab) => (
-                      <SelectItem key={colab.id} value={colab.nome}>
-                        {colab.nome} {colab.status?.toLowerCase() !== "ativo" ? "(Inativo)" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={responsavelOpen} onOpenChange={setResponsavelOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={responsavelOpen}
+                      className="w-full justify-between font-normal"
+                      data-testid="combobox-edit-responsavel"
+                    >
+                      {editForm.responsavel || "Selecione o responsável..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar colaborador..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="__none__"
+                            onSelect={() => {
+                              setEditForm({ ...editForm, responsavel: "" });
+                              setResponsavelOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", !editForm.responsavel ? "opacity-100" : "opacity-0")} />
+                            Nenhum
+                          </CommandItem>
+                          {sortedColaboradores.map((colab) => (
+                            <CommandItem
+                              key={colab.id}
+                              value={colab.nome}
+                              onSelect={(value) => {
+                                setEditForm({ ...editForm, responsavel: value });
+                                setResponsavelOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", editForm.responsavel === colab.nome ? "opacity-100" : "opacity-0")} />
+                              {colab.nome} {colab.status?.toLowerCase() !== "ativo" ? "(Inativo)" : ""}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="csResponsavel">CS Responsável</Label>
-                <Select
-                  value={editForm.csResponsavel || "__none__"}
-                  onValueChange={(value) => setEditForm({ ...editForm, csResponsavel: value === "__none__" ? "" : value })}
-                >
-                  <SelectTrigger data-testid="select-edit-cs">
-                    <SelectValue placeholder="Selecione o CS" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Nenhum</SelectItem>
-                    {sortedColaboradores.map((colab) => (
-                      <SelectItem key={colab.id} value={colab.nome}>
-                        {colab.nome} {colab.status?.toLowerCase() !== "ativo" ? "(Inativo)" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={csResponsavelOpen} onOpenChange={setCsResponsavelOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={csResponsavelOpen}
+                      className="w-full justify-between font-normal"
+                      data-testid="combobox-edit-cs"
+                    >
+                      {editForm.csResponsavel || "Selecione o CS..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar colaborador..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="__none__"
+                            onSelect={() => {
+                              setEditForm({ ...editForm, csResponsavel: "" });
+                              setCsResponsavelOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", !editForm.csResponsavel ? "opacity-100" : "opacity-0")} />
+                            Nenhum
+                          </CommandItem>
+                          {sortedColaboradores.map((colab) => (
+                            <CommandItem
+                              key={colab.id}
+                              value={colab.nome}
+                              onSelect={(value) => {
+                                setEditForm({ ...editForm, csResponsavel: value });
+                                setCsResponsavelOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", editForm.csResponsavel === colab.nome ? "opacity-100" : "opacity-0")} />
+                              {colab.nome} {colab.status?.toLowerCase() !== "ativo" ? "(Inativo)" : ""}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <DialogFooter>
