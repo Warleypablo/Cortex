@@ -8414,6 +8414,18 @@ export class DbStorage implements IStorage {
       whereConditions = sql`${whereConditions} AND p.data_quitacao <= ${endDate}::date`;
     }
     
+    // Debug: Check how many records match base conditions
+    const debugResult = await db.execute(sql`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status IN ('Pago', 'Baixado')) as paid,
+        COUNT(*) FILTER (WHERE data_quitacao IS NOT NULL) as has_quitacao,
+        COUNT(*) FILTER (WHERE id_cliente IS NOT NULL) as has_cliente,
+        COUNT(*) FILTER (WHERE status IN ('Pago', 'Baixado') AND data_quitacao IS NOT NULL AND id_cliente IS NOT NULL) as matching
+      FROM caz_parcelas
+    `);
+    console.log("[getCohortData] Debug counts:", debugResult.rows[0]);
+    
     // Simplified query without JOIN - cohort is based purely on payment data
     const result = await db.execute(sql`
       WITH client_cohorts AS (
