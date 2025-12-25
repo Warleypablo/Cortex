@@ -25,6 +25,15 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { ContratoCompleto, TimelineEvent, ClientAlert } from "@shared/schema";
+import { 
+  CONTRACT_STATUS_OPTIONS,
+  SQUAD_OPTIONS,
+  ACCOUNT_STATUS_OPTIONS,
+  getBusinessTypeInfo,
+  getAccountStatusInfo,
+  getClusterInfo,
+  getSquadLabel
+} from "@shared/constants";
 
 interface CredentialGroup {
   id: string;
@@ -584,22 +593,6 @@ export default function ClientDetail() {
     return Array.from(servicos).sort();
   }, [contratos]);
 
-  const statusOptions = [
-    "ativo",
-    "onboarding", 
-    "triagem",
-    "cancelado/inativo",
-    "pausado",
-    "em cancelamento",
-    "entregue"
-  ];
-
-  const squadOptions = [
-    { value: "0", label: "Supreme" },
-    { value: "1", label: "Forja" },
-    { value: "2", label: "Squadra" },
-    { value: "3", label: "Chama" },
-  ];
 
   const handleContratoSort = (key: string) => {
     setContratosSortConfig(prev => ({
@@ -643,65 +636,6 @@ export default function ClientDetail() {
     }
   };
 
-  const mapSquadCodeToName = (code: string | null): string => {
-    if (!code) return "Não definido";
-    switch (code) {
-      case "0": return "Supreme";
-      case "1": return "Forja";
-      case "2": return "Squadra";
-      case "3": return "Chama";
-      default: return code;
-    }
-  };
-
-  const mapClusterToName = (cluster: string | null): string => {
-    if (!cluster) return "Não definido";
-    switch (cluster) {
-      case "1": return "NFNC";
-      case "2": return "Regulares";
-      case "3": return "Chaves";
-      case "4": return "Imperdíveis";
-      default: return cluster;
-    }
-  };
-
-  const getClusterBadgeColor = (cluster: string | null): string => {
-    if (!cluster) return "bg-muted text-muted-foreground";
-    switch (cluster) {
-      case "1": return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
-      case "2": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
-      case "3": return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300";
-      case "4": return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
-      default: return "bg-muted text-muted-foreground";
-    }
-  };
-
-  const getTipoNegocioBadge = (tipo: string | null): { label: string; color: string } => {
-    if (!tipo) return { label: "Não definido", color: "bg-muted text-muted-foreground" };
-    const tipoLower = tipo.toLowerCase();
-    if (tipoLower === "ecommerce" || tipoLower === "e-commerce") {
-      return { label: "Ecommerce", color: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300" };
-    } else if (tipoLower === "lead") {
-      return { label: "Lead", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300" };
-    } else if (tipoLower === "info" || tipoLower === "infoproduto") {
-      return { label: "Info", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" };
-    }
-    return { label: tipo, color: "bg-muted text-muted-foreground" };
-  };
-
-  const getStatusContaBadge = (status: string | null): { label: string; color: string } => {
-    if (!status) return { label: "Não definido", color: "bg-muted text-muted-foreground" };
-    switch (status) {
-      case "saudavel":
-        return { label: "Saudável", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" };
-      case "requer_atencao":
-        return { label: "Requer Atenção", color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" };
-      case "insatisfeito":
-        return { label: "Insatisfeito", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" };
-      default:
-        return { label: "Não definido", color: "bg-muted text-muted-foreground" };
-    }
-  };
 
   const formatCurrency = (value: string | null): string => {
     if (!value) return "Não informado";
@@ -724,7 +658,7 @@ export default function ClientDetail() {
         case 'status':
           return multiplier * (a.status || '').localeCompare(b.status || '');
         case 'squad':
-          return multiplier * mapSquadCodeToName(a.squad).localeCompare(mapSquadCodeToName(b.squad));
+          return multiplier * getSquadLabel(a.squad).localeCompare(getSquadLabel(b.squad));
         case 'dataInicio':
           const dateA = a.dataInicio ? new Date(a.dataInicio).getTime() : 0;
           const dateB = b.dataInicio ? new Date(b.dataInicio).getTime() : 0;
@@ -2044,7 +1978,7 @@ export default function ClientDetail() {
                     >
                       <SelectValue>
                         {(() => {
-                          const statusInfo = getStatusContaBadge(cliente.statusConta);
+                          const statusInfo = getAccountStatusInfo(cliente.statusConta);
                           return (
                             <Badge className={statusInfo.color} variant="outline">
                               {statusInfo.label}
@@ -2077,8 +2011,8 @@ export default function ClientDetail() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Cluster</p>
-                  <Badge className={`text-xs ${getClusterBadgeColor(cliente.cluster)}`} variant="outline" data-testid="badge-cluster">
-                    {mapClusterToName(cliente.cluster)}
+                  <Badge className={`text-xs ${getClusterInfo(cliente.cluster).color}`} variant="outline" data-testid="badge-cluster">
+                    {getClusterInfo(cliente.cluster).label}
                   </Badge>
                 </div>
               </div>
@@ -2090,7 +2024,7 @@ export default function ClientDetail() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Tipo de Negócio</p>
                   {(() => {
-                    const badge = getTipoNegocioBadge(cliente.tipoNegocio);
+                    const badge = getBusinessTypeInfo(cliente.tipoNegocio);
                     return (
                       <Badge className={`text-xs ${badge.color}`} variant="outline" data-testid="badge-tipo-negocio">
                         {badge.label}
@@ -2358,8 +2292,8 @@ export default function ClientDetail() {
                                     <SelectValue placeholder="Status..." />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {statusOptions.map((s) => (
-                                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    {CONTRACT_STATUS_OPTIONS.map((s) => (
+                                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
@@ -2373,7 +2307,7 @@ export default function ClientDetail() {
                                     <SelectValue placeholder="Squad..." />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {squadOptions.map((s) => (
+                                    {SQUAD_OPTIONS.map((s) => (
                                       <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                                     ))}
                                   </SelectContent>
@@ -2620,11 +2554,11 @@ export default function ClientDetail() {
                             </TableCell>
                             <TableCell>
                               <Badge 
-                                className={getSquadColorForContract(mapSquadCodeToName(contrato.squad))} 
+                                className={getSquadColorForContract(getSquadLabel(contrato.squad))} 
                                 variant="outline"
                                 data-testid={`badge-squad-${contrato.idSubtask}`}
                               >
-                                {mapSquadCodeToName(contrato.squad)}
+                                {getSquadLabel(contrato.squad)}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-muted-foreground" data-testid={`text-responsavel-${contrato.idSubtask}`}>
