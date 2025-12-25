@@ -8405,33 +8405,24 @@ export class DbStorage implements IStorage {
   async getCohortData(filters: import("@shared/schema").CohortFilters): Promise<import("@shared/schema").CohortData> {
     const { startDate, endDate, produto, squad, metricType } = filters;
     
-    let whereConditions = sql`p.status IN ('Pago', 'Baixado') AND p.data_quitacao IS NOT NULL AND p.id_cliente IS NOT NULL`;
+    // caz_parcelas uses 'QUITADO' for paid records (not 'Pago'/'Baixado')
+    // Also use data_quitacao OR data_vencimento when data_quitacao is null but status is QUITADO
+    let whereConditions = sql`p.status = 'QUITADO' AND p.id_cliente IS NOT NULL AND p.valor_pago IS NOT NULL`;
     
     if (startDate) {
-      whereConditions = sql`${whereConditions} AND p.data_quitacao >= ${startDate}::date`;
+      whereConditions = sql`${whereConditions} AND COALESCE(p.data_quitacao, p.data_vencimento) >= ${startDate}::date`;
     }
     if (endDate) {
-      whereConditions = sql`${whereConditions} AND p.data_quitacao <= ${endDate}::date`;
+      whereConditions = sql`${whereConditions} AND COALESCE(p.data_quitacao, p.data_vencimento) <= ${endDate}::date`;
     }
     
-    // Debug: Check how many records match base conditions
-    const debugResult = await db.execute(sql`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status IN ('Pago', 'Baixado')) as paid,
-        COUNT(*) FILTER (WHERE data_quitacao IS NOT NULL) as has_quitacao,
-        COUNT(*) FILTER (WHERE id_cliente IS NOT NULL) as has_cliente,
-        COUNT(*) FILTER (WHERE status IN ('Pago', 'Baixado') AND data_quitacao IS NOT NULL AND id_cliente IS NOT NULL) as matching
-      FROM caz_parcelas
-    `);
-    console.log("[getCohortData] Debug counts:", debugResult.rows[0]);
-    
     // Simplified query without JOIN - cohort is based purely on payment data
+    // Use COALESCE(data_quitacao, data_vencimento) since data_quitacao may be null even for QUITADO
     const result = await db.execute(sql`
       WITH client_cohorts AS (
         SELECT 
           p.id_cliente,
-          DATE_TRUNC('month', MIN(p.data_quitacao))::date as cohort_month
+          DATE_TRUNC('month', MIN(COALESCE(p.data_quitacao, p.data_vencimento)))::date as cohort_month
         FROM caz_parcelas p
         WHERE ${whereConditions}
         GROUP BY p.id_cliente
@@ -8439,11 +8430,11 @@ export class DbStorage implements IStorage {
       monthly_revenue AS (
         SELECT 
           p.id_cliente,
-          DATE_TRUNC('month', p.data_quitacao)::date as revenue_month,
+          DATE_TRUNC('month', COALESCE(p.data_quitacao, p.data_vencimento))::date as revenue_month,
           SUM(COALESCE(p.valor_pago::numeric, 0)) as revenue
         FROM caz_parcelas p
         WHERE ${whereConditions}
-        GROUP BY p.id_cliente, DATE_TRUNC('month', p.data_quitacao)
+        GROUP BY p.id_cliente, DATE_TRUNC('month', COALESCE(p.data_quitacao, p.data_vencimento))
       ),
       cohort_data AS (
         SELECT 
