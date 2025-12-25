@@ -14,7 +14,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus, ChevronsUpDown } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -142,10 +143,16 @@ export default function ClientDetail() {
   const [isEditingDados, setIsEditingDados] = useState(false);
   const [editingContratoId, setEditingContratoId] = useState<string | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [openResponsavel, setOpenResponsavel] = useState(false);
+  const [openResponsavelGeral, setOpenResponsavelGeral] = useState(false);
+  const [openContratoResponsavel, setOpenContratoResponsavel] = useState(false);
+  const [openContratoCs, setOpenContratoCs] = useState(false);
 
   useEffect(() => {
     if (!editingContratoId) {
       setDatePickerOpen(false);
+      setOpenContratoResponsavel(false);
+      setOpenContratoCs(false);
     }
   }, [editingContratoId]);
 
@@ -1519,22 +1526,55 @@ export default function ClientDetail() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Responsável (CS)</FormLabel>
-                          <Select 
-                            onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)} 
-                            value={field.value || "__none__"}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-responsavel">
-                                <SelectValue placeholder="Selecione o CS" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="__none__">Nenhum</SelectItem>
-                              {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
-                                <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Popover open={openResponsavel} onOpenChange={setOpenResponsavel}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openResponsavel}
+                                  className="w-full justify-between font-normal"
+                                  data-testid="select-responsavel"
+                                >
+                                  {field.value || "Selecione o CS"}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[300px] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Buscar colaborador..." />
+                                <CommandList>
+                                  <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                                  <CommandGroup>
+                                    <CommandItem
+                                      value="__none__"
+                                      onSelect={() => {
+                                        field.onChange("");
+                                        setOpenResponsavel(false);
+                                      }}
+                                    >
+                                      <Check className={`mr-2 h-4 w-4 ${!field.value ? "opacity-100" : "opacity-0"}`} />
+                                      Nenhum
+                                    </CommandItem>
+                                    {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
+                                      <CommandItem
+                                        key={c.id}
+                                        value={c.nome}
+                                        onSelect={() => {
+                                          field.onChange(c.nome);
+                                          setOpenResponsavel(false);
+                                        }}
+                                      >
+                                        <Check className={`mr-2 h-4 w-4 ${field.value === c.nome ? "opacity-100" : "opacity-0"}`} />
+                                        {c.nome}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         </FormItem>
                       )}
                     />
@@ -1544,22 +1584,55 @@ export default function ClientDetail() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Nome Responsável</FormLabel>
-                          <Select 
-                            onValueChange={(val) => field.onChange(val === "__none__" ? "" : val)} 
-                            value={field.value || "__none__"}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-responsavel-geral">
-                                <SelectValue placeholder="Selecione o responsável" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="__none__">Nenhum</SelectItem>
-                              {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
-                                <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Popover open={openResponsavelGeral} onOpenChange={setOpenResponsavelGeral}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openResponsavelGeral}
+                                  className="w-full justify-between font-normal"
+                                  data-testid="select-responsavel-geral"
+                                >
+                                  {field.value || "Selecione o responsável"}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[300px] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Buscar colaborador..." />
+                                <CommandList>
+                                  <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                                  <CommandGroup>
+                                    <CommandItem
+                                      value="__none__"
+                                      onSelect={() => {
+                                        field.onChange("");
+                                        setOpenResponsavelGeral(false);
+                                      }}
+                                    >
+                                      <Check className={`mr-2 h-4 w-4 ${!field.value ? "opacity-100" : "opacity-0"}`} />
+                                      Nenhum
+                                    </CommandItem>
+                                    {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
+                                      <CommandItem
+                                        key={c.id}
+                                        value={c.nome}
+                                        onSelect={() => {
+                                          field.onChange(c.nome);
+                                          setOpenResponsavelGeral(false);
+                                        }}
+                                      >
+                                        <Check className={`mr-2 h-4 w-4 ${field.value === c.nome ? "opacity-100" : "opacity-0"}`} />
+                                        {c.nome}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         </FormItem>
                       )}
                     />
@@ -2307,36 +2380,106 @@ export default function ClientDetail() {
                                 </Select>
                               </TableCell>
                               <TableCell>
-                                <Select
-                                  value={contratoEditForm.watch("responsavel") || "__none__"}
-                                  onValueChange={(val) => contratoEditForm.setValue("responsavel", val === "__none__" ? "" : val)}
-                                >
-                                  <SelectTrigger className="w-[140px]" data-testid={`select-responsavel-${contrato.idSubtask}`}>
-                                    <SelectValue placeholder="Responsável..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="__none__">Nenhum</SelectItem>
-                                    {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
-                                      <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                <Popover open={openContratoResponsavel} onOpenChange={setOpenContratoResponsavel}>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      aria-expanded={openContratoResponsavel}
+                                      className="w-[160px] justify-between font-normal"
+                                      data-testid={`select-responsavel-${contrato.idSubtask}`}
+                                    >
+                                      <span className="truncate">
+                                        {contratoEditForm.watch("responsavel") || "Responsável..."}
+                                      </span>
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[250px] p-0" align="start">
+                                    <Command>
+                                      <CommandInput placeholder="Buscar colaborador..." />
+                                      <CommandList>
+                                        <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                                        <CommandGroup>
+                                          <CommandItem
+                                            value="__none__"
+                                            onSelect={() => {
+                                              contratoEditForm.setValue("responsavel", "");
+                                              setOpenContratoResponsavel(false);
+                                            }}
+                                          >
+                                            <Check className={`mr-2 h-4 w-4 ${!contratoEditForm.watch("responsavel") ? "opacity-100" : "opacity-0"}`} />
+                                            Nenhum
+                                          </CommandItem>
+                                          {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
+                                            <CommandItem
+                                              key={c.id}
+                                              value={c.nome}
+                                              onSelect={() => {
+                                                contratoEditForm.setValue("responsavel", c.nome);
+                                                setOpenContratoResponsavel(false);
+                                              }}
+                                            >
+                                              <Check className={`mr-2 h-4 w-4 ${contratoEditForm.watch("responsavel") === c.nome ? "opacity-100" : "opacity-0"}`} />
+                                              {c.nome}
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
                               </TableCell>
                               <TableCell>
-                                <Select
-                                  value={contratoEditForm.watch("csResponsavel") || "__none__"}
-                                  onValueChange={(val) => contratoEditForm.setValue("csResponsavel", val === "__none__" ? "" : val)}
-                                >
-                                  <SelectTrigger className="w-[140px]" data-testid={`select-cs-${contrato.idSubtask}`}>
-                                    <SelectValue placeholder="CS..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="__none__">Nenhum</SelectItem>
-                                    {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
-                                      <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                <Popover open={openContratoCs} onOpenChange={setOpenContratoCs}>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      aria-expanded={openContratoCs}
+                                      className="w-[160px] justify-between font-normal"
+                                      data-testid={`select-cs-${contrato.idSubtask}`}
+                                    >
+                                      <span className="truncate">
+                                        {contratoEditForm.watch("csResponsavel") || "CS..."}
+                                      </span>
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[250px] p-0" align="start">
+                                    <Command>
+                                      <CommandInput placeholder="Buscar colaborador..." />
+                                      <CommandList>
+                                        <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                                        <CommandGroup>
+                                          <CommandItem
+                                            value="__none__"
+                                            onSelect={() => {
+                                              contratoEditForm.setValue("csResponsavel", "");
+                                              setOpenContratoCs(false);
+                                            }}
+                                          >
+                                            <Check className={`mr-2 h-4 w-4 ${!contratoEditForm.watch("csResponsavel") ? "opacity-100" : "opacity-0"}`} />
+                                            Nenhum
+                                          </CommandItem>
+                                          {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
+                                            <CommandItem
+                                              key={c.id}
+                                              value={c.nome}
+                                              onSelect={() => {
+                                                contratoEditForm.setValue("csResponsavel", c.nome);
+                                                setOpenContratoCs(false);
+                                              }}
+                                            >
+                                              <Check className={`mr-2 h-4 w-4 ${contratoEditForm.watch("csResponsavel") === c.nome ? "opacity-100" : "opacity-0"}`} />
+                                              {c.nome}
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
                               </TableCell>
                               <TableCell>
                                 <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
