@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText } from "lucide-react";
+import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText, TrendingUp, Building2, AlertTriangle, FileCheck, UserMinus, Target, GitBranch, ChevronDown, ChevronUp } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -48,15 +49,27 @@ interface NotificationRule {
 }
 
 const FIELD_TYPES = [
+  // Clientes
   { key: 'client_status', label: 'Status do Cliente', icon: Activity },
   { key: 'business_type', label: 'Tipo de Negócio', icon: Briefcase },
   { key: 'cluster', label: 'Cluster', icon: Layers },
-  { key: 'squad', label: 'Squad', icon: Users },
   { key: 'account_status', label: 'Status da Conta', icon: Flag },
-  { key: 'collaborator_status', label: 'Status Colaborador', icon: UserCog },
+  // Comercial
+  { key: 'origem_lead', label: 'Origem do Lead', icon: Target },
+  { key: 'pipeline_stage', label: 'Etapa do Pipeline', icon: GitBranch },
+  { key: 'motivo_churn', label: 'Motivo de Churn', icon: UserMinus },
+  { key: 'prioridade', label: 'Prioridade', icon: AlertTriangle },
+  // Contratos
   { key: 'contract_status', label: 'Status do Contrato', icon: Database },
+  { key: 'tipo_contrato', label: 'Tipo de Contrato', icon: FileCheck },
   { key: 'product', label: 'Produto', icon: Package },
   { key: 'plan', label: 'Plano', icon: FileText },
+  // RH
+  { key: 'squad', label: 'Squad', icon: Users },
+  { key: 'collaborator_status', label: 'Status Colaborador', icon: UserCog },
+  { key: 'cargo', label: 'Cargo', icon: Briefcase },
+  { key: 'nivel', label: 'Nível', icon: TrendingUp },
+  { key: 'setor', label: 'Setor', icon: Building2 },
 ];
 
 interface ColaboradorVinculado {
@@ -888,6 +901,7 @@ function AddEditFieldOptionDialog({
 
 function FieldTypeCard({ fieldType }: { fieldType: { key: string; label: string; icon: any } }) {
   const { toast } = useToast();
+  const [isOpen, setIsOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOption, setEditingOption] = useState<SystemFieldOption | null>(null);
   const Icon = fieldType.icon;
@@ -926,68 +940,85 @@ function FieldTypeCard({ fieldType }: { fieldType: { key: string; label: string;
   };
 
   const options = data?.options || [];
+  const optionCount = options.length;
 
   return (
     <Card data-testid={`card-field-${fieldType.key}`}>
-      <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
-        <div className="flex items-center gap-2">
-          <Icon className="h-5 w-5 text-muted-foreground" />
-          <CardTitle className="text-base">{fieldType.label}</CardTitle>
-        </div>
-        <Button size="sm" onClick={handleAdd} data-testid={`button-add-${fieldType.key}`}>
-          <Plus className="h-4 w-4 mr-1" />
-          Adicionar
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : options.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Nenhuma opção cadastrada
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {options.map((option) => (
-              <div 
-                key={option.id} 
-                className="flex items-center justify-between p-2 rounded-md border bg-muted/30"
-                data-testid={`option-${option.id}`}
-              >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {option.color ? (
-                    <Badge className={option.color}>{option.label}</Badge>
-                  ) : (
-                    <span className="text-sm font-medium">{option.label}</span>
-                  )}
-                  <span className="text-xs text-muted-foreground truncate">({option.value})</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    onClick={() => handleEdit(option)}
-                    data-testid={`button-edit-option-${option.id}`}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    onClick={() => handleDelete(option)}
-                    data-testid={`button-delete-option-${option.id}`}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer hover-elevate py-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Icon className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">{fieldType.label}</CardTitle>
+                <Badge variant="secondary" className="text-xs">{optionCount}</Badge>
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
+              {isOpen ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-0">
+            <div className="flex justify-end mb-3">
+              <Button size="sm" onClick={handleAdd} data-testid={`button-add-${fieldType.key}`}>
+                <Plus className="h-4 w-4 mr-1" />
+                Adicionar
+              </Button>
+            </div>
+            {isLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ) : options.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma opção cadastrada
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {options.map((option) => (
+                  <div 
+                    key={option.id} 
+                    className="flex items-center justify-between p-2 rounded-md border bg-muted/30"
+                    data-testid={`option-${option.id}`}
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {option.color ? (
+                        <Badge className={option.color}>{option.label}</Badge>
+                      ) : (
+                        <span className="text-sm font-medium">{option.label}</span>
+                      )}
+                      <span className="text-xs text-muted-foreground truncate">({option.value})</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => handleEdit(option)}
+                        data-testid={`button-edit-option-${option.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => handleDelete(option)}
+                        data-testid={`button-delete-option-${option.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
 
       <AddEditFieldOptionDialog
         open={isDialogOpen}
