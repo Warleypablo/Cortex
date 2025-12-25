@@ -18,7 +18,19 @@ interface ClientsTableProps {
   onSort: (field: SortField) => void;
 }
 
+const clusterLabels: Record<string, string> = {
+  "1": "NFNC",
+  "2": "Regulares",
+  "3": "Chaves",
+  "4": "Imperdíveis",
+};
+
 export default function ClientsTable({ clients, onClientClick, ltvMap, sortField, sortDirection, onSort }: ClientsTableProps) {
+
+  const getClusterLabel = (cluster: string | null) => {
+    if (!cluster) return "-";
+    return clusterLabels[cluster] || cluster;
+  };
 
   const getStatusColor = (status: string | null) => {
     if (!status) return "bg-muted text-muted-foreground";
@@ -264,7 +276,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, sortField
               </div>
               {/* Cluster */}
               <div className="px-4 py-3 text-sm text-muted-foreground" data-testid={`text-cluster-${clientId}`}>
-                {client.cluster || "-"}
+                {getClusterLabel(client.cluster)}
               </div>
               {/* Financeiro */}
               <div className="px-4 py-3 text-sm" data-testid={`text-financeiro-${clientId}`}>
