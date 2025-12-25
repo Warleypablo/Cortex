@@ -62,6 +62,7 @@ interface ClienteDb {
   tipoNegocio: string | null;
   faturamentoMensal: string | null;
   investimentoAds: string | null;
+  statusConta: string | null;
 }
 
 interface ContaReceber {
@@ -359,6 +360,29 @@ export default function ClientDetail() {
     },
   });
 
+  const updateStatusContaMutation = useMutation({
+    mutationFn: async (statusConta: string | null) => {
+      const cnpj = cliente?.cnpj;
+      if (!cnpj) throw new Error("CNPJ do cliente não encontrado");
+      const response = await apiRequest("PATCH", `/api/clientes/${encodeURIComponent(cnpj)}/status-conta`, { statusConta });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente", clientId] });
+      toast({
+        title: "Sucesso!",
+        description: "Status da conta atualizado com sucesso.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao atualizar",
+        description: error.message || "Não foi possível atualizar o status da conta.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const mapClusterNameToCode = (name: string): string => {
     switch (name) {
       case "NFNC": return "0";
@@ -594,6 +618,20 @@ export default function ClientDetail() {
       return { label: "Info", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300" };
     }
     return { label: tipo, color: "bg-muted text-muted-foreground" };
+  };
+
+  const getStatusContaBadge = (status: string | null): { label: string; color: string } => {
+    if (!status) return { label: "Não definido", color: "bg-muted text-muted-foreground" };
+    switch (status) {
+      case "saudavel":
+        return { label: "Saudável", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" };
+      case "requer_atencao":
+        return { label: "Requer Atenção", color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" };
+      case "insatisfeito":
+        return { label: "Insatisfeito", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" };
+      default:
+        return { label: "Não definido", color: "bg-muted text-muted-foreground" };
+    }
   };
 
   const formatCurrency = (value: string | null): string => {
@@ -1693,6 +1731,51 @@ export default function ClientDetail() {
                   <Badge variant={temContratoAtivo ? "default" : "secondary"} data-testid="badge-status-cliente">
                     {temContratoAtivo ? "Ativo" : "Inativo"}
                   </Badge>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3" data-testid="field-status-conta">
+                <Activity className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">STATUS DA CONTA</p>
+                  <Select
+                    value={cliente.statusConta || ""}
+                    onValueChange={(value) => {
+                      const newValue = value === "__none__" ? null : value;
+                      updateStatusContaMutation.mutate(newValue);
+                    }}
+                    disabled={updateStatusContaMutation.isPending}
+                  >
+                    <SelectTrigger 
+                      className="w-auto h-auto p-0 border-0 shadow-none bg-transparent [&>span]:flex [&>span]:items-center [&>span]:gap-1.5"
+                      data-testid="select-status-conta"
+                    >
+                      <SelectValue>
+                        {(() => {
+                          const statusInfo = getStatusContaBadge(cliente.statusConta);
+                          return (
+                            <Badge className={statusInfo.color} variant="outline">
+                              {statusInfo.label}
+                            </Badge>
+                          );
+                        })()}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">
+                        <Badge className="bg-muted text-muted-foreground" variant="outline">Não definido</Badge>
+                      </SelectItem>
+                      <SelectItem value="saudavel">
+                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" variant="outline">Saudável</Badge>
+                      </SelectItem>
+                      <SelectItem value="requer_atencao">
+                        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" variant="outline">Requer Atenção</Badge>
+                      </SelectItem>
+                      <SelectItem value="insatisfeito">
+                        <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" variant="outline">Insatisfeito</Badge>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
