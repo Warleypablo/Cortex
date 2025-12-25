@@ -11097,19 +11097,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // 3. Overdue payments notifications (>7 days overdue)
-      // Using caz_parcelas table with id_cliente for grouping, with client name from caz_clientes
+      // Using caz_parcelas table with id_cliente for grouping
       const overdueResult = await db.execute(sql`
         SELECT 
           p.id_cliente, 
-          c.nome as cliente_nome,
           COUNT(*) as parcelas_vencidas, 
           SUM(p.valor_bruto) as total_devido
         FROM caz_parcelas p
-        LEFT JOIN caz_clientes c ON p.id_cliente = c.id::text
         WHERE p.data_vencimento < CURRENT_DATE - INTERVAL '7 days'
           AND p.status != 'Pago'
           AND p.id_cliente IS NOT NULL
-        GROUP BY p.id_cliente, c.nome
+        GROUP BY p.id_cliente
         HAVING COUNT(*) >= 1
       `);
       
@@ -11117,7 +11115,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const overdue of overdueResult.rows as any[]) {
         const clientId = overdue.id_cliente || 'unknown';
-        const clientName = overdue.cliente_nome || 'Cliente não identificado';
         const uniqueKey = `inadimplencia_${clientId}_${currentMonth}`;
         
         const exists = await storage.notificationExists(uniqueKey);
@@ -11126,7 +11123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const notification = await storage.createNotification({
             type: 'inadimplencia',
-            title: `Inadimplência - ${clientName}`,
+            title: `Inadimplência detectada`,
             message: `${overdue.parcelas_vencidas} parcela(s) vencida(s) há mais de 7 dias. Total: ${totalDevido}`,
             entityId: clientId,
             entityType: 'cliente',
