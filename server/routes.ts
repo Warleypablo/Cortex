@@ -1368,6 +1368,154 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/clientes/:cnpj/alertas - Fetch alerts for a client
+  app.get("/api/clientes/:cnpj/alertas", async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      const alerts: Array<{
+        id: string;
+        type: 'inadimplencia' | 'vencimento_proximo' | 'contrato_expirando' | 'cliente_inativo';
+        severity: 'critical' | 'warning' | 'info';
+        title: string;
+        message: string;
+        actionUrl?: string;
+        metadata?: Record<string, any>;
+      }> = [];
+
+      const today = new Date();
+      const sevenDaysFromNow = new Date(today);
+      sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+      const thirtyDaysFromNow = new Date(today);
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+      // Get client info from caz_clientes
+      const clienteResult = await db.execute(sql`
+        SELECT nome FROM caz_clientes WHERE cnpj = ${cnpj}
+      `);
+      const clienteNome = clienteResult.rows.length > 0 ? (clienteResult.rows[0] as any).nome : null;
+
+      // Get client status from cup_clientes
+      const statusResult = await db.execute(sql`
+        SELECT status FROM cup_clientes WHERE cnpj = ${cnpj}
+      `);
+      const clienteStatus = statusResult.rows.length > 0 ? (statusResult.rows[0] as any).status : null;
+
+      // Check for inactive client
+      if (clienteStatus && clienteStatus !== 'Ativo') {
+        alerts.push({
+          id: 'cliente_inativo',
+          type: 'cliente_inativo',
+          severity: 'info',
+          title: 'Cliente Inativo',
+          message: `Status atual: ${clienteStatus}`,
+          metadata: { status: clienteStatus }
+        });
+      }
+
+      if (clienteNome) {
+        // Check for overdue payments (inadimplência)
+        const overdueResult = await db.execute(sql`
+          SELECT 
+            COUNT(*) as count,
+            SUM(COALESCE(nao_pago, 0)) as total
+          FROM caz_parcelas
+          WHERE empresa = ${clienteNome}
+            AND COALESCE(nao_pago, 0) > 0
+            AND data_vencimento < ${today}
+        `);
+        const overdueData = overdueResult.rows[0] as any;
+        const overdueCount = parseInt(overdueData?.count || '0');
+        const overdueTotal = parseFloat(overdueData?.total || '0');
+
+        if (overdueCount > 0 && overdueTotal > 0) {
+          const formattedValue = new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+          }).format(overdueTotal);
+          alerts.push({
+            id: 'inadimplencia',
+            type: 'inadimplencia',
+            severity: 'critical',
+            title: 'Inadimplência',
+            message: `${overdueCount} parcela${overdueCount > 1 ? 's' : ''} em atraso totalizando ${formattedValue}`,
+            metadata: { count: overdueCount, total: overdueTotal }
+          });
+        }
+
+        // Check for payments due within next 7 days
+        const upcomingResult = await db.execute(sql`
+          SELECT 
+            SUM(COALESCE(nao_pago, 0)) as total,
+            MIN(data_vencimento) as proxima_data
+          FROM caz_parcelas
+          WHERE empresa = ${clienteNome}
+            AND COALESCE(nao_pago, 0) > 0
+            AND data_vencimento >= ${today}
+            AND data_vencimento <= ${sevenDaysFromNow}
+        `);
+        const upcomingData = upcomingResult.rows[0] as any;
+        const upcomingTotal = parseFloat(upcomingData?.total || '0');
+        const proximaData = upcomingData?.proxima_data;
+
+        if (upcomingTotal > 0 && proximaData) {
+          const formattedValue = new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+          }).format(upcomingTotal);
+          const dataFormatada = new Date(proximaData).toLocaleDateString('pt-BR');
+          alerts.push({
+            id: 'vencimento_proximo',
+            type: 'vencimento_proximo',
+            severity: 'warning',
+            title: 'Próximo Vencimento',
+            message: `${formattedValue} vence em ${dataFormatada}`,
+            metadata: { total: upcomingTotal, dueDate: proximaData }
+          });
+        }
+      }
+
+      // Check for expiring contracts
+      const expiringContractsResult = await db.execute(sql`
+        SELECT 
+          servico,
+          data_encerramento
+        FROM cup_contratos
+        WHERE id_task IN (
+          SELECT id_task FROM cup_contratos c2
+          WHERE EXISTS (
+            SELECT 1 FROM cup_clientes cl WHERE cl.cnpj = ${cnpj} AND cl.nome = c2.id_task
+          )
+          UNION
+          SELECT task_id FROM cup_clientes WHERE cnpj = ${cnpj}
+        )
+        AND LOWER(status) = 'ativo'
+        AND data_encerramento IS NOT NULL
+        AND data_encerramento > ${today}
+        AND data_encerramento <= ${thirtyDaysFromNow}
+        ORDER BY data_encerramento ASC
+        LIMIT 5
+      `);
+
+      for (const contrato of expiringContractsResult.rows as any[]) {
+        const dataEncerramento = new Date(contrato.data_encerramento);
+        const diasRestantes = Math.ceil((dataEncerramento.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        alerts.push({
+          id: `contrato_expirando_${contrato.servico}`,
+          type: 'contrato_expirando',
+          severity: 'warning',
+          title: 'Contrato Expirando',
+          message: `${contrato.servico} expira em ${diasRestantes} dia${diasRestantes > 1 ? 's' : ''}`,
+          metadata: { servico: contrato.servico, diasRestantes, dataEncerramento: contrato.data_encerramento }
+        });
+      }
+
+      res.json(alerts);
+    } catch (error) {
+      console.error("[api] Error fetching client alerts:", error);
+      res.status(500).json({ error: "Failed to fetch client alerts" });
+    }
+  });
+
   // GET /api/clientes/:cnpj/timeline - Fetch unified timeline of events for a client
   app.get("/api/clientes/:cnpj/timeline", async (req, res) => {
     try {
