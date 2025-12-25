@@ -1368,6 +1368,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/clientes/:cnpj/timeline - Fetch unified timeline of events for a client
+  app.get("/api/clientes/:cnpj/timeline", async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      
+      // Get client info from caz_clientes
+      const clienteResult = await db.execute(sql`
+        SELECT nome FROM caz_clientes WHERE cnpj = ${cnpj}
+      `);
+      
+      const clienteNome = clienteResult.rows.length > 0 ? (clienteResult.rows[0] as any).nome : null;
+      
+      if (!clienteNome) {
+        return res.json([]);
+      }
+      
+      const today = new Date();
+      const twelveMonthsAgo = new Date(today);
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      
+      // Query payments and contracts in parallel
+      const [parcelasResult, contratosResult] = await Promise.all([
+        // Payment events from caz_parcelas
+        db.execute(sql`
+          SELECT 
+            id,
+            status,
+            valor_pago,
+            nao_pago,
+            data_vencimento,
+            data_quitacao,
+            descricao,
+            metodo_pagamento,
+            valor_bruto
+          FROM caz_parcelas
+          WHERE empresa = ${clienteNome}
+            AND (data_vencimento >= ${twelveMonthsAgo} OR data_quitacao >= ${twelveMonthsAgo})
+          ORDER BY COALESCE(data_quitacao, data_vencimento) DESC
+          LIMIT 50
+        `),
+        // Contract events from cup_contratos
+        db.execute(sql`
+          SELECT 
+            id_subtask,
+            servico,
+            status,
+            valorr,
+            valorp,
+            data_inicio,
+            data_encerramento,
+            squad
+          FROM cup_contratos
+          WHERE id_task IN (
+            SELECT id_task FROM cup_contratos c2
+            INNER JOIN cup_clientes cl ON cl.nome ILIKE ('%' || SPLIT_PART(c2.servico, ' - ', 1) || '%')
+            WHERE cl.cnpj = ${cnpj}
+          ) OR servico ILIKE ('%' || ${clienteNome} || '%')
+          ORDER BY COALESCE(data_encerramento, data_inicio) DESC NULLS LAST
+          LIMIT 30
+        `)
+      ]);
+      
+      const events: Array<{
+        id: string;
+        type: 'payment_received' | 'payment_due' | 'payment_overdue' | 'contract_started' | 'contract_ended' | 'contract_cancelled';
+        date: string;
+        title: string;
+        description: string;
+        amount?: number;
+        metadata?: Record<string, any>;
+      }> = [];
+      
+      // Process payment events
+      for (const row of parcelasResult.rows) {
+        const parcela = row as any;
+        const valorPago = parseFloat(parcela.valor_pago || '0');
+        const naoPago = parseFloat(parcela.nao_pago || '0');
+        const valorBruto = parseFloat(parcela.valor_bruto || '0');
+        const status = parcela.status?.toUpperCase();
+        const dataVencimento = parcela.data_vencimento ? new Date(parcela.data_vencimento) : null;
+        const dataQuitacao = parcela.data_quitacao ? new Date(parcela.data_quitacao) : null;
+        
+        if (status === 'PAGO' || status === 'ACQUITTED') {
+          // Payment received
+          if (dataQuitacao) {
+            events.push({
+              id: `payment-received-${parcela.id}`,
+              type: 'payment_received',
+              date: dataQuitacao.toISOString(),
+              title: 'Pagamento Recebido',
+              description: parcela.descricao || 'Pagamento processado',
+              amount: valorPago || valorBruto,
+              metadata: {
+                metodoPagamento: parcela.metodo_pagamento,
+                parcelaId: parcela.id
+              }
+            });
+          }
+        } else if (dataVencimento && dataVencimento < today && naoPago > 0) {
+          // Payment overdue
+          events.push({
+            id: `payment-overdue-${parcela.id}`,
+            type: 'payment_overdue',
+            date: dataVencimento.toISOString(),
+            title: 'Pagamento em Atraso',
+            description: parcela.descricao || 'Pagamento vencido não quitado',
+            amount: naoPago,
+            metadata: {
+              diasAtraso: Math.floor((today.getTime() - dataVencimento.getTime()) / (1000 * 60 * 60 * 24)),
+              parcelaId: parcela.id
+            }
+          });
+        } else if (dataVencimento && dataVencimento >= today) {
+          // Payment due
+          events.push({
+            id: `payment-due-${parcela.id}`,
+            type: 'payment_due',
+            date: dataVencimento.toISOString(),
+            title: 'Pagamento a Vencer',
+            description: parcela.descricao || 'Pagamento programado',
+            amount: valorBruto || naoPago,
+            metadata: {
+              parcelaId: parcela.id
+            }
+          });
+        }
+      }
+      
+      // Process contract events
+      for (const row of contratosResult.rows) {
+        const contrato = row as any;
+        const valorRecorrente = parseFloat(contrato.valorr || '0');
+        const valorPontual = parseFloat(contrato.valorp || '0');
+        const dataInicio = contrato.data_inicio ? new Date(contrato.data_inicio) : null;
+        const dataEncerramento = contrato.data_encerramento ? new Date(contrato.data_encerramento) : null;
+        const status = contrato.status?.toLowerCase();
+        
+        // Contract started
+        if (dataInicio) {
+          events.push({
+            id: `contract-started-${contrato.id_subtask}`,
+            type: 'contract_started',
+            date: dataInicio.toISOString(),
+            title: 'Contrato Iniciado',
+            description: contrato.servico || 'Novo contrato ativo',
+            amount: valorRecorrente || valorPontual,
+            metadata: {
+              squad: contrato.squad,
+              contratoId: contrato.id_subtask
+            }
+          });
+        }
+        
+        // Contract ended or cancelled
+        if (dataEncerramento) {
+          const isCancelled = status === 'cancelado' || status === 'cancelled';
+          events.push({
+            id: `contract-${isCancelled ? 'cancelled' : 'ended'}-${contrato.id_subtask}`,
+            type: isCancelled ? 'contract_cancelled' : 'contract_ended',
+            date: dataEncerramento.toISOString(),
+            title: isCancelled ? 'Contrato Cancelado' : 'Contrato Encerrado',
+            description: contrato.servico || 'Contrato finalizado',
+            amount: valorRecorrente || valorPontual,
+            metadata: {
+              squad: contrato.squad,
+              contratoId: contrato.id_subtask
+            }
+          });
+        }
+      }
+      
+      // Sort by date descending
+      events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      // Limit to 50 events
+      res.json(events.slice(0, 50));
+    } catch (error) {
+      console.error("[api] Error fetching client timeline:", error);
+      res.status(500).json({ error: "Failed to fetch timeline" });
+    }
+  });
+
   app.get("/api/fornecedores/:fornecedorId/despesas", async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
