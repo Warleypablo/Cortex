@@ -80,6 +80,41 @@ export async function initializeNotificationRulesTable(): Promise<void> {
       )
     `);
     console.log('[database] Notification rules table initialized');
+    
+    // Seed default rules if table is empty
+    const countResult = await db.execute(sql`SELECT COUNT(*) as count FROM notification_rules`);
+    const count = Number((countResult.rows[0] as any)?.count || 0);
+    
+    if (count === 0) {
+      const defaultRules = [
+        {
+          ruleType: 'inadimplencia',
+          name: 'Inadimplência (+7 dias)',
+          description: 'Alerta quando um cliente está com pagamento em atraso por mais de 7 dias',
+          config: JSON.stringify({ minDaysOverdue: 7, minValue: 0 })
+        },
+        {
+          ruleType: 'contrato_vencendo',
+          name: 'Contrato Vencendo (30 dias)',
+          description: 'Alerta quando um contrato está próximo do vencimento (30 dias)',
+          config: JSON.stringify({ daysBeforeExpiry: 30 })
+        },
+        {
+          ruleType: 'aniversario',
+          name: 'Aniversário de Colaborador',
+          description: 'Alerta quando é aniversário de um colaborador',
+          config: JSON.stringify({ enabled: true })
+        }
+      ];
+      
+      for (const rule of defaultRules) {
+        await db.execute(sql`
+          INSERT INTO notification_rules (rule_type, name, description, is_enabled, config)
+          VALUES (${rule.ruleType}, ${rule.name}, ${rule.description}, true, ${rule.config})
+        `);
+      }
+      console.log('[database] Default notification rules seeded');
+    }
   } catch (error) {
     console.error('[database] Error initializing notification rules table:', error);
   }
