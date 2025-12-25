@@ -8397,8 +8397,6 @@ export class DbStorage implements IStorage {
   async getCohortData(filters: import("@shared/schema").CohortFilters): Promise<import("@shared/schema").CohortData> {
     const { startDate, endDate, produto, squad, metricType } = filters;
     
-    const hasFilters = !!(produto || squad);
-    
     let whereConditions = sql`p.status IN ('Pago', 'Baixado') AND p.data_quitacao IS NOT NULL AND p.id_cliente IS NOT NULL`;
     
     if (startDate) {
@@ -8408,28 +8406,14 @@ export class DbStorage implements IStorage {
       whereConditions = sql`${whereConditions} AND p.data_quitacao <= ${endDate}::date`;
     }
     
-    let produtoCondition = sql`TRUE`;
-    let squadCondition = sql`TRUE`;
-    
-    if (produto) {
-      produtoCondition = sql`c.produto = ${produto}`;
-    }
-    if (squad) {
-      squadCondition = sql`c.squad = ${squad}`;
-    }
-    
-    const joinType = hasFilters ? sql`INNER JOIN` : sql`LEFT JOIN`;
-    
+    // Simplified query without JOIN - cohort is based purely on payment data
     const result = await db.execute(sql`
       WITH client_cohorts AS (
         SELECT 
           p.id_cliente,
           DATE_TRUNC('month', MIN(p.data_quitacao))::date as cohort_month
         FROM caz_parcelas p
-        ${joinType} cup_contratos c ON p.id_cliente = c.id_task::text
         WHERE ${whereConditions}
-          AND ${produtoCondition}
-          AND ${squadCondition}
         GROUP BY p.id_cliente
       ),
       monthly_revenue AS (
@@ -8438,10 +8422,7 @@ export class DbStorage implements IStorage {
           DATE_TRUNC('month', p.data_quitacao)::date as revenue_month,
           SUM(COALESCE(p.valor_pago::numeric, 0)) as revenue
         FROM caz_parcelas p
-        ${joinType} cup_contratos c ON p.id_cliente = c.id_task::text
         WHERE ${whereConditions}
-          AND ${produtoCondition}
-          AND ${squadCondition}
         GROUP BY p.id_cliente, DATE_TRUNC('month', p.data_quitacao)
       ),
       cohort_data AS (
