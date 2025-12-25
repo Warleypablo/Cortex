@@ -8,15 +8,27 @@ import { formatCurrency, formatPercent } from "@/lib/utils";
 import type { CohortData, CohortViewMode, CohortMetricType, CohortCell } from "@shared/schema";
 import { Users, DollarSign, TrendingUp, Percent, Hash } from "lucide-react";
 
-function getCellColor(percentage: number): string {
-  if (percentage >= 90) return 'bg-green-700 text-white';
-  if (percentage >= 80) return 'bg-green-600 text-white';
-  if (percentage >= 70) return 'bg-green-500 text-white';
-  if (percentage >= 60) return 'bg-yellow-500 text-white';
-  if (percentage >= 50) return 'bg-yellow-600 text-white';
-  if (percentage >= 40) return 'bg-orange-500 text-white';
-  if (percentage >= 30) return 'bg-red-400 text-white';
-  if (percentage >= 20) return 'bg-red-500 text-white';
+function getExpectedRetention(monthOffset: number): number {
+  return 100 * Math.pow(0.92, monthOffset);
+}
+
+function getCellColor(percentage: number, monthOffset: number): string {
+  if (monthOffset === 0) {
+    return 'bg-muted text-foreground';
+  }
+  
+  const expected = getExpectedRetention(monthOffset);
+  const diff = percentage - expected;
+  const diffPercent = (diff / expected) * 100;
+  
+  if (diffPercent >= 15) return 'bg-green-700 text-white';
+  if (diffPercent >= 10) return 'bg-green-600 text-white';
+  if (diffPercent >= 5) return 'bg-green-500 text-white';
+  if (diffPercent >= 0) return 'bg-green-400 text-white';
+  if (diffPercent >= -5) return 'bg-yellow-500 text-white';
+  if (diffPercent >= -10) return 'bg-orange-500 text-white';
+  if (diffPercent >= -15) return 'bg-red-400 text-white';
+  if (diffPercent >= -25) return 'bg-red-500 text-white';
   return 'bg-red-600 text-white';
 }
 
@@ -179,7 +191,12 @@ export default function Cohort() {
                           key={i} 
                           className="border border-border px-3 py-2 text-center font-semibold min-w-[60px]"
                         >
-                          {i}
+                          <div>{i}</div>
+                          {i > 0 && (
+                            <div className="text-xs font-normal text-muted-foreground">
+                              ({Math.round(getExpectedRetention(i))}%)
+                            </div>
+                          )}
                         </th>
                       ))}
                     </tr>
@@ -209,8 +226,9 @@ export default function Cohort() {
                           return (
                             <td
                               key={monthOffset}
-                              className={`border border-border px-3 py-2 text-center font-medium ${getCellColor(cell.percentage)}`}
+                              className={`border border-border px-3 py-2 text-center font-medium ${getCellColor(cell.percentage, monthOffset)}`}
                               data-testid={`cell-${rowIndex}-${monthOffset}`}
+                              title={monthOffset > 0 ? `Esperado: ${Math.round(getExpectedRetention(monthOffset))}%` : undefined}
                             >
                               {formatCellValue(cell, viewMode, metricType)}
                             </td>
@@ -222,21 +240,21 @@ export default function Cohort() {
                 </table>
               </div>
 
-              <div className="flex items-center gap-4 text-sm text-muted-foreground mt-4">
+              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mt-4">
                 <div className="flex items-center gap-2">
-                  <span>Legenda:</span>
+                  <span>Legenda (vs esperado -8%/mês):</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-4 h-4 rounded bg-green-600" />
-                  <span>≥80%</span>
+                  <span>Acima do esperado</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-4 h-4 rounded bg-yellow-500" />
-                  <span>50-79%</span>
+                  <span>Próximo do esperado</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-4 h-4 rounded bg-red-500" />
-                  <span>&lt;50%</span>
+                  <span>Abaixo do esperado</span>
                 </div>
               </div>
             </div>
