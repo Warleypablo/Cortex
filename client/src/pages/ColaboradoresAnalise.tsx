@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Cake, Briefcase, TrendingUp, Clock, Users, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ArrowLeft, Cake, Briefcase, TrendingUp, Clock, Users, Loader2, ArrowUpDown, ArrowUp, ArrowDown, Heart, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
 import { formatDecimal } from "@/lib/utils";
 
@@ -50,6 +52,18 @@ interface TempoPermanencia {
   totalAtivos: number;
   tempoPermanenciaDesligados: number;
   totalDesligados: number;
+}
+
+interface ColaboradorSaude {
+  id: number;
+  nome: string;
+  cargo: string | null;
+  squad: string | null;
+  healthScore: number;
+  lastEnpsScore: number | null;
+  daysSinceOneOnOne: number | null;
+  pdiProgress: number | null;
+  pendingActions: number;
 }
 
 interface DashboardAnaliseData {
@@ -107,14 +121,91 @@ const formatSquadName = (squad: string | null | undefined): string => {
   return squadIcons[cleanSquad] || squad;
 };
 
+function getInitials(nome: string) {
+  if (!nome) return "??";
+  return nome
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function HealthGauge({ score }: { score: number }) {
+  const color = score >= 80 ? "text-green-500" : score >= 50 ? "text-yellow-500" : "text-red-500";
+  const bgColor = score >= 80 ? "stroke-green-500" : score >= 50 ? "stroke-yellow-500" : "stroke-red-500";
+  const radius = 36;
+  const circumference = 2 * Math.PI * radius;
+  const progress = (score / 100) * circumference;
+
+  return (
+    <div className="relative w-20 h-20">
+      <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 80 80">
+        <circle
+          cx="40"
+          cy="40"
+          r={radius}
+          stroke="currentColor"
+          strokeWidth="6"
+          fill="none"
+          className="text-muted/20"
+        />
+        <circle
+          cx="40"
+          cy="40"
+          r={radius}
+          strokeWidth="6"
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference - progress}
+          strokeLinecap="round"
+          className={bgColor}
+        />
+      </svg>
+      <div className={`absolute inset-0 flex items-center justify-center font-bold text-lg ${color}`}>
+        {score}
+      </div>
+    </div>
+  );
+}
+
 export default function ColaboradoresAnalise() {
   useSetPageInfo("Análise de Colaboradores", "Dashboard com métricas e indicadores de recursos humanos");
   const { data, isLoading } = useQuery<DashboardAnaliseData>({
     queryKey: ["/api/colaboradores/analise"],
   });
 
+  const { data: healthData = [], isLoading: isLoadingHealth } = useQuery<ColaboradorSaude[]>({
+    queryKey: ["/api/colaboradores/saude"],
+  });
+
   const [sortColumn, setSortColumn] = useState<PromocaoSortColumn>("mesesDesdeAumento");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [healthSquadFilter, setHealthSquadFilter] = useState<string>("all");
+  const [healthSortOrder, setHealthSortOrder] = useState<"asc" | "desc">("asc");
+
+  const uniqueSquads = useMemo(() => {
+    const squads = new Set<string>();
+    healthData.forEach((c) => {
+      if (c.squad) squads.add(c.squad);
+    });
+    return Array.from(squads).sort();
+  }, [healthData]);
+
+  const filteredHealthData = useMemo(() => {
+    let filtered = [...healthData];
+    if (healthSquadFilter !== "all") {
+      filtered = filtered.filter((c) => c.squad === healthSquadFilter);
+    }
+    filtered.sort((a, b) => 
+      healthSortOrder === "asc" ? a.healthScore - b.healthScore : b.healthScore - a.healthScore
+    );
+    return filtered;
+  }, [healthData, healthSquadFilter, healthSortOrder]);
+
+  const criticalCount = useMemo(() => 
+    healthData.filter((c) => c.healthScore < 50).length, 
+  [healthData]);
 
   const handleSort = (column: PromocaoSortColumn) => {
     if (sortColumn === column) {
@@ -196,6 +287,103 @@ export default function ColaboradoresAnalise() {
         </div>
 
         <div className="space-y-6">
+          {/* Saúde dos Colaboradores */}
+          <Card data-testid="card-saude-colaboradores">
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <Heart className="w-5 h-5" />
+                  <CardTitle>Saúde dos Colaboradores</CardTitle>
+                  {criticalCount > 0 && (
+                    <Badge variant="destructive" className="flex items-center gap-1" data-testid="badge-critical-count">
+                      <AlertTriangle className="w-3 h-3" />
+                      {criticalCount} crítico{criticalCount !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={healthSquadFilter} onValueChange={setHealthSquadFilter}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-squad-filter">
+                      <SelectValue placeholder="Filtrar por Squad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Squads</SelectItem>
+                      {uniqueSquads.map((squad) => (
+                        <SelectItem key={squad} value={squad}>
+                          {formatSquadName(squad)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setHealthSortOrder(healthSortOrder === "asc" ? "desc" : "asc")}
+                    data-testid="button-sort-health"
+                  >
+                    {healthSortOrder === "asc" ? <ArrowUp className="w-4 h-4 mr-1" /> : <ArrowDown className="w-4 h-4 mr-1" />}
+                    Score
+                  </Button>
+                </div>
+              </div>
+              <CardDescription>
+                Score de saúde calculado a partir de E-NPS, 1x1, PDI e ações pendentes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingHealth ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredHealthData.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nenhum colaborador encontrado
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {filteredHealthData.map((colab) => {
+                    const formattedSquad = formatSquadName(colab.squad);
+                    return (
+                      <Link key={colab.id} href={`/colaborador/${colab.id}`}>
+                        <Card
+                          className="hover-elevate cursor-pointer transition-all"
+                          data-testid={`card-health-${colab.id}`}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarFallback className="text-xs bg-muted">
+                                  {getInitials(colab.nome)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate" data-testid={`text-name-${colab.id}`}>
+                                  {colab.nome}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {colab.cargo || "-"}
+                                </p>
+                                {formattedSquad !== "-" && squadColors[formattedSquad] && (
+                                  <Badge
+                                    className={`${squadColors[formattedSquad]} mt-1 text-[10px] px-1.5 py-0`}
+                                    variant="outline"
+                                  >
+                                    {formattedSquad}
+                                  </Badge>
+                                )}
+                              </div>
+                              <HealthGauge score={colab.healthScore} />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Métricas de Tempo Médio */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card data-testid="card-tempo-medio-promocao">
