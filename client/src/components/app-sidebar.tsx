@@ -109,6 +109,7 @@ const dashboardCategories = [
     subItems: [
       { title: "Visão Geral", url: "/visao-geral", icon: Eye },
       { title: "Análise de Retenção", url: "/dashboard/retencao", icon: UserCheck },
+      { title: "Cohort de Retenção", url: "/dashboard/cohort", icon: BarChart3 },
     ],
   },
   {
