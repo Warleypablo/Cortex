@@ -24,7 +24,6 @@ interface Contract {
   id: string;
   service: string;
   produto: string;
-  plano: string;
   clientName: string;
   clientId: string;
   status: string;
@@ -49,10 +48,9 @@ interface ContractsProps {
   statusFilter: string[];
   tipoContratoFilter: string;
   produtoFilter: string[];
-  planoFilter: string[];
 }
 
-type SortField = "service" | "status" | "squad" | "responsavel" | "csResponsavel" | "createdDate" | "recurringValue" | "oneTimeValue" | "plano" | "lt" | "dataSolicitacaoEncerramento" | "dataEntrega";
+type SortField = "service" | "status" | "squad" | "responsavel" | "csResponsavel" | "createdDate" | "recurringValue" | "oneTimeValue" | "lt" | "dataSolicitacaoEncerramento" | "dataEntrega";
 type SortDirection = "asc" | "desc";
 
 const mapSquadCodeToName = (code: string | null): string => {
@@ -72,7 +70,6 @@ export default function Contracts({
   statusFilter,
   tipoContratoFilter,
   produtoFilter,
-  planoFilter,
 }: ContractsProps) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -88,7 +85,6 @@ export default function Contracts({
     produto: "",
     status: "",
     squad: "",
-    plano: "",
     valorr: "",
     valorp: "",
     dataInicio: "",
@@ -161,7 +157,6 @@ export default function Contracts({
         id: c.idSubtask || "",
         service: c.servico || c.produto || "Sem serviço",
         produto: c.produto || c.servico || "",
-        plano: c.plano || "",
         clientName: c.nomeCliente || "Cliente não identificado",
         clientId: c.idCliente || "",
         status: c.status || "Desconhecido",
@@ -199,7 +194,6 @@ export default function Contracts({
       produto: contract.produto,
       status: contract.status,
       squad: contract.squadCode,
-      plano: contract.plano,
       valorr: contract.recurringValue.toString(),
       valorp: contract.oneTimeValue.toString(),
       dataInicio: contract.rawDataInicio || "",
@@ -219,7 +213,6 @@ export default function Contracts({
         produto: editForm.produto,
         status: editForm.status,
         squad: editForm.squad,
-        plano: editForm.plano,
         valorr: editForm.valorr,
         valorp: editForm.valorp,
         dataInicio: editForm.dataInicio || null,
@@ -239,16 +232,15 @@ export default function Contracts({
       const matchesServico = servicoFilter.length === 0 || servicoFilter.includes(contract.produto);
       const matchesStatus = statusFilter.length === 0 || statusFilter.includes(contract.status);
       const matchesProduto = produtoFilter.length === 0 || produtoFilter.includes(contract.produto);
-      const matchesPlano = planoFilter.length === 0 || planoFilter.includes(contract.plano);
       
       const matchesTipoContrato = 
         tipoContratoFilter === "ambos" ||
         (tipoContratoFilter === "recorrente" && contract.recurringValue > 0) ||
         (tipoContratoFilter === "pontual" && contract.oneTimeValue > 0);
       
-      return matchesSearch && matchesServico && matchesStatus && matchesProduto && matchesPlano && matchesTipoContrato;
+      return matchesSearch && matchesServico && matchesStatus && matchesProduto && matchesTipoContrato;
     });
-  }, [contracts, searchQuery, servicoFilter, statusFilter, produtoFilter, planoFilter, tipoContratoFilter]);
+  }, [contracts, searchQuery, servicoFilter, statusFilter, produtoFilter, tipoContratoFilter]);
 
   const sortedContracts = useMemo(() => {
     return [...filteredContracts].sort((a, b) => {
@@ -270,8 +262,6 @@ export default function Contracts({
         comparison = a.recurringValue - b.recurringValue;
       } else if (sortField === "oneTimeValue") {
         comparison = a.oneTimeValue - b.oneTimeValue;
-      } else if (sortField === "plano") {
-        comparison = a.plano.localeCompare(b.plano);
       } else if (sortField === "lt") {
         comparison = a.lt - b.lt;
       } else if (sortField === "dataSolicitacaoEncerramento") {
@@ -327,15 +317,9 @@ export default function Contracts({
     
     const contratosAtivos = contratosAtivosArray.length;
     
-    const ativosRecorrentes = contratosAtivosArray.filter(c => {
-      const plano = c.plano?.toLowerCase() || "";
-      return plano.includes("recorrente") || plano.includes("mensal") || plano.includes("trimestral") || plano.includes("semestral") || plano.includes("anual");
-    }).length;
+    const ativosRecorrentes = contratosAtivosArray.filter(c => c.recurringValue > 0).length;
     
-    const ativosPontuais = contratosAtivosArray.filter(c => {
-      const plano = c.plano?.toLowerCase() || "";
-      return plano.includes("pontual") || plano.includes("projeto") || plano.includes("único");
-    }).length;
+    const ativosPontuais = contratosAtivosArray.filter(c => c.oneTimeValue > 0 && c.recurringValue === 0).length;
     
     const somaValorTotal = filteredContracts.reduce((acc, contract) => {
       return acc + contract.recurringValue + contract.oneTimeValue;
@@ -359,7 +343,7 @@ export default function Contracts({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, servicoFilter, statusFilter, tipoContratoFilter, produtoFilter, planoFilter]);
+  }, [searchQuery, servicoFilter, statusFilter, tipoContratoFilter, produtoFilter]);
 
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();
@@ -575,18 +559,6 @@ export default function Contracts({
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => handleSort("plano")}
-                      className="hover-elevate -ml-3"
-                      data-testid="sort-plano"
-                    >
-                      Plano
-                      <ArrowUpDown className="ml-2 h-4 w-4" />
-                    </Button>
-                  </TableHead>
-                  <TableHead className="bg-background">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
                       onClick={() => handleSort("lt")}
                       className="hover-elevate -ml-3"
                       data-testid="sort-lt"
@@ -683,9 +655,6 @@ export default function Contracts({
                           ? formatCurrencyNoDecimals(contract.oneTimeValue)
                           : '-'
                         }
-                      </TableCell>
-                      <TableCell className="text-muted-foreground" data-testid={`text-plano-${contract.id}`}>
-                        {contract.plano || '-'}
                       </TableCell>
                       <TableCell className="text-muted-foreground" data-testid={`text-lt-${contract.id}`}>
                         {formatLT(contract.lt, contract.ltDays)}
@@ -873,15 +842,6 @@ export default function Contracts({
                     )}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="plano">Plano</Label>
-                <Input
-                  id="plano"
-                  value={editForm.plano}
-                  onChange={(e) => setEditForm({ ...editForm, plano: e.target.value })}
-                  data-testid="input-edit-plano"
-                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="valorr">Valor Recorrente</Label>
