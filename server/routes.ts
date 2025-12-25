@@ -10674,23 +10674,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // 2. Contract expiring notifications (next 30 days)
+      // Using cup_contratos table which exists in the database
       const contractResult = await db.execute(sql`
-        SELECT c.id, c.cnpj, c.data_encerramento, cl.name as client_name
-        FROM contratos c
-        LEFT JOIN clients cl ON cl.cnpj = c.cnpj
+        SELECT c.id_subtask as id, c.cnpj, c.data_encerramento, c.cliente as client_name
+        FROM cup_contratos c
         WHERE c.data_encerramento IS NOT NULL
           AND c.data_encerramento >= CURRENT_DATE
           AND c.data_encerramento <= CURRENT_DATE + INTERVAL '30 days'
+          AND c.status IN ('ativo', 'onboarding')
       `);
       
       for (const contract of contractResult.rows as any[]) {
         const endDate = new Date(contract.data_encerramento);
-        const uniqueKey = `contrato_vencendo_${contract.cnpj}_${endDate.toISOString().split('T')[0]}`;
+        const uniqueKey = `contrato_vencendo_${contract.cnpj || contract.id}_${endDate.toISOString().split('T')[0]}`;
         
         const exists = await storage.notificationExists(uniqueKey);
         if (!exists) {
           const diffDays = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-          const clientName = contract.client_name || contract.cnpj;
+          const clientName = contract.client_name || contract.cnpj || 'Cliente';
           
           const notification = await storage.createNotification({
             type: 'contrato_vencendo',
@@ -10706,14 +10707,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // 3. Overdue payments notifications (>7 days overdue)
+      // Using caz_parcelas and cup_clientes tables
       const overdueResult = await db.execute(sql`
-        SELECT DISTINCT c.cnpj, cl.name as client_name, COUNT(*) as parcelas_vencidas, SUM(p.valor) as total_devido
-        FROM parcelas p
-        JOIN contratos c ON c.id = p.contrato_id
-        LEFT JOIN clients cl ON cl.cnpj = c.cnpj
+        SELECT DISTINCT p.cnpj, cl.nome as client_name, COUNT(*) as parcelas_vencidas, SUM(p.valor) as total_devido
+        FROM caz_parcelas p
+        LEFT JOIN cup_clientes cl ON cl.cnpj = p.cnpj
         WHERE p.data_vencimento < CURRENT_DATE - INTERVAL '7 days'
           AND p.status != 'Pago'
-        GROUP BY c.cnpj, cl.name
+        GROUP BY p.cnpj, cl.nome
       `);
       
       const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -10764,42 +10765,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/okr2026/krs", isAuthenticated, async (req, res) => {
     try {
-      const { getKRs, getDashboardMetrics, calculateProgress, getStatus } = await import("./okr2026/metricsAdapter");
-      const krsData = getKRs();
-      const metrics = await getDashboardMetrics();
-      
-      const metricsMap: Record<string, number> = {
-        mrr_ativo: metrics.mrr_ativo,
-        receita_liquida: metrics.receita_liquida_ytd,
-        clientes_ativos: metrics.clientes_ativos,
-        ebitda: metrics.ebitda_ytd,
-        geracao_caixa: metrics.geracao_caixa_ytd,
-        caixa: metrics.caixa_atual,
-        inadimplencia: metrics.inadimplencia_percentual,
-        gross_mrr_churn: metrics.gross_mrr_churn_percentual,
-      };
-
-      const enrichedObjectives = krsData.objectives.map((obj: any) => ({
-        ...obj,
-        krs: obj.krs.map((kr: any) => {
-          const atual = metricsMap[kr.metric_key] ?? null;
-          const target = kr.target_type === "quarterly" 
-            ? (kr.targets as any)[getCurrentQuarter()] 
-            : kr.target;
-          const progress = atual !== null && target ? calculateProgress(atual, target, kr.direction) : null;
-          const status = progress !== null ? getStatus(progress, kr.direction) : "gray";
-          
-          return {
-            ...kr,
-            atual,
-            target,
-            progress,
-            status
-          };
-        })
-      }));
-      
-      res.json({ objectives: enrichedObjectives });
+      const { getKRs } = await import("./okr2026/metricsAdapter");
+      const krs = getKRs();
+      res.json({ krs });
     } catch (error) {
       console.error("[api] Error fetching OKR KRs:", error);
       res.status(500).json({ error: "Failed to fetch OKR KRs" });
@@ -10930,13 +10898,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         atual = metricMap[kr.metricKey] ?? null;
         
-        if (kr.targetType === "quarterly") {
-          target = kr.targets[quarter as keyof typeof kr.targets] || kr.targets.annual || null;
-        } else if (kr.targetType === "monthly") {
-          target = kr.targets.monthly || null;
-        } else {
-          target = kr.targets.annual || null;
-        }
+        target = kr.targets[quarter as keyof typeof kr.targets] || kr.targets.FY || null;
         
         const progress = atual !== null && target !== null 
           ? calculateProgress(atual, target, kr.direction) 
@@ -10955,27 +10917,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const getMrrTarget = () => {
         const kr = krRegistry.find(k => k.metricKey === "mrr_active");
         if (!kr) return null;
-        return kr.targets[quarter as keyof typeof kr.targets] || kr.targets.annual || null;
+        return kr.targets[quarter as keyof typeof kr.targets] || kr.targets.FY || null;
       };
       
       const getRevenueTarget = () => {
         const kr = krRegistry.find(k => k.metricKey === "revenue_net");
-        return kr?.targets.annual || null;
+        if (!kr) return null;
+        return kr.targets[quarter as keyof typeof kr.targets] || kr.targets.FY || null;
       };
       
       const getEbitdaTarget = () => {
         const kr = krRegistry.find(k => k.metricKey === "ebitda");
-        return kr?.targets.annual || null;
+        if (!kr) return null;
+        return kr.targets[quarter as keyof typeof kr.targets] || kr.targets.FY || null;
       };
       
       const getInadimplenciaTarget = () => {
-        const kr = krRegistry.find(k => k.metricKey === "inadimplencia_pct");
-        return kr?.targets.monthly || null;
+        const kr = krRegistry.find(k => k.metricKey === "delinquency_pct");
+        if (!kr) return null;
+        return kr.targets[quarter as keyof typeof kr.targets] || kr.targets.FY || null;
       };
       
       const getNetChurnTarget = () => {
-        const kr = krRegistry.find(k => k.metricKey === "net_churn_pct");
-        return kr?.targets.monthly || null;
+        const kr = krRegistry.find(k => k.metricKey === "net_mrr_churn_pct");
+        if (!kr) return null;
+        return kr.targets[quarter as keyof typeof kr.targets] || kr.targets.FY || null;
       };
       
       const mrrTarget = getMrrTarget();
