@@ -1011,7 +1011,7 @@ export default function ClientDetail() {
 
   return (
     <div className="bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="w-full px-4 py-6">
         <div className="mb-6">
           <div className="flex items-center justify-between gap-4 mb-4">
             <Link href="/">
@@ -1100,7 +1100,7 @@ export default function ClientDetail() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6" data-testid="stats-grid">
           <StatsCard
             title="Receita Total"
             value={new Intl.NumberFormat('pt-BR', { 
@@ -1149,113 +1149,111 @@ export default function ClientDetail() {
         </div>
 
         {/* Quick Actions Bar */}
-        <Card className="mb-8 p-4" data-testid="quick-actions-bar">
-          <div className="flex flex-wrap items-center justify-start gap-4">
-            {/* WhatsApp */}
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!cliente.telefone}
-              onClick={() => {
-                if (cliente.telefone) {
-                  let phoneDigits = cliente.telefone.replace(/\D/g, '');
-                  // Add Brazil country code if not present
-                  if (phoneDigits.length <= 11 && !phoneDigits.startsWith('55')) {
-                    phoneDigits = '55' + phoneDigits;
-                  }
-                  window.open(`https://wa.me/${phoneDigits}`, '_blank');
+        <div className="mb-6 flex flex-wrap items-center gap-2" data-testid="quick-actions-bar">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs gap-1.5"
+            disabled={!cliente.telefone}
+            onClick={() => {
+              if (cliente.telefone) {
+                let phoneDigits = cliente.telefone.replace(/\D/g, '');
+                if (phoneDigits.length <= 11 && !phoneDigits.startsWith('55')) {
+                  phoneDigits = '55' + phoneDigits;
                 }
-              }}
-              data-testid="quick-action-whatsapp"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span className="text-xs">WhatsApp</span>
-            </Button>
-
-            {/* Email */}
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!cliente.email}
-              onClick={() => {
-                if (cliente.email) {
-                  window.location.href = `mailto:${cliente.email}`;
-                }
-              }}
-              data-testid="quick-action-email"
-            >
-              <Mail className="w-4 h-4" />
-              <span className="text-xs">Email</span>
-            </Button>
-
-            {/* ClickUp */}
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!cliente.linkListaClickup}
-              onClick={() => {
-                if (cliente.linkListaClickup) {
-                  window.open(cliente.linkListaClickup, '_blank');
-                }
-              }}
-              data-testid="quick-action-clickup"
-            >
-              <ListTodo className="w-4 h-4" />
-              <span className="text-xs">ClickUp</span>
-            </Button>
-
-            {/* Novo Contrato */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                toast({
-                  title: "Novo Contrato",
-                  description: "Funcionalidade em desenvolvimento.",
-                });
-              }}
-              data-testid="quick-action-novo-contrato"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="text-xs">Novo Contrato</span>
-            </Button>
-
-            {/* Adicionar Nota */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const tabElement = document.querySelector('[data-testid="tab-comunicacao"]') as HTMLElement;
-                if (tabElement) {
-                  tabElement.click();
-                  setTimeout(() => {
-                    tabElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }, 100);
-                }
-              }}
-              data-testid="quick-action-adicionar-nota"
-            >
-              <FileText className="w-4 h-4" />
-              <span className="text-xs">Nota</span>
-            </Button>
-          </div>
-        </Card>
+                window.open(`https://wa.me/${phoneDigits}`, '_blank');
+              }
+            }}
+            data-testid="quick-action-whatsapp"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            WhatsApp
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs gap-1.5"
+            disabled={!cliente.email}
+            onClick={() => {
+              if (cliente.email) {
+                window.location.href = `mailto:${cliente.email}`;
+              }
+            }}
+            data-testid="quick-action-email"
+          >
+            <Mail className="w-3.5 h-3.5" />
+            Email
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs gap-1.5"
+            disabled={!cliente.linkListaClickup}
+            onClick={() => {
+              if (cliente.linkListaClickup) {
+                window.open(cliente.linkListaClickup, '_blank');
+              }
+            }}
+            data-testid="quick-action-clickup"
+          >
+            <ListTodo className="w-3.5 h-3.5" />
+            ClickUp
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs gap-1.5"
+            onClick={() => {
+              toast({
+                title: "Novo Contrato",
+                description: "Funcionalidade em desenvolvimento.",
+              });
+            }}
+            data-testid="quick-action-novo-contrato"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Contrato
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs gap-1.5"
+            onClick={() => {
+              const tabElement = document.querySelector('[data-testid="tab-comunicacao"]') as HTMLElement;
+              if (tabElement) {
+                tabElement.click();
+                setTimeout(() => {
+                  tabElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+              }
+            }}
+            data-testid="quick-action-adicionar-nota"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Nota
+          </Button>
+        </div>
 
         {/* Timeline de Eventos */}
-        <Card className="mb-8 p-6" data-testid="timeline-section">
-          <div className="flex items-center gap-3 mb-4">
-            <Clock className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold">Timeline de Eventos</h2>
+        <Card className="mb-6 p-4" data-testid="timeline-section">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-primary" />
+            </div>
+            <h2 className="text-base font-semibold">Timeline de Eventos</h2>
           </div>
           
           {isLoadingTimeline ? (
-            <div className="flex items-center justify-center py-8" data-testid="timeline-loading">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center py-6" data-testid="timeline-loading">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
           ) : !timeline || timeline.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground" data-testid="timeline-empty">
-              <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>Nenhum evento encontrado para este cliente.</p>
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground" data-testid="timeline-empty">
+              <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+                <CalendarIcon className="w-6 h-6 opacity-40" />
+              </div>
+              <p className="text-sm font-medium">Nenhum evento registrado</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">Os eventos aparecerão aqui conforme forem registrados</p>
             </div>
           ) : (
             <div className="relative" data-testid="timeline-container">
@@ -1355,31 +1353,31 @@ export default function ClientDetail() {
         </Card>
 
         <Tabs defaultValue="dados-cadastrais" className="w-full" data-testid="client-detail-tabs">
-          <TabsList className="grid w-full grid-cols-4 mb-6" data-testid="tabs-list">
-            <TabsTrigger value="dados-cadastrais" data-testid="tab-dados-cadastrais">
-              <Building2 className="w-4 h-4 mr-2" />
-              Dados Cadastrais
+          <TabsList className="grid w-full grid-cols-4 mb-4 h-11 p-1 bg-muted/60" data-testid="tabs-list">
+            <TabsTrigger value="dados-cadastrais" className="text-sm font-medium gap-1.5" data-testid="tab-dados-cadastrais">
+              <Building2 className="w-3.5 h-3.5" />
+              Dados
             </TabsTrigger>
-            <TabsTrigger value="tarefas" data-testid="tab-tarefas">
-              <ListTodo className="w-4 h-4 mr-2" />
+            <TabsTrigger value="tarefas" className="text-sm font-medium gap-1.5" data-testid="tab-tarefas">
+              <ListTodo className="w-3.5 h-3.5" />
               Tarefas
             </TabsTrigger>
-            <TabsTrigger value="comunicacao" data-testid="tab-comunicacao">
-              <MessageSquare className="w-4 h-4 mr-2" />
+            <TabsTrigger value="comunicacao" className="text-sm font-medium gap-1.5" data-testid="tab-comunicacao">
+              <MessageSquare className="w-3.5 h-3.5" />
               Comunicação
             </TabsTrigger>
-            <TabsTrigger value="situacao-financeira" data-testid="tab-situacao-financeira">
-              <Scale className="w-4 h-4 mr-2" />
-              Situação Financeira
+            <TabsTrigger value="situacao-financeira" className="text-sm font-medium gap-1.5" data-testid="tab-situacao-financeira">
+              <Scale className="w-3.5 h-3.5" />
+              Financeiro
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="dados-cadastrais" data-testid="tabcontent-dados-cadastrais">
-        <div className="mb-8">
-          <Card data-testid="card-client-info">
+          <TabsContent value="dados-cadastrais" className="mt-0" data-testid="tabcontent-dados-cadastrais">
+        <div className="mb-6">
+          <Card className="p-0" data-testid="card-client-info">
             <Accordion type="single" collapsible defaultValue="dados-cadastrais">
               <AccordionItem value="dados-cadastrais" className="border-none">
-                <div className="flex items-center justify-between gap-4 px-6 pt-4">
+                <div className="flex items-center justify-between gap-4 px-4 pt-3">
                   <AccordionTrigger className="py-0 hover:no-underline">
                     <div className="flex items-center gap-3">
                       <Building2 className="w-5 h-5 text-primary" />
@@ -1396,11 +1394,11 @@ export default function ClientDetail() {
                     {isEditingDados ? "Cancelar" : "Editar"}
                   </Button>
                 </div>
-                <AccordionContent className="px-6 pb-6 pt-4">
+                <AccordionContent className="px-4 pb-4 pt-3">
             {isEditingDados ? (
               <Form {...editForm}>
-                <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     <FormField
                       control={editForm.control}
                       name="endereco"
@@ -1610,138 +1608,163 @@ export default function ClientDetail() {
                 </form>
               </Form>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="flex items-start gap-3" data-testid="info-cnpj">
-                <Building2 className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex items-start gap-2.5" data-testid="info-cnpj">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">CNPJ</p>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium" data-testid="text-cnpj">{cliente.cnpj || "N/A"}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">CNPJ</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-semibold" data-testid="text-cnpj">{cliente.cnpj || <span className="text-muted-foreground/60 font-normal">Não informado</span>}</p>
                     {cliente.cnpj && (
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-6 w-6"
                         onClick={() => copyToClipboard(cliente.cnpj!, "CNPJ")}
                         data-testid="button-copy-cnpj"
                       >
-                        <Copy className="w-3.5 h-3.5" />
+                        <Copy className="w-3 h-3" />
                       </Button>
                     )}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-endereco">
-                <MapPin className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-endereco">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Endereço</p>
-                  <p className="font-medium" data-testid="text-endereco">{cliente.endereco || "Não informado"}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Endereço</p>
+                  <p className="text-sm font-semibold" data-testid="text-endereco">{cliente.endereco || <span className="text-muted-foreground/60 font-normal">Não informado</span>}</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-telefone">
-                <Phone className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-telefone">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Telefone</p>
-                  <p className="font-medium" data-testid="text-telefone">{cliente.telefone ? formatPhoneMask(cliente.telefone) : "Não informado"}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Telefone</p>
+                  <p className="text-sm font-semibold" data-testid="text-telefone">{cliente.telefone ? formatPhoneMask(cliente.telefone) : <span className="text-muted-foreground/60 font-normal">Não informado</span>}</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-responsavel">
-                <User className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-responsavel">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <User className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Responsável</p>
-                  <p className="font-medium" data-testid="text-responsavel">{cliente.responsavel || "Não informado"}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Responsável</p>
+                  <p className="text-sm font-semibold" data-testid="text-responsavel">{cliente.responsavel || <span className="text-muted-foreground/60 font-normal">Não informado</span>}</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-responsavel-geral">
-                <User className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-responsavel-geral">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <User className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Nome Responsável</p>
-                  <p className="font-medium" data-testid="text-responsavel-geral">{cliente.responsavelGeral || "Não informado"}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Nome Responsável</p>
+                  <p className="text-sm font-semibold" data-testid="text-responsavel-geral">{cliente.responsavelGeral || <span className="text-muted-foreground/60 font-normal">Não informado</span>}</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-nome-dono">
-                <Crown className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-nome-dono">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <Crown className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Nome do Dono</p>
-                  <p className="font-medium" data-testid="text-nome-dono">{cliente.nomeDono || "Não informado"}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Nome do Dono</p>
+                  <p className="text-sm font-semibold" data-testid="text-nome-dono">{cliente.nomeDono || <span className="text-muted-foreground/60 font-normal">Não informado</span>}</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-email">
-                <Mail className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-email">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Email</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Email</p>
                   {cliente.email ? (
-                    <a href={`mailto:${cliente.email}`} className="font-medium text-primary hover:underline" data-testid="text-email">{cliente.email}</a>
+                    <a href={`mailto:${cliente.email}`} className="text-sm font-semibold text-primary hover:underline" data-testid="text-email">{cliente.email}</a>
                   ) : (
-                    <p className="font-medium text-muted-foreground" data-testid="text-email">Não informado</p>
+                    <p className="text-sm text-muted-foreground/60" data-testid="text-email">Não informado</p>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-site">
-                <Globe className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-site">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Site</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Site</p>
                   {cliente.site ? (
-                    <a href={cliente.site.startsWith('http') ? cliente.site : `https://${cliente.site}`} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline flex items-center gap-1" data-testid="text-site">
+                    <a href={cliente.site.startsWith('http') ? cliente.site : `https://${cliente.site}`} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1" data-testid="text-site">
                       {cliente.site}
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   ) : (
-                    <p className="font-medium text-muted-foreground" data-testid="text-site">Não informado</p>
+                    <p className="text-sm text-muted-foreground/60" data-testid="text-site">Não informado</p>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-instagram">
-                <SiInstagram className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-instagram">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <SiInstagram className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Instagram</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Instagram</p>
                   {cliente.instagram ? (
-                    <a href={cliente.instagram.startsWith('http') ? cliente.instagram : `https://instagram.com/${cliente.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline flex items-center gap-1" data-testid="text-instagram">
+                    <a href={cliente.instagram.startsWith('http') ? cliente.instagram : `https://instagram.com/${cliente.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1" data-testid="text-instagram">
                       {cliente.instagram}
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   ) : (
-                    <p className="font-medium text-muted-foreground" data-testid="text-instagram">Não informado</p>
+                    <p className="text-sm text-muted-foreground/60" data-testid="text-instagram">Não informado</p>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-data-cadastro">
-                <CalendarIcon className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-data-cadastro">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Data de Cadastro</p>
-                  <p className="font-medium" data-testid="text-data-cadastro">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Data de Cadastro</p>
+                  <p className="text-sm font-semibold" data-testid="text-data-cadastro">
                     {cliente.createdAt 
                       ? new Date(cliente.createdAt).toLocaleDateString('pt-BR')
                       : cliente.dataInicio 
                         ? new Date(cliente.dataInicio).toLocaleDateString('pt-BR')
-                        : "N/A"
+                        : <span className="text-muted-foreground/60 font-normal">Não informado</span>
                     }
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-status">
-                <CheckCircle className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-status">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <CheckCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Status</p>
-                  <Badge variant={temContratoAtivo ? "default" : "secondary"} data-testid="badge-status-cliente">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Status</p>
+                  <Badge variant={temContratoAtivo ? "default" : "secondary"} className="text-xs" data-testid="badge-status-cliente">
                     {temContratoAtivo ? "Ativo" : "Inativo"}
                   </Badge>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="field-status-conta">
-                <Activity className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="field-status-conta">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">STATUS DA CONTA</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Status da Conta</p>
                   <Select
                     value={cliente.statusConta || ""}
                     onValueChange={(value) => {
@@ -1783,24 +1806,28 @@ export default function ClientDetail() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-cluster">
-                <Layers className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-cluster">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Cluster</p>
-                  <Badge className={`${getClusterBadgeColor(cliente.cluster)}`} variant="outline" data-testid="badge-cluster">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Cluster</p>
+                  <Badge className={`text-xs ${getClusterBadgeColor(cliente.cluster)}`} variant="outline" data-testid="badge-cluster">
                     {mapClusterToName(cliente.cluster)}
                   </Badge>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-tipo-negocio">
-                <Briefcase className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-tipo-negocio">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <Briefcase className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Tipo de Negócio</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Tipo de Negócio</p>
                   {(() => {
                     const badge = getTipoNegocioBadge(cliente.tipoNegocio);
                     return (
-                      <Badge className={badge.color} variant="outline" data-testid="badge-tipo-negocio">
+                      <Badge className={`text-xs ${badge.color}`} variant="outline" data-testid="badge-tipo-negocio">
                         {badge.label}
                       </Badge>
                     );
@@ -1808,71 +1835,81 @@ export default function ClientDetail() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-faturamento-mensal">
-                <DollarSign className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-faturamento-mensal">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Faturamento Mensal</p>
-                  <p className="font-medium" data-testid="text-faturamento-mensal">
-                    {formatCurrency(cliente.faturamentoMensal)}
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Faturamento Mensal</p>
+                  <p className="text-sm font-semibold" data-testid="text-faturamento-mensal">
+                    {formatCurrency(cliente.faturamentoMensal) || <span className="text-muted-foreground/60 font-normal">Não informado</span>}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-investimento-ads">
-                <TrendingUp className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-investimento-ads">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Investimento em Ads</p>
-                  <p className="font-medium" data-testid="text-investimento-ads">
-                    {formatCurrency(cliente.investimentoAds)}
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Investimento em Ads</p>
+                  <p className="text-sm font-semibold" data-testid="text-investimento-ads">
+                    {formatCurrency(cliente.investimentoAds) || <span className="text-muted-foreground/60 font-normal">Não informado</span>}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-link-clickup">
-                <ListTodo className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-link-clickup">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <ListTodo className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Link Lista ClickUp</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Link Lista ClickUp</p>
                   {cliente.linkListaClickup ? (
-                    <a href={cliente.linkListaClickup} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline flex items-center gap-1" data-testid="text-link-clickup">
+                    <a href={cliente.linkListaClickup} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1" data-testid="text-link-clickup">
                       Abrir no ClickUp
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   ) : (
-                    <p className="font-medium text-muted-foreground" data-testid="text-link-clickup">Não informado</p>
+                    <p className="text-sm text-muted-foreground/60" data-testid="text-link-clickup">Não informado</p>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-start gap-3" data-testid="info-links-contrato">
-                <Link2 className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5" data-testid="info-links-contrato">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <Link2 className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Links Contrato</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Links Contrato</p>
                   {cliente.linksContrato ? (
-                    <div className="flex flex-col gap-1" data-testid="list-links-contrato">
+                    <div className="flex flex-col gap-0.5" data-testid="list-links-contrato">
                       {cliente.linksContrato.split(/[,\n]/).filter(link => link.trim()).map((link, idx) => (
-                        <a key={idx} href={link.trim().startsWith('http') ? link.trim() : `https://${link.trim()}`} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline flex items-center gap-1 text-sm" data-testid={`link-contrato-${idx}`}>
+                        <a key={idx} href={link.trim().startsWith('http') ? link.trim() : `https://${link.trim()}`} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-primary hover:underline flex items-center gap-1" data-testid={`link-contrato-${idx}`}>
                           Contrato {idx + 1}
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       ))}
                     </div>
                   ) : (
-                    <p className="font-medium text-muted-foreground" data-testid="text-no-links-contrato">Não informado</p>
+                    <p className="text-sm text-muted-foreground/60" data-testid="text-no-links-contrato">Não informado</p>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 md:col-span-2" data-testid="info-servicos">
-                <Briefcase className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2.5 lg:col-span-3" data-testid="info-servicos">
+                <div className="w-7 h-7 rounded-md bg-muted/50 flex items-center justify-center shrink-0">
+                  <Briefcase className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Serviços Ativos</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Serviços Ativos</p>
                   {servicosAtivos.length > 0 ? (
-                    <div className="flex flex-wrap gap-2" data-testid="list-servicos">
+                    <div className="flex flex-wrap gap-1.5" data-testid="list-servicos">
                       {servicosAtivos.map((servico, idx) => (
                         <Badge 
                           key={idx} 
                           variant="outline" 
-                          className="bg-primary/10"
+                          className="text-xs bg-primary/10"
                           data-testid={`badge-servico-${idx}`}
                         >
                           {servico}
@@ -1880,7 +1917,7 @@ export default function ClientDetail() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-muted-foreground" data-testid="text-no-servicos">Nenhum serviço ativo</p>
+                    <p className="text-sm text-muted-foreground/60" data-testid="text-no-servicos">Nenhum serviço ativo</p>
                   )}
                 </div>
               </div>
