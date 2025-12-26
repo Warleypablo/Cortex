@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
 import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus, ChevronsUpDown } from "lucide-react";
@@ -177,6 +178,8 @@ export default function ClientDetail() {
   const [openResponsavelGeral, setOpenResponsavelGeral] = useState(false);
   const [openContratoResponsavel, setOpenContratoResponsavel] = useState(false);
   const [openContratoCs, setOpenContratoCs] = useState(false);
+  const [notaDialogOpen, setNotaDialogOpen] = useState(false);
+  const [notaText, setNotaText] = useState("");
 
   useEffect(() => {
     if (!editingContratoId) {
@@ -383,6 +386,24 @@ export default function ClientDetail() {
       toast({
         title: "Erro ao criar comunicação",
         description: error.message || "Não foi possível criar a comunicação.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createEventMutation = useMutation({
+    mutationFn: async (data: { tipo: string; titulo: string; descricao?: string; dadosExtras?: string }) => {
+      const response = await apiRequest("POST", `/api/clientes/${cliente?.cnpj}/eventos`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/clientes", cliente?.cnpj, "timeline"] });
+      toast({ title: "Evento registrado", description: "O evento foi adicionado à timeline." });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao registrar evento",
+        description: error.message || "Não foi possível registrar o evento.",
         variant: "destructive",
       });
     },
@@ -1211,6 +1232,11 @@ export default function ClientDetail() {
                   phoneDigits = '55' + phoneDigits;
                 }
                 window.open(`https://wa.me/${phoneDigits}`, '_blank');
+                createEventMutation.mutate({
+                  tipo: "whatsapp",
+                  titulo: "WhatsApp enviado",
+                  descricao: `Contato via WhatsApp para ${cliente?.nome}`
+                });
               }
             }}
             data-testid="quick-action-whatsapp"
@@ -1226,6 +1252,11 @@ export default function ClientDetail() {
             onClick={() => {
               if (cliente.email) {
                 window.location.href = `mailto:${cliente.email}`;
+                createEventMutation.mutate({
+                  tipo: "email",
+                  titulo: "Email enviado",
+                  descricao: `Email enviado para ${cliente?.email}`
+                });
               }
             }}
             data-testid="quick-action-email"
@@ -1253,6 +1284,11 @@ export default function ClientDetail() {
             size="sm"
             className="h-8 px-3 text-xs gap-1.5"
             onClick={() => {
+              createEventMutation.mutate({
+                tipo: "contrato",
+                titulo: "Contrato visualizado/adicionado",
+                descricao: `Ação de contrato para ${cliente?.nome}`
+              });
               toast({
                 title: "Novo Contrato",
                 description: "Funcionalidade em desenvolvimento.",
@@ -1267,15 +1303,7 @@ export default function ClientDetail() {
             variant="outline"
             size="sm"
             className="h-8 px-3 text-xs gap-1.5"
-            onClick={() => {
-              const tabElement = document.querySelector('[data-testid="tab-comunicacao"]') as HTMLElement;
-              if (tabElement) {
-                tabElement.click();
-                setTimeout(() => {
-                  tabElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 100);
-              }
-            }}
+            onClick={() => setNotaDialogOpen(true)}
             data-testid="quick-action-adicionar-nota"
           >
             <FileText className="w-3.5 h-3.5" />
@@ -3375,6 +3403,62 @@ export default function ClientDetail() {
             )}
           </TabsContent>
         </Tabs>
+
+        {/* Dialog para adicionar nota */}
+        <Dialog open={notaDialogOpen} onOpenChange={setNotaDialogOpen}>
+          <DialogContent className="sm:max-w-md" data-testid="dialog-nota">
+            <DialogHeader>
+              <DialogTitle>Adicionar Nota</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <Textarea
+                placeholder="Digite sua nota aqui..."
+                value={notaText}
+                onChange={(e) => setNotaText(e.target.value)}
+                className="min-h-[120px]"
+                data-testid="input-nota-text"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setNotaDialogOpen(false);
+                  setNotaText("");
+                }}
+                data-testid="button-nota-cancel"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  if (notaText.trim()) {
+                    createEventMutation.mutate({
+                      tipo: "nota",
+                      titulo: "Nota adicionada",
+                      descricao: notaText.trim()
+                    });
+                    setNotaDialogOpen(false);
+                    setNotaText("");
+                  } else {
+                    toast({
+                      title: "Erro",
+                      description: "A nota não pode estar vazia.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                disabled={createEventMutation.isPending}
+                data-testid="button-nota-submit"
+              >
+                {createEventMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Salvar Nota
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </div>
