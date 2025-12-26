@@ -2228,7 +2228,6 @@ export class DbStorage implements IStorage {
     
     return (result.rows || []).map((row: any) => ({
       ...row,
-      senhaAtivo: null,
     }));
   }
 
@@ -2279,7 +2278,7 @@ export class DbStorage implements IStorage {
       valorMercado: row.valorMercado,
       valorVenda: row.valorVenda,
       descricao: row.descricao,
-      senhaAtivo: null,
+      email: null,
       colaborador: row.colaborador || undefined,
     };
   }
@@ -2332,7 +2331,7 @@ export class DbStorage implements IStorage {
       throw new Error("Patrimônio não encontrado");
     }
     
-    return { ...(result.rows[0] as any), senhaAtivo: null };
+    return { ...(result.rows[0] as any), email: null };
   }
 
   async updatePatrimonioResponsavelById(id: number, responsavelId: number, responsavelNome: string): Promise<Patrimonio> {
@@ -2357,7 +2356,7 @@ export class DbStorage implements IStorage {
       throw new Error("Patrimônio não encontrado");
     }
     
-    return { ...(result.rows[0] as any), senhaAtivo: null };
+    return { ...(result.rows[0] as any), email: null };
   }
 
   async updatePatrimonio(id: number, data: Record<string, string | null>): Promise<Patrimonio> {
@@ -2406,7 +2405,7 @@ export class DbStorage implements IStorage {
       throw new Error("Patrimônio não encontrado");
     }
     
-    return { ...(result.rows[0] as any), senhaAtivo: null };
+    return { ...(result.rows[0] as any), email: null };
   }
 
   async deletePatrimonio(id: number): Promise<void> {
