@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -227,6 +228,7 @@ function FloatingParticles() {
 }
 
 export default function DetailClosers() {
+  usePageTitle("Detalhes Closer");
   const { setPageInfo } = usePageInfo();
   const hoje = new Date();
   const inicioAno = new Date(hoje.getFullYear(), 0, 1);

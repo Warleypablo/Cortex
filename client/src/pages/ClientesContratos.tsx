@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { usePersistentFilters } from "@/hooks/use-persistent-filters";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Users, FileText, Search, Filter, X, Check, Save, Bookmark, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePageInfo } from "@/contexts/PageContext";
@@ -76,6 +77,7 @@ const mapClusterToName = (cluster: string | null): string => {
 };
 
 export default function ClientesContratos() {
+  usePageTitle("Clientes e Contratos");
   const { setPageInfo } = usePageInfo();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("clientes");

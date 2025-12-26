@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import type { CohortData, CohortViewMode, CohortMetricType, CohortCell, CohortRow } from "@shared/schema";
 import { Users, DollarSign, TrendingUp, Percent, Hash, AlertTriangle, Info, ArrowUp, ArrowDown } from "lucide-react";
@@ -75,6 +76,7 @@ function isOutlierCell(percentage: number, monthOffset: number): { isOutlier: bo
 }
 
 export default function Cohort() {
+  usePageTitle("Cohort");
   useSetPageInfo("Cohort de Retenção", "Análise de retenção de clientes e receita por safra");
   
   const [viewMode, setViewMode] = useState<CohortViewMode>('percentage');

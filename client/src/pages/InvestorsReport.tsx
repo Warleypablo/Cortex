@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -94,6 +95,7 @@ const formatPercentSigned = (value: number) => {
 const COLORS = ['#1978D5', '#041F60', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'];
 
 export default function InvestorsReport() {
+  usePageTitle("Relatório para Investidores");
   useSetPageInfo("Investors Report", "Métricas financeiras consolidadas • 2022-2025");
   
   const [startPeriod, setStartPeriod] = useState({ month: 1, year: 2022 });

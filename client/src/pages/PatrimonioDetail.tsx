@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { usePageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { ArrowLeft, Package, User, DollarSign, Info, Mail, Phone, Briefcase, Calendar, Check, ChevronsUpDown, UserPlus, X, Edit, Trash2, History, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,6 +94,7 @@ const editPatrimonioSchema = z.object({
 type EditPatrimonioForm = z.infer<typeof editPatrimonioSchema>;
 
 export default function PatrimonioDetail() {
+  usePageTitle("Detalhes do Patrimônio");
   const { setPageInfo } = usePageInfo();
   const params = useParams();
   const [, setLocation] = useLocation();

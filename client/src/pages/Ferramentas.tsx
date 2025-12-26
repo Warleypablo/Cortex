@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExternalLink, BarChart3, MessageSquare, FileText, Activity } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 interface Ferramenta {
   id: string;
@@ -42,6 +43,7 @@ const ferramentas: Ferramenta[] = [
 ];
 
 export default function Ferramentas() {
+  usePageTitle("Ferramentas");
   useSetPageInfo("Ferramentas", "Acesse as ferramentas e sistemas da Turbo Partners");
   
   const handleFerramentaClick = (url: string) => {

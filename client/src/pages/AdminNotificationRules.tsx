@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -303,6 +304,7 @@ function RuleCardSkeleton() {
 }
 
 export default function AdminNotificationRules() {
+  usePageTitle("Regras de Notificação");
   const { toast } = useToast();
   
   useSetPageInfo("Regras de Notificação", "Configurar regras automáticas de notificação");
