@@ -161,7 +161,7 @@ export function DateRangePicker({
           <span className="truncate">{displayText}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className={cn("w-auto p-0", className)} align={align}>
+      <PopoverContent className={cn("w-auto p-0 z-[100]", className)} align={align} sideOffset={8}>
         <div className="flex">
           <div className="border-r border-border p-3 space-y-1 min-w-[160px]">
             {presets.map((preset) => (
