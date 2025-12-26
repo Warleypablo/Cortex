@@ -565,7 +565,9 @@ function AddColaboradorDialog() {
   });
 
   const addColaboradorSchema = insertColaboradorSchema.extend({
+    nome: z.string().min(1, "Nome é obrigatório"),
     cidade: z.string().optional(),
+    salario: z.string().optional(),
   });
 
   const form = useForm<InsertColaborador & { cidade?: string }>({
@@ -586,6 +588,7 @@ function AddColaboradorDialog() {
       cidade: "",
       pix: "",
       cnpj: "",
+      salario: "",
       aniversario: undefined,
       admissao: undefined,
     },
@@ -865,6 +868,27 @@ function AddColaboradorDialog() {
                     <FormLabel>PIX</FormLabel>
                     <FormControl>
                       <Input {...field} value={field.value || ""} data-testid="input-pix" placeholder="Chave PIX" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="salario"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Salário</FormLabel>
+                    <FormControl>
+                      <Input 
+                        {...field} 
+                        value={field.value || ""} 
+                        data-testid="input-salario" 
+                        type="number" 
+                        step="0.01"
+                        placeholder="0.00" 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
