@@ -4,7 +4,7 @@ import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Search, Package, Filter, ChevronUp, ChevronDown, 
-  DollarSign, TrendingUp, CheckCircle, X, Users, Phone, Pencil, Check, ChevronsUpDown, Info
+  DollarSign, TrendingUp, CheckCircle, X, Users, Phone, Pencil, Check, ChevronsUpDown, Info, Plus
 } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import StatsCard from "@/components/StatsCard";
@@ -113,6 +113,36 @@ export default function Patrimonio() {
   const [editingTelefone, setEditingTelefone] = useState<Telefone | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [responsavelOpen, setResponsavelOpen] = useState(false);
+  
+  // Create telefone state
+  const [isCreateTelefoneDialogOpen, setIsCreateTelefoneDialogOpen] = useState(false);
+  const [createResponsavelOpen, setCreateResponsavelOpen] = useState(false);
+  const [newTelefone, setNewTelefone] = useState({
+    conta: "",
+    planoOperadora: "",
+    telefone: "",
+    responsavelNome: "",
+    responsavelId: null as number | null,
+    setor: "",
+    ultimaRecarga: null as string | null,
+    status: "Ativo",
+  });
+  
+  // Create patrimônio state
+  const [isCreatePatrimonioDialogOpen, setIsCreatePatrimonioDialogOpen] = useState(false);
+  const [createPatrimonioResponsavelOpen, setCreatePatrimonioResponsavelOpen] = useState(false);
+  const [newPatrimonio, setNewPatrimonio] = useState({
+    numeroAtivo: "",
+    ativo: "",
+    marca: "",
+    estadoConservacao: "",
+    responsavelAtual: "",
+    responsavelId: null as number | null,
+    valorPago: "",
+    valorMercado: "",
+    valorVenda: "",
+    descricao: "",
+  });
   
   const { toast } = useToast();
 
@@ -497,6 +527,106 @@ export default function Patrimonio() {
     },
   });
 
+  const createTelefoneMutation = useMutation({
+    mutationFn: async (data: typeof newTelefone) => {
+      return await apiRequest("POST", "/api/telefones", {
+        conta: data.conta || null,
+        planoOperadora: data.planoOperadora || null,
+        telefone: data.telefone || null,
+        responsavelNome: data.responsavelNome || null,
+        responsavelId: data.responsavelId,
+        setor: data.setor || null,
+        ultimaRecarga: data.ultimaRecarga || null,
+        status: data.status || "Ativo",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/telefones"] });
+      setIsCreateTelefoneDialogOpen(false);
+      resetNewTelefoneForm();
+      toast({
+        title: "Sucesso",
+        description: "Linha telefônica criada com sucesso.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
+        description: "Não foi possível criar a linha telefônica.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetNewTelefoneForm = () => {
+    setNewTelefone({
+      conta: "",
+      planoOperadora: "",
+      telefone: "",
+      responsavelNome: "",
+      responsavelId: null,
+      setor: "",
+      ultimaRecarga: null,
+      status: "Ativo",
+    });
+  };
+
+  const handleCreateTelefone = () => {
+    createTelefoneMutation.mutate(newTelefone);
+  };
+
+  const createPatrimonioMutation = useMutation({
+    mutationFn: async (data: typeof newPatrimonio) => {
+      return await apiRequest("POST", "/api/patrimonio", {
+        numeroAtivo: data.numeroAtivo || null,
+        ativo: data.ativo || null,
+        marca: data.marca || null,
+        estadoConservacao: data.estadoConservacao || null,
+        responsavelAtual: data.responsavelAtual || null,
+        responsavelId: data.responsavelId,
+        valorPago: data.valorPago || null,
+        valorMercado: data.valorMercado || null,
+        valorVenda: data.valorVenda || null,
+        descricao: data.descricao || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patrimonio"] });
+      setIsCreatePatrimonioDialogOpen(false);
+      resetNewPatrimonioForm();
+      toast({
+        title: "Sucesso",
+        description: "Patrimônio criado com sucesso.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Não foi possível criar o patrimônio.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetNewPatrimonioForm = () => {
+    setNewPatrimonio({
+      numeroAtivo: "",
+      ativo: "",
+      marca: "",
+      estadoConservacao: "",
+      responsavelAtual: "",
+      responsavelId: null,
+      valorPago: "",
+      valorMercado: "",
+      valorVenda: "",
+      descricao: "",
+    });
+  };
+
+  const handleCreatePatrimonio = () => {
+    createPatrimonioMutation.mutate(newPatrimonio);
+  };
+
   const handleEditTelefone = (telefone: Telefone) => {
     setEditingTelefone({ ...telefone });
     setIsEditDialogOpen(true);
@@ -601,6 +731,15 @@ export default function Patrimonio() {
                   Total de {filteredAndSortedPatrimonios.length} {filteredAndSortedPatrimonios.length === 1 ? "item" : "itens"}
                 </CardDescription>
               </div>
+              <Button
+                variant="default"
+                onClick={() => setIsCreatePatrimonioDialogOpen(true)}
+                className="gap-2"
+                data-testid="patrimonio-button-novo"
+              >
+                <Plus className="w-4 h-4" />
+                Novo Patrimônio
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Search and Filter Button Row */}
@@ -1047,6 +1186,15 @@ export default function Patrimonio() {
                       Total de {filteredTelefones.length} {filteredTelefones.length === 1 ? "linha" : "linhas"}
                     </CardDescription>
                   </div>
+                  <Button
+                    variant="default"
+                    onClick={() => setIsCreateTelefoneDialogOpen(true)}
+                    className="gap-2"
+                    data-testid="button-nova-linha"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Nova Linha
+                  </Button>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Search and Filters */}
@@ -1440,6 +1588,383 @@ export default function Patrimonio() {
                 </>
               ) : (
                 "Salvar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateTelefoneDialogOpen} onOpenChange={setIsCreateTelefoneDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Nova Linha Telefônica</DialogTitle>
+            <DialogDescription>
+              Preencha as informações da nova linha telefônica abaixo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="create-conta" className="text-right">
+                Conta
+              </Label>
+              <Input
+                id="create-conta"
+                value={newTelefone.conta}
+                onChange={(e) => setNewTelefone({ ...newTelefone, conta: e.target.value })}
+                className="col-span-3"
+                data-testid="input-create-conta"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="create-plano" className="text-right">
+                Plano/Operadora
+              </Label>
+              <Select
+                value={newTelefone.planoOperadora}
+                onValueChange={(value) => setNewTelefone({ ...newTelefone, planoOperadora: value })}
+              >
+                <SelectTrigger className="col-span-3" data-testid="select-create-plano">
+                  <SelectValue placeholder="Selecione o plano" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PÓS">Pós</SelectItem>
+                  <SelectItem value="PRÉ">Pré</SelectItem>
+                  <SelectItem value="FLEX">Flex</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="create-telefone" className="text-right">
+                Telefone
+              </Label>
+              <Input
+                id="create-telefone"
+                value={newTelefone.telefone}
+                onChange={(e) => setNewTelefone({ ...newTelefone, telefone: e.target.value })}
+                className="col-span-3"
+                data-testid="input-create-telefone"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="create-responsavel" className="text-right">
+                Responsável
+              </Label>
+              <Popover open={createResponsavelOpen} onOpenChange={setCreateResponsavelOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={createResponsavelOpen}
+                    className="col-span-3 justify-between"
+                    data-testid="combobox-create-responsavel"
+                  >
+                    {newTelefone.responsavelNome || "Selecione um colaborador..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Buscar colaborador..." data-testid="input-search-create-responsavel" />
+                    <CommandList>
+                      <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value=""
+                          onSelect={() => {
+                            setNewTelefone({ ...newTelefone, responsavelId: null, responsavelNome: "" });
+                            setCreateResponsavelOpen(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", !newTelefone.responsavelId ? "opacity-100" : "opacity-0")} />
+                          Nenhum
+                        </CommandItem>
+                        {colaboradoresDropdown?.map((col) => (
+                          <CommandItem
+                            key={col.id}
+                            value={col.nome}
+                            onSelect={() => {
+                              setNewTelefone({ ...newTelefone, responsavelId: col.id, responsavelNome: col.nome });
+                              setCreateResponsavelOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", newTelefone.responsavelId === col.id ? "opacity-100" : "opacity-0")} />
+                            {col.nome}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="create-setor" className="text-right">
+                Setor
+              </Label>
+              <Input
+                id="create-setor"
+                value={newTelefone.setor}
+                onChange={(e) => setNewTelefone({ ...newTelefone, setor: e.target.value })}
+                className="col-span-3"
+                data-testid="input-create-setor"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="create-recarga" className="text-right">
+                Última Recarga
+              </Label>
+              <Input
+                id="create-recarga"
+                type="date"
+                value={newTelefone.ultimaRecarga || ""}
+                onChange={(e) => setNewTelefone({ ...newTelefone, ultimaRecarga: e.target.value || null })}
+                className="col-span-3"
+                data-testid="input-create-recarga"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="create-status" className="text-right">
+                Status
+              </Label>
+              <Select
+                value={newTelefone.status}
+                onValueChange={(value) => setNewTelefone({ ...newTelefone, status: value })}
+              >
+                <SelectTrigger className="col-span-3" data-testid="select-create-status">
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Ativo">Ativo</SelectItem>
+                  <SelectItem value="Cancelado">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCreateTelefoneDialogOpen(false);
+                resetNewTelefoneForm();
+              }}
+              data-testid="button-cancel-create"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateTelefone}
+              disabled={createTelefoneMutation.isPending}
+              data-testid="button-save-create"
+            >
+              {createTelefoneMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                "Criar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreatePatrimonioDialogOpen} onOpenChange={setIsCreatePatrimonioDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Novo Patrimônio</DialogTitle>
+            <DialogDescription>
+              Preencha as informações do novo patrimônio abaixo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="patrimonio-numero-ativo" className="text-right">
+                Número do Ativo
+              </Label>
+              <Input
+                id="patrimonio-numero-ativo"
+                value={newPatrimonio.numeroAtivo}
+                onChange={(e) => setNewPatrimonio({ ...newPatrimonio, numeroAtivo: e.target.value })}
+                className="col-span-3"
+                data-testid="patrimonio-input-numero-ativo"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="patrimonio-tipo-bem" className="text-right">
+                Tipo de Bem
+              </Label>
+              <Input
+                id="patrimonio-tipo-bem"
+                value={newPatrimonio.ativo}
+                onChange={(e) => setNewPatrimonio({ ...newPatrimonio, ativo: e.target.value })}
+                placeholder="Ex: Notebook, Computador, Monitor"
+                className="col-span-3"
+                data-testid="patrimonio-input-tipo-bem"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="patrimonio-marca" className="text-right">
+                Marca
+              </Label>
+              <Input
+                id="patrimonio-marca"
+                value={newPatrimonio.marca}
+                onChange={(e) => setNewPatrimonio({ ...newPatrimonio, marca: e.target.value })}
+                className="col-span-3"
+                data-testid="patrimonio-input-marca"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="patrimonio-estado" className="text-right">
+                Estado
+              </Label>
+              <Select
+                value={newPatrimonio.estadoConservacao}
+                onValueChange={(value) => setNewPatrimonio({ ...newPatrimonio, estadoConservacao: value })}
+              >
+                <SelectTrigger className="col-span-3" data-testid="patrimonio-select-estado">
+                  <SelectValue placeholder="Selecione o estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Novo">Novo</SelectItem>
+                  <SelectItem value="Bom">Bom</SelectItem>
+                  <SelectItem value="Regular">Regular</SelectItem>
+                  <SelectItem value="Ruim">Ruim</SelectItem>
+                  <SelectItem value="Em estoque">Em estoque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="patrimonio-responsavel" className="text-right">
+                Responsável
+              </Label>
+              <Popover open={createPatrimonioResponsavelOpen} onOpenChange={setCreatePatrimonioResponsavelOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={createPatrimonioResponsavelOpen}
+                    className="col-span-3 justify-between"
+                    data-testid="patrimonio-combobox-responsavel"
+                  >
+                    {newPatrimonio.responsavelAtual || "Selecione um colaborador..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Buscar colaborador..." data-testid="patrimonio-input-search-responsavel" />
+                    <CommandList>
+                      <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value=""
+                          onSelect={() => {
+                            setNewPatrimonio({ ...newPatrimonio, responsavelId: null, responsavelAtual: "" });
+                            setCreatePatrimonioResponsavelOpen(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", !newPatrimonio.responsavelId ? "opacity-100" : "opacity-0")} />
+                          Nenhum
+                        </CommandItem>
+                        {colaboradoresDropdown?.map((col) => (
+                          <CommandItem
+                            key={col.id}
+                            value={col.nome}
+                            onSelect={() => {
+                              setNewPatrimonio({ ...newPatrimonio, responsavelId: col.id, responsavelAtual: col.nome });
+                              setCreatePatrimonioResponsavelOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", newPatrimonio.responsavelId === col.id ? "opacity-100" : "opacity-0")} />
+                            {col.nome}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="patrimonio-valor-pago" className="text-right">
+                Valor Pago
+              </Label>
+              <Input
+                id="patrimonio-valor-pago"
+                type="number"
+                step="0.01"
+                value={newPatrimonio.valorPago}
+                onChange={(e) => setNewPatrimonio({ ...newPatrimonio, valorPago: e.target.value })}
+                className="col-span-3"
+                data-testid="patrimonio-input-valor-pago"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="patrimonio-valor-mercado" className="text-right">
+                Valor de Mercado
+              </Label>
+              <Input
+                id="patrimonio-valor-mercado"
+                type="number"
+                step="0.01"
+                value={newPatrimonio.valorMercado}
+                onChange={(e) => setNewPatrimonio({ ...newPatrimonio, valorMercado: e.target.value })}
+                className="col-span-3"
+                data-testid="patrimonio-input-valor-mercado"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="patrimonio-valor-venda" className="text-right">
+                Valor de Venda
+              </Label>
+              <Input
+                id="patrimonio-valor-venda"
+                type="number"
+                step="0.01"
+                value={newPatrimonio.valorVenda}
+                onChange={(e) => setNewPatrimonio({ ...newPatrimonio, valorVenda: e.target.value })}
+                className="col-span-3"
+                data-testid="patrimonio-input-valor-venda"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="patrimonio-descricao" className="text-right">
+                Descrição
+              </Label>
+              <Input
+                id="patrimonio-descricao"
+                value={newPatrimonio.descricao}
+                onChange={(e) => setNewPatrimonio({ ...newPatrimonio, descricao: e.target.value })}
+                className="col-span-3"
+                data-testid="patrimonio-input-descricao"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCreatePatrimonioDialogOpen(false);
+                resetNewPatrimonioForm();
+              }}
+              data-testid="patrimonio-button-cancel"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreatePatrimonio}
+              disabled={createPatrimonioMutation.isPending}
+              data-testid="patrimonio-button-save"
+            >
+              {createPatrimonioMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                "Criar"
               )}
             </Button>
           </DialogFooter>
