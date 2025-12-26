@@ -276,6 +276,7 @@ export interface IStorage {
   // Telefones (Linhas Telefônicas)
   getTelefones(): Promise<import("@shared/schema").Telefone[]>;
   getTelefoneById(id: number): Promise<import("@shared/schema").Telefone | undefined>;
+  createTelefone(telefone: import("@shared/schema").InsertTelefone): Promise<import("@shared/schema").Telefone>;
   updateTelefone(id: number, data: Partial<import("@shared/schema").InsertTelefone>): Promise<import("@shared/schema").Telefone>;
   
   // Acessos - Bulk CNPJ Update
@@ -938,6 +939,13 @@ export class MemStorage implements IStorage {
 
   async getTelefoneById(id: number): Promise<import("@shared/schema").Telefone | undefined> {
     return this.telefones.find(t => t.id === id);
+  }
+
+  async createTelefone(telefone: import("@shared/schema").InsertTelefone): Promise<import("@shared/schema").Telefone> {
+    const newId = Math.max(...this.telefones.map(t => t.id), 0) + 1;
+    const newTelefone: import("@shared/schema").Telefone = { ...telefone, id: newId };
+    this.telefones.push(newTelefone);
+    return newTelefone;
   }
 
   async updateTelefone(id: number, data: Partial<import("@shared/schema").InsertTelefone>): Promise<import("@shared/schema").Telefone> {
@@ -8336,6 +8344,26 @@ export class DbStorage implements IStorage {
       WHERE id = ${id}
     `);
     if (result.rows.length === 0) return undefined;
+    const row = result.rows[0] as any;
+    return {
+      id: row.id,
+      conta: row.conta,
+      planoOperadora: row.planoOperadora,
+      telefone: row.telefone,
+      responsavelNome: row.responsavelNome,
+      responsavelId: row.responsavelId,
+      setor: row.setor,
+      ultimaRecarga: row.ultimaRecarga,
+      status: row.status,
+    };
+  }
+
+  async createTelefone(telefone: import("@shared/schema").InsertTelefone): Promise<import("@shared/schema").Telefone> {
+    const result = await db.execute(sql`
+      INSERT INTO rh_telefones (conta, plano_operadora, telefone, responsavel_nome, responsavel_id, setor, ultima_recarga, status)
+      VALUES (${telefone.conta || null}, ${telefone.planoOperadora || null}, ${telefone.telefone || null}, ${telefone.responsavelNome || null}, ${telefone.responsavelId || null}, ${telefone.setor || null}, ${telefone.ultimaRecarga || null}, ${telefone.status || 'Ativo'})
+      RETURNING id, conta, plano_operadora as "planoOperadora", telefone, responsavel_nome as "responsavelNome", responsavel_id as "responsavelId", setor, ultima_recarga as "ultimaRecarga", status
+    `);
     const row = result.rows[0] as any;
     return {
       id: row.id,
