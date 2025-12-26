@@ -319,11 +319,11 @@ export default function DashboardDFC() {
           <div className="flex items-center gap-3 flex-wrap">
             {/* Date Range Picker no header */}
             <div className="flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 rounded-xl px-3 py-2 border border-slate-200/60 dark:border-slate-700/60 shadow-sm">
-              <Calendar className="w-4 h-4 text-primary" />
               <DateRangePicker
                 value={dateRange}
                 onChange={setDateRange}
                 placeholder="Selecione o período"
+                align="end"
                 data-testid="date-range-picker-dfc"
               />
               {dateRange && (
