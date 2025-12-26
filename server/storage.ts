@@ -8065,7 +8065,7 @@ export class DbStorage implements IStorage {
           entity: 'colaborador',
           label: r.nome,
           description: r.cargo || r.email_turbo || undefined,
-          route: '/colaboradores',
+          route: `/colaborador/${r.id}`,
           meta: {
             status: r.status || undefined,
           },
@@ -8078,10 +8078,10 @@ export class DbStorage implements IStorage {
     // Search contratos
     try {
       const contratosResult = await db.execute(sql`
-        SELECT c.id_subtask as id, c.servico, c.status, c.valorr, cc.nome as cliente_nome
+        SELECT c.id_subtask as id, c.servico, c.status, c.valorr, cc.nome as cliente_nome, cc.id::text as cliente_id
         FROM cup_contratos c
         LEFT JOIN cup_clientes cc ON c.id_task = cc.task_id
-        WHERE c.servico ILIKE ${searchTerm}
+        WHERE c.servico ILIKE ${searchTerm} OR cc.nome ILIKE ${searchTerm}
         LIMIT 20
       `);
       for (const row of contratosResult.rows) {
@@ -8091,7 +8091,7 @@ export class DbStorage implements IStorage {
           entity: 'contrato',
           label: r.servico || 'Contrato',
           description: r.cliente_nome || undefined,
-          route: '/contratos',
+          route: r.cliente_id ? `/cliente/${r.cliente_id}?tab=contratos` : '/clientes',
           meta: {
             status: r.status || undefined,
             value: r.valorr ? parseFloat(r.valorr) : undefined,
