@@ -12,6 +12,7 @@ import { PageProvider } from "@/contexts/PageContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import { AssistantWidget } from "@/components/AssistantWidget";
+import { useDealNotifications } from "@/hooks/use-deal-notifications";
 
 const Homepage = lazy(() => import("@/pages/Homepage"));
 const Clients = lazy(() => import("@/pages/Clients"));
@@ -248,6 +249,12 @@ function Router() {
   );
 }
 
+function DealNotificationsHandler() {
+  const { user } = useAuth();
+  useDealNotifications({ enabled: !!user, playSound: true });
+  return null;
+}
+
 function AppLayout() {
   const [location] = useLocation();
   const isLoginPage = location === "/login";
@@ -268,6 +275,7 @@ function AppLayout() {
 
   return (
     <PageProvider>
+      <DealNotificationsHandler />
       <SidebarProvider style={style as React.CSSProperties}>
         <div className="flex h-screen w-full">
           <AppSidebar />
