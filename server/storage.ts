@@ -2025,11 +2025,15 @@ export class DbStorage implements IStorage {
   async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
     const { id, ...data } = colaborador as any;
     
+    const maxIdResult = await db.execute(sql`SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM rh_pessoal`);
+    const nextId = (maxIdResult.rows[0] as any).next_id;
+    
     const result = await db.execute(sql`
       INSERT INTO rh_pessoal (
-        status, nome, cpf, endereco, estado, telefone, aniversario, admissao,
+        id, status, nome, cpf, endereco, estado, telefone, aniversario, admissao,
         setor, squad, cargo, nivel, pix, cnpj, email_turbo, email_pessoal, salario
       ) VALUES (
+        ${nextId},
         ${data.status || null},
         ${data.nome},
         ${data.cpf || null},
