@@ -162,16 +162,16 @@ export function DateRangePicker({
           <span className="truncate">{displayText}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className={cn("w-auto p-0 z-[100]", className)} align={align} sideOffset={8}>
-        <div className="flex max-h-[400px]">
-          <ScrollArea className="border-r border-border">
-            <div className="p-2 space-y-0.5 min-w-[130px]">
+      <PopoverContent className={cn("w-auto p-0 z-[100]", className)} align={align} sideOffset={4}>
+        <div className="flex">
+          <ScrollArea className="border-r border-border max-h-[280px]">
+            <div className="p-1.5 space-y-0.5 w-[100px]">
               {presets.map((preset) => (
                 <button
                   key={preset.label}
                   onClick={() => handlePresetClick(preset)}
                   className={cn(
-                    "w-full text-left px-2 py-1.5 text-xs rounded-md transition-colors",
+                    "w-full text-left px-2 py-1 text-[11px] rounded transition-colors",
                     selectedPreset === preset.label
                       ? "bg-primary/10 text-primary font-medium"
                       : "hover:bg-muted"
@@ -184,12 +184,12 @@ export function DateRangePicker({
             </div>
           </ScrollArea>
           
-          <div className="p-2">
+          <div className="p-1.5">
             <Calendar
               mode="range"
               selected={value}
               onSelect={handleCalendarSelect}
-              numberOfMonths={numberOfMonths}
+              numberOfMonths={1}
               month={month}
               onMonthChange={setMonth}
               locale={ptBR}
@@ -198,23 +198,25 @@ export function DateRangePicker({
               fromYear={2020}
               toYear={2030}
               classNames={{
-                caption: "flex justify-center pt-1 relative items-center text-sm",
+                months: "flex flex-col",
+                month: "space-y-1",
+                caption: "flex justify-center pt-0.5 relative items-center text-xs",
                 caption_label: "hidden",
                 caption_dropdowns: "flex gap-1",
-                dropdown: "bg-background border rounded px-1 py-0.5 text-xs",
+                dropdown: "bg-background border rounded px-1 py-0.5 text-[10px]",
                 dropdown_month: "font-medium",
                 dropdown_year: "font-medium",
-                nav: "flex items-center gap-1",
-                nav_button: "h-6 w-6 bg-transparent p-0 hover:bg-muted rounded",
-                nav_button_previous: "absolute left-1",
-                nav_button_next: "absolute right-1",
+                nav: "flex items-center gap-0.5",
+                nav_button: "h-5 w-5 bg-transparent p-0 hover:bg-muted rounded",
+                nav_button_previous: "absolute left-0",
+                nav_button_next: "absolute right-0",
                 table: "w-full border-collapse",
                 head_row: "flex",
-                head_cell: "text-muted-foreground w-7 font-normal text-[0.7rem]",
+                head_cell: "text-muted-foreground w-6 font-normal text-[10px]",
                 row: "flex w-full",
-                cell: "text-center text-xs p-0 relative focus-within:relative focus-within:z-20",
-                day: "h-7 w-7 p-0 font-normal hover:bg-muted rounded-md transition-colors",
-                day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                cell: "text-center text-[10px] p-0 relative",
+                day: "h-6 w-6 p-0 font-normal hover:bg-muted rounded transition-colors text-[10px]",
+                day_selected: "bg-primary text-primary-foreground hover:bg-primary",
                 day_today: "bg-accent text-accent-foreground",
                 day_outside: "text-muted-foreground opacity-50",
                 day_disabled: "text-muted-foreground opacity-50",
@@ -223,18 +225,18 @@ export function DateRangePicker({
               }}
             />
             
-            <div className="flex items-center justify-between mt-2 pt-2 border-t border-border gap-2">
-              <div className="flex items-center gap-1 text-xs">
-                <div className="px-2 py-1 bg-muted rounded text-center min-w-[90px]">
-                  {value?.from ? format(value.from, "dd/MM/yy", { locale: ptBR }) : "Início"}
-                </div>
+            <div className="flex items-center justify-between mt-1 pt-1 border-t border-border gap-1">
+              <div className="flex items-center gap-1 text-[10px]">
+                <span className="px-1.5 py-0.5 bg-muted rounded">
+                  {value?.from ? format(value.from, "dd/MM/yy") : "Início"}
+                </span>
                 <span className="text-muted-foreground">→</span>
-                <div className="px-2 py-1 bg-muted rounded text-center min-w-[90px]">
-                  {value?.to ? format(value.to, "dd/MM/yy", { locale: ptBR }) : "Fim"}
-                </div>
+                <span className="px-1.5 py-0.5 bg-muted rounded">
+                  {value?.to ? format(value.to, "dd/MM/yy") : "Fim"}
+                </span>
               </div>
-              <Button size="sm" className="h-7 text-xs" onClick={handleApply} data-testid="button-apply-date-range">
-                Aplicar
+              <Button size="sm" className="h-6 text-[10px] px-2" onClick={handleApply} data-testid="button-apply-date-range">
+                OK
               </Button>
             </div>
           </div>
