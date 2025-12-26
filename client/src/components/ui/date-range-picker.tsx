@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, subWeeks, subMonths, addMonths } from "date-fns";
+import { format, subDays, startOfWeek, startOfMonth, endOfMonth, startOfYear, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 
@@ -18,99 +18,160 @@ interface Preset {
   getValue: () => DateRange;
 }
 
-const DEFAULT_PRESETS: Preset[] = [
+interface PresetSection {
+  title: string;
+  presets: Preset[];
+}
+
+const currentYear = new Date().getFullYear();
+
+const PRESET_SECTIONS: PresetSection[] = [
   {
-    label: "Hoje",
-    getValue: () => {
-      const today = new Date();
-      return { from: today, to: today };
-    },
+    title: "Períodos",
+    presets: [
+      {
+        label: "Hoje",
+        getValue: () => {
+          const today = new Date();
+          return { from: today, to: today };
+        },
+      },
+      {
+        label: "Ontem",
+        getValue: () => {
+          const yesterday = subDays(new Date(), 1);
+          return { from: yesterday, to: yesterday };
+        },
+      },
+      {
+        label: "Essa semana",
+        getValue: () => {
+          const today = new Date();
+          return { from: startOfWeek(today, { weekStartsOn: 0 }), to: today };
+        },
+      },
+      {
+        label: "Esse mês",
+        getValue: () => {
+          const today = new Date();
+          return { from: startOfMonth(today), to: today };
+        },
+      },
+      {
+        label: "Esse ano",
+        getValue: () => {
+          const today = new Date();
+          return { from: startOfYear(today), to: today };
+        },
+      },
+      {
+        label: "Últimos 7 dias",
+        getValue: () => {
+          const today = new Date();
+          return { from: subDays(today, 6), to: today };
+        },
+      },
+      {
+        label: "Últimos 30 dias",
+        getValue: () => {
+          const today = new Date();
+          return { from: subDays(today, 29), to: today };
+        },
+      },
+      {
+        label: "Últimos 90 dias",
+        getValue: () => {
+          const today = new Date();
+          return { from: subDays(today, 89), to: today };
+        },
+      },
+      {
+        label: "Mês passado",
+        getValue: () => {
+          const lastMonth = subMonths(new Date(), 1);
+          return { from: startOfMonth(lastMonth), to: endOfMonth(lastMonth) };
+        },
+      },
+    ],
   },
   {
-    label: "Ontem",
-    getValue: () => {
-      const yesterday = subDays(new Date(), 1);
-      return { from: yesterday, to: yesterday };
-    },
+    title: "Trimestres",
+    presets: [
+      {
+        label: "Q1",
+        getValue: () => ({ from: new Date(currentYear, 0, 1), to: new Date(currentYear, 2, 31) }),
+      },
+      {
+        label: "Q2",
+        getValue: () => ({ from: new Date(currentYear, 3, 1), to: new Date(currentYear, 5, 30) }),
+      },
+      {
+        label: "Q3",
+        getValue: () => ({ from: new Date(currentYear, 6, 1), to: new Date(currentYear, 8, 30) }),
+      },
+      {
+        label: "Q4",
+        getValue: () => ({ from: new Date(currentYear, 9, 1), to: new Date(currentYear, 11, 31) }),
+      },
+    ],
   },
   {
-    label: "Essa semana",
-    getValue: () => {
-      const today = new Date();
-      return { from: startOfWeek(today, { weekStartsOn: 0 }), to: today };
-    },
-  },
-  {
-    label: "Esse mês",
-    getValue: () => {
-      const today = new Date();
-      return { from: startOfMonth(today), to: today };
-    },
-  },
-  {
-    label: "Esse ano",
-    getValue: () => {
-      const today = new Date();
-      return { from: startOfYear(today), to: today };
-    },
-  },
-  {
-    label: "Últimos 7 dias",
-    getValue: () => {
-      const today = new Date();
-      return { from: subDays(today, 6), to: today };
-    },
-  },
-  {
-    label: "Últimos 30 dias",
-    getValue: () => {
-      const today = new Date();
-      return { from: subDays(today, 29), to: today };
-    },
-  },
-  {
-    label: "Últimos 90 dias",
-    getValue: () => {
-      const today = new Date();
-      return { from: subDays(today, 89), to: today };
-    },
-  },
-  {
-    label: "Mês passado",
-    getValue: () => {
-      const lastMonth = subMonths(new Date(), 1);
-      return { from: startOfMonth(lastMonth), to: endOfMonth(lastMonth) };
-    },
-  },
-  {
-    label: "Q1",
-    getValue: () => {
-      const year = new Date().getFullYear();
-      return { from: new Date(year, 0, 1), to: new Date(year, 2, 31) };
-    },
-  },
-  {
-    label: "Q2",
-    getValue: () => {
-      const year = new Date().getFullYear();
-      return { from: new Date(year, 3, 1), to: new Date(year, 5, 30) };
-    },
-  },
-  {
-    label: "Q3",
-    getValue: () => {
-      const year = new Date().getFullYear();
-      return { from: new Date(year, 6, 1), to: new Date(year, 8, 30) };
-    },
-  },
-  {
-    label: "Q4",
-    getValue: () => {
-      const year = new Date().getFullYear();
-      return { from: new Date(year, 9, 1), to: new Date(year, 11, 31) };
-    },
+    title: "Meses",
+    presets: [
+      {
+        label: "Janeiro",
+        getValue: () => ({ from: new Date(currentYear, 0, 1), to: new Date(currentYear, 0, 31) }),
+      },
+      {
+        label: "Fevereiro",
+        getValue: () => ({ from: new Date(currentYear, 1, 1), to: new Date(currentYear, 1, 29) }),
+      },
+      {
+        label: "Março",
+        getValue: () => ({ from: new Date(currentYear, 2, 1), to: new Date(currentYear, 2, 31) }),
+      },
+      {
+        label: "Abril",
+        getValue: () => ({ from: new Date(currentYear, 3, 1), to: new Date(currentYear, 3, 30) }),
+      },
+      {
+        label: "Maio",
+        getValue: () => ({ from: new Date(currentYear, 4, 1), to: new Date(currentYear, 4, 31) }),
+      },
+      {
+        label: "Junho",
+        getValue: () => ({ from: new Date(currentYear, 5, 1), to: new Date(currentYear, 5, 30) }),
+      },
+      {
+        label: "Julho",
+        getValue: () => ({ from: new Date(currentYear, 6, 1), to: new Date(currentYear, 6, 31) }),
+      },
+      {
+        label: "Agosto",
+        getValue: () => ({ from: new Date(currentYear, 7, 1), to: new Date(currentYear, 7, 31) }),
+      },
+      {
+        label: "Setembro",
+        getValue: () => ({ from: new Date(currentYear, 8, 1), to: new Date(currentYear, 8, 30) }),
+      },
+      {
+        label: "Outubro",
+        getValue: () => ({ from: new Date(currentYear, 9, 1), to: new Date(currentYear, 9, 31) }),
+      },
+      {
+        label: "Novembro",
+        getValue: () => ({ from: new Date(currentYear, 10, 1), to: new Date(currentYear, 10, 30) }),
+      },
+      {
+        label: "Dezembro",
+        getValue: () => ({ from: new Date(currentYear, 11, 1), to: new Date(currentYear, 11, 31) }),
+      },
+    ],
   },
 ];
+
+// Flatten all presets for backwards compatibility
+const DEFAULT_PRESETS: Preset[] = PRESET_SECTIONS.flatMap(section => section.presets);
 
 interface DateRangePickerProps {
   value: DateRange | undefined;
@@ -127,12 +188,10 @@ interface DateRangePickerProps {
 export function DateRangePicker({
   value,
   onChange,
-  presets = DEFAULT_PRESETS,
   className,
   triggerClassName,
   disabled = false,
   placeholder = "Selecione um período",
-  numberOfMonths = 2,
   align = "start",
 }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
@@ -184,27 +243,36 @@ export function DateRangePicker({
       </PopoverTrigger>
       <PopoverContent className={cn("w-auto p-0 z-[100]", className)} align={align} sideOffset={4}>
         <div className="flex">
-          <ScrollArea className="border-r border-border max-h-[320px]">
-            <div className="p-2 space-y-0.5 w-[110px]">
-              {presets.map((preset) => (
-                <button
-                  key={preset.label}
-                  onClick={() => handlePresetClick(preset)}
-                  className={cn(
-                    "w-full text-left px-2 py-1.5 text-xs rounded transition-colors",
-                    selectedPreset === preset.label
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "hover:bg-muted"
-                  )}
-                  data-testid={`preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
-                >
-                  {preset.label}
-                </button>
+          <ScrollArea className="border-r border-border h-[400px]">
+            <div className="p-3 w-[140px]">
+              {PRESET_SECTIONS.map((section, idx) => (
+                <div key={section.title} className={cn(idx > 0 && "mt-4")}>
+                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                    {section.title}
+                  </div>
+                  <div className="space-y-0.5">
+                    {section.presets.map((preset) => (
+                      <button
+                        key={preset.label}
+                        onClick={() => handlePresetClick(preset)}
+                        className={cn(
+                          "w-full text-left px-3 py-2 text-sm rounded-md transition-colors",
+                          selectedPreset === preset.label
+                            ? "bg-primary text-primary-foreground font-medium"
+                            : "hover:bg-muted"
+                        )}
+                        data-testid={`preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </ScrollArea>
           
-          <div className="p-2">
+          <div className="p-4">
             <Calendar
               mode="range"
               selected={value}
@@ -219,43 +287,43 @@ export function DateRangePicker({
               toYear={2030}
               classNames={{
                 months: "flex flex-col",
-                month: "space-y-2",
-                caption: "flex justify-center pt-1 relative items-center text-sm",
+                month: "space-y-3",
+                caption: "flex justify-center pt-1 relative items-center",
                 caption_label: "hidden",
-                caption_dropdowns: "flex gap-1",
-                dropdown: "bg-background border rounded px-1.5 py-1 text-xs cursor-pointer hover:bg-muted",
-                dropdown_month: "font-medium",
-                dropdown_year: "font-medium",
+                caption_dropdowns: "flex gap-2",
+                dropdown: "bg-background border rounded-md px-2 py-1.5 text-sm cursor-pointer hover:bg-muted font-medium",
+                dropdown_month: "",
+                dropdown_year: "",
                 nav: "flex items-center gap-1",
-                nav_button: "h-7 w-7 bg-transparent p-0 hover:bg-muted rounded",
+                nav_button: "h-8 w-8 bg-transparent p-0 hover:bg-muted rounded-md transition-colors",
                 nav_button_previous: "absolute left-0",
                 nav_button_next: "absolute right-0",
-                table: "w-full border-collapse",
+                table: "w-full border-collapse mt-2",
                 head_row: "flex",
-                head_cell: "text-muted-foreground w-8 font-normal text-xs",
-                row: "flex w-full",
-                cell: "text-center text-xs p-0 relative",
-                day: "h-8 w-8 p-0 font-normal hover:bg-muted rounded-md transition-colors",
-                day_selected: "bg-primary text-primary-foreground hover:bg-primary",
+                head_cell: "text-muted-foreground w-10 font-medium text-sm",
+                row: "flex w-full mt-1",
+                cell: "text-center text-sm p-0 relative",
+                day: "h-10 w-10 p-0 font-normal hover:bg-muted rounded-md transition-colors",
+                day_selected: "bg-primary text-primary-foreground hover:bg-primary font-medium",
                 day_today: "bg-accent text-accent-foreground font-semibold",
-                day_outside: "text-muted-foreground opacity-50",
-                day_disabled: "text-muted-foreground opacity-50",
-                day_range_middle: "bg-primary/20",
+                day_outside: "text-muted-foreground opacity-40",
+                day_disabled: "text-muted-foreground opacity-40",
+                day_range_middle: "bg-primary/15 rounded-none",
                 day_hidden: "invisible",
               }}
             />
             
-            <div className="flex items-center justify-between mt-2 pt-2 border-t border-border gap-2">
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="px-2 py-1 bg-muted rounded font-medium">
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-border gap-3">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="px-3 py-1.5 bg-muted rounded-md font-medium">
                   {value?.from ? format(value.from, "dd/MM/yy") : "Início"}
                 </span>
                 <span className="text-muted-foreground">→</span>
-                <span className="px-2 py-1 bg-muted rounded font-medium">
+                <span className="px-3 py-1.5 bg-muted rounded-md font-medium">
                   {value?.to ? format(value.to, "dd/MM/yy") : "Fim"}
                 </span>
               </div>
-              <Button size="sm" className="h-7 text-xs px-3" onClick={handleApply} data-testid="button-apply-date-range">
+              <Button size="sm" className="h-8 px-4" onClick={handleApply} data-testid="button-apply-date-range">
                 Aplicar
               </Button>
             </div>
@@ -266,5 +334,5 @@ export function DateRangePicker({
   );
 }
 
-export { DEFAULT_PRESETS };
-export type { Preset, DateRangePickerProps };
+export { DEFAULT_PRESETS, PRESET_SECTIONS };
+export type { Preset, PresetSection, DateRangePickerProps };
