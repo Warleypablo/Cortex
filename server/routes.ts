@@ -9066,12 +9066,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT 
             p.id_cliente, 
             COUNT(*) as parcelas_vencidas, 
-            SUM(p.valor_bruto) as total_devido
+            SUM(p.valor_bruto) as total_devido,
+            cl.nome as cliente_nome
           FROM caz_parcelas p
+          LEFT JOIN cup_clientes cl ON cl.cnpj = p.id_cliente
           WHERE p.data_vencimento < CURRENT_DATE - INTERVAL '1 day' * ${diasAtraso}
             AND p.status != 'Pago'
             AND p.id_cliente IS NOT NULL
-          GROUP BY p.id_cliente
+          GROUP BY p.id_cliente, cl.nome
           HAVING SUM(COALESCE(p.valor_bruto, 0)) >= ${valorMinimo}
         `);
         
@@ -9079,6 +9081,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         for (const overdue of overdueResult.rows as any[]) {
           const clientId = overdue.id_cliente || 'unknown';
+          const clientName = overdue.cliente_nome || clientId;
           const uniqueKey = `inadimplencia_${clientId}_${currentMonth}`;
           
           const exists = await storage.notificationExists(uniqueKey);
@@ -9087,7 +9090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             const notification = await storage.createNotification({
               type: 'inadimplencia',
-              title: `Inadimplência detectada`,
+              title: `Inadimplência: ${clientName}`,
               message: `${overdue.parcelas_vencidas} parcela(s) vencida(s) há mais de ${diasAtraso} dias. Total: ${totalDevido}`,
               entityId: clientId,
               entityType: 'cliente',
