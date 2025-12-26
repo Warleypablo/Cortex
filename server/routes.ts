@@ -1845,8 +1845,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/colaboradores/by-user/:userId", async (req, res) => {
     try {
-      // Coluna user_id não existe na tabela - retornar 404
-      return res.status(404).json({ error: "Colaborador não encontrado para este usuário" });
+      const { userId } = req.params;
+      
+      // Busca o usuário no banco de autenticação para pegar o email
+      const { findUserById } = await import("./auth/userDb");
+      const user = await findUserById(userId);
+      
+      if (!user || !user.email) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+      
+      // Busca o colaborador pelo email (email_turbo ou email_pessoal)
+      const result = await db.execute(sql`
+        SELECT id FROM rh_pessoal 
+        WHERE LOWER(email_turbo) = LOWER(${user.email}) 
+           OR LOWER(email_pessoal) = LOWER(${user.email})
+        LIMIT 1
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Colaborador não encontrado para este usuário" });
+      }
+      
+      const colaboradorId = (result.rows[0] as any).id;
+      res.json({ colaboradorId });
     } catch (error) {
       console.error("[api] Error fetching colaborador by userId:", error);
       res.status(500).json({ error: "Failed to fetch colaborador" });
