@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { DollarSign, Eye, MousePointer, Users, TrendingUp, Target, Smartphone, Filter, X, CalendarIcon } from "lucide-react";
 import { usePageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, FunnelChart, Funnel, LabelList } from "recharts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MetaOverview, CampaignPerformance, AdsetPerformance, AdPerformance, ConversionFunnel, MetaLeadFilters } from "@shared/schema";
@@ -26,6 +27,7 @@ const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
 };
 
 export default function MetaAds() {
+  usePageTitle("Meta Ads");
   const { setPageInfo } = usePageInfo();
   const queryClient = useQueryClient();
   

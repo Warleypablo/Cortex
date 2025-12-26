@@ -1,8 +1,10 @@
 import { MessageSquare, Zap } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 export default function TurboZap() {
+  usePageTitle("TurboZap");
   useSetPageInfo("TurboZap", "Central de cobranças via WhatsApp");
   
   return (

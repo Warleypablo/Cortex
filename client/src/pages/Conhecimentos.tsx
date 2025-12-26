@@ -5,6 +5,7 @@ import { insertCourseSchema, courseStatusEnum } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Loader2, ChevronDown, ChevronRight, GraduationCap, BookOpen, LayoutGrid, Table2, ArrowUpDown } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -636,6 +637,7 @@ function CourseCard({
 }
 
 export default function Conhecimentos() {
+  usePageTitle("Base de Conhecimentos");
   useSetPageInfo("Conhecimentos", "Gerenciamento de cursos e formações");
 
   const [search, setSearch] = useState("");

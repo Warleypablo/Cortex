@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,7 @@ const formatCurrency = (value: number | null): string => {
 };
 
 export default function PerformancePlataformas() {
+  usePageTitle("Performance por Plataforma");
   useSetPageInfo("Performance por Plataforma", "Análise hierárquica: Plataforma → Campanha → Conjunto → Anúncio");
   const [dateRange, setDateRange] = useState({
     from: subDays(new Date(), 30),

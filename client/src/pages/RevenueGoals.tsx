@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -117,6 +118,7 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export default function RevenueGoals() {
+  usePageTitle("Metas de Receita");
   useSetPageInfo("Revenue Goals", "Acompanhamento de recebimentos do mês");
   
   const hoje = new Date();

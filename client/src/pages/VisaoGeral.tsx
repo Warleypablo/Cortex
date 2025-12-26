@@ -6,8 +6,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 export default function VisaoGeral() {
+  usePageTitle("Visão Geral");
   useSetPageInfo("Visão Geral", "Métricas de MRR e performance");
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();

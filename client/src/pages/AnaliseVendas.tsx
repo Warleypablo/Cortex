@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -155,6 +156,7 @@ function FloatingParticles() {
 
 
 export default function AnaliseVendas() {
+  usePageTitle("Análise de Vendas");
   useSetPageInfo("Análise de Vendas", "Métricas de performance comercial em tempo real");
   
   const hoje = new Date();

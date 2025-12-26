@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { usePageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -159,6 +160,7 @@ interface SituacaoJuridica {
 }
 
 export default function ClientDetail() {
+  usePageTitle("Detalhes do Cliente");
   const { setPageInfo } = usePageInfo();
   const { toast } = useToast();
   const [, params] = useRoute("/cliente/:id");

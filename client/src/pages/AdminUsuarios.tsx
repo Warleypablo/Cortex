@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -1446,6 +1447,7 @@ function SortableTableHead({
 }
 
 export default function AdminUsuarios() {
+  usePageTitle("Administração de Usuários");
   useSetPageInfo("Gerenciar Usuários", "Controle de acesso e permissões de usuários");
   
   const [editingUser, setEditingUser] = useState<User | null>(null);

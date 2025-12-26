@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1015,6 +1016,7 @@ export function AdminLogsContent() {
 }
 
 export default function AdminLogs() {
+  usePageTitle("Logs do Sistema");
   useSetPageInfo("Logs do Sistema", "Monitore acessos, chamadas de API e status das integrações");
   return <AdminLogsContent />;
 }

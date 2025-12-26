@@ -7,6 +7,7 @@ import {
   DollarSign, TrendingUp, CheckCircle, X, Users, Phone, Pencil, Check, ChevronsUpDown, Info, Plus
 } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import StatsCard from "@/components/StatsCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -88,6 +89,7 @@ type SortDirection = "asc" | "desc";
 type TelefonesSortField = "conta" | "planoOperadora" | "telefone" | "responsavelNome" | "setor" | "ultimaRecarga" | "status";
 
 export default function Patrimonio() {
+  usePageTitle("Patrimônio");
   useSetPageInfo("Patrimônio", "Gerencie os bens e ativos da empresa");
   
   const [, setLocation] = useLocation();

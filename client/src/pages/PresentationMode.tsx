@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Maximize2,
@@ -115,6 +116,7 @@ interface PresentationConfig {
 }
 
 export default function PresentationMode() {
+  usePageTitle("Modo Apresentação");
   const [, navigate] = useLocation();
   const [config, setConfig] = useState<PresentationConfig>({
     dashboards: ['closers', 'sdrs'],

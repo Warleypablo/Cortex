@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, memo } from "react";
 import { usePersistentFilters } from "@/hooks/use-persistent-filters";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/use-page-title";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
@@ -1929,6 +1930,7 @@ function DeleteConfirmDialog({ colaborador, open, onOpenChange }: { colaborador:
 }
 
 export default function Colaboradores() {
+  usePageTitle("Colaboradores");
   useSetPageInfo("Colaboradores", "Gerencie os colaboradores da sua equipe");
   const [, setLocation] = useLocation();
   

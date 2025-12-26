@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ const getMesNome = (mes: number, ano: number) => {
 };
 
 export default function FluxoCaixa() {
+  usePageTitle("Fluxo de Caixa");
   useSetPageInfo("Fluxo de Caixa", "Análise de entradas e saídas do período");
   
   const hoje = new Date();

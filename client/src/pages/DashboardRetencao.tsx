@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { formatPercent, formatCurrency } from "@/lib/utils";
 import {
   HoverCard,
@@ -63,6 +64,7 @@ type ViewMode = "clientes" | "valor" | "contratos";
 type ViewModeChurn = "quantidade" | "valorTotal" | "percentual";
 
 export default function DashboardRetencao() {
+  usePageTitle("Retenção");
   useSetPageInfo("Análise de Retenção", "Análise de coorte de clientes por mês de início do contrato");
   
   const [filterSquad, setFilterSquad] = useState<string>("todos");

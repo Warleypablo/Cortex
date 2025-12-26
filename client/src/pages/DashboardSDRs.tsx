@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -86,6 +87,7 @@ interface RankingSDR {
 }
 
 export default function DashboardSDRs() {
+  usePageTitle("Dashboard SDRs");
   useSetPageInfo("Arena dos SDRs", "Quem agendará mais reuniões?");
   const [, navigate] = useLocation();
   const hoje = new Date();

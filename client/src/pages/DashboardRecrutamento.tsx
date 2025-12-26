@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { formatDecimal, formatPercent } from "@/lib/utils";
 import { 
   Users, UserPlus, UserCheck, Target, Briefcase, TrendingUp, TrendingDown,
@@ -46,6 +47,7 @@ const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
 };
 
 export default function DashboardRecrutamento() {
+  usePageTitle("Recrutamento");
   const { setPageInfo } = usePageInfo();
   const [activeTab, setActiveTab] = useState("visao-geral");
   const [periodoMeses, setPeriodoMeses] = useState(6);

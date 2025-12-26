@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/use-page-title";
 import type { Benefit, InsertBenefit } from "@shared/schema";
 import { insertBenefitSchema, benefitSegmentEnum } from "@shared/schema";
 import { Input } from "@/components/ui/input";
@@ -591,6 +592,7 @@ function BenefitCard({
 }
 
 export default function Beneficios() {
+  usePageTitle("Benefícios");
   useSetPageInfo("Benefícios", "Cupons e descontos exclusivos");
 
   const [search, setSearch] = useState("");

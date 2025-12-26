@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { SiGoogle } from "react-icons/si";
 import { Mail, ArrowLeft, Loader2, Lock, Eye, EyeOff } from "lucide-react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { motion, AnimatePresence } from "framer-motion";
 import { WebGLShader } from "@/components/ui/web-gl-shader";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,7 @@ function GlassFilter() {
 }
 
 export default function Login() {
+  usePageTitle("Login");
   const [isHovered, setIsHovered] = useState(false);
   const [isDevLoading, setIsDevLoading] = useState(false);
   const [showExternalLogin, setShowExternalLogin] = useState(false);

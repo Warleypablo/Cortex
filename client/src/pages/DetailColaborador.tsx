@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { usePageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDecimal } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -2903,6 +2904,7 @@ function HealthCard({ colaboradorId }: { colaboradorId: string }) {
 }
 
 export default function DetailColaborador() {
+  usePageTitle("Detalhes do Colaborador");
   const { setPageInfo } = usePageInfo();
   const [, params] = useRoute("/colaborador/:id");
   const colaboradorId = params?.id || "";

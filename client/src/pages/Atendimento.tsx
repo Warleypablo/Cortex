@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Briefcase, Users, DollarSign, Send, Search, MessageCircle, Link2, Unlink, Building2, Phone, User, Layers, X, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -279,6 +280,7 @@ const channelConfig: Record<Channel, { label: string; icon: typeof Briefcase; co
 };
 
 export default function Atendimento() {
+  usePageTitle("Atendimento");
   useSetPageInfo("Atendimento", "Gestão de Grupos WhatsApp");
   
   const [activeChannel, setActiveChannel] = useState<Channel>("operacao");

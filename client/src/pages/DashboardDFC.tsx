@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +55,7 @@ type VisibleItem =
   | { type: 'parcela'; parcela: DfcParcela; parentNode: DfcNode };
 
 export default function DashboardDFC() {
+  usePageTitle("DFC");
   useSetPageInfo("DFC - Demonstração de Fluxo de Caixa", "Análise hierárquica de receitas e despesas");
   
   const [dateRange, setDateRange] = useState<DateRange | undefined>({

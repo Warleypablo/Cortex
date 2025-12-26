@@ -7,6 +7,7 @@ import { Send, Bot, User, Loader2, Trophy } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 interface Message {
   id: string;
@@ -16,6 +17,7 @@ interface Message {
 }
 
 export default function CasesChat() {
+  usePageTitle("Cases Chat");
   useSetPageInfo("GPTurbo");
   
   const [messages, setMessages] = useState<Message[]>([]);
