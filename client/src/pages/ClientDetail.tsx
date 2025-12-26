@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus, ChevronsUpDown, XCircle, Star, MessageCircle } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -1348,7 +1348,22 @@ export default function ClientDetail() {
                       case 'contract_started':
                       case 'contract_ended':
                       case 'contract_cancelled':
+                      case 'contrato':
                         return <FileText className="w-4 h-4" />;
+                      case 'whatsapp':
+                        return <MessageSquare className="w-4 h-4" />;
+                      case 'email':
+                        return <Mail className="w-4 h-4" />;
+                      case 'nota':
+                        return <FileText className="w-4 h-4" />;
+                      case 'responsavel_change':
+                        return <User className="w-4 h-4" />;
+                      case 'encerramento':
+                        return <XCircle className="w-4 h-4" />;
+                      case 'nps':
+                        return <Star className="w-4 h-4" />;
+                      case 'comunicacao':
+                        return <MessageCircle className="w-4 h-4" />;
                       default:
                         return <Clock className="w-4 h-4" />;
                     }
@@ -1365,7 +1380,22 @@ export default function ClientDetail() {
                       case 'contract_ended':
                         return 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400';
                       case 'contract_cancelled':
+                      case 'encerramento':
                         return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
+                      case 'whatsapp':
+                        return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400';
+                      case 'email':
+                        return 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400';
+                      case 'nota':
+                        return 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400';
+                      case 'contrato':
+                        return 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400';
+                      case 'responsavel_change':
+                        return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
+                      case 'nps':
+                        return 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400';
+                      case 'comunicacao':
+                        return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400';
                       case 'payment_due':
                       default:
                         return 'bg-muted text-muted-foreground';
