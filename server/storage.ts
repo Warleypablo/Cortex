@@ -2023,9 +2023,64 @@ export class DbStorage implements IStorage {
   }
 
   async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
-    const { id, ...dataWithoutId } = colaborador as any;
-    const [newColaborador] = await db.insert(schema.rhPessoal).values(dataWithoutId).returning();
-    return newColaborador;
+    const { id, ...data } = colaborador as any;
+    
+    const result = await db.execute(sql`
+      INSERT INTO rh_pessoal (
+        status, nome, cpf, endereco, estado, telefone, aniversario, admissao,
+        setor, squad, cargo, nivel, pix, cnpj, email_turbo, email_pessoal, salario
+      ) VALUES (
+        ${data.status || null},
+        ${data.nome},
+        ${data.cpf || null},
+        ${data.endereco || null},
+        ${data.estado || null},
+        ${data.telefone || null},
+        ${data.aniversario || null},
+        ${data.admissao || null},
+        ${data.setor || null},
+        ${data.squad || null},
+        ${data.cargo || null},
+        ${data.nivel || null},
+        ${data.pix || null},
+        ${data.cnpj || null},
+        ${data.emailTurbo || null},
+        ${data.emailPessoal || null},
+        ${data.salario || null}
+      )
+      RETURNING *
+    `);
+    
+    const row = result.rows[0] as any;
+    return {
+      id: row.id,
+      status: row.status,
+      nome: row.nome,
+      cpf: row.cpf,
+      endereco: row.endereco,
+      estado: row.estado,
+      telefone: row.telefone,
+      aniversario: row.aniversario,
+      admissao: row.admissao,
+      demissao: row.demissao,
+      tipoDemissao: row.tipo_demissao,
+      motivoDemissao: row.motivo_demissao,
+      proporcional: row.proporcional,
+      proporcionalCaju: row.proporcional_caju,
+      setor: row.setor,
+      squad: row.squad,
+      cargo: row.cargo,
+      nivel: row.nivel,
+      pix: row.pix,
+      cnpj: row.cnpj,
+      emailTurbo: row.email_turbo,
+      emailPessoal: row.email_pessoal,
+      mesesDeTurbo: row.meses_de_turbo,
+      ultimoAumento: row.ultimo_aumento,
+      mesesUltAumento: row.meses_ult_aumento,
+      salario: row.salario,
+      userId: row.user_id,
+    };
   }
 
   async updateColaborador(id: number, colaborador: Partial<InsertColaborador>, criadoPor?: string): Promise<Colaborador> {
