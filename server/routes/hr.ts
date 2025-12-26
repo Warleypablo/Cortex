@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
-import { insertRhCargoSchema, insertRhNivelSchema, insertRhSquadSchema, insertRhPromocaoSchema, insertOnboardingTemplateSchema, insertOnboardingEtapaSchema, insertOnboardingColaboradorSchema, insertOnboardingProgressoSchema } from "@shared/schema";
+import { insertRhCargoSchema, insertRhNivelSchema, insertRhSquadSchema, insertRhPromocaoSchema, insertOnboardingTemplateSchema, insertOnboardingEtapaSchema, insertOnboardingColaboradorSchema, insertOnboardingProgressoSchema, insertTelefoneSchema } from "@shared/schema";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== 'admin') {
@@ -111,6 +111,20 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     } catch (error) {
       console.error("[api] Error updating telefone:", error);
       res.status(500).json({ error: "Failed to update telefone" });
+    }
+  });
+
+  app.post("/api/telefones", async (req, res) => {
+    try {
+      const validation = insertTelefoneSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid data", details: validation.error });
+      }
+      const novoTelefone = await storage.createTelefone(validation.data);
+      res.status(201).json(novoTelefone);
+    } catch (error) {
+      console.error("[api] Error creating telefone:", error);
+      res.status(500).json({ error: "Failed to create telefone" });
     }
   });
 
