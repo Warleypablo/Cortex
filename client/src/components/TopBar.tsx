@@ -24,6 +24,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import ThemeToggle from "@/components/ThemeToggle";
 import GlobalSearch from "@/components/GlobalSearch";
 import PresentationModeButton from "@/components/PresentationModeButton";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { usePageInfo } from "@/contexts/PageContext";
 
 interface Notification {
@@ -627,6 +628,7 @@ export default function TopBar() {
     <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
       <div className="flex items-center gap-4">
         <SidebarTrigger data-testid="button-sidebar-toggle" />
+        <Breadcrumbs />
         {title && (
           <div className="flex flex-col">
             <h1 className="text-lg font-semibold leading-tight" data-testid="header-title">{title}</h1>
