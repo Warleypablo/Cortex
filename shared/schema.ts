@@ -1965,3 +1965,21 @@ export type OnboardingColaborador = typeof onboardingColaborador.$inferSelect;
 export type InsertOnboardingColaborador = z.infer<typeof insertOnboardingColaboradorSchema>;
 export type OnboardingProgresso = typeof onboardingProgresso.$inferSelect;
 export type InsertOnboardingProgresso = z.infer<typeof insertOnboardingProgressoSchema>;
+
+// ==================== CLIENTE EVENTOS (TIMELINE) ====================
+
+export const clienteEventos = pgTable("cliente_eventos", {
+  id: serial("id").primaryKey(),
+  clienteCnpj: text("cliente_cnpj").notNull(),
+  tipo: text("tipo").notNull(),
+  titulo: text("titulo").notNull(),
+  descricao: text("descricao"),
+  usuarioId: text("usuario_id"),
+  usuarioNome: text("usuario_nome"),
+  dadosExtras: text("dados_extras"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClienteEventoSchema = createInsertSchema(clienteEventos).omit({ id: true, createdAt: true });
+export type InsertClienteEvento = z.infer<typeof insertClienteEventoSchema>;
+export type ClienteEvento = typeof clienteEventos.$inferSelect;

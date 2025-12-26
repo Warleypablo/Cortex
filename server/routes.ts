@@ -1564,8 +1564,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const twelveMonthsAgo = new Date(today);
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
       
-      // Query payments and contracts in parallel
-      const [parcelasResult, contratosResult] = await Promise.all([
+      // Query payments, contracts, and custom events in parallel
+      const [parcelasResult, contratosResult, eventosResult] = await Promise.all([
         // Payment events from caz_parcelas
         db.execute(sql`
           SELECT 
@@ -1603,6 +1603,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ) OR servico ILIKE ('%' || ${clienteNome} || '%')
           ORDER BY COALESCE(data_encerramento, data_inicio) DESC NULLS LAST
           LIMIT 30
+        `),
+        // Custom events from cliente_eventos
+        db.execute(sql`
+          SELECT id, tipo as type, titulo as title, descricao as description, 
+                 usuario_nome as "userName", created_at as date
+          FROM cliente_eventos
+          WHERE cliente_cnpj = ${cnpj}
+          ORDER BY created_at DESC
+          LIMIT 50
         `)
       ]);
       
@@ -1715,6 +1724,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Process custom events from cliente_eventos
+      for (const evento of eventosResult.rows as any[]) {
+        events.push({
+          id: `evento-${evento.id}`,
+          type: evento.type,
+          date: evento.date ? new Date(evento.date).toISOString() : new Date().toISOString(),
+          title: evento.title,
+          description: evento.description || `Por ${evento.userName}`,
+          metadata: {
+            userName: evento.userName
+          }
+        });
+      }
+      
       // Sort by date descending
       events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
@@ -1723,6 +1746,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching client timeline:", error);
       res.status(500).json({ error: "Failed to fetch timeline" });
+    }
+  });
+
+  app.post("/api/clientes/:cnpj/eventos", async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      const { tipo, titulo, descricao, dadosExtras } = req.body;
+      
+      const usuarioId = req.user?.id || 'system';
+      const usuarioNome = req.user?.name || 'Sistema';
+      
+      const result = await db.execute(sql`
+        INSERT INTO cliente_eventos (cliente_cnpj, tipo, titulo, descricao, usuario_id, usuario_nome, dados_extras)
+        VALUES (${cnpj}, ${tipo}, ${titulo}, ${descricao || null}, ${usuarioId}, ${usuarioNome}, ${dadosExtras || null})
+        RETURNING id, cliente_cnpj as "clienteCnpj", tipo, titulo, descricao, usuario_id as "usuarioId", 
+                  usuario_nome as "usuarioNome", dados_extras as "dadosExtras", created_at as "createdAt"
+      `);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating client event:", error);
+      res.status(500).json({ error: "Failed to create event" });
+    }
+  });
+
+  app.get("/api/clientes/:cnpj/eventos", async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      const result = await db.execute(sql`
+        SELECT id, cliente_cnpj as "clienteCnpj", tipo, titulo, descricao, 
+               usuario_id as "usuarioId", usuario_nome as "usuarioNome", 
+               dados_extras as "dadosExtras", created_at as "createdAt"
+        FROM cliente_eventos
+        WHERE cliente_cnpj = ${cnpj}
+        ORDER BY created_at DESC
+        LIMIT 100
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching client events:", error);
+      res.status(500).json({ error: "Failed to fetch events" });
     }
   });
 
