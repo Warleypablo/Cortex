@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -170,6 +171,7 @@ function HealthGauge({ score }: { score: number }) {
 }
 
 export default function ColaboradoresAnalise() {
+  usePageTitle("Análise de Colaboradores");
   useSetPageInfo("Análise de Colaboradores", "Dashboard com métricas e indicadores de recursos humanos");
   const { data, isLoading } = useQuery<DashboardAnaliseData>({
     queryKey: ["/api/colaboradores/analise"],

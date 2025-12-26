@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -609,6 +610,7 @@ function DashboardOperacao() {
 }
 
 export default function Homepage() {
+  usePageTitle("Home");
   const { user } = useAuth();
   
   const department = user?.department || (user?.role === 'admin' ? 'admin' : null);

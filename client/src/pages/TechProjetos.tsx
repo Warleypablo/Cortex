@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -157,6 +158,7 @@ const getTempoColor = (dias: number): string => {
 };
 
 export default function TechProjetos() {
+  usePageTitle("Projetos Tech");
   useSetPageInfo("Tech - Projetos", "Análise técnica detalhada e métricas de performance");
   const [activeTab, setActiveTab] = useState<'abertos' | 'fechados'>('abertos');
   const [responsavelFilter, setResponsavelFilter] = useState<string>('todos');

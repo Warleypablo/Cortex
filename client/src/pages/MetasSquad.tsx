@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ function getCardBorderColor(percent: number): string {
 }
 
 export default function MetasSquad() {
+  usePageTitle("Metas Squad");
   useSetPageInfo("Metas por Squad", "Acompanhamento das metas de MRR por squad");
   
   const { toast } = useToast();

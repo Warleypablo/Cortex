@@ -1,5 +1,6 @@
 import { useState, useMemo, Fragment, useEffect } from "react";
 import { usePersistentFilters } from "@/hooks/use-persistent-filters";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import type { Client, Credential, InsertClient, InsertCredential, AccessLog, ClientStatus } from "@shared/schema";
@@ -2483,6 +2484,7 @@ function ClientsTab() {
 }
 
 export default function Acessos() {
+  usePageTitle("Acessos");
   useSetPageInfo("Acessos", "Gerenciamento de credenciais de clientes");
 
   return (
