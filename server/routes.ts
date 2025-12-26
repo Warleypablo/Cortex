@@ -1247,27 +1247,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Query tasks from staging.tarefas_clientes
       // Related by "cliente" column matching cup_clientes.nome (case-insensitive, trimmed)
+      // Uses ClickUp column names (English) and maps to Portuguese for frontend
       const tasksResult = await db.execute(sql`
         SELECT 
           t.id,
-          t.nome,
+          t.name as "nome",
           t.status,
-          t.prioridade,
-          t.responsavel,
-          t.data_limite as "dataLimite",
-          t.projeto,
-          t.data_criacao as "dataCriacao",
-          t.data_atualizacao as "dataAtualizacao",
+          t.priority as "prioridade",
+          t.assignee as "responsavel",
+          t.due_date as "dataLimite",
+          t.project_name as "projeto",
+          t.date_created as "dataCriacao",
+          t.date_updated as "dataAtualizacao",
           t.cliente,
-          t.lista,
+          t.list as "lista",
           t.tags,
-          t.descricao
+          t.description as "descricao"
         FROM staging.tarefas_clientes t
         WHERE LOWER(TRIM(t.cliente)) = LOWER(TRIM(${clienteNome}))
            OR t.cliente ILIKE ${`%${clienteNome}%`}
         ORDER BY 
           CASE WHEN LOWER(TRIM(t.cliente)) = LOWER(TRIM(${clienteNome})) THEN 0 ELSE 1 END,
-          t.data_criacao DESC NULLS LAST
+          t.date_created DESC NULLS LAST
         LIMIT 100
       `);
       
