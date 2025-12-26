@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -139,6 +140,7 @@ const getDeadlineStatus = (days: number | null): { color: string; label: string;
 };
 
 export default function DashboardTech() {
+  usePageTitle("Tech");
   useSetPageInfo("Tech - Visão Geral", "Dashboard visual do pipeline de entregas");
   const { data: metricas, isLoading: isLoadingMetricas } = useQuery<TechMetricas>({
     queryKey: ['/api/tech/metricas'],

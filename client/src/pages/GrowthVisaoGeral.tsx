@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { CalendarIcon, TrendingUp, TrendingDown, Target, DollarSign, Users, ShoppingCart, BarChart3, Rocket, Percent, Trophy, CircleDollarSign, ChevronDown, ChevronRight, Loader2, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { format, subDays, subMonths, eachDayOfInterval, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, Cell } from "recharts";
@@ -358,6 +359,7 @@ interface Lead {
 }
 
 export default function GrowthVisaoGeral() {
+  usePageTitle("Growth - Visão Geral");
   const [dateRange, setDateRange] = useState({
     from: startOfMonth(new Date()),
     to: new Date(),

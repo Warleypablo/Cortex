@@ -4,6 +4,7 @@ import { Users, TrendingUp, UserCheck, FileText, Target, Award } from "lucide-re
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, FunnelChart, Funnel, LabelList } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { formatDecimal, formatPercent } from "@/lib/utils";
 
 interface InhireMetrics {
@@ -63,6 +64,7 @@ const COLORS = {
 };
 
 export default function DashboardInhire() {
+  usePageTitle("InHire");
   useSetPageInfo("Dashboard Inhire", "Análise de recrutamento e seleção");
   
   const { data: metrics, isLoading: isLoadingMetrics } = useQuery<InhireMetrics>({

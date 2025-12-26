@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ type SortField = 'nomeCliente' | 'cnpj' | 'valorClickUp' | 'valorContaAzul' | 'd
 type SortOrder = 'asc' | 'desc';
 
 export default function AuditoriaSistemasPage() {
+  usePageTitle("Auditoria de Sistemas");
   useSetPageInfo("Auditoria de Sistemas", "Comparação de valores entre ClickUp e Conta Azul");
   const [mesAno, setMesAno] = useState<string>(new Date().toISOString().slice(0, 7));
   const [squad, setSquad] = useState<string>('todos');

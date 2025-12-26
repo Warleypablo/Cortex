@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ShieldAlert } from "lucide-react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 interface User {
   id: string;
@@ -16,6 +17,7 @@ interface User {
 }
 
 export default function AccessDenied() {
+  usePageTitle("Acesso Negado");
   const [, setLocation] = useLocation();
   
   const { data: user } = useQuery<User>({

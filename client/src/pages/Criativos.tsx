@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,7 @@ function formatCurrency(value: number | null): string {
 }
 
 export default function Criativos() {
+  usePageTitle("Criativos");
   useSetPageInfo("Criativos", "Performance de Anúncios Meta Ads");
   const [dateRange, setDateRange] = useState({
     from: startOfMonth(new Date()),

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSetPageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -695,6 +696,7 @@ function TemplateCard({ template, isAdmin }: { template: OnboardingTemplate; isA
 }
 
 export default function OnboardingRH() {
+  usePageTitle("Onboarding RH");
   useSetPageInfo("Onboarding RH", "Gestão de onboarding de colaboradores");
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";

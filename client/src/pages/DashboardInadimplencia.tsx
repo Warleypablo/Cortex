@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { usePageInfo } from "@/contexts/PageContext";
+import { usePageTitle } from "@/hooks/use-page-title";
 import {
   Table,
   TableBody,
@@ -185,6 +186,7 @@ const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
 };
 
 export default function DashboardInadimplencia() {
+  usePageTitle("Inadimplência");
   const { setPageInfo } = usePageInfo();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("visao-geral");
