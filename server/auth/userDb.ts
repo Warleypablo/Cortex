@@ -180,12 +180,47 @@ const ALL_ROUTES = [
 
 // Rotas padrão para novos usuários @turbopartners.com.br
 const DEFAULT_USER_ROUTES = [
-  '/patrimonio',           // Patrimônio
-  '/ferramentas',          // Turbo Tools
-  '/cases/chat',           // GPTurbo
-  '/conhecimentos',        // Conhecimento
-  '/beneficios',           // Clube de Benefícios
-  '/colaborador'           // Portal do Colaborador (acesso próprio via /colaborador/:id)
+  // Clientes e Contratos
+  '/clientes',
+  '/contratos',
+  // Patrimônio
+  '/patrimonio',
+  // Acessos
+  '/acessos',
+  // Turbo Tools
+  '/ferramentas',
+  // TurboZap
+  '/turbozap',
+  // Atendimento
+  '/atendimento',
+  // GPTurbo
+  '/cases/chat',
+  // Conhecimento
+  '/conhecimentos',
+  // Clube de Benefícios
+  '/beneficios',
+  // Calendário Turbo
+  '/calendario',
+  // Portal do Colaborador
+  '/colaborador',
+  // Operações
+  '/visao-geral',
+  '/dashboard/retencao',
+  // Tech
+  '/dashboard/tech',
+  '/tech/projetos',
+  // Comercial
+  '/dashboard/comercial/closers',
+  '/dashboard/comercial/sdrs',
+  '/dashboard/comercial/detalhamento-closers',
+  '/dashboard/comercial/detalhamento-sdrs',
+  '/dashboard/comercial/analise-vendas',
+  '/dashboard/comercial/detalhamento-vendas',
+  '/dashboard/comercial/apresentacao',
+  // Growth
+  '/growth/visao-geral',
+  '/growth/criativos',
+  '/growth/performance-plataformas',
 ];
 
 // Migra permissões antigas ("/" -> "/clientes") automaticamente
