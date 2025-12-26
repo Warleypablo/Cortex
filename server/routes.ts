@@ -1114,6 +1114,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         investimentoAds
       } = req.body;
       
+      // Check for responsavel change to log event
+      const oldResponsavel = cliente.responsavel;
+      const oldResponsavelGeral = cliente.responsavelGeral;
+      
       await db.execute(sql`
         UPDATE cup_clientes
         SET 
@@ -1135,6 +1139,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           investimento_ads = ${investimentoAds ?? null}
         WHERE cnpj = ${cnpj}
       `);
+      
+      // Log event if responsavel changed
+      const user = req.user as any;
+      const usuarioNome = user?.name || 'Sistema';
+      
+      if (responsavel && responsavel !== oldResponsavel) {
+        await db.execute(sql`
+          INSERT INTO cliente_eventos (cliente_cnpj, tipo, titulo, descricao, usuario_id, usuario_nome)
+          VALUES (${cnpj}, 'responsavel_change', 'Responsável alterado', 
+                  ${'De ' + (oldResponsavel || 'Não definido') + ' para ' + responsavel}, 
+                  ${user?.id || 'system'}, ${usuarioNome})
+        `);
+      }
+      
+      if (responsavelGeral && responsavelGeral !== oldResponsavelGeral) {
+        await db.execute(sql`
+          INSERT INTO cliente_eventos (cliente_cnpj, tipo, titulo, descricao, usuario_id, usuario_nome)
+          VALUES (${cnpj}, 'responsavel_change', 'Responsável Geral alterado', 
+                  ${'De ' + (oldResponsavelGeral || 'Não definido') + ' para ' + responsavelGeral}, 
+                  ${user?.id || 'system'}, ${usuarioNome})
+        `);
+      }
       
       const updatedCliente = await storage.getClienteById(req.params.id);
       res.json(updatedCliente);

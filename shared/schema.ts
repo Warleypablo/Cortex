@@ -1626,7 +1626,7 @@ export const insertAtendimentoMensagemSchema = createInsertSchema(atendimentoMen
 export type AtendimentoMensagem = typeof atendimentoMensagens.$inferSelect;
 export type InsertAtendimentoMensagem = z.infer<typeof insertAtendimentoMensagemSchema>;
 
-export type TimelineEventType = 'payment_received' | 'payment_due' | 'payment_overdue' | 'contract_started' | 'contract_ended' | 'contract_cancelled';
+export type TimelineEventType = 'payment_received' | 'payment_due' | 'payment_overdue' | 'contract_started' | 'contract_ended' | 'contract_cancelled' | 'whatsapp' | 'email' | 'nota' | 'contrato' | 'responsavel_change' | 'encerramento' | 'nps' | 'comunicacao';
 
 export interface TimelineEvent {
   id: string;
