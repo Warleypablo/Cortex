@@ -2023,7 +2023,8 @@ export class DbStorage implements IStorage {
   }
 
   async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
-    const [newColaborador] = await db.insert(schema.rhPessoal).values(colaborador as any).returning();
+    const { id, ...dataWithoutId } = colaborador as any;
+    const [newColaborador] = await db.insert(schema.rhPessoal).values(dataWithoutId).returning();
     return newColaborador;
   }
 
