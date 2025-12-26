@@ -317,6 +317,28 @@ export default function DashboardDFC() {
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Date Range Picker no header */}
+            <div className="flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 rounded-xl px-3 py-2 border border-slate-200/60 dark:border-slate-700/60 shadow-sm">
+              <Calendar className="w-4 h-4 text-primary" />
+              <DateRangePicker
+                value={dateRange}
+                onChange={setDateRange}
+                placeholder="Selecione o período"
+                data-testid="date-range-picker-dfc"
+              />
+              {dateRange && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDateRange(undefined)}
+                  className="h-7 w-7 p-0 text-muted-foreground hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                  data-testid="button-clear-dates"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </Button>
+              )}
+            </div>
+            
             <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1" data-testid="toggle-view-mode">
               <Button
                 variant={viewMode === "table" ? "secondary" : "ghost"}
@@ -339,15 +361,6 @@ export default function DashboardDFC() {
                 Cards
               </Button>
             </div>
-            <Button
-              onClick={() => setChatOpen(true)}
-              disabled={isLoading || !dfcData?.nodes?.length}
-              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg shadow-violet-500/25"
-              data-testid="button-chat-ia"
-            >
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Assistente IA
-            </Button>
           </div>
         </div>
       </div>
@@ -741,50 +754,15 @@ export default function DashboardDFC() {
           {/* Filters and DFC Table */}
           <Card className="shadow-sm border-0">
             <CardHeader className="pb-4">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Activity className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">Demonstrativo de Fluxo de Caixa</CardTitle>
-                      <CardDescription className="text-xs">
-                        Clique nas categorias para expandir detalhes
-                      </CardDescription>
-                    </div>
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Activity className="w-5 h-5 text-primary" />
                 </div>
-                
-                {/* Date Range Selector */}
-                <div className="bg-gradient-to-r from-slate-50 to-slate-100/50 dark:from-slate-900/50 dark:to-slate-800/30 rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <div className="flex-1">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
-                        Período
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <DateRangePicker
-                          value={dateRange}
-                          onChange={setDateRange}
-                          placeholder="Selecione o período"
-                          data-testid="date-range-picker-dfc"
-                        />
-                        {dateRange && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setDateRange(undefined)}
-                            className="h-9 px-4 border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 dark:hover:bg-rose-950/30 dark:hover:border-rose-800 dark:hover:text-rose-400 transition-all"
-                            data-testid="button-clear-dates"
-                          >
-                            <RotateCcw className="w-4 h-4 mr-1.5" />
-                            Limpar
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                <div>
+                  <CardTitle className="text-lg">Demonstrativo de Fluxo de Caixa</CardTitle>
+                  <CardDescription className="text-xs">
+                    Clique nas categorias para expandir detalhes
+                  </CardDescription>
                 </div>
               </div>
             </CardHeader>
