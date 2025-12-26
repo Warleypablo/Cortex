@@ -6,6 +6,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, subWeeks, subMonths, addMonths } from "date-fns";
@@ -162,26 +163,28 @@ export function DateRangePicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent className={cn("w-auto p-0 z-[100]", className)} align={align} sideOffset={8}>
-        <div className="flex">
-          <div className="border-r border-border p-3 space-y-1 min-w-[160px]">
-            {presets.map((preset) => (
-              <button
-                key={preset.label}
-                onClick={() => handlePresetClick(preset)}
-                className={cn(
-                  "w-full text-left px-3 py-2 text-sm rounded-md transition-colors",
-                  selectedPreset === preset.label
-                    ? "bg-primary/10 text-primary border border-primary/30"
-                    : "hover:bg-muted"
-                )}
-                data-testid={`preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex max-h-[400px]">
+          <ScrollArea className="border-r border-border">
+            <div className="p-2 space-y-0.5 min-w-[130px]">
+              {presets.map((preset) => (
+                <button
+                  key={preset.label}
+                  onClick={() => handlePresetClick(preset)}
+                  className={cn(
+                    "w-full text-left px-2 py-1.5 text-xs rounded-md transition-colors",
+                    selectedPreset === preset.label
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "hover:bg-muted"
+                  )}
+                  data-testid={`preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
           
-          <div className="p-3">
+          <div className="p-2">
             <Calendar
               mode="range"
               selected={value}
@@ -191,26 +194,49 @@ export function DateRangePicker({
               onMonthChange={setMonth}
               locale={ptBR}
               weekStartsOn={0}
+              captionLayout="dropdown-buttons"
+              fromYear={2020}
+              toYear={2030}
+              classNames={{
+                caption: "flex justify-center pt-1 relative items-center text-sm",
+                caption_label: "hidden",
+                caption_dropdowns: "flex gap-1",
+                dropdown: "bg-background border rounded px-1 py-0.5 text-xs",
+                dropdown_month: "font-medium",
+                dropdown_year: "font-medium",
+                nav: "flex items-center gap-1",
+                nav_button: "h-6 w-6 bg-transparent p-0 hover:bg-muted rounded",
+                nav_button_previous: "absolute left-1",
+                nav_button_next: "absolute right-1",
+                table: "w-full border-collapse",
+                head_row: "flex",
+                head_cell: "text-muted-foreground w-7 font-normal text-[0.7rem]",
+                row: "flex w-full",
+                cell: "text-center text-xs p-0 relative focus-within:relative focus-within:z-20",
+                day: "h-7 w-7 p-0 font-normal hover:bg-muted rounded-md transition-colors",
+                day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                day_today: "bg-accent text-accent-foreground",
+                day_outside: "text-muted-foreground opacity-50",
+                day_disabled: "text-muted-foreground opacity-50",
+                day_range_middle: "bg-primary/20",
+                day_hidden: "invisible",
+              }}
             />
             
-            <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
-              <div className="flex items-center gap-2 text-sm">
-                <div className="px-3 py-1.5 bg-muted rounded-md min-w-[140px] text-center">
-                  {value?.from ? format(value.from, "d 'de' MMM 'de' yyyy", { locale: ptBR }) : "Data inicial"}
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-border gap-2">
+              <div className="flex items-center gap-1 text-xs">
+                <div className="px-2 py-1 bg-muted rounded text-center min-w-[90px]">
+                  {value?.from ? format(value.from, "dd/MM/yy", { locale: ptBR }) : "Início"}
                 </div>
-                <span className="text-muted-foreground">-</span>
-                <div className="px-3 py-1.5 bg-muted rounded-md min-w-[140px] text-center">
-                  {value?.to ? format(value.to, "d 'de' MMM 'de' yyyy", { locale: ptBR }) : "Data final"}
+                <span className="text-muted-foreground">→</span>
+                <div className="px-2 py-1 bg-muted rounded text-center min-w-[90px]">
+                  {value?.to ? format(value.to, "dd/MM/yy", { locale: ptBR }) : "Fim"}
                 </div>
               </div>
-              <Button size="sm" onClick={handleApply} data-testid="button-apply-date-range">
+              <Button size="sm" className="h-7 text-xs" onClick={handleApply} data-testid="button-apply-date-range">
                 Aplicar
               </Button>
             </div>
-            
-            <p className="text-xs text-muted-foreground mt-2">
-              Fuso horário das datas: Horário de São Paulo
-            </p>
           </div>
         </div>
       </PopoverContent>
