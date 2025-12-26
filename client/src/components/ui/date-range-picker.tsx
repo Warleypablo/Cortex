@@ -62,13 +62,6 @@ const DEFAULT_PRESETS: Preset[] = [
     },
   },
   {
-    label: "Últimos 14 dias",
-    getValue: () => {
-      const today = new Date();
-      return { from: subDays(today, 13), to: today };
-    },
-  },
-  {
     label: "Últimos 30 dias",
     getValue: () => {
       const today = new Date();
@@ -76,11 +69,10 @@ const DEFAULT_PRESETS: Preset[] = [
     },
   },
   {
-    label: "Semana passada",
+    label: "Últimos 90 dias",
     getValue: () => {
-      const lastWeekStart = startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 0 });
-      const lastWeekEnd = endOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 0 });
-      return { from: lastWeekStart, to: lastWeekEnd };
+      const today = new Date();
+      return { from: subDays(today, 89), to: today };
     },
   },
   {
@@ -88,6 +80,34 @@ const DEFAULT_PRESETS: Preset[] = [
     getValue: () => {
       const lastMonth = subMonths(new Date(), 1);
       return { from: startOfMonth(lastMonth), to: endOfMonth(lastMonth) };
+    },
+  },
+  {
+    label: "Q1",
+    getValue: () => {
+      const year = new Date().getFullYear();
+      return { from: new Date(year, 0, 1), to: new Date(year, 2, 31) };
+    },
+  },
+  {
+    label: "Q2",
+    getValue: () => {
+      const year = new Date().getFullYear();
+      return { from: new Date(year, 3, 1), to: new Date(year, 5, 30) };
+    },
+  },
+  {
+    label: "Q3",
+    getValue: () => {
+      const year = new Date().getFullYear();
+      return { from: new Date(year, 6, 1), to: new Date(year, 8, 30) };
+    },
+  },
+  {
+    label: "Q4",
+    getValue: () => {
+      const year = new Date().getFullYear();
+      return { from: new Date(year, 9, 1), to: new Date(year, 11, 31) };
     },
   },
 ];
@@ -164,14 +184,14 @@ export function DateRangePicker({
       </PopoverTrigger>
       <PopoverContent className={cn("w-auto p-0 z-[100]", className)} align={align} sideOffset={4}>
         <div className="flex">
-          <ScrollArea className="border-r border-border max-h-[280px]">
-            <div className="p-1.5 space-y-0.5 w-[100px]">
+          <ScrollArea className="border-r border-border max-h-[320px]">
+            <div className="p-2 space-y-0.5 w-[110px]">
               {presets.map((preset) => (
                 <button
                   key={preset.label}
                   onClick={() => handlePresetClick(preset)}
                   className={cn(
-                    "w-full text-left px-2 py-1 text-[11px] rounded transition-colors",
+                    "w-full text-left px-2 py-1.5 text-xs rounded transition-colors",
                     selectedPreset === preset.label
                       ? "bg-primary/10 text-primary font-medium"
                       : "hover:bg-muted"
@@ -184,7 +204,7 @@ export function DateRangePicker({
             </div>
           </ScrollArea>
           
-          <div className="p-1.5">
+          <div className="p-2">
             <Calendar
               mode="range"
               selected={value}
@@ -199,25 +219,25 @@ export function DateRangePicker({
               toYear={2030}
               classNames={{
                 months: "flex flex-col",
-                month: "space-y-1",
-                caption: "flex justify-center pt-0.5 relative items-center text-xs",
+                month: "space-y-2",
+                caption: "flex justify-center pt-1 relative items-center text-sm",
                 caption_label: "hidden",
                 caption_dropdowns: "flex gap-1",
-                dropdown: "bg-background border rounded px-1 py-0.5 text-[10px]",
+                dropdown: "bg-background border rounded px-1.5 py-1 text-xs cursor-pointer hover:bg-muted",
                 dropdown_month: "font-medium",
                 dropdown_year: "font-medium",
-                nav: "flex items-center gap-0.5",
-                nav_button: "h-5 w-5 bg-transparent p-0 hover:bg-muted rounded",
+                nav: "flex items-center gap-1",
+                nav_button: "h-7 w-7 bg-transparent p-0 hover:bg-muted rounded",
                 nav_button_previous: "absolute left-0",
                 nav_button_next: "absolute right-0",
                 table: "w-full border-collapse",
                 head_row: "flex",
-                head_cell: "text-muted-foreground w-6 font-normal text-[10px]",
+                head_cell: "text-muted-foreground w-8 font-normal text-xs",
                 row: "flex w-full",
-                cell: "text-center text-[10px] p-0 relative",
-                day: "h-6 w-6 p-0 font-normal hover:bg-muted rounded transition-colors text-[10px]",
+                cell: "text-center text-xs p-0 relative",
+                day: "h-8 w-8 p-0 font-normal hover:bg-muted rounded-md transition-colors",
                 day_selected: "bg-primary text-primary-foreground hover:bg-primary",
-                day_today: "bg-accent text-accent-foreground",
+                day_today: "bg-accent text-accent-foreground font-semibold",
                 day_outside: "text-muted-foreground opacity-50",
                 day_disabled: "text-muted-foreground opacity-50",
                 day_range_middle: "bg-primary/20",
@@ -225,18 +245,18 @@ export function DateRangePicker({
               }}
             />
             
-            <div className="flex items-center justify-between mt-1 pt-1 border-t border-border gap-1">
-              <div className="flex items-center gap-1 text-[10px]">
-                <span className="px-1.5 py-0.5 bg-muted rounded">
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-border gap-2">
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="px-2 py-1 bg-muted rounded font-medium">
                   {value?.from ? format(value.from, "dd/MM/yy") : "Início"}
                 </span>
                 <span className="text-muted-foreground">→</span>
-                <span className="px-1.5 py-0.5 bg-muted rounded">
+                <span className="px-2 py-1 bg-muted rounded font-medium">
                   {value?.to ? format(value.to, "dd/MM/yy") : "Fim"}
                 </span>
               </div>
-              <Button size="sm" className="h-6 text-[10px] px-2" onClick={handleApply} data-testid="button-apply-date-range">
-                OK
+              <Button size="sm" className="h-7 text-xs px-3" onClick={handleApply} data-testid="button-apply-date-range">
+                Aplicar
               </Button>
             </div>
           </div>
