@@ -1754,8 +1754,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { cnpj } = req.params;
       const { tipo, titulo, descricao, dadosExtras } = req.body;
       
-      const usuarioId = req.user?.id || 'system';
-      const usuarioNome = req.user?.name || 'Sistema';
+      const user = req.user as any;
+      const usuarioId = user?.id || 'system';
+      const usuarioNome = user?.name || 'Sistema';
       
       const result = await db.execute(sql`
         INSERT INTO cliente_eventos (cliente_cnpj, tipo, titulo, descricao, usuario_id, usuario_nome, dados_extras)
