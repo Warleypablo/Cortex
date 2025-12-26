@@ -1229,38 +1229,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
 
   // GET /api/cliente/:cnpj/tasks - Fetch tasks for a client
+  // Uses staging.tarefas_clientes table, related by cliente column matching cup_clientes.nome
   app.get("/api/cliente/:cnpj/tasks", async (req, res) => {
     try {
       const { cnpj } = req.params;
       
-      // First get the client name from caz_clientes
+      // First get the client name from cup_clientes
       const clienteResult = await db.execute(sql`
-        SELECT nome FROM caz_clientes WHERE cnpj = ${cnpj}
+        SELECT nome FROM cup_clientes WHERE cnpj = ${cnpj}
       `);
       
       const clienteNome = clienteResult.rows.length > 0 ? (clienteResult.rows[0] as any).nome : null;
       
-      // Query tasks from cup_tech_tasks, joining with cup_projetos_tech for project info
-      // Tasks can be linked by cliente name or CNPJ in the project
+      if (!clienteNome) {
+        return res.json([]);
+      }
+      
+      // Query tasks from staging.tarefas_clientes
+      // Related by "cliente" column matching cup_clientes.nome (case-insensitive, trimmed)
       const tasksResult = await db.execute(sql`
         SELECT 
           t.id,
-          t.name,
+          t.nome,
           t.status,
-          t.priority,
-          t.assignee,
-          t.due_date,
-          t.project_name,
-          t.project_id,
-          t.date_created,
-          t.date_updated
-        FROM cup_tech_tasks t
-        LEFT JOIN cup_projetos_tech p ON t.project_id = p.id OR t.project_name = p.cliente
-        WHERE 
-          t.project_name ILIKE ${clienteNome ? `%${clienteNome}%` : '%NOMATCH%'}
-          OR p.cliente ILIKE ${clienteNome ? `%${clienteNome}%` : '%NOMATCH%'}
-          OR p.cnpj = ${cnpj}
-        ORDER BY t.date_created DESC
+          t.prioridade,
+          t.responsavel,
+          t.data_limite as "dataLimite",
+          t.projeto,
+          t.data_criacao as "dataCriacao",
+          t.data_atualizacao as "dataAtualizacao",
+          t.cliente,
+          t.lista,
+          t.tags,
+          t.descricao
+        FROM staging.tarefas_clientes t
+        WHERE LOWER(TRIM(t.cliente)) = LOWER(TRIM(${clienteNome}))
+           OR t.cliente ILIKE ${`%${clienteNome}%`}
+        ORDER BY 
+          CASE WHEN LOWER(TRIM(t.cliente)) = LOWER(TRIM(${clienteNome})) THEN 0 ELSE 1 END,
+          t.data_criacao DESC NULLS LAST
         LIMIT 100
       `);
       
