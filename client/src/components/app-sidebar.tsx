@@ -230,16 +230,22 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader 
         className="border-b border-sidebar-border px-6 py-5 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-3 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:cursor-pointer"
-        onClick={() => isCollapsed && setOpen(true)}
         data-testid="sidebar-header"
       >
-        <div className="flex flex-col items-start gap-1 group-data-[collapsible=icon]:hidden">
-          <img src={turboLogo} alt="Turbo" className="h-6 w-auto" />
-          <span className="text-sm font-medium text-muted-foreground">Cortex</span>
-        </div>
-        <div className="hidden group-data-[collapsible=icon]:block">
-          <img src={turboLogo} alt="Turbo" className="h-8 w-8 object-contain" />
-        </div>
+        <Link 
+          href="/" 
+          onClick={() => isCollapsed && setOpen(true)}
+          className="hover-elevate rounded-md"
+          data-testid="link-home-logo"
+        >
+          <div className="flex flex-col items-start gap-1 group-data-[collapsible=icon]:hidden">
+            <img src={turboLogo} alt="Turbo" className="h-6 w-auto" />
+            <span className="text-sm font-medium text-muted-foreground">Cortex</span>
+          </div>
+          <div className="hidden group-data-[collapsible=icon]:block">
+            <img src={turboLogo} alt="Turbo" className="h-8 w-8 object-contain" />
+          </div>
+        </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
