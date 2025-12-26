@@ -1789,6 +1789,7 @@ export default function Patrimonio() {
                 value={newPatrimonio.numeroAtivo}
                 onChange={(e) => setNewPatrimonio({ ...newPatrimonio, numeroAtivo: e.target.value })}
                 className="col-span-3"
+                placeholder="Ex: 001, 002, 003..."
                 data-testid="patrimonio-input-numero-ativo"
               />
             </div>
@@ -1796,26 +1797,37 @@ export default function Patrimonio() {
               <Label htmlFor="patrimonio-tipo-bem" className="text-right">
                 Tipo de Bem
               </Label>
-              <Input
-                id="patrimonio-tipo-bem"
+              <Select
                 value={newPatrimonio.ativo}
-                onChange={(e) => setNewPatrimonio({ ...newPatrimonio, ativo: e.target.value })}
-                placeholder="Ex: Notebook, Computador, Monitor"
-                className="col-span-3"
-                data-testid="patrimonio-input-tipo-bem"
-              />
+                onValueChange={(value) => setNewPatrimonio({ ...newPatrimonio, ativo: value })}
+              >
+                <SelectTrigger className="col-span-3" data-testid="patrimonio-select-tipo-bem">
+                  <SelectValue placeholder="Selecione o tipo de bem" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueTiposBem.map((tipo) => (
+                    <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="patrimonio-marca" className="text-right">
                 Marca
               </Label>
-              <Input
-                id="patrimonio-marca"
+              <Select
                 value={newPatrimonio.marca}
-                onChange={(e) => setNewPatrimonio({ ...newPatrimonio, marca: e.target.value })}
-                className="col-span-3"
-                data-testid="patrimonio-input-marca"
-              />
+                onValueChange={(value) => setNewPatrimonio({ ...newPatrimonio, marca: value })}
+              >
+                <SelectTrigger className="col-span-3" data-testid="patrimonio-select-marca">
+                  <SelectValue placeholder="Selecione a marca" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueMarcas.map((marca) => (
+                    <SelectItem key={marca} value={marca}>{marca}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="patrimonio-estado" className="text-right">
@@ -1829,11 +1841,19 @@ export default function Patrimonio() {
                   <SelectValue placeholder="Selecione o estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Novo">Novo</SelectItem>
-                  <SelectItem value="Bom">Bom</SelectItem>
-                  <SelectItem value="Regular">Regular</SelectItem>
-                  <SelectItem value="Ruim">Ruim</SelectItem>
-                  <SelectItem value="Em estoque">Em estoque</SelectItem>
+                  {uniqueEstados.length > 0 ? (
+                    uniqueEstados.map((estado) => (
+                      <SelectItem key={estado} value={estado}>{estado}</SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="Novo">Novo</SelectItem>
+                      <SelectItem value="Bom">Bom</SelectItem>
+                      <SelectItem value="Regular">Regular</SelectItem>
+                      <SelectItem value="Ruim">Ruim</SelectItem>
+                      <SelectItem value="Em estoque">Em estoque</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -1893,43 +1913,58 @@ export default function Patrimonio() {
               <Label htmlFor="patrimonio-valor-pago" className="text-right">
                 Valor Pago
               </Label>
-              <Input
-                id="patrimonio-valor-pago"
-                type="number"
-                step="0.01"
-                value={newPatrimonio.valorPago}
-                onChange={(e) => setNewPatrimonio({ ...newPatrimonio, valorPago: e.target.value })}
-                className="col-span-3"
-                data-testid="patrimonio-input-valor-pago"
-              />
+              <div className="col-span-3 relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                <Input
+                  id="patrimonio-valor-pago"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={newPatrimonio.valorPago}
+                  onChange={(e) => setNewPatrimonio({ ...newPatrimonio, valorPago: e.target.value })}
+                  className="pl-10"
+                  placeholder="0,00"
+                  data-testid="patrimonio-input-valor-pago"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="patrimonio-valor-mercado" className="text-right">
                 Valor de Mercado
               </Label>
-              <Input
-                id="patrimonio-valor-mercado"
-                type="number"
-                step="0.01"
-                value={newPatrimonio.valorMercado}
-                onChange={(e) => setNewPatrimonio({ ...newPatrimonio, valorMercado: e.target.value })}
-                className="col-span-3"
-                data-testid="patrimonio-input-valor-mercado"
-              />
+              <div className="col-span-3 relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                <Input
+                  id="patrimonio-valor-mercado"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={newPatrimonio.valorMercado}
+                  onChange={(e) => setNewPatrimonio({ ...newPatrimonio, valorMercado: e.target.value })}
+                  className="pl-10"
+                  placeholder="0,00"
+                  data-testid="patrimonio-input-valor-mercado"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="patrimonio-valor-venda" className="text-right">
                 Valor de Venda
               </Label>
-              <Input
-                id="patrimonio-valor-venda"
-                type="number"
-                step="0.01"
-                value={newPatrimonio.valorVenda}
-                onChange={(e) => setNewPatrimonio({ ...newPatrimonio, valorVenda: e.target.value })}
-                className="col-span-3"
-                data-testid="patrimonio-input-valor-venda"
-              />
+              <div className="col-span-3 relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                <Input
+                  id="patrimonio-valor-venda"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={newPatrimonio.valorVenda}
+                  onChange={(e) => setNewPatrimonio({ ...newPatrimonio, valorVenda: e.target.value })}
+                  className="pl-10"
+                  placeholder="0,00"
+                  data-testid="patrimonio-input-valor-venda"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="patrimonio-descricao" className="text-right">
@@ -1940,6 +1975,7 @@ export default function Patrimonio() {
                 value={newPatrimonio.descricao}
                 onChange={(e) => setNewPatrimonio({ ...newPatrimonio, descricao: e.target.value })}
                 className="col-span-3"
+                placeholder="Ex: Macbook Air M1, Dell Inspiron 15..."
                 data-testid="patrimonio-input-descricao"
               />
             </div>
