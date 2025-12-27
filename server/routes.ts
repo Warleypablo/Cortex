@@ -11697,6 +11697,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== SYS SCHEMA API - Canonical Data Layer ====================
+
+  // GET /api/admin/sys/catalogs - List all catalogs in sys schema
+  app.get("/api/admin/sys/catalogs", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT c.catalog_key, c.description, 
+               (SELECT COUNT(*) FROM sys.catalog_items ci WHERE ci.catalog_key = c.catalog_key AND ci.active = true)::int as item_count,
+               c.created_at, c.updated_at
+        FROM sys.catalogs c
+        ORDER BY c.catalog_key
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[admin/sys/catalogs] Error fetching catalogs:", error);
+      res.status(500).json({ error: "Failed to fetch sys catalogs" });
+    }
+  });
+
+  // GET /api/admin/sys/catalog-items/:catalogKey - List items in a catalog
+  app.get("/api/admin/sys/catalog-items/:catalogKey", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { catalogKey } = req.params;
+      const result = await db.execute(sql`
+        SELECT ci.*, 
+               (SELECT array_agg(ca.alias) FROM sys.catalog_aliases ca WHERE ca.catalog_key = ci.catalog_key AND ca.slug = ci.slug) as aliases
+        FROM sys.catalog_items ci
+        WHERE ci.catalog_key = ${catalogKey}
+        ORDER BY ci.sort_order, ci.name
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[admin/sys/catalog-items] Error:", error);
+      res.status(500).json({ error: "Failed to fetch catalog items" });
+    }
+  });
+
+  // GET /api/admin/sys/aliases/:catalogKey - List all aliases for a catalog
+  app.get("/api/admin/sys/aliases/:catalogKey", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { catalogKey } = req.params;
+      const result = await db.execute(sql`
+        SELECT ca.*, ci.name as item_name
+        FROM sys.catalog_aliases ca
+        JOIN sys.catalog_items ci ON ca.catalog_key = ci.catalog_key AND ca.slug = ci.slug
+        WHERE ca.catalog_key = ${catalogKey}
+        ORDER BY ca.alias
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[admin/sys/aliases] Error:", error);
+      res.status(500).json({ error: "Failed to fetch aliases" });
+    }
+  });
+
+  // GET /api/admin/sys/test-view - Test the canonical view vw_contratos_canon
+  app.get("/api/admin/sys/test-view", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          status, status_slug, 
+          produto, product_slug, 
+          squad, squad_slug
+        FROM public.vw_contratos_canon 
+        LIMIT 50
+      `);
+      
+      // Also get stats on mapping coverage
+      const statsResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(CASE WHEN status_slug IS NOT NULL THEN 1 END) as status_mapped,
+          COUNT(CASE WHEN product_slug IS NOT NULL THEN 1 END) as product_mapped,
+          COUNT(CASE WHEN squad_slug IS NOT NULL THEN 1 END) as squad_mapped
+        FROM public.vw_contratos_canon
+      `);
+      
+      res.json({
+        sample: result.rows,
+        stats: statsResult.rows[0]
+      });
+    } catch (error) {
+      console.error("[admin/sys/test-view] Error:", error);
+      res.status(500).json({ error: "Failed to test canonical view" });
+    }
+  });
+
+  // GET /api/admin/sys/unmapped - Find values that don't have explicit aliases or direct slug matches
+  app.get("/api/admin/sys/unmapped", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      // Find raw values that have no matching alias AND no direct slug match in catalog_items
+      const result = await db.execute(sql`
+        WITH raw_status AS (
+          SELECT DISTINCT LOWER(TRIM(status)) as raw_val, status as original
+          FROM public.cup_contratos 
+          WHERE status IS NOT NULL
+        ),
+        raw_produto AS (
+          SELECT DISTINCT LOWER(TRIM(produto)) as raw_val, produto as original
+          FROM public.cup_contratos 
+          WHERE produto IS NOT NULL
+        ),
+        raw_squad AS (
+          SELECT DISTINCT LOWER(TRIM(squad)) as raw_val, squad as original
+          FROM public.cup_contratos 
+          WHERE squad IS NOT NULL
+        )
+        SELECT 'status' as field, r.original as raw_value, 
+               (SELECT COUNT(*) FROM cup_contratos WHERE LOWER(TRIM(status)) = r.raw_val) as count
+        FROM raw_status r
+        LEFT JOIN sys.catalog_aliases a ON a.catalog_key = 'catalog_contract_status' AND a.alias = r.raw_val
+        LEFT JOIN sys.catalog_items ci ON ci.catalog_key = 'catalog_contract_status' AND ci.slug = r.raw_val AND ci.active = true
+        WHERE a.alias IS NULL AND ci.slug IS NULL
+        UNION ALL
+        SELECT 'produto' as field, r.original as raw_value,
+               (SELECT COUNT(*) FROM cup_contratos WHERE LOWER(TRIM(produto)) = r.raw_val) as count
+        FROM raw_produto r
+        LEFT JOIN sys.catalog_aliases a ON a.catalog_key = 'catalog_products' AND a.alias = r.raw_val
+        LEFT JOIN sys.catalog_items ci ON ci.catalog_key = 'catalog_products' AND ci.slug = r.raw_val AND ci.active = true
+        WHERE a.alias IS NULL AND ci.slug IS NULL
+        UNION ALL
+        SELECT 'squad' as field, r.original as raw_value,
+               (SELECT COUNT(*) FROM cup_contratos WHERE LOWER(TRIM(squad)) = r.raw_val) as count
+        FROM raw_squad r
+        LEFT JOIN sys.catalog_aliases a ON a.catalog_key = 'catalog_squads' AND a.alias = r.raw_val
+        LEFT JOIN sys.catalog_items ci ON ci.catalog_key = 'catalog_squads' AND ci.slug = r.raw_val AND ci.active = true
+        WHERE a.alias IS NULL AND ci.slug IS NULL
+        ORDER BY field, count DESC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[admin/sys/unmapped] Error:", error);
+      res.status(500).json({ error: "Failed to find unmapped values" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
