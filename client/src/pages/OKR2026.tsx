@@ -10,6 +10,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,7 +31,8 @@ import {
   ArrowUpRight, Info, Rocket, Clock, CheckCircle2, 
   XCircle, Banknote, PiggyBank, ClipboardCheck, MessageSquare, History,
   CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building,
-  LayoutGrid, List, Search, Loader2, Database
+  LayoutGrid, List, Search, Loader2, Database, FileText, ListChecks, Calendar,
+  ChevronRight, X, ExternalLink, Tag
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -1857,16 +1861,202 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
   },
 ];
 
+function InitiativeDrawer({
+  initiative,
+  open,
+  onOpenChange,
+  resolveOwner,
+  getKRTitle,
+  krs,
+}: {
+  initiative: Initiative | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  resolveOwner: (email: string | undefined) => string;
+  getKRTitle: (krId: string) => string;
+  krs: KR[];
+}) {
+  if (!initiative) return null;
+  
+  const title = initiative.title || initiative.name || "";
+  const krIds = initiative.krs || initiative.krIds || [];
+  const tags = initiative.tags || [];
+  const checklist = initiative.checklist || [];
+  const ownerEmail = initiative.owner_email || initiative.ownerRole;
+  const ownerName = initiative.owner_name || resolveOwner(ownerEmail);
+  const description = initiative.description || "";
+  
+  const getStatusConfig = (status: string) => {
+    const configs: Record<string, { label: string; color: string; bg: string }> = {
+      backlog: { label: "Backlog", color: "text-gray-600 dark:text-gray-400", bg: "bg-gray-500/10" },
+      planned: { label: "Planejado", color: "text-gray-600 dark:text-gray-400", bg: "bg-gray-500/10" },
+      doing: { label: "Em andamento", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
+      in_progress: { label: "Em andamento", color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
+      done: { label: "Concluído", color: "text-green-600 dark:text-green-400", bg: "bg-green-500/10" },
+      completed: { label: "Concluído", color: "text-green-600 dark:text-green-400", bg: "bg-green-500/10" },
+      blocked: { label: "Bloqueado", color: "text-red-600 dark:text-red-400", bg: "bg-red-500/10" },
+    };
+    return configs[status] || configs.backlog;
+  };
+  
+  const statusConfig = getStatusConfig(initiative.status);
+  
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-[480px] sm:max-w-[480px] p-0" data-testid="drawer-initiative">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b">
+          <div className="flex items-center gap-2 mb-2">
+            <ObjectiveBadge objective={initiative.objectiveId} />
+            {initiative.quarter && <QuarterBadge quarter={initiative.quarter} />}
+            <Badge variant="outline" className={`${statusConfig.color} ${statusConfig.bg} border-0`}>
+              {statusConfig.label}
+            </Badge>
+          </div>
+          <SheetTitle className="text-lg font-semibold pr-8" data-testid="drawer-initiative-title">
+            {title}
+          </SheetTitle>
+          {ownerName && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+              <Users className="w-4 h-4" />
+              <span>{ownerName}</span>
+            </div>
+          )}
+        </SheetHeader>
+        
+        <ScrollArea className="h-[calc(100vh-180px)]">
+          <div className="px-6 py-4 space-y-6">
+            {description && (
+              <div data-testid="drawer-section-description">
+                <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                  <FileText className="w-4 h-4 text-muted-foreground" />
+                  Descrição
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {description}
+                </p>
+              </div>
+            )}
+            
+            {krIds.length > 0 && (
+              <div data-testid="drawer-section-krs">
+                <div className="flex items-center gap-2 text-sm font-medium mb-3">
+                  <Target className="w-4 h-4 text-muted-foreground" />
+                  KRs Vinculados
+                  <Badge variant="outline" className="text-[10px]">{krIds.length}</Badge>
+                </div>
+                <div className="space-y-2">
+                  {krIds.map((krId) => {
+                    const krTitle = getKRTitle(krId);
+                    return (
+                      <div 
+                        key={krId}
+                        className="flex items-start gap-2 p-2 rounded-lg bg-purple-500/5 border border-purple-500/20"
+                      >
+                        <Badge 
+                          variant="secondary" 
+                          className="text-[10px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30 shrink-0"
+                        >
+                          {krId}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">{krTitle}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {checklist.length > 0 && (
+              <div data-testid="drawer-section-checklist">
+                <div className="flex items-center gap-2 text-sm font-medium mb-3">
+                  <ListChecks className="w-4 h-4 text-muted-foreground" />
+                  Checklist
+                  <Badge variant="outline" className="text-[10px]">
+                    {checklist.filter(Boolean).length} itens
+                  </Badge>
+                </div>
+                <div className="space-y-2">
+                  {checklist.map((item, idx) => (
+                    <div key={idx} className="flex items-start gap-3 py-1.5">
+                      <Checkbox 
+                        id={`check-${idx}`} 
+                        disabled 
+                        className="mt-0.5"
+                        data-testid={`checkbox-item-${idx}`}
+                      />
+                      <label 
+                        htmlFor={`check-${idx}`}
+                        className="text-sm text-muted-foreground cursor-pointer"
+                      >
+                        {item}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {tags.length > 0 && (
+              <div data-testid="drawer-section-tags">
+                <div className="flex items-center gap-2 text-sm font-medium mb-3">
+                  <Tag className="w-4 h-4 text-muted-foreground" />
+                  Tags
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {tags.map((tag, idx) => (
+                    <Badge 
+                      key={idx}
+                      variant="outline"
+                      className="text-[10px] bg-muted/50"
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {initiative.dueDate && (
+              <div data-testid="drawer-section-deadline">
+                <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  Prazo
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {format(new Date(initiative.dueDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </p>
+              </div>
+            )}
+            
+            <div className="pt-4 border-t" data-testid="drawer-section-history">
+              <div className="flex items-center gap-2 text-sm font-medium mb-3">
+                <History className="w-4 h-4 text-muted-foreground" />
+                Histórico de Atualizações
+              </div>
+              <div className="text-sm text-muted-foreground/70 text-center py-6 bg-muted/30 rounded-lg">
+                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                Nenhuma atualização ainda
+              </div>
+            </div>
+          </div>
+        </ScrollArea>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function InitiativeKanbanCard({
   initiative,
   resolveOwner,
   getKRTitle,
   krs,
+  onClick,
 }: {
   initiative: Initiative;
   resolveOwner: (email: string | undefined) => string;
   getKRTitle: (krId: string) => string;
   krs: KR[];
+  onClick?: () => void;
 }) {
   const title = initiative.title || initiative.name || "";
   const krIds = initiative.krs || initiative.krIds || [];
@@ -1880,6 +2070,7 @@ function InitiativeKanbanCard({
     <Card 
       className="hover-elevate cursor-pointer mb-2" 
       data-testid={`card-initiative-${initiative.id}`}
+      onClick={onClick}
     >
       <CardContent className="p-3">
         <div className="space-y-2">
@@ -1946,6 +2137,13 @@ function InitiativesTab({
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  
+  const handleInitiativeClick = (initiative: Initiative) => {
+    setSelectedInitiative(initiative);
+    setDrawerOpen(true);
+  };
 
   const collaboratorMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -2158,6 +2356,7 @@ function InitiativesTab({
                         resolveOwner={resolveOwner}
                         getKRTitle={getKRTitle}
                         krs={krs}
+                        onClick={() => handleInitiativeClick(initiative)}
                       />
                     ))
                   )}
@@ -2200,6 +2399,7 @@ function InitiativesTab({
                           key={initiative.id} 
                           className="hover-elevate cursor-pointer"
                           data-testid={`row-initiative-${initiative.id}`}
+                          onClick={() => handleInitiativeClick(initiative)}
                         >
                           <TableCell className="font-medium">
                             <div className="max-w-[280px] truncate" title={title}>
@@ -2275,6 +2475,15 @@ function InitiativesTab({
           </CardContent>
         </Card>
       )}
+      
+      <InitiativeDrawer
+        initiative={selectedInitiative}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        resolveOwner={resolveOwner}
+        getKRTitle={getKRTitle}
+        krs={krs}
+      />
     </div>
   );
 }
