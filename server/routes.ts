@@ -6362,6 +6362,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/geg/colaboradores-por-filtro", async (req, res) => {
+    try {
+      const tipo = req.query.tipo as string;
+      const valor = req.query.valor as string;
+      
+      if (!tipo || !valor) {
+        return res.status(400).json({ error: "tipo and valor are required" });
+      }
+      
+      const colaboradores = await storage.getColaboradores({ status: 'Ativo' });
+      
+      const esCities = ['vitória', 'vitoria', 'vila velha', 'serra', 'cariacica', 'viana', 'guarapari', 'fundão', 'fundao'];
+      
+      const extractCity = (endereco: string | null): string => {
+        if (!endereco) return 'Não informado';
+        const lower = endereco.toLowerCase();
+        if (lower.includes('vitória') || lower.includes('vitoria')) return 'Vitória';
+        if (lower.includes('vila velha')) return 'Vila Velha';
+        if (lower.includes('serra')) return 'Serra';
+        if (lower.includes('cariacica')) return 'Cariacica';
+        if (lower.includes('viana')) return 'Viana';
+        if (lower.includes('guarapari')) return 'Guarapari';
+        if (lower.includes('fundão') || lower.includes('fundao')) return 'Fundão';
+        const match = endereco.match(/^([^,-]+)/);
+        if (match) {
+          const city = match[1].trim();
+          if (city.length > 2 && city.length < 50) return city;
+        }
+        return 'Outros';
+      };
+      
+      const isPresencial = (endereco: string | null, estado: string | null): boolean => {
+        if (estado?.toUpperCase() === 'ES') return true;
+        if (!endereco) return false;
+        const lower = endereco.toLowerCase();
+        return esCities.some(city => lower.includes(city));
+      };
+      
+      const removeEmoji = (str: string) => {
+        return str.split('').filter(char => {
+          const code = char.codePointAt(0) || 0;
+          return !(
+            (code >= 0x1F300 && code <= 0x1F9FF) ||
+            (code >= 0x2600 && code <= 0x26FF) ||
+            (code >= 0x2700 && code <= 0x27BF) ||
+            (code >= 0x1F600 && code <= 0x1F64F) ||
+            (code >= 0x1F680 && code <= 0x1F6FF) ||
+            code === 0x2693
+          );
+        }).join('').trim();
+      };
+      
+      let filtered: typeof colaboradores = [];
+      
+      switch (tipo) {
+        case 'modalidade':
+          if (valor === 'Presencial') {
+            filtered = colaboradores.filter(c => isPresencial(c.endereco, c.estado));
+          } else if (valor === 'Remoto') {
+            filtered = colaboradores.filter(c => !isPresencial(c.endereco, c.estado));
+          }
+          break;
+        case 'cidade':
+          filtered = colaboradores.filter(c => {
+            const cidade = extractCity(c.endereco);
+            return cidade === valor;
+          });
+          break;
+        case 'estado':
+          filtered = colaboradores.filter(c => {
+            const estado = c.estado?.toUpperCase() || 'Não informado';
+            return estado === valor;
+          });
+          break;
+        case 'squad':
+          filtered = colaboradores.filter(c => {
+            const squadName = removeEmoji(c.squad || '');
+            const valorClean = removeEmoji(valor);
+            return squadName === valorClean || c.squad === valor;
+          });
+          break;
+        case 'cargo':
+          filtered = colaboradores.filter(c => c.cargo === valor);
+          break;
+        case 'nivel':
+          filtered = colaboradores.filter(c => {
+            const nivelClean = c.nivel?.replace(/^X\s+/, '');
+            const valorClean = valor.replace(/^X\s+/, '');
+            return c.nivel === valor || nivelClean === valorClean;
+          });
+          break;
+        default:
+          return res.status(400).json({ error: "Invalid tipo" });
+      }
+      
+      const result = filtered.map(c => ({
+        id: c.id,
+        nome: c.nome,
+        cargo: c.cargo,
+        squad: c.squad
+      }));
+      
+      res.json(result);
+    } catch (error) {
+      console.error("[api] Error fetching collaborators by filter:", error);
+      res.status(500).json({ error: "Failed to fetch collaborators by filter" });
+    }
+  });
+
   app.get("/api/inhire/metrics", async (req, res) => {
     try {
       const metrics = await storage.getInhireMetrics();
