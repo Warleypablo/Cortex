@@ -11261,15 +11261,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const ini of initiatives) {
         const stableKey = ini.stable_key || ini.id;
-        const tags = ini.tags ? `{${ini.tags.join(",")}}` : null;
-        const krs = ini.krs ? `{${ini.krs.join(",")}}` : null;
+        const tagsArray = ini.tags || [];
+        const krsArray = ini.krs || [];
         
         await db.execute(sql`
           INSERT INTO okr_initiatives 
             (stable_key, objective_id, title, quarter, status, owner_email, owner_name, tags, krs, origin)
           VALUES 
             (${stableKey}, ${ini.objectiveId}, ${ini.title}, ${ini.quarter || null}, ${ini.status}, 
-             ${ini.owner_email || null}, ${ini.owner_name || null}, ${sql.raw(`'${tags}'::text[]`)}, ${sql.raw(`'${krs}'::text[]`)}, ${ini.origin || 'seed_turbo_2026'})
+             ${ini.owner_email || null}, ${ini.owner_name || null}, ${tagsArray}, ${krsArray}, ${ini.origin || 'seed_turbo_2026'})
           ON CONFLICT (stable_key) DO UPDATE SET
             objective_id = EXCLUDED.objective_id,
             title = EXCLUDED.title,
