@@ -1565,7 +1565,7 @@ function SortableTableHead({
 
 export default function AdminUsuarios() {
   usePageTitle("Administração de Usuários");
-  useSetPageInfo("Gerenciar Usuários", "Controle de acesso e permissões de usuários");
+  useSetPageInfo("Administração", "Controle de acesso e permissões de usuários");
   
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);

@@ -361,7 +361,7 @@ export const NAV_CONFIG = {
     title: 'Administração',
     icon: 'Settings',
     items: [
-      { title: 'Gerenciar Usuários', url: '/admin/usuarios', icon: 'Users', permissionKey: PERMISSION_KEYS.ADMIN.USUARIOS },
+      { title: 'Administração', url: '/admin/usuarios', icon: 'Users', permissionKey: PERMISSION_KEYS.ADMIN.USUARIOS },
     ],
   },
 };
@@ -490,5 +490,5 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GG.PATRIMONIO]: 'Patrimônio',
   [PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES]: 'Clientes Inadimplentes',
   [PERMISSION_KEYS.REPORTS.INVESTORS]: 'Investors Report',
-  [PERMISSION_KEYS.ADMIN.USUARIOS]: 'Gerenciar Usuários',
+  [PERMISSION_KEYS.ADMIN.USUARIOS]: 'Administração',
 };
