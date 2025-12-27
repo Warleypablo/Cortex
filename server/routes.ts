@@ -10963,6 +10963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/okr2026/bp-financeiro", isAuthenticated, async (req, res) => {
     try {
       const { BP_2026_TARGETS, BP_MONTHS, BP_METRIC_ORDER, getMetricByKey } = await import("./okr2026/bp2026Targets");
+      const { computePeriodValue, computeSignalStatus, computeVariance } = await import("./okr2026/rollupEngine");
       
       const targetsByMetric: Record<string, Record<string, number>> = {};
       const actualsByMetric: Record<string, Record<string, number>> = {};
@@ -11048,9 +11049,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         });
         
-        const planTotal = Object.values(targets).reduce((sum, v) => sum + (v || 0), 0);
-        const actualTotal = Object.values(actuals).reduce((sum, v) => sum + (v || 0), 0);
         const hasActuals = Object.keys(actuals).length > 0;
+        
+        const planTotal = computePeriodValue(metricKey, 2026, "YTD", targets, def.period_type);
+        const actualTotal = hasActuals ? computePeriodValue(metricKey, 2026, "YTD", actuals, def.period_type) : null;
+        
+        const quarters = ["Q1", "Q2", "Q3", "Q4"].map(q => {
+          const qPlan = computePeriodValue(metricKey, 2026, q, targets, def.period_type);
+          const qActual = hasActuals ? computePeriodValue(metricKey, 2026, q, actuals, def.period_type) : null;
+          const { variance, variancePct } = computeVariance(qActual, qPlan);
+          const status = computeSignalStatus(qActual, qPlan, def.direction, def.unit);
+          return { quarter: q, plan: qPlan, actual: qActual, variance, variancePct, status };
+        });
+        
+        const ytdVariance = computeVariance(actualTotal, planTotal);
+        const ytdStatus = computeSignalStatus(actualTotal, planTotal, def.direction, def.unit);
         
         return {
           metric_key: metricKey,
@@ -11058,11 +11071,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           unit: def.unit,
           direction: def.direction,
           is_derived: def.is_derived,
+          period_type: def.period_type,
           order: idx,
           months: monthsData,
+          quarters,
           totals: {
-            plan: def.period_type === "month_end" ? (def.totals?.dec ?? targets["2026-12"]) : planTotal,
-            actual: def.period_type === "month_end" ? (actuals["2026-12"] ?? null) : (hasActuals ? actualTotal : null)
+            plan: planTotal,
+            actual: actualTotal,
+            variance: ytdVariance.variance,
+            variancePct: ytdVariance.variancePct,
+            status: ytdStatus
           }
         };
       }).filter(Boolean);

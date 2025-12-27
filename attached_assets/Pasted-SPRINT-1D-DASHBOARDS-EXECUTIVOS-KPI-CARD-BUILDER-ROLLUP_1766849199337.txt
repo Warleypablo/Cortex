@@ -1,0 +1,257 @@
+SPRINT 1D — DASHBOARDS EXECUTIVOS + KPI CARD BUILDER + ROLLUPS (Q/M/YTD) + CHECK-INS (KR) + INICIATIVAS (LINKED)
+
+Contexto real do projeto:
+- Já existe: plan.metric_targets_monthly (targets), kpi.metrics_registry (registry), kpi.metric_actuals_monthly (actuals cache), endpoint /kpi/recompute, telas: Dashboard, KRs, Iniciativas, BP Financeiro.
+- Já existe BP 2026 populado (ou parcialmente). Esta sprint deve ser IDPOTENTE: rodar seed várias vezes sem duplicar.
+- Ainda NÃO vamos automatizar Conta Azul por categoria: tudo que depende de classificação (Conta Azul) deve continuar MANUAL via override nesta sprint (Sprint 2 terá category_mapping).
+
+Regras:
+- NÃO alterar nem escrever em cup_* nem caz_*.
+- Percentuais armazenar como FRAÇÃO (ex.: 13,26% => 0.1326).
+- BRL armazenar em reais numeric(18,2), sem “R$”.
+- Quarter rollup:
+  - period_type=month_sum => Quarter = soma dos 3 meses; YTD = soma Jan..mês_final_do_periodo
+  - period_type=month_end => Quarter = valor do ÚLTIMO mês do trimestre; YTD = valor do último mês do período (fotografia)
+  - PCT => por enquanto média simples do trimestre/YTD (Sprint 2 pode ponderar por receita)
+
+OBJETIVO DA SPRINT:
+Transformar o OKR 2026 em “cockpit executivo”: cards configuráveis + plan vs actual + variação + semáforo + rollups corretos + check-ins e iniciativas ligadas aos KRs.
+
+========================================================
+1) CORRIGIR ROLLUPS (isso provavelmente está errado hoje)
+========================================================
+Hoje o Q4 para métricas month_end (ex: mrr_active) está pegando Outubro (início) ao invés de Dezembro (fim). Corrigir:
+- Implementar utilitário único:
+  computePeriodValue(metric_key, year, period) onde period pode ser:
+    - month: "2026-10"
+    - quarter: "Q4"
+    - ytd até o quarter selecionado
+- Para month_end:
+    Q1 => Mar, Q2 => Jun, Q3 => Set, Q4 => Dez
+- Aplicar a mesma regra em:
+  - Dashboard cards
+  - KR grid (cada célula de quarter)
+  - BP Financeiro (Total e YTD)
+Criar testes unitários simples para garantir:
+- mrr_active Q4 2026 == target de 2026-12 (2337388)
+- headcount_total Q4 2026 == 179
+- revenue_one_time Q4 2026 == soma Out+Nov+Dez (398333+416667+435000 = 1250000)
+
+========================================================
+2) KPI CARD BUILDER (configuração de cards por dashboard)
+========================================================
+Criar tabelas:
+
+kpi.dashboard_views
+- id (uuid)
+- key (text unique) ex: "overview", "financeiro", "pessoas", "comercial"
+- name (text)
+- description (text)
+- is_active (bool)
+- created_at
+
+kpi.dashboard_cards
+- id (uuid)
+- view_key (fk -> dashboard_views.key)
+- metric_key (fk -> metrics_registry.metric_key)
+- position (int)
+- size (text: "sm"|"md"|"lg")
+- show_trend (bool default true)
+- trend_months (int default 6)
+- show_ytd (bool default true)
+- show_variance (bool default true)
+- show_status (bool default true)
+- created_at
+
+Seed padrão de cards:
+VIEW overview:
+- mrr_active
+- revenue_billable_total (derived)
+- revenue_net (derived)
+- ebitda (derived)
+- cash_generation (derived)
+- cash_balance
+- headcount_total
+- clients_active
+- contracts_active
+- churn_mrr_month
+- bad_debt (para virar “inadimplência R$”)
+- bad_debt_pct (DERIVED: bad_debt / revenue_billable_total)
+
+VIEW financeiro:
+- mrr_active, revenue_one_time, revenue_other
+- revenue_billable_total, bad_debt, taxes_on_revenue, revenue_net
+- cogs_csv, gross_margin, cac_total, sga_total, ebitda
+- tax_ir_csll, capex, cash_generation, cash_generation_margin_pct
+- cash_balance
+
+VIEW pessoas:
+- headcount_total, headcount_bucket_csv, headcount_bucket_cac, headcount_bucket_sga
+- revenue_per_head (derived), mrr_per_head (derived)
+
+VIEW comercial:
+- sales_mrr_total (manual override)
+- sales_mrr_total_target (plan)
+- sales_mrr_new_target (plan) vs sales_mrr_new_actual (manual override placeholder)
+- sales_mrr_monetization_target (plan) vs sales_mrr_monetization_actual (manual override placeholder)
+- sales_mrr_performance_target (plan) vs sales_mrr_performance_actual (manual override placeholder)
+- contracts_performance (plan) vs contracts_performance_actual (manual override placeholder)
+
+Adicionar UI Admin:
+- Admin > Dashboards > selecionar view e rearranjar cards (drag/drop) + ativar/desativar.
+
+========================================================
+3) MELHORAR KPI REGISTRY (derivadas, direção e tolerância)
+========================================================
+Garantir/Adicionar campos em kpi.metrics_registry:
+- unit: BRL|COUNT|PCT
+- period_type: month_end|month_sum
+- actual_source_type: auto_sql|manual|derived
+- direction: up|down|flat
+- is_derived bool
+- formula_expr text (ex: "A + B - C")
+- base_metrics jsonb array (["mrr_active","revenue_one_time","revenue_other"])
+- tolerance_yellow numeric (default por regra)
+- tolerance_red numeric
+
+Semáforo:
+- direction=up: green >= target; yellow >= target*(1-0.05); red < target*(1-0.10)
+- direction=down: green <= target; yellow <= target*(1+0.05); red > target*(1+0.10)
+- direction=flat: green dentro ±0.02; yellow ±0.05; red > ±0.05
+- PCT: usar ABS diff (2pp e 4pp) por padrão
+
+Criar/garantir métricas DERIVED:
+- revenue_billable_total = mrr_active + revenue_one_time + revenue_other
+- revenue_net = revenue_billable_total - bad_debt - taxes_on_revenue
+- gross_margin = revenue_net - cogs_csv
+- ebitda = gross_margin - cac_total - sga_total
+- cash_generation = ebitda - tax_ir_csll - capex
+- cash_generation_margin_pct = cash_generation / revenue_billable_total
+- effective_tax_rate_pct = taxes_on_revenue / revenue_billable_total
+- bad_debt_pct = bad_debt / revenue_billable_total
+- revenue_per_head = revenue_total / headcount_total  (usar revenue_total month_sum)
+- mrr_per_head = mrr_active / headcount_total
+
+========================================================
+4) MANUAL OVERRIDE (o que ainda não é auto_sql)
+========================================================
+Criar tabela:
+kpi.metric_actual_overrides_monthly
+- id (uuid)
+- metric_key (text)
+- year (int)
+- month ("2026-01".."2026-12")
+- dimension_key (nullable)
+- dimension_value (nullable)
+- actual_value numeric(18,2)  (para COUNT também usar numeric e converter na UI)
+- notes text
+- updated_by text
+- updated_at
+Unique: (metric_key, year, month, dimension_key, dimension_value)
+
+Regra do recompute:
+- Para cada metric_key/mês:
+  1) se existe override => usa override
+  2) senão, se auto_sql => calcula via SQL
+  3) se derived => calcula via formula + bases já resolvidas
+  4) senão => null (marcar como “Em instrumentação”)
+
+Criar UI Admin > Overrides:
+- filtro por metric_key + ano
+- grid Jan–Dez para editar rápido
+- salvar em lote
+- botão “Recompute after save”
+
+========================================================
+5) BP FINANCEIRO — transformar em “Plan vs Actual vs Variance”
+========================================================
+Na tabela BP Financeiro:
+- Cada célula deve exibir:
+  - Actual (top)
+  - Target (bottom, menor)
+  - Variance (tooltip ou mini texto)
+  - Semáforo por célula (bordas/bolinha)
+- Toggle no topo: [Plan] [Actual] [Variance]
+- Coluna Total:
+  - month_sum => soma 12 meses
+  - month_end => Dez (year-end)
+  - PCT => média simples
+
+Adicionar “Download CSV” do BP Financeiro filtrado.
+
+========================================================
+6) KRs — check-in real (não só número)
+========================================================
+Criar tabela:
+okr.kr_checkins
+- id uuid
+- kr_id uuid
+- year int
+- period_type ("month"|"quarter")
+- period_value ("2026-10"|"Q4")
+- confidence int (0-100)
+- commentary text
+- blockers text
+- next_actions text
+- created_by
+- created_at
+
+UI:
+- KR detail drawer/modal:
+  - mostra Target/Actual/Variance/Score do período selecionado
+  - histórico de check-ins (últimos 6)
+  - botão “Novo check-in”
+- KR grid:
+  - cada célula Q1..Q4 mostra score e status
+  - label “Em instrumentação” quando actual null e não houver override
+
+KR Score:
+- direction=up: score = clamp(actual/target, 0, 1.2) -> depois map 0..100 (min(100, ratio*100))
+- direction=down: score = clamp(target/actual, 0, 1.2)
+- direction=flat: score = 1 - (abs(actual-target)/target); clamp mínimo 0
+
+========================================================
+7) INICIATIVAS — virar “execução ligada ao número”
+========================================================
+Garantir que iniciativas tenham:
+- id
+- title
+- objective_id (opcional)
+- linked_kr_ids (array)  OU tabela pivot initiative_krs
+- owner_user_id (colaboradores)
+- status: planned|doing|blocked|done
+- quarter: Q1|Q2|Q3|Q4
+- due_date (opcional)
+- impact_estimate (low|med|high)
+- notes
+
+UI melhorias:
+- Kanban (planned/doing/blocked/done) + lista (já existe lista, adicionar toggle)
+- Filtros: Objective, KR, Owner, Quarter, Status
+- Dentro do KR detail: listar iniciativas vinculadas + botão “link existing” e “create new”
+
+========================================================
+8) SEED IDPOTENTE — garantir BP 2026 completo
+========================================================
+Manter ação Admin: “Seed BP 2026 (auto)”:
+- UPSERT em plan.metric_targets_monthly para TODOS os targets definidos (inclusive checkpoints com dimension_key='bp_checkpoint')
+- UPSERT no metrics_registry para assegurar todas as métricas e fórmulas
+- Ao final, rodar /kpi/recompute (para preencher derived e aplicar overrides)
+
+OBS: dataset BP 2026 targets é o mesmo já passado anteriormente (mrr_active, revenue_one_time, revenue_other, bad_debt, taxes_on_revenue, cogs_csv, cac_total, sga_total, tax_ir_csll, capex, cash_balance, revenue_total, expense_total, headcount_total, clients_active, contracts_active, churn_mrr_month, headcount_bucket_* e metas comerciais). Não recriar valores, apenas garantir upsert.
+
+========================================================
+9) DEFINIÇÃO DE PRONTO (DoD)
+========================================================
+- Q rollups corretos (month_end usa fim do trimestre).
+- Dashboard Overview e Financeiro com cards configuráveis via Admin.
+- BP Financeiro com toggle Plan/Actual/Variance + semáforo.
+- KRs com check-in (confidence/comentário) e status “Em instrumentação” quando faltam dados.
+- Iniciativas com Kanban + link KR + filtros.
+- Overrides funcionando e priorizados no recompute.
+- Seed BP idempotente e recompute ao final.
+
+Entregas técnicas:
+- migrations (dashboard_views, dashboard_cards, metric_actual_overrides_monthly, kr_checkins e ajustes registry)
+- services: rollup engine + recompute atualizado (override > auto_sql > derived)
+- UI: Admin dashboards/cards, Admin overrides, BP Financeiro toggle, KR detail check-in, Iniciativas kanban e link KR
