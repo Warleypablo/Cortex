@@ -337,7 +337,7 @@ export default function DashboardGeG() {
   });
 
   const { data: retencaoSaude, isLoading: isLoadingRetencaoSaude } = useQuery<RetencaoSaude>({
-    queryKey: ['/api/geg/retencao-saude', { squad, setor, nivel, cargo }],
+    queryKey: ['/api/geg/retencao-saude', { periodo, squad, setor, nivel, cargo }],
   });
 
   const formatMesAno = (mesAno: string) => {
