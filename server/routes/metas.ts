@@ -32,8 +32,84 @@ async function initializeSquadMetasTable(db: any): Promise<void> {
   }
 }
 
+import { BP_2026_TARGETS } from "../okr2026/bp2026Targets";
+
+function isAdmin(req: any, res: any, next: any) {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: "Forbidden - Admin access required" });
+  }
+  next();
+}
+
 export async function registerMetasRoutes(app: Express, db: any, storage: IStorage) {
   await initializeSquadMetasTable(db);
+
+  // ============ BP 2026 Seeding Endpoints ============
+  
+  app.post("/api/okr2026/seed-bp", isAdmin, async (req, res) => {
+    try {
+      console.log("[api] Starting BP 2026 seeding...");
+      let upsertedCount = 0;
+      let registryCount = 0;
+
+      // 1. Seed metrics registry first
+      for (const metric of BP_2026_TARGETS) {
+        await db.execute(sql`
+          INSERT INTO kpi.metrics_registry_extended (
+            metric_key, title, unit, period_type, direction, 
+            is_derived, formula_expr, dimension_key, dimension_value, updated_at
+          )
+          VALUES (
+            ${metric.metric_key}, ${metric.title}, ${metric.unit}, ${metric.period_type}, ${metric.direction},
+            ${metric.is_derived}, ${metric.formula || null}, ${metric.dimension_key || null}, ${metric.dimension_value || null}, NOW()
+          )
+          ON CONFLICT (metric_key) DO UPDATE SET
+            title = EXCLUDED.title,
+            unit = EXCLUDED.unit,
+            period_type = EXCLUDED.period_type,
+            direction = EXCLUDED.direction,
+            is_derived = EXCLUDED.is_derived,
+            formula_expr = EXCLUDED.formula_expr,
+            dimension_key = EXCLUDED.dimension_key,
+            dimension_value = EXCLUDED.dimension_value,
+            updated_at = NOW()
+        `);
+        registryCount++;
+
+        // 2. Seed monthly targets
+        for (const [monthStr, value] of Object.entries(metric.months)) {
+          // Parse monthStr like "2026-01"
+          const [year, month] = monthStr.split('-').map(Number);
+          
+          await db.execute(sql`
+            INSERT INTO plan.metric_targets_monthly (
+              year, month, metric_key, dimension_key, dimension_value, target_value, updated_at
+            )
+            VALUES (
+              ${year}, ${month}, ${metric.metric_key}, 
+              ${metric.dimension_key || null}, ${metric.dimension_value || null}, 
+              ${value}, NOW()
+            )
+            ON CONFLICT (year, month, metric_key, dimension_key, dimension_value)
+            DO UPDATE SET
+              target_value = EXCLUDED.target_value,
+              updated_at = NOW()
+          `);
+          upsertedCount++;
+        }
+      }
+
+      console.log(`[api] BP 2026 seeding completed: ${registryCount} metrics, ${upsertedCount} monthly targets.`);
+      res.json({ 
+        success: true, 
+        metricsProcessed: registryCount,
+        targetsUpserted: upsertedCount 
+      });
+    } catch (error) {
+      console.error("[api] Error seeding BP 2026 targets:", error);
+      res.status(500).json({ error: "Failed to seed BP 2026 targets" });
+    }
+  });
 
   // ============ Squad Goals (Metas) Endpoints ============
 
