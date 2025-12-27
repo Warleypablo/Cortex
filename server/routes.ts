@@ -638,6 +638,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/connections/status", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const lastChecked = new Date().toISOString();
+      
+      // Check Database connection
+      let databaseStatus: { name: string; status: string; latency?: number; error?: string; lastChecked: string } = {
+        name: "Google Cloud SQL (PostgreSQL)",
+        status: "disconnected",
+        lastChecked,
+      };
+      
+      try {
+        const dbStart = Date.now();
+        await db.execute(sql`SELECT 1`);
+        const dbLatency = Date.now() - dbStart;
+        databaseStatus = {
+          name: "Google Cloud SQL (PostgreSQL)",
+          status: "connected",
+          latency: dbLatency,
+          lastChecked,
+        };
+      } catch (dbError: any) {
+        databaseStatus = {
+          name: "Google Cloud SQL (PostgreSQL)",
+          status: "error",
+          error: dbError.message || "Database connection failed",
+          lastChecked,
+        };
+      }
+      
+      // Check OpenAI API
+      let openaiStatus: { name: string; status: string; latency?: number; error?: string; lastChecked: string } = {
+        name: "OpenAI API",
+        status: "not_configured",
+        lastChecked,
+      };
+      
+      const openaiKey = process.env.OPENAI_API_KEY;
+      if (openaiKey) {
+        try {
+          const openaiStart = Date.now();
+          const response = await fetch("https://api.openai.com/v1/models", {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${openaiKey}`,
+            },
+          });
+          const openaiLatency = Date.now() - openaiStart;
+          
+          if (response.ok) {
+            openaiStatus = {
+              name: "OpenAI API",
+              status: "connected",
+              latency: openaiLatency,
+              lastChecked,
+            };
+          } else {
+            const errorData = await response.json().catch(() => ({}));
+            openaiStatus = {
+              name: "OpenAI API",
+              status: "error",
+              latency: openaiLatency,
+              error: (errorData as any).error?.message || `HTTP ${response.status}`,
+              lastChecked,
+            };
+          }
+        } catch (openaiError: any) {
+          openaiStatus = {
+            name: "OpenAI API",
+            status: "error",
+            error: openaiError.message || "OpenAI connection failed",
+            lastChecked,
+          };
+        }
+      }
+      
+      // Check Google OAuth configuration
+      const googleClientId = process.env.GOOGLE_CLIENT_ID;
+      const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      
+      const googleStatus = {
+        name: "Google OAuth",
+        status: (googleClientId && googleClientSecret) ? "configured" : "not_configured",
+        lastChecked,
+      };
+      
+      res.json({
+        database: databaseStatus,
+        openai: openaiStatus,
+        google: googleStatus,
+      });
+    } catch (error) {
+      console.error("[api] Error checking connections status:", error);
+      res.status(500).json({ error: "Failed to check connections status" });
+    }
+  });
+
   app.get("/api/admin/sync-logs", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
