@@ -217,6 +217,7 @@ export interface IStorage {
   upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
   upsertContextoJuridico(data: { clienteId: string; contextoJuridico?: string; procedimentoJuridico?: string; statusJuridico?: string; valorAcordado?: number; atualizadoPor: string }): Promise<{ contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>;
   getGegDemissoesPorTipo(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDemissoesPorTipo[]>;
+  getGegUltimasDemissoes(squad: string, setor: string, nivel: string, cargo: string, limit?: number): Promise<{ id: number; nome: string; cargo: string | null; squad: string | null; dataDesligamento: string; tempoDeEmpresa: number }[]>;
   getGegHeadcountPorTenure(squad: string, setor: string, nivel: string, cargo: string): Promise<GegHeadcountPorTenure[]>;
   getGegColaboradoresPorSquad(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDistribuicao[]>;
   getGegColaboradoresPorCargo(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDistribuicao[]>;
@@ -4843,6 +4844,45 @@ export class DbStorage implements IStorage {
         percentual: totalGeral > 0 ? Math.round((total / totalGeral) * 100) : 0,
       };
     });
+  }
+
+  async getGegUltimasDemissoes(squad: string, setor: string, nivel: string, cargo: string, limit: number = 10): Promise<{ id: number; nome: string; cargo: string | null; squad: string | null; dataDesligamento: string; tempoDeEmpresa: number }[]> {
+    const squadFilter = squad !== 'todos' ? `AND squad = '${squad}'` : '';
+    const setorFilter = setor !== 'todos' ? `AND setor = '${setor}'` : '';
+    const nivelFilter = nivel !== 'todos' ? `AND nivel = '${nivel}'` : '';
+    const cargoFilter = cargo !== 'todos' ? `AND cargo = '${cargo}'` : '';
+    
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        id,
+        nome,
+        cargo,
+        squad,
+        TO_CHAR(demissao, 'YYYY-MM-DD') as data_desligamento,
+        CASE 
+          WHEN demissao IS NOT NULL AND admissao IS NOT NULL THEN
+            GREATEST(1, EXTRACT(MONTH FROM AGE(demissao, admissao)) + EXTRACT(YEAR FROM AGE(demissao, admissao)) * 12)::integer
+          ELSE 0
+        END as tempo_de_empresa
+      FROM rh_pessoal
+      WHERE LOWER(status) IN ('inativo', 'em desligamento', 'dispensado')
+        AND demissao IS NOT NULL
+        ${squadFilter}
+        ${setorFilter}
+        ${nivelFilter}
+        ${cargoFilter}
+      ORDER BY demissao DESC
+      LIMIT ${limit}
+    `));
+
+    return result.rows.map(row => ({
+      id: parseInt(row.id as string || '0'),
+      nome: row.nome as string,
+      cargo: row.cargo as string | null,
+      squad: row.squad as string | null,
+      dataDesligamento: row.data_desligamento as string,
+      tempoDeEmpresa: parseInt(row.tempo_de_empresa as string || '0'),
+    }));
   }
 
   async getGegHeadcountPorTenure(squad: string, setor: string, nivel: string, cargo: string): Promise<GegHeadcountPorTenure[]> {
