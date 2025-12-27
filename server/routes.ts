@@ -6097,7 +6097,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cargo: c.cargo,
           squad: c.squad,
           mesesDeTurbo: c.mesesDeTurbo ?? 0,
-          mesesUltAumento: c.mesesUltAumento
+          mesesUltAumento: c.mesesUltAumento,
+          salario: parseFloat(c.salario || '0') || 0,
+          setor: c.setor,
+          nivel: c.nivel,
+          admissao: c.admissao
         }))
         .sort((a, b) => (b.mesesUltAumento ?? 999) - (a.mesesUltAumento ?? 999))
         .slice(0, 10);
@@ -6123,7 +6127,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             cargo: c.cargo,
             squad: c.squad,
             admissao: c.admissao,
-            diasRestantes
+            diasRestantes,
+            salario: parseFloat(c.salario || '0') || 0,
+            setor: c.setor,
+            nivel: c.nivel
           };
         })
         .sort((a, b) => a.diasRestantes - b.diasRestantes)
@@ -6159,7 +6166,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             squad: c.squad,
             salario,
             mediaCargo: avg,
-            diferenca: ((salario - avg) / avg * 100).toFixed(1)
+            diferenca: ((salario - avg) / avg * 100).toFixed(1),
+            setor: c.setor,
+            nivel: c.nivel,
+            admissao: c.admissao,
+            mesesDeTurbo: c.mesesDeTurbo ?? 0
           };
         })
         .slice(0, 10);
@@ -6266,6 +6277,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching retention and health:", error);
       res.status(500).json({ error: "Failed to fetch retention and health data" });
+    }
+  });
+
+  // Collaborators grouped by health status with reasons
+  app.get("/api/geg/colaboradores-por-saude", async (req, res) => {
+    try {
+      const colaboradores = await storage.getColaboradores({ status: 'Ativo' });
+      
+      // Calculate salary averages by cargo
+      const salarioPorCargo: Record<string, { total: number; count: number; avg: number }> = {};
+      colaboradores.forEach(c => {
+        const cargo = c.cargo || 'N/A';
+        const salario = parseFloat(c.salario || '0') || 0;
+        if (salario > 0) {
+          if (!salarioPorCargo[cargo]) salarioPorCargo[cargo] = { total: 0, count: 0, avg: 0 };
+          salarioPorCargo[cargo].total += salario;
+          salarioPorCargo[cargo].count++;
+        }
+      });
+      
+      // Calculate averages
+      Object.keys(salarioPorCargo).forEach(cargo => {
+        salarioPorCargo[cargo].avg = salarioPorCargo[cargo].total / salarioPorCargo[cargo].count;
+      });
+
+      type HealthCategory = 'saudavel' | 'atencao' | 'critico';
+      const result: Record<HealthCategory, { id: number; nome: string; cargo: string | null; squad: string | null; reasons: string[] }[]> = {
+        saudavel: [],
+        atencao: [],
+        critico: []
+      };
+
+      colaboradores.forEach(c => {
+        const mesesUltAumento = c.mesesUltAumento;
+        const cargo = c.cargo || 'N/A';
+        const salario = parseFloat(c.salario || '0') || 0;
+        const avgCargo = salarioPorCargo[cargo]?.avg || 0;
+        const reasons: string[] = [];
+        let category: HealthCategory = 'saudavel';
+
+        // Check critical conditions
+        if (mesesUltAumento !== null && mesesUltAumento >= 24) {
+          reasons.push(`${mesesUltAumento} meses sem aumento`);
+          category = 'critico';
+        }
+        if (avgCargo > 0 && salario > 0 && salario < avgCargo * 0.70 && salarioPorCargo[cargo]?.count >= 3) {
+          const pct = ((salario / avgCargo) * 100).toFixed(0);
+          reasons.push(`Salário ${pct}% da média do cargo`);
+          category = 'critico';
+        }
+
+        // Check attention conditions (only if not already critical)
+        if (category !== 'critico') {
+          if (mesesUltAumento !== null && mesesUltAumento >= 12) {
+            reasons.push(`${mesesUltAumento} meses sem aumento`);
+            category = 'atencao';
+          }
+          if (avgCargo > 0 && salario > 0 && salario < avgCargo * 0.85 && salarioPorCargo[cargo]?.count >= 3) {
+            const pct = ((salario / avgCargo) * 100).toFixed(0);
+            reasons.push(`Salário ${pct}% da média do cargo`);
+            category = 'atencao';
+          }
+        }
+
+        // Default reason for healthy
+        if (category === 'saudavel' && reasons.length === 0) {
+          reasons.push('Colaborador em boas condições');
+        }
+
+        result[category].push({
+          id: c.id,
+          nome: c.nome,
+          cargo: c.cargo,
+          squad: c.squad,
+          reasons
+        });
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("[api] Error fetching collaborators by health:", error);
+      res.status(500).json({ error: "Failed to fetch collaborators by health" });
     }
   });
 
