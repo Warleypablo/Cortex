@@ -138,6 +138,43 @@ const ROLE_PRESETS = [
   },
 ];
 
+// Function to detect which access profile matches user's permissions
+function detectAccessProfile(allowedRoutes: string[]): { label: string; variant: "default" | "secondary" | "outline" } | null {
+  const userPermissions = routesToPermissions(allowedRoutes || []);
+  const userPermsSet = new Set(userPermissions);
+  
+  // Check profiles from most restrictive to least restrictive
+  const profiles = [
+    { profile: ACCESS_PROFILES.CONTROL_TOWER, variant: "default" as const },
+    { profile: ACCESS_PROFILES.LIDER, variant: "default" as const },
+    { profile: ACCESS_PROFILES.TIME, variant: "secondary" as const },
+    { profile: ACCESS_PROFILES.BASE, variant: "outline" as const },
+  ];
+  
+  for (const { profile, variant } of profiles) {
+    const profilePermsSet = new Set(profile.permissions);
+    
+    // Check if user has all permissions from this profile
+    const hasAllProfilePerms = profile.permissions.every(p => userPermsSet.has(p));
+    
+    // Check if user has exactly these permissions (or subset for higher profiles)
+    if (hasAllProfilePerms) {
+      // For exact match or superset
+      const isExactOrSuperset = userPermissions.length >= profile.permissions.length;
+      if (isExactOrSuperset) {
+        return { label: profile.label, variant };
+      }
+    }
+  }
+  
+  // If no profile matches, return custom
+  if (userPermissions.length > 0) {
+    return { label: "Personalizado", variant: "outline" };
+  }
+  
+  return { label: "Sem acesso", variant: "outline" };
+}
+
 function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
   user: User;
   open: boolean;
@@ -1585,13 +1622,7 @@ export default function AdminUsuarios() {
                     sortDirection={sortDirection} 
                     onSort={handleSort} 
                   />
-                  <SortableTableHead 
-                    column="allowedRoutes" 
-                    label="Páginas Permitidas" 
-                    sortColumn={sortColumn} 
-                    sortDirection={sortDirection} 
-                    onSort={handleSort} 
-                  />
+                  <TableHead>Perfil de Acesso</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1643,15 +1674,24 @@ export default function AdminUsuarios() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm">
-                        {user.role === 'admin' ? (
-                          <span className="text-muted-foreground">Acesso Total</span>
-                        ) : (
-                          <span data-testid={`text-routes-${user.id}`}>
-                            {user.allowedRoutes?.length || 0} página{user.allowedRoutes?.length !== 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
+                      {user.role === 'admin' ? (
+                        <Badge variant="default" data-testid={`badge-profile-${user.id}`}>
+                          Control Tower
+                        </Badge>
+                      ) : (
+                        (() => {
+                          const profile = detectAccessProfile(user.allowedRoutes);
+                          return profile ? (
+                            <Badge variant={profile.variant} data-testid={`badge-profile-${user.id}`}>
+                              {profile.label}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" data-testid={`badge-profile-${user.id}`}>
+                              Sem acesso
+                            </Badge>
+                          );
+                        })()
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
