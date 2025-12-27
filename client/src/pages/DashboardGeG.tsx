@@ -1216,8 +1216,8 @@ export default function DashboardGeG() {
                             {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
                           </div>
                         ) : filteredVeteranos.length > 0 ? (
-                          <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                            {filteredVeteranos.slice(0, 5).map((v) => (
+                          <div className="space-y-2 max-h-[320px] overflow-y-auto">
+                            {filteredVeteranos.slice(0, 8).map((v) => (
                               <div 
                                 key={v.id} 
                                 className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20 cursor-pointer hover-elevate" 
@@ -1245,8 +1245,8 @@ export default function DashboardGeG() {
                                 </Badge>
                               </div>
                             ))}
-                            {filteredVeteranos.length > 5 && (
-                              <p className="text-[10px] text-muted-foreground text-center">+{filteredVeteranos.length - 5} outros</p>
+                            {filteredVeteranos.length > 8 && (
+                              <p className="text-[10px] text-muted-foreground text-center">+{filteredVeteranos.length - 8} outros</p>
                             )}
                           </div>
                         ) : (
@@ -1287,8 +1287,8 @@ export default function DashboardGeG() {
                             {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
                           </div>
                         ) : filteredExperiencia.length > 0 ? (
-                          <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                            {filteredExperiencia.slice(0, 5).map((f) => (
+                          <div className="space-y-2 max-h-[320px] overflow-y-auto">
+                            {filteredExperiencia.slice(0, 8).map((f) => (
                               <div 
                                 key={f.id} 
                                 className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20 cursor-pointer hover-elevate" 
@@ -1316,8 +1316,8 @@ export default function DashboardGeG() {
                                 </Badge>
                               </div>
                             ))}
-                            {filteredExperiencia.length > 5 && (
-                              <p className="text-[10px] text-muted-foreground text-center">+{filteredExperiencia.length - 5} outros</p>
+                            {filteredExperiencia.length > 8 && (
+                              <p className="text-[10px] text-muted-foreground text-center">+{filteredExperiencia.length - 8} outros</p>
                             )}
                           </div>
                         ) : (
@@ -1344,8 +1344,8 @@ export default function DashboardGeG() {
                             {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
                           </div>
                         ) : filteredSalario.length > 0 ? (
-                          <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                            {filteredSalario.slice(0, 5).map((s) => (
+                          <div className="space-y-2 max-h-[320px] overflow-y-auto">
+                            {filteredSalario.slice(0, 8).map((s) => (
                               <div 
                                 key={s.id} 
                                 className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20 cursor-pointer hover-elevate" 
@@ -1374,8 +1374,8 @@ export default function DashboardGeG() {
                                 </Badge>
                               </div>
                             ))}
-                            {filteredSalario.length > 5 && (
-                              <p className="text-[10px] text-muted-foreground text-center">+{filteredSalario.length - 5} outros</p>
+                            {filteredSalario.length > 8 && (
+                              <p className="text-[10px] text-muted-foreground text-center">+{filteredSalario.length - 8} outros</p>
                             )}
                           </div>
                         ) : (
@@ -1959,7 +1959,7 @@ export default function DashboardGeG() {
               {isLoadingColaboradoresPorSquad ? (
                 <Skeleton className="h-[250px] w-full" />
               ) : colaboradoresPorSquad && colaboradoresPorSquad.length > 0 ? (
-                <div className="max-h-[280px] overflow-y-auto">
+                <div className="max-h-[400px] overflow-y-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2052,7 +2052,7 @@ export default function DashboardGeG() {
               {isLoadingColaboradoresPorCargo ? (
                 <Skeleton className="h-[250px] w-full" />
               ) : colaboradoresPorCargo && colaboradoresPorCargo.length > 0 ? (
-                <div className="max-h-[280px] overflow-y-auto">
+                <div className="max-h-[400px] overflow-y-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2100,7 +2100,7 @@ export default function DashboardGeG() {
               {isLoadingColaboradoresPorNivel ? (
                 <Skeleton className="h-[250px] w-full" />
               ) : colaboradoresPorNivel && colaboradoresPorNivel.length > 0 ? (
-                <div className="max-h-[280px] overflow-y-auto">
+                <div className="max-h-[400px] overflow-y-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
