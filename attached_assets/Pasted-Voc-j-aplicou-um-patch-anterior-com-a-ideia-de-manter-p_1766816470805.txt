@@ -1,0 +1,89 @@
+Você já aplicou um patch anterior com a ideia de manter public.cup_* como RAW (somente leitura) e criar uma camada canônica SYS e uma view canônica de contratos. Agora quero a próxima sprint.
+
+OBJETIVO DA SPRINT (entregáveis):
+1) Implementar o módulo Admin para gerir:
+   - Catálogos (catalogs + catalog_items)
+   - Aliases (catalog_aliases)
+   - Campos do sistema (system_fields)
+   - Regras de validação (validation_rules)
+2) Garantir que o produto (telas/KPIs) passe a LER da view canônica (vw_contratos_canon) em vez de ler direto de public.cup_contratos.
+3) Criar uma tela “Pendências de Padronização” para mostrar quais valores do RAW não estão mapeados para slug (ex.: status_slug/product_slug/squad_slug nulos) e permitir cadastrar alias rapidamente.
+
+REGRAS IMPORTANTES:
+- NÃO alterar/criar/escrever em public.cup_* (RAW).
+- Tudo em sys.* é configurável pelo Admin.
+- Slugs/field_key/rule_id são imutáveis (não permitir edição; somente name/active/meta etc).
+- Soft delete: nunca apagar registros, apenas active=false.
+- O Admin deve ser a fonte de verdade para catálogos/campos/regras.
+
+TAREFAS DETALHADAS:
+
+A) BACKEND / BANCO (se ainda não existir, criar)
+1) Confirmar schema sys com tabelas:
+   - sys.catalogs
+   - sys.catalog_items (meta jsonb, sort_order, active)
+   - sys.catalog_aliases (catalog_key + alias -> slug)
+   - sys.system_fields
+   - sys.validation_rules
+2) Confirmar view public.vw_contratos_canon existe e retorna:
+   - contract_ext_id, client_ext_id (ou id_task/id_subtask)
+   - status_slug, product_slug, squad_slug
+   - mrr_value_cents, one_time_value_cents
+   - campos RAW úteis (status/produto/squad originais)
+3) Criar 1 endpoint/service de “spec apply” (opcional nesta sprint, mas desejável):
+   - aplica/upserta o YAML do spec para sys.*
+   - se não der tempo, ignorar e focar no CRUD via Admin UI.
+
+B) ADMIN UI (CRUD)
+1) Admin > Catálogos
+   - Listar sys.catalogs
+   - Ao entrar num catálogo: listar sys.catalog_items, criar/editar item (exceto slug), toggle active, sort_order, meta json
+   - Para catalog_products, meta deve conter bp_segment
+   - Para catalog_squads, meta pode conter is_off
+   - Para catalog_contract_status, meta deve conter counts_as_operating
+2) Admin > Aliases
+   - Selecionar catálogo
+   - Listar aliases existentes (alias -> slug)
+   - Criar alias novo: escolher slug existente no catálogo
+   - Bloquear alias duplicado (unique por catalog_key+alias)
+3) Admin > Campos do Sistema (Field Registry)
+   - Listar sys.system_fields
+   - Criar campo novo com field_key imutável
+   - Editar label/type/required/default/validation/help_text/active
+   - Se type=enum, obrigar enum_catalog
+4) Admin > Regras
+   - Listar sys.validation_rules
+   - Criar/editar regra (rule_id imutável)
+   - Toggle active
+   - (Opcional) Botão “Testar regra” com payload JSON (simular validação e mostrar quais regras disparam)
+
+C) PENDÊNCIAS DE PADRONIZAÇÃO (MUITO IMPORTANTE)
+Criar uma tela “Admin > Pendências” que:
+1) Consulta a view canônica e mostra linhas onde:
+   - status_slug IS NULL OR product_slug IS NULL OR squad_slug IS NULL
+2) Agrupa por campo e valor RAW:
+   - Ex.: Campo=status, raw="cancelado/inativo", count=12
+3) Para cada item, permitir cadastrar alias na hora:
+   - escolher o slug correto (dropdown do catálogo)
+   - salvar em sys.catalog_aliases
+4) Após salvar alias, permitir “revalidar” (refresh) e ver pendência sumir.
+
+D) MIGRAÇÃO DAS TELAS/KPIs PARA A VIEW CANÔNICA
+1) Onde quer que o sistema use contratos, trocar a query para:
+   - FROM public.vw_contratos_canon
+2) Para filtros de produto/status/squad, usar os *_slug:
+   - product_slug, status_slug, squad_slug
+3) Exibir também o “raw” em detalhes (se útil), mas o filtro e agregação sempre pelo slug.
+
+CRITÉRIOS DE ACEITE (Definition of Done):
+1) Consigo criar/editar catálogos e itens via Admin sem mexer no banco manualmente.
+2) Consigo criar aliases via Admin e isso corrige slugs nulos na view canônica.
+3) A tela de Pendências lista os valores RAW não mapeados e eu resolvo sem developer.
+4) O produto (KPIs/telas) lê da view canônica, não do RAW cup_*.
+5) Nada no código escreve em public.cup_*.
+
+ENTREGUE:
+- Rotas/API necessárias
+- Componentes/telas do Admin
+- Queries SQL usadas
+- Observações de setup local
