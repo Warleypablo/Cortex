@@ -2240,6 +2240,16 @@ export default function Colaboradores() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar colaborador..."
+                  value={filters.search}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  className="pl-9 w-[200px] md:w-[250px]"
+                  data-testid="input-search-colaborador"
+                />
+              </div>
               <FilterDialog
                 filters={filters}
                 onApplyFilters={setFilters}
