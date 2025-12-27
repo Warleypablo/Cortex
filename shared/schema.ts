@@ -1997,3 +1997,77 @@ export const systemSettings = pgTable("system_settings", {
 export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true });
 export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
 export type SystemSetting = typeof systemSettings.$inferSelect;
+
+// ==================== KPI DASHBOARD VIEWS ====================
+
+export const dashboardViews = pgTable("dashboard_views", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDashboardViewSchema = createInsertSchema(dashboardViews).omit({ id: true, createdAt: true });
+export type InsertDashboardView = z.infer<typeof insertDashboardViewSchema>;
+export type DashboardView = typeof dashboardViews.$inferSelect;
+
+// ==================== KPI DASHBOARD CARDS ====================
+
+export const dashboardCards = pgTable("dashboard_cards", {
+  id: serial("id").primaryKey(),
+  viewKey: varchar("view_key", { length: 50 }).notNull(),
+  metricKey: varchar("metric_key", { length: 100 }).notNull(),
+  position: integer("position").notNull().default(0),
+  size: varchar("size", { length: 10 }).notNull().default("md"),
+  showTrend: boolean("show_trend").notNull().default(true),
+  trendMonths: integer("trend_months").notNull().default(6),
+  showYtd: boolean("show_ytd").notNull().default(true),
+  showVariance: boolean("show_variance").notNull().default(true),
+  showStatus: boolean("show_status").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDashboardCardSchema = createInsertSchema(dashboardCards).omit({ id: true, createdAt: true });
+export type InsertDashboardCard = z.infer<typeof insertDashboardCardSchema>;
+export type DashboardCard = typeof dashboardCards.$inferSelect;
+
+// ==================== METRIC ACTUAL OVERRIDES (MONTHLY) ====================
+
+export const metricActualOverridesMonthly = pgTable("metric_actual_overrides_monthly", {
+  id: serial("id").primaryKey(),
+  metricKey: varchar("metric_key", { length: 100 }).notNull(),
+  year: integer("year").notNull(),
+  month: varchar("month", { length: 7 }).notNull(),
+  dimensionKey: varchar("dimension_key", { length: 50 }),
+  dimensionValue: varchar("dimension_value", { length: 100 }),
+  actualValue: decimal("actual_value", { precision: 18, scale: 2 }).notNull(),
+  notes: text("notes"),
+  updatedBy: varchar("updated_by", { length: 100 }),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMetricOverrideSchema = createInsertSchema(metricActualOverridesMonthly).omit({ id: true, updatedAt: true });
+export type InsertMetricOverride = z.infer<typeof insertMetricOverrideSchema>;
+export type MetricOverride = typeof metricActualOverridesMonthly.$inferSelect;
+
+// ==================== KR CHECK-INS ====================
+
+export const krCheckins = pgTable("kr_checkins", {
+  id: serial("id").primaryKey(),
+  krId: varchar("kr_id", { length: 50 }).notNull(),
+  year: integer("year").notNull(),
+  periodType: varchar("period_type", { length: 10 }).notNull(),
+  periodValue: varchar("period_value", { length: 10 }).notNull(),
+  confidence: integer("confidence").notNull().default(50),
+  commentary: text("commentary"),
+  blockers: text("blockers"),
+  nextActions: text("next_actions"),
+  createdBy: varchar("created_by", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKrCheckinSchema = createInsertSchema(krCheckins).omit({ id: true, createdAt: true });
+export type InsertKrCheckin = z.infer<typeof insertKrCheckinSchema>;
+export type KrCheckin = typeof krCheckins.$inferSelect;
