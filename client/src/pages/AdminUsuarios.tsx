@@ -106,7 +106,8 @@ import {
   PERMISSION_LABELS, 
   ACCESS_PROFILES, 
   ALL_PERMISSION_KEYS,
-  permissionsToRoutes 
+  permissionsToRoutes,
+  routesToPermissions
 } from "@shared/nav-config";
 
 // New access profiles (Base, Time, Líder, Control Tower)
@@ -144,7 +145,9 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
   onToggleRole: (user: User) => void;
 }) {
   const { toast } = useToast();
-  const [selectedRoutes, setSelectedRoutes] = useState<string[]>(user.allowedRoutes || []);
+  // Convert legacy routes to permission keys for backward compatibility
+  const initialPermissions = routesToPermissions(user.allowedRoutes || []);
+  const [selectedRoutes, setSelectedRoutes] = useState<string[]>(initialPermissions);
 
   const updatePermissionsMutation = useMutation({
     mutationFn: async (allowedRoutes: string[]) => {
@@ -195,7 +198,9 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
   };
 
   const handleSave = () => {
-    updatePermissionsMutation.mutate(selectedRoutes);
+    // Convert permission keys to routes for API compatibility
+    const routesToSave = permissionsToRoutes(selectedRoutes);
+    updatePermissionsMutation.mutate(routesToSave);
   };
 
   const handlePromoteToAdmin = () => {
@@ -457,12 +462,14 @@ function AddUserDialog({ open, onOpenChange }: {
       return;
     }
 
-    const uniqueRoutes = Array.from(new Set(selectedRoutes));
+    // Convert permission keys to routes for API compatibility
+    const uniquePermissions = Array.from(new Set(selectedRoutes));
+    const routesToSave = permissionsToRoutes(uniquePermissions);
     createUserMutation.mutate({
       name: name.trim(),
       email: email.trim().toLowerCase(),
       role,
-      allowedRoutes: role === 'admin' ? [] : uniqueRoutes,
+      allowedRoutes: role === 'admin' ? [] : routesToSave,
     });
   };
 
