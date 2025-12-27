@@ -57,30 +57,89 @@ function getAIClient(provider: AIProvider): OpenAI {
   return openai;
 }
 
-export async function testAIConnection(): Promise<{ success: boolean; provider: string; model: string; error?: string }> {
+export interface AIConnectionTestResult {
+  success: boolean;
+  provider: string;
+  model: string;
+  error?: string;
+  errorType?: 'timeout' | 'authentication' | 'rate_limit' | 'network' | 'invalid_model' | 'unknown';
+}
+
+export async function testAIConnection(): Promise<AIConnectionTestResult> {
+  const AI_TEST_TIMEOUT_MS = 10000; // 10 second timeout
+  
+  let config: { provider: AIProvider; model: AIModel };
   try {
-    const config = await getAIConfig();
+    config = await getAIConfig();
+  } catch (configError: any) {
+    return {
+      success: false,
+      provider: 'unknown',
+      model: 'unknown',
+      error: 'Failed to load AI configuration. Please check system settings.',
+      errorType: 'unknown',
+    };
+  }
+  
+  try {
     const client = getAIClient(config.provider);
     
-    const response = await client.chat.completions.create({
-      model: config.model,
-      messages: [{ role: "user", content: "Say 'Hello! AI is working.' and nothing else." }],
-      max_tokens: 50,
-    });
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), AI_TEST_TIMEOUT_MS);
     
-    const text = response.choices[0]?.message?.content || '';
-    return {
-      success: text.toLowerCase().includes('hello') || text.toLowerCase().includes('ai'),
-      provider: AI_PROVIDERS[config.provider].name,
-      model: config.model,
-    };
+    try {
+      const response = await client.chat.completions.create({
+        model: config.model,
+        messages: [{ role: "user", content: "Say 'Hello! AI is working.' and nothing else." }],
+        max_tokens: 50,
+      }, {
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      const text = response.choices[0]?.message?.content || '';
+      return {
+        success: text.toLowerCase().includes('hello') || text.toLowerCase().includes('ai'),
+        provider: AI_PROVIDERS[config.provider].name,
+        model: config.model,
+      };
+    } catch (apiError: any) {
+      clearTimeout(timeoutId);
+      throw apiError;
+    }
   } catch (error: any) {
-    const config = await getAIConfig();
+    const errorMessage = error.message || 'Unknown error';
+    const statusCode = error.status || error.statusCode;
+    
+    // Categorize error types for actionable messages
+    let errorType: AIConnectionTestResult['errorType'] = 'unknown';
+    let actionableMessage = errorMessage;
+    
+    if (error.name === 'AbortError' || errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
+      errorType = 'timeout';
+      actionableMessage = `Connection timed out after ${AI_TEST_TIMEOUT_MS / 1000} seconds. The AI provider may be experiencing delays or the network is slow.`;
+    } else if (statusCode === 401 || errorMessage.toLowerCase().includes('unauthorized') || errorMessage.toLowerCase().includes('invalid api key') || errorMessage.toLowerCase().includes('authentication')) {
+      errorType = 'authentication';
+      actionableMessage = 'Authentication failed. Please verify your API key is correct and has the necessary permissions.';
+    } else if (statusCode === 429 || errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('quota')) {
+      errorType = 'rate_limit';
+      actionableMessage = 'Rate limit exceeded. Please wait a few minutes before trying again, or check your API usage quota.';
+    } else if (statusCode === 404 || errorMessage.toLowerCase().includes('model') || errorMessage.toLowerCase().includes('not found')) {
+      errorType = 'invalid_model';
+      actionableMessage = `The model '${config.model}' was not found or is not available. Please select a different model.`;
+    } else if (errorMessage.toLowerCase().includes('network') || errorMessage.toLowerCase().includes('econnrefused') || errorMessage.toLowerCase().includes('fetch')) {
+      errorType = 'network';
+      actionableMessage = 'Network error connecting to AI provider. Please check your internet connection and try again.';
+    }
+    
     return {
       success: false,
       provider: AI_PROVIDERS[config.provider].name,
       model: config.model,
-      error: error.message || 'Unknown error',
+      error: actionableMessage,
+      errorType,
     };
   }
 }
