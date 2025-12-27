@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -1459,21 +1460,72 @@ function AlertsSection({
   );
 }
 
+type ViewMode = "quarter" | "month";
+type MonthKey = "jan" | "fev" | "mar" | "abr" | "mai" | "jun" | "jul" | "ago" | "set" | "out" | "nov" | "dez";
+
+const MONTHS: { key: MonthKey; label: string; quarter: "Q1" | "Q2" | "Q3" | "Q4" }[] = [
+  { key: "jan", label: "Janeiro", quarter: "Q1" },
+  { key: "fev", label: "Fevereiro", quarter: "Q1" },
+  { key: "mar", label: "Março", quarter: "Q1" },
+  { key: "abr", label: "Abril", quarter: "Q2" },
+  { key: "mai", label: "Maio", quarter: "Q2" },
+  { key: "jun", label: "Junho", quarter: "Q2" },
+  { key: "jul", label: "Julho", quarter: "Q3" },
+  { key: "ago", label: "Agosto", quarter: "Q3" },
+  { key: "set", label: "Setembro", quarter: "Q3" },
+  { key: "out", label: "Outubro", quarter: "Q4" },
+  { key: "nov", label: "Novembro", quarter: "Q4" },
+  { key: "dez", label: "Dezembro", quarter: "Q4" },
+];
+
+function getCurrentMonth(): MonthKey {
+  const monthIndex = new Date().getMonth();
+  return MONTHS[monthIndex].key;
+}
+
 function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChange?: (tab: string) => void }) {
   const { metrics, highlights, series, initiatives, krs, objectives } = data;
   const currentQuarter = getCurrentQuarter();
+  const [viewMode, setViewMode] = useState<ViewMode>("quarter");
   const [selectedQuarter, setSelectedQuarter] = useState<"Q1" | "Q2" | "Q3" | "Q4">(currentQuarter);
+  const [selectedMonth, setSelectedMonth] = useState<MonthKey>(getCurrentMonth());
 
   const { data: latestCheckinsData } = useQuery<LatestCheckinsResponse>({
     queryKey: ["/api/okr2026/kr-checkins-latest"],
   });
 
   const latestCheckins = latestCheckinsData?.latestByKr || {};
+  
+  const getValueFromSeries = (seriesData: { month: string; value: number }[] | undefined, monthKey: MonthKey): number | null => {
+    if (!seriesData || seriesData.length === 0) return null;
+    const monthLabels: Record<MonthKey, string[]> = {
+      jan: ["jan", "janeiro", "01"],
+      fev: ["fev", "fevereiro", "02"],
+      mar: ["mar", "março", "marco", "03"],
+      abr: ["abr", "abril", "04"],
+      mai: ["mai", "maio", "05"],
+      jun: ["jun", "junho", "06"],
+      jul: ["jul", "julho", "07"],
+      ago: ["ago", "agosto", "08"],
+      set: ["set", "setembro", "09"],
+      out: ["out", "outubro", "10"],
+      nov: ["nov", "novembro", "11"],
+      dez: ["dez", "dezembro", "12"],
+    };
+    const possibleLabels = monthLabels[monthKey];
+    const entry = seriesData.find(s => 
+      possibleLabels.some(label => s.month.toLowerCase().includes(label))
+    );
+    return entry?.value ?? null;
+  };
+  
+  const selectedMonthData = MONTHS.find(m => m.key === selectedMonth);
+  const effectiveQuarter = viewMode === "month" && selectedMonthData ? selectedMonthData.quarter : selectedQuarter;
 
   const getTargetForMetric = (metricKey: string): number | null => {
     const kr = krs?.find(k => k.metricKey === metricKey);
     if (!kr?.targets) return null;
-    return kr.targets[selectedQuarter] ?? null;
+    return kr.targets[effectiveQuarter] ?? null;
   };
 
   const mrrTarget = getTargetForMetric("mrr_active");
@@ -1547,45 +1599,94 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Building className="w-4 h-4" />
-          <span>Metas do trimestre:</span>
+          <span>Visualizar por:</span>
         </div>
-        <Select value={selectedQuarter} onValueChange={(v) => setSelectedQuarter(v as "Q1" | "Q2" | "Q3" | "Q4")}>
-          <SelectTrigger className="w-[150px]" data-testid="filter-dashboard-quarter">
-            <SelectValue placeholder="Trimestre" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
-            <SelectItem value="Q2">Q2 (Abr-Jun)</SelectItem>
-            <SelectItem value="Q3">Q3 (Jul-Set)</SelectItem>
-            <SelectItem value="Q4">Q4 (Out-Dez)</SelectItem>
-          </SelectContent>
-        </Select>
+        <ToggleGroup 
+          type="single" 
+          value={viewMode} 
+          onValueChange={(v) => v && setViewMode(v as ViewMode)}
+          className="bg-muted/50 p-0.5 rounded-md"
+          data-testid="toggle-view-mode"
+        >
+          <ToggleGroupItem value="quarter" className="text-xs px-3 h-7 data-[state=on]:bg-background">
+            Trimestre
+          </ToggleGroupItem>
+          <ToggleGroupItem value="month" className="text-xs px-3 h-7 data-[state=on]:bg-background">
+            Mês
+          </ToggleGroupItem>
+        </ToggleGroup>
+        
+        {viewMode === "quarter" ? (
+          <Select value={selectedQuarter} onValueChange={(v) => setSelectedQuarter(v as "Q1" | "Q2" | "Q3" | "Q4")}>
+            <SelectTrigger className="w-[150px]" data-testid="filter-dashboard-quarter">
+              <SelectValue placeholder="Trimestre" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
+              <SelectItem value="Q2">Q2 (Abr-Jun)</SelectItem>
+              <SelectItem value="Q3">Q3 (Jul-Set)</SelectItem>
+              <SelectItem value="Q4">Q4 (Out-Dez)</SelectItem>
+            </SelectContent>
+          </Select>
+        ) : (
+          <Select value={selectedMonth} onValueChange={(v) => setSelectedMonth(v as MonthKey)}>
+            <SelectTrigger className="w-[150px]" data-testid="filter-dashboard-month">
+              <SelectValue placeholder="Mês" />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTHS.map(m => (
+                <SelectItem key={m.key} value={m.key}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        
         <span className="text-xs text-muted-foreground">
-          ({getQuarterLabel(selectedQuarter)}) {selectedQuarter === currentQuarter && <Badge variant="outline" className="ml-1 text-[10px]">Atual</Badge>}
+          {viewMode === "quarter" ? (
+            <>
+              ({getQuarterLabel(selectedQuarter)}) 
+              {selectedQuarter === currentQuarter && <Badge variant="outline" className="ml-1 text-[10px]">Atual</Badge>}
+            </>
+          ) : (
+            <>
+              ({selectedMonthData?.label} - {effectiveQuarter})
+              {selectedMonth === getCurrentMonth() && <Badge variant="outline" className="ml-1 text-[10px]">Atual</Badge>}
+            </>
+          )}
         </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <HeroCard
           title="MRR Ativo"
-          value={metrics.mrr_ativo}
+          value={viewMode === "month" 
+            ? getValueFromSeries(series.mrr || metrics.mrr_serie, selectedMonth) ?? metrics.mrr_ativo
+            : metrics.mrr_ativo}
           target={mrrTarget}
           format="currency"
           direction="higher"
           icon={TrendingUp}
-          tooltip={`Meta ${selectedQuarter}: ${mrrTarget ? formatCurrency(mrrTarget) : "—"}`}
-          quarterLabel={selectedQuarter}
+          tooltip={viewMode === "month"
+            ? `${selectedMonthData?.label} (${effectiveQuarter})`
+            : `Meta ${selectedQuarter}: ${mrrTarget ? formatCurrency(mrrTarget) : "—"}`}
+          quarterLabel={viewMode === "month" ? selectedMonthData?.label || selectedMonth : selectedQuarter}
           series={series.mrr || metrics.mrr_serie}
         />
         <HeroCard
           title="EBITDA"
-          value={metrics.ebitda_ytd}
+          value={viewMode === "month"
+            ? getValueFromSeries(series.ebitda, selectedMonth) ?? metrics.ebitda_ytd
+            : metrics.ebitda_ytd}
           target={ebitdaTarget}
           format="currency"
           direction="higher"
           icon={Banknote}
-          tooltip={`Meta ${selectedQuarter}: ${ebitdaTarget ? formatCurrency(ebitdaTarget) : "—"}`}
-          quarterLabel={selectedQuarter}
+          tooltip={viewMode === "month"
+            ? `${selectedMonthData?.label} (${effectiveQuarter})`
+            : `Meta ${selectedQuarter}: ${ebitdaTarget ? formatCurrency(ebitdaTarget) : "—"}`}
+          quarterLabel={viewMode === "month" ? selectedMonthData?.label || selectedMonth : selectedQuarter}
           series={series.ebitda}
         />
         <HeroCard
@@ -1595,8 +1696,10 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           format="currency"
           direction="higher"
           icon={PiggyBank}
-          tooltip={`Meta ${selectedQuarter}: ${cashGenTarget ? formatCurrency(cashGenTarget) : "—"}`}
-          quarterLabel={selectedQuarter}
+          tooltip={viewMode === "month"
+            ? `${selectedMonthData?.label} (${effectiveQuarter})`
+            : `Meta ${selectedQuarter}: ${cashGenTarget ? formatCurrency(cashGenTarget) : "—"}`}
+          quarterLabel={viewMode === "month" ? selectedMonthData?.label || selectedMonth : selectedQuarter}
         />
         <HeroCard
           title="Inadimplência %"
@@ -1605,17 +1708,23 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           format="percent"
           direction="lower"
           icon={CreditCard}
-          tooltip={`Meta ${selectedQuarter}: <= ${inadTarget}%`}
+          tooltip={viewMode === "month"
+            ? `${selectedMonthData?.label} (Meta: ≤${inadTarget}%)`
+            : `Meta ${selectedQuarter}: <= ${inadTarget}%`}
           status={inadStatus}
         />
         <HeroCard
           title="Net Churn %"
-          value={metrics.net_churn_mrr_percentual}
+          value={viewMode === "month"
+            ? getValueFromSeries(series.churn, selectedMonth) ?? metrics.net_churn_mrr_percentual
+            : metrics.net_churn_mrr_percentual}
           target={netChurnTarget}
           format="percent"
           direction="lower"
           icon={TrendingDownIcon}
-          tooltip={`Meta ${selectedQuarter}: <= ${netChurnTarget}%`}
+          tooltip={viewMode === "month"
+            ? `${selectedMonthData?.label} (Meta: ≤${netChurnTarget}%)`
+            : `Meta ${selectedQuarter}: <= ${netChurnTarget}%`}
           status={netChurnStatus}
           series={series.churn}
         />
@@ -1626,7 +1735,9 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           format="percent"
           direction="lower"
           icon={Users}
-          tooltip={`Meta ${selectedQuarter}: <= ${logoChurnTarget}%`}
+          tooltip={viewMode === "month"
+            ? `${selectedMonthData?.label} (Meta: ≤${logoChurnTarget}%)`
+            : `Meta ${selectedQuarter}: <= ${logoChurnTarget}%`}
           status={logoChurnStatus}
         />
       </div>
@@ -1635,29 +1746,29 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
         objectives={objectives}
         krs={krs}
         initiatives={initiatives}
-        currentQuarter={selectedQuarter}
+        currentQuarter={effectiveQuarter}
         onObjectiveClick={onTabChange ? (id) => onTabChange("krs") : undefined}
       />
 
       {computeAlerts.length > 0 && (
-        <AlertsSection alerts={computeAlerts} selectedQuarter={selectedQuarter} />
+        <AlertsSection alerts={computeAlerts} selectedQuarter={effectiveQuarter} />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <PriorityInitiativesSection 
           initiatives={initiatives} 
-          currentQuarter={selectedQuarter}
+          currentQuarter={effectiveQuarter}
           onViewAll={onTabChange ? () => onTabChange("initiatives") : undefined}
         />
         <PendingCheckinsSection 
           krs={krs} 
           latestCheckins={latestCheckins}
-          currentQuarter={selectedQuarter}
+          currentQuarter={effectiveQuarter}
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <TurboOHBlock metrics={metrics} quarter={selectedQuarter} />
+        <TurboOHBlock metrics={metrics} quarter={effectiveQuarter} />
         <HugzBlock metrics={metrics} initiatives={initiatives} />
       </div>
 
