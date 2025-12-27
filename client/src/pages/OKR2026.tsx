@@ -1488,6 +1488,218 @@ function InitiativesTab({
   );
 }
 
+interface BPMetricMonth {
+  month: string;
+  plan: number | null;
+  actual: number | null;
+  variance: number | null;
+  status: "green" | "yellow" | "red" | "gray";
+}
+
+interface BPMetric {
+  metric_key: string;
+  title: string;
+  unit: "BRL" | "COUNT" | "PCT";
+  direction: string;
+  is_derived: boolean;
+  order: number;
+  months: BPMetricMonth[];
+  totals: {
+    plan: number | null;
+    actual: number | null;
+  };
+}
+
+interface BPFinanceiroResponse {
+  year: number;
+  currentMonth: string | null;
+  months: string[];
+  metrics: BPMetric[];
+  meta: {
+    generatedAt: string;
+    totalMetrics: number;
+  };
+}
+
+function BPFinanceiroTab() {
+  const { data, isLoading, error } = useQuery<BPFinanceiroResponse>({
+    queryKey: ["/api/okr2026/bp-financeiro"],
+  });
+
+  const formatValue = (value: number | null, unit: string) => {
+    if (value === null) return "—";
+    if (unit === "PCT") return `${(value * 100).toFixed(1)}%`;
+    if (unit === "COUNT") return formatNumber(value);
+    return formatCurrency(value);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "green": return "bg-green-500/20 text-green-700 dark:text-green-400";
+      case "yellow": return "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400";
+      case "red": return "bg-red-500/20 text-red-700 dark:text-red-400";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const getStatusDot = (status: string) => {
+    switch (status) {
+      case "green": return "bg-green-500";
+      case "yellow": return "bg-yellow-500";
+      case "red": return "bg-red-500";
+      default: return "bg-muted-foreground/40";
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <h3 className="text-lg font-medium mb-2">Erro ao carregar BP Financeiro</h3>
+          <p className="text-muted-foreground">
+            Não foi possível carregar os dados do BP 2026. Verifique se o seed foi executado.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const getMonthLabel = (month: string) => {
+    const monthNum = parseInt(month.split("-")[1]);
+    const labels = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    return labels[monthNum - 1] || month;
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-primary" />
+                BP 2026 — Financeiro
+              </CardTitle>
+              <CardDescription>
+                Plan vs Actual por métrica e mês
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30">
+                <div className="w-2 h-2 rounded-full bg-green-500 mr-1.5" />
+                No alvo
+              </Badge>
+              <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30">
+                <div className="w-2 h-2 rounded-full bg-yellow-500 mr-1.5" />
+                Atenção
+              </Badge>
+              <Badge variant="outline" className="text-xs bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30">
+                <div className="w-2 h-2 rounded-full bg-red-500 mr-1.5" />
+                Fora
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left py-2 px-3 font-medium sticky left-0 bg-muted/50 z-10 min-w-[180px]">Métrica</th>
+                  {data.months.map(m => (
+                    <th key={m} className="text-center py-2 px-2 font-medium min-w-[70px]">
+                      {getMonthLabel(m)}
+                    </th>
+                  ))}
+                  <th className="text-center py-2 px-3 font-medium min-w-[90px] border-l">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.metrics.map((metric) => (
+                  <tr key={metric.metric_key} className="border-b hover:bg-muted/30" data-testid={`row-bp-${metric.metric_key}`}>
+                    <td className="py-2 px-3 sticky left-0 bg-background z-10">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1.5 cursor-help">
+                            <span className="font-medium truncate max-w-[150px]">{metric.title}</span>
+                            {metric.is_derived && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">calc</Badge>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div>
+                            <div className="font-medium">{metric.title}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {metric.metric_key} | {metric.unit} | {metric.direction === "up" ? "Maior melhor" : metric.direction === "down" ? "Menor melhor" : "Estável"}
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </td>
+                    {metric.months.map((m) => (
+                      <td key={m.month} className="py-1 px-1 text-center">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className={`flex flex-col items-center justify-center rounded px-1 py-0.5 ${getStatusColor(m.status)}`}>
+                              <div className="text-[11px] font-medium">
+                                {m.actual !== null ? formatValue(m.actual, metric.unit) : "—"}
+                              </div>
+                              <div className="text-[9px] opacity-70">
+                                {m.plan !== null ? formatValue(m.plan, metric.unit) : "—"}
+                              </div>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="space-y-1">
+                              <div className="font-medium">{metric.title} - {getMonthLabel(m.month)}</div>
+                              <div className="text-xs">Plan: {formatValue(m.plan, metric.unit)}</div>
+                              <div className="text-xs">Actual: {m.actual !== null ? formatValue(m.actual, metric.unit) : "Sem dados"}</div>
+                              {m.variance !== null && (
+                                <div className={`text-xs ${m.variance >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                  Variância: {m.variance >= 0 ? "+" : ""}{m.variance.toFixed(1)}%
+                                </div>
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </td>
+                    ))}
+                    <td className="py-1 px-2 text-center border-l">
+                      <div className="flex flex-col items-center">
+                        <div className="text-xs font-medium">
+                          {metric.totals.actual !== null ? formatValue(metric.totals.actual, metric.unit) : "—"}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          / {metric.totals.plan !== null ? formatValue(metric.totals.plan, metric.unit) : "—"}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="text-xs text-muted-foreground text-center">
+        Atualizado em: {new Date(data.meta.generatedAt).toLocaleString("pt-BR")} | {data.meta.totalMetrics} métricas
+      </div>
+    </div>
+  );
+}
+
 const PERIODS = ["YTD", "Q1", "Q2", "Q3", "Q4"];
 const BUSINESS_UNITS = [
   { id: "all", label: "Todas" },
@@ -1551,6 +1763,8 @@ export default function OKR2026() {
         return <KRsTab data={data} />;
       case "initiatives":
         return <InitiativesTab data={data} collaborators={collaborators} />;
+      case "bp-financeiro":
+        return <BPFinanceiroTab />;
       default:
         return <DashboardTab data={data} />;
     }
@@ -1597,7 +1811,7 @@ export default function OKR2026() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsList className="grid w-full max-w-lg grid-cols-4">
             <TabsTrigger value="dashboard" data-testid="tab-dashboard">
               Dashboard
             </TabsTrigger>
@@ -1606,6 +1820,9 @@ export default function OKR2026() {
             </TabsTrigger>
             <TabsTrigger value="initiatives" data-testid="tab-initiatives">
               Iniciativas
+            </TabsTrigger>
+            <TabsTrigger value="bp-financeiro" data-testid="tab-bp-financeiro">
+              BP Financeiro
             </TabsTrigger>
           </TabsList>
 
