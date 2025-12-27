@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Cake, Briefcase, TrendingUp, Clock, Users, Loader2, ArrowUpDown, ArrowUp, ArrowDown, Heart, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Cake, Briefcase, TrendingUp, Clock, Users, Loader2, ArrowUpDown, ArrowUp, ArrowDown, Heart, AlertTriangle, BarChart3, DollarSign } from "lucide-react";
 import { Link } from "wouter";
 import { formatDecimal } from "@/lib/utils";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 type SortDirection = "asc" | "desc";
 type PromocaoSortColumn = "nome" | "cargo" | "squad" | "ultimoAumento" | "mesesDesdeAumento";
@@ -80,6 +81,20 @@ interface DashboardAnaliseData {
   ultimasPromocoes: UltimaPromocao[];
   tempoMedioPromocao: TempoMedioPromocao;
   tempoPermanencia: TempoPermanencia;
+}
+
+interface AnaliseGeralData {
+  healthDistribution: { saudavel: number; atencao: number; critico: number };
+  headcountBySquad: Record<string, number>;
+  nivelDistribution: Record<string, number>;
+  salarioByTempo: Record<string, { total: number; count: number; avg: number }>;
+  salarioBySquad: Record<string, { total: number; count: number; avg: number }>;
+  tempoBySquad: Record<string, { total: number; count: number; avg: number }>;
+  estatisticas: {
+    totalColaboradores: number;
+    salarioMedio: number;
+    tempoMedioMeses: number;
+  };
 }
 
 function formatDate(date: string | null | undefined) {
@@ -186,6 +201,10 @@ export default function ColaboradoresAnalise() {
 
   const { data: healthData = [], isLoading: isLoadingHealth } = useQuery<ColaboradorSaude[]>({
     queryKey: ["/api/colaboradores/saude"],
+  });
+
+  const { data: analiseGeral, isLoading: isLoadingAnaliseGeral } = useQuery<AnaliseGeralData>({
+    queryKey: ["/api/colaboradores/analise-geral"],
   });
 
   const [sortColumn, setSortColumn] = useState<PromocaoSortColumn>("mesesDesdeAumento");
@@ -620,6 +639,229 @@ export default function ColaboradoresAnalise() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Análises e Métricas */}
+          <Card data-testid="card-analises-metricas">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Análises e Métricas
+              </CardTitle>
+              <CardDescription>
+                Visão geral de indicadores e distribuições do time
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingAnaliseGeral ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : analiseGeral ? (
+                <div className="space-y-6">
+                  {/* KPI Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card data-testid="kpi-total-colaboradores">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                            <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Total Colaboradores</p>
+                            <p className="text-2xl font-bold" data-testid="value-total-colaboradores">{analiseGeral.estatisticas.totalColaboradores}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card data-testid="kpi-salario-medio">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                            <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Salário Médio</p>
+                            <p className="text-2xl font-bold" data-testid="value-salario-medio">
+                              R$ {formatDecimal(analiseGeral.estatisticas.salarioMedio, 2).replace('.', ',')}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card data-testid="kpi-tempo-medio">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                            <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Tempo Médio</p>
+                            <p className="text-2xl font-bold" data-testid="value-tempo-medio">{formatDecimal(analiseGeral.estatisticas.tempoMedioMeses, 1)} meses</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* 2x2 Chart Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Health Distribution Pie Chart */}
+                    <Card data-testid="chart-health-distribution">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Distribuição de Saúde</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-[250px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={[
+                                  { name: 'Saudável', value: analiseGeral.healthDistribution.saudavel, color: '#22c55e' },
+                                  { name: 'Atenção', value: analiseGeral.healthDistribution.atencao, color: '#eab308' },
+                                  { name: 'Crítico', value: analiseGeral.healthDistribution.critico, color: '#ef4444' },
+                                ]}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={50}
+                                outerRadius={80}
+                                paddingAngle={2}
+                                dataKey="value"
+                                label={({ name, value }) => `${name}: ${value}`}
+                                labelLine={false}
+                              >
+                                <Cell fill="#22c55e" />
+                                <Cell fill="#eab308" />
+                                <Cell fill="#ef4444" />
+                              </Pie>
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: 'hsl(var(--card))', 
+                                  border: '1px solid hsl(var(--border))',
+                                  borderRadius: '6px',
+                                  color: 'hsl(var(--foreground))'
+                                }} 
+                              />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Headcount by Squad Bar Chart */}
+                    <Card data-testid="chart-headcount-squad">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Headcount por Squad</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-[250px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={Object.entries(analiseGeral.headcountBySquad).map(([squad, count]) => ({
+                                squad: squad.length > 12 ? squad.slice(0, 12) + '...' : squad,
+                                count,
+                              }))}
+                              layout="vertical"
+                              margin={{ left: 80, right: 20 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" />
+                              <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))' }} fontSize={12} />
+                              <YAxis dataKey="squad" type="category" tick={{ fill: 'hsl(var(--muted-foreground))' }} fontSize={11} width={80} />
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: 'hsl(var(--card))', 
+                                  border: '1px solid hsl(var(--border))',
+                                  borderRadius: '6px',
+                                  color: 'hsl(var(--foreground))'
+                                }} 
+                              />
+                              <Bar dataKey="count" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name="Colaboradores" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Salary by Tenure Bar Chart */}
+                    <Card data-testid="chart-salary-tenure">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Salário Médio por Tempo de Empresa</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-[250px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={Object.entries(analiseGeral.salarioByTempo).map(([tempo, data]) => ({
+                                tempo,
+                                avg: data.avg,
+                              }))}
+                              margin={{ left: 20, right: 20 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" />
+                              <XAxis dataKey="tempo" tick={{ fill: 'hsl(var(--muted-foreground))' }} fontSize={11} />
+                              <YAxis 
+                                tick={{ fill: 'hsl(var(--muted-foreground))' }} 
+                                fontSize={12}
+                                tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`}
+                              />
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: 'hsl(var(--card))', 
+                                  border: '1px solid hsl(var(--border))',
+                                  borderRadius: '6px',
+                                  color: 'hsl(var(--foreground))'
+                                }} 
+                                formatter={(value: number) => [`R$ ${formatDecimal(value, 2).replace('.', ',')}`, 'Salário Médio']}
+                              />
+                              <Bar dataKey="avg" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Salário Médio" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Nivel Distribution Bar Chart */}
+                    <Card data-testid="chart-nivel-distribution">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Distribuição por Nível</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-[250px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={Object.entries(analiseGeral.nivelDistribution).map(([nivel, count]) => ({
+                                nivel: nivel.length > 15 ? nivel.slice(0, 15) + '...' : nivel,
+                                count,
+                              }))}
+                              layout="vertical"
+                              margin={{ left: 100, right: 20 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" />
+                              <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))' }} fontSize={12} />
+                              <YAxis dataKey="nivel" type="category" tick={{ fill: 'hsl(var(--muted-foreground))' }} fontSize={11} width={100} />
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: 'hsl(var(--card))', 
+                                  border: '1px solid hsl(var(--border))',
+                                  borderRadius: '6px',
+                                  color: 'hsl(var(--foreground))'
+                                }} 
+                              />
+                              <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} name="Colaboradores" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  Dados não disponíveis
                 </div>
               )}
             </CardContent>
