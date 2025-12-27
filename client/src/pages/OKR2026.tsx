@@ -763,6 +763,20 @@ function HeroCard({
   );
 }
 
+function ImpactBadge({ type }: { type: "mrr" | "churn" | "caixa" }) {
+  const config = {
+    mrr: { label: "Impacta MRR", className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
+    churn: { label: "Impacta Churn", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30" },
+    caixa: { label: "Impacta Caixa", className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+  };
+  const { label, className } = config[type];
+  return (
+    <Badge variant="outline" className={`text-[9px] ${className}`}>
+      {label}
+    </Badge>
+  );
+}
+
 function TurboOHBlock({ metrics, quarter }: { metrics: DashboardMetrics; quarter: string }) {
   const receitaOH = metrics.turbooh_receita;
   const resultadoOH = metrics.turbooh_resultado;
@@ -773,43 +787,48 @@ function TurboOHBlock({ metrics, quarter }: { metrics: DashboardMetrics; quarter
     : null;
   
   return (
-    <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-      <CardHeader className="pb-3">
+    <Card className="border-primary/20">
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <MonitorPlay className="w-5 h-5 text-primary" />
-            TurboOH
-          </CardTitle>
-          <Badge variant="outline">{quarter}</Badge>
+          <div>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <MonitorPlay className="w-4 h-4 text-primary" />
+              TurboOH
+            </CardTitle>
+            <CardDescription className="text-xs mt-0.5">Segmento Out-of-Home</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <ImpactBadge type="mrr" />
+            <Badge variant="outline" className="text-[10px]">{quarter}</Badge>
+          </div>
         </div>
-        <CardDescription>Performance do segmento Out-of-Home</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-1">
-            <div className="text-sm text-muted-foreground">Receita Líquida OH</div>
-            <div className="text-xl font-bold">
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="p-2 rounded-md bg-muted/30">
+            <div className="text-[10px] text-muted-foreground mb-0.5">Receita</div>
+            <div className="text-lg font-bold">
               {receitaOH !== null ? formatCurrency(receitaOH) : "—"}
             </div>
           </div>
-          <div className="space-y-1">
-            <div className="text-sm text-muted-foreground">Resultado OH</div>
-            <div className="text-xl font-bold">
+          <div className="p-2 rounded-md bg-muted/30">
+            <div className="text-[10px] text-muted-foreground mb-0.5">Resultado</div>
+            <div className="text-lg font-bold">
               {resultadoOH !== null ? formatCurrency(resultadoOH) : "—"}
             </div>
           </div>
-          <div className="space-y-1">
-            <div className="text-sm text-muted-foreground flex items-center gap-1">
-              Vacância %
+          <div className="p-2 rounded-md bg-muted/30">
+            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
+              Vacância
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Info className="w-3 h-3 cursor-help" />
                 </TooltipTrigger>
-                <TooltipContent>Meta: {"<="} 10%</TooltipContent>
+                <TooltipContent>Meta: ≤10%</TooltipContent>
               </Tooltip>
             </div>
             {vacancyPct !== null ? (
-              <div className={`text-xl font-bold ${
+              <div className={`text-lg font-bold ${
                 vacancyStatus === "green" ? "text-green-600 dark:text-green-400" : 
                 vacancyStatus === "yellow" ? "text-yellow-600 dark:text-yellow-400" : 
                 "text-red-600 dark:text-red-400"
@@ -817,9 +836,7 @@ function TurboOHBlock({ metrics, quarter }: { metrics: DashboardMetrics; quarter
                 {formatPercent(vacancyPct)}
               </div>
             ) : (
-              <Badge variant="outline" className="bg-muted text-muted-foreground">
-                Em instrumentação
-              </Badge>
+              <div className="text-sm text-muted-foreground">—</div>
             )}
           </div>
         </div>
@@ -852,30 +869,53 @@ function HugzBlock({
   const churnStatus = churnPct <= 9 ? "green" : churnPct <= 10 ? "yellow" : "red";
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Heart className="w-5 h-5 text-pink-500" />
-          Hugz — Saúde da Receita
-        </CardTitle>
-        <CardDescription>Monitoramento de inadimplência e churn</CardDescription>
+    <Card className="border-pink-500/20">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Heart className="w-4 h-4 text-pink-500" />
+              Hugz — Saúde da Receita
+            </CardTitle>
+            <CardDescription className="text-xs mt-0.5">Inadimplência e churn</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <ImpactBadge type="churn" />
+            <ImpactBadge type="caixa" />
+          </div>
+        </div>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="space-y-1">
-            <div className="text-sm text-muted-foreground">Inadimplência %</div>
-            <div className={`text-xl font-bold ${
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-4 gap-3">
+          <div className="p-2 rounded-md bg-muted/30">
+            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
+              Inadimplência
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-3 h-3 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>Meta: ≤6%</TooltipContent>
+              </Tooltip>
+            </div>
+            <div className={`text-lg font-bold ${
               inadStatus === "green" ? "text-green-600 dark:text-green-400" :
               inadStatus === "yellow" ? "text-yellow-600 dark:text-yellow-400" :
               "text-red-600 dark:text-red-400"
             }`}>
               {formatPercent(metrics.inadimplencia_percentual)}
             </div>
-            <div className="text-xs text-muted-foreground">Meta: {"<="} 6%</div>
           </div>
-          <div className="space-y-1">
-            <div className="text-sm text-muted-foreground">Net Churn %</div>
-            <div className={`text-xl font-bold ${
+          <div className="p-2 rounded-md bg-muted/30">
+            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
+              Net Churn
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-3 h-3 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>Meta: ≤9%</TooltipContent>
+              </Tooltip>
+            </div>
+            <div className={`text-lg font-bold ${
               churnStatus === "green" ? "text-green-600 dark:text-green-400" :
               churnStatus === "yellow" ? "text-yellow-600 dark:text-yellow-400" :
               "text-red-600 dark:text-red-400"
@@ -884,28 +924,30 @@ function HugzBlock({
                 ? formatPercent(metrics.net_churn_mrr_percentual) 
                 : "—"}
             </div>
-            <div className="text-xs text-muted-foreground">Meta: {"<="} 9%</div>
           </div>
-          <div className="space-y-1">
-            <div className="text-sm text-muted-foreground">Logo Churn %</div>
-            <div className="text-xl font-bold">
+          <div className="p-2 rounded-md bg-muted/30">
+            <div className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
+              Logo Churn
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-3 h-3 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>Meta: ≤10%</TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="text-lg font-bold">
               {metrics.logo_churn_percentual !== null 
                 ? formatPercent(metrics.logo_churn_percentual) 
                 : "—"}
             </div>
-            <div className="text-xs text-muted-foreground">Meta: {"<="} 10%</div>
           </div>
-          <div className="space-y-1">
-            <div className="text-sm text-muted-foreground">Iniciativas Hugz</div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">
-                <Rocket className="w-3 h-3 mr-1" />
-                {doingCount} doing
-              </Badge>
+          <div className="p-2 rounded-md bg-muted/30">
+            <div className="text-[10px] text-muted-foreground mb-0.5">Iniciativas</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{doingCount}</span>
               {blockedCount > 0 && (
-                <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30">
-                  <XCircle className="w-3 h-3 mr-1" />
-                  {blockedCount} blocked
+                <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/30 text-[9px] px-1">
+                  {blockedCount}!
                 </Badge>
               )}
             </div>
@@ -1021,6 +1063,130 @@ function StatusBadge({ status }: { status: "green" | "yellow" | "red" | "gray" }
     <Badge variant="outline" className={`${className} text-xs`}>
       {label}
     </Badge>
+  );
+}
+
+type OverallStatus = "on_track" | "attention" | "off_track";
+
+function calculateOverallStatus(krs: KR[]): { status: OverallStatus; onTrackPct: number; details: { green: number; yellow: number; red: number; gray: number } } {
+  const financialMetricKeys = ["mrr_active", "ebitda", "cash_generation", "delinquency_pct", "net_mrr_churn_pct"];
+  
+  let green = 0, yellow = 0, red = 0, gray = 0;
+  let financialWeight = 0, financialOnTrack = 0;
+  
+  krs.forEach(kr => {
+    const isFinancial = financialMetricKeys.includes(kr.metricKey);
+    const weight = isFinancial ? 2 : 1;
+    
+    if (kr.status === "green") {
+      green++;
+      financialWeight += weight;
+      financialOnTrack += weight;
+    } else if (kr.status === "yellow") {
+      yellow++;
+      financialWeight += weight;
+      financialOnTrack += weight * 0.5;
+    } else if (kr.status === "red") {
+      red++;
+      financialWeight += weight;
+    } else {
+      gray++;
+    }
+  });
+  
+  const totalWithStatus = green + yellow + red;
+  const onTrackPct = financialWeight > 0 ? (financialOnTrack / financialWeight) * 100 : 0;
+  
+  let status: OverallStatus = "on_track";
+  if (onTrackPct >= 80) {
+    status = "on_track";
+  } else if (onTrackPct >= 60) {
+    status = "attention";
+  } else {
+    status = "off_track";
+  }
+  
+  return { status, onTrackPct, details: { green, yellow, red, gray } };
+}
+
+function OverallStatusBadge({ status, onTrackPct }: { status: OverallStatus; onTrackPct: number }) {
+  const config = {
+    on_track: { 
+      label: "On Track", 
+      icon: CheckCircle,
+      className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" 
+    },
+    attention: { 
+      label: "Atenção", 
+      icon: AlertTriangle,
+      className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30" 
+    },
+    off_track: { 
+      label: "Fora do Plano", 
+      icon: AlertCircle,
+      className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30" 
+    },
+  };
+  const { label, icon: Icon, className } = config[status];
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="outline" className={`${className} text-xs px-3 py-1 gap-1.5 cursor-help`}>
+          <Icon className="w-3.5 h-3.5" />
+          {label}
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent>
+        <div className="text-xs">
+          <div className="font-medium mb-1">Score: {onTrackPct.toFixed(0)}%</div>
+          <div className="text-muted-foreground">Baseado no desempenho dos KRs com peso maior para métricas financeiras</div>
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function ExecutiveHeader({ 
+  quarter, 
+  krs,
+  viewMode,
+  monthLabel 
+}: { 
+  quarter: string; 
+  krs: KR[];
+  viewMode: "quarter" | "month";
+  monthLabel?: string;
+}) {
+  const { status, onTrackPct, details } = useMemo(() => calculateOverallStatus(krs), [krs]);
+  
+  return (
+    <div className="sticky top-0 z-10 -mx-6 px-6 py-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b mb-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
+            OKR 2026 — Status Executivo
+            <Badge variant="outline" className="text-sm font-normal">
+              {viewMode === "month" ? monthLabel : quarter}
+            </Badge>
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Bigger & Better · Consolidação, Escala e Padronização
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="text-right text-xs text-muted-foreground hidden sm:block">
+            <div className="flex items-center gap-2">
+              <span className="text-green-500">{details.green} no alvo</span>
+              <span className="text-amber-500">{details.yellow} atenção</span>
+              <span className="text-red-500">{details.red} fora</span>
+            </div>
+          </div>
+          <OverallStatusBadge status={status} onTrackPct={onTrackPct} />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1384,14 +1550,28 @@ interface AlertItem {
   severity: "critical" | "warning";
   direction: "higher" | "lower";
   format: "currency" | "percent" | "number";
+  metricKey?: string;
 }
 
-function AlertsSection({ 
+const METRIC_TO_KR: Record<string, string> = {
+  "MRR Ativo": "O1_KR1",
+  "EBITDA": "O2_KR1",
+  "Geração Caixa": "O2_KR2",
+  "Inadimplência %": "O3_KR1",
+  "Net Churn %": "O3_KR2",
+  "Logo Churn %": "O3_KR3",
+};
+
+function RisksActiveSection({ 
   alerts,
-  selectedQuarter 
+  selectedQuarter,
+  initiatives,
+  onViewInitiatives
 }: { 
   alerts: AlertItem[];
   selectedQuarter: string;
+  initiatives: Initiative[];
+  onViewInitiatives?: () => void;
 }) {
   if (alerts.length === 0) {
     return null;
@@ -1404,52 +1584,250 @@ function AlertsSection({
     return formatNumber(value);
   };
 
+  const getRelatedInitiatives = (metricName: string): number => {
+    const krId = METRIC_TO_KR[metricName];
+    if (!krId) return 0;
+    return initiatives.filter(init => 
+      (init.krIds?.includes(krId) || init.krs?.includes(krId)) &&
+      (init.status === "doing" || init.status === "in_progress" || init.status === "blocked")
+    ).length;
+  };
+
+  const getDeviationPct = (alert: AlertItem): string => {
+    if (alert.direction === "higher") {
+      return `-${(100 - alert.percentage).toFixed(0)}%`;
+    } else {
+      const overshoot = alert.currentValue && alert.target 
+        ? (((alert.currentValue - alert.target) / alert.target) * 100).toFixed(0) 
+        : "0";
+      return `+${overshoot}%`;
+    }
+  };
+
   return (
-    <Card data-testid="section-alerts" className="border-amber-500/30">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-500" />
-          Métricas que requerem atenção
-          <Badge variant="outline" className="ml-auto text-[10px]">{alerts.length}</Badge>
-        </CardTitle>
+    <Card data-testid="section-risks" className="border-red-500/20 bg-gradient-to-br from-red-500/5 to-transparent">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-red-500" />
+            Riscos Ativos do {selectedQuarter}
+          </CardTitle>
+          <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30">
+            {alerts.length} métrica{alerts.length > 1 ? "s" : ""} em risco
+          </Badge>
+        </div>
+        <CardDescription>Métricas fora do plano que requerem ação imediata</CardDescription>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="divide-y divide-border">
+        <div className="space-y-3">
           {alerts.map((alert, idx) => {
             const isCritical = alert.severity === "critical";
-            const IconComponent = isCritical ? AlertCircle : AlertTriangle;
-            const textColor = isCritical 
-              ? "text-red-600 dark:text-red-400" 
-              : "text-amber-600 dark:text-amber-400";
-            const bgColor = isCritical 
-              ? "bg-red-500/5" 
-              : "bg-amber-500/5";
+            const relatedCount = getRelatedInitiatives(alert.name);
+            const krId = METRIC_TO_KR[alert.name];
             
             return (
               <div 
                 key={idx}
-                className={`flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-md ${bgColor}`}
-                data-testid={`alert-item-${idx}`}
+                className={`p-4 rounded-lg border ${isCritical ? "border-red-500/30 bg-red-500/5" : "border-amber-500/30 bg-amber-500/5"}`}
+                data-testid={`risk-item-${idx}`}
               >
-                <IconComponent className={`w-4 h-4 flex-shrink-0 ${textColor}`} />
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium">{alert.name}</span>
-                </div>
-                <div className="flex items-center gap-3 text-right">
-                  <div>
-                    <span className={`text-sm font-bold ${textColor}`}>
-                      {formatAlertValue(alert.currentValue, alert.format)}
-                    </span>
-                    <span className="text-xs text-muted-foreground ml-1">
-                      / {formatAlertValue(alert.target, alert.format)}
-                    </span>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge 
+                        variant="outline" 
+                        className={`text-[10px] px-1.5 ${isCritical ? "bg-red-500 text-white border-red-500" : "bg-amber-500 text-white border-amber-500"}`}
+                      >
+                        {isCritical ? "CRÍTICO" : "ATENÇÃO"}
+                      </Badge>
+                      <span className="font-semibold">{alert.name}</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-0.5">Atual</div>
+                        <div className={`font-bold ${isCritical ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`}>
+                          {formatAlertValue(alert.currentValue, alert.format)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-0.5">Meta</div>
+                        <div className="font-medium">{formatAlertValue(alert.target, alert.format)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-0.5">Desvio</div>
+                        <div className={`font-bold ${isCritical ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`}>
+                          {getDeviationPct(alert)}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 mt-3 text-xs">
+                      {krId && (
+                        <span className="text-muted-foreground">
+                          KR: <span className="font-mono text-foreground">{krId}</span>
+                        </span>
+                      )}
+                      <span className="text-muted-foreground">
+                        Iniciativas ativas: <span className="font-semibold text-foreground">{relatedCount}</span>
+                      </span>
+                    </div>
                   </div>
-                  <Badge 
-                    variant="outline" 
-                    className={`text-[10px] ${isCritical ? "border-red-500/30 text-red-600 dark:text-red-400" : "border-amber-500/30 text-amber-600 dark:text-amber-400"}`}
-                  >
-                    {alert.percentage.toFixed(0)}%
-                  </Badge>
+                  
+                  {relatedCount > 0 && onViewInitiatives && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={onViewInitiatives}
+                      className="text-xs flex-shrink-0"
+                    >
+                      Ver iniciativas
+                      <ArrowUpRight className="w-3 h-3 ml-1" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StrategicInitiativesSection({
+  initiatives,
+  krs,
+  currentQuarter,
+  onViewAll
+}: {
+  initiatives: Initiative[];
+  krs: KR[];
+  currentQuarter: "Q1" | "Q2" | "Q3" | "Q4";
+  onViewAll?: () => void;
+}) {
+  const offTrackKRIds = useMemo(() => {
+    return krs.filter(kr => kr.status === "red" || kr.status === "yellow").map(kr => kr.id);
+  }, [krs]);
+
+  const strategicInitiatives = useMemo(() => {
+    const activeStatuses = ["doing", "in_progress", "blocked"];
+    
+    return initiatives
+      .filter(init => {
+        if (!activeStatuses.includes(init.status)) return false;
+        const linkedKRs = init.krIds || init.krs || [];
+        const linksToOffTrack = linkedKRs.some(krId => offTrackKRIds.includes(krId));
+        return linksToOffTrack || init.status === "blocked";
+      })
+      .slice(0, 5);
+  }, [initiatives, offTrackKRIds]);
+
+  if (strategicInitiatives.length === 0) {
+    return null;
+  }
+
+  const getDaysInProgress = (init: Initiative): number | null => {
+    const startField = init.startedAt || init.start;
+    const startDate = startField ? new Date(startField) : null;
+    if (!startDate || isNaN(startDate.getTime())) return null;
+    const now = new Date();
+    return Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const getSlaStatus = (days: number | null): { color: string; label: string; tooltip: string } => {
+    if (days === null) return { 
+      color: "text-muted-foreground", 
+      label: "N/D", 
+      tooltip: "Sem data de início definida" 
+    };
+    if (days <= 14) return { 
+      color: "text-green-600 dark:text-green-400", 
+      label: `${days}d`, 
+      tooltip: `${days} dias em andamento - dentro do SLA` 
+    };
+    if (days <= 30) return { 
+      color: "text-amber-600 dark:text-amber-400", 
+      label: `${days}d`, 
+      tooltip: `${days} dias em andamento - atenção` 
+    };
+    return { 
+      color: "text-red-600 dark:text-red-400", 
+      label: `${days}d`, 
+      tooltip: `${days} dias em andamento - acima do SLA` 
+    };
+  };
+
+  return (
+    <Card data-testid="section-strategic-initiatives" className="border-primary/20">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Rocket className="w-5 h-5 text-primary" />
+            Iniciativas Estratégicas Ativas
+          </CardTitle>
+          {onViewAll && (
+            <Button variant="ghost" size="sm" onClick={onViewAll} className="text-xs">
+              Ver todas
+              <ArrowUpRight className="w-3 h-3 ml-1" />
+            </Button>
+          )}
+        </div>
+        <CardDescription>Iniciativas ligadas a KRs fora do alvo ({currentQuarter})</CardDescription>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="space-y-2">
+          {strategicInitiatives.map((init, idx) => {
+            const days = getDaysInProgress(init);
+            const sla = getSlaStatus(days);
+            const linkedKRs = init.krIds || init.krs || [];
+            const isBlocked = init.status === "blocked";
+            
+            return (
+              <div 
+                key={init.id}
+                className={`p-3 rounded-lg border transition-colors ${
+                  isBlocked 
+                    ? "border-red-500/30 bg-red-500/5" 
+                    : "border-border bg-muted/30 hover:border-primary/30"
+                }`}
+                data-testid={`strategic-init-${idx}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate mb-1.5">
+                      {init.title || init.name}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <ObjectiveBadge objectiveId={init.objectiveId} />
+                      <InitiativeStatusBadge status={init.status} />
+                      {linkedKRs.slice(0, 2).map(krId => (
+                        <Badge key={krId} variant="outline" className="text-[10px] font-mono">
+                          {krId}
+                        </Badge>
+                      ))}
+                      {linkedKRs.length > 2 && (
+                        <Badge variant="outline" className="text-[10px]">
+                          +{linkedKRs.length - 2}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 flex-shrink-0 text-right">
+                    <div className="text-xs text-muted-foreground">
+                      {init.owner_name || init.ownerRole || "—"}
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="outline" className={`text-[10px] ${sla.color}`}>
+                          <Clock className="w-3 h-3 mr-1" />
+                          {sla.label}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>{sla.tooltip}</TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
               </div>
             );
@@ -1596,29 +1974,36 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
+      <ExecutiveHeader 
+        quarter={effectiveQuarter} 
+        krs={krs} 
+        viewMode={viewMode}
+        monthLabel={selectedMonthData?.label}
+      />
+      
+      <div className="flex flex-wrap items-center gap-3 bg-muted/30 p-3 rounded-lg">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Building className="w-4 h-4" />
-          <span>Visualizar por:</span>
+          <span>Período:</span>
         </div>
         <ToggleGroup 
           type="single" 
           value={viewMode} 
           onValueChange={(v) => v && setViewMode(v as ViewMode)}
-          className="bg-muted/50 p-0.5 rounded-md"
+          className="bg-background/80 p-0.5 rounded-md border"
           data-testid="toggle-view-mode"
         >
-          <ToggleGroupItem value="quarter" className="text-xs px-3 h-7 data-[state=on]:bg-background">
+          <ToggleGroupItem value="quarter" className="text-xs px-3 h-7 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
             Trimestre
           </ToggleGroupItem>
-          <ToggleGroupItem value="month" className="text-xs px-3 h-7 data-[state=on]:bg-background">
+          <ToggleGroupItem value="month" className="text-xs px-3 h-7 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
             Mês
           </ToggleGroupItem>
         </ToggleGroup>
         
         {viewMode === "quarter" ? (
           <Select value={selectedQuarter} onValueChange={(v) => setSelectedQuarter(v as "Q1" | "Q2" | "Q3" | "Q4")}>
-            <SelectTrigger className="w-[150px]" data-testid="filter-dashboard-quarter">
+            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="filter-dashboard-quarter">
               <SelectValue placeholder="Trimestre" />
             </SelectTrigger>
             <SelectContent>
@@ -1630,7 +2015,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           </Select>
         ) : (
           <Select value={selectedMonth} onValueChange={(v) => setSelectedMonth(v as MonthKey)}>
-            <SelectTrigger className="w-[150px]" data-testid="filter-dashboard-month">
+            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="filter-dashboard-month">
               <SelectValue placeholder="Mês" />
             </SelectTrigger>
             <SelectContent>
@@ -1643,19 +2028,9 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           </Select>
         )}
         
-        <span className="text-xs text-muted-foreground">
-          {viewMode === "quarter" ? (
-            <>
-              ({getQuarterLabel(selectedQuarter)}) 
-              {selectedQuarter === currentQuarter && <Badge variant="outline" className="ml-1 text-[10px]">Atual</Badge>}
-            </>
-          ) : (
-            <>
-              ({selectedMonthData?.label} - {effectiveQuarter})
-              {selectedMonth === getCurrentMonth() && <Badge variant="outline" className="ml-1 text-[10px]">Atual</Badge>}
-            </>
-          )}
-        </span>
+        {(viewMode === "quarter" ? selectedQuarter === currentQuarter : selectedMonth === getCurrentMonth()) && (
+          <Badge className="bg-primary/10 text-primary border-primary/30 text-[10px]">Atual</Badge>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -1750,20 +2125,20 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
         onObjectiveClick={onTabChange ? (id) => onTabChange("krs") : undefined}
       />
 
-      {computeAlerts.length > 0 && (
-        <AlertsSection alerts={computeAlerts} selectedQuarter={effectiveQuarter} />
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <PriorityInitiativesSection 
-          initiatives={initiatives} 
+        {computeAlerts.length > 0 && (
+          <RisksActiveSection 
+            alerts={computeAlerts} 
+            selectedQuarter={effectiveQuarter}
+            initiatives={initiatives}
+            onViewInitiatives={onTabChange ? () => onTabChange("initiatives") : undefined}
+          />
+        )}
+        <StrategicInitiativesSection
+          initiatives={initiatives}
+          krs={krs}
           currentQuarter={effectiveQuarter}
           onViewAll={onTabChange ? () => onTabChange("initiatives") : undefined}
-        />
-        <PendingCheckinsSection 
-          krs={krs} 
-          latestCheckins={latestCheckins}
-          currentQuarter={effectiveQuarter}
         />
       </div>
 
@@ -1772,38 +2147,13 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
         <HugzBlock metrics={metrics} initiatives={initiatives} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <MRRChart data={series.mrr || metrics.mrr_serie || []} />
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-primary" />
-              Resumo Operacional
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1 p-3 rounded-lg bg-muted/50">
-                <div className="text-xs text-muted-foreground">Clientes Ativos</div>
-                <div className="text-xl font-bold">{formatNumber(metrics.clientes_ativos)}</div>
-              </div>
-              <div className="space-y-1 p-3 rounded-lg bg-muted/50">
-                <div className="text-xs text-muted-foreground">Headcount</div>
-                <div className="text-xl font-bold">{formatNumber(metrics.headcount)}</div>
-              </div>
-              <div className="space-y-1 p-3 rounded-lg bg-muted/50">
-                <div className="text-xs text-muted-foreground">Receita/Head</div>
-                <div className="text-xl font-bold">{formatCurrency(metrics.receita_por_head)}</div>
-              </div>
-              <div className="space-y-1 p-3 rounded-lg bg-muted/50">
-                <div className="text-xs text-muted-foreground">MRR/Head</div>
-                <div className="text-xl font-bold">{formatCurrency(metrics.mrr_por_head)}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <PendingCheckinsSection 
+        krs={krs} 
+        latestCheckins={latestCheckins}
+        currentQuarter={effectiveQuarter}
+      />
+
+      <MRRChart data={series.mrr || metrics.mrr_serie || []} />
     </div>
   );
 }
