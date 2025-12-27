@@ -624,6 +624,349 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // ============ Timeline Unificada do Colaborador ============
+  app.get("/api/colaboradores/:id/timeline", async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.id);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "Invalid colaborador ID" });
+      }
+
+      // Buscar todos os eventos em paralelo
+      const [enpsResult, oneOnOneResult, pdiResult, pdiCheckpointsResult, promocoesResult, healthResult] = await Promise.all([
+        // E-NPS responses
+        db.execute(sql`
+          SELECT id, score, comentario, data, created_at
+          FROM rh_enps
+          WHERE colaborador_id = ${colaboradorId}
+          ORDER BY data DESC
+        `),
+        // 1x1 meetings
+        db.execute(sql`
+          SELECT id, data, pauta, notas, created_at
+          FROM rh_one_on_one
+          WHERE colaborador_id = ${colaboradorId}
+          ORDER BY data DESC
+        `),
+        // PDI goals
+        db.execute(sql`
+          SELECT id, titulo, descricao, competencia, status, data_inicio, data_alvo, created_at
+          FROM rh_pdi
+          WHERE colaborador_id = ${colaboradorId}
+          ORDER BY created_at DESC
+        `),
+        // PDI checkpoints (all for this colaborador's PDIs)
+        db.execute(sql`
+          SELECT pc.id, pc.pdi_id, pc.descricao, pc.data_alvo, pc.concluido, pc.concluido_em, p.titulo as pdi_titulo
+          FROM rh_pdi_checkpoints pc
+          JOIN rh_pdi p ON p.id = pc.pdi_id
+          WHERE p.colaborador_id = ${colaboradorId}
+          ORDER BY COALESCE(pc.concluido_em, pc.data_alvo) DESC NULLS LAST
+        `),
+        // Promoções
+        db.execute(sql`
+          SELECT id, cargo_anterior, cargo_novo, nivel_anterior, nivel_novo, salario_anterior, salario_novo, data_promocao, observacao
+          FROM rh_promocoes
+          WHERE colaborador_id = ${colaboradorId}
+          ORDER BY data_promocao DESC
+        `),
+        // Health score changes
+        db.execute(sql`
+          SELECT id, score, categoria, observacao, data, created_at
+          FROM rh_health_scores
+          WHERE colaborador_id = ${colaboradorId}
+          ORDER BY data DESC
+        `)
+      ]);
+
+      // Consolidar todos os eventos em uma timeline única
+      const events: Array<{
+        id: string;
+        type: string;
+        title: string;
+        description: string | null;
+        date: string;
+        metadata: Record<string, any>;
+      }> = [];
+
+      // E-NPS events
+      for (const row of enpsResult.rows as any[]) {
+        const category = row.score >= 9 ? "Promotor" : row.score >= 7 ? "Neutro" : "Detrator";
+        events.push({
+          id: `enps-${row.id}`,
+          type: "enps",
+          title: `E-NPS: Score ${row.score}`,
+          description: row.comentario,
+          date: row.data || row.created_at,
+          metadata: { score: row.score, category }
+        });
+      }
+
+      // 1x1 events
+      for (const row of oneOnOneResult.rows as any[]) {
+        events.push({
+          id: `1x1-${row.id}`,
+          type: "one_on_one",
+          title: "Reunião 1x1",
+          description: row.pauta,
+          date: row.data || row.created_at,
+          metadata: { notas: row.notas }
+        });
+      }
+
+      // PDI events (creation)
+      for (const row of pdiResult.rows as any[]) {
+        events.push({
+          id: `pdi-${row.id}`,
+          type: "pdi",
+          title: `PDI: ${row.titulo}`,
+          description: row.descricao,
+          date: row.created_at || row.data_inicio,
+          metadata: { 
+            status: row.status, 
+            competencia: row.competencia,
+            dataAlvo: row.data_alvo
+          }
+        });
+      }
+
+      // PDI checkpoint completions
+      for (const row of pdiCheckpointsResult.rows as any[]) {
+        if (row.concluido === 'true' && row.concluido_em) {
+          events.push({
+            id: `pdi-checkpoint-${row.id}`,
+            type: "pdi_checkpoint",
+            title: `Checkpoint concluído: ${row.descricao}`,
+            description: `PDI: ${row.pdi_titulo}`,
+            date: row.concluido_em,
+            metadata: { pdiId: row.pdi_id }
+          });
+        }
+      }
+
+      // Promoções events
+      for (const row of promocoesResult.rows as any[]) {
+        const changes: string[] = [];
+        if (row.cargo_anterior && row.cargo_novo && row.cargo_anterior !== row.cargo_novo) {
+          changes.push(`Cargo: ${row.cargo_anterior} → ${row.cargo_novo}`);
+        }
+        if (row.nivel_anterior && row.nivel_novo && row.nivel_anterior !== row.nivel_novo) {
+          changes.push(`Nível: ${row.nivel_anterior} → ${row.nivel_novo}`);
+        }
+        if (row.salario_anterior && row.salario_novo && row.salario_anterior !== row.salario_novo) {
+          const salarioAnterior = parseFloat(row.salario_anterior).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          const salarioNovo = parseFloat(row.salario_novo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          changes.push(`Salário: ${salarioAnterior} → ${salarioNovo}`);
+        }
+        events.push({
+          id: `promocao-${row.id}`,
+          type: "promocao",
+          title: "Promoção/Movimentação",
+          description: changes.join(" | ") || row.observacao,
+          date: row.data_promocao,
+          metadata: { 
+            cargoAnterior: row.cargo_anterior,
+            cargoNovo: row.cargo_novo,
+            nivelAnterior: row.nivel_anterior,
+            nivelNovo: row.nivel_novo,
+            salarioAnterior: row.salario_anterior,
+            salarioNovo: row.salario_novo,
+            observacao: row.observacao
+          }
+        });
+      }
+
+      // Health score events
+      for (const row of healthResult.rows as any[]) {
+        events.push({
+          id: `health-${row.id}`,
+          type: "health",
+          title: `Health Score: ${row.score}`,
+          description: row.observacao,
+          date: row.data || row.created_at,
+          metadata: { score: row.score, categoria: row.categoria }
+        });
+      }
+
+      // Ordenar por data (mais recente primeiro)
+      events.sort((a, b) => {
+        const dateA = new Date(a.date || 0).getTime();
+        const dateB = new Date(b.date || 0).getTime();
+        return dateB - dateA;
+      });
+
+      res.json(events);
+    } catch (error) {
+      console.error("[api] Error fetching colaborador timeline:", error);
+      res.status(500).json({ error: "Failed to fetch timeline" });
+    }
+  });
+
+  // ============ Pesquisas G&G - Dashboard Consolidado ============
+  app.get("/api/rh/pesquisas/dashboard", async (req, res) => {
+    try {
+      // Métricas de E-NPS
+      const enpsResult = await db.execute(sql`
+        SELECT 
+          AVG(e.score) as "mediaGeral",
+          COUNT(*) FILTER (WHERE e.score >= 9) as "promotores",
+          COUNT(*) FILTER (WHERE e.score >= 7 AND e.score < 9) as "neutros",
+          COUNT(*) FILTER (WHERE e.score < 7) as "detratores",
+          COUNT(*) as "totalRespostas"
+        FROM rh_enps e
+        JOIN rh_pessoal c ON e.colaborador_id = c.id
+        WHERE c.status = 'Ativo'
+      `);
+      const enpsData = enpsResult.rows[0] as any;
+      const totalEnps = parseInt(enpsData.totalRespostas) || 0;
+      const promotores = parseInt(enpsData.promotores) || 0;
+      const detratores = parseInt(enpsData.detratores) || 0;
+      const enpsScore = totalEnps > 0 ? Math.round(((promotores - detratores) / totalEnps) * 100) : 0;
+
+      // Métricas de 1x1
+      const oneOnOneResult = await db.execute(sql`
+        SELECT 
+          c.id as "colaboradorId",
+          c.nome,
+          c.squad,
+          MAX(o.data) as "ultimaReuniao",
+          COUNT(o.id) as "totalReunioes"
+        FROM rh_pessoal c
+        LEFT JOIN rh_one_on_one o ON c.id = o.colaborador_id
+        WHERE c.status = 'Ativo'
+        GROUP BY c.id, c.nome, c.squad
+      `);
+
+      const oneOnOneData = (oneOnOneResult.rows as any[]).map(row => {
+        const ultimaReuniao = row.ultimaReuniao ? new Date(row.ultimaReuniao) : null;
+        const diasSemReuniao = ultimaReuniao 
+          ? Math.floor((new Date().getTime() - ultimaReuniao.getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+        return {
+          colaboradorId: row.colaboradorId,
+          nome: row.nome,
+          squad: row.squad,
+          ultimaReuniao: row.ultimaReuniao,
+          totalReunioes: parseInt(row.totalReunioes) || 0,
+          diasSemReuniao,
+          status: diasSemReuniao === null ? "nunca" : diasSemReuniao > 30 ? "atrasado" : diasSemReuniao > 14 ? "atencao" : "ok"
+        };
+      });
+
+      const oneOnOneStats = {
+        ok: oneOnOneData.filter(d => d.status === "ok").length,
+        atencao: oneOnOneData.filter(d => d.status === "atencao").length,
+        atrasado: oneOnOneData.filter(d => d.status === "atrasado").length,
+        nunca: oneOnOneData.filter(d => d.status === "nunca").length
+      };
+
+      // Métricas de PDI
+      const pdiResult = await db.execute(sql`
+        SELECT 
+          c.id as "colaboradorId",
+          c.nome,
+          c.squad,
+          COUNT(p.id) FILTER (WHERE p.status = 'em_andamento') as "pdiAtivos",
+          COUNT(p.id) FILTER (WHERE p.status = 'concluido') as "pdiConcluidos",
+          AVG(p.progresso) FILTER (WHERE p.status = 'em_andamento') as "progressoMedio"
+        FROM rh_pessoal c
+        LEFT JOIN rh_pdi p ON c.id = p.colaborador_id
+        WHERE c.status = 'Ativo'
+        GROUP BY c.id, c.nome, c.squad
+      `);
+
+      const pdiData = (pdiResult.rows as any[]).map(row => ({
+        colaboradorId: row.colaboradorId,
+        nome: row.nome,
+        squad: row.squad,
+        pdiAtivos: parseInt(row.pdiAtivos) || 0,
+        pdiConcluidos: parseInt(row.pdiConcluidos) || 0,
+        progressoMedio: Math.round(parseFloat(row.progressoMedio) || 0)
+      }));
+
+      const pdiStats = {
+        comPdiAtivo: pdiData.filter(d => d.pdiAtivos > 0).length,
+        semPdi: pdiData.filter(d => d.pdiAtivos === 0 && d.pdiConcluidos === 0).length,
+        totalPdisAtivos: pdiData.reduce((sum, d) => sum + d.pdiAtivos, 0),
+        progressoMedioGeral: Math.round(pdiData.filter(d => d.pdiAtivos > 0).reduce((sum, d) => sum + d.progressoMedio, 0) / Math.max(1, pdiData.filter(d => d.pdiAtivos > 0).length))
+      };
+
+      // Últimos E-NPS (para tabela)
+      const recentEnpsResult = await db.execute(sql`
+        SELECT 
+          e.id,
+          e.score,
+          e.comentario,
+          e.data,
+          c.id as "colaboradorId",
+          c.nome,
+          c.squad
+        FROM rh_enps e
+        JOIN rh_pessoal c ON e.colaborador_id = c.id
+        WHERE c.status = 'Ativo'
+        ORDER BY e.data DESC
+        LIMIT 20
+      `);
+
+      // Alertas de atenção
+      const alertas = [
+        ...oneOnOneData.filter(d => d.status === "atrasado").slice(0, 5).map(d => ({
+          tipo: "1x1",
+          colaborador: d.nome,
+          colaboradorId: d.colaboradorId,
+          mensagem: `${d.diasSemReuniao} dias sem 1x1`,
+          urgencia: "alta" as const
+        })),
+        ...oneOnOneData.filter(d => d.status === "nunca").slice(0, 3).map(d => ({
+          tipo: "1x1",
+          colaborador: d.nome,
+          colaboradorId: d.colaboradorId,
+          mensagem: "Nunca teve 1x1",
+          urgencia: "alta" as const
+        })),
+        ...pdiData.filter(d => d.pdiAtivos === 0).slice(0, 5).map(d => ({
+          tipo: "PDI",
+          colaborador: d.nome,
+          colaboradorId: d.colaboradorId,
+          mensagem: "Sem PDI ativo",
+          urgencia: "media" as const
+        }))
+      ];
+
+      res.json({
+        enps: {
+          score: enpsScore,
+          mediaGeral: Math.round(parseFloat(enpsData.mediaGeral) * 10) / 10 || 0,
+          promotores,
+          neutros: parseInt(enpsData.neutros) || 0,
+          detratores,
+          totalRespostas: totalEnps
+        },
+        oneOnOne: {
+          stats: oneOnOneStats,
+          colaboradores: oneOnOneData
+        },
+        pdi: {
+          stats: pdiStats,
+          colaboradores: pdiData
+        },
+        recentEnps: recentEnpsResult.rows.map((r: any) => ({
+          id: r.id,
+          score: r.score,
+          comentario: r.comentario,
+          data: r.data,
+          colaboradorId: r.colaboradorId,
+          nome: r.nome,
+          squad: r.squad
+        })),
+        alertas
+      });
+    } catch (error) {
+      console.error("[api] Error fetching pesquisas dashboard:", error);
+      res.status(500).json({ error: "Failed to fetch pesquisas dashboard" });
+    }
+  });
+
   // ============ Onboarding Metricas Endpoint ============
   app.get("/api/rh/onboarding/metricas", async (req, res) => {
     try {
