@@ -67,6 +67,7 @@ const AdminDesignSystem = lazy(() => import("@/pages/AdminDesignSystem"));
 const Calendario = lazy(() => import("@/pages/Calendario"));
 const OnboardingRH = lazy(() => import("@/pages/OnboardingRH"));
 const MeuPerfil = lazy(() => import("@/pages/MeuPerfil"));
+const Avisos = lazy(() => import("@/pages/Avisos"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -217,6 +218,9 @@ function ProtectedRouter() {
       
       {/* Meu Perfil */}
       <Route path="/meu-perfil">{() => <ProtectedRoute path="/meu-perfil" component={MeuPerfil} />}</Route>
+      
+      {/* Avisos/Notificações */}
+      <Route path="/avisos">{() => <ProtectedRoute path="/avisos" component={Avisos} />}</Route>
       
       {/* Admin */}
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
