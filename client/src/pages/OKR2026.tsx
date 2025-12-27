@@ -1533,41 +1533,47 @@ function BPFinanceiroTab() {
     return formatCurrency(value);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBg = (status: string) => {
     switch (status) {
-      case "green": return "bg-green-500/20 text-green-700 dark:text-green-400";
-      case "yellow": return "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400";
-      case "red": return "bg-red-500/20 text-red-700 dark:text-red-400";
-      default: return "bg-muted text-muted-foreground";
+      case "green": return "bg-emerald-50 dark:bg-emerald-950/40";
+      case "yellow": return "bg-amber-50 dark:bg-amber-950/40";
+      case "red": return "bg-rose-50 dark:bg-rose-950/40";
+      default: return "bg-muted/30";
     }
   };
 
-  const getStatusDot = (status: string) => {
+  const getStatusText = (status: string) => {
     switch (status) {
-      case "green": return "bg-green-500";
-      case "yellow": return "bg-yellow-500";
-      case "red": return "bg-red-500";
-      default: return "bg-muted-foreground/40";
+      case "green": return "text-emerald-700 dark:text-emerald-400";
+      case "yellow": return "text-amber-700 dark:text-amber-400";
+      case "red": return "text-rose-700 dark:text-rose-400";
+      default: return "text-muted-foreground";
     }
   };
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-96 w-full" />
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-[500px] rounded-xl" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
-          <h3 className="text-lg font-medium mb-2">Erro ao carregar BP Financeiro</h3>
-          <p className="text-muted-foreground">
-            Não foi possível carregar os dados do BP 2026. Verifique se o seed foi executado.
+      <Card className="border-destructive/50 bg-destructive/5">
+        <CardContent className="py-16 text-center">
+          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="w-8 h-8 text-destructive" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Erro ao carregar BP Financeiro</h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Não foi possível carregar os dados do Business Plan 2026. Verifique sua conexão e tente novamente.
           </p>
         </CardContent>
       </Card>
@@ -1580,94 +1586,170 @@ function BPFinanceiroTab() {
     return labels[monthNum - 1] || month;
   };
 
+  const keyMetrics = data.metrics.filter(m => 
+    ["receita_liquida", "ebitda", "margem_bruta", "mrr_ativo"].includes(m.metric_key)
+  );
+
+  const getMetricIcon = (key: string) => {
+    switch (key) {
+      case "mrr_ativo": return <TrendingUp className="w-5 h-5" />;
+      case "receita_liquida": return <Banknote className="w-5 h-5" />;
+      case "ebitda": return <PiggyBank className="w-5 h-5" />;
+      case "margem_bruta": return <TrendingUp className="w-5 h-5" />;
+      default: return <DollarSign className="w-5 h-5" />;
+    }
+  };
+
+  const calculateProgress = (actual: number | null, plan: number | null) => {
+    if (actual === null || plan === null || plan === 0) return null;
+    return Math.round((actual / plan) * 100);
+  };
+
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg flex items-center gap-2">
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {keyMetrics.map((metric) => {
+          const progress = calculateProgress(metric.totals.actual, metric.totals.plan);
+          const isOnTrack = progress !== null && progress >= 90;
+          return (
+            <Card key={metric.metric_key} className="overflow-hidden border-0 shadow-md bg-gradient-to-br from-card to-card/80">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className={`p-2.5 rounded-xl ${isOnTrack ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400'}`}>
+                    {getMetricIcon(metric.metric_key)}
+                  </div>
+                  {progress !== null && (
+                    <Badge variant="outline" className={`text-xs font-medium ${isOnTrack ? 'border-emerald-300 text-emerald-600 dark:text-emerald-400' : 'border-amber-300 text-amber-600 dark:text-amber-400'}`}>
+                      {progress}%
+                    </Badge>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground font-medium">{metric.title}</p>
+                  <p className="text-2xl font-bold tracking-tight">
+                    {formatValue(metric.totals.actual, metric.unit)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Meta: {formatValue(metric.totals.plan, metric.unit)}
+                  </p>
+                </div>
+                {progress !== null && (
+                  <Progress value={Math.min(progress, 100)} className="h-1.5 mt-3" />
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Card className="border-0 shadow-lg overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-primary/10">
                 <DollarSign className="w-5 h-5 text-primary" />
-                BP 2026 — Financeiro
-              </CardTitle>
-              <CardDescription>
-                Plan vs Actual por métrica e mês
-              </CardDescription>
+              </div>
+              <div>
+                <CardTitle className="text-xl">BP 2026 — Financeiro</CardTitle>
+                <CardDescription className="mt-0.5">
+                  Acompanhamento Plan vs Actual por métrica e mês
+                </CardDescription>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30">
-                <div className="w-2 h-2 rounded-full bg-green-500 mr-1.5" />
-                No alvo
-              </Badge>
-              <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30">
-                <div className="w-2 h-2 rounded-full bg-yellow-500 mr-1.5" />
-                Atenção
-              </Badge>
-              <Badge variant="outline" className="text-xs bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30">
-                <div className="w-2 h-2 rounded-full bg-red-500 mr-1.5" />
-                Fora
-              </Badge>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5 text-xs">
+                <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
+                <span className="text-muted-foreground">No alvo</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs">
+                <div className="w-3 h-3 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50" />
+                <span className="text-muted-foreground">Atenção</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs">
+                <div className="w-3 h-3 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50" />
+                <span className="text-muted-foreground">Fora</span>
+              </div>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full">
               <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-left py-2 px-3 font-medium sticky left-0 bg-muted/50 z-10 min-w-[180px]">Métrica</th>
+                <tr className="bg-muted/30">
+                  <th className="text-left py-3 px-4 font-semibold text-sm sticky left-0 bg-muted/30 backdrop-blur-sm z-10 min-w-[200px] border-r border-border/50">
+                    Métrica
+                  </th>
                   {data.months.map(m => (
-                    <th key={m} className="text-center py-2 px-2 font-medium min-w-[70px]">
+                    <th key={m} className="text-center py-3 px-2 font-semibold text-xs text-muted-foreground uppercase tracking-wider min-w-[80px]">
                       {getMonthLabel(m)}
                     </th>
                   ))}
-                  <th className="text-center py-2 px-3 font-medium min-w-[90px] border-l">Total</th>
+                  <th className="text-center py-3 px-4 font-semibold text-sm min-w-[100px] border-l-2 border-primary/20 bg-primary/5">
+                    YTD
+                  </th>
                 </tr>
               </thead>
-              <tbody>
-                {data.metrics.map((metric) => (
-                  <tr key={metric.metric_key} className="border-b hover:bg-muted/30" data-testid={`row-bp-${metric.metric_key}`}>
-                    <td className="py-2 px-3 sticky left-0 bg-background z-10">
+              <tbody className="divide-y divide-border/50">
+                {data.metrics.map((metric, idx) => (
+                  <tr 
+                    key={metric.metric_key} 
+                    className={`group transition-colors hover:bg-muted/40 ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}
+                    data-testid={`row-bp-${metric.metric_key}`}
+                  >
+                    <td className={`py-3 px-4 sticky left-0 z-10 border-r border-border/50 ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/10'} group-hover:bg-muted/40 transition-colors`}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <div className="flex items-center gap-1.5 cursor-help">
-                            <span className="font-medium truncate max-w-[150px]">{metric.title}</span>
+                          <div className="flex items-center gap-2 cursor-help">
+                            <span className="font-medium text-sm">{metric.title}</span>
                             {metric.is_derived && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">calc</Badge>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal">
+                                calc
+                              </Badge>
                             )}
                           </div>
                         </TooltipTrigger>
-                        <TooltipContent>
-                          <div>
-                            <div className="font-medium">{metric.title}</div>
+                        <TooltipContent side="right" className="max-w-xs">
+                          <div className="space-y-1">
+                            <div className="font-semibold">{metric.title}</div>
                             <div className="text-xs text-muted-foreground">
-                              {metric.metric_key} | {metric.unit} | {metric.direction === "up" ? "Maior melhor" : metric.direction === "down" ? "Menor melhor" : "Estável"}
+                              Chave: {metric.metric_key}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {metric.direction === "up" ? "↑ Maior é melhor" : metric.direction === "down" ? "↓ Menor é melhor" : "→ Estável"}
                             </div>
                           </div>
                         </TooltipContent>
                       </Tooltip>
                     </td>
                     {metric.months.map((m) => (
-                      <td key={m.month} className="py-1 px-1 text-center">
+                      <td key={m.month} className="py-2 px-1 text-center">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className={`flex flex-col items-center justify-center rounded px-1 py-0.5 ${getStatusColor(m.status)}`}>
-                              <div className="text-[11px] font-medium">
+                            <div className={`inline-flex flex-col items-center justify-center rounded-lg px-2 py-1.5 min-w-[60px] transition-colors ${getStatusBg(m.status)} hover:brightness-95 dark:hover:brightness-110`}>
+                              <div className={`text-xs font-semibold ${getStatusText(m.status)}`}>
                                 {m.actual !== null ? formatValue(m.actual, metric.unit) : "—"}
                               </div>
-                              <div className="text-[9px] opacity-70">
+                              <div className="text-[10px] text-muted-foreground/70 mt-0.5">
                                 {m.plan !== null ? formatValue(m.plan, metric.unit) : "—"}
                               </div>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <div className="space-y-1">
-                              <div className="font-medium">{metric.title} - {getMonthLabel(m.month)}</div>
-                              <div className="text-xs">Plan: {formatValue(m.plan, metric.unit)}</div>
-                              <div className="text-xs">Actual: {m.actual !== null ? formatValue(m.actual, metric.unit) : "Sem dados"}</div>
+                            <div className="space-y-2 min-w-[160px]">
+                              <div className="font-semibold border-b pb-1">{metric.title}</div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Meta:</span>
+                                <span className="font-medium">{formatValue(m.plan, metric.unit)}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Realizado:</span>
+                                <span className="font-medium">{m.actual !== null ? formatValue(m.actual, metric.unit) : "Sem dados"}</span>
+                              </div>
                               {m.variance !== null && (
-                                <div className={`text-xs ${m.variance >= 0 ? "text-green-500" : "text-red-500"}`}>
-                                  Variância: {m.variance >= 0 ? "+" : ""}{m.variance.toFixed(1)}%
+                                <div className={`flex items-center justify-between text-xs pt-1 border-t ${m.variance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                                  <span>Variação:</span>
+                                  <span className="font-semibold">{m.variance >= 0 ? "+" : ""}{m.variance.toFixed(1)}%</span>
                                 </div>
                               )}
                             </div>
@@ -1675,12 +1757,12 @@ function BPFinanceiroTab() {
                         </Tooltip>
                       </td>
                     ))}
-                    <td className="py-1 px-2 text-center border-l">
+                    <td className="py-2 px-3 text-center border-l-2 border-primary/20 bg-primary/5">
                       <div className="flex flex-col items-center">
-                        <div className="text-xs font-medium">
+                        <div className="text-sm font-bold text-foreground">
                           {metric.totals.actual !== null ? formatValue(metric.totals.actual, metric.unit) : "—"}
                         </div>
-                        <div className="text-[10px] text-muted-foreground">
+                        <div className="text-[10px] text-muted-foreground font-medium">
                           / {metric.totals.plan !== null ? formatValue(metric.totals.plan, metric.unit) : "—"}
                         </div>
                       </div>
@@ -1693,8 +1775,11 @@ function BPFinanceiroTab() {
         </CardContent>
       </Card>
 
-      <div className="text-xs text-muted-foreground text-center">
-        Atualizado em: {new Date(data.meta.generatedAt).toLocaleString("pt-BR")} | {data.meta.totalMetrics} métricas
+      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+        <Clock className="w-3.5 h-3.5" />
+        Atualizado em {new Date(data.meta.generatedAt).toLocaleString("pt-BR")}
+        <span className="text-border">•</span>
+        {data.meta.totalMetrics} métricas
       </div>
     </div>
   );
@@ -1771,57 +1856,84 @@ export default function OKR2026() {
   };
 
   return (
-    <div className="h-full overflow-auto p-6" data-testid="page-okr-2026">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="text-page-title">
-              <Target className="w-8 h-8 text-primary" />
-              OKR 2026 — Bigger & Better
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Consolidação, Escala e Padronização
-            </p>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger className="w-[120px]" data-testid="select-period">
-                <SelectValue placeholder="Período" />
-              </SelectTrigger>
-              <SelectContent>
-                {PERIODS.map(p => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedBU} onValueChange={setSelectedBU}>
-              <SelectTrigger className="w-[130px]" data-testid="select-bu">
-                <SelectValue placeholder="Unidade" />
-              </SelectTrigger>
-              <SelectContent>
-                {BUSINESS_UNITS.map(bu => (
-                  <SelectItem key={bu.id} value={bu.id}>{bu.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Badge variant="outline" className="text-sm bg-primary/10 text-primary border-primary/30">
-              {currentQuarter} 2026
-            </Badge>
+    <div className="h-full overflow-auto" data-testid="page-okr-2026">
+      <div className="bg-gradient-to-br from-primary/5 via-primary/3 to-transparent border-b">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-2xl bg-primary/10 shadow-lg shadow-primary/5">
+                <Target className="w-10 h-10 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">
+                  OKR 2026
+                </h1>
+                <p className="text-xl text-muted-foreground font-medium mt-0.5">
+                  Bigger & Better
+                </p>
+                <p className="text-sm text-muted-foreground/70 mt-1">
+                  Consolidação, Escala e Padronização
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-[120px] bg-background/80 backdrop-blur-sm" data-testid="select-period">
+                  <SelectValue placeholder="Período" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PERIODS.map(p => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedBU} onValueChange={setSelectedBU}>
+                <SelectTrigger className="w-[130px] bg-background/80 backdrop-blur-sm" data-testid="select-bu">
+                  <SelectValue placeholder="Unidade" />
+                </SelectTrigger>
+                <SelectContent>
+                  {BUSINESS_UNITS.map(bu => (
+                    <SelectItem key={bu.id} value={bu.id}>{bu.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Badge className="text-sm px-4 py-1.5 bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+                {currentQuarter} 2026
+              </Badge>
+            </div>
           </div>
         </div>
+      </div>
 
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-lg grid-cols-4">
-            <TabsTrigger value="dashboard" data-testid="tab-dashboard">
+          <TabsList className="inline-flex h-11 items-center justify-start gap-1 rounded-xl bg-muted/50 p-1 backdrop-blur-sm">
+            <TabsTrigger 
+              value="dashboard" 
+              data-testid="tab-dashboard"
+              className="rounded-lg px-4 py-2 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
               Dashboard
             </TabsTrigger>
-            <TabsTrigger value="krs" data-testid="tab-krs">
+            <TabsTrigger 
+              value="krs" 
+              data-testid="tab-krs"
+              className="rounded-lg px-4 py-2 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
               KRs
             </TabsTrigger>
-            <TabsTrigger value="initiatives" data-testid="tab-initiatives">
+            <TabsTrigger 
+              value="initiatives" 
+              data-testid="tab-initiatives"
+              className="rounded-lg px-4 py-2 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
               Iniciativas
             </TabsTrigger>
-            <TabsTrigger value="bp-financeiro" data-testid="tab-bp-financeiro">
+            <TabsTrigger 
+              value="bp-financeiro" 
+              data-testid="tab-bp-financeiro"
+              className="rounded-lg px-4 py-2 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
               BP Financeiro
             </TabsTrigger>
           </TabsList>
