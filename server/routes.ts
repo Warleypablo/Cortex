@@ -6772,7 +6772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       filtered.forEach(c => {
         const cargoNome = c.cargo || 'Não informado';
-        const salario = c.salario || 0;
+        const salario = parseFloat(String(c.salario || '0')) || 0;
         if (salario > 0) {
           if (!salarioPorCargo[cargoNome]) {
             salarioPorCargo[cargoNome] = { total: 0, sum: 0 };
@@ -6817,7 +6817,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       filtered.forEach(c => {
         const squadNome = c.squad || 'Não informado';
-        const salario = c.salario || 0;
+        const salario = parseFloat(String(c.salario || '0')) || 0;
         if (salario > 0) {
           if (!salarioPorSquad[squadNome]) {
             salarioPorSquad[squadNome] = { total: 0, sum: 0 };
