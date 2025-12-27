@@ -60,11 +60,18 @@ interface ColaboradorSaude {
   nome: string;
   cargo: string | null;
   squad: string | null;
+  nivel: string | null;
   healthScore: number;
-  lastEnpsScore: number | null;
-  daysSinceOneOnOne: number | null;
-  pdiProgress: number | null;
-  pendingActions: number;
+  healthStatus: 'saudavel' | 'atencao' | 'critico';
+  mesesDeTurbo: number;
+  mesesUltAumento: number | null;
+  breakdown: {
+    stability: number;
+    growth: number;
+    development: number;
+    engagement: number;
+  };
+  reasons: string[];
 }
 
 interface DashboardAnaliseData {
@@ -206,17 +213,17 @@ export default function ColaboradoresAnalise() {
   }, [healthData, healthSquadFilter, healthSortOrder]);
 
   const criticalColabs = useMemo(() => 
-    filteredHealthData.filter((c) => c.healthScore < 50).sort((a, b) => a.healthScore - b.healthScore), 
+    filteredHealthData.filter((c) => c.healthStatus === 'critico').sort((a, b) => a.healthScore - b.healthScore), 
   [filteredHealthData]);
 
   const criticalCount = criticalColabs.length;
 
   const healthStats = useMemo(() => ({
     total: filteredHealthData.length,
-    healthy: filteredHealthData.filter((c) => c.healthScore >= 80).length,
-    attention: filteredHealthData.filter((c) => c.healthScore >= 50 && c.healthScore < 80).length,
-    critical: criticalCount,
-  }), [filteredHealthData, criticalCount]);
+    healthy: filteredHealthData.filter((c) => c.healthStatus === 'saudavel').length,
+    attention: filteredHealthData.filter((c) => c.healthStatus === 'atencao').length,
+    critical: filteredHealthData.filter((c) => c.healthStatus === 'critico').length,
+  }), [filteredHealthData]);
 
   const handleSort = (column: PromocaoSortColumn) => {
     if (sortColumn === column) {
@@ -724,21 +731,26 @@ export default function ColaboradoresAnalise() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {filteredHealthData.map((colab) => {
                     const formattedSquad = formatSquadName(colab.squad);
-                    const isCritical = colab.healthScore < 50;
+                    const isCritical = colab.healthStatus === 'critico';
+                    const isAttention = colab.healthStatus === 'atencao';
+                    const statusBadgeClass = isCritical 
+                      ? 'bg-red-500 text-white' 
+                      : isAttention 
+                        ? 'bg-yellow-500 text-white' 
+                        : 'bg-green-500 text-white';
+                    const statusLabel = isCritical ? 'Crítico' : isAttention ? 'Atenção' : 'Saudável';
                     return (
                       <Link key={colab.id} href={`/colaborador/${colab.id}`}>
                         <Card
-                          className={`hover-elevate cursor-pointer transition-all relative ${isCritical ? 'ring-2 ring-red-400 dark:ring-red-600 ring-offset-2 ring-offset-background' : ''}`}
+                          className={`hover-elevate cursor-pointer transition-all relative ${isCritical ? 'ring-2 ring-red-400 dark:ring-red-600 ring-offset-2 ring-offset-background' : isAttention ? 'ring-1 ring-yellow-400 dark:ring-yellow-600' : ''}`}
                           data-testid={`card-health-${colab.id}`}
                         >
-                          {isCritical && (
-                            <Badge 
-                              className="absolute -top-2 -right-2 text-[9px] px-1.5 py-0 bg-red-500 text-white border-0 z-10"
-                              data-testid={`badge-critico-${colab.id}`}
-                            >
-                              Crítico
-                            </Badge>
-                          )}
+                          <Badge 
+                            className={`absolute -top-2 -right-2 text-[9px] px-1.5 py-0 border-0 z-10 ${statusBadgeClass}`}
+                            data-testid={`badge-status-${colab.id}`}
+                          >
+                            {statusLabel}
+                          </Badge>
                           <CardContent className="p-4">
                             <div className="flex items-start gap-3">
                               <Avatar className="h-10 w-10">
@@ -753,13 +765,23 @@ export default function ColaboradoresAnalise() {
                                 <p className="text-xs text-muted-foreground truncate">
                                   {colab.cargo || "-"}
                                 </p>
-                                {formattedSquad !== "-" && squadColors[formattedSquad] && (
-                                  <Badge
-                                    className={`${squadColors[formattedSquad]} mt-1 text-[10px] px-1.5 py-0`}
-                                    variant="outline"
-                                  >
-                                    {formattedSquad}
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {formattedSquad !== "-" && squadColors[formattedSquad] && (
+                                    <Badge
+                                      className={`${squadColors[formattedSquad]} text-[10px] px-1.5 py-0`}
+                                      variant="outline"
+                                    >
+                                      {formattedSquad}
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                    {colab.mesesDeTurbo}m empresa
                                   </Badge>
+                                </div>
+                                {colab.reasons.length > 0 && (
+                                  <p className="text-[10px] text-orange-600 dark:text-orange-400 mt-1 truncate">
+                                    {colab.reasons[0]}
+                                  </p>
                                 )}
                               </div>
                               <HealthGauge score={colab.healthScore} />

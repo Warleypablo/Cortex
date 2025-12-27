@@ -1912,105 +1912,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/colaboradores/saude", async (req, res) => {
     try {
       const colaboradoresResult = await db.execute(sql`
-        SELECT id, nome, cargo, squad
+        SELECT 
+          id, nome, cargo, squad, nivel, status,
+          meses_de_turbo as "mesesDeTurbo",
+          meses_ult_aumento as "mesesUltAumento",
+          ultimo_aumento as "ultimoAumento",
+          admissao
         FROM rh_pessoal
         WHERE status = 'Ativo'
         ORDER BY nome
       `);
       
-      const colaboradores = colaboradoresResult.rows as { id: number; nome: string; cargo: string | null; squad: string | null }[];
+      interface ColabRow {
+        id: number;
+        nome: string;
+        cargo: string | null;
+        squad: string | null;
+        nivel: string | null;
+        status: string | null;
+        mesesDeTurbo: number | null;
+        mesesUltAumento: number | null;
+        ultimoAumento: string | null;
+        admissao: string | null;
+      }
       
-      const healthData = await Promise.all(colaboradores.map(async (colab) => {
-        let enpsScore = 20;
-        let hasEnpsData = false;
-        let lastEnpsScoreValue: number | null = null;
-        try {
-          const enpsResult = await db.execute(sql`
-            SELECT score FROM rh_enps 
-            WHERE colaborador_id = ${colab.id} 
-            ORDER BY data DESC LIMIT 1
-          `);
-          if (enpsResult.rows.length > 0) {
-            hasEnpsData = true;
-            const score = (enpsResult.rows[0] as { score: number }).score;
-            lastEnpsScoreValue = score;
-            if (score >= 9) enpsScore = 30;
-            else if (score >= 7) enpsScore = 20;
-            else if (score >= 5) enpsScore = 10;
-            else enpsScore = 0;
+      const colaboradores = colaboradoresResult.rows as unknown as ColabRow[];
+      
+      const healthData = colaboradores.map((colab) => {
+        const reasons: string[] = [];
+        
+        const mesesTurbo = colab.mesesDeTurbo ?? 0;
+        const mesesUltAumento = colab.mesesUltAumento;
+        
+        let stabilityScore = 0;
+        if (colab.status === 'Ativo') stabilityScore += 15;
+        
+        if (mesesTurbo >= 6 && mesesTurbo <= 36) {
+          stabilityScore += 15;
+        } else if (mesesTurbo >= 3 && mesesTurbo < 6) {
+          stabilityScore += 10;
+          reasons.push('Período de adaptação (< 6 meses)');
+        } else if (mesesTurbo < 3) {
+          stabilityScore += 5;
+          reasons.push('Recém-contratado (< 3 meses)');
+        } else if (mesesTurbo > 36) {
+          stabilityScore += 12;
+        }
+        
+        let growthScore = 0;
+        if (mesesUltAumento !== null) {
+          if (mesesUltAumento <= 12) {
+            growthScore = 25;
+          } else if (mesesUltAumento <= 18) {
+            growthScore = 18;
+          } else if (mesesUltAumento <= 24) {
+            growthScore = 10;
+            reasons.push('Sem aumento há mais de 18 meses');
+          } else {
+            growthScore = 3;
+            reasons.push('Sem aumento há mais de 24 meses');
           }
-        } catch (e) { }
-
-        let oneOnOneScore = 15;
-        let hasOneOnOneData = false;
-        let daysSinceOneOnOneValue: number | null = null;
-        try {
-          const oneOnOneResult = await db.execute(sql`
-            SELECT data FROM rh_one_on_one 
-            WHERE colaborador_id = ${colab.id} 
-            ORDER BY data DESC LIMIT 1
-          `);
-          if (oneOnOneResult.rows.length > 0) {
-            hasOneOnOneData = true;
-            const lastDate = new Date((oneOnOneResult.rows[0] as { data: string }).data);
-            const daysDiff = Math.floor((Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-            daysSinceOneOnOneValue = daysDiff;
-            if (daysDiff <= 14) oneOnOneScore = 25;
-            else if (daysDiff <= 30) oneOnOneScore = 15;
-            else if (daysDiff <= 45) oneOnOneScore = 5;
-            else oneOnOneScore = 0;
+        } else {
+          if (mesesTurbo <= 12) {
+            growthScore = 20;
+          } else {
+            growthScore = 12;
+            reasons.push('Sem registro de último aumento');
           }
-        } catch (e) { }
-
-        let pdiScore = 15;
-        let hasPdiData = false;
-        let pdiProgressValue: number | null = null;
-        try {
-          const pdiResult = await db.execute(sql`
-            SELECT AVG(progresso) as avg_progress FROM rh_pdi 
-            WHERE colaborador_id = ${colab.id}
-          `);
-          if (pdiResult.rows.length > 0 && (pdiResult.rows[0] as any).avg_progress !== null) {
-            hasPdiData = true;
-            const avgProgress = parseFloat((pdiResult.rows[0] as any).avg_progress) || 0;
-            pdiProgressValue = Math.round(avgProgress);
-            pdiScore = Math.round((avgProgress / 100) * 25);
-          }
-        } catch (e) { }
-
-        let pendingActionsScore = 20;
-        let pendingActionsValue = 0;
-        try {
-          const actionsResult = await db.execute(sql`
-            SELECT COUNT(*) as count FROM rh_one_on_one_acoes a
-            JOIN rh_one_on_one o ON a.one_on_one_id = o.id
-            WHERE o.colaborador_id = ${colab.id} AND (a.status IS NULL OR a.status != 'concluida')
-          `);
-          if (actionsResult.rows.length > 0) {
-            const count = parseInt((actionsResult.rows[0] as any).count) || 0;
-            pendingActionsValue = count;
-            if (count === 0) pendingActionsScore = 20;
-            else if (count <= 2) pendingActionsScore = 15;
-            else if (count <= 5) pendingActionsScore = 10;
-            else if (count <= 8) pendingActionsScore = 5;
-            else pendingActionsScore = 0;
-          }
-        } catch (e) { }
-
-        const healthScore = enpsScore + oneOnOneScore + pdiScore + pendingActionsScore;
+        }
+        
+        let developmentScore = 0;
+        const nivel = (colab.nivel || '').toLowerCase();
+        if (nivel.includes('senior') || nivel.includes('sênior') || nivel.includes('lider') || nivel.includes('líder') || nivel.includes('head') || nivel.includes('diretor') || nivel.includes('c-level')) {
+          developmentScore = 25;
+        } else if (nivel.includes('pleno') || nivel.includes('mid')) {
+          developmentScore = 20;
+        } else if (nivel.includes('junior') || nivel.includes('júnior')) {
+          developmentScore = 15;
+        } else if (nivel.includes('estagiário') || nivel.includes('estagiario') || nivel.includes('trainee')) {
+          developmentScore = 12;
+        } else {
+          developmentScore = 18;
+        }
+        
+        let engagementScore = 15;
+        
+        if (mesesTurbo > 48 && (mesesUltAumento === null || mesesUltAumento > 24)) {
+          engagementScore = 8;
+          reasons.push('Colaborador veterano sem reconhecimento recente');
+        } else if (mesesTurbo >= 24 && mesesTurbo <= 48) {
+          engagementScore = 18;
+        } else if (mesesTurbo >= 12 && mesesTurbo < 24) {
+          engagementScore = 20;
+        } else if (mesesTurbo >= 6 && mesesTurbo < 12) {
+          engagementScore = 15;
+        } else {
+          engagementScore = 12;
+        }
+        
+        const healthScore = stabilityScore + growthScore + developmentScore + engagementScore;
+        
+        let healthStatus: 'saudavel' | 'atencao' | 'critico';
+        if (healthScore >= 70) {
+          healthStatus = 'saudavel';
+        } else if (healthScore >= 50) {
+          healthStatus = 'atencao';
+        } else {
+          healthStatus = 'critico';
+        }
 
         return {
           id: colab.id,
           nome: colab.nome,
           cargo: colab.cargo,
           squad: colab.squad,
+          nivel: colab.nivel,
           healthScore,
-          lastEnpsScore: lastEnpsScoreValue,
-          daysSinceOneOnOne: daysSinceOneOnOneValue,
-          pdiProgress: pdiProgressValue,
-          pendingActions: pendingActionsValue,
+          healthStatus,
+          mesesDeTurbo: mesesTurbo,
+          mesesUltAumento: mesesUltAumento,
+          breakdown: {
+            stability: stabilityScore,
+            growth: growthScore,
+            development: developmentScore,
+            engagement: engagementScore,
+          },
+          reasons,
         };
-      }));
+      });
 
       res.json(healthData);
     } catch (error) {
