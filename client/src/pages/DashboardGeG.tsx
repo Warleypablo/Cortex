@@ -190,6 +190,10 @@ interface HeadcountPorTenure {
   ordem: number;
 }
 
+interface SalarioByTempo {
+  [key: string]: { total: number; count: number; avg: number };
+}
+
 const CHART_COLORS = [
   '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', 
   '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#22c55e'
@@ -282,6 +286,11 @@ export default function DashboardGeG() {
 
   const { data: headcountPorTenure, isLoading: isLoadingHeadcountPorTenure } = useQuery<HeadcountPorTenure[]>({
     queryKey: ['/api/geg/headcount-por-tenure', { squad, setor, nivel, cargo }],
+  });
+
+  const { data: salarioByTempo, isLoading: isLoadingSalarioByTempo } = useQuery<{ salarioByTempo: SalarioByTempo }>({
+    queryKey: ['/api/colaboradores/analise-geral'],
+    select: (data: any) => ({ salarioByTempo: data.salarioByTempo }),
   });
 
   const { data: colaboradoresPorSquad, isLoading: isLoadingColaboradoresPorSquad } = useQuery<Distribuicao[]>({
@@ -1383,6 +1392,54 @@ export default function DashboardGeG() {
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-demissoes-tipo">
+                  <p className="text-muted-foreground">Nenhum dado disponível</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Salário Médio por Tempo de Empresa */}
+          <Card data-testid="card-salario-tempo-empresa">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-blue-500" />
+                <CardTitle>Salário Médio por Tempo de Empresa</CardTitle>
+              </div>
+              <CardDescription>Correlação entre tempo de casa e remuneração</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingSalarioByTempo ? (
+                <Skeleton className="h-[250px] w-full" />
+              ) : salarioByTempo?.salarioByTempo ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    data={Object.entries(salarioByTempo.salarioByTempo).map(([tempo, data]) => ({
+                      tempo,
+                      avg: data.avg,
+                    }))}
+                    margin={{ left: 20, right: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" />
+                    <XAxis dataKey="tempo" tick={{ fill: 'hsl(var(--muted-foreground))' }} fontSize={11} />
+                    <YAxis 
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }} 
+                      fontSize={12}
+                      tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px',
+                        color: 'hsl(var(--foreground))'
+                      }} 
+                      formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Salário Médio']}
+                    />
+                    <Bar dataKey="avg" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Salário Médio" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-salario">
                   <p className="text-muted-foreground">Nenhum dado disponível</p>
                 </div>
               )}
