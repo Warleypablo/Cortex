@@ -1,0 +1,482 @@
+spec_name: "Turbo Commerce — Admin Data Dictionary"
+spec_version: "1.0.0"
+last_updated: "2025-12-27"
+owner: "Turbo Partners"
+
+# -----------------------------
+# 1) Catálogos / Listas
+# -----------------------------
+catalogs:
+  catalog_products:
+    description: "Produtos oficiais (com mapeamento para segmento do BP 2026)"
+    key: "slug"
+    fields: ["slug", "name", "bp_segment", "active", "sort_order"]
+    bp_segments_allowed: ["performance", "creators", "social", "community", "others"]
+    items:
+      - { slug: performance, name: "Performance", bp_segment: performance, active: true, sort_order: 10 }
+      - { slug: creators, name: "Creators", bp_segment: creators, active: true, sort_order: 20 }
+      - { slug: social_media, name: "Social Media", bp_segment: social, active: true, sort_order: 30 }
+      - { slug: gestao_comunidade, name: "Gestão de Comunidade", bp_segment: community, active: true, sort_order: 40 }
+
+      - { slug: agente_ia, name: "Agente IA", bp_segment: others, active: true, sort_order: 100 }
+      - { slug: blog_post, name: "Blog Post", bp_segment: others, active: true, sort_order: 110 }
+      - { slug: broadcast, name: "Broadcast", bp_segment: others, active: true, sort_order: 120 }
+      - { slug: crm_vendas, name: "CRM de Vendas", bp_segment: others, active: true, sort_order: 130 }
+      - { slug: cro_alteracao, name: "CRO & Alteração", bp_segment: others, active: true, sort_order: 140 }
+      - { slug: dashboard, name: "Dashboard", bp_segment: others, active: true, sort_order: 150 }
+      - { slug: ecommerce, name: "Ecommerce", bp_segment: others, active: true, sort_order: 160 }
+      - { slug: estruturacao_comercial, name: "Estruturação Comercial", bp_segment: others, active: true, sort_order: 170 }
+      - { slug: estruturacao_estrategica, name: "Estruturação Estratégica", bp_segment: others, active: true, sort_order: 180 }
+      - { slug: gameplan, name: "Gameplan", bp_segment: others, active: true, sort_order: 190 }
+      - { slug: gestao_atendimento, name: "Gestão & Atendimento", bp_segment: others, active: true, sort_order: 200 }
+      - { slug: id_visual, name: "ID Visual", bp_segment: others, active: true, sort_order: 210 }
+      - { slug: landing_page, name: "Landing Page", bp_segment: others, active: true, sort_order: 220 }
+      - { slug: pacote_artes_rotulos, name: "Pacote Artes / Rótulos", bp_segment: others, active: true, sort_order: 230 }
+      - { slug: regua_automacao, name: "Régua de Automação", bp_segment: others, active: true, sort_order: 240 }
+      - { slug: seo_full, name: "SEO Full", bp_segment: others, active: true, sort_order: 250 }
+      - { slug: site, name: "Site", bp_segment: others, active: true, sort_order: 260 }
+      - { slug: sustentacao, name: "Sustentação", bp_segment: others, active: true, sort_order: 270 }
+
+  catalog_plans:
+    description: "Planos oficiais"
+    key: "slug"
+    fields: ["slug", "name", "active", "sort_order"]
+    items:
+      - { slug: starter, name: "Starter", active: true, sort_order: 10 }
+      - { slug: scale, name: "Scale", active: true, sort_order: 20 }
+      - { slug: enterprise, name: "Enterprise", active: true, sort_order: 30 }
+      - { slug: personalizado, name: "Personalizado", active: true, sort_order: 40 }
+      - { slug: projeto_pontual, name: "Projeto Pontual", active: true, sort_order: 50 }
+      - { slug: antigo, name: "Antigo ⚠️", active: true, sort_order: 999 }
+
+  catalog_squads:
+    description: "Squads (marcar OFF via is_off)"
+    key: "slug"
+    fields: ["slug", "name", "is_off", "active", "sort_order"]
+    items:
+      - { slug: squadra, name: "⚓️ Squadra", is_off: false, active: true, sort_order: 10 }
+      - { slug: makers, name: "⚡ Makers", is_off: false, active: true, sort_order: 20 }
+      - { slug: pulse, name: "💠 Pulse", is_off: false, active: true, sort_order: 30 }
+      - { slug: tech, name: "🖥️ Tech", is_off: false, active: true, sort_order: 40 }
+      - { slug: selva, name: "🪖 Selva", is_off: false, active: true, sort_order: 50 }
+      - { slug: hunters, name: "🏹 Hunters", is_off: false, active: true, sort_order: 60 }
+      - { slug: supreme, name: "👑 Supreme", is_off: false, active: true, sort_order: 70 }
+      - { slug: squad_x, name: "👾 Squad X", is_off: false, active: true, sort_order: 80 }
+      - { slug: aurea, name: "🌟 Aurea", is_off: false, active: true, sort_order: 90 }
+      - { slug: chama, name: "🔥 Chama", is_off: false, active: true, sort_order: 100 }
+      - { slug: turbo_interno, name: "🚀 Turbo Interno", is_off: false, active: true, sort_order: 110 }
+      - { slug: bloomfield, name: "🗝️ Bloomfield", is_off: false, active: true, sort_order: 120 }
+
+  catalog_clusters:
+    description: "Cluster do cliente"
+    key: "slug"
+    fields: ["slug", "name", "active", "sort_order"]
+    items:
+      - { slug: regulares, name: "Regulares", active: true, sort_order: 10 }
+      - { slug: imperdiveis, name: "Imperdíveis", active: true, sort_order: 20 }
+      - { slug: chaves, name: "Chaves", active: true, sort_order: 30 }
+      - { slug: nfnc, name: "NFNC", active: true, sort_order: 40 }
+      - { slug: empty, name: "Empty", active: true, sort_order: 999 }
+
+  catalog_contract_status:
+    description: "Status do contrato (counts_as_operating define 'operando')"
+    key: "slug"
+    fields: ["slug", "name", "counts_as_operating", "active", "sort_order"]
+    items:
+      - { slug: triagem, name: "TRIAGEM", counts_as_operating: false, active: true, sort_order: 10 }
+      - { slug: onboarding, name: "ONBOARDING", counts_as_operating: false, active: true, sort_order: 20 }
+      - { slug: ativo, name: "ATIVO", counts_as_operating: true, active: true, sort_order: 30 }
+      - { slug: pausado, name: "PAUSADO", counts_as_operating: false, active: true, sort_order: 40 }
+      - { slug: em_cancelamento, name: "EM CANCELAMENTO", counts_as_operating: true, active: true, sort_order: 50 }
+      - { slug: entregue, name: "ENTREGUE", counts_as_operating: false, active: true, sort_order: 60 }
+      - { slug: cancelado, name: "CANCELADO", counts_as_operating: false, active: true, sort_order: 70 }
+
+  catalog_account_health:
+    description: "Saúde da conta (cliente)"
+    key: "slug"
+    fields: ["slug", "name", "active", "sort_order"]
+    items:
+      - { slug: saudavel, name: "Saudável", active: true, sort_order: 10 }
+      - { slug: atencao, name: "Atenção", active: true, sort_order: 20 }
+      - { slug: insatisfeito, name: "Insatisfeito", active: true, sort_order: 30 }
+
+  catalog_roi_bucket:
+    description: "Buckets de ROI"
+    key: "slug"
+    fields: ["slug", "name", "active", "sort_order"]
+    items:
+      - { slug: lt_2, name: "ROI < 2", active: true, sort_order: 10 }
+      - { slug: btw_2_4, name: "ROI 2–4", active: true, sort_order: 20 }
+      - { slug: gt_4, name: "ROI > 4", active: true, sort_order: 30 }
+      - { slug: no_data, name: "Sem dado", active: true, sort_order: 999 }
+
+  catalog_churn_reason:
+    description: "Motivos de cancelamento (alto nível)"
+    key: "slug"
+    fields: ["slug", "name", "active", "sort_order"]
+    items:
+      - { slug: resultado_fraco, name: "Resultado fraco / ROI", active: true, sort_order: 10 }
+      - { slug: falta_verba, name: "Falta de verba", active: true, sort_order: 20 }
+      - { slug: in_house, name: "Contratou in-house / troca interna", active: true, sort_order: 30 }
+      - { slug: concorrente, name: "Troca por concorrente", active: true, sort_order: 40 }
+      - { slug: qualidade_entrega, name: "Problemas de entrega / qualidade", active: true, sort_order: 50 }
+      - { slug: comunicacao, name: "Problemas de comunicação", active: true, sort_order: 60 }
+      - { slug: timing, name: "Timing / pausa estratégica", active: true, sort_order: 70 }
+      - { slug: inadimplencia, name: "Inadimplência", active: true, sort_order: 80 }
+      - { slug: outros, name: "Outros", active: true, sort_order: 999 }
+
+# -----------------------------
+# 2) Field Registry (campos canônicos)
+# -----------------------------
+fields:
+  # ---- CLIENT ----
+  - field_key: client.name
+    label: "Nome do Cliente"
+    entity: client
+    type: string
+    required: true
+    default: null
+    help_text: "Nome oficial do cliente (razão/nome fantasia)."
+
+  - field_key: client.cluster_slug
+    label: "Cluster"
+    entity: client
+    type: enum
+    required: true
+    enum_catalog: catalog_clusters
+    default: regulares
+
+  - field_key: client.health_status_slug
+    label: "Status da Conta"
+    entity: client
+    type: enum
+    required: false
+    enum_catalog: catalog_account_health
+    default: atencao
+
+  - field_key: client.cnpj
+    label: "CNPJ"
+    entity: client
+    type: string
+    required: false
+    validation:
+      regex: "^[0-9]{14}$"
+      regex_error: "CNPJ deve ter 14 dígitos (somente números)."
+
+  - field_key: client.contact_name
+    label: "Pessoa de Contato"
+    entity: client
+    type: string
+    required: false
+
+  - field_key: client.contact_phone
+    label: "Telefone de Contato"
+    entity: client
+    type: string
+    required: false
+
+  - field_key: client.email
+    label: "E-mail"
+    entity: client
+    type: string
+    required: false
+
+  - field_key: client.instagram
+    label: "Instagram"
+    entity: client
+    type: string
+    required: false
+
+  - field_key: client.site
+    label: "Site"
+    entity: client
+    type: string
+    required: false
+
+  - field_key: client.notes
+    label: "Observações"
+    entity: client
+    type: text
+    required: false
+
+  # ---- CONTRACT ----
+  - field_key: contract.client_id
+    label: "Cliente"
+    entity: contract
+    type: string
+    required: true
+    help_text: "FK para client.id"
+
+  - field_key: contract.product_slug
+    label: "Produto"
+    entity: contract
+    type: enum
+    required: true
+    enum_catalog: catalog_products
+
+  - field_key: contract.plan_slug
+    label: "Plano"
+    entity: contract
+    type: enum
+    required: true
+    enum_catalog: catalog_plans
+
+  - field_key: contract.squad_slug
+    label: "Squad"
+    entity: contract
+    type: enum
+    required: true
+    enum_catalog: catalog_squads
+
+  - field_key: contract.status_slug
+    label: "Status do Contrato"
+    entity: contract
+    type: enum
+    required: true
+    enum_catalog: catalog_contract_status
+
+  - field_key: contract.mrr_value_cents
+    label: "Valor Recorrente (MRR)"
+    entity: contract
+    type: currency_cents
+    required: false
+    default: 0
+    validation:
+      min: 0
+
+  - field_key: contract.one_time_value_cents
+    label: "Valor Pontual"
+    entity: contract
+    type: currency_cents
+    required: false
+    default: 0
+    validation:
+      min: 0
+
+  - field_key: contract.first_payment_at
+    label: "Data 1º Pagamento"
+    entity: contract
+    type: date
+    required: false
+
+  - field_key: contract.cancel_request_at
+    label: "Data Solicitação de Encerramento"
+    entity: contract
+    type: date
+    required: false
+
+  - field_key: contract.last_operation_day
+    label: "Último Dia de Operação"
+    entity: contract
+    type: date
+    required: false
+
+  - field_key: contract.pause_at
+    label: "Data de Pausa"
+    entity: contract
+    type: date
+    required: false
+
+  - field_key: contract.resume_at
+    label: "Data de Retorno"
+    entity: contract
+    type: date
+    required: false
+
+  - field_key: contract.delivered_at
+    label: "Data de Entrega (Pontual)"
+    entity: contract
+    type: date
+    required: false
+
+  # Ownership
+  - field_key: contract.sales_owner_user_id
+    label: "Vendedor"
+    entity: contract
+    type: user_ref
+    required: false
+
+  - field_key: contract.cs_owner_user_id
+    label: "CS Responsável"
+    entity: contract
+    type: user_ref
+    required: false
+
+  - field_key: contract.delivery_owner_user_id
+    label: "Responsável Entrega"
+    entity: contract
+    type: user_ref
+    required: false
+
+  - field_key: contract.designer_owner_user_id
+    label: "Designer Responsável"
+    entity: contract
+    type: user_ref
+    required: false
+
+  # Saúde (opcional)
+  - field_key: contract.ads_investment_cents_monthly
+    label: "Investimento ADS (Mensal)"
+    entity: contract
+    type: currency_cents
+    required: false
+    default: 0
+    validation:
+      min: 0
+
+  - field_key: contract.client_revenue_cents_monthly
+    label: "Faturamento Cliente (Mensal)"
+    entity: contract
+    type: currency_cents
+    required: false
+    default: 0
+    validation:
+      min: 0
+
+  # Churn intelligence
+  - field_key: contract.churn_reason_slug
+    label: "Motivo do Cancelamento"
+    entity: contract
+    type: enum
+    required: false
+    enum_catalog: catalog_churn_reason
+
+  - field_key: contract.churn_subreason
+    label: "Submotivo do Cancelamento"
+    entity: contract
+    type: text
+    required: false
+
+  - field_key: contract.retention_possible
+    label: "Possibilidade de Retenção"
+    entity: contract
+    type: enum
+    required: false
+    validation:
+      allowed_values: ["high", "medium", "low"]
+
+  - field_key: contract.retained_flag
+    label: "Reteve?"
+    entity: contract
+    type: bool
+    required: false
+    default: false
+
+  - field_key: contract.waive_churn_flag
+    label: "Abonar Churn?"
+    entity: contract
+    type: bool
+    required: false
+    default: false
+
+  # ---- HEALTH MONTHLY ----
+  - field_key: health_monthly.month
+    label: "Mês (YYYY-MM)"
+    entity: health_monthly
+    type: string
+    required: true
+    validation:
+      regex: "^[0-9]{4}-[0-9]{2}$"
+      regex_error: "Formato inválido. Use YYYY-MM."
+
+  - field_key: health_monthly.roi_bucket_slug
+    label: "ROI Bucket"
+    entity: health_monthly
+    type: enum
+    required: false
+    enum_catalog: catalog_roi_bucket
+    default: no_data
+
+  - field_key: health_monthly.roi_value
+    label: "ROI (numérico)"
+    entity: health_monthly
+    type: decimal
+    required: false
+    validation:
+      min: 0
+
+  - field_key: health_monthly.hs_score
+    label: "HS (0–10)"
+    entity: health_monthly
+    type: int
+    required: false
+    validation:
+      min: 0
+      max: 10
+
+  - field_key: health_monthly.hs_reason
+    label: "HS — Motivo"
+    entity: health_monthly
+    type: text
+    required: false
+
+  - field_key: health_monthly.nps_score
+    label: "NPS (0–10)"
+    entity: health_monthly
+    type: int
+    required: false
+    validation:
+      min: 0
+      max: 10
+
+  - field_key: health_monthly.nps_reason
+    label: "NPS — Motivo"
+    entity: health_monthly
+    type: text
+    required: false
+
+# -----------------------------
+# 3) Regras / Validações
+# -----------------------------
+rules:
+  - rule_id: R001
+    name: "Contrato não pode ficar sem valor"
+    entity: contract
+    when: "contract.mrr_value_cents == 0 AND contract.one_time_value_cents == 0"
+    action: "BLOCK_SAVE"
+    message: "Defina Valor Recorrente (MRR) e/ou Valor Pontual."
+
+  - rule_id: R002
+    name: "Recorrente exige Data 1º Pagamento"
+    entity: contract
+    when: "contract.mrr_value_cents > 0 AND contract.first_payment_at IS NULL"
+    action: "BLOCK_SAVE"
+    message: "Contrato recorrente exige Data 1º Pagamento."
+
+  - rule_id: R003
+    name: "Em cancelamento exige data de solicitação"
+    entity: contract
+    when: "contract.status_slug == 'em_cancelamento' AND contract.cancel_request_at IS NULL"
+    action: "BLOCK_SAVE"
+    message: "Status 'EM CANCELAMENTO' exige Data Solicitação de Encerramento."
+
+  - rule_id: R004
+    name: "Cancelado exige último dia de operação"
+    entity: contract
+    when: "contract.status_slug == 'cancelado' AND contract.last_operation_day IS NULL"
+    action: "BLOCK_SAVE"
+    message: "Status 'CANCELADO' exige Último Dia de Operação."
+
+  - rule_id: R005
+    name: "Pontual entregue exige data de entrega"
+    entity: contract
+    when: "contract.one_time_value_cents > 0 AND contract.status_slug == 'entregue' AND contract.delivered_at IS NULL"
+    action: "BLOCK_SAVE"
+    message: "Pontual marcado como 'ENTREGUE' exige Data de Entrega."
+
+  - rule_id: R006
+    name: "Contrato operando exige CS responsável"
+    entity: contract
+    when: "(contract.status_slug == 'ativo' OR contract.status_slug == 'em_cancelamento') AND contract.cs_owner_user_id IS NULL"
+    action: "BLOCK_SAVE"
+    message: "Contrato operando exige CS Responsável."
+
+# -----------------------------
+# 4) (Opcional) Qualidade de Dados — Flags automáticas
+# -----------------------------
+quality_flags:
+  contract:
+    - { flag: missing_value, when: "mrr_value_cents == 0 AND one_time_value_cents == 0" }
+    - { flag: missing_cs_owner, when: "(status_slug == 'ativo' OR status_slug == 'em_cancelamento') AND cs_owner_user_id IS NULL" }
+    - { flag: missing_first_payment, when: "mrr_value_cents > 0 AND first_payment_at IS NULL" }
+    - { flag: missing_product, when: "product_slug IS NULL" }
