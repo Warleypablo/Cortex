@@ -59,8 +59,16 @@ interface MenuItem {
 function getAllMenuItems(): MenuItem[] {
   const items: MenuItem[] = [];
   
+  // Acesso Rápido primeiro
+  NAV_CONFIG.quickAccess.forEach(item => {
+    items.push({ ...item, category: 'Acesso Rápido' });
+  });
+  
   NAV_CONFIG.geral.items.forEach(item => {
-    items.push({ ...item, category: 'Geral' });
+    // Evitar duplicatas do quickAccess
+    if (!NAV_CONFIG.quickAccess.some(qa => qa.url === item.url)) {
+      items.push({ ...item, category: 'Geral' });
+    }
   });
   
   NAV_CONFIG.setores.forEach(category => {
