@@ -362,7 +362,8 @@ export const NAV_CONFIG = {
     title: 'Administração',
     icon: 'Settings',
     items: [
-      { title: 'Administração', url: '/admin/usuarios', icon: 'Users', permissionKey: PERMISSION_KEYS.ADMIN.USUARIOS },
+      { title: 'Usuários', url: '/admin/usuarios', icon: 'Users', permissionKey: PERMISSION_KEYS.ADMIN.USUARIOS },
+      { title: 'Design System', url: '/admin/design-system', icon: 'Palette', permissionKey: PERMISSION_KEYS.ADMIN.USUARIOS },
     ],
   },
 };

@@ -258,13 +258,13 @@ export function AppSidebar() {
             {/* Setores - Primeiro */}
             {!isCollapsed && (
               <div className="flex items-center gap-2 px-3 py-2 mb-1">
-                <div className="flex items-center justify-center h-6 w-6 rounded-md bg-violet-600/20">
-                  <Briefcase className="h-3.5 w-3.5 text-violet-400" />
+                <div className="flex items-center justify-center h-6 w-6 rounded-md bg-primary/20">
+                  <Briefcase className="h-3.5 w-3.5 text-primary" />
                 </div>
-                <span className="text-xs font-bold text-violet-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-primary uppercase tracking-wider">
                   Setores
                 </span>
-                <Badge className="h-4 px-1.5 text-[9px] bg-violet-600/30 text-violet-300 border-violet-500/30 hover:bg-violet-600/30">
+                <Badge className="h-4 px-1.5 text-[9px] bg-primary/20 text-primary border-primary/30 hover:bg-primary/20">
                   {NAV_CONFIG.setores.length + 3}
                 </Badge>
               </div>
@@ -280,13 +280,13 @@ export function AppSidebar() {
             {/* Acesso Rápido - Segundo */}
             {!isCollapsed && (
               <div className="flex items-center gap-2 px-3 py-2 mb-1">
-                <div className="flex items-center justify-center h-6 w-6 rounded-md bg-amber-600/20">
-                  <Zap className="h-3.5 w-3.5 text-amber-400" />
+                <div className="flex items-center justify-center h-6 w-6 rounded-md bg-primary/10">
+                  <Zap className="h-3.5 w-3.5 text-primary/70" />
                 </div>
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-primary/70 uppercase tracking-wider">
                   Acesso Rápido
                 </span>
-                <Badge className="h-4 px-1.5 text-[9px] bg-amber-600/30 text-amber-300 border-amber-500/30 hover:bg-amber-600/30">
+                <Badge className="h-4 px-1.5 text-[9px] bg-primary/10 text-primary/70 border-primary/20 hover:bg-primary/10">
                   {NAV_CONFIG.quickAccess.length}
                 </Badge>
               </div>
