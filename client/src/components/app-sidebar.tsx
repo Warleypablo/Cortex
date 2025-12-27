@@ -243,11 +243,11 @@ export function AppSidebar() {
           data-testid="link-home-logo"
         >
           <div className="flex flex-col items-start gap-1 group-data-[collapsible=icon]:hidden">
-            <img src={turboLogoDark} alt="Turbo" className="h-6 w-auto" />
+            <img src={turboLogo} alt="Turbo" className="h-6 w-auto" />
             <span className="text-xs font-medium text-sidebar-foreground/60">Cortex</span>
           </div>
           <div className="hidden group-data-[collapsible=icon]:block">
-            <img src={turboLogoDark} alt="Turbo" className="h-7 w-7 object-contain" />
+            <img src={turboLogo} alt="Turbo" className="h-7 w-7 object-contain" />
           </div>
         </Link>
       </SidebarHeader>
