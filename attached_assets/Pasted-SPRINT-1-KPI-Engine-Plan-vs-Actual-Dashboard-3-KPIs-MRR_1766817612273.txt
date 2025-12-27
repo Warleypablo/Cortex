@@ -1,0 +1,215 @@
+SPRINT 1 — KPI Engine (Plan vs Actual) + Dashboard 3 KPIs (MRR, Headcount, Contratos)
+
+Contexto:
+- Temos um Postgres (Google Cloud) com dados:
+  - contratos (preferir view canônica vw_contratos_canon se existir; senão usar public.cup_contratos)
+  - financeiro Conta Azul (caz_*) — NÃO mexer agora
+  - colaboradores (tabela já existe, com cargo/role/nivel/salario etc; mas o nome exato pode variar)
+- Temos o BP 2026 com metas mensais (Plan). Queremos comparar Plan vs Actual por mês.
+
+REGRA DE OURO:
+- NÃO alterar/escrever em public.cup_* nem em tabelas caz_*.
+- NÃO rodar migrations automaticamente no start do app. Migrations apenas manual (script separado).
+
+OBJETIVO DA SPRINT:
+1) Criar camada de metas (Plan) e registry de KPIs (como calcular Actual).
+2) Criar cache mensal de Actual (para performance e histórico).
+3) Criar Dashboard “Plan vs Actual” com 3 cards:
+   - mrr_active (R$)
+   - headcount_total (#)
+   - contracts_active (#)
+4) Criar tela Admin simples para importar metas do BP 2026 via “colar tabela” (TSV/CSV) + mapear linhas para metric_key.
+
+========================================================
+A) BANCO (schemas/tabelas)
+========================================================
+
+1) Criar schema plan e kpi (se não existir).
+
+2) Criar tabelas:
+
+A. plan.metric_targets_monthly
+- id (uuid pk)
+- year int (ex: 2026)
+- month varchar(7) formato 'YYYY-MM'
+- metric_key text
+- dimension_key text null
+- dimension_value text null
+- target_value numeric(18,2)
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+UNIQUE(year, month, metric_key, coalesce(dimension_key,''), coalesce(dimension_value,''))
+
+B. kpi.metrics_registry
+- metric_key text pk
+- name text
+- unit text CHECK IN ('BRL','COUNT','PCT')
+- period_type text CHECK IN ('month_end','month_sum')
+- actual_source_type text CHECK IN ('auto_sql','manual')
+- actual_sql text null  (SQL parametrizada)
+- tolerance_yellow_pct numeric(6,3) default 0.05  (5%)
+- tolerance_red_pct numeric(6,3) default 0.10     (10%)
+- active boolean default true
+- created_at timestamptz default now()
+- updated_at timestamptz default now()
+
+C. kpi.metric_actuals_monthly (cache)
+- id uuid pk
+- year int
+- month varchar(7) 'YYYY-MM'
+- metric_key text
+- dimension_key text null
+- dimension_value text null
+- actual_value numeric(18,2)
+- computed_at timestamptz default now()
+- source text default 'computed'  (computed|manual_override|snapshot)
+UNIQUE(year, month, metric_key, coalesce(dimension_key,''), coalesce(dimension_value,''))
+
+3) Seed inicial em kpi.metrics_registry (3 métricas):
+- mrr_active (unit BRL, period_type month_end, auto_sql)
+- headcount_total (unit COUNT, period_type month_end, auto_sql)
+- contracts_active (unit COUNT, period_type month_end, auto_sql)
+
+========================================================
+B) AUTO-DISCOVERY (descobrir tabelas/colunas reais do banco)
+========================================================
+
+Implementar uma rotina utilitária no backend:
+- Detectar se existe view public.vw_contratos_canon.
+- Se não existir, detectar tabela public.cup_contratos.
+
+Descobrir colunas existentes e escolher as melhores:
+Para contratos, tentar encontrar colunas candidatas:
+- MRR: (mrr_value_cents) ou (valorr) ou (valor_r) ou (valor_recorrente)
+- Datas: first_payment_at / data_inicio / start_date / created_at
+- Cancelamento/fim: last_operation_day / data_encerramento / cancel_at / canceled_at
+- Status: status_slug ou status
+
+Para colaboradores, fazer discovery:
+- Procurar tabelas com nome parecido: colaboradores, employees, staff, team, people
+- e/ou tabela que tenha colunas: cargo OR role OR nivel OR salario
+- Precisamos no mínimo: start_date/entrada e (end_date/saida) OU active boolean.
+
+Se não achar automaticamente:
+- exponha no Admin uma config “Escolher tabela de colaboradores” com dropdown das tabelas + escolha manual das colunas:
+  - start_date
+  - end_date (opcional)
+  - active (opcional)
+
+========================================================
+C) SQL “Actual” (auto_sql) — regras para month_end
+========================================================
+
+IMPORTANTE:
+- KPIs month_end precisam refletir o estado “ativo” no último dia do mês.
+- Para meses passados, se não der para calcular “as-of” com datas, usamos cache/snapshot (o sistema salva no fim do mês). Para o mês atual, calcula on-demand.
+
+Implementar os SQLs com parâmetros:
+- :month_start (date)
+- :month_end (date)
+
+1) mrr_active (BRL)
+- Se tiver mrr em centavos, dividir por 100.
+- Considerar contrato “ativo no mês_end” se:
+  - data_inicio/first_payment_at <= month_end
+  - e (data_fim/cancelamento is null OR data_fim > month_end)
+  - e status indica operando (preferir status_slug IN ('ativo','em_cancelamento') quando existir)
+
+2) headcount_total (COUNT)
+- colaborador ativo no month_end:
+  - start_date <= month_end
+  - e (end_date is null OR end_date > month_end)
+  - se houver campo active, também exigir active=true
+
+3) contracts_active (COUNT)
+- mesma lógica do mrr_active, mas COUNT de contratos ativos no month_end.
+
+Se não existir data_fim, usar fallback:
+- status atual (status_slug) define ativo.
+- E nesse caso: month_end para meses passados será “snapshot do sistema” (armazenar em kpi.metric_actuals_monthly; não prometer precisão retroativa sem histórico).
+
+========================================================
+D) Serviço de cálculo + Cache
+========================================================
+
+Criar endpoints (backend):
+1) POST /kpi/recompute?year=2026&month=YYYY-MM
+- Lê kpi.metrics_registry active=true
+- Para cada métrica auto_sql:
+  - executa a query com month_start/month_end
+  - upsert em kpi.metric_actuals_monthly
+
+2) GET /kpi/values?year=2026&month=YYYY-MM&metric_key=...
+- Retorna:
+  - plan_value (plan.metric_targets_monthly)
+  - actual_value (kpi.metric_actuals_monthly)
+  - variance_abs
+  - variance_pct
+  - status (green/yellow/red) com tolerâncias
+
+3) (Opcional) POST /kpi/manual_override
+- Permite setar actual_value e source='manual_override' para meses sem dado.
+
+========================================================
+E) IMPORT DO BP (Plan) — tela Admin “Colar tabela”
+========================================================
+
+Criar Admin > BP Targets:
+- Um textarea para colar uma tabela em TSV/CSV com cabeçalho de meses.
+- Exemplo do formato colado:
+  [linha] Nome da Métrica | Janeiro | Fevereiro | ... | Dezembro
+- O admin escolhe o ano (2026) e mapeia cada “Nome da Métrica” para metric_key usando dropdown.
+
+Mapeamentos iniciais sugeridos (preencher automaticamente):
+- "(+) MRR Ativo" -> mrr_active
+- "Numero de Colaboradores" -> headcount_total
+- "Numero de Contratos" -> contracts_active
+
+A tela deve:
+- Normalizar moeda BR (R$ e separadores)
+- Normalizar meses PT-BR -> YYYY-MM
+- Upsert em plan.metric_targets_monthly
+
+========================================================
+F) DASHBOARD (Plan vs Actual) — 3 cards
+========================================================
+
+Dashboard > KPIs (ano=2026, mês selecionável):
+- 3 cards:
+  1) MRR Ativo
+  2) Headcount Total
+  3) Contratos Ativos
+
+Cada card mostra:
+- Actual do mês (valor)
+- Target do mês (plan)
+- Variance (abs e %)
+- Semáforo:
+  - verde: actual >= target
+  - amarelo: actual >= target*(1 - tolerance_yellow_pct)
+  - vermelho: abaixo disso
+- YTD (somatório ou última fotografia):
+  - Para month_sum: YTD = soma meses
+  - Para month_end: YTD = mostrar “último mês disponível” e comparação com target do último mês
+
+Botão “Recalcular mês” (chama POST /kpi/recompute).
+
+========================================================
+G) CRITÉRIOS DE ACEITE (DoD)
+========================================================
+
+1) Eu consigo importar metas BP 2026 via Admin colando a tabela (sem dev).
+2) O sistema calcula e armazena actual mensal para:
+   - mrr_active
+   - headcount_total
+   - contracts_active
+3) Dashboard exibe Plan vs Actual + semáforo + variance e permite trocar o mês.
+4) Nada escreve em cup_* nem em caz_*.
+5) Não existe migration rodando automaticamente no start (somente comando manual).
+
+ENTREGAR:
+- migrations SQL (plan/kpi)
+- endpoints + serviço de recompute
+- tela Admin BP Targets
+- dashboard 3 cards
+- notes rápidas de setup (env vars de DB)

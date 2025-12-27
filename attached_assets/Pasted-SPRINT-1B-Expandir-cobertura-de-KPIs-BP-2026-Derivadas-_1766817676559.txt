@@ -1,0 +1,298 @@
+SPRINT 1B — Expandir cobertura de KPIs (BP 2026) + Derivadas + Estrutura para OKR/KR
+
+Contexto:
+- Já existe: plan.metric_targets_monthly, kpi.metrics_registry, kpi.metric_actuals_monthly, endpoints /kpi/recompute e dashboard com 3 KPIs (mrr_active, headcount_total, contracts_active).
+- Agora precisamos cadastrar TODOS os KPIs do BP 2026 (metas) + criar KPIs derivados (fórmulas) + criar páginas/abas para acompanhar, com Plan vs Actual (mês e YTD).
+- A automatização completa do financeiro por categoria do Conta Azul (CSV/CAC/SG&A/IR/CAPEX) ainda NÃO existe. Portanto:
+  - métricas financeiras dependentes de classificação entram como manual override nesta sprint
+  - mas já devem existir no registry + no dashboard
+  - e devem estar prontas para trocar de manual -> auto_sql na Sprint 2 (mapeamento).
+
+REGRAS:
+- NÃO escrever em cup_* nem em caz_*.
+- Para métricas que não conseguimos calcular com precisão (falta de histórico / falta de mapeamento), usar:
+  actual_source_type = manual
+  e permitir “Manual Override” por mês no Admin.
+- Para métricas derivadas, NÃO permitir override direto; elas recalculam a partir das bases.
+
+========================================================
+1) REGISTRY COMPLETO DE MÉTRICAS (metrics_registry)
+========================================================
+
+Criar/atualizar o kpi.metrics_registry com os seguintes metric_keys (todas active=true):
+
+A) Receita (base)
+- mrr_active (BRL, month_end, auto_sql)  [já existe]
+- revenue_one_time (BRL, month_sum, manual inicialmente)
+- revenue_other (BRL, month_sum, manual inicialmente)
+
+B) Deduções (base)
+- bad_debt (BRL, month_sum, manual inicialmente)          // Inadimplência
+- taxes_on_revenue (BRL, month_sum, manual inicialmente)  // Impostos sobre receita
+
+C) Custos e despesas (base — manual agora, auto na Sprint 2)
+- cogs_csv (BRL, month_sum, manual)       // CSV
+- cac_total (BRL, month_sum, manual)      // CAC
+- sga_total (BRL, month_sum, manual)      // SG&A
+- tax_ir_csll (BRL, month_sum, manual)    // IR + CSLL
+- capex (BRL, month_sum, manual)          // CAPEX
+
+D) Pessoas (base — auto_sql via tabela de colaboradores)
+- headcount_total (COUNT, month_end, auto_sql) [já existe]
+- headcount_bucket_csv (COUNT, month_end, auto_sql)   // Pessoas em CSV
+- headcount_bucket_cac (COUNT, month_end, auto_sql)   // Pessoas em CAC
+- headcount_bucket_sga (COUNT, month_end, auto_sql)   // Pessoas em SG&A
+
+E) Base de clientes/contratos (auto_sql via contratos)
+- clients_active (COUNT, month_end, auto_sql)     // Número de Clientes
+- contracts_active (COUNT, month_end, auto_sql)   [já existe]
+- churn_mrr_month (BRL, month_sum, manual inicialmente ou auto_sql se existir data de encerramento confiável)
+
+F) Comercial (metas BP — inicialmente manual, pode virar auto depois)
+- sales_mrr_total (BRL, month_sum, manual)        // Vendas MRR (realizado)
+- sales_one_time_total (BRL, month_sum, manual)   // Vendas Pontual (realizado)
+
+G) Caixa / saldo (manual agora; auto depois se houver fonte confiável)
+- cash_generation (BRL, month_sum, manual inicialmente)   // Geração de Caixa
+- cash_balance (BRL, month_end, manual inicialmente)      // Saldo de Caixa
+
+========================================================
+2) MÉTRICAS DERIVADAS (fórmulas) — sem override manual
+========================================================
+
+Adicionar suporte a métricas derivadas no registry:
+- registry precisa ter campos adicionais:
+  - is_derived boolean
+  - formula_expr text (ex: "A + B - C")
+  - base_metrics jsonb array (ex: ["mrr_active","revenue_one_time","revenue_other"])
+
+Criar métricas derivadas:
+
+A) Receita total faturável (BP)
+- revenue_billable_total = mrr_active + revenue_one_time + revenue_other
+
+B) Receita líquida
+- revenue_net = revenue_billable_total - bad_debt - taxes_on_revenue
+
+C) Margem bruta (valor)
+- gross_margin = revenue_net - cogs_csv
+
+D) EBITDA
+- ebitda = gross_margin - cac_total - sga_total
+
+E) Geração de caixa
+- cash_generation = ebitda - tax_ir_csll - capex
+  (OBS: se cash_generation já existir como base manual, manter 1 só: preferir derivada para bater com BP)
+
+F) Margem de geração (%)
+- cash_generation_margin_pct = cash_generation / revenue_billable_total
+  (unit=PCT, month_sum; exibir como %)
+
+G) Taxa efetiva de imposto (%)
+- effective_tax_rate_pct = taxes_on_revenue / revenue_billable_total
+
+H) Receita por cabeça
+- revenue_per_head = revenue_billable_total / headcount_total
+
+I) MRR por cabeça
+- mrr_per_head = mrr_active / headcount_total
+
+J) Ticket médio cliente
+- avg_ticket_client = mrr_active / clients_active
+
+K) Ticket médio contrato
+- avg_ticket_contract = mrr_active / contracts_active
+
+========================================================
+3) MAPEAMENTO DO BP 2026 PARA metric_key (import automático)
+========================================================
+
+Atualizar a tela Admin > BP Targets (colar tabela) para sugerir mapeamentos automáticos:
+
+Linhas BP -> metric_key:
+- "(+) MRR Ativo" -> mrr_active
+- "(+) Receita Pontual" -> revenue_one_time
+- "(+) Outras Receitas" -> revenue_other
+- "(=) Receita Total Faturavel" -> revenue_billable_total (DERIVADA; não importar como base)
+- "(-) Inadimplência" -> bad_debt
+- "(-) Impostos Sob Receita" -> taxes_on_revenue
+- "(=) Receita Líquida" -> revenue_net (DERIVADA)
+- "(-) CSV" -> cogs_csv
+- "(=) Margem Bruta" -> gross_margin (DERIVADA)
+- "(-) CAC" -> cac_total
+- "(-) SG&A" -> sga_total
+- "(=) EBITDA" -> ebitda (DERIVADA)
+- "(-) IR + CSLL" -> tax_ir_csll
+- "(-) CAPEX" -> capex
+- "(=) Geração de Caixa" -> cash_generation (DERIVADA ou base — escolher UM só)
+- "(%) Margem Geração" -> cash_generation_margin_pct (DERIVADA)
+- "Numero de Colaboradores" -> headcount_total
+- "Pessoas em CSV" -> headcount_bucket_csv
+- "Pessoas em CAC" -> headcount_bucket_cac
+- "Pessoas em SGEA" -> headcount_bucket_sga
+- "Numero de Clientes" -> clients_active
+- "Numero de Contratos" -> contracts_active
+- "Churn Mês" -> churn_mrr_month
+- "Saldo de Caixa" -> cash_balance
+- "Vendas MRR" -> sales_mrr_total
+- "Vendas Pontual" -> sales_one_time_total
+- "Receita Cabeça" -> revenue_per_head (DERIVADA)
+- "MRR Cabeça" -> mrr_per_head (DERIVADA)
+- "Ticket Medio Cliente" -> avg_ticket_client (DERIVADA)
+- "Ticket Medio Contratos" -> avg_ticket_contract (DERIVADA)
+- "Aliquota Imposto Efetiva" -> effective_tax_rate_pct (DERIVADA)
+
+IMPORTANTE:
+- Para métricas DERIVADAS: não importar target se já for calculável a partir das metas base.
+  Porém: como o BP já traz valores de linha derivada, permitir “validação”:
+  - comparar derivada calculada vs target importado
+  - se divergir > 1%, mostrar alerta "BP inconsistente" e sugerir corrigir base ou aceitar BP como referência.
+  Decisão: por padrão, usar cálculo derivado como fonte e tratar o valor do BP como “checkpoint”.
+
+========================================================
+4) AUTO-SQL: contratos e colaboradores (discovery + queries)
+========================================================
+
+A) CONTRATOS (auto_sql)
+Implementar/ajustar SQL para:
+- clients_active: count(distinct client_id) de contratos ativos no month_end
+- contracts_active: count(*) de contratos ativos no month_end (já existe)
+- mrr_active: soma do MRR de contratos ativos no month_end (já existe)
+
+Ativo no month_end:
+- start_date <= month_end
+- e (end_date is null OR end_date > month_end)
+- e status_slug IN ('ativo','em_cancelamento') quando existir; senão fallback para status textual.
+
+B) COLABORADORES (auto_sql)
+Discovery obrigatório para achar tabela e colunas:
+- tabela com nome parecido ou colunas: cargo/role/nivel/salario + datas.
+Precisamos:
+- start_date (entrada)
+- end_date (saída, opcional)
+- active boolean (opcional)
+- bucket (csv/cac/sga) (já existe)
+Então:
+- headcount_total = ativos no month_end
+- headcount_bucket_csv = ativos no month_end com bucket='csv'
+- headcount_bucket_cac = bucket='cac'
+- headcount_bucket_sga = bucket='sga'
+
+Se bucket estiver em outro nome (ex: cost_center), mapear.
+
+========================================================
+5) ADMIN: Manual override mensal (para métricas financeiras por enquanto)
+========================================================
+
+Criar Admin > KPI Overrides:
+- Selecionar ano/mês
+- Listar métricas com actual_source_type=manual
+- Input para preencher actual_value (BRL/COUNT)
+- Salvar em kpi.metric_actuals_monthly com source='manual_override'
+- Log de quem alterou + timestamp
+
+As métricas manuais nesta sprint:
+- revenue_one_time
+- revenue_other
+- bad_debt
+- taxes_on_revenue
+- cogs_csv
+- cac_total
+- sga_total
+- tax_ir_csll
+- capex
+- cash_balance
+- sales_mrr_total
+- sales_one_time_total
+- churn_mrr_month (até virar auto)
+- cash_generation (se decidirmos manter manual; se derivada, não permitir override)
+
+========================================================
+6) DASHBOARDS / TELAS — o que precisa existir
+========================================================
+
+Criar 4 abas/páginas de acompanhamento (ano e mês selecionável):
+
+A) OVERVIEW (executivo)
+Cards (Plan vs Actual + YTD + semáforo):
+- mrr_active
+- revenue_billable_total
+- revenue_net
+- ebitda
+- cash_generation
+- cash_balance
+- headcount_total
+- contracts_active
+- clients_active
+
+B) FINANCEIRO (DRE BP)
+Tabela mensal (linhas BP) com Plan/Actual/Δ:
+- mrr_active
+- revenue_one_time
+- revenue_other
+- revenue_billable_total (derivada)
+- bad_debt
+- taxes_on_revenue
+- revenue_net (derivada)
+- cogs_csv
+- gross_margin (derivada)
+- cac_total
+- sga_total
+- ebitda (derivada)
+- tax_ir_csll
+- capex
+- cash_generation (derivada)
+- cash_generation_margin_pct (derivada)
+- effective_tax_rate_pct (derivada)
+
+C) PESSOAS
+Cards + breakdown:
+- headcount_total
+- headcount_bucket_csv/cac/sga
+- revenue_per_head (derivada)
+- mrr_per_head (derivada)
+Opcional: tabela por role_slug (se for fácil) — senão deixar para Sprint 2.
+
+D) COMERCIAL
+Cards:
+- sales_mrr_total (manual)
+- sales_one_time_total (manual)
+- churn_mrr_month (manual por enquanto)
+- avg_ticket_client (derivada)
+- avg_ticket_contract (derivada)
+
+========================================================
+7) Conexão com OKR/KR (sem implementar tudo agora)
+========================================================
+
+Adicionar no modelo KR (se já existe):
+- metric_key (string)
+- year, month_scope (ou quarter_scope)
+- target_source = plan.metric_targets_monthly
+- actual_source = kpi.metric_actuals_monthly
+- KR card deve puxar automaticamente Plan/Actual/Δ via GET /kpi/values.
+
+Ainda nesta sprint:
+- Criar uma lista default de KRs sugeridos (semáforo + check-in manual):
+  - KR: MRR Ativo >= meta mensal (metric_key=mrr_active)
+  - KR: Geração de Caixa >= meta mensal (metric_key=cash_generation)
+  - KR: Headcount Total <= meta (se direção decrease ou controlar variação)
+  - KR: EBITDA >= meta (metric_key=ebitda)
+
+========================================================
+8) CRITÉRIOS DE ACEITE (DoD)
+========================================================
+
+1) Consigo importar BP 2026 com todas as linhas base, e o sistema mapeia metric_keys corretamente.
+2) Métricas derivadas calculam Plan e Actual automaticamente e batem (ou acusam divergência BP).
+3) Tenho Admin de overrides para preencher métricas financeiras manuais por mês.
+4) Overview mostra Plan vs Actual + YTD para os KPIs principais.
+5) Pessoas e Comercial mostram pelo menos o básico conforme acima.
+6) Tudo pronto para, na Sprint 2, trocar manuais por auto com mapping do Conta Azul.
+
+ENTREGAR:
+- Migrações necessárias (novos campos derived no registry)
+- Ajustes endpoints /kpi/recompute e /kpi/values para derivadas + YTD
+- Telas (Overview, Financeiro, Pessoas, Comercial)
+- Admin overrides mensal
+- Documentação curta de como adicionar uma métrica nova

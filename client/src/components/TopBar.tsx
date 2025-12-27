@@ -17,13 +17,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { LogOut, Bell, AlertTriangle, CheckCircle, X, Check, Settings, Cake, FileText, ExternalLink, ChevronRight, Calendar, DollarSign, User } from "lucide-react";
+import { Bell, AlertTriangle, CheckCircle, X, Check, Settings, Cake, FileText, ExternalLink, ChevronRight, Calendar, DollarSign, User } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import ThemeToggle from "@/components/ThemeToggle";
 import GlobalSearch from "@/components/GlobalSearch";
-import PresentationModeButton from "@/components/PresentationModeButton";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { usePageInfo } from "@/contexts/PageContext";
 
@@ -599,16 +598,6 @@ export default function TopBar() {
 
   const unreadCount = notifications.filter(n => !n.read && !n.dismissed).length;
 
-  const handleLogout = async () => {
-    try {
-      await apiRequest("POST", "/auth/logout");
-      setLocation("/login");
-      window.location.reload();
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
-  };
-
   const handleUserClick = () => {
     if (colaboradorData?.colaboradorId) {
       setLocation(`/colaborador/${colaboradorData.colaboradorId}`);
@@ -667,8 +656,6 @@ export default function TopBar() {
             <TooltipContent>Avisos{unreadCount > 0 ? ` (${unreadCount})` : ''}</TooltipContent>
           </Tooltip>
           
-          <PresentationModeButton />
-          
           {user && user.role === 'admin' && (
             <Link href="/admin/usuarios">
               <Tooltip>
@@ -684,22 +671,6 @@ export default function TopBar() {
                 <TooltipContent>Administração</TooltipContent>
               </Tooltip>
             </Link>
-          )}
-          
-          {user && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center justify-center h-10 w-10 rounded-full border border-destructive/50 bg-background hover:bg-destructive/10 transition-colors"
-                  data-testid="button-logout"
-                  aria-label="Sair"
-                >
-                  <LogOut className="h-4 w-4 text-destructive" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Sair</TooltipContent>
-            </Tooltip>
           )}
         </div>
         
