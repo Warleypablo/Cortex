@@ -41,6 +41,13 @@ Preferred communication style: Simple, everyday language.
     - **Jurídico (Legal) Dashboard**: Legal department module for tracking clients with "cobrar" (collect) status from inadimplência (delinquency) system. Features client accordion list with full details, overdue parcelas table, and legal procedure management (notificação, protesto, ação judicial, acordo, baixa). Data stored in `juridico_clientes` table with tracking for procedure type, status, agreement details, and protocol numbers.
     - **Patrimônio (Assets)**: Asset management with two tabs - "Patrimônios" for physical assets and "Linhas Telefônicas" for phone lines. Phone lines tab includes: conta, plano/operadora (Pós/Pré/Flex), telefone, responsável, setor, última recarga, and status. Features filters by setor and plano, search, and stats cards. Data stored in `rh_telefones` table with responsável linking to colaboradores.
     - **Meu Perfil (My Profile)**: Personal profile page that redirects authenticated users to their linked colaborador detail page (/colaborador/:id). If user email is not linked to a colaborador record, displays a friendly "Perfil não vinculado" message. Links via /api/colaboradores/by-user/:userId endpoint.
+    - **G&G Dashboard (DashboardGeG)**: Comprehensive people management dashboard with:
+      - **KPIs**: Headcount, turnover, admissões/demissões, tempo médio, custo folha, benefícios, premiação, salário médio
+      - **Alertas e Atenção**: Veteranos sem aumento (36+ meses), fim de experiência, salário abaixo da média
+      - **Retenção e Saúde**: Taxa de retenção por período, distribuição de health scores (saudável/atenção/crítico)
+      - **Distribuição Geográfica**: Análise por estado, Grande Vitória (Vitória, Vila Velha, Serra, Cariacica), presencial vs remoto
+      - **Visualizações**: Evolução headcount, pessoas por setor, custo por setor, tempo de casa, demissões por tipo
+      - **Tabelas**: Distribuição por squad/cargo/nível, aniversariantes, más contratações, últimas promoções
     - **OKR 2026 Module**: Strategic objectives and key results tracking for "Bigger & Better — Consolidação, Escala e Padronização" plan. Features:
       - **5 Objectives**: O1 Ecossistema, O2 Eficiência & Sistemas, O3 Saúde da Receita (Hugz), O4 TurboOH, O5 Padronização & Produto
       - **18 KRs** with quarterly targets (Q1-Q4) using KRDef schema: metricKey, aggregation (quarter_end/sum/avg), direction (gte/lte), unit (BRL/PCT/COUNT)
@@ -77,6 +84,11 @@ Preferred communication style: Simple, everyday language.
 - **Backward Compatibility**: Helper functions `routesToPermissions()` and `permissionsToRoutes()` maintain compatibility with legacy route-based allowedRoutes.
 - **Protected Routes**: Backend API routes secured with middleware; frontend routes protected by `ProtectedRoute` component.
 - **Admin Interface**: `/admin/usuarios` for managing user permissions using the new profile selector or granular permission checkboxes.
+- **Conexões (Connections Tab)**: Admin panel tab showing real-time status of system integrations:
+  - **Database**: Google Cloud SQL (PostgreSQL) connection status with latency
+  - **OpenAI API**: Connection status with latency (uses OPENAI_API_KEY secret)
+  - **Google OAuth**: Configuration status (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
+  - Refresh button for manual status check, color-coded badges (green/red/yellow)
 
 ## External Dependencies
 
