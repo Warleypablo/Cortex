@@ -2395,15 +2395,6 @@ export default function Colaboradores() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4" data-testid="metrics-summary">
             <Card className="hover-elevate">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total de Colaboradores</CardTitle>
-                <Users className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold" data-testid="metric-total">{metrics.total}</div>
-              </CardContent>
-            </Card>
-            <Card className="hover-elevate">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Colaboradores Ativos</CardTitle>
                 <Briefcase className="w-4 h-4 text-green-500" />
               </CardHeader>
@@ -2475,6 +2466,25 @@ export default function Colaboradores() {
                 >
                   {(metrics.novosUltimos30d - metrics.desligadosUltimos30d) > 0 ? '+' : ''}{metrics.novosUltimos30d - metrics.desligadosUltimos30d}
                 </div>
+              </CardContent>
+            </Card>
+            <Card className="hover-elevate">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <div className="flex items-center gap-1">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Inativos</CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Colaboradores não ativos (desligados, férias, afastados)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Users className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-muted-foreground" data-testid="metric-inativos">{metrics.total - metrics.ativos}</div>
               </CardContent>
             </Card>
           </div>
