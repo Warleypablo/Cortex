@@ -27,8 +27,26 @@ import {
   Target, TrendingUp, DollarSign, AlertTriangle, AlertCircle,
   ArrowUpRight, Info, Rocket, Clock, CheckCircle2, 
   XCircle, Banknote, PiggyBank, ClipboardCheck, MessageSquare, History,
-  CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building
+  CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building,
+  LayoutGrid, List, Search
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { 
+  ObjectiveBadge, 
+  QuarterBadge, 
+  InitiativeStatusBadge, 
+  KRLinkBadge,
+  TagBadge,
+  EmptyState 
+} from "@/components/ui/okr-badges";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { 
   ResponsiveContainer, 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
@@ -249,18 +267,15 @@ function KRCheckinModal({
 
   const createCheckinMutation = useMutation({
     mutationFn: async (values: KRCheckinFormValues) => {
-      return apiRequest("/api/okr2026/kr-checkins", {
-        method: "POST",
-        body: JSON.stringify({
-          krId: kr?.id,
-          year: 2026,
-          periodType: "quarter",
-          periodValue: values.periodValue,
-          confidence: values.confidence,
-          commentary: values.commentary || null,
-          blockers: values.blockers || null,
-          nextActions: values.nextActions || null,
-        }),
+      return apiRequest("POST", "/api/okr2026/kr-checkins", {
+        krId: kr?.id,
+        year: 2026,
+        periodType: "quarter",
+        periodValue: values.periodValue,
+        confidence: values.confidence,
+        commentary: values.commentary || null,
+        blockers: values.blockers || null,
+        nextActions: values.nextActions || null,
       });
     },
     onSuccess: () => {
@@ -958,25 +973,6 @@ function StatusBadge({ status }: { status: "green" | "yellow" | "red" | "gray" }
   const { label, className } = config[status] || config.gray;
   return (
     <Badge variant="outline" className={`${className} text-xs`}>
-      {label}
-    </Badge>
-  );
-}
-
-function InitiativeStatusBadge({ status }: { status: string }) {
-  const config: Record<string, { label: string; icon: typeof Rocket; className: string }> = {
-    planned: { label: "Planejado", icon: Clock, className: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30" },
-    not_started: { label: "Backlog", icon: Clock, className: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30" },
-    doing: { label: "Em andamento", icon: Rocket, className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30" },
-    in_progress: { label: "Em andamento", icon: Rocket, className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30" },
-    done: { label: "Concluído", icon: CheckCircle2, className: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30" },
-    completed: { label: "Concluído", icon: CheckCircle2, className: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30" },
-    blocked: { label: "Bloqueado", icon: XCircle, className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30" },
-  };
-  const { label, icon: Icon, className } = config[status] || config.planned;
-  return (
-    <Badge variant="outline" className={`${className} gap-1`}>
-      <Icon className="w-3 h-3" />
       {label}
     </Badge>
   );
@@ -1728,6 +1724,8 @@ function InitiativesTab({
   const [objectiveFilter, setObjectiveFilter] = useState<string>("all");
   const [quarterFilter, setQuarterFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const collaboratorMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -1762,9 +1760,14 @@ function InitiativesTab({
         const ownerMatch = ini.owner_email === ownerFilter || ini.ownerRole === ownerFilter;
         if (!ownerMatch) return false;
       }
+      if (searchQuery) {
+        const title = (ini.name || ini.title || "").toLowerCase();
+        const query = searchQuery.toLowerCase();
+        if (!title.includes(query)) return false;
+      }
       return true;
     });
-  }, [initiatives, objectiveFilter, quarterFilter, ownerFilter]);
+  }, [initiatives, objectiveFilter, quarterFilter, ownerFilter, searchQuery]);
 
   const columnData = useMemo(() => {
     const data: Record<string, Initiative[]> = {};
@@ -1786,6 +1789,19 @@ function InitiativesTab({
   const getKRTitle = (krId: string) => {
     const kr = krs.find(k => k.id === krId);
     return kr ? kr.title : krId;
+  };
+
+  const getStatusLabel = (status: string) => {
+    const statusMap: Record<string, string> = {
+      planned: "Backlog",
+      not_started: "Backlog", 
+      doing: "Em andamento",
+      in_progress: "Em andamento",
+      done: "Concluído",
+      completed: "Concluído",
+      blocked: "Bloqueado",
+    };
+    return statusMap[status] || status;
   };
 
   return (
@@ -1836,63 +1852,209 @@ function InitiativesTab({
           </Select>
         </div>
         
-        <div className="ml-auto flex items-center gap-4 text-sm text-muted-foreground">
-          <span>{filteredInitiatives.length} iniciativa(s)</span>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px] bg-slate-500/10">{totalStats.backlog} backlog</Badge>
-            <Badge variant="outline" className="text-[10px] bg-blue-500/10">{totalStats.doing} doing</Badge>
-            <Badge variant="outline" className="text-[10px] bg-green-500/10">{totalStats.done} done</Badge>
-            {totalStats.blocked > 0 && (
-              <Badge variant="outline" className="text-[10px] bg-red-500/10">{totalStats.blocked} blocked</Badge>
-            )}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar iniciativa..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 w-[200px]"
+            data-testid="input-search-initiative"
+          />
+        </div>
+        
+        <div className="ml-auto flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>{filteredInitiatives.length} iniciativa(s)</span>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px] bg-slate-500/10">{totalStats.backlog} backlog</Badge>
+              <Badge variant="outline" className="text-[10px] bg-blue-500/10">{totalStats.doing} doing</Badge>
+              <Badge variant="outline" className="text-[10px] bg-green-500/10">{totalStats.done} done</Badge>
+              {totalStats.blocked > 0 && (
+                <Badge variant="outline" className="text-[10px] bg-red-500/10">{totalStats.blocked} blocked</Badge>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center border rounded-lg p-1 bg-muted/50">
+            <Button 
+              variant={viewMode === "kanban" ? "secondary" : "ghost"} 
+              size="sm"
+              onClick={() => setViewMode("kanban")}
+              className="gap-1.5"
+              data-testid="button-view-kanban"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              Kanban
+            </Button>
+            <Button 
+              variant={viewMode === "list" ? "secondary" : "ghost"} 
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="gap-1.5"
+              data-testid="button-view-list"
+            >
+              <List className="w-4 h-4" />
+              Lista
+            </Button>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="kanban-board">
-        {KANBAN_COLUMNS.map(column => {
-          const Icon = column.icon;
-          const items = columnData[column.id] || [];
-          
-          return (
-            <div 
-              key={column.id}
-              className={`rounded-lg border-t-4 ${column.borderColor} ${column.bgColor}`}
-              data-testid={`kanban-column-${column.id}`}
-            >
-              <div className="p-3 border-b border-border/50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Icon className={`w-4 h-4 ${column.iconColor}`} />
-                    <span className="font-medium text-sm">{column.title}</span>
+      {viewMode === "kanban" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="kanban-board">
+          {KANBAN_COLUMNS.map(column => {
+            const Icon = column.icon;
+            const items = columnData[column.id] || [];
+            
+            return (
+              <div 
+                key={column.id}
+                className={`rounded-lg border-t-4 ${column.borderColor} ${column.bgColor}`}
+                data-testid={`kanban-column-${column.id}`}
+              >
+                <div className="p-3 border-b border-border/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Icon className={`w-4 h-4 ${column.iconColor}`} />
+                      <span className="font-medium text-sm">{column.title}</span>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">
+                      {items.length}
+                    </Badge>
                   </div>
-                  <Badge variant="secondary" className="text-xs">
-                    {items.length}
-                  </Badge>
+                </div>
+                
+                <div className="p-2 min-h-[200px] max-h-[calc(100vh-400px)] overflow-y-auto">
+                  {items.length === 0 ? (
+                    <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
+                      Nenhuma iniciativa
+                    </div>
+                  ) : (
+                    items.map(initiative => (
+                      <InitiativeKanbanCard
+                        key={initiative.id}
+                        initiative={initiative}
+                        resolveOwner={resolveOwner}
+                        getKRTitle={getKRTitle}
+                        krs={krs}
+                      />
+                    ))
+                  )}
                 </div>
               </div>
-              
-              <div className="p-2 min-h-[200px] max-h-[calc(100vh-400px)] overflow-y-auto">
-                {items.length === 0 ? (
-                  <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
-                    Nenhuma iniciativa
-                  </div>
-                ) : (
-                  items.map(initiative => (
-                    <InitiativeKanbanCard
-                      key={initiative.id}
-                      initiative={initiative}
-                      resolveOwner={resolveOwner}
-                      getKRTitle={getKRTitle}
-                      krs={krs}
-                    />
-                  ))
-                )}
+            );
+          })}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            {filteredInitiatives.length === 0 ? (
+              <EmptyState 
+                title="Nenhuma iniciativa encontrada"
+                description="Tente ajustar os filtros para ver mais resultados."
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-[300px]">Título</TableHead>
+                      <TableHead className="w-[80px]">Objetivo</TableHead>
+                      <TableHead className="w-[70px]">Quarter</TableHead>
+                      <TableHead className="w-[120px]">Status</TableHead>
+                      <TableHead className="w-[150px]">Owner</TableHead>
+                      <TableHead className="w-[200px]">KRs Vinculados</TableHead>
+                      <TableHead className="w-[150px]">Tags</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredInitiatives.map((initiative) => {
+                      const title = initiative.name || initiative.title || "—";
+                      const krIds = initiative.krs || initiative.krIds || [];
+                      const tags = initiative.tags || [];
+                      const ownerEmail = initiative.owner_email || initiative.ownerRole;
+                      
+                      return (
+                        <TableRow 
+                          key={initiative.id} 
+                          className="hover-elevate cursor-pointer"
+                          data-testid={`row-initiative-${initiative.id}`}
+                        >
+                          <TableCell className="font-medium">
+                            <div className="max-w-[280px] truncate" title={title}>
+                              {title}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <ObjectiveBadge objective={initiative.objectiveId} />
+                          </TableCell>
+                          <TableCell>
+                            {initiative.quarter ? (
+                              <QuarterBadge quarter={initiative.quarter} />
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <InitiativeStatusBadge status={getStatusLabel(initiative.status)} />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium shrink-0">
+                                {resolveOwner(ownerEmail) !== "—" 
+                                  ? resolveOwner(ownerEmail).split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
+                                  : "?"
+                                }
+                              </div>
+                              <span className="text-sm truncate max-w-[100px]">
+                                {resolveOwner(ownerEmail)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1 max-w-[180px]">
+                              {krIds.slice(0, 3).map((krId) => (
+                                <Tooltip key={krId}>
+                                  <TooltipTrigger asChild>
+                                    <span>
+                                      <KRLinkBadge krKey={krId} />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    {getKRTitle(krId)}
+                                  </TooltipContent>
+                                </Tooltip>
+                              ))}
+                              {krIds.length > 3 && (
+                                <Badge variant="outline" className="text-[10px]">
+                                  +{krIds.length - 3}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1 max-w-[130px]">
+                              {tags.slice(0, 2).map((tag) => (
+                                <TagBadge key={tag} tag={tag} />
+                              ))}
+                              {tags.length > 2 && (
+                                <Badge variant="outline" className="text-[10px]">
+                                  +{tags.length - 2}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
@@ -2332,7 +2494,7 @@ export default function OKR2026() {
 
   const seedBPMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("/api/okr2026/seed-bp", { method: "POST" });
+      const res = await apiRequest("POST", "/api/okr2026/seed-bp");
       return res.json();
     },
     onSuccess: (data) => {
