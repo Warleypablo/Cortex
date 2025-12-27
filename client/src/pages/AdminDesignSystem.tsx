@@ -25,14 +25,16 @@ import {
   BarChart3
 } from "lucide-react";
 
-import RoundedPieChart from "@/components/ui/charts/pie-chart-demo";
-import PingingDotChart from "@/components/ui/charts/line-chart-pinging";
-import GlowingLineChart from "@/components/ui/charts/line-chart-glowing";
-import GlowingBarChart from "@/components/ui/charts/bar-chart-glowing";
-import HatchedBarChart from "@/components/ui/charts/bar-chart-hatched";
-import DetailedIncidentReportCard from "@/components/ui/charts/horizontal-bar-report";
-import StackedAreaReport from "@/components/ui/charts/stacked-area-chart";
-import StatisticCard from "@/components/ui/charts/statistics-card";
+import {
+  RoundedPieChart,
+  PingingDotChart,
+  GlowingLineChart,
+  GlowingBarChart,
+  HatchedBarChart,
+  DetailedIncidentReportCard,
+  StackedAreaReport,
+  StatisticCard,
+} from "@/components/ui/charts";
 
 export default function AdminDesignSystem() {
   return (
@@ -546,6 +548,61 @@ export default function AdminDesignSystem() {
                   <code className="text-xs text-muted-foreground block">
                     import {"{"} StatisticCard {"}"} from "@/components/ui/charts"; // Card de estatísticas com trend
                   </code>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Exemplos com Props Customizados</h3>
+                <p className="text-sm text-muted-foreground">Todos os componentes aceitam props para dados, cores e configurações.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <RoundedPieChart 
+                    title="Receita por Serviço"
+                    description="Q4 2024"
+                    data={[
+                      { name: "Performance", value: 450000, fill: "hsl(var(--chart-1))" },
+                      { name: "Social Media", value: 280000, fill: "hsl(var(--chart-2))" },
+                      { name: "Inbound", value: 180000, fill: "hsl(var(--chart-3))" },
+                    ]}
+                    trend={{ value: 12.5, direction: 'up' }}
+                  />
+                  <PingingDotChart 
+                    title="Novos Clientes"
+                    description="Últimos 6 meses"
+                    data={[
+                      { label: "Jul", value: 12 },
+                      { label: "Ago", value: 18 },
+                      { label: "Set", value: 15 },
+                      { label: "Out", value: 22 },
+                      { label: "Nov", value: 28 },
+                      { label: "Dez", value: 35 },
+                    ]}
+                    color="hsl(var(--chart-3))"
+                    trend={{ value: 45, direction: 'up' }}
+                  />
+                  <StatisticCard 
+                    title="MRR Ativo"
+                    value={1850000}
+                    currency="BRL"
+                    trend={{ value: 8.3, direction: 'up', label: 'vs mês anterior' }}
+                    details={[
+                      { label: 'Ticket Médio:', value: 'R$ 12.500' },
+                      { label: 'Total Clientes:', value: '148' },
+                    ]}
+                  />
+                </div>
+                <div className="bg-muted/50 rounded-lg p-4 mt-2">
+                  <pre className="text-xs text-muted-foreground overflow-x-auto">
+{`<RoundedPieChart 
+  title="Receita por Serviço"
+  data={[
+    { name: "Performance", value: 450000 },
+    { name: "Social Media", value: 280000 },
+  ]}
+  trend={{ value: 12.5, direction: 'up' }}
+/>`}
+                  </pre>
                 </div>
               </div>
 
