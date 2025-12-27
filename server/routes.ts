@@ -1921,7 +1921,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const colaboradores = colaboradoresResult.rows as { id: number; nome: string; cargo: string | null; squad: string | null }[];
       
       const healthData = await Promise.all(colaboradores.map(async (colab) => {
-        let enpsScore = 0;
+        let enpsScore = 20;
+        let hasEnpsData = false;
         let lastEnpsScoreValue: number | null = null;
         try {
           const enpsResult = await db.execute(sql`
@@ -1930,15 +1931,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ORDER BY data DESC LIMIT 1
           `);
           if (enpsResult.rows.length > 0) {
+            hasEnpsData = true;
             const score = (enpsResult.rows[0] as { score: number }).score;
             lastEnpsScoreValue = score;
             if (score >= 9) enpsScore = 30;
             else if (score >= 7) enpsScore = 20;
             else if (score >= 5) enpsScore = 10;
+            else enpsScore = 0;
           }
         } catch (e) { }
 
-        let oneOnOneScore = 0;
+        let oneOnOneScore = 15;
+        let hasOneOnOneData = false;
         let daysSinceOneOnOneValue: number | null = null;
         try {
           const oneOnOneResult = await db.execute(sql`
@@ -1947,16 +1951,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ORDER BY data DESC LIMIT 1
           `);
           if (oneOnOneResult.rows.length > 0) {
+            hasOneOnOneData = true;
             const lastDate = new Date((oneOnOneResult.rows[0] as { data: string }).data);
             const daysDiff = Math.floor((Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
             daysSinceOneOnOneValue = daysDiff;
             if (daysDiff <= 14) oneOnOneScore = 25;
             else if (daysDiff <= 30) oneOnOneScore = 15;
             else if (daysDiff <= 45) oneOnOneScore = 5;
+            else oneOnOneScore = 0;
           }
         } catch (e) { }
 
-        let pdiScore = 0;
+        let pdiScore = 15;
+        let hasPdiData = false;
         let pdiProgressValue: number | null = null;
         try {
           const pdiResult = await db.execute(sql`
@@ -1964,6 +1971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             WHERE colaborador_id = ${colab.id}
           `);
           if (pdiResult.rows.length > 0 && (pdiResult.rows[0] as any).avg_progress !== null) {
+            hasPdiData = true;
             const avgProgress = parseFloat((pdiResult.rows[0] as any).avg_progress) || 0;
             pdiProgressValue = Math.round(avgProgress);
             pdiScore = Math.round((avgProgress / 100) * 25);
