@@ -1,0 +1,795 @@
+PROMPT 1 — MVP OKR 2026 + KPI Engine + BP 2026 (Targets) + Plan vs Actual + Dashboards
+
+Quero que você crie um produto web full-stack chamado “Turbo Cortex — OKR 2026”.
+O sistema precisa ter 4 áreas: Dashboard, KRs, Iniciativas e BP Financeiro, além de um motor de KPIs com targets (BP) e actuals (sistema).
+
+PRINCÍPIOS:
+- Produto executivo (visão de dono). Clareza e objetividade.
+- Tudo que é do ERP/CRM (cup_* e caz_*) é READ-ONLY. Não escrever nem alterar.
+- Onde não der para automatizar agora, deve existir “manual override” por mês.
+- O sistema precisa suportar “Plan vs Actual” em todos os cards e tabelas.
+- PCT deve ser armazenado como FRAÇÃO (13,26% => 0.1326).
+- BRL em reais (numeric 18,2) sem “R$” no banco.
+
+STACK (usar isso):
+- Frontend: React + TypeScript + Tailwind + componentes do projeto (se não existir, usar shadcn/ui)
+- Backend: Node + TypeScript (Express ou Fastify)
+- DB: Postgres
+- Migrations: SQL migrations simples (executadas na inicialização) OU Prisma/Drizzle (o que você preferir, mas faça direito).
+- Formatação BRL e PCT no frontend.
+
+========================================================
+A) CONEXÃO COM BANCO (CRÍTICO)
+========================================================
+1) O sistema deve funcionar com:
+- Postgres local do Replit (default) OU Cloud SQL (via env vars)
+2) Usar DATABASE_URL no padrão Postgres.
+3) Criar uma tela /admin/health que mostra:
+- DB conectado (OK/FAIL)
+- quantas linhas existem em plan.metric_targets_monthly (para confirmar seed)
+- quantas métricas no registry
+
+========================================================
+B) MODELAGEM DE DADOS (CRIAR SCHEMAS E TABELAS)
+========================================================
+Criar schemas: plan, kpi, okr, admin
+
+1) plan.metric_targets_monthly
+- id (pk)
+- year int (ex: 2026)
+- month text (YYYY-MM, ex: "2026-01")
+- metric_key text (index)
+- dimension_key text nullable
+- dimension_value text nullable
+- target_value numeric(18,2) nullable (para PCT também armazenar numeric, mas valores 0-1)
+- unit text (BRL|COUNT|PCT)  [redundante ok, ajuda auditoria]
+- created_at, updated_at
+UNIQUE: (year, month, metric_key, coalesce(dimension_key,''), coalesce(dimension_value,''))
+
+2) kpi.metrics_registry
+- metric_key (pk)
+- name
+- unit (BRL|COUNT|PCT)
+- period_type (month_end|month_sum|derived)
+- direction (up|down|flat)
+- actual_source_type (auto_sql|manual|derived)
+- actual_sql text nullable (quando auto_sql)
+- is_derived boolean default false
+- formula_expr text nullable (para derived, ex: "A + B - C")
+- base_metrics jsonb nullable (lista de metric_keys base)
+- tolerance_yellow numeric nullable
+- tolerance_red numeric nullable
+- group_key text (Overview|Financeiro|Pessoas|Comercial|Base)
+- description text
+- active boolean default true
+- created_at, updated_at
+
+3) kpi.metric_actuals_monthly
+- id pk
+- year int
+- month text (YYYY-MM)
+- metric_key text
+- dimension_key text nullable
+- dimension_value text nullable
+- actual_value numeric(18,2) nullable
+- source text (auto_sql|manual|derived)
+- computed_at timestamp
+UNIQUE: (year, month, metric_key, coalesce(dimension_key,''), coalesce(dimension_value,''))
+
+4) kpi.metric_overrides_monthly  (manual override)
+- id pk
+- year int
+- month text
+- metric_key text
+- dimension_key text nullable
+- dimension_value text nullable
+- override_value numeric(18,2)
+- note text nullable
+- updated_by text nullable
+- updated_at timestamp
+UNIQUE igual acima
+
+REGRA: Se existir override para uma métrica/mês, ela ganha de auto_sql.
+
+5) okr.objectives
+- id pk
+- code text (O1, O2…)
+- title
+- description
+- owner_role text nullable
+- year int default 2026
+- created_at, updated_at
+
+6) okr.key_results
+- id pk
+- objective_id fk
+- code text (O1_KR1 etc)
+- title
+- metric_key (fk registry)
+- direction (up|down|flat)
+- weight numeric(5,2)
+- cadence text (monthly)
+- created_at, updated_at
+
+7) okr.initiatives
+- id pk
+- title
+- objective_code (O1..O5) (ou fk objective)
+- quarter text (Q1|Q2|Q3|Q4)
+- owner text nullable (email/nome)
+- status text (planejado|andamento|bloqueado|concluido)
+- tags text[] nullable
+- created_at, updated_at
+
+8) okr.initiative_krs (m2m)
+- initiative_id fk
+- kr_id fk
+PK composto
+
+9) okr.kr_checkins
+- id pk
+- kr_id fk
+- month text (YYYY-MM) nullable
+- quarter text nullable
+- confidence int (0-100)
+- comment text
+- created_at
+
+10) admin.category_mapping  (placeholder para Sprint 3 Conta Azul)
+- id pk
+- source_system text default 'conta_azul'
+- source_category text
+- group_key text (CSV|CAC|SGA|Taxes|BadDebt etc)
+- active boolean default true
+Obs: nesta sprint NÃO usar isso para calcular. Só deixar pronto.
+
+========================================================
+C) QUARTER RULES (AGREGAÇÃO)
+========================================================
+Implementar função canônica:
+- month_sum (BRL): quarter = soma 3 meses
+- month_end (BRL/COUNT): quarter = valor do último mês do quarter (Mar/Jun/Set/Dez)
+- PCT: quarter = média simples dos 3 meses (por enquanto)
+
+========================================================
+D) MOTOR KPI (RECOMPUTE)
+========================================================
+Criar endpoint:
+POST /api/kpi/recompute?year=2026
+Ele deve:
+1) Para cada metric_key ativo no registry:
+   a) Para cada mês 2026-01..2026-12:
+      - Se existir override, salvar metric_actuals_monthly com source=manual
+      - Senão:
+         - auto_sql: executar SQL com params year/month, salvar
+         - manual: deixar null (ou criar linha null)
+2) Depois calcular derived:
+   - para cada derived, usar base_metrics e formula_expr
+   - salvar derived em metric_actuals_monthly
+3) Retornar resumo: quantos calculados, quantos sem dado, quanto override usado
+
+IMPORTANTE:
+- Não pode quebrar se uma métrica não tiver actual_sql: apenas marca como sem_dado.
+- Deve existir também GET /api/kpi/overview?year=2026&period=month|quarter&month=2026-10&quarter=Q4
+  que retorna: actual, target, variance, status, score, ytd.
+
+STATUS (semafóro):
+- up:
+  green >= target
+  yellow >= target*(1-0.05)
+  red < target*(1-0.10)
+- down:
+  green <= target
+  yellow <= target*(1+0.05)
+  red > target*(1+0.10)
+- flat:
+  green dentro de ±2%
+  yellow dentro de ±5%
+  red > ±5%
+- PCT:
+  usar ABS diff:
+  green <= 0.02
+  yellow <= 0.04
+  red > 0.04
+
+SCORE KR:
+- up: score = min(actual/target, 1.2)
+- down: score = min(target/actual, 1.2)
+- flat: score = max(0, 1 - abs(actual-target)/target)
+Depois normalizar para 0..100
+
+========================================================
+E) FONTES DE “ACTUAL” (AUTO_SQL) — O QUE DER, LIGAR
+========================================================
+Você deve tentar automatizar pelo menos:
+1) mrr_active (month_end):
+- usar tabela public.cup_contratos (READ ONLY)
+- regra inicial: somar valorr onde status for considerado “ativo”
+- como não sabemos os statuses, crie uma tabela admin.contract_status_map:
+  - status text pk
+  - is_active boolean
+Seed inicial is_active=true para: 'ativo','onboarding','triagem'
+E permitir editar em /admin/mapeamentos.
+SQL do mrr_active deve usar esse map:
+SELECT COALESCE(SUM(c.valorr),0) FROM public.cup_contratos c
+JOIN admin.contract_status_map m ON m.status=c.status AND m.is_active=true
+WHERE c.valorr IS NOT NULL
+AND c.data_inicio <= month_end_date
+AND (c.data_encerramento IS NULL OR c.data_encerramento > month_end_date);
+
+Observação: se não tiver datas completas, simplificar: ignorar datas no MVP e só filtrar status.
+
+2) clients_active (month_end):
+- se existir public.cup_clientes, contar clientes ativos
+- se não tiver status, derivar via contratos: COUNT DISTINCT cliente_id dos contratos ativos
+(Se não existir cliente_id em cup_contratos, criar view vw_contratos_canon com melhor suposição e deixar clients_active manual por enquanto.)
+
+3) contracts_active (month_end):
+- contar contratos ativos pelo mesmo filtro do map
+
+4) headcount_total:
+- se existir tabela de colaboradores no DB, usar.
+- se não existir, criar app.employees (MVP) e permitir seed manual via /admin/colaboradores.
+E headcount_total fica manual até conectar.
+
+Tudo o resto pode ficar manual override nesta Sprint 1 (mas registry e targets precisam existir).
+
+========================================================
+F) REGISTRY — DEFINIR TODAS AS MÉTRICAS DO BP 2026
+========================================================
+Criar seed do registry com essas métricas:
+
+(1) Receita & DRE (BP)
+- mrr_active (BRL, month_end) [auto_sql]
+- revenue_one_time (BRL, month_sum) [manual]
+- revenue_other (BRL, month_sum) [manual]
+- revenue_billable_total (BRL, derived) = mrr_active + revenue_one_time + revenue_other
+- bad_debt (BRL, month_sum) [manual]
+- taxes_on_revenue (BRL, month_sum) [manual]
+- revenue_net (BRL, derived) = revenue_billable_total - bad_debt - taxes_on_revenue
+- cogs_csv (BRL, month_sum) [manual]
+- gross_margin (BRL, derived) = revenue_net - cogs_csv
+- cac_total (BRL, month_sum) [manual]
+- sga_total (BRL, month_sum) [manual]
+- ebitda (BRL, derived) = gross_margin - cac_total - sga_total
+- tax_ir_csll (BRL, month_sum) [manual]
+- capex (BRL, month_sum) [manual]
+- cash_generation (BRL, derived) = ebitda - tax_ir_csll - capex
+- cash_generation_margin_pct (PCT, derived) = cash_generation / revenue_billable_total
+- effective_tax_rate_pct (PCT, derived) = taxes_on_revenue / revenue_billable_total
+
+(2) Caixa
+- cash_balance (BRL, month_end) [manual]
+
+(3) Base
+- clients_active (COUNT, month_end) [auto_sql ou manual]
+- contracts_active (COUNT, month_end) [auto_sql]
+- churn_mrr_month (BRL, month_sum) [manual]
+
+(4) Pessoas
+- headcount_total (COUNT, month_end) [manual ou auto]
+- headcount_bucket_csv (COUNT, month_end) [manual]
+- headcount_bucket_cac (COUNT, month_end) [manual]
+- headcount_bucket_sga (COUNT, month_end) [manual]
+
+(5) Eficiência (checkpoint do BP)
+- revenue_per_head (BRL, checkpoint) [manual target; actual derived se tiver dados]
+- mrr_per_head (BRL, checkpoint)
+- avg_ticket_client (BRL, checkpoint)
+- avg_ticket_contract (BRL, checkpoint)
+
+(6) Comercial (targets)
+- sales_mrr_total_target (BRL, month_sum) [plan target]
+- sales_mrr_new_target (BRL, month_sum) [plan target]
+- sales_mrr_monetization_target (BRL, month_sum) [plan target]
+- sales_performance_share_pct (PCT, month_sum) [plan target]
+- sales_mrr_performance_target (BRL, month_sum) [plan target]
+- aov_performance (BRL, month_end) [plan target]
+- contracts_performance (COUNT, month_sum) [plan target]
+
+========================================================
+G) SEED DO BP 2026 — TARGETS COM NÚMEROS (OBRIGATÓRIO)
+========================================================
+Implementar um seed BP 2026 que faz UPSERT em plan.metric_targets_monthly para 2026-01..2026-12.
+Criar endpoint:
+POST /api/admin/seed/bp2026
+Ele deve popular TODOS os targets abaixo.
+
+DATASET (targets):
+
+mrr_active:
+2026-01 1156850
+2026-02 1267734
+2026-03 1368637
+2026-04 1485460
+2026-05 1591769
+2026-06 1688510
+2026-07 1806544
+2026-08 1913955
+2026-09 2011699
+2026-10 2130646
+2026-11 2238888
+2026-12 2337388
+
+revenue_one_time:
+2026-01 240000
+2026-02 280000
+2026-03 270000
+2026-04 288333
+2026-05 306667
+2026-06 325000
+2026-07 343333
+2026-08 361667
+2026-09 380000
+2026-10 398333
+2026-11 416667
+2026-12 435000
+
+revenue_other:
+2026-01 24767
+2026-02 21600
+2026-03 20267
+2026-04 34037
+2026-05 34037
+2026-06 25703
+2026-07 45973
+2026-08 45973
+2026-09 49587
+2026-10 87927
+2026-11 87927
+2026-12 87927
+
+bad_debt:
+2026-01 99513
+2026-02 109853
+2026-03 116123
+2026-04 108470
+2026-05 115948
+2026-06 122353
+2026-07 131751
+2026-08 139296
+2026-09 146477
+2026-10 157014
+2026-11 164609
+2026-12 171619
+
+taxes_on_revenue:
+2026-01 146247
+2026-02 160603
+2026-03 169308
+2026-04 185757
+2026-05 198001
+2026-06 208486
+2026-07 223872
+2026-08 236224
+2026-09 247981
+2026-10 265233
+2026-11 277666
+2026-12 289143
+
+cogs_csv:
+2026-01 392504
+2026-02 407706
+2026-03 436438
+2026-04 475848
+2026-05 497651
+2026-06 516746
+2026-07 577633
+2026-08 602414
+2026-09 616990
+2026-10 659609
+2026-11 672624
+2026-12 697685
+
+cac_total:
+2026-01 287296
+2026-02 290796
+2026-03 316796
+2026-04 336374
+2026-05 421374
+2026-06 361374
+2026-07 452725
+2026-08 370725
+2026-09 383725
+2026-10 419577
+2026-11 404577
+2026-12 427577
+
+sga_total:
+2026-01 410130
+2026-02 296477
+2026-03 290518
+2026-04 296633
+2026-05 299429
+2026-06 303725
+2026-07 437438
+2026-08 309683
+2026-09 311030
+2026-10 335494
+2026-11 347141
+2026-12 369337
+
+tax_ir_csll:
+2026-01 29215
+2026-02 103325
+2026-03 112105
+2026-04 137614
+2026-05 136024
+2026-06 179020
+2026-07 126627
+2026-08 225506
+2026-09 249928
+2026-10 265193
+2026-11 298134
+2026-12 307684
+
+capex:
+2026-01 32500
+2026-02 32500
+2026-03 32500
+2026-04 32500
+2026-05 32500
+2026-06 32500
+2026-07 32500
+2026-08 32500
+2026-09 32500
+2026-10 32500
+2026-11 32500
+2026-12 32500
+
+cash_balance (month_end):
+2026-01 624212
+2026-02 792285
+2026-03 977401
+2026-04 1212035
+2026-05 1443581
+2026-06 1758591
+2026-07 1971895
+2026-08 2377142
+2026-09 2829796
+2026-10 3312082
+2026-11 3858312
+2026-12 4423082
+
+clients_active (month_end):
+2026-01 290
+2026-02 319
+2026-03 340
+2026-04 365
+2026-05 388
+2026-06 409
+2026-07 434
+2026-08 458
+2026-09 479
+2026-10 505
+2026-11 530
+2026-12 552
+
+contracts_active (month_end):
+2026-01 415
+2026-02 456
+2026-03 486
+2026-04 521
+2026-05 555
+2026-06 585
+2026-07 620
+2026-08 655
+2026-09 686
+2026-10 722
+2026-11 758
+2026-12 789
+
+headcount_total (month_end):
+2026-01 126
+2026-02 129
+2026-03 138
+2026-04 143
+2026-05 147
+2026-06 151
+2026-07 158
+2026-08 163
+2026-09 166
+2026-10 172
+2026-11 175
+2026-12 179
+
+headcount_bucket_csv:
+2026-01 87
+2026-02 89
+2026-03 96
+2026-04 100
+2026-05 104
+2026-06 107
+2026-07 114
+2026-08 118
+2026-09 120
+2026-10 125
+2026-11 128
+2026-12 131
+
+headcount_bucket_cac:
+2026-01 27
+2026-02 28
+2026-03 30
+2026-04 31
+2026-05 31
+2026-06 31
+2026-07 31
+2026-08 32
+2026-09 33
+2026-10 34
+2026-11 34
+2026-12 35
+
+headcount_bucket_sga:
+2026-01 12
+2026-02 12
+2026-03 12
+2026-04 12
+2026-05 12
+2026-06 13
+2026-07 13
+2026-08 13
+2026-09 13
+2026-10 13
+2026-11 13
+2026-12 13
+
+churn_mrr_month:
+2026-01 104117
+2026-02 114096
+2026-03 123177
+2026-04 133691
+2026-05 143259
+2026-06 151966
+2026-07 162589
+2026-08 172256
+2026-09 181053
+2026-10 191758
+2026-11 201500
+2026-12 210365
+
+sales_mrr_total_target:
+2026-01 215000
+2026-02 215000
+2026-03 215000
+2026-04 240000
+2026-05 240000
+2026-06 240000
+2026-07 270000
+2026-08 270000
+2026-09 270000
+2026-10 300000
+2026-11 300000
+2026-12 300000
+
+sales_mrr_new_target:
+2026-01 200000
+2026-02 200000
+2026-03 200000
+2026-04 220000
+2026-05 220000
+2026-06 220000
+2026-07 240000
+2026-08 240000
+2026-09 240000
+2026-10 260000
+2026-11 260000
+2026-12 260000
+
+sales_mrr_monetization_target:
+2026-01 15000
+2026-02 15000
+2026-03 15000
+2026-04 20000
+2026-05 20000
+2026-06 20000
+2026-07 30000
+2026-08 30000
+2026-09 30000
+2026-10 40000
+2026-11 40000
+2026-12 40000
+
+sales_performance_share_pct (PCT):
+2026-01 0.30
+2026-02 0.30
+2026-03 0.30
+2026-04 0.30
+2026-05 0.30
+2026-06 0.30
+2026-07 0.30
+2026-08 0.30
+2026-09 0.30
+2026-10 0.30
+2026-11 0.30
+2026-12 0.30
+
+sales_mrr_performance_target:
+2026-01 64500
+2026-02 64500
+2026-03 64500
+2026-04 72000
+2026-05 72000
+2026-06 72000
+2026-07 81000
+2026-08 81000
+2026-09 81000
+2026-10 90000
+2026-11 90000
+2026-12 90000
+
+aov_performance (month_end):
+2026-01 3000
+2026-02 3000
+2026-03 3000
+2026-04 3000
+2026-05 3000
+2026-06 3000
+2026-07 3000
+2026-08 3000
+2026-09 3000
+2026-10 3000
+2026-11 3000
+2026-12 3000
+
+contracts_performance (COUNT month_sum):
+2026-01 22
+2026-02 22
+2026-03 22
+2026-04 24
+2026-05 24
+2026-06 24
+2026-07 27
+2026-08 27
+2026-09 27
+2026-10 30
+2026-11 30
+2026-12 30
+
+Além disso, seed checkpoints (PCT):
+effective_tax_rate_pct:
+2026-01 0.1234
+2026-02 0.1682
+2026-03 0.1696
+2026-04 0.1789
+2026-05 0.1728
+2026-06 0.1900
+2026-07 0.1596
+2026-08 0.1989
+2026-09 0.2040
+2026-10 0.2027
+2026-11 0.2099
+2026-12 0.2087
+
+cash_generation_margin_pct:
+2026-01 0.0209
+2026-02 0.1326
+2026-03 0.1353
+2026-04 0.1580
+2026-05 0.1455
+2026-06 0.1866
+2026-07 0.1181
+2026-08 0.2117
+2026-09 0.2250
+2026-10 0.2264
+2026-11 0.2440
+2026-12 0.2416
+
+(Observação: esses PCTs podem ser target “checkpoint”. Se a métrica for derived, pode ser armazenada mesmo assim como target.)
+
+========================================================
+H) OKR TEMPLATE 2026 (OBJECTIVES + KRs)
+========================================================
+Criar endpoint:
+POST /api/admin/seed/okr2026
+Que cria Objectives + KRs padrão:
+
+O1 — Crescer Receita Recorrente com qualidade
+- O1_KR1 MRR Ativo (mrr_active) weight 0.20 dir up
+- O1_KR2 Clientes Ativos (clients_active) weight 0.08 dir up
+- O1_KR3 Contratos Ativos (contracts_active) weight 0.07 dir up
+- O1_KR4 Ticket Médio Cliente (avg_ticket_client) weight 0.05 dir up
+- O1_KR5 Ticket Médio Contrato (avg_ticket_contract) weight 0.05 dir up
+- O1_KR6 Churn MRR mês (churn_mrr_month) weight 0.10 dir down
+
+O2 — Aumentar lucro e eficiência (DRE)
+- O2_KR1 Receita Faturável (revenue_billable_total) weight 0.08 dir up
+- O2_KR2 Receita Líquida (revenue_net) weight 0.08 dir up
+- O2_KR3 Margem Bruta (gross_margin) weight 0.06 dir up
+- O2_KR4 EBITDA (ebitda) weight 0.10 dir up
+- O2_KR5 Alíquota efetiva (effective_tax_rate_pct) weight 0.03 dir flat
+
+O3 — Gerar Caixa e fortalecer balanço
+- O3_KR1 Geração de Caixa (cash_generation) weight 0.10 dir up
+- O3_KR2 Margem de Geração (cash_generation_margin_pct) weight 0.05 dir up
+- O3_KR3 Saldo de Caixa (cash_balance) weight 0.05 dir up
+- O3_KR4 CAPEX (capex) weight 0.02 dir down
+
+O4 — Escalar time com produtividade
+- O4_KR1 Headcount Total (headcount_total) weight 0.04 dir flat
+- O4_KR2 Mix CSV/CAC/SGA (headcount_bucket_*) weight 0.04 dir flat
+- O4_KR3 Receita por cabeça (revenue_per_head) weight 0.03 dir up
+- O4_KR4 MRR por cabeça (mrr_per_head) weight 0.03 dir up
+
+O5 — Fortalecer motor comercial
+- O5_KR1 Vendas Totais MRR vs meta (sales_mrr_total_target) weight 0.08 dir up
+- O5_KR2 Vendas Novas MRR vs meta (sales_mrr_new_target) weight 0.05 dir up
+- O5_KR3 Monetização MRR vs meta (sales_mrr_monetization_target) weight 0.03 dir up
+- O5_KR4 Performance MRR vs meta (sales_mrr_performance_target) weight 0.02 dir up
+- O5_KR5 Contratos Performance vs meta (contracts_performance) weight 0.01 dir up
+
+========================================================
+I) TELAS (FRONTEND) — MVP FUNCIONAL
+========================================================
+Criar página principal /okr/2026 com tabs:
+- Dashboard
+- KRs
+- Iniciativas
+- BP Financeiro
+
+1) Dashboard:
+- Cards principais (mínimo 6):
+  mrr_active, ebitda, cash_generation, bad_debt (ou inadimplencia%), churn_mrr_month, cash_balance
+Cada card mostra:
+- Actual (se houver)
+- Target
+- Variance (R$ e %)
+- Status (badge)
+- Tooltip com definition
+E abaixo um bloco “Alertas” listando métricas com status vermelho.
+
+2) BP Financeiro:
+Tabela com linhas por métrica (pelo menos as do DRE) e colunas Jan..Dez + Total.
+Cada célula deve mostrar Target (sempre) e Actual (quando existir).
+Métricas derived devem estar marcadas como “calc”.
+
+3) KRs:
+Lista agrupada por Objective:
+Para cada KR mostrar por quarter (Q1..Q4):
+- actual vs target
+- badge status
+- score 0..100
+Clicar no KR abre drawer/modal com:
+- detalhes + check-ins
+- botão “Novo check-in”
+
+4) Iniciativas:
+Lista com filtros (Objective, Quarter, Status, Owner).
+Cada iniciativa mostra:
+- status badge
+- owner
+- quarter
+- KRs linkados (chips)
+- editar status
+(Seed inicial pode ser vazio nesta sprint, mas a UI tem que estar pronta.)
+
+5) Admin:
+Criar /admin com seções:
+- Seed BP 2026 (botão chama /api/admin/seed/bp2026)
+- Seed OKR 2026 (botão chama /api/admin/seed/okr2026)
+- Rodar Recompute (botão chama /api/kpi/recompute?year=2026)
+- Overrides (CRUD por mês/métrica)
+- Mapeamento status contratos (admin.contract_status_map CRUD)
+
+========================================================
+J) CHECKLIST / DO-DONE (VALIDAÇÃO)
+========================================================
+1) Abrir /admin/health e ver DB OK
+2) Rodar Seed BP 2026 -> targets populados (>= 300 linhas)
+3) Rodar Seed OKR 2026 -> objectives + KRs criados
+4) Rodar Recompute -> metric_actuals_monthly populada
+5) Dashboard mostra cards com Target sempre, Actual quando existir
+6) BP Financeiro mostra tabela completa com targets
+7) KRs aparece por objetivos e quarters
+8) Overrides funcionam (ao setar override, recompute reflete no dashboard)
+
+OBS:
+Se você não conseguir automatizar mrr_active por falta de colunas certas, deixe mrr_active como manual por enquanto, mas NÃO quebre o sistema. O core do MVP é: targets + derived + UI + overrides + recompute.
+
+ENTREGAR:
+- projeto rodando
+- migrations
+- seeds (BP e OKR)
+- endpoints
+- UI básica e consistente

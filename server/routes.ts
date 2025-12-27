@@ -11101,6 +11101,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== KR CHECK-INS ====================
+  
+  app.get("/api/okr2026/kr-checkins/:krId", isAuthenticated, async (req, res) => {
+    try {
+      const { krId } = req.params;
+      const year = parseInt(req.query.year as string) || 2026;
+      
+      const result = await db.execute(sql`
+        SELECT 
+          id, kr_id, year, period_type, period_value, 
+          confidence, commentary, blockers, next_actions,
+          created_by, created_at
+        FROM kr_checkins
+        WHERE kr_id = ${krId} AND year = ${year}
+        ORDER BY created_at DESC
+      `);
+      
+      res.json({
+        krId,
+        year,
+        checkins: result.rows.map((r: any) => ({
+          id: r.id,
+          krId: r.kr_id,
+          year: r.year,
+          periodType: r.period_type,
+          periodValue: r.period_value,
+          confidence: r.confidence,
+          commentary: r.commentary,
+          blockers: r.blockers,
+          nextActions: r.next_actions,
+          createdBy: r.created_by,
+          createdAt: r.created_at
+        }))
+      });
+    } catch (error) {
+      console.error("[api] Error fetching KR check-ins:", error);
+      res.status(500).json({ error: "Failed to fetch KR check-ins" });
+    }
+  });
+  
+  app.get("/api/okr2026/kr-checkins-latest", isAuthenticated, async (req, res) => {
+    try {
+      const year = parseInt(req.query.year as string) || 2026;
+      
+      const result = await db.execute(sql`
+        SELECT DISTINCT ON (kr_id)
+          id, kr_id, year, period_type, period_value, 
+          confidence, commentary, blockers, next_actions,
+          created_by, created_at
+        FROM kr_checkins
+        WHERE year = ${year}
+        ORDER BY kr_id, created_at DESC
+      `);
+      
+      const latestByKr: Record<string, any> = {};
+      for (const r of result.rows as any[]) {
+        latestByKr[r.kr_id] = {
+          id: r.id,
+          krId: r.kr_id,
+          year: r.year,
+          periodType: r.period_type,
+          periodValue: r.period_value,
+          confidence: r.confidence,
+          commentary: r.commentary,
+          blockers: r.blockers,
+          nextActions: r.next_actions,
+          createdBy: r.created_by,
+          createdAt: r.created_at
+        };
+      }
+      
+      res.json({ year, latestByKr });
+    } catch (error) {
+      console.error("[api] Error fetching latest KR check-ins:", error);
+      res.status(500).json({ error: "Failed to fetch latest KR check-ins" });
+    }
+  });
+  
+  app.post("/api/okr2026/kr-checkins", isAuthenticated, async (req, res) => {
+    try {
+      const { krId, year, periodType, periodValue, confidence, commentary, blockers, nextActions } = req.body;
+      
+      if (!krId || !year || !periodType || !periodValue) {
+        return res.status(400).json({ error: "krId, year, periodType and periodValue are required" });
+      }
+      
+      if (confidence === undefined || confidence < 0 || confidence > 100) {
+        return res.status(400).json({ error: "confidence must be between 0 and 100" });
+      }
+      
+      const createdBy = (req as any).user?.email || "unknown";
+      
+      const result = await db.execute(sql`
+        INSERT INTO kr_checkins (kr_id, year, period_type, period_value, confidence, commentary, blockers, next_actions, created_by)
+        VALUES (${krId}, ${year}, ${periodType}, ${periodValue}, ${confidence}, ${commentary || null}, ${blockers || null}, ${nextActions || null}, ${createdBy})
+        RETURNING id, kr_id, year, period_type, period_value, confidence, commentary, blockers, next_actions, created_by, created_at
+      `);
+      
+      const r = result.rows[0] as any;
+      res.json({
+        id: r.id,
+        krId: r.kr_id,
+        year: r.year,
+        periodType: r.period_type,
+        periodValue: r.period_value,
+        confidence: r.confidence,
+        commentary: r.commentary,
+        blockers: r.blockers,
+        nextActions: r.next_actions,
+        createdBy: r.created_by,
+        createdAt: r.created_at
+      });
+    } catch (error) {
+      console.error("[api] Error creating KR check-in:", error);
+      res.status(500).json({ error: "Failed to create KR check-in" });
+    }
+  });
+
   // ==================== SYSTEM FIELD OPTIONS ====================
   
   app.get("/api/system-fields", isAuthenticated, async (req, res) => {

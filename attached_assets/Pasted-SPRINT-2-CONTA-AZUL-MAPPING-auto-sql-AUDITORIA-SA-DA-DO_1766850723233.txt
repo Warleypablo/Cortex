@@ -1,0 +1,203 @@
+SPRINT 2 — CONTA AZUL MAPPING (auto_sql) + AUDITORIA + SAÍDA DO “MANUAL OVERRIDE”
+
+Contexto:
+- Sprint 1 já entregou: plan.metric_targets_monthly + kpi.metrics_registry + kpi.metric_actuals_monthly + /kpi/recompute + dashboards/KRs/Iniciativas/BP Financeiro.
+- Hoje várias métricas ainda estão “manual_override” porque dependem de classificar categorias do Conta Azul.
+- Agora a meta é: criar um “motor de classificação” por categoria (Conta Azul) e transformar as métricas manuais em auto_sql — sem mexer em caz_*.
+
+REGRAS:
+- NÃO escrever/alterar cup_* nem caz_*.
+- Continuar aceitando override manual, mas agora como fallback (ou exceção), não como regra.
+- PCT em FRAÇÃO (0–1). BRL numeric(18,2).
+- Ter 2 bases possíveis por métrica: COMPETÊNCIA vs CAIXA.
+  - DRE (EBITDA, CAC, SG&A, CSV, impostos, IR/CSLL, CAPEX) → por padrão COMPETÊNCIA
+  - Caixa (cash_generation_cash, cash_balance) → CAIXA
+  - Se faltarem datas, fallback para a data disponível.
+
+========================================================
+1) DEFINIR O “CANON” DE LANÇAMENTOS (VIEW ÚNICA)
+========================================================
+Criar schema kpi e uma VIEW única normalizada:
+
+kpi.vw_ca_entries
+- entry_id (text)              // ex: "pagar:<id>" / "receber:<id>" / "parcela:<id>"
+- entry_type (text)            // 'payable' | 'receivable'
+- amount (numeric)             // sempre positivo
+- direction (text)             // 'expense' | 'income'
+- category_id (text)
+- category_name (text)
+- description (text)
+- counterparty_name (text)     // fornecedor/cliente se existir
+- status (text)
+- competence_date (date)       // preferência: issue_date -> due_date -> paid/received_date
+- cash_date (date)             // pago/recebido
+- competence_month (text)      // 'YYYY-MM'
+- cash_month (text)            // 'YYYY-MM'
+- raw_source_table (text)      // 'caz_pagar'|'caz_parcelas'|'caz_receber'
+- raw_source_id (text)
+
+IMPLEMENTAÇÃO:
+- Fonte de despesas: priorizar caz_parcelas (se existir e tiver datas/valores), senão caz_pagar.
+- Fonte de receitas: caz_receber.
+- Montar com UNION ALL e COALESCE de campos (o código deve introspectar colunas via information_schema para não quebrar se o nome variar).
+- Sempre preencher competence_month e cash_month quando houver data.
+
+========================================================
+2) TABELA DE MAPEAMENTO DE CATEGORIAS (ADMIN EDITÁVEL)
+========================================================
+Criar tabela:
+
+kpi.ca_category_mapping
+- id uuid pk
+- entry_type ('payable'|'receivable')
+- category_id text
+- category_name text
+- metric_key text                // ex: 'cogs_csv', 'cac_total', 'sga_total', 'taxes_on_revenue'...
+- basis ('competence'|'cash')    // default por métrica, mas customizável
+- sign int default 1             // (normalmente 1). usar -1 só se houver lançamento invertido
+- is_active bool default true
+- notes text
+- updated_by text
+- updated_at timestamptz
+UNIQUE(entry_type, category_id, metric_key, basis) com upsert.
+
+Criar tabela cache de categorias (para UI e auditoria):
+kpi.ca_categories_cache
+- entry_type
+- category_id
+- category_name
+- first_seen_at
+- last_seen_at
+- tx_count
+- total_amount_12m
+- is_mapped bool (derived em view ou atualizado por job)
+
+Rotina “refresh categories cache”:
+- Lê distinct category_id/category_name de kpi.vw_ca_entries e atualiza cache.
+
+========================================================
+3) UI ADMIN — “Conta Azul > Mapeamento”
+========================================================
+Criar página Admin com:
+- Tabela de categorias (filtrar por entry_type, texto, “não mapeadas”, “mapeadas para X”)
+- Colunas: category_name, entry_type, total_amount_12m, tx_count, last_seen, metric_key atual
+- Ações:
+  - “Mapear selecionadas para…” (dropdown de metric_key + basis)
+  - “Remover mapeamento”
+  - “Export CSV” e “Import CSV”
+- Bloco de “Auditoria” no topo:
+  - % não mapeado (valor e quantidade de categorias)
+  - Top 10 categorias não mapeadas por valor (últimos 3 meses e 12m)
+
+========================================================
+4) DEFINIR “BUCKETS” (AS MÉTRICAS QUE VIRAM AUTO AGORA)
+========================================================
+Converter estas métricas (hoje manuais) para auto_sql via mapping:
+
+DESPESAS (payable):
+- taxes_on_revenue        // impostos sobre receita (Simples/ISS/etc) — COMPETÊNCIA
+- tax_ir_csll             // IR/CSLL — COMPETÊNCIA
+- cogs_csv                // custo do serviço (time entrega + freelancers etc, se contabilizado por categoria) — COMPETÊNCIA
+- cac_total               // custo aquisição (mídia, comissões, SDR tools etc) — COMPETÊNCIA
+- sga_total               // G&A (adm geral) — COMPETÊNCIA
+- capex                   // investimentos — COMPETÊNCIA
+
+RECEITAS (receivable):
+- revenue_one_time        // pontual — COMPETÊNCIA
+- revenue_other           // outras receitas — COMPETÊNCIA
+(Obs: mrr_active continua vindo de contratos; não depende de Conta Azul.)
+
+INADIMPLÊNCIA:
+- bad_debt (BRL) deve virar AUTO com uma regra simples, sem depender de categoria:
+  - Modelo 1 (preferido): do caz_receber, somar “valor vencido e não pago” alocado por mês de vencimento (competence_month = due_date)
+  - Modelo 2 (fallback): mapear categorias específicas de “perdas/baixa” se vocês registram isso como despesa
+Implementar os dois e escolher automaticamente:
+  - Se caz_receber tiver status + due_date + amount + recebido/pago => usar Modelo 1
+  - Senão, permitir mapear via categoria (Modelo 2)
+
+========================================================
+5) VIEW DE AGREGADOS POR MÉTRICA/MÊS (AUTO)
+========================================================
+Criar view:
+
+kpi.vw_metric_actuals_auto_monthly
+- metric_key
+- year
+- month ('YYYY-MM')
+- actual_value
+
+Regra:
+- Para cada métrica “mapeável”:
+  - Pegar kpi.vw_ca_entries
+  - JOIN kpi.ca_category_mapping por (entry_type, category_id)
+  - Filtrar metric_key + basis
+  - Agrupar por month = CASE basis WHEN 'competence' THEN competence_month ELSE cash_month END
+  - actual_value = SUM(amount * sign)
+
+Para bad_debt (Modelo 1):
+- month = competence_month (due_date)
+- actual_value = SUM(amount WHERE status in ('VENCIDO','EM_ATRASO', etc) e NOT recebido)
+- Também gerar bad_debt_pct (derived) = bad_debt / revenue_billable_total
+
+========================================================
+6) ATUALIZAR O /kpi/recompute (PIPELINE CORRETO)
+========================================================
+Atualizar recompute para resolver na ordem:
+1) override manual (kpi.metric_actual_overrides_monthly) se existir
+2) auto_sql:
+   - se “mapeável Conta Azul”: ler de kpi.vw_metric_actuals_auto_monthly
+   - se “auto_sql contratos”: ler do SQL já existente (mrr_active, clients_active, contracts_active, headcount_*)
+3) derived: calcular por fórmula (usando bases já resolvidas no mesmo mês)
+
+IMPORTANTE:
+- Recompute deve preencher kpi.metric_actuals_monthly para o ano inteiro (ou pelo menos 24 meses).
+- Recompute deve registrar também “data_quality”:
+  - mapped_coverage_pct por mês (quanto do total de entries foi classificado)
+  - unmapped_amount por mês
+
+Criar tabela opcional:
+kpi.metric_data_quality_monthly
+- month
+- mapped_amount
+- total_amount
+- coverage_pct
+- unmapped_top_categories jsonb
+
+========================================================
+7) RECONCILIAÇÃO (PARA VOCÊ CONFIAR NO NÚMERO)
+========================================================
+Criar página Admin > Auditoria Conta Azul:
+- Gráfico/tabela por mês:
+  - total_expense_entries vs total_mapped_expense
+  - total_income_entries vs total_mapped_income
+  - coverage_pct
+- Alertas:
+  - coverage < 90% => “dados insuficientes”
+  - variação abrupta em CAC/SGA/CSV (>30% MoM) => “verificar classificação”
+- “Top categorias não mapeadas” com botão “mapear agora”.
+
+========================================================
+8) DASHBOARDS — SUBIR A CAMADA EXECUTIVA COM OS AUTO_SQL
+========================================================
+Depois do mapping:
+- BP Financeiro deve passar a exibir ACTUAL preenchido automaticamente (não só target).
+- Dashboard Overview deve ter cards:
+  - Inadimplência % (bad_debt_pct) + Inadimplência R$ (bad_debt)
+  - CAC, SG&A, CSV, Impostos, IR/CSLL, CAPEX, Cash Generation (derived) com semáforo
+- “Em instrumentação” só pode aparecer se coverage < 90% OU se categorias críticas não estiverem mapeadas.
+
+========================================================
+9) CHECKLIST / DoD (SÓ CONSIDERA PRONTO SE…)
+========================================================
+1) Admin consegue mapear categorias e ver % de coverage.
+2) /kpi/recompute puxa automatico via mapping e preenche actuals nos meses.
+3) BP Financeiro mostra Plan vs Actual em todas as linhas mapeadas.
+4) Inadimplência R$ e % saem automáticas (Modelo 1 se possível).
+5) Auditoria mostra onde falta mapeamento (Top categorias) + reconciliação básica.
+
+ENTREGAR:
+- migrations (ca_category_mapping, ca_categories_cache, metric_data_quality_monthly opcional)
+- view kpi.vw_ca_entries (union pagar/parcela/receber)
+- view kpi.vw_metric_actuals_auto_monthly
+- Admin UI: Mapeamento + Auditoria
+- update /kpi/recompute (override > auto_sql > derived) + coverage flags
