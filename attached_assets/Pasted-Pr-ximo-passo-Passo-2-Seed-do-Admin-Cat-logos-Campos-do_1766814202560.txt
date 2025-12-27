@@ -1,0 +1,296 @@
+Próximo passo (Passo 2): Seed do Admin — Catálogos + Campos do Sistema + Validações
+2.1 Seed dos Catálogos (criar primeiro)
+
+Crie estes catálogos no teu Admin, com slug/ID estável (não use só texto).
+
+A) catalog_products
+
+Cada item com: slug, name, bp_segment, active=true
+
+performance | Performance | performance
+
+creators | Creators | creators
+
+social_media | Social Media | social
+
+gestao_comunidade | Gestão de Comunidade | community
+
+agente_ia | Agente IA | others
+
+blog_post | Blog Post | others
+
+broadcast | Broadcast | others
+
+crm_vendas | CRM de Vendas | others
+
+cro_alteracao | CRO & Alteração | others
+
+dashboard | Dashboard | others
+
+ecommerce | Ecommerce | others
+
+estruturacao_comercial | Estruturação Comercial | others
+
+estruturacao_estrategica | Estruturação Estratégica | others
+
+gameplan | Gameplan | others
+
+gestao_atendimento | Gestão & Atendimento | others
+
+id_visual | ID Visual | others
+
+landing_page | Landing Page | others
+
+pacote_artes_rotulos | Pacote Artes / Rótulos | others
+
+regua_automacao | Régua de Automação | others
+
+seo_full | SEO Full | others
+
+site | Site | others
+
+sustentacao | Sustentação | others
+
+B) catalog_plans
+
+starter Starter
+
+scale Scale
+
+enterprise Enterprise
+
+personalizado Personalizado
+
+projeto_pontual Projeto Pontual
+
+antigo Antigo ⚠️ (active=true por enquanto)
+
+C) catalog_squads
+
+Crie com is_off=false (depois você ajusta)
+
+squadra ⚓️ Squadra
+
+makers ⚡Makers
+
+pulse 💠 Pulse
+
+tech 🖥️ Tech
+
+selva 🪖 Selva
+
+hunters 🏹 Hunters
+
+supreme 👑 Supreme
+
+squad_x 👾 Squad X
+
+aurea 🌟 Aurea
+
+chama 🔥 Chama
+
+turbo_interno 🚀 Turbo Interno
+
+bloomfield 🗝️ Bloomfield
+
+(Se você quiser incluir os OFF, crie com is_off=true.)
+
+D) catalog_clusters
+
+regulares Regulares
+
+imperdiveis Imperdíveis
+
+chaves Chaves
+
+nfnc NFNC
+
+empty Empty
+
+E) catalog_contract_status
+
+Campos extra: counts_as_operating
+
+triagem TRIAGEM | false
+
+onboarding ONBOARDING | false
+
+ativo ATIVO | true
+
+pausado PAUSADO | false
+
+em_cancelamento EM CANCELAMENTO | true (operando)
+
+entregue ENTREGUE | false
+
+cancelado CANCELADO | false
+
+F) catalog_account_health
+
+saudavel Saudável
+
+atencao Atenção
+
+insatisfeito Insatisfeito
+
+G) catalog_roi_bucket
+
+lt_2 ROI < 2
+
+btw_2_4 ROI 2–4
+
+gt_4 ROI > 4
+
+no_data Sem dado
+
+H) catalog_churn_reason
+
+resultado_fraco Resultado fraco / ROI
+
+falta_verba Falta de verba
+
+in_house Contratou in-house / troca interna
+
+concorrente Troca por concorrente
+
+qualidade_entrega Problemas de entrega / qualidade
+
+comunicacao Problemas de comunicação
+
+timing Timing / pausa estratégica
+
+inadimplencia Inadimplência
+
+outros Outros
+
+2.2 Seed do “Field Registry” (campos do sistema)
+
+Agora crie os campos com field_key imutável. Sugestão de padrão: client.*, contract.*, health.*.
+
+A) Campos de CLIENTE
+
+Obrigatórios
+
+client.name | string | required
+
+client.cluster_id | enum | required | catalog=clusters
+
+Recomendados
+
+client.health_status_id | enum | default=atencao | catalog=account_health
+
+client.cnpj | string
+
+client.contact_name | string
+
+client.contact_phone | string
+
+client.email | string
+
+client.instagram | string
+
+client.site | string
+
+client.notes | string (ou text)
+
+B) Campos de CONTRATO
+
+Obrigatórios
+
+contract.client_id | fk | required
+
+contract.product_id | enum | required | catalog=products
+
+contract.plan_id | enum | required | catalog=plans
+
+contract.squad_id | enum | required | catalog=squads
+
+contract.status_id | enum | required | catalog=contract_status
+
+contract.mrr_value_cents | currency (int) | default=0
+
+contract.one_time_value_cents | currency (int) | default=0
+
+contract.first_payment_at | date (required se mrr>0)
+
+Datas importantes
+
+contract.cancel_request_at | date
+
+contract.last_operation_day | date
+
+contract.pause_at | date
+
+contract.resume_at | date
+
+contract.delivered_at | date
+
+Ownership
+
+contract.sales_owner_user_id | user
+
+contract.cs_owner_user_id | user
+
+contract.delivery_owner_user_id | user
+
+contract.designer_owner_user_id | user
+
+Saúde / ROI real (opcional mas forte)
+
+contract.ads_investment_cents_monthly | currency
+
+contract.client_revenue_cents_monthly | currency
+
+Churn intelligence
+
+contract.churn_reason_id | enum | catalog=churn_reason
+
+contract.churn_subreason | string
+
+contract.retention_possible | enum (high/medium/low)
+
+contract.retained_flag | bool
+
+contract.waive_churn_flag | bool
+
+2.3 Validações mínimas (criar agora)
+
+Coloque essas regras no teu Admin como “business rules”:
+
+Regra 1 — Tipo do contrato
+
+is_recurring = (mrr_value_cents > 0)
+
+is_one_time = (one_time_value_cents > 0)
+
+Se is_recurring=false e is_one_time=false → bloquear salvar (ou salvar como draft, sua escolha).
+
+Regra 2 — Data obrigatória em recorrente
+
+Se mrr_value_cents > 0 então first_payment_at obrigatório.
+
+Regra 3 — Coerência de cancelamento
+
+Se status_id = em_cancelamento então cancel_request_at obrigatório.
+
+Se status_id = cancelado então last_operation_day obrigatório.
+
+Regra 4 — Entrega pontual
+
+Se plan_id = projeto_pontual OU one_time_value_cents > 0, então:
+
+Quando status virar entregue, delivered_at obrigatório.
+
+Regra 5 — Ownership
+
+Se status ativo ou em_cancelamento → cs_owner_user_id obrigatório.
+
+2.4 Resultado esperado (o “done” desta etapa)
+
+Você vai terminar com:
+
+Catálogos prontos e consistentes
+
+Campos do sistema registrados (com tipos, required e validações)
+
+Admin preparado pra virar a fonte de verdade

@@ -1,0 +1,44 @@
+ATENÇÃO: Correção de arquitetura. Não refaça tudo, apenas ajuste.
+
+Contexto:
+- Já existe uma camada RAW no Postgres com tabelas public.cup_* (ex: public.cup_contratos) alimentadas por ClickUp/ETL. Isso NÃO deve ser alterado pelo nosso sistema, pois pode ser sobrescrito.
+- Nosso sistema precisa ter uma camada CANÔNICA (SYS) para catálogos, campos do sistema e regras, baseada no spec YAML (Admin Data Dictionary).
+
+Tarefas (implementar agora):
+
+1) Criar schema sys (se não existir) e criar as 5 tabelas abaixo (se não existirem):
+- sys.catalogs(catalog_key PK, description, created_at, updated_at)
+- sys.catalog_items(catalog_key FK, slug, name, active, sort_order, meta jsonb, PK(catalog_key, slug))
+- sys.catalog_aliases(catalog_key, alias, slug, PK(catalog_key, alias), FK(catalog_key, slug)->sys.catalog_items)
+- sys.system_fields(field_key PK, label, entity, type, required, default_value jsonb, enum_catalog, validation jsonb, help_text, active)
+- sys.validation_rules(rule_id PK, name, entity, when, action, message, active)
+
+2) Implementar um “spec apply” (script ou endpoint admin) que recebe/usa o YAML do spec e faz UPSERT em:
+- sys.catalogs
+- sys.catalog_items
+- sys.system_fields
+- sys.validation_rules
+Sem deletar nada. Só atualizar e permitir active=false.
+
+3) Criar/gerar aliases:
+- Para cada catalog_item, criar aliases automáticos: lower(name), versões sem emoji (quando houver), e trim/normalização.
+- Adicionar alias manual obrigatório:
+  - catalog_key='catalog_contract_status': alias='cancelado/inativo' -> slug='cancelado'
+
+4) Criar view canônica para contratos (sem alterar RAW):
+- Criar/atualizar view public.vw_contratos_canon que seleciona de public.cup_contratos e mapeia:
+  - produto -> product_slug via sys.catalog_aliases (catalog_products)
+  - squad -> squad_slug via sys.catalog_aliases (catalog_squads)
+  - status -> status_slug via sys.catalog_aliases (catalog_contract_status)
+  - valorr/valorp -> mrr_value_cents / one_time_value_cents (multiplicar por 100 e converter para bigint)
+Manter também campos raw úteis (id_task, id_subtask, datas).
+
+5) Validação:
+- Rodar uma query de teste: SELECT status, status_slug, produto, product_slug, squad, squad_slug FROM public.vw_contratos_canon LIMIT 50;
+- Garantir que os slugs estão preenchidos para valores comuns (ativo, onboarding, triagem; Performance, Creators, Social Media; Pulse, Makers etc.)
+
+Importante:
+- NÃO alterar as tabelas public.cup_*.
+- Não reestruturar o sistema inteiro. Apenas adicionar esta camada sys e a view canônica.
+
+Entregue: migrations SQL + código do spec apply + criação dos aliases + view.
