@@ -127,3 +127,56 @@ export async function initializeNotificationRulesTable(): Promise<void> {
     console.error('[database] Error initializing notification rules table:', error);
   }
 }
+
+export async function initializeOnboardingTables(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS onboarding_templates (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(100) NOT NULL,
+        descricao TEXT,
+        ativo BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS onboarding_etapas (
+        id SERIAL PRIMARY KEY,
+        template_id INTEGER NOT NULL,
+        nome VARCHAR(100) NOT NULL,
+        ordem INTEGER NOT NULL,
+        descricao TEXT,
+        responsavel_padrao VARCHAR(100),
+        prazo_dias INTEGER
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS onboarding_colaborador (
+        id SERIAL PRIMARY KEY,
+        colaborador_id INTEGER NOT NULL,
+        template_id INTEGER NOT NULL,
+        data_inicio DATE NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS onboarding_progresso (
+        id SERIAL PRIMARY KEY,
+        onboarding_colaborador_id INTEGER NOT NULL,
+        etapa_id INTEGER NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        responsavel_id INTEGER,
+        data_conclusao TIMESTAMP,
+        observacoes TEXT
+      )
+    `);
+    
+    console.log('[database] Onboarding tables initialized');
+  } catch (error) {
+    console.error('[database] Error initializing onboarding tables:', error);
+  }
+}
