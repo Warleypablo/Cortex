@@ -5854,6 +5854,317 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Geographic Analysis - Distribution by State and City (ES focus: Vitória, Vila Velha, Serra, Cariacica)
+  app.get("/api/geg/distribuicao-geografica", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
+
+      const colaboradores = await storage.getColaboradores({ status: 'Ativo' });
+      
+      // Filter by filters
+      let filtered = colaboradores;
+      if (squad !== 'todos') filtered = filtered.filter(c => c.squad === squad);
+      if (setor !== 'todos') filtered = filtered.filter(c => c.setor === setor);
+      if (nivel !== 'todos') filtered = filtered.filter(c => c.nivel === nivel);
+      if (cargo !== 'todos') filtered = filtered.filter(c => c.cargo === cargo);
+
+      // ES Cities mapping for presencial/remoto analysis
+      const esCities = ['vitória', 'vitoria', 'vila velha', 'serra', 'cariacica', 'viana', 'guarapari', 'fundão', 'fundao'];
+      
+      // Extract city from address (common patterns: "Cidade - ES" or "Cidade, ES" or just city name)
+      const extractCity = (endereco: string | null): string => {
+        if (!endereco) return 'Não informado';
+        const lower = endereco.toLowerCase();
+        
+        // Check for known ES cities
+        if (lower.includes('vitória') || lower.includes('vitoria')) return 'Vitória';
+        if (lower.includes('vila velha')) return 'Vila Velha';
+        if (lower.includes('serra')) return 'Serra';
+        if (lower.includes('cariacica')) return 'Cariacica';
+        if (lower.includes('viana')) return 'Viana';
+        if (lower.includes('guarapari')) return 'Guarapari';
+        if (lower.includes('fundão') || lower.includes('fundao')) return 'Fundão';
+        
+        // Try to extract city from patterns like "City - STATE" or "City, STATE"
+        const match = endereco.match(/^([^,-]+)/);
+        if (match) {
+          const city = match[1].trim();
+          if (city.length > 2 && city.length < 50) return city;
+        }
+        
+        return 'Outros';
+      };
+
+      // Determine if employee is presencial (ES region) or remoto
+      const isPresencial = (endereco: string | null, estado: string | null): boolean => {
+        if (estado?.toUpperCase() === 'ES') return true;
+        if (!endereco) return false;
+        const lower = endereco.toLowerCase();
+        return esCities.some(city => lower.includes(city));
+      };
+
+      // Distribution by state
+      const byEstado: Record<string, number> = {};
+      // Distribution by city (focus on ES)
+      const byCidade: Record<string, number> = {};
+      // Presencial vs Remoto
+      let presencialCount = 0;
+      let remotoCount = 0;
+      // Grande Vitória breakdown
+      const grandeVitoria: Record<string, number> = {
+        'Vitória': 0,
+        'Vila Velha': 0,
+        'Serra': 0,
+        'Cariacica': 0,
+        'Viana': 0,
+        'Guarapari': 0,
+        'Fundão': 0,
+        'Outras ES': 0
+      };
+
+      filtered.forEach(c => {
+        // By state
+        const estado = c.estado?.toUpperCase() || 'Não informado';
+        byEstado[estado] = (byEstado[estado] || 0) + 1;
+
+        // By city
+        const cidade = extractCity(c.endereco);
+        byCidade[cidade] = (byCidade[cidade] || 0) + 1;
+
+        // Presencial vs Remoto
+        if (isPresencial(c.endereco, c.estado)) {
+          presencialCount++;
+          // Grande Vitória breakdown
+          if (cidade === 'Vitória') grandeVitoria['Vitória']++;
+          else if (cidade === 'Vila Velha') grandeVitoria['Vila Velha']++;
+          else if (cidade === 'Serra') grandeVitoria['Serra']++;
+          else if (cidade === 'Cariacica') grandeVitoria['Cariacica']++;
+          else if (cidade === 'Viana') grandeVitoria['Viana']++;
+          else if (cidade === 'Guarapari') grandeVitoria['Guarapari']++;
+          else if (cidade === 'Fundão') grandeVitoria['Fundão']++;
+          else grandeVitoria['Outras ES']++;
+        } else {
+          remotoCount++;
+        }
+      });
+
+      // Sort by count
+      const estadosSorted = Object.entries(byEstado)
+        .sort((a, b) => b[1] - a[1])
+        .map(([estado, total]) => ({ estado, total }));
+
+      const cidadesSorted = Object.entries(byCidade)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 15)
+        .map(([cidade, total]) => ({ cidade, total }));
+
+      const grandeVitoriaSorted = Object.entries(grandeVitoria)
+        .filter(([_, total]) => total > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([cidade, total]) => ({ cidade, total }));
+
+      res.json({
+        byEstado: estadosSorted,
+        byCidade: cidadesSorted,
+        grandeVitoria: grandeVitoriaSorted,
+        modalidade: {
+          presencial: presencialCount,
+          remoto: remotoCount,
+          total: presencialCount + remotoCount
+        }
+      });
+    } catch (error) {
+      console.error("[api] Error fetching geographic distribution:", error);
+      res.status(500).json({ error: "Failed to fetch geographic distribution" });
+    }
+  });
+
+  // Alerts and Attention - Veterans without raises, high turnover, etc.
+  app.get("/api/geg/alertas", async (req, res) => {
+    try {
+      const colaboradores = await storage.getColaboradores({ status: 'Ativo' });
+      
+      // Veterans without raise (36+ months tenure, 24+ months without raise)
+      const veteranosSemAumento = colaboradores
+        .filter(c => {
+          const mesesTurbo = c.mesesDeTurbo ?? 0;
+          const mesesUltAumento = c.mesesUltAumento;
+          return mesesTurbo >= 36 && (mesesUltAumento === null || mesesUltAumento >= 24);
+        })
+        .map(c => ({
+          id: c.id,
+          nome: c.nome,
+          cargo: c.cargo,
+          squad: c.squad,
+          mesesDeTurbo: c.mesesDeTurbo ?? 0,
+          mesesUltAumento: c.mesesUltAumento
+        }))
+        .sort((a, b) => (b.mesesUltAumento ?? 999) - (a.mesesUltAumento ?? 999))
+        .slice(0, 10);
+
+      // Employees ending probation (3 months mark)
+      const hoje = new Date();
+      const fimExperiencia = colaboradores
+        .filter(c => {
+          if (!c.admissao) return false;
+          const admissao = new Date(c.admissao);
+          const mesesTurbo = c.mesesDeTurbo ?? 0;
+          return mesesTurbo >= 2 && mesesTurbo <= 4;
+        })
+        .map(c => ({
+          id: c.id,
+          nome: c.nome,
+          cargo: c.cargo,
+          squad: c.squad,
+          admissao: c.admissao,
+          diasRestantes: c.mesesDeTurbo ? Math.max(0, 90 - (c.mesesDeTurbo * 30)) : 90
+        }))
+        .sort((a, b) => a.diasRestantes - b.diasRestantes)
+        .slice(0, 10);
+
+      // Salary below average by role
+      const salarioPorCargo: Record<string, { total: number; count: number }> = {};
+      colaboradores.forEach(c => {
+        const cargo = c.cargo || 'N/A';
+        const salario = parseFloat(c.salario || '0') || 0;
+        if (salario > 0) {
+          if (!salarioPorCargo[cargo]) salarioPorCargo[cargo] = { total: 0, count: 0 };
+          salarioPorCargo[cargo].total += salario;
+          salarioPorCargo[cargo].count++;
+        }
+      });
+
+      const salarioAbaixoMedia = colaboradores
+        .filter(c => {
+          const cargo = c.cargo || 'N/A';
+          const salario = parseFloat(c.salario || '0') || 0;
+          const avg = salarioPorCargo[cargo]?.count > 2 ? salarioPorCargo[cargo].total / salarioPorCargo[cargo].count : 0;
+          return salario > 0 && avg > 0 && salario < avg * 0.8 && salarioPorCargo[cargo]?.count >= 3;
+        })
+        .map(c => {
+          const cargo = c.cargo || 'N/A';
+          const salario = parseFloat(c.salario || '0') || 0;
+          const avg = salarioPorCargo[cargo].total / salarioPorCargo[cargo].count;
+          return {
+            id: c.id,
+            nome: c.nome,
+            cargo: c.cargo,
+            squad: c.squad,
+            salario,
+            mediaCargo: avg,
+            diferenca: ((salario - avg) / avg * 100).toFixed(1)
+          };
+        })
+        .slice(0, 10);
+
+      res.json({
+        veteranosSemAumento,
+        fimExperiencia,
+        salarioAbaixoMedia,
+        totalAlertas: veteranosSemAumento.length + fimExperiencia.length + salarioAbaixoMedia.length
+      });
+    } catch (error) {
+      console.error("[api] Error fetching alerts:", error);
+      res.status(500).json({ error: "Failed to fetch alerts" });
+    }
+  });
+
+  // Retention Rate and Health Distribution
+  app.get("/api/geg/retencao-saude", async (req, res) => {
+    try {
+      const periodo = req.query.periodo as string || 'ano';
+      const colaboradores = await storage.getColaboradores({});
+      
+      const hoje = new Date();
+      let inicioMeses = 12;
+      if (periodo === 'trimestre') inicioMeses = 3;
+      else if (periodo === 'semestre') inicioMeses = 6;
+      else if (periodo === 'mes') inicioMeses = 1;
+
+      const dataInicio = new Date(hoje);
+      dataInicio.setMonth(dataInicio.getMonth() - inicioMeses);
+
+      // Count active at start of period
+      const ativosInicio = colaboradores.filter(c => {
+        const admissao = c.admissao ? new Date(c.admissao) : null;
+        const demissao = c.demissao ? new Date(c.demissao) : null;
+        return admissao && admissao < dataInicio && (!demissao || demissao >= dataInicio);
+      }).length;
+
+      // Count active now
+      const ativosAtual = colaboradores.filter(c => c.status === 'Ativo').length;
+
+      // Count dismissed in period
+      const demitidosPeriodo = colaboradores.filter(c => {
+        const demissao = c.demissao ? new Date(c.demissao) : null;
+        return demissao && demissao >= dataInicio && demissao <= hoje;
+      }).length;
+
+      // Retention rate
+      const taxaRetencao = ativosInicio > 0 ? ((ativosInicio - demitidosPeriodo) / ativosInicio * 100) : 100;
+
+      // Health distribution (simplified calculation)
+      const ativos = colaboradores.filter(c => c.status === 'Ativo');
+      const healthDistribution = { saudavel: 0, atencao: 0, critico: 0 };
+
+      ativos.forEach(c => {
+        const mesesTurbo = c.mesesDeTurbo ?? 0;
+        const mesesUltAumento = c.mesesUltAumento;
+        const nivel = (c.nivel || '').toLowerCase();
+
+        // Stability score (max 30)
+        let stabilityScore = 15;
+        if (c.status === 'Ativo') stabilityScore += 5;
+        if (mesesTurbo >= 6 && mesesTurbo <= 36) stabilityScore += 10;
+        else if (mesesTurbo > 36) stabilityScore += 8;
+
+        // Growth score (max 25)
+        let growthScore = 12;
+        if (mesesUltAumento !== null) {
+          if (mesesUltAumento <= 12) growthScore = 25;
+          else if (mesesUltAumento <= 18) growthScore = 18;
+          else if (mesesUltAumento <= 24) growthScore = 12;
+          else growthScore = 5;
+        }
+
+        // Development score (max 25)
+        let developmentScore = 15;
+        if (nivel.includes('senior') || nivel.includes('sênior') || nivel.includes('head')) developmentScore = 25;
+        else if (nivel.includes('pleno')) developmentScore = 20;
+        else if (nivel.includes('junior') || nivel.includes('júnior')) developmentScore = 15;
+
+        // Engagement score (max 25) - progressive based on tenure
+        let engagementScore = 15;
+        if (mesesTurbo >= 60) engagementScore = 25;
+        else if (mesesTurbo >= 48) engagementScore = 23;
+        else if (mesesTurbo >= 36) engagementScore = 22;
+        else if (mesesTurbo >= 24) engagementScore = 20;
+        else if (mesesTurbo >= 12) engagementScore = 18;
+
+        const healthScore = stabilityScore + growthScore + developmentScore + engagementScore;
+        
+        if (healthScore >= 70) healthDistribution.saudavel++;
+        else if (healthScore >= 50) healthDistribution.atencao++;
+        else healthDistribution.critico++;
+      });
+
+      res.json({
+        taxaRetencao: parseFloat(taxaRetencao.toFixed(1)),
+        ativosInicio,
+        ativosAtual,
+        demitidosPeriodo,
+        healthDistribution,
+        periodo
+      });
+    } catch (error) {
+      console.error("[api] Error fetching retention and health:", error);
+      res.status(500).json({ error: "Failed to fetch retention and health data" });
+    }
+  });
+
   app.get("/api/inhire/metrics", async (req, res) => {
     try {
       const metrics = await storage.getInhireMetrics();
