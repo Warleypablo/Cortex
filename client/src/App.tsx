@@ -66,6 +66,7 @@ const AdminNotificationRules = lazy(() => import("@/pages/AdminNotificationRules
 const Calendario = lazy(() => import("@/pages/Calendario"));
 const MetasSquad = lazy(() => import("@/pages/MetasSquad"));
 const OnboardingRH = lazy(() => import("@/pages/OnboardingRH"));
+const MeuPerfil = lazy(() => import("@/pages/MeuPerfil"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -215,6 +216,9 @@ function ProtectedRouter() {
       
       {/* Metas por Squad */}
       <Route path="/metas-squad">{() => <ProtectedRoute path="/metas-squad" component={MetasSquad} />}</Route>
+      
+      {/* Meu Perfil */}
+      <Route path="/meu-perfil">{() => <ProtectedRoute path="/meu-perfil" component={MeuPerfil} />}</Route>
       
       {/* Admin */}
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
