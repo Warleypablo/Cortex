@@ -331,9 +331,9 @@ export const NAV_CONFIG = {
     icon: 'UsersRound',
     items: [
       { title: 'Visão Geral', url: '/dashboard/geg', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GG.VISAO_GERAL },
+      { title: 'Colaboradores', url: '/colaboradores', icon: 'UserCog', permissionKey: PERMISSION_KEYS.GG.COLABORADORES },
       { title: 'Recrutamento', url: '/dashboard/recrutamento', icon: 'UserPlus', permissionKey: PERMISSION_KEYS.GG.RECRUTAMENTO },
       { title: 'Onboarding', url: '/rh/onboarding', icon: 'ClipboardList', permissionKey: PERMISSION_KEYS.GG.ONBOARDING },
-      { title: 'Colaboradores', url: '/colaboradores', icon: 'UserCog', permissionKey: PERMISSION_KEYS.GG.COLABORADORES },
       { title: 'Patrimônio', url: '/patrimonio', icon: 'Building2', permissionKey: PERMISSION_KEYS.GG.PATRIMONIO },
     ],
   },
