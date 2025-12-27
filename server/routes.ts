@@ -735,6 +735,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // System Settings API
+  app.get("/api/system/settings", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const settings = await storage.getAllSystemSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("[api] Error fetching system settings:", error);
+      res.status(500).json({ error: "Failed to fetch system settings" });
+    }
+  });
+
+  app.get("/api/system/settings/:key", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const value = await storage.getSystemSetting(req.params.key);
+      if (value === null) {
+        return res.status(404).json({ error: "Setting not found" });
+      }
+      res.json({ key: req.params.key, value });
+    } catch (error) {
+      console.error("[api] Error fetching system setting:", error);
+      res.status(500).json({ error: "Failed to fetch system setting" });
+    }
+  });
+
+  app.put("/api/system/settings/:key", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { value, description } = req.body;
+      if (typeof value !== 'string') {
+        return res.status(400).json({ error: "Value must be a string" });
+      }
+      await storage.setSystemSetting(req.params.key, value, description);
+      res.json({ success: true, key: req.params.key, value });
+    } catch (error) {
+      console.error("[api] Error updating system setting:", error);
+      res.status(500).json({ error: "Failed to update system setting" });
+    }
+  });
+
+  // AI Configuration API
+  app.get("/api/admin/ai/providers", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { getAvailableProviders } = await import("./services/unifiedAssistant");
+      const providers = getAvailableProviders();
+      res.json(providers);
+    } catch (error) {
+      console.error("[api] Error fetching AI providers:", error);
+      res.status(500).json({ error: "Failed to fetch AI providers" });
+    }
+  });
+
+  app.get("/api/admin/ai/config", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const provider = await storage.getSystemSetting('ai_provider') || 'openai';
+      const model = await storage.getSystemSetting('ai_model') || 'gpt-4o';
+      const { getAvailableProviders } = await import("./services/unifiedAssistant");
+      const providers = getAvailableProviders();
+      res.json({ provider, model, providers });
+    } catch (error) {
+      console.error("[api] Error fetching AI config:", error);
+      res.status(500).json({ error: "Failed to fetch AI configuration" });
+    }
+  });
+
+  app.put("/api/admin/ai/config", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { provider, model } = req.body;
+      if (provider) {
+        await storage.setSystemSetting('ai_provider', provider, 'AI provider (openai or gemini)');
+      }
+      if (model) {
+        await storage.setSystemSetting('ai_model', model, 'AI model to use for chat');
+      }
+      res.json({ success: true, provider, model });
+    } catch (error) {
+      console.error("[api] Error updating AI config:", error);
+      res.status(500).json({ error: "Failed to update AI configuration" });
+    }
+  });
+
+  app.post("/api/admin/ai/test", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { testAIConnection } = await import("./services/unifiedAssistant");
+      const result = await testAIConnection();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[api] Error testing AI connection:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message || "Failed to test AI connection" 
+      });
+    }
+  });
+
   app.get("/api/admin/sync-logs", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;

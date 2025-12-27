@@ -5,7 +5,94 @@ import { storage } from "../storage";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+const gemini = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL && process.env.AI_INTEGRATIONS_GEMINI_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+    })
+  : null;
+
 const N8N_CASES_WEBHOOK_URL = process.env.N8N_CASES_WEBHOOK_URL || "https://n8n.turbopartners.com.br/webhook/assistente-cases";
+
+export const AI_PROVIDERS = {
+  openai: {
+    name: 'OpenAI',
+    models: ['gpt-4o'],
+    available: !!process.env.OPENAI_API_KEY,
+  },
+  gemini: {
+    name: 'Gemini',
+    models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+    available: !!(process.env.AI_INTEGRATIONS_GEMINI_BASE_URL && process.env.AI_INTEGRATIONS_GEMINI_API_KEY),
+  },
+} as const;
+
+export type AIProvider = keyof typeof AI_PROVIDERS;
+export type AIModel = 'gpt-4o' | 'gemini-2.5-flash' | 'gemini-2.5-pro';
+
+async function getAIConfig(): Promise<{ provider: AIProvider; model: AIModel }> {
+  const providerSetting = await storage.getSystemSetting('ai_provider');
+  const modelSetting = await storage.getSystemSetting('ai_model');
+  
+  const provider = (providerSetting === 'gemini' && AI_PROVIDERS.gemini.available) ? 'gemini' : 'openai';
+  let model: AIModel = 'gpt-4o';
+  
+  if (modelSetting) {
+    if (provider === 'openai' && modelSetting === 'gpt-4o') {
+      model = 'gpt-4o';
+    } else if (provider === 'gemini' && (modelSetting === 'gemini-2.5-flash' || modelSetting === 'gemini-2.5-pro')) {
+      model = modelSetting;
+    }
+  } else if (provider === 'gemini') {
+    model = 'gemini-2.5-flash';
+  }
+  
+  return { provider, model };
+}
+
+function getAIClient(provider: AIProvider): OpenAI {
+  if (provider === 'gemini' && gemini) {
+    return gemini;
+  }
+  return openai;
+}
+
+export async function testAIConnection(): Promise<{ success: boolean; provider: string; model: string; error?: string }> {
+  try {
+    const config = await getAIConfig();
+    const client = getAIClient(config.provider);
+    
+    const response = await client.chat.completions.create({
+      model: config.model,
+      messages: [{ role: "user", content: "Say 'Hello! AI is working.' and nothing else." }],
+      max_tokens: 50,
+    });
+    
+    const text = response.choices[0]?.message?.content || '';
+    return {
+      success: text.toLowerCase().includes('hello') || text.toLowerCase().includes('ai'),
+      provider: AI_PROVIDERS[config.provider].name,
+      model: config.model,
+    };
+  } catch (error: any) {
+    const config = await getAIConfig();
+    return {
+      success: false,
+      provider: AI_PROVIDERS[config.provider].name,
+      model: config.model,
+      error: error.message || 'Unknown error',
+    };
+  }
+}
+
+export function getAvailableProviders() {
+  return Object.entries(AI_PROVIDERS).map(([key, value]) => ({
+    id: key,
+    name: value.name,
+    models: value.models,
+    available: value.available,
+  }));
+}
 
 const CONTEXT_DETECTION_PROMPT = `Você é um classificador de contexto para o GPTurbo, assistente virtual da Turbo Partners.
 
@@ -61,8 +148,11 @@ async function chatGeral(request: UnifiedAssistantRequest): Promise<UnifiedAssis
   messages.push({ role: "user", content: request.message });
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+    const config = await getAIConfig();
+    const client = getAIClient(config.provider);
+    
+    const response = await client.chat.completions.create({
+      model: config.model,
       messages,
       max_tokens: 1024,
     });
@@ -115,8 +205,11 @@ Para informações mais detalhadas, oriente o usuário a verificar na página de
 
     messages.push({ role: "user", content: request.message });
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+    const config = await getAIConfig();
+    const client = getAIClient(config.provider);
+    
+    const response = await client.chat.completions.create({
+      model: config.model,
       messages,
       max_tokens: 1024,
     });
@@ -208,8 +301,11 @@ async function detectContext(message: string, pageContext?: string): Promise<Ass
       ? `Página atual: ${pageContext}\n\nMensagem do usuário: ${message}`
       : message;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const config = await getAIConfig();
+    const client = getAIClient(config.provider);
+    
+    const response = await client.chat.completions.create({
+      model: config.model,
       messages: [
         { role: "system", content: CONTEXT_DETECTION_PROMPT },
         { role: "user", content: userMessage }
