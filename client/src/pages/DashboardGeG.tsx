@@ -47,6 +47,19 @@ interface ColaboradoresPorSaude {
   critico: ColaboradorSaude[];
 }
 
+interface ChartFilter {
+  tipo: 'modalidade' | 'cidade' | 'estado' | 'squad' | 'cargo' | 'nivel';
+  valor: string;
+  label: string;
+}
+
+interface ColaboradorFiltrado {
+  id: number;
+  nome: string;
+  cargo: string | null;
+  squad: string | null;
+}
+
 type PeriodoPreset = "mesAtual" | "trimestre" | "semestre" | "ano";
 
 interface PeriodoState {
@@ -276,6 +289,7 @@ export default function DashboardGeG() {
   const [selectedAlert, setSelectedAlert] = useState<SelectedAlert | null>(null);
   const [ignoredAlerts, setIgnoredAlerts] = useState<string[]>([]);
   const [selectedHealthCategory, setSelectedHealthCategory] = useState<HealthCategory | null>(null);
+  const [selectedChartFilter, setSelectedChartFilter] = useState<ChartFilter | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('geg-ignored-alerts');
@@ -404,6 +418,15 @@ export default function DashboardGeG() {
     queryKey: ['/api/geg/colaboradores-por-saude'],
     enabled: selectedHealthCategory !== null,
   });
+
+  const { data: colaboradoresFiltrados, isLoading: isLoadingColaboradoresFiltrados } = useQuery<ColaboradorFiltrado[]>({
+    queryKey: ['/api/geg/colaboradores-por-filtro', { tipo: selectedChartFilter?.tipo, valor: selectedChartFilter?.valor }],
+    enabled: selectedChartFilter !== null,
+  });
+
+  const handleChartClick = (tipo: ChartFilter['tipo'], valor: string, label: string) => {
+    setSelectedChartFilter({ tipo, valor, label });
+  };
 
   const formatMesAno = (mesAno: string) => {
     const [ano, mes] = mesAno.split('-');
@@ -1501,6 +1524,63 @@ export default function DashboardGeG() {
           </DialogContent>
         </Dialog>
 
+        {/* Dialog de Colaboradores por Filtro (Charts/Tables) */}
+        <Dialog open={!!selectedChartFilter} onOpenChange={(open) => !open && setSelectedChartFilter(null)}>
+          <DialogContent className="sm:max-w-lg max-h-[80vh]" data-testid="dialog-chart-filter">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {selectedChartFilter?.tipo === 'modalidade' && <Building className="w-5 h-5 text-teal-500" />}
+                {selectedChartFilter?.tipo === 'cidade' && <MapPin className="w-5 h-5 text-blue-500" />}
+                {selectedChartFilter?.tipo === 'estado' && <MapPin className="w-5 h-5 text-amber-500" />}
+                {selectedChartFilter?.tipo === 'squad' && <Users className="w-5 h-5 text-blue-500" />}
+                {selectedChartFilter?.tipo === 'cargo' && <Award className="w-5 h-5 text-purple-500" />}
+                {selectedChartFilter?.tipo === 'nivel' && <TrendingUp className="w-5 h-5 text-green-500" />}
+                {selectedChartFilter?.label}
+              </DialogTitle>
+              <DialogDescription>
+                {colaboradoresFiltrados?.length || 0} colaborador{colaboradoresFiltrados?.length !== 1 ? 'es' : ''} encontrado{colaboradoresFiltrados?.length !== 1 ? 's' : ''}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[50vh] overflow-y-auto space-y-2">
+              {isLoadingColaboradoresFiltrados ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+                </div>
+              ) : colaboradoresFiltrados && colaboradoresFiltrados.length > 0 ? (
+                colaboradoresFiltrados.map((c) => (
+                  <div 
+                    key={c.id} 
+                    className="p-3 rounded-lg border bg-muted/30"
+                    data-testid={`filtro-colaborador-${c.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <Link href={`/colaboradores/${c.id}`} className="hover:underline">
+                          <p className="font-medium text-sm truncate">{c.nome}</p>
+                        </Link>
+                        <p className="text-xs text-muted-foreground">{c.cargo || 'N/A'}</p>
+                        {c.squad && <p className="text-xs text-muted-foreground">{c.squad}</p>}
+                      </div>
+                      <Button variant="ghost" size="icon" asChild className="flex-shrink-0">
+                        <Link href={`/colaboradores/${c.id}`}>
+                          <ExternalLink className="w-4 h-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-muted-foreground py-8">Nenhum colaborador encontrado</p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSelectedChartFilter(null)} data-testid="btn-fechar-filtro">
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Seção Retenção e Saúde */}
         <div className="mb-6" data-testid="section-retencao-saude">
           <div className="flex items-center gap-2 mb-4 pb-2 border-b">
@@ -1659,6 +1739,8 @@ export default function DashboardGeG() {
                           outerRadius={60}
                           label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                           labelLine={false}
+                          onClick={(data) => handleChartClick('modalidade', data.name, `Modalidade: ${data.name}`)}
+                          style={{ cursor: 'pointer' }}
                         >
                           <Cell fill="#14b8a6" />
                           <Cell fill="#8b5cf6" />
@@ -1667,11 +1749,19 @@ export default function DashboardGeG() {
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="flex gap-4 mt-2 text-xs">
-                      <div className="flex items-center gap-1" data-testid="modalidade-presencial">
+                      <div 
+                        className="flex items-center gap-1 cursor-pointer hover:opacity-80" 
+                        data-testid="modalidade-presencial"
+                        onClick={() => handleChartClick('modalidade', 'Presencial', 'Modalidade: Presencial')}
+                      >
                         <div className="w-2 h-2 rounded-full bg-teal-500" />
                         <span>Presencial: {distribuicaoGeografica.modalidade.presencial}</span>
                       </div>
-                      <div className="flex items-center gap-1" data-testid="modalidade-remoto">
+                      <div 
+                        className="flex items-center gap-1 cursor-pointer hover:opacity-80" 
+                        data-testid="modalidade-remoto"
+                        onClick={() => handleChartClick('modalidade', 'Remoto', 'Modalidade: Remoto')}
+                      >
                         <div className="w-2 h-2 rounded-full bg-purple-500" />
                         <span>Remoto: {distribuicaoGeografica.modalidade.remoto}</span>
                       </div>
@@ -1722,7 +1812,13 @@ export default function DashboardGeG() {
                               return null;
                             }}
                           />
-                          <Bar dataKey="total" name="Colaboradores" radius={[0, 4, 4, 0]}>
+                          <Bar 
+                            dataKey="total" 
+                            name="Colaboradores" 
+                            radius={[0, 4, 4, 0]}
+                            onClick={(data) => handleChartClick('cidade', data.cidade, `Cidade: ${data.cidade}`)}
+                            style={{ cursor: 'pointer' }}
+                          >
                             {distribuicaoGeografica.grandeVitoria.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                             ))}
@@ -1776,7 +1872,13 @@ export default function DashboardGeG() {
                               return null;
                             }}
                           />
-                          <Bar dataKey="total" name="Colaboradores" radius={[0, 4, 4, 0]}>
+                          <Bar 
+                            dataKey="total" 
+                            name="Colaboradores" 
+                            radius={[0, 4, 4, 0]}
+                            onClick={(data) => handleChartClick('estado', data.estado, `Estado: ${data.estado}`)}
+                            style={{ cursor: 'pointer' }}
+                          >
                             {distribuicaoGeografica.byEstado.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                             ))}
@@ -1868,7 +1970,12 @@ export default function DashboardGeG() {
                         }, [] as { nome: string; total: number }[]);
                         const totalSquad = aggregatedSquads.reduce((sum, item) => sum + item.total, 0);
                         return aggregatedSquads.map((item, index) => (
-                          <TableRow key={item.nome} data-testid={`squad-dist-${index}`}>
+                          <TableRow 
+                            key={item.nome} 
+                            data-testid={`squad-dist-${index}`}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleChartClick('squad', item.nome, `Squad: ${item.nome}`)}
+                          >
                             <TableCell className="font-medium">{item.nome}</TableCell>
                             <TableCell className="text-right">{item.total}</TableCell>
                             <TableCell className="text-right">{totalSquad > 0 ? ((item.total / totalSquad) * 100).toFixed(1) : 0}%</TableCell>
@@ -1911,7 +2018,12 @@ export default function DashboardGeG() {
                       {(() => {
                         const totalCargo = colaboradoresPorCargo.reduce((sum, item) => sum + item.total, 0);
                         return colaboradoresPorCargo.map((item, index) => (
-                          <TableRow key={item.nome} data-testid={`cargo-dist-${index}`}>
+                          <TableRow 
+                            key={item.nome} 
+                            data-testid={`cargo-dist-${index}`}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleChartClick('cargo', item.nome, `Cargo: ${item.nome}`)}
+                          >
                             <TableCell className="font-medium">{item.nome}</TableCell>
                             <TableCell className="text-right">{item.total}</TableCell>
                             <TableCell className="text-right">{totalCargo > 0 ? ((item.total / totalCargo) * 100).toFixed(1) : 0}%</TableCell>
@@ -1955,7 +2067,12 @@ export default function DashboardGeG() {
                         const totalNivel = colaboradoresPorNivel.reduce((sum, item) => sum + item.total, 0);
                         const formatNivel = (nome: string) => nome.replace(/^X\s+/, '');
                         return colaboradoresPorNivel.map((item, index) => (
-                          <TableRow key={item.nome} data-testid={`nivel-dist-${index}`}>
+                          <TableRow 
+                            key={item.nome} 
+                            data-testid={`nivel-dist-${index}`}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => handleChartClick('nivel', item.nome, `Nível: ${formatNivel(item.nome)}`)}
+                          >
                             <TableCell className="font-medium">{formatNivel(item.nome)}</TableCell>
                             <TableCell className="text-right">{item.total}</TableCell>
                             <TableCell className="text-right">{totalNivel > 0 ? ((item.total / totalNivel) * 100).toFixed(1) : 0}%</TableCell>
