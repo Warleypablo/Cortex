@@ -361,13 +361,13 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
           year INTEGER NOT NULL,
           month INTEGER NOT NULL,
           metric_key VARCHAR(100) NOT NULL,
-          dimension_key VARCHAR(100),
-          dimension_value VARCHAR(255),
+          dimension_key VARCHAR(100) DEFAULT '',
+          dimension_value VARCHAR(255) DEFAULT '',
           override_value NUMERIC(18,6) NOT NULL,
           note TEXT,
           updated_by VARCHAR(255),
           updated_at TIMESTAMP DEFAULT NOW(),
-          UNIQUE (year, month, metric_key, COALESCE(dimension_key, ''), COALESCE(dimension_value, ''))
+          UNIQUE (year, month, metric_key, dimension_key, dimension_value)
         )
       `);
       

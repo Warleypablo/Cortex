@@ -2509,11 +2509,27 @@ const PERSPECTIVES = [
 const SQUADS = ["Commerce", "TurboOH", "Ventures", "Tech", "G&G", "Finance"];
 
 function SquadGoalsTab() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [filterSquad, setFilterSquad] = useState<string>("all");
   const [filterPerspective, setFilterPerspective] = useState<string>("all");
 
-  const { data, isLoading, error } = useQuery<SquadGoalsResponse>({
+  const { data, isLoading, error, refetch } = useQuery<SquadGoalsResponse>({
     queryKey: ["/api/okr2026/squad-goals", { year: 2026 }],
+  });
+
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/okr2026/seed-squad-goals");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Seed realizado", description: "Metas de squad populadas com sucesso." });
+      refetch();
+    },
+    onError: () => {
+      toast({ title: "Erro no seed", description: "Falha ao popular metas.", variant: "destructive" });
+    }
   });
 
   const goals = data?.goals || [];
@@ -2588,8 +2604,27 @@ function SquadGoalsTab() {
           </div>
           <h3 className="text-xl font-semibold mb-2">Nenhuma meta cadastrada</h3>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            As metas por squad ainda não foram configuradas. Importe via planilha ou adicione manualmente.
+            As metas por squad ainda não foram configuradas. Clique abaixo para popular com dados de exemplo.
           </p>
+          {user?.role === "admin" && (
+            <Button 
+              onClick={() => seedMutation.mutate()} 
+              disabled={seedMutation.isPending}
+              data-testid="button-seed-squad-goals"
+            >
+              {seedMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Populando...
+                </>
+              ) : (
+                <>
+                  <Database className="w-4 h-4 mr-2" />
+                  Popular Metas de Vendas
+                </>
+              )}
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
