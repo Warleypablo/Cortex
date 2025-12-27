@@ -28,7 +28,7 @@ import {
   ArrowUpRight, Info, Rocket, Clock, CheckCircle2, 
   XCircle, Banknote, PiggyBank, ClipboardCheck, MessageSquare, History,
   CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building,
-  LayoutGrid, List, Search
+  LayoutGrid, List, Search, Loader2, Database
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -126,8 +126,10 @@ interface Initiative {
   title?: string;
   ownerRole?: string;
   owner_email?: string;
+  owner_name?: string;
   start?: string;
   end?: string;
+  dueDate?: string;
   quarter?: string;
   status: string;
   type?: string;
@@ -909,15 +911,54 @@ function HugzBlock({
   );
 }
 
+function SmartEmptyState({ 
+  title, 
+  description,
+  icon: Icon = Info,
+  targetYear = 2026
+}: { 
+  title: string; 
+  description: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  targetYear?: number;
+}) {
+  const currentYear = new Date().getFullYear();
+  const isFutureYear = currentYear < targetYear;
+  
+  return (
+    <div className="h-full flex flex-col items-center justify-center text-center p-6">
+      <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+        <Icon className="w-6 h-6 text-muted-foreground" />
+      </div>
+      <div className="text-sm font-medium text-muted-foreground mb-1">{title}</div>
+      <div className="text-xs text-muted-foreground/70 max-w-[200px]">
+        {isFutureYear 
+          ? `BP ${targetYear} carregado. Dados reais começam quando ${targetYear} iniciar.`
+          : description
+        }
+      </div>
+    </div>
+  );
+}
+
 function MRRChart({ data }: { data: { month: string; value: number }[] }) {
-  if (!data || data.length === 0) {
+  const hasValidData = data && data.length >= 2 && data.some(d => d.value > 0);
+  
+  if (!hasValidData) {
     return (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Evolução MRR</CardTitle>
+          <CardTitle className="text-sm flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            Evolução MRR
+          </CardTitle>
         </CardHeader>
-        <CardContent className="h-48 flex items-center justify-center text-muted-foreground">
-          Sem dados disponíveis
+        <CardContent className="h-48">
+          <SmartEmptyState 
+            title="Aguardando dados"
+            description="São necessários ao menos 2 pontos para exibir o gráfico."
+            icon={TrendingUp}
+          />
         </CardContent>
       </Card>
     );
@@ -978,6 +1019,201 @@ function StatusBadge({ status }: { status: "green" | "yellow" | "red" | "gray" }
   );
 }
 
+function PriorityInitiativesSection({ 
+  initiatives, 
+  currentQuarter,
+  onViewAll
+}: { 
+  initiatives: Initiative[];
+  currentQuarter: "Q1" | "Q2" | "Q3" | "Q4";
+  onViewAll?: () => void;
+}) {
+  const priorityOrder: Record<string, number> = { 
+    blocked: 0, 
+    doing: 1, 
+    in_progress: 1,
+    backlog: 2, 
+    planned: 2,
+    done: 3
+  };
+
+  const quarterInitiatives = initiatives.filter(i => 
+    i.quarter === currentQuarter || !i.quarter
+  );
+
+  const sorted = [...quarterInitiatives].sort((a, b) => {
+    const aOrder = priorityOrder[a.status] ?? 3;
+    const bOrder = priorityOrder[b.status] ?? 3;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    const aDate = a.end || a.dueDate || "9999-12-31";
+    const bDate = b.end || b.dueDate || "9999-12-31";
+    return aDate.localeCompare(bDate);
+  });
+
+  const top5 = sorted.slice(0, 5);
+
+  if (top5.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card data-testid="section-priorities">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Rocket className="w-5 h-5 text-primary" />
+            Prioridades do Trimestre
+          </CardTitle>
+          {onViewAll && (
+            <Button variant="ghost" size="sm" onClick={onViewAll} className="text-xs">
+              Ver todas
+              <ArrowUpRight className="w-3 h-3 ml-1" />
+            </Button>
+          )}
+        </div>
+        <CardDescription>Top 5 iniciativas para focar no {currentQuarter}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {top5.map((init, idx) => (
+          <div 
+            key={init.id} 
+            className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover-elevate border border-transparent hover:border-border transition-colors"
+            data-testid={`priority-item-${idx}`}
+          >
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                {idx + 1}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-sm truncate">{init.title || init.name}</div>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <InitiativeStatusBadge status={init.status} />
+                  {init.quarter && <QuarterBadge quarter={init.quarter} />}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0 text-right">
+              <div className="text-xs text-muted-foreground">
+                {init.owner_name || init.ownerRole || "—"}
+              </div>
+              {(init.end || init.dueDate) && (
+                <Badge variant="outline" className="text-[10px]">
+                  <Clock className="w-3 h-3 mr-1" />
+                  {format(new Date(init.end || init.dueDate!), "dd/MM", { locale: ptBR })}
+                </Badge>
+              )}
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PendingCheckinsSection({ 
+  krs, 
+  latestCheckins,
+  currentQuarter,
+  onCheckin,
+  targetYear = 2026
+}: { 
+  krs: KR[];
+  latestCheckins: Record<string, KRCheckin>;
+  currentQuarter: "Q1" | "Q2" | "Q3" | "Q4";
+  onCheckin?: (kr: KR) => void;
+  targetYear?: number;
+}) {
+  const pendingKRs = krs.filter(kr => {
+    const latestCheckin = latestCheckins[kr.id];
+    if (!latestCheckin) return true;
+    const checkinYear = latestCheckin.year;
+    const checkinQuarter = latestCheckin.periodValue;
+    if (checkinYear !== targetYear) return true;
+    return checkinQuarter !== currentQuarter;
+  });
+
+  if (pendingKRs.length === 0) {
+    return (
+      <Card data-testid="section-checkins-all-done">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ClipboardCheck className="w-5 h-5 text-green-500" />
+            Check-ins do Trimestre
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+            <CheckCircle2 className="w-5 h-5 text-green-500" />
+            <div>
+              <div className="font-medium text-sm text-green-700 dark:text-green-400">
+                Todos os check-ins em dia!
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Todos os KRs possuem check-in no {currentQuarter}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const top5Pending = pendingKRs.slice(0, 5);
+
+  return (
+    <Card data-testid="section-checkins-pending">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <ClipboardCheck className="w-5 h-5 text-amber-500" />
+          Check-ins Pendentes ({pendingKRs.length})
+        </CardTitle>
+        <CardDescription>
+          KRs sem check-in no {currentQuarter}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {top5Pending.map((kr, idx) => (
+          <div 
+            key={kr.id} 
+            className="flex items-center justify-between p-3 rounded-lg bg-amber-500/5 border border-amber-500/20"
+            data-testid={`checkin-pending-${idx}`}
+          >
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="p-1.5 rounded-md bg-amber-500/10">
+                <AlertCircle className="w-4 h-4 text-amber-500" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-sm truncate">
+                  {kr.id}: {kr.title}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {kr.objectiveId} • {kr.owner || "Sem owner"}
+                </div>
+              </div>
+            </div>
+            {onCheckin && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => onCheckin(kr)}
+                className="text-xs flex-shrink-0"
+              >
+                <MessageSquare className="w-3 h-3 mr-1" />
+                Check-in
+              </Button>
+            )}
+          </div>
+        ))}
+        {pendingKRs.length > 5 && (
+          <div className="text-center text-xs text-muted-foreground pt-2">
+            E mais {pendingKRs.length - 5} KR(s) pendente(s)...
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 interface AlertItem {
   name: string;
   currentValue: number | null;
@@ -999,9 +1235,6 @@ function AlertsSection({
     return null;
   }
 
-  const criticalAlerts = alerts.filter(a => a.severity === "critical");
-  const warningAlerts = alerts.filter(a => a.severity === "warning");
-
   const formatAlertValue = (value: number | null, format: "currency" | "percent" | "number") => {
     if (value === null) return "—";
     if (format === "currency") return formatCurrency(value);
@@ -1010,97 +1243,71 @@ function AlertsSection({
   };
 
   return (
-    <Card data-testid="section-alerts">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-amber-500" />
-          Alertas de Métricas ({alerts.length})
+    <Card data-testid="section-alerts" className="border-amber-500/30">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-500" />
+          Métricas que requerem atenção
+          <Badge variant="outline" className="ml-auto text-[10px]">{alerts.length}</Badge>
         </CardTitle>
-        <CardDescription>
-          Métricas que requerem atenção no {selectedQuarter}
-        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {criticalAlerts.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-medium text-red-600 dark:text-red-400">
-              <AlertCircle className="w-4 h-4" />
-              Críticos ({criticalAlerts.length})
-            </div>
-            <div className="space-y-2">
-              {criticalAlerts.map((alert, idx) => (
-                <div 
-                  key={idx}
-                  className="flex items-center justify-between p-3 rounded-lg bg-red-500/10 border border-red-500/20"
-                  data-testid={`alert-item-critical-${idx}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <AlertCircle className="w-4 h-4 text-red-500" />
-                    <div>
-                      <div className="font-medium text-sm">{alert.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {alert.direction === "lower" ? "Meta: ≤" : "Meta:"} {formatAlertValue(alert.target, alert.format)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-red-600 dark:text-red-400">
-                      {formatAlertValue(alert.currentValue, alert.format)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {alert.percentage.toFixed(0)}% da meta
-                    </div>
-                  </div>
+      <CardContent className="pt-0">
+        <div className="divide-y divide-border">
+          {alerts.map((alert, idx) => {
+            const isCritical = alert.severity === "critical";
+            const IconComponent = isCritical ? AlertCircle : AlertTriangle;
+            const textColor = isCritical 
+              ? "text-red-600 dark:text-red-400" 
+              : "text-amber-600 dark:text-amber-400";
+            const bgColor = isCritical 
+              ? "bg-red-500/5" 
+              : "bg-amber-500/5";
+            
+            return (
+              <div 
+                key={idx}
+                className={`flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-md ${bgColor}`}
+                data-testid={`alert-item-${idx}`}
+              >
+                <IconComponent className={`w-4 h-4 flex-shrink-0 ${textColor}`} />
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium">{alert.name}</span>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {warningAlerts.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-medium text-yellow-600 dark:text-yellow-400">
-              <AlertTriangle className="w-4 h-4" />
-              Atenção ({warningAlerts.length})
-            </div>
-            <div className="space-y-2">
-              {warningAlerts.map((alert, idx) => (
-                <div 
-                  key={idx}
-                  className="flex items-center justify-between p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20"
-                  data-testid={`alert-item-warning-${idx}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                    <div>
-                      <div className="font-medium text-sm">{alert.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {alert.direction === "lower" ? "Meta: ≤" : "Meta:"} {formatAlertValue(alert.target, alert.format)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-yellow-600 dark:text-yellow-400">
+                <div className="flex items-center gap-3 text-right">
+                  <div>
+                    <span className={`text-sm font-bold ${textColor}`}>
                       {formatAlertValue(alert.currentValue, alert.format)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {alert.percentage.toFixed(0)}% da meta
-                    </div>
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-1">
+                      / {formatAlertValue(alert.target, alert.format)}
+                    </span>
                   </div>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-[10px] ${isCritical ? "border-red-500/30 text-red-600 dark:text-red-400" : "border-amber-500/30 text-amber-600 dark:text-amber-400"}`}
+                  >
+                    {alert.percentage.toFixed(0)}%
+                  </Badge>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-function DashboardTab({ data }: { data: SummaryResponse }) {
+function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChange?: (tab: string) => void }) {
   const { metrics, highlights, series, initiatives, krs } = data;
   const currentQuarter = getCurrentQuarter();
   const [selectedQuarter, setSelectedQuarter] = useState<"Q1" | "Q2" | "Q3" | "Q4">(currentQuarter);
+
+  const { data: latestCheckinsData } = useQuery<LatestCheckinsResponse>({
+    queryKey: ["/api/okr2026/kr-checkins-latest"],
+  });
+
+  const latestCheckins = latestCheckinsData?.latestByKr || {};
 
   const getTargetForMetric = (metricKey: string): number | null => {
     const kr = krs?.find(k => k.metricKey === metricKey);
@@ -1266,6 +1473,19 @@ function DashboardTab({ data }: { data: SummaryResponse }) {
       {computeAlerts.length > 0 && (
         <AlertsSection alerts={computeAlerts} selectedQuarter={selectedQuarter} />
       )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <PriorityInitiativesSection 
+          initiatives={initiatives} 
+          currentQuarter={selectedQuarter}
+          onViewAll={onTabChange ? () => onTabChange("initiatives") : undefined}
+        />
+        <PendingCheckinsSection 
+          krs={krs} 
+          latestCheckins={latestCheckins}
+          currentQuarter={selectedQuarter}
+        />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TurboOHBlock metrics={metrics} quarter={selectedQuarter} />
@@ -2864,7 +3084,7 @@ export default function OKR2026() {
 
     switch (activeTab) {
       case "dashboard":
-        return <DashboardTab data={data} />;
+        return <DashboardTab data={data} onTabChange={setActiveTab} />;
       case "krs":
         return <KRsTab data={data} />;
       case "initiatives":
@@ -2874,7 +3094,7 @@ export default function OKR2026() {
       case "metas-squad":
         return <SquadGoalsTab />;
       default:
-        return <DashboardTab data={data} />;
+        return <DashboardTab data={data} onTabChange={setActiveTab} />;
     }
   };
 
