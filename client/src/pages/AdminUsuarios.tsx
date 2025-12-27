@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText, TrendingUp, Building2, AlertTriangle, FileCheck, UserMinus, Target, GitBranch, ChevronDown, ChevronUp, Plug, Wifi, WifiOff, Cloud, RefreshCw } from "lucide-react";
+import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText, TrendingUp, Building2, AlertTriangle, FileCheck, UserMinus, Target, GitBranch, ChevronDown, ChevronUp, Plug, Wifi, WifiOff, Cloud, RefreshCw, Bot, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -1406,6 +1406,296 @@ function ConnectionsContent() {
   );
 }
 
+interface AIProvider {
+  id: string;
+  name: string;
+  models: string[];
+  available: boolean;
+}
+
+interface AIConfig {
+  provider: string;
+  model: string;
+  providers: AIProvider[];
+}
+
+interface TestResult {
+  success: boolean;
+  provider: string;
+  model: string;
+  error?: string;
+}
+
+function AIConfigContent() {
+  const { toast } = useToast();
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
+
+  const { data: config, isLoading } = useQuery<AIConfig>({
+    queryKey: ['/api/admin/ai/config'],
+  });
+
+  useEffect(() => {
+    if (config) {
+      setSelectedProvider(config.provider);
+      setSelectedModel(config.model);
+    }
+  }, [config]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { provider: string; model: string }) => {
+      return await apiRequest('PUT', '/api/admin/ai/config', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ai/config'] });
+      toast({ title: "Configuração salva", description: "As configurações de IA foram atualizadas." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/admin/ai/test');
+      return response.json();
+    },
+    onSuccess: (data: TestResult) => {
+      setTestResult(data);
+      if (data.success) {
+        toast({ title: "Conexão testada com sucesso", description: `${data.provider} (${data.model}) está funcionando.` });
+      } else {
+        toast({ title: "Erro na conexão", description: data.error || "Falha ao conectar com a IA.", variant: "destructive" });
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao testar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const currentProviderData = config?.providers?.find(p => p.id === selectedProvider);
+  const availableModels = currentProviderData?.models || [];
+
+  const handleProviderChange = (provider: string) => {
+    setSelectedProvider(provider);
+    const providerData = config?.providers?.find(p => p.id === provider);
+    if (providerData && providerData.models.length > 0) {
+      setSelectedModel(providerData.models[0]);
+    }
+    setTestResult(null);
+  };
+
+  const handleSave = () => {
+    updateMutation.mutate({ provider: selectedProvider, model: selectedModel });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold">Configurações de IA</h2>
+          <p className="text-sm text-muted-foreground">
+            Configure o provedor e modelo de IA para o assistente GPTurbo
+          </p>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6" data-testid="ai-config-content">
+      <div>
+        <h2 className="text-lg font-semibold">Configurações de IA</h2>
+        <p className="text-sm text-muted-foreground">
+          Configure o provedor e modelo de IA para o assistente GPTurbo
+        </p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card data-testid="card-ai-provider">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bot className="h-5 w-5" />
+              Provedor de IA
+            </CardTitle>
+            <CardDescription>
+              Selecione o provedor de inteligência artificial
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              {config?.providers?.map((provider) => (
+                <div
+                  key={provider.id}
+                  className={`flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-colors ${
+                    selectedProvider === provider.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:bg-muted/50'
+                  } ${!provider.available ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => provider.available && handleProviderChange(provider.id)}
+                  data-testid={`provider-${provider.id}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      selectedProvider === provider.id ? 'border-primary' : 'border-muted-foreground'
+                    }`}>
+                      {selectedProvider === provider.id && (
+                        <div className="w-2 h-2 rounded-full bg-primary" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium">{provider.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Modelos: {provider.models.join(', ')}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant={provider.available ? "default" : "secondary"}>
+                    {provider.available ? "Disponível" : "Não configurado"}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-ai-model">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Modelo
+            </CardTitle>
+            <CardDescription>
+              Selecione o modelo de linguagem a ser utilizado
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Select
+              value={selectedModel}
+              onValueChange={setSelectedModel}
+              disabled={!currentProviderData?.available}
+            >
+              <SelectTrigger data-testid="select-model">
+                <SelectValue placeholder="Selecione um modelo" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableModels.map((model) => (
+                  <SelectItem key={model} value={model} data-testid={`model-${model}`}>
+                    {model}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="pt-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Configuração atual:</span>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50 space-y-1">
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Provedor:</span>{' '}
+                  <span className="font-medium">{config?.providers?.find(p => p.id === config.provider)?.name || config?.provider}</span>
+                </p>
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Modelo:</span>{' '}
+                  <span className="font-medium">{config?.model}</span>
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card data-testid="card-ai-actions">
+        <CardHeader>
+          <CardTitle>Ações</CardTitle>
+          <CardDescription>
+            Salve as configurações ou teste a conexão com o provedor selecionado
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-4">
+            <Button
+              onClick={handleSave}
+              disabled={updateMutation.isPending || !selectedProvider || !selectedModel}
+              data-testid="button-save-ai-config"
+            >
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                'Salvar Configurações'
+              )}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => testMutation.mutate()}
+              disabled={testMutation.isPending}
+              data-testid="button-test-ai-connection"
+            >
+              {testMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Testando...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Testar Conexão
+                </>
+              )}
+            </Button>
+          </div>
+
+          {testResult && (
+            <div className={`p-4 rounded-lg border ${
+              testResult.success 
+                ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900' 
+                : 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900'
+            }`} data-testid="test-result">
+              <div className="flex items-center gap-2">
+                {testResult.success ? (
+                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                )}
+                <div>
+                  <p className={`font-medium ${testResult.success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                    {testResult.success ? 'Conexão bem sucedida!' : 'Falha na conexão'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {testResult.provider} ({testResult.model})
+                    {testResult.error && ` - ${testResult.error}`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Separator />
+
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p className="font-medium">Informações sobre os provedores:</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li><strong>OpenAI:</strong> Requer OPENAI_API_KEY configurada no ambiente.</li>
+              <li><strong>Gemini:</strong> Usa Replit AI Integrations - cobrado nos créditos Replit, sem necessidade de API key própria.</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function EditRuleDialog({ 
   rule, 
   open, 
@@ -1713,6 +2003,10 @@ export default function AdminUsuarios() {
             <Plug className="h-4 w-4 mr-2" />
             Conexões
           </TabsTrigger>
+          <TabsTrigger value="ai-config" data-testid="tab-ai-config">
+            <Bot className="h-4 w-4 mr-2" />
+            Configurações IA
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="usuarios" className="space-y-6">
@@ -1930,6 +2224,10 @@ export default function AdminUsuarios() {
 
         <TabsContent value="conexoes">
           <ConnectionsContent />
+        </TabsContent>
+
+        <TabsContent value="ai-config">
+          <AIConfigContent />
         </TabsContent>
       </Tabs>
     </div>
