@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDecimal } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, TrendingDown, UserPlus, UserMinus, Clock, Cake, Award, Gift, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet, Filter, Info, X, MapPin, Heart, Activity, ShieldCheck } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Users, TrendingUp, TrendingDown, UserPlus, UserMinus, Clock, Cake, Award, Gift, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet, Filter, Info, X, MapPin, Heart, Activity, ShieldCheck, Eye, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ComposedChart } from "recharts";
@@ -14,6 +15,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
+import { Link } from "wouter";
+
+type AlertType = 'veterano' | 'experiencia' | 'salario';
+interface SelectedAlert {
+  type: AlertType;
+  id: number;
+  nome: string;
+  cargo: string | null;
+  squad: string | null;
+  detail: string;
+  extra?: string;
+}
 
 type PeriodoPreset = "mesAtual" | "trimestre" | "semestre" | "ano";
 
@@ -241,6 +254,32 @@ export default function DashboardGeG() {
   const [nivel, setNivel] = useState("todos");
   const [cargo, setCargo] = useState("todos");
   const [diasExperiencia, setDiasExperiencia] = useState(30);
+  const [selectedAlert, setSelectedAlert] = useState<SelectedAlert | null>(null);
+  const [ignoredAlerts, setIgnoredAlerts] = useState<string[]>([]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('geg-ignored-alerts');
+    if (stored) {
+      try {
+        setIgnoredAlerts(JSON.parse(stored));
+      } catch { }
+    }
+  }, []);
+
+  const ignoreAlert = (type: AlertType, id: number) => {
+    const key = `${type}-${id}`;
+    const updated = [...ignoredAlerts, key];
+    setIgnoredAlerts(updated);
+    localStorage.setItem('geg-ignored-alerts', JSON.stringify(updated));
+    setSelectedAlert(null);
+  };
+
+  const isIgnored = (type: AlertType, id: number) => ignoredAlerts.includes(`${type}-${id}`);
+
+  const clearIgnored = () => {
+    setIgnoredAlerts([]);
+    localStorage.removeItem('geg-ignored-alerts');
+  };
 
   const periodo = getPeriodoParaQuery(periodoState);
 
@@ -1053,152 +1092,265 @@ export default function DashboardGeG() {
         </div>
 
         {/* Seção Alertas e Atenção */}
-        {alertas && alertas.totalAlertas > 0 && (
+        {alertas && (
           <div className="mb-6" data-testid="section-alertas">
-            <div className="flex items-center gap-2 mb-4 pb-2 border-b">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
-              <h2 className="text-lg font-semibold">Alertas e Atenção</h2>
-              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
-                {alertas.totalAlertas} {alertas.totalAlertas === 1 ? 'alerta' : 'alertas'}
-              </Badge>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Veteranos sem Aumento */}
-              <Card className="border-amber-500/20" data-testid="card-alerta-veteranos">
-                <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
-                    <CardTitle className="text-sm font-medium">Veteranos sem Aumento</CardTitle>
-                  </div>
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">
-                    {alertas.veteranosSemAumento?.length || 0}
-                  </Badge>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground mb-3">12+ meses sem promoção</p>
-                  {isLoadingAlertas ? (
-                    <div className="space-y-2">
-                      {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
-                    </div>
-                  ) : alertas.veteranosSemAumento && alertas.veteranosSemAumento.length > 0 ? (
-                    <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                      {alertas.veteranosSemAumento.slice(0, 5).map((v) => (
-                        <div key={v.id} className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20" data-testid={`alerta-veterano-${v.id}`}>
-                          <div>
-                            <p className="font-medium text-xs">{v.nome}</p>
-                            <p className="text-[10px] text-muted-foreground">{v.cargo || 'N/A'} - {v.squad || 'N/A'}</p>
-                          </div>
-                          <Badge variant="outline" className="text-amber-600 text-[10px]">
-                            {v.mesesUltAumento ? `${v.mesesUltAumento}m` : 'Nunca'}
-                          </Badge>
-                        </div>
-                      ))}
-                      {alertas.veteranosSemAumento.length > 5 && (
-                        <p className="text-[10px] text-muted-foreground text-center">+{alertas.veteranosSemAumento.length - 5} outros</p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground text-center py-4">Nenhum alerta</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Fim de Experiência */}
-              <Card className="border-amber-500/20" data-testid="card-alerta-experiencia">
-                <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-amber-500" />
-                    <CardTitle className="text-sm font-medium">Fim de Experiência</CardTitle>
-                  </div>
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">
-                    {alertas.fimExperiencia?.length || 0}
-                  </Badge>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-1 mb-3">
-                    <span className="text-xs text-muted-foreground">Próximos</span>
-                    {[30, 60, 90].map((dias) => (
-                      <Button
-                        key={dias}
-                        variant={diasExperiencia === dias ? "default" : "ghost"}
-                        size="sm"
-                        className="h-5 px-2 text-xs"
-                        onClick={() => setDiasExperiencia(dias)}
-                        data-testid={`btn-dias-experiencia-${dias}`}
-                      >
-                        {dias}d
+            {(() => {
+              const filteredVeteranos = (alertas.veteranosSemAumento || []).filter(v => !isIgnored('veterano', v.id));
+              const filteredExperiencia = (alertas.fimExperiencia || []).filter(f => !isIgnored('experiencia', f.id));
+              const filteredSalario = (alertas.salarioAbaixoMedia || []).filter(s => !isIgnored('salario', s.id));
+              const totalFiltered = filteredVeteranos.length + filteredExperiencia.length + filteredSalario.length;
+              
+              return (
+                <>
+                  <div className="flex items-center gap-2 mb-4 pb-2 border-b">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                    <h2 className="text-lg font-semibold">Alertas e Atenção</h2>
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
+                      {totalFiltered} {totalFiltered === 1 ? 'alerta' : 'alertas'}
+                    </Badge>
+                    {ignoredAlerts.length > 0 && (
+                      <Button variant="ghost" size="sm" className="h-6 text-xs ml-auto" onClick={clearIgnored} data-testid="btn-limpar-ignorados">
+                        <Eye className="w-3 h-3 mr-1" />
+                        Mostrar {ignoredAlerts.length} ignorado(s)
                       </Button>
-                    ))}
+                    )}
                   </div>
-                  {isLoadingAlertas ? (
-                    <div className="space-y-2">
-                      {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
-                    </div>
-                  ) : alertas.fimExperiencia && alertas.fimExperiencia.length > 0 ? (
-                    <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                      {alertas.fimExperiencia.slice(0, 5).map((f) => (
-                        <div key={f.id} className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20" data-testid={`alerta-experiencia-${f.id}`}>
-                          <div>
-                            <p className="font-medium text-xs">{f.nome}</p>
-                            <p className="text-[10px] text-muted-foreground">{f.cargo || 'N/A'} - {f.squad || 'N/A'}</p>
-                          </div>
-                          <Badge variant="outline" className="text-amber-600 text-[10px]">
-                            {f.diasRestantes}d
-                          </Badge>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Veteranos sem Aumento */}
+                    <Card className="border-amber-500/20" data-testid="card-alerta-veteranos">
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-500" />
+                          <CardTitle className="text-sm font-medium">Veteranos sem Aumento</CardTitle>
                         </div>
-                      ))}
-                      {alertas.fimExperiencia.length > 5 && (
-                        <p className="text-[10px] text-muted-foreground text-center">+{alertas.fimExperiencia.length - 5} outros</p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground text-center py-4">Nenhum alerta</p>
-                  )}
-                </CardContent>
-              </Card>
+                        <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">
+                          {filteredVeteranos.length}
+                        </Badge>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-xs text-muted-foreground mb-3">12+ meses sem promoção</p>
+                        {isLoadingAlertas ? (
+                          <div className="space-y-2">
+                            {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+                          </div>
+                        ) : filteredVeteranos.length > 0 ? (
+                          <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                            {filteredVeteranos.slice(0, 5).map((v) => (
+                              <div 
+                                key={v.id} 
+                                className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20 cursor-pointer hover-elevate" 
+                                data-testid={`alerta-veterano-${v.id}`}
+                                onClick={() => setSelectedAlert({
+                                  type: 'veterano',
+                                  id: v.id,
+                                  nome: v.nome,
+                                  cargo: v.cargo,
+                                  squad: v.squad,
+                                  detail: v.mesesUltAumento ? `${v.mesesUltAumento} meses sem aumento` : 'Nunca recebeu aumento',
+                                  extra: `${v.mesesDeTurbo} meses de empresa`
+                                })}
+                              >
+                                <div>
+                                  <p className="font-medium text-xs">{v.nome}</p>
+                                  <p className="text-[10px] text-muted-foreground">{v.cargo || 'N/A'} - {v.squad || 'N/A'}</p>
+                                </div>
+                                <Badge variant="outline" className="text-amber-600 text-[10px]">
+                                  {v.mesesUltAumento ? `${v.mesesUltAumento}m` : 'Nunca'}
+                                </Badge>
+                              </div>
+                            ))}
+                            {filteredVeteranos.length > 5 && (
+                              <p className="text-[10px] text-muted-foreground text-center">+{filteredVeteranos.length - 5} outros</p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground text-center py-4">Nenhum alerta</p>
+                        )}
+                      </CardContent>
+                    </Card>
 
-              {/* Salário Abaixo da Média */}
-              <Card className="border-amber-500/20" data-testid="card-alerta-salario">
-                <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-amber-500" />
-                    <CardTitle className="text-sm font-medium">Salário Abaixo da Média</CardTitle>
-                  </div>
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">
-                    {alertas.salarioAbaixoMedia?.length || 0}
-                  </Badge>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground mb-3">Abaixo da média do cargo</p>
-                  {isLoadingAlertas ? (
-                    <div className="space-y-2">
-                      {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
-                    </div>
-                  ) : alertas.salarioAbaixoMedia && alertas.salarioAbaixoMedia.length > 0 ? (
-                    <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                      {alertas.salarioAbaixoMedia.slice(0, 5).map((s) => (
-                        <div key={s.id} className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20" data-testid={`alerta-salario-${s.id}`}>
-                          <div>
-                            <p className="font-medium text-xs">{s.nome}</p>
-                            <p className="text-[10px] text-muted-foreground">{s.cargo || 'N/A'}</p>
-                          </div>
-                          <Badge variant="outline" className="text-amber-600 text-[10px]">
-                            {s.diferenca}
-                          </Badge>
+                    {/* Fim de Experiência */}
+                    <Card className="border-amber-500/20" data-testid="card-alerta-experiencia">
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-amber-500" />
+                          <CardTitle className="text-sm font-medium">Fim de Experiência</CardTitle>
                         </div>
-                      ))}
-                      {alertas.salarioAbaixoMedia.length > 5 && (
-                        <p className="text-[10px] text-muted-foreground text-center">+{alertas.salarioAbaixoMedia.length - 5} outros</p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground text-center py-4">Nenhum alerta</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                        <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">
+                          {filteredExperiencia.length}
+                        </Badge>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center gap-1 mb-3">
+                          <span className="text-xs text-muted-foreground">Próximos</span>
+                          {[30, 60, 90].map((dias) => (
+                            <Button
+                              key={dias}
+                              variant={diasExperiencia === dias ? "default" : "ghost"}
+                              size="sm"
+                              className="h-5 px-2 text-xs"
+                              onClick={() => setDiasExperiencia(dias)}
+                              data-testid={`btn-dias-experiencia-${dias}`}
+                            >
+                              {dias}d
+                            </Button>
+                          ))}
+                        </div>
+                        {isLoadingAlertas ? (
+                          <div className="space-y-2">
+                            {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+                          </div>
+                        ) : filteredExperiencia.length > 0 ? (
+                          <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                            {filteredExperiencia.slice(0, 5).map((f) => (
+                              <div 
+                                key={f.id} 
+                                className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20 cursor-pointer hover-elevate" 
+                                data-testid={`alerta-experiencia-${f.id}`}
+                                onClick={() => setSelectedAlert({
+                                  type: 'experiencia',
+                                  id: f.id,
+                                  nome: f.nome,
+                                  cargo: f.cargo,
+                                  squad: f.squad,
+                                  detail: `${f.diasRestantes} dias restantes`,
+                                  extra: `Admissão: ${f.admissao ? new Date(f.admissao).toLocaleDateString('pt-BR') : 'N/A'}`
+                                })}
+                              >
+                                <div>
+                                  <p className="font-medium text-xs">{f.nome}</p>
+                                  <p className="text-[10px] text-muted-foreground">{f.cargo || 'N/A'} - {f.squad || 'N/A'}</p>
+                                </div>
+                                <Badge variant="outline" className="text-amber-600 text-[10px]">
+                                  {f.diasRestantes}d
+                                </Badge>
+                              </div>
+                            ))}
+                            {filteredExperiencia.length > 5 && (
+                              <p className="text-[10px] text-muted-foreground text-center">+{filteredExperiencia.length - 5} outros</p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground text-center py-4">Nenhum alerta</p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Salário Abaixo da Média */}
+                    <Card className="border-amber-500/20" data-testid="card-alerta-salario">
+                      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-amber-500" />
+                          <CardTitle className="text-sm font-medium">Salário Abaixo da Média</CardTitle>
+                        </div>
+                        <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">
+                          {filteredSalario.length}
+                        </Badge>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-xs text-muted-foreground mb-3">Abaixo da média do cargo</p>
+                        {isLoadingAlertas ? (
+                          <div className="space-y-2">
+                            {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+                          </div>
+                        ) : filteredSalario.length > 0 ? (
+                          <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                            {filteredSalario.slice(0, 5).map((s) => (
+                              <div 
+                                key={s.id} 
+                                className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20 cursor-pointer hover-elevate" 
+                                data-testid={`alerta-salario-${s.id}`}
+                                onClick={() => setSelectedAlert({
+                                  type: 'salario',
+                                  id: s.id,
+                                  nome: s.nome,
+                                  cargo: s.cargo,
+                                  squad: s.squad,
+                                  detail: s.diferenca,
+                                  extra: `Salário atual: R$ ${s.salario != null ? s.salario.toLocaleString('pt-BR') : 'N/A'} | Média do cargo: R$ ${s.mediaCargo != null ? s.mediaCargo.toLocaleString('pt-BR') : 'N/A'}`
+                                })}
+                              >
+                                <div>
+                                  <p className="font-medium text-xs">{s.nome}</p>
+                                  <p className="text-[10px] text-muted-foreground">{s.cargo || 'N/A'}</p>
+                                </div>
+                                <Badge variant="outline" className="text-amber-600 text-[10px]">
+                                  {s.diferenca}
+                                </Badge>
+                              </div>
+                            ))}
+                            {filteredSalario.length > 5 && (
+                              <p className="text-[10px] text-muted-foreground text-center">+{filteredSalario.length - 5} outros</p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground text-center py-4">Nenhum alerta</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
+
+        {/* Dialog de Detalhes do Alerta */}
+        <Dialog open={!!selectedAlert} onOpenChange={(open) => !open && setSelectedAlert(null)}>
+          <DialogContent className="sm:max-w-md" data-testid="dialog-alerta-detalhe">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                Detalhe do Alerta
+              </DialogTitle>
+              <DialogDescription>
+                {selectedAlert?.type === 'veterano' && 'Colaborador sem aumento salarial há muito tempo'}
+                {selectedAlert?.type === 'experiencia' && 'Período de experiência próximo do fim'}
+                {selectedAlert?.type === 'salario' && 'Salário abaixo da média do cargo'}
+              </DialogDescription>
+            </DialogHeader>
+            {selectedAlert && (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <h3 className="font-semibold text-lg">{selectedAlert.nome}</h3>
+                  <p className="text-sm text-muted-foreground">{selectedAlert.cargo || 'Cargo não informado'}</p>
+                  {selectedAlert.squad && (
+                    <p className="text-sm text-muted-foreground">{selectedAlert.squad}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-sm text-amber-700 dark:text-amber-400">{selectedAlert.detail}</p>
+                      {selectedAlert.extra && (
+                        <p className="text-xs text-muted-foreground mt-1">{selectedAlert.extra}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button variant="outline" size="sm" asChild className="flex-1" data-testid="btn-ver-perfil">
+                <Link href={`/colaboradores/${selectedAlert?.id}`}>
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Ver Perfil
+                </Link>
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="flex-1 text-muted-foreground"
+                onClick={() => selectedAlert && ignoreAlert(selectedAlert.type, selectedAlert.id)}
+                data-testid="btn-ignorar-alerta"
+              >
+                <XCircle className="w-4 h-4 mr-2" />
+                Ignorar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Seção Retenção e Saúde */}
         <div className="mb-6" data-testid="section-retencao-saude">
