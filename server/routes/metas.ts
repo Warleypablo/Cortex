@@ -32,10 +32,41 @@ async function initializeSquadMetasTable(db: any): Promise<void> {
   }
 }
 
+async function initializeSquadGoalsTable(db: any): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS squad_goals (
+        id SERIAL PRIMARY KEY,
+        squad TEXT NOT NULL,
+        perspective TEXT NOT NULL,
+        metric_name TEXT NOT NULL,
+        unit TEXT DEFAULT 'number',
+        periodicity TEXT DEFAULT 'monthly',
+        data_source TEXT,
+        owner_team TEXT,
+        actual_value DECIMAL(18, 6),
+        target_value DECIMAL(18, 6),
+        score DECIMAL(5, 2),
+        weight DECIMAL(5, 2) DEFAULT 1,
+        notes TEXT,
+        year INTEGER DEFAULT 2026,
+        quarter INTEGER,
+        month INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('[metas] Squad goals table initialized');
+  } catch (error) {
+    console.error('[metas] Error initializing squad_goals table:', error);
+  }
+}
+
 import { BP_2026_TARGETS } from "../okr2026/bp2026Targets";
 
 export async function registerMetasRoutes(app: Express, db: any, storage: IStorage) {
   await initializeSquadMetasTable(db);
+  await initializeSquadGoalsTable(db);
 
   // ============ BP 2026 Seeding Endpoints ============
   
