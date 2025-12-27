@@ -2158,3 +2158,53 @@ export const krCheckins = pgTable("kr_checkins", {
 export const insertKrCheckinSchema = createInsertSchema(krCheckins).omit({ id: true, createdAt: true });
 export type InsertKrCheckin = z.infer<typeof insertKrCheckinSchema>;
 export type KrCheckin = typeof krCheckins.$inferSelect;
+
+// ==================== SQUAD GOALS (OKR 2026) ====================
+
+export const squadGoals = pgTable("squad_goals", {
+  id: serial("id").primaryKey(),
+  squad: varchar("squad", { length: 50 }).notNull(),
+  perspective: varchar("perspective", { length: 50 }).notNull(),
+  metricName: varchar("metric_name", { length: 200 }).notNull(),
+  unit: varchar("unit", { length: 20 }).notNull(),
+  periodicity: varchar("periodicity", { length: 20 }).notNull().default("monthly"),
+  dataSource: varchar("data_source", { length: 100 }),
+  ownerTeam: varchar("owner_team", { length: 100 }),
+  actualValue: decimal("actual_value", { precision: 18, scale: 2 }),
+  targetValue: decimal("target_value", { precision: 18, scale: 2 }),
+  score: decimal("score", { precision: 5, scale: 2 }),
+  weight: decimal("weight", { precision: 5, scale: 2 }).default("1.00"),
+  notes: text("notes"),
+  year: integer("year").notNull().default(2026),
+  quarter: varchar("quarter", { length: 5 }),
+  month: varchar("month", { length: 7 }),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSquadGoalSchema = createInsertSchema(squadGoals).omit({ id: true, updatedAt: true });
+export type InsertSquadGoal = z.infer<typeof insertSquadGoalSchema>;
+export type SquadGoal = typeof squadGoals.$inferSelect;
+
+// ==================== INITIATIVES (OKR 2026 - DB) ====================
+
+export const okrInitiatives = pgTable("okr_initiatives", {
+  id: serial("id").primaryKey(),
+  stableKey: varchar("stable_key", { length: 100 }).notNull().unique(),
+  objectiveId: varchar("objective_id", { length: 10 }).notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  quarter: varchar("quarter", { length: 5 }),
+  status: varchar("status", { length: 30 }).notNull().default("planned"),
+  ownerEmail: varchar("owner_email", { length: 255 }),
+  ownerName: varchar("owner_name", { length: 255 }),
+  tags: text("tags").array(),
+  krs: text("krs").array(),
+  dueDate: date("due_date"),
+  progress: decimal("progress", { precision: 5, scale: 2 }).default("0.00"),
+  origin: varchar("origin", { length: 50 }).notNull().default("manual"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertOkrInitiativeSchema = createInsertSchema(okrInitiatives).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertOkrInitiative = z.infer<typeof insertOkrInitiativeSchema>;
+export type OkrInitiative = typeof okrInitiatives.$inferSelect;
