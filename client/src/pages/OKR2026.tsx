@@ -1997,7 +1997,7 @@ function InitiativesTab({
                             )}
                           </TableCell>
                           <TableCell>
-                            <InitiativeStatusBadge status={getStatusLabel(initiative.status)} />
+                            <InitiativeStatusBadge status={initiative.status} />
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
