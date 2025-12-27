@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatDecimal, formatPercent, formatCurrencyNoDecimals, formatCurrencyCompact } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -891,10 +891,9 @@ export default function DashboardDFC() {
                         const isRootNode = node.categoriaId === 'RECEITAS' || node.categoriaId === 'DESPESAS';
                         
                         return (
-                          <>
+                          <Fragment key={`row-${node.categoriaId}`}>
                             {/* Category Cell */}
-                            <div 
-                              key={`cat-${node.categoriaId}`}
+                            <div
                               className={`sticky left-0 z-10 p-3 border-b border-r transition-colors ${
                                 isRootNode 
                                   ? (isReceitaNode 
@@ -986,7 +985,7 @@ export default function DashboardDFC() {
                                 </div>
                               );
                             })}
-                          </>
+                          </Fragment>
                         );
                       } else {
                         const parcela = item.parcela;
@@ -994,10 +993,9 @@ export default function DashboardDFC() {
                         const isReceitaParcela = isReceita(parentNode.categoriaId);
                         
                         return (
-                          <>
+                          <Fragment key={`parcela-row-${parcela.id}-${idx}`}>
                             {/* Parcela Cell */}
-                            <div 
-                              key={`parcela-cat-${parcela.id}-${idx}`}
+                            <div
                               className={`sticky left-0 z-10 p-2 border-b border-r text-xs ${
                                 isReceitaParcela 
                                   ? 'bg-emerald-50 dark:bg-emerald-950' 
@@ -1038,7 +1036,7 @@ export default function DashboardDFC() {
                                 </div>
                               );
                             })}
-                          </>
+                          </Fragment>
                         );
                       }
                     })}
