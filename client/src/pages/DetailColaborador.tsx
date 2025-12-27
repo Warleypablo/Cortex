@@ -169,6 +169,15 @@ interface PdiCheckpointItem {
   criadoEm: string | null;
 }
 
+interface TimelineEvent {
+  id: string;
+  type: "enps" | "one_on_one" | "pdi" | "pdi_checkpoint" | "promocao" | "health";
+  title: string;
+  description: string | null;
+  date: string;
+  metadata: Record<string, any>;
+}
+
 interface PdiItem {
   id: number;
   colaboradorId: number;
@@ -2601,6 +2610,160 @@ const MONTH_LABELS: Record<string, string> = {
   '07': 'Jul', '08': 'Ago', '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
 };
 
+const EVENT_TYPE_CONFIG: Record<string, { icon: typeof Calendar; label: string; color: string; bgColor: string }> = {
+  enps: { icon: BarChart2, label: "E-NPS", color: "text-blue-600 dark:text-blue-400", bgColor: "bg-blue-100 dark:bg-blue-900/30" },
+  one_on_one: { icon: MessageSquare, label: "1x1", color: "text-purple-600 dark:text-purple-400", bgColor: "bg-purple-100 dark:bg-purple-900/30" },
+  pdi: { icon: Target, label: "PDI", color: "text-green-600 dark:text-green-400", bgColor: "bg-green-100 dark:bg-green-900/30" },
+  pdi_checkpoint: { icon: CheckCircle2, label: "Checkpoint PDI", color: "text-emerald-600 dark:text-emerald-400", bgColor: "bg-emerald-100 dark:bg-emerald-900/30" },
+  promocao: { icon: TrendingUp, label: "Promoção", color: "text-orange-600 dark:text-orange-400", bgColor: "bg-orange-100 dark:bg-orange-900/30" },
+  health: { icon: Award, label: "Health Score", color: "text-pink-600 dark:text-pink-400", bgColor: "bg-pink-100 dark:bg-pink-900/30" },
+};
+
+function TimelineCard({ colaboradorId }: { colaboradorId: string }) {
+  const [filter, setFilter] = useState<string>("all");
+  const [expanded, setExpanded] = useState(false);
+
+  const { data: events = [], isLoading } = useQuery<TimelineEvent[]>({
+    queryKey: ["/api/colaboradores", colaboradorId, "timeline"],
+  });
+
+  const filteredEvents = filter === "all" 
+    ? events 
+    : events.filter(e => e.type === filter);
+
+  const displayEvents = expanded ? filteredEvents : filteredEvents.slice(0, 5);
+
+  const formatEventDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return format(date, "dd MMM yyyy", { locale: ptBR });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const getEventConfig = (type: string) => {
+    return EVENT_TYPE_CONFIG[type] || { icon: Calendar, label: type, color: "text-muted-foreground", bgColor: "bg-muted" };
+  };
+
+  return (
+    <Card className="p-6 md:col-span-2" data-testid="card-timeline">
+      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-lg bg-gradient-to-br from-primary/20 to-orange-500/20">
+            <Clock className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold">Timeline do Colaborador</h3>
+            <p className="text-xs text-muted-foreground">{events.length} evento{events.length !== 1 ? "s" : ""} registrado{events.length !== 1 ? "s" : ""}</p>
+          </div>
+        </div>
+        <Select value={filter} onValueChange={setFilter}>
+          <SelectTrigger className="w-[140px]" data-testid="select-timeline-filter">
+            <SelectValue placeholder="Filtrar" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="enps">E-NPS</SelectItem>
+            <SelectItem value="one_on_one">1x1</SelectItem>
+            <SelectItem value="pdi">PDI</SelectItem>
+            <SelectItem value="pdi_checkpoint">Checkpoints</SelectItem>
+            <SelectItem value="promocao">Promoções</SelectItem>
+            <SelectItem value="health">Health Score</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : events.length === 0 ? (
+        <div className="text-center py-8">
+          <Clock className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+          <p className="text-muted-foreground text-sm">Nenhum evento registrado ainda</p>
+        </div>
+      ) : (
+        <>
+          <div className="relative">
+            <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
+            <div className="space-y-4">
+              {displayEvents.map((event) => {
+                const config = getEventConfig(event.type);
+                const IconComponent = config.icon;
+                return (
+                  <div key={event.id} className="relative pl-10" data-testid={`timeline-event-${event.id}`}>
+                    <div className={`absolute left-2 top-1 p-1.5 rounded-full ${config.bgColor} ring-4 ring-background`}>
+                      <IconComponent className={`w-3 h-3 ${config.color}`} />
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50 hover-elevate">
+                      <div className="flex items-start justify-between gap-2 flex-wrap">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="secondary" className={`text-xs ${config.bgColor} ${config.color}`}>
+                              {config.label}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {formatEventDate(event.date)}
+                            </span>
+                          </div>
+                          <p className="font-medium text-sm mt-1">{event.title}</p>
+                          {event.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{event.description}</p>
+                          )}
+                        </div>
+                        {event.type === "enps" && event.metadata.score !== undefined && (
+                          <div className={`text-xl font-bold ${
+                            event.metadata.score >= 9 ? "text-green-600 dark:text-green-400" :
+                            event.metadata.score >= 7 ? "text-yellow-600 dark:text-yellow-400" :
+                            "text-red-600 dark:text-red-400"
+                          }`}>
+                            {event.metadata.score}
+                          </div>
+                        )}
+                        {event.type === "health" && event.metadata.score !== undefined && (
+                          <div className={`text-xl font-bold ${
+                            event.metadata.score >= 70 ? "text-green-600 dark:text-green-400" :
+                            event.metadata.score >= 40 ? "text-yellow-600 dark:text-yellow-400" :
+                            "text-red-600 dark:text-red-400"
+                          }`}>
+                            {event.metadata.score}%
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {filteredEvents.length > 5 && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full mt-4" 
+              onClick={() => setExpanded(!expanded)}
+              data-testid="button-toggle-timeline"
+            >
+              {expanded ? (
+                <>
+                  <ChevronUp className="w-4 h-4 mr-1" />
+                  Mostrar menos
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4 mr-1" />
+                  Ver mais {filteredEvents.length - 5} evento{filteredEvents.length - 5 !== 1 ? "s" : ""}
+                </>
+              )}
+            </Button>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
 function HealthCard({ colaboradorId }: { colaboradorId: string }) {
   const { data: enpsResponses = [], isLoading: enpsLoading } = useQuery<EnpsItem[]>({
     queryKey: ["/api/colaboradores", colaboradorId, "enps"],
@@ -3554,6 +3717,7 @@ export default function DetailColaborador() {
 
           <TabsContent value="desenvolvimento" data-testid="tab-content-desenvolvimento">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <TimelineCard colaboradorId={colaboradorId} />
               <HealthCard colaboradorId={colaboradorId} />
               <EnpsCard colaboradorId={colaboradorId} />
               <PdiCard colaboradorId={colaboradorId} />
