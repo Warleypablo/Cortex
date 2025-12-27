@@ -62,6 +62,8 @@ const routeNameMap: Record<string, string> = {
   "admin": "Administração",
   "usuarios": "Usuários",
   "regras-notificacoes": "Regras de Notificações",
+  "health": "Diagnóstico",
+  "kpi": "Motor KPI",
   "projetos": "Projetos",
   "analise": "Análise",
 };

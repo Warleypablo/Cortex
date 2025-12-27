@@ -68,6 +68,8 @@ const Calendario = lazy(() => import("@/pages/Calendario"));
 const OnboardingRH = lazy(() => import("@/pages/OnboardingRH"));
 const MeuPerfil = lazy(() => import("@/pages/MeuPerfil"));
 const Avisos = lazy(() => import("@/pages/Avisos"));
+const AdminHealth = lazy(() => import("@/pages/AdminHealth"));
+const AdminOverrides = lazy(() => import("@/pages/AdminOverrides"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -226,6 +228,8 @@ function ProtectedRouter() {
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/admin/regras-notificacoes">{() => <ProtectedRoute path="/admin/regras-notificacoes" component={AdminNotificationRules} />}</Route>
       <Route path="/admin/design-system">{() => <ProtectedRoute path="/admin/design-system" component={AdminDesignSystem} />}</Route>
+      <Route path="/admin/health">{() => <ProtectedRoute path="/admin/health" component={AdminHealth} />}</Route>
+      <Route path="/admin/kpi">{() => <ProtectedRoute path="/admin/kpi" component={AdminOverrides} />}</Route>
       
       {/* Homepage - Dashboard baseado no perfil do usuário (placed at end to avoid shadowing other routes) */}
       <Route path="/">{() => (

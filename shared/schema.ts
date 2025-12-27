@@ -1012,12 +1012,42 @@ export const metricActualsMonthly = pgTable("metric_actuals_monthly", {
   };
 });
 
+export const metricOverridesMonthly = pgTable("metric_overrides_monthly", {
+  id: serial("id").primaryKey(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  metricKey: varchar("metric_key", { length: 100 }).notNull(),
+  dimensionKey: varchar("dimension_key", { length: 100 }),
+  dimensionValue: varchar("dimension_value", { length: 255 }),
+  overrideValue: decimal("override_value", { precision: 18, scale: 6 }).notNull(),
+  note: text("note"),
+  updatedBy: varchar("updated_by", { length: 255 }),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => {
+  return {
+    unq: sql`UNIQUE (${table.year}, ${table.month}, ${table.metricKey}, ${table.dimensionKey}, ${table.dimensionValue})`
+  };
+});
+
+export const contractStatusMap = pgTable("contract_status_map", {
+  id: serial("id").primaryKey(),
+  status: varchar("status", { length: 100 }).unique().notNull(),
+  isActive: boolean("is_active").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const insertMetricTargetMonthlySchema = createInsertSchema(metricTargetsMonthly).omit({ id: true, createdAt: true, updatedAt: true });
 export type MetricTargetMonthly = typeof metricTargetsMonthly.$inferSelect;
 export type InsertMetricTargetMonthly = z.infer<typeof insertMetricTargetMonthlySchema>;
 
 export type MetricActualMonthly = typeof metricActualsMonthly.$inferSelect;
 export type MetricRegistryExtended = typeof metricsRegistryExtended.$inferSelect;
+export type MetricOverrideMonthly = typeof metricOverridesMonthly.$inferSelect;
+export type ContractStatusMap = typeof contractStatusMap.$inferSelect;
+
+export const insertMetricOverrideSchema = createInsertSchema(metricOverridesMonthly).omit({ id: true, updatedAt: true });
+export type InsertMetricOverride = z.infer<typeof insertMetricOverrideSchema>;
 
 // Recruitment Analytics Types (Power BI style G&G Dashboard)
 export type RecrutamentoKPIs = {
@@ -2105,9 +2135,9 @@ export const metricActualOverridesMonthly = pgTable("metric_actual_overrides_mon
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertMetricOverrideSchema = createInsertSchema(metricActualOverridesMonthly).omit({ id: true, updatedAt: true });
-export type InsertMetricOverride = z.infer<typeof insertMetricOverrideSchema>;
-export type MetricOverride = typeof metricActualOverridesMonthly.$inferSelect;
+export const insertMetricActualOverrideSchema = createInsertSchema(metricActualOverridesMonthly).omit({ id: true, updatedAt: true });
+export type InsertMetricActualOverride = z.infer<typeof insertMetricActualOverrideSchema>;
+export type MetricActualOverride = typeof metricActualOverridesMonthly.$inferSelect;
 
 // ==================== KR CHECK-INS ====================
 
