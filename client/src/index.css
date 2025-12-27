@@ -28,7 +28,7 @@
 
   --sidebar: 0 0% 100%;
 
-  --sidebar-foreground: 0 0% 25%;
+  --sidebar-foreground: 0 0% 10%;
 
   --sidebar-border: 0 0% 92%;
 
@@ -36,9 +36,9 @@
 
   --sidebar-primary-foreground: 0 0% 100%;
 
-  --sidebar-accent: 209 60% 94%;
+  --sidebar-accent: 209 60% 92%;
 
-  --sidebar-accent-foreground: 220 50% 30%;
+  --sidebar-accent-foreground: 220 50% 15%;
 
   --sidebar-ring: 209 76% 47%;
 
