@@ -2475,6 +2475,279 @@ function BPFinanceiroTab() {
   );
 }
 
+interface SquadGoal {
+  id: number;
+  squad: string;
+  perspective: string;
+  metricName: string;
+  unit: string;
+  periodicity: string;
+  dataSource: string | null;
+  ownerTeam: string | null;
+  actualValue: number | null;
+  targetValue: number | null;
+  score: number | null;
+  weight: number;
+  notes: string | null;
+  year: number;
+  quarter: string | null;
+  month: string | null;
+  updatedAt: string;
+}
+
+interface SquadGoalsResponse {
+  goals: SquadGoal[];
+}
+
+const PERSPECTIVES = [
+  { id: "financeiro", label: "Financeiro", icon: DollarSign, color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" },
+  { id: "cliente", label: "Cliente", icon: Users, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+  { id: "processo", label: "Processo", icon: ClipboardCheck, color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" },
+  { id: "pessoas", label: "Pessoas", icon: Heart, color: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300" },
+];
+
+const SQUADS = ["Commerce", "TurboOH", "Ventures", "Tech", "G&G", "Finance"];
+
+function SquadGoalsTab() {
+  const [filterSquad, setFilterSquad] = useState<string>("all");
+  const [filterPerspective, setFilterPerspective] = useState<string>("all");
+
+  const { data, isLoading, error } = useQuery<SquadGoalsResponse>({
+    queryKey: ["/api/okr2026/squad-goals", { year: 2026 }],
+  });
+
+  const goals = data?.goals || [];
+
+  const filteredGoals = useMemo(() => {
+    return goals.filter(g => {
+      if (filterSquad !== "all" && g.squad !== filterSquad) return false;
+      if (filterPerspective !== "all" && g.perspective !== filterPerspective) return false;
+      return true;
+    });
+  }, [goals, filterSquad, filterPerspective]);
+
+  const goalsByPerspective = useMemo(() => {
+    const grouped: Record<string, SquadGoal[]> = {};
+    for (const p of PERSPECTIVES) {
+      grouped[p.id] = filteredGoals.filter(g => g.perspective.toLowerCase() === p.id);
+    }
+    return grouped;
+  }, [filteredGoals]);
+
+  const calculateScore = (actual: number | null, target: number | null) => {
+    if (actual === null || target === null || target === 0) return null;
+    return Math.round((actual / target) * 100);
+  };
+
+  const getScoreColor = (score: number | null) => {
+    if (score === null) return "bg-gray-100 text-gray-500 dark:bg-gray-800/50 dark:text-gray-400";
+    if (score >= 100) return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300";
+    if (score >= 80) return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300";
+    return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+  };
+
+  const formatValue = (value: number | null, unit: string) => {
+    if (value === null) return "—";
+    if (unit === "PCT" || unit === "%") return `${(value * 100).toFixed(1)}%`;
+    if (unit === "BRL" || unit === "R$") return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+    return new Intl.NumberFormat("pt-BR").format(value);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-64 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="border-destructive/50 bg-destructive/5">
+        <CardContent className="py-12 text-center">
+          <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Erro ao carregar metas</h3>
+          <p className="text-muted-foreground">
+            Não foi possível carregar as metas dos squads.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (goals.length === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="py-16 text-center">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
+            <Target className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Nenhuma meta cadastrada</h3>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            As metas por squad ainda não foram configuradas. Importe via planilha ou adicione manualmente.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-4">
+        <Select value={filterSquad} onValueChange={setFilterSquad}>
+          <SelectTrigger className="w-[160px]" data-testid="select-squad-filter">
+            <SelectValue placeholder="Squad" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os Squads</SelectItem>
+            {SQUADS.map(s => (
+              <SelectItem key={s} value={s}>{s}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterPerspective} onValueChange={setFilterPerspective}>
+          <SelectTrigger className="w-[180px]" data-testid="select-perspective-filter">
+            <SelectValue placeholder="Perspectiva" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas Perspectivas</SelectItem>
+            {PERSPECTIVES.map(p => (
+              <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Badge variant="outline" className="text-sm px-3 py-1.5 gap-1">
+          <Target className="w-3.5 h-3.5" />
+          {filteredGoals.length} metas
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {PERSPECTIVES.filter(p => filterPerspective === "all" || filterPerspective === p.id).map(perspective => {
+          const perspectiveGoals = goalsByPerspective[perspective.id] || [];
+          const PerspectiveIcon = perspective.icon;
+
+          if (perspectiveGoals.length === 0 && filterPerspective === "all") return null;
+
+          return (
+            <Card key={perspective.id} className="overflow-hidden border-0 shadow-md">
+              <CardHeader className={`pb-3 ${perspective.color}`}>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-background/80 backdrop-blur-sm">
+                    <PerspectiveIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">{perspective.label}</CardTitle>
+                    <CardDescription className="text-current/70">
+                      {perspectiveGoals.length} {perspectiveGoals.length === 1 ? "métrica" : "métricas"}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {perspectiveGoals.length === 0 ? (
+                  <div className="py-8 text-center text-muted-foreground">
+                    <p className="text-sm">Nenhuma métrica nesta perspectiva</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30">
+                        <TableHead className="font-semibold">Métrica</TableHead>
+                        <TableHead className="font-semibold text-center w-[80px]">Squad</TableHead>
+                        <TableHead className="font-semibold text-right w-[90px]">Atual</TableHead>
+                        <TableHead className="font-semibold text-right w-[90px]">Meta</TableHead>
+                        <TableHead className="font-semibold text-center w-[70px]">Score</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {perspectiveGoals.map((goal) => {
+                        const score = goal.score ?? calculateScore(goal.actualValue, goal.targetValue);
+                        return (
+                          <TableRow key={goal.id} className="group">
+                            <TableCell className="font-medium">
+                              <div className="flex flex-col">
+                                <span>{goal.metricName}</span>
+                                {goal.ownerTeam && (
+                                  <span className="text-xs text-muted-foreground">{goal.ownerTeam}</span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className="text-xs">
+                                {goal.squad}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {formatValue(goal.actualValue, goal.unit)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm text-muted-foreground">
+                              {formatValue(goal.targetValue, goal.unit)}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge className={`${getScoreColor(score)} border-0 font-semibold min-w-[50px]`}>
+                                {score !== null ? `${score}%` : "—"}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {filteredGoals.length > 0 && (
+        <Card className="border-0 shadow-md">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <ClipboardCheck className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle>Resumo por Squad</CardTitle>
+                <CardDescription>Score médio ponderado por squad</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {SQUADS.map(squad => {
+                const squadGoals = filteredGoals.filter(g => g.squad === squad);
+                if (squadGoals.length === 0) return null;
+
+                const avgScore = squadGoals.reduce((sum, g) => {
+                  const score = g.score ?? calculateScore(g.actualValue, g.targetValue);
+                  return sum + (score || 0);
+                }, 0) / squadGoals.length;
+
+                return (
+                  <div key={squad} className="p-4 rounded-xl bg-muted/50 text-center">
+                    <p className="text-sm font-medium text-muted-foreground mb-1">{squad}</p>
+                    <p className={`text-2xl font-bold ${avgScore >= 100 ? "text-green-600" : avgScore >= 80 ? "text-yellow-600" : "text-red-600"}`}>
+                      {Math.round(avgScore)}%
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">{squadGoals.length} métricas</p>
+                    <Progress value={Math.min(avgScore, 100)} className="h-1.5 mt-2" />
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 const PERIODS = ["YTD", "Q1", "Q2", "Q3", "Q4"];
 const BUSINESS_UNITS = [
   { id: "all", label: "Todas" },
@@ -2563,6 +2836,8 @@ export default function OKR2026() {
         return <InitiativesTab data={data} collaborators={collaborators} />;
       case "bp-financeiro":
         return <BPFinanceiroTab />;
+      case "metas-squad":
+        return <SquadGoalsTab />;
       default:
         return <DashboardTab data={data} />;
     }
@@ -2661,6 +2936,13 @@ export default function OKR2026() {
               className="rounded-lg px-4 py-2 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
               BP Financeiro
+            </TabsTrigger>
+            <TabsTrigger 
+              value="metas-squad" 
+              data-testid="tab-metas-squad"
+              className="rounded-lg px-4 py-2 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              Metas Squad
             </TabsTrigger>
           </TabsList>
 
