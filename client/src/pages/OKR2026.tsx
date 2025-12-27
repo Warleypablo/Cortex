@@ -33,7 +33,7 @@ import {
   XCircle, Banknote, PiggyBank, ClipboardCheck, MessageSquare, History,
   CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building,
   LayoutGrid, List, Search, Loader2, Database, FileText, ListChecks, Calendar,
-  ChevronRight, X, ExternalLink, Tag, Lightbulb
+  ChevronRight, X, ExternalLink, Tag, Lightbulb, Zap
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -1706,6 +1706,165 @@ function StrategicInitiativesSection({
   );
 }
 
+function ExecutiveSummaryStrip({ 
+  metrics, 
+  krs, 
+  initiatives,
+  alerts 
+}: { 
+  metrics: DashboardMetrics;
+  krs: KR[];
+  initiatives: Initiative[];
+  alerts: AlertItem[];
+}) {
+  const blockedInitiatives = initiatives.filter(i => i.status === "blocked");
+  const criticalAlerts = alerts.filter(a => a.severity === "critical");
+  const doingInitiatives = initiatives.filter(i => i.status === "doing" || i.status === "in_progress");
+  
+  const highlights: { icon: typeof TrendingUp; text: string; type: "positive" | "warning" | "critical" | "neutral" }[] = [];
+  
+  if (criticalAlerts.length > 0) {
+    highlights.push({
+      icon: AlertCircle,
+      text: `${criticalAlerts.length} métrica(s) crítica(s) fora do alvo`,
+      type: "critical"
+    });
+  }
+  
+  if (blockedInitiatives.length > 0) {
+    highlights.push({
+      icon: AlertTriangle,
+      text: `${blockedInitiatives.length} iniciativa(s) bloqueada(s)`,
+      type: "warning"
+    });
+  }
+  
+  if (doingInitiatives.length > 0) {
+    highlights.push({
+      icon: Rocket,
+      text: `${doingInitiatives.length} iniciativa(s) em andamento`,
+      type: "neutral"
+    });
+  }
+  
+  const krsOnTrack = krs.filter(kr => kr.status === "green").length;
+  const krsTotal = krs.filter(kr => kr.status !== "gray").length;
+  if (krsTotal > 0) {
+    const pct = Math.round((krsOnTrack / krsTotal) * 100);
+    highlights.push({
+      icon: Target,
+      text: `${krsOnTrack}/${krsTotal} KRs no alvo (${pct}%)`,
+      type: pct >= 80 ? "positive" : pct >= 60 ? "neutral" : "warning"
+    });
+  }
+  
+  if (highlights.length === 0) return null;
+  
+  const getTypeStyles = (type: string) => {
+    switch (type) {
+      case "positive": return "text-emerald-600 dark:text-emerald-400";
+      case "warning": return "text-amber-600 dark:text-amber-400";
+      case "critical": return "text-red-600 dark:text-red-400";
+      default: return "text-muted-foreground";
+    }
+  };
+  
+  return (
+    <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/30 rounded-lg border border-border/50" data-testid="executive-summary-strip">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Zap className="w-3.5 h-3.5" />
+        <span className="font-medium">Destaques:</span>
+      </div>
+      {highlights.slice(0, 4).map((h, idx) => (
+        <div key={idx} className={`flex items-center gap-1.5 text-xs ${getTypeStyles(h.type)}`}>
+          <h.icon className="w-3.5 h-3.5" />
+          <span>{h.text}</span>
+        </div>
+      ))}
+      <div className="ml-auto text-[10px] text-muted-foreground/60">
+        Atualizado: {format(new Date(), "dd/MM HH:mm", { locale: ptBR })}
+      </div>
+    </div>
+  );
+}
+
+function NextActionsSection({ 
+  initiatives,
+  currentQuarter
+}: { 
+  initiatives: Initiative[];
+  currentQuarter: string;
+}) {
+  const upcomingActions = initiatives
+    .filter(i => {
+      const status = i.status;
+      const hasDate = i.end || i.dueDate;
+      return (status === "doing" || status === "in_progress" || status === "backlog" || status === "planned") && hasDate;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.end || a.dueDate || "9999-12-31");
+      const dateB = new Date(b.end || b.dueDate || "9999-12-31");
+      return dateA.getTime() - dateB.getTime();
+    })
+    .slice(0, 5);
+  
+  if (upcomingActions.length === 0) return null;
+  
+  const getDaysUntil = (dateStr: string): number => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    return Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+  
+  const getUrgencyStyle = (days: number): string => {
+    if (days < 0) return "text-red-600 dark:text-red-400 bg-red-500/10";
+    if (days <= 7) return "text-amber-600 dark:text-amber-400 bg-amber-500/10";
+    return "text-muted-foreground bg-muted/50";
+  };
+  
+  return (
+    <Card data-testid="section-next-actions" className="border-amber-500/20">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-amber-500" />
+          Próximas Entregas
+        </CardTitle>
+        <CardDescription className="text-xs">Ações com prazo mais próximo</CardDescription>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="space-y-2">
+          {upcomingActions.map((action, idx) => {
+            const dateStr = action.end || action.dueDate || "";
+            const days = getDaysUntil(dateStr);
+            const urgency = getUrgencyStyle(days);
+            
+            return (
+              <div
+                key={action.id}
+                className="flex items-center justify-between p-2 rounded-lg bg-muted/30 hover-elevate"
+                data-testid={`next-action-${idx}`}
+              >
+                <div className="flex-1 min-w-0 flex items-center gap-2">
+                  <ObjectiveBadge objectiveId={action.objectiveId} />
+                  <span className="text-sm truncate">{action.title || action.name}</span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-muted-foreground">
+                    {action.owner_name || action.ownerRole || "—"}
+                  </span>
+                  <Badge variant="outline" className={`text-[10px] ${urgency}`}>
+                    {days < 0 ? `${Math.abs(days)}d atraso` : days === 0 ? "Hoje" : `${days}d`}
+                  </Badge>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 type ViewMode = "quarter" | "month";
 type MonthKey = "jan" | "fev" | "mar" | "abr" | "mai" | "jun" | "jul" | "ago" | "set" | "out" | "nov" | "dez";
 
@@ -1979,6 +2138,13 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
         />
       </div>
 
+      <ExecutiveSummaryStrip 
+        metrics={metrics} 
+        krs={krs} 
+        initiatives={initiatives} 
+        alerts={computeAlerts} 
+      />
+
       <ObjectiveSummaryCards
         objectives={objectives}
         krs={krs}
@@ -1988,27 +2154,32 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {computeAlerts.length > 0 && (
-          <RisksActiveSection 
-            alerts={computeAlerts} 
-            selectedQuarter={effectiveQuarter}
+        <div className="space-y-4">
+          {computeAlerts.length > 0 && (
+            <RisksActiveSection 
+              alerts={computeAlerts} 
+              selectedQuarter={effectiveQuarter}
+              initiatives={initiatives}
+              onViewInitiatives={onTabChange ? () => onTabChange("initiatives") : undefined}
+            />
+          )}
+          <StrategicInitiativesSection
             initiatives={initiatives}
-            onViewInitiatives={onTabChange ? () => onTabChange("initiatives") : undefined}
+            krs={krs}
+            currentQuarter={effectiveQuarter}
+            onViewAll={onTabChange ? () => onTabChange("initiatives") : undefined}
           />
-        )}
-        <StrategicInitiativesSection
-          initiatives={initiatives}
-          krs={krs}
-          currentQuarter={effectiveQuarter}
-          onViewAll={onTabChange ? () => onTabChange("initiatives") : undefined}
-        />
-      </div>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <TurboOHBlock metrics={metrics} quarter={effectiveQuarter} />
-        <HugzBlock metrics={metrics} initiatives={initiatives} />
+        <div className="space-y-4">
+          <NextActionsSection 
+            initiatives={initiatives}
+            currentQuarter={effectiveQuarter}
+          />
+          <TurboOHBlock metrics={metrics} quarter={effectiveQuarter} />
+          <HugzBlock metrics={metrics} initiatives={initiatives} />
+        </div>
       </div>
-
     </div>
   );
 }
