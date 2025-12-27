@@ -791,17 +791,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { tableName } = req.params;
       
-      // Validate table exists
-      const tableExistsResult = await db.execute(sql`
+      // Security: Get whitelist of valid table names from information_schema
+      const whitelistResult = await db.execute(sql`
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'public' 
-        AND table_name = ${tableName}
+        AND table_type = 'BASE TABLE'
       `);
       
-      if (tableExistsResult.rows.length === 0) {
+      const validTableNames = new Set(
+        (whitelistResult.rows as { table_name: string }[]).map(row => row.table_name)
+      );
+      
+      // Validate tableName is in the whitelist
+      if (!validTableNames.has(tableName)) {
         return res.status(404).json({ error: "Table not found" });
       }
+      
+      // Use the validated table name (now safe to use in queries)
+      const validatedTableName = tableName;
       
       // Get columns with details
       const columnsResult = await db.execute(sql`
@@ -823,7 +831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ON kcu.constraint_name = tc.constraint_name 
           AND tc.constraint_type = 'PRIMARY KEY'
         WHERE c.table_schema = 'public' 
-        AND c.table_name = ${tableName}
+        AND c.table_name = ${validatedTableName}
         ORDER BY c.ordinal_position
       `);
       
@@ -831,24 +839,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rowCountResult = await db.execute(sql`
         SELECT n_live_tup as row_count 
         FROM pg_stat_user_tables 
-        WHERE relname = ${tableName}
+        WHERE relname = ${validatedTableName}
       `);
       
       const rowCount = Number((rowCountResult.rows[0] as any)?.row_count || 0);
       
-      // Get sample data (first 5 rows) - use dynamic query with proper escaping
+      // Get sample data (first 5 rows) - safe because tableName is validated against whitelist
       let sampleData: any[] = [];
       try {
         const sampleResult = await db.execute(
-          sql.raw(`SELECT * FROM "${tableName}" LIMIT 5`)
+          sql.raw(`SELECT * FROM "${validatedTableName}" LIMIT 5`)
         );
         sampleData = sampleResult.rows as any[];
       } catch (sampleError) {
-        console.error(`[api] Error fetching sample data for ${tableName}:`, sampleError);
+        console.error(`[api] Error fetching sample data for ${validatedTableName}:`, sampleError);
       }
       
       res.json({
-        name: tableName,
+        name: validatedTableName,
         columns: columnsResult.rows,
         rowCount,
         sampleData,
@@ -924,13 +932,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/admin/ai/config", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const { provider, model } = req.body;
-      if (provider) {
-        await storage.setSystemSetting('ai_provider', provider, 'AI provider (openai or gemini)');
+      const { AI_PROVIDERS } = await import("./services/unifiedAssistant");
+      const { z } = await import("zod");
+      
+      // Define Zod schema for AI config validation
+      const aiConfigSchema = z.object({
+        provider: z.enum(['openai', 'gemini']),
+        model: z.string().min(1, "Model is required"),
+      });
+      
+      // Validate request body structure
+      const parseResult = aiConfigSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request body", 
+          details: parseResult.error.errors 
+        });
       }
-      if (model) {
-        await storage.setSystemSetting('ai_model', model, 'AI model to use for chat');
+      
+      const { provider, model } = parseResult.data;
+      
+      // Validate that provider is available
+      const providerConfig = AI_PROVIDERS[provider];
+      if (!providerConfig) {
+        return res.status(400).json({ 
+          error: `Invalid provider: ${provider}. Valid providers are: openai, gemini` 
+        });
       }
+      
+      // Validate that model is valid for the selected provider
+      if (!providerConfig.models.includes(model as any)) {
+        return res.status(400).json({ 
+          error: `Invalid model '${model}' for provider '${provider}'. Valid models are: ${providerConfig.models.join(', ')}` 
+        });
+      }
+      
+      // Validate that provider is available (has API key configured)
+      if (!providerConfig.available) {
+        return res.status(400).json({ 
+          error: `Provider '${provider}' is not available. Please configure the required API keys.` 
+        });
+      }
+      
+      await storage.setSystemSetting('ai_provider', provider, 'AI provider (openai or gemini)');
+      await storage.setSystemSetting('ai_model', model, 'AI model to use for chat');
+      
       res.json({ success: true, provider, model });
     } catch (error) {
       console.error("[api] Error updating AI config:", error);
