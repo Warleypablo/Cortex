@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao, type OneOnOne, type InsertOneOnOne, type OneOnOneAcao, type InsertOneOnOneAcao, type EnpsResponse, type InsertEnps, type PdiGoal, type InsertPdi, type PdiCheckpoint, type InsertPdiCheckpoint, type TurboEvento, type InsertTurboEvento } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao, type OneOnOne, type InsertOneOnOne, type OneOnOneAcao, type InsertOneOnOneAcao, type EnpsResponse, type InsertEnps, type PdiGoal, type InsertPdi, type PdiCheckpoint, type InsertPdiCheckpoint, type TurboEvento, type InsertTurboEvento, type SystemSetting } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
@@ -325,6 +325,11 @@ export interface IStorage {
   createTurboEvento(data: InsertTurboEvento): Promise<TurboEvento>;
   updateTurboEvento(id: number, data: Partial<InsertTurboEvento>): Promise<TurboEvento>;
   deleteTurboEvento(id: number): Promise<void>;
+  
+  // System Settings
+  getSystemSetting(key: string): Promise<string | null>;
+  setSystemSetting(key: string, value: string, description?: string): Promise<void>;
+  getAllSystemSettings(): Promise<SystemSetting[]>;
 }
 
 // GEG Dashboard Extended Types
@@ -9079,6 +9084,33 @@ export class DbStorage implements IStorage {
 
   async deleteTurboEvento(id: number): Promise<void> {
     await db.execute(sql`DELETE FROM turbo_eventos WHERE id = ${id}`);
+  }
+
+  // System Settings
+  async getSystemSetting(key: string): Promise<string | null> {
+    const result = await db.execute(sql`
+      SELECT value FROM system_settings WHERE key = ${key}
+    `);
+    if (result.rows.length === 0) return null;
+    return (result.rows[0] as { value: string }).value;
+  }
+
+  async setSystemSetting(key: string, value: string, description?: string): Promise<void> {
+    await db.execute(sql`
+      INSERT INTO system_settings (key, value, description, updated_at)
+      VALUES (${key}, ${value}, ${description || null}, NOW())
+      ON CONFLICT (key) 
+      DO UPDATE SET value = ${value}, description = COALESCE(${description || null}, system_settings.description), updated_at = NOW()
+    `);
+  }
+
+  async getAllSystemSettings(): Promise<SystemSetting[]> {
+    const result = await db.execute(sql`
+      SELECT id, key, value, description, updated_at as "updatedAt"
+      FROM system_settings
+      ORDER BY key
+    `);
+    return result.rows as SystemSetting[];
   }
 }
 

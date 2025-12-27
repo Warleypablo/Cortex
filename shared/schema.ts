@@ -1983,3 +1983,17 @@ export const clienteEventos = pgTable("cliente_eventos", {
 export const insertClienteEventoSchema = createInsertSchema(clienteEventos).omit({ id: true, createdAt: true });
 export type InsertClienteEvento = z.infer<typeof insertClienteEventoSchema>;
 export type ClienteEvento = typeof clienteEventos.$inferSelect;
+
+// ==================== SYSTEM SETTINGS ====================
+
+export const systemSettings = pgTable("system_settings", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 255 }).notNull().unique(),
+  value: text("value").notNull(),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true });
+export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
+export type SystemSetting = typeof systemSettings.$inferSelect;
