@@ -2048,6 +2048,213 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint para análises gerais com dados agregados
+  app.get("/api/colaboradores/analise-geral", async (req, res) => {
+    try {
+      const colaboradoresResult = await db.execute(sql`
+        SELECT 
+          id, nome, cargo, squad, nivel, status,
+          meses_de_turbo as "mesesDeTurbo",
+          meses_ult_aumento as "mesesUltAumento",
+          salario,
+          admissao
+        FROM rh_pessoal
+        WHERE status = 'Ativo'
+        ORDER BY nome
+      `);
+      
+      interface ColabAnalise {
+        id: number;
+        nome: string;
+        cargo: string | null;
+        squad: string | null;
+        nivel: string | null;
+        status: string;
+        mesesDeTurbo: number | null;
+        mesesUltAumento: number | null;
+        salario: string | null;
+        admissao: string | null;
+      }
+      
+      const colaboradores = colaboradoresResult.rows as unknown as ColabAnalise[];
+      
+      // 1. Calcular saúde de cada colaborador para distribuição
+      const healthDistribution = { saudavel: 0, atencao: 0, critico: 0 };
+      
+      colaboradores.forEach((colab) => {
+        const mesesTurbo = colab.mesesDeTurbo ?? 0;
+        const mesesUltAumento = colab.mesesUltAumento;
+        const nivel = (colab.nivel || '').toLowerCase();
+        
+        let stabilityScore = 15;
+        if (mesesTurbo >= 6 && mesesTurbo <= 36) {
+          stabilityScore += 15;
+        } else if (mesesTurbo >= 3 && mesesTurbo < 6) {
+          stabilityScore += 10;
+        } else if (mesesTurbo < 3) {
+          stabilityScore += 5;
+        } else if (mesesTurbo > 36) {
+          stabilityScore += 12;
+        }
+        
+        let growthScore = 0;
+        if (mesesUltAumento !== null && mesesUltAumento !== undefined) {
+          if (mesesUltAumento <= 12) {
+            growthScore = 25;
+          } else if (mesesUltAumento <= 18) {
+            growthScore = 18;
+          } else if (mesesUltAumento <= 24) {
+            growthScore = 10;
+          } else {
+            growthScore = 3;
+          }
+        } else {
+          growthScore = mesesTurbo <= 12 ? 20 : 12;
+        }
+        
+        let developmentScore = 18;
+        if (nivel.includes('senior') || nivel.includes('sênior') || nivel.includes('lider') || nivel.includes('líder') || nivel.includes('head') || nivel.includes('diretor')) {
+          developmentScore = 25;
+        } else if (nivel.includes('pleno')) {
+          developmentScore = 20;
+        } else if (nivel.includes('junior') || nivel.includes('júnior')) {
+          developmentScore = 15;
+        } else if (nivel.includes('estagiário') || nivel.includes('trainee')) {
+          developmentScore = 12;
+        }
+        
+        let engagementScore = 15;
+        if (mesesTurbo > 48 && (mesesUltAumento === null || mesesUltAumento > 24)) {
+          engagementScore = 8;
+        } else if (mesesTurbo >= 24 && mesesTurbo <= 48) {
+          engagementScore = 18;
+        } else if (mesesTurbo >= 12) {
+          engagementScore = 20;
+        }
+        
+        const healthScore = stabilityScore + growthScore + developmentScore + engagementScore;
+        
+        if (healthScore >= 70) {
+          healthDistribution.saudavel++;
+        } else if (healthScore >= 50) {
+          healthDistribution.atencao++;
+        } else {
+          healthDistribution.critico++;
+        }
+      });
+      
+      // 2. Headcount por Squad
+      const headcountBySquad: Record<string, number> = {};
+      colaboradores.forEach((colab) => {
+        const squad = colab.squad || 'Sem Squad';
+        headcountBySquad[squad] = (headcountBySquad[squad] || 0) + 1;
+      });
+      
+      // 3. Distribuição por Nível
+      const nivelDistribution: Record<string, number> = {};
+      colaboradores.forEach((colab) => {
+        const nivel = colab.nivel || 'Não definido';
+        nivelDistribution[nivel] = (nivelDistribution[nivel] || 0) + 1;
+      });
+      
+      // 4. Salário por Tempo de Casa (faixas)
+      const salarioByTempo: Record<string, { total: number; count: number; avg: number }> = {
+        '0-6 meses': { total: 0, count: 0, avg: 0 },
+        '6-12 meses': { total: 0, count: 0, avg: 0 },
+        '1-2 anos': { total: 0, count: 0, avg: 0 },
+        '2-3 anos': { total: 0, count: 0, avg: 0 },
+        '3-5 anos': { total: 0, count: 0, avg: 0 },
+        '+5 anos': { total: 0, count: 0, avg: 0 },
+      };
+      
+      colaboradores.forEach((colab) => {
+        const meses = colab.mesesDeTurbo ?? 0;
+        const salario = parseFloat(colab.salario || '0') || 0;
+        
+        let faixa = '0-6 meses';
+        if (meses >= 60) faixa = '+5 anos';
+        else if (meses >= 36) faixa = '3-5 anos';
+        else if (meses >= 24) faixa = '2-3 anos';
+        else if (meses >= 12) faixa = '1-2 anos';
+        else if (meses >= 6) faixa = '6-12 meses';
+        
+        if (salario > 0) {
+          salarioByTempo[faixa].total += salario;
+          salarioByTempo[faixa].count++;
+        }
+      });
+      
+      // Calcular médias
+      Object.keys(salarioByTempo).forEach((faixa) => {
+        const data = salarioByTempo[faixa];
+        data.avg = data.count > 0 ? Math.round(data.total / data.count) : 0;
+      });
+      
+      // 5. Média salarial por Squad
+      const salarioBySquad: Record<string, { total: number; count: number; avg: number }> = {};
+      colaboradores.forEach((colab) => {
+        const squad = colab.squad || 'Sem Squad';
+        const salario = parseFloat(colab.salario || '0') || 0;
+        
+        if (!salarioBySquad[squad]) {
+          salarioBySquad[squad] = { total: 0, count: 0, avg: 0 };
+        }
+        
+        if (salario > 0) {
+          salarioBySquad[squad].total += salario;
+          salarioBySquad[squad].count++;
+        }
+      });
+      
+      Object.keys(salarioBySquad).forEach((squad) => {
+        const data = salarioBySquad[squad];
+        data.avg = data.count > 0 ? Math.round(data.total / data.count) : 0;
+      });
+      
+      // 6. Tempo médio por Squad
+      const tempoBySquad: Record<string, { total: number; count: number; avg: number }> = {};
+      colaboradores.forEach((colab) => {
+        const squad = colab.squad || 'Sem Squad';
+        const meses = colab.mesesDeTurbo ?? 0;
+        
+        if (!tempoBySquad[squad]) {
+          tempoBySquad[squad] = { total: 0, count: 0, avg: 0 };
+        }
+        
+        tempoBySquad[squad].total += meses;
+        tempoBySquad[squad].count++;
+      });
+      
+      Object.keys(tempoBySquad).forEach((squad) => {
+        const data = tempoBySquad[squad];
+        data.avg = data.count > 0 ? Math.round((data.total / data.count) * 10) / 10 : 0;
+      });
+      
+      // 7. Estatísticas gerais
+      const totalColaboradores = colaboradores.length;
+      const salarios = colaboradores.map(c => parseFloat(c.salario || '0')).filter(s => s > 0);
+      const salarioMedio = salarios.length > 0 ? Math.round(salarios.reduce((a, b) => a + b, 0) / salarios.length) : 0;
+      const tempoMedio = colaboradores.reduce((acc, c) => acc + (c.mesesDeTurbo ?? 0), 0) / (totalColaboradores || 1);
+      
+      res.json({
+        healthDistribution,
+        headcountBySquad,
+        nivelDistribution,
+        salarioByTempo,
+        salarioBySquad,
+        tempoBySquad,
+        estatisticas: {
+          totalColaboradores,
+          salarioMedio,
+          tempoMedioMeses: Math.round(tempoMedio * 10) / 10,
+        },
+      });
+    } catch (error) {
+      console.error("[api] Error fetching analise geral:", error);
+      res.status(500).json({ error: "Failed to fetch analise geral" });
+    }
+  });
+
   app.get("/api/colaboradores/dropdown", async (req, res) => {
     try {
       const colaboradores = await storage.getColaboradoresDropdown();
