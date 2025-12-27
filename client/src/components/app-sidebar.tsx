@@ -255,61 +255,45 @@ export function AppSidebar() {
       <SidebarContent className="bg-slate-900 dark:bg-slate-950">
         <ScrollArea className="flex-1 px-2 py-2">
           <nav className="flex flex-col gap-1">
-            {/* Acesso Rápido */}
+            {/* Setores - Primeiro */}
             {!isCollapsed && (
-              <div className="px-3 py-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <div className="flex items-center gap-2 px-3 py-2 mb-1">
+                <div className="flex items-center justify-center h-6 w-6 rounded-md bg-violet-600/20">
+                  <Briefcase className="h-3.5 w-3.5 text-violet-400" />
+                </div>
+                <span className="text-xs font-bold text-violet-400 uppercase tracking-wider">
+                  Setores
+                </span>
+                <Badge className="h-4 px-1.5 text-[9px] bg-violet-600/30 text-violet-300 border-violet-500/30 hover:bg-violet-600/30">
+                  {NAV_CONFIG.setores.length + 3}
+                </Badge>
+              </div>
+            )}
+            
+            {NAV_CONFIG.setores.map(category => renderCategorySection(category))}
+            {renderCategorySection(NAV_CONFIG.gg)}
+            {NAV_CONFIG.governanca.map(category => renderCategorySection(category))}
+            {user?.role === 'admin' && renderCategorySection(NAV_CONFIG.admin)}
+            
+            {!isCollapsed && <Separator className="my-3 bg-slate-800" />}
+            
+            {/* Acesso Rápido - Segundo */}
+            {!isCollapsed && (
+              <div className="flex items-center gap-2 px-3 py-2 mb-1">
+                <div className="flex items-center justify-center h-6 w-6 rounded-md bg-amber-600/20">
+                  <Zap className="h-3.5 w-3.5 text-amber-400" />
+                </div>
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
                   Acesso Rápido
                 </span>
+                <Badge className="h-4 px-1.5 text-[9px] bg-amber-600/30 text-amber-300 border-amber-500/30 hover:bg-amber-600/30">
+                  {NAV_CONFIG.quickAccess.length}
+                </Badge>
               </div>
             )}
             <div className="space-y-0.5">
               {NAV_CONFIG.quickAccess.map(item => renderNavItem(item))}
             </div>
-            
-            {!isCollapsed && <Separator className="my-3 bg-slate-800" />}
-            
-            {/* Setores */}
-            {!isCollapsed && (
-              <div className="px-3 py-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Setores
-                </span>
-              </div>
-            )}
-            
-            {NAV_CONFIG.setores.map(category => renderCategorySection(category))}
-            
-            {/* G&G */}
-            {renderCategorySection(NAV_CONFIG.gg)}
-            
-            {!isCollapsed && <Separator className="my-3 bg-slate-800" />}
-            
-            {/* Governança */}
-            {!isCollapsed && (
-              <div className="px-3 py-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Governança
-                </span>
-              </div>
-            )}
-            
-            {NAV_CONFIG.governanca.map(category => renderCategorySection(category))}
-            
-            {/* Admin */}
-            {user?.role === 'admin' && (
-              <>
-                {!isCollapsed && <Separator className="my-3 bg-slate-800" />}
-                {!isCollapsed && (
-                  <div className="px-3 py-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Administração
-                    </span>
-                  </div>
-                )}
-                {renderCategorySection(NAV_CONFIG.admin)}
-              </>
-            )}
           </nav>
         </ScrollArea>
       </SidebarContent>
