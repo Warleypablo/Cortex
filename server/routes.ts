@@ -1997,17 +1997,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         let engagementScore = 15;
         
-        if (mesesTurbo > 48 && (mesesUltAumento === null || mesesUltAumento > 24)) {
-          engagementScore = 8;
-          reasons.push('Colaborador veterano sem reconhecimento recente');
-        } else if (mesesTurbo >= 24 && mesesTurbo <= 48) {
-          engagementScore = 18;
-        } else if (mesesTurbo >= 12 && mesesTurbo < 24) {
+        if (mesesTurbo >= 60) {
+          engagementScore = 25;
+        } else if (mesesTurbo >= 48) {
+          engagementScore = 23;
+        } else if (mesesTurbo >= 36) {
+          engagementScore = 22;
+        } else if (mesesTurbo >= 24) {
           engagementScore = 20;
-        } else if (mesesTurbo >= 6 && mesesTurbo < 12) {
+        } else if (mesesTurbo >= 12) {
+          engagementScore = 18;
+        } else if (mesesTurbo >= 6) {
           engagementScore = 15;
         } else {
           engagementScore = 12;
+        }
+        
+        if (mesesTurbo > 36 && (mesesUltAumento === null || mesesUltAumento > 30)) {
+          reasons.push('Veterano sem aumento há muito tempo - verificar reconhecimento');
         }
         
         const healthScore = stabilityScore + growthScore + developmentScore + engagementScore;
@@ -2124,12 +2131,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         let engagementScore = 15;
-        if (mesesTurbo > 48 && (mesesUltAumento === null || mesesUltAumento > 24)) {
-          engagementScore = 8;
-        } else if (mesesTurbo >= 24 && mesesTurbo <= 48) {
-          engagementScore = 18;
-        } else if (mesesTurbo >= 12) {
+        if (mesesTurbo >= 60) {
+          engagementScore = 25;
+        } else if (mesesTurbo >= 48) {
+          engagementScore = 23;
+        } else if (mesesTurbo >= 36) {
+          engagementScore = 22;
+        } else if (mesesTurbo >= 24) {
           engagementScore = 20;
+        } else if (mesesTurbo >= 12) {
+          engagementScore = 18;
+        } else if (mesesTurbo >= 6) {
+          engagementScore = 15;
+        } else {
+          engagementScore = 12;
         }
         
         const healthScore = stabilityScore + growthScore + developmentScore + engagementScore;
