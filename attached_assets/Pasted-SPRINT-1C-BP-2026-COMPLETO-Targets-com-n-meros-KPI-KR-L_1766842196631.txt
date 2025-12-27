@@ -1,0 +1,385 @@
+SPRINT 1C — BP 2026 COMPLETO (Targets com números) + KPI/KR Library + Dashboards Executivos (Plan vs Actual)
+
+CONTEXTO ATUAL (já existe no sistema):
+- plan.metric_targets_monthly
+- kpi.metrics_registry
+- kpi.metric_actuals_monthly
+- endpoint /kpi/recompute
+- Dashboard com 3 cards
+Problema atual: tela “BP Financeiro” não carrega (mensagem: seed não executado).
+
+OBJETIVO DA SPRINT:
+1) Registrar TODOS os KPIs do BP 2026 no registry (incluindo derived/checkpoints).
+2) Seed/UPSERT das metas mensais 2026 (targets com números) em plan.metric_targets_monthly.
+3) Criar “KPI Library” (catálogo) + “KR Templates / OKR Template 2026” plugados em KPIs.
+4) Criar dashboards completos: Overview (cards), BP Financeiro (tabela estilo BP), OKR Board (cards de KR).
+5) Garantir que, mesmo sem Actual automatizado, o BP carrega com targets e permite manual override.
+
+REGRAS (obrigatórias):
+- NÃO escrever/alterar NADA em cup_* nem caz_* (somente SELECT).
+- Tudo que depende de “classificação por categoria do Conta Azul” fica MANUAL nesta sprint (manual override mensal).
+- Percentuais (PCT) armazenar como FRAÇÃO (ex.: 13,26% => 0.1326).
+- BRL armazenar como reais (numeric(18,2)) — sem “R$” no banco.
+- Seeds devem ser idempotentes (UPSERT). Rodar 10x não duplica.
+
+========================================================
+A) DEFINIÇÃO CANÔNICA — KPIs que o sistema deve acompanhar
+========================================================
+
+A1) Bases (com target no BP)
+- mrr_active (BRL, month_end) [auto_sql preferencial; se falhar, fica sem actual]
+- revenue_one_time (BRL, month_sum) [manual override por enquanto]
+- revenue_other (BRL, month_sum) [manual override por enquanto]
+- bad_debt (BRL, month_sum) [manual override]
+- taxes_on_revenue (BRL, month_sum) [manual override]
+- cogs_csv (BRL, month_sum) [manual override]
+- cac_total (BRL, month_sum) [manual override]
+- sga_total (BRL, month_sum) [manual override]
+- tax_ir_csll (BRL, month_sum) [manual override]
+- capex (BRL, month_sum) [manual override]
+- cash_balance (BRL, month_end) [manual override]
+- clients_active (COUNT, month_end) [auto_sql se possível; senão sem actual]
+- contracts_active (COUNT, month_end) [auto_sql se possível; senão sem actual]
+- churn_mrr_month (BRL, month_sum) [manual override]
+- headcount_total (COUNT, month_end) [auto_sql se possível; senão manual override]
+- headcount_bucket_csv (COUNT, month_end) [auto_sql/override]
+- headcount_bucket_cac (COUNT, month_end) [auto_sql/override]
+- headcount_bucket_sga (COUNT, month_end) [auto_sql/override]
+
+A2) Derived (calculadas pelo sistema; NÃO precisam target base)
+IMPORTANTE: Derived devem ser calculadas mensalmente e aparecer nos dashboards mesmo se não tiver target próprio.
+- revenue_billable_total = mrr_active + revenue_one_time + revenue_other
+- revenue_net = revenue_billable_total - bad_debt - taxes_on_revenue
+- gross_margin = revenue_net - cogs_csv
+- ebitda = gross_margin - cac_total - sga_total
+- cash_generation = ebitda - tax_ir_csll - capex
+
+CORREÇÃO #1 (muito importante): 
+- cash_generation_margin_pct = cash_generation / mrr_active
+(essa bate com seus números: Jan 24212/1156850 = 0.0209, etc)
+
+CORREÇÃO #2 (muito importante):
+- effective_tax_rate_pct = (taxes_on_revenue + tax_ir_csll) / revenue_billable_total
+(essa bate com “Aliquota Imposto Efetiva”: Feb (160603+103325)/1569334 = 0.1682)
+
+A3) “Métricas gerais” (targets do BP, podem ser checkpoint/mais tarde derived)
+- revenue_total (BRL, month_sum) [target do BP]
+- expense_total (BRL, month_sum) [target do BP]
+- revenue_per_head (BRL, month_sum) [checkpoint target]
+- mrr_per_head (BRL, month_end) [checkpoint target]
+- avg_ticket_client (BRL, month_end) [checkpoint target]
+- avg_ticket_contract (BRL, month_end) [checkpoint target]
+
+A4) Comercial (targets e placeholders de actual)
+- sales_mrr_total_target (BRL, month_sum) [target BP]
+- sales_mrr_new_target (BRL, month_sum) [target BP]
+- sales_mrr_monetization_target (BRL, month_sum) [target BP]
+- sales_performance_share_pct (PCT, month_sum) [target BP = 0.30]
+- sales_mrr_performance_target (BRL, month_sum) [target BP]
+- aov_performance (BRL, month_end) [target BP]
+- contracts_performance (COUNT, month_sum) [target BP]
+OBS: se ainda não existir actual de sales_* no banco, deixar source_type=manual e permitir override.
+
+========================================================
+B) REGISTRY (kpi.metrics_registry) — ajustar modelo e cadastrar KPIs
+========================================================
+
+B1) Garantir que o registry suporta (migração se precisar):
+- metric_key (PK)
+- name
+- unit: BRL | COUNT | PCT
+- period_type: month_end | month_sum
+- actual_source_type: auto_sql | manual
+- actual_sql (nullable)
+- is_derived boolean default false
+- formula_expr text (nullable)
+- base_metrics jsonb (ex.: ["mrr_active","revenue_one_time","revenue_other"])
+- direction: up | down | flat
+- tolerance_yellow numeric, tolerance_red numeric (para % relativos ou pp)
+- is_active boolean default true
+- group_key: "Overview" | "Financeiro" | "Pessoas" | "Comercial"
+
+B2) Semáforo (padrões):
+- direction=up:
+  green: actual >= target
+  yellow: actual >= target*(1-0.05)
+  red: actual < target*(1-0.10)
+- direction=down:
+  green: actual <= target
+  yellow: actual <= target*(1+0.05)
+  red: actual > target*(1+0.10)
+- direction=flat:
+  green: abs(actual-target)/target <= 0.02
+  yellow: <= 0.05
+  red: > 0.05
+- unit=PCT: tolerância ABS (pontos percentuais):
+  green: abs(actual-target) <= 0.02
+  yellow: <= 0.04
+  red: > 0.04
+
+B3) Recompute:
+- /kpi/recompute deve:
+  1) calcular/atualizar actuals (auto_sql quando existir)
+  2) aplicar manual override quando existir (manual sempre vence)
+  3) calcular derived mensalmente e gravar em kpi.metric_actuals_monthly
+
+========================================================
+C) SEED/UPSERT DO BP 2026 (plan.metric_targets_monthly) — COM NÚMEROS
+========================================================
+
+C1) Criar ação Admin: “Seed BP 2026 (UPSERT)”
+- Roda UPSERT para year=2026, month="2026-01".."2026-12"
+- dimension_key e dimension_value default NULL
+- Para CHECKPOINTS: gravar como dimension_key='bp_checkpoint', dimension_value='checkpoint'
+
+C2) Importante:
+- Para DERIVED: NÃO gravar target base (porque o sistema calcula),
+  mas se houver número no BP, gravar como bp_checkpoint.
+- UI deve exibir derived (calculada) e, se existir checkpoint, mostrar alerta se diferença > 1%.
+
+C3) DATASET — BP 2026 TARGETS (usar exatamente)
+
+# BASES (targets)
+mrr_active (BRL, month_end)
+2026-01 1156850 | 02 1267734 | 03 1368637 | 04 1485460 | 05 1591769 | 06 1688510 | 07 1806544 | 08 1913955 | 09 2011699 | 10 2130646 | 11 2238888 | 12 2337388
+
+revenue_one_time (BRL, month_sum)
+2026-01 240000 | 02 280000 | 03 270000 | 04 288333 | 05 306667 | 06 325000 | 07 343333 | 08 361667 | 09 380000 | 10 398333 | 11 416667 | 12 435000
+
+revenue_other (BRL, month_sum)
+2026-01 24767 | 02 21600 | 03 20267 | 04 34037 | 05 34037 | 06 25703 | 07 45973 | 08 45973 | 09 49587 | 10 87927 | 11 87927 | 12 87927
+
+bad_debt (BRL, month_sum)
+2026-01 99513 | 02 109853 | 03 116123 | 04 108470 | 05 115948 | 06 122353 | 07 131751 | 08 139296 | 09 146477 | 10 157014 | 11 164609 | 12 171619
+
+taxes_on_revenue (BRL, month_sum)
+2026-01 146247 | 02 160603 | 03 169308 | 04 185757 | 05 198001 | 06 208486 | 07 223872 | 08 236224 | 09 247981 | 10 265233 | 11 277666 | 12 289143
+
+cogs_csv (BRL, month_sum)
+2026-01 392504 | 02 407706 | 03 436438 | 04 475848 | 05 497651 | 06 516746 | 07 577633 | 08 602414 | 09 616990 | 10 659609 | 11 672624 | 12 697685
+
+cac_total (BRL, month_sum)
+2026-01 287296 | 02 290796 | 03 316796 | 04 336374 | 05 421374 | 06 361374 | 07 452725 | 08 370725 | 09 383725 | 10 419577 | 11 404577 | 12 427577
+
+sga_total (BRL, month_sum)
+2026-01 410130 | 02 296477 | 03 290518 | 04 296633 | 05 299429 | 06 303725 | 07 437438 | 08 309683 | 09 311030 | 10 335494 | 11 347141 | 12 369337
+
+tax_ir_csll (BRL, month_sum)
+2026-01 29215 | 02 103325 | 03 112105 | 04 137614 | 05 136024 | 06 179020 | 07 126627 | 08 225506 | 09 249928 | 10 265193 | 11 298134 | 12 307684
+
+capex (BRL, month_sum)
+2026-01 32500 | 02 32500 | 03 32500 | 04 32500 | 05 32500 | 06 32500 | 07 32500 | 08 32500 | 09 32500 | 10 32500 | 11 32500 | 12 32500
+
+cash_balance (BRL, month_end)
+2026-01 624212 | 02 792285 | 03 977401 | 04 1212035 | 05 1443581 | 06 1758591 | 07 1971895 | 08 2377142 | 09 2829796 | 10 3312082 | 11 3858312 | 12 4423082
+
+clients_active (COUNT, month_end)
+2026-01 290 | 02 319 | 03 340 | 04 365 | 05 388 | 06 409 | 07 434 | 08 458 | 09 479 | 10 505 | 11 530 | 12 552
+
+contracts_active (COUNT, month_end)
+2026-01 415 | 02 456 | 03 486 | 04 521 | 05 555 | 06 585 | 07 620 | 08 655 | 09 686 | 10 722 | 11 758 | 12 789
+
+churn_mrr_month (BRL, month_sum)
+2026-01 104117 | 02 114096 | 03 123177 | 04 133691 | 05 143259 | 06 151966 | 07 162589 | 08 172256 | 09 181053 | 10 191758 | 11 201500 | 12 210365
+
+headcount_total (COUNT, month_end)
+2026-01 126 | 02 129 | 03 138 | 04 143 | 05 147 | 06 151 | 07 158 | 08 163 | 09 166 | 10 172 | 11 175 | 12 179
+
+headcount_bucket_csv (COUNT, month_end)
+2026-01 87 | 02 89 | 03 96 | 04 100 | 05 104 | 06 107 | 07 114 | 08 118 | 09 120 | 10 125 | 11 128 | 12 131
+
+headcount_bucket_cac (COUNT, month_end)
+2026-01 27 | 02 28 | 03 30 | 04 31 | 05 31 | 06 31 | 07 31 | 08 32 | 09 33 | 10 34 | 11 34 | 12 35
+
+headcount_bucket_sga (COUNT, month_end)
+2026-01 12 | 02 12 | 03 12 | 04 12 | 05 12 | 06 13 | 07 13 | 08 13 | 09 13 | 10 13 | 11 13 | 12 13
+
+revenue_total (BRL, month_sum)
+2026-01 1322104 | 02 1459480 | 03 1542781 | 04 1699360 | 05 1816524 | 06 1916860 | 07 2064099 | 08 2182299 | 09 2294808 | 10 2459892 | 11 2578872 | 12 2688696
+
+expense_total (BRL, month_sum)
+2026-01 1297892 | 02 1291407 | 03 1357664 | 04 1464726 | 05 1584978 | 06 1601851 | 07 1850795 | 08 1777052 | 09 1842154 | 10 1977605 | 11 2032642 | 12 2123926
+
+# CHECKPOINTS (dimension_key='bp_checkpoint', dimension_value='checkpoint')
+revenue_billable_total checkpoint (BRL, month_sum)
+2026-01 1421617 | 02 1569334 | 03 1658904 | 04 1807830 | 05 1932472 | 06 2039213 | 07 2195850 | 08 2321595 | 09 2441285 | 10 2616906 | 11 2743481 | 12 2860315
+
+revenue_net checkpoint (BRL, month_sum)
+2026-01 1175857 | 02 1298878 | 03 1373473 | 04 1513603 | 05 1618523 | 06 1708374 | 07 1840227 | 08 1946075 | 09 2046827 | 10 2194659 | 11 2301206 | 12 2399553
+
+gross_margin checkpoint (BRL, month_sum)
+2026-01 783352 | 02 891171 | 03 937036 | 04 1037755 | 05 1120872 | 06 1191628 | 07 1262594 | 08 1343661 | 09 1429837 | 10 1535050 | 11 1628582 | 12 1701868
+
+ebitda checkpoint (BRL, month_sum)
+2026-01 85927 | 02 303899 | 03 329722 | 04 404749 | 05 400070 | 06 526529 | 07 372431 | 08 663253 | 09 735082 | 10 779979 | 11 876864 | 12 904954
+
+cash_generation checkpoint (BRL, month_sum)
+2026-01 24212 | 02 168073 | 03 185117 | 04 234634 | 05 231546 | 06 315009 | 07 213304 | 08 405247 | 09 452654 | 10 482286 | 11 546230 | 12 564770
+
+cash_generation_margin_pct checkpoint (PCT, month_sum)
+2026-01 0.0209 | 02 0.1326 | 03 0.1353 | 04 0.1580 | 05 0.1455 | 06 0.1866 | 07 0.1181 | 08 0.2117 | 09 0.2250 | 10 0.2264 | 11 0.2440 | 12 0.2416
+
+effective_tax_rate_pct checkpoint (PCT, month_sum)
+2026-01 0.1234 | 02 0.1682 | 03 0.1696 | 04 0.1789 | 05 0.1728 | 06 0.1900 | 07 0.1596 | 08 0.1989 | 09 0.2040 | 10 0.2027 | 11 0.2099 | 12 0.2087
+
+revenue_per_head checkpoint (BRL, month_sum)
+2026-01 11283 | 02 12165 | 03 12021 | 04 12642 | 05 13146 | 06 13505 | 07 13898 | 08 14243 | 09 14707 | 10 15215 | 11 15677 | 12 15979
+
+mrr_per_head checkpoint (BRL, month_end)
+2026-01 9181 | 02 9827 | 03 9918 | 04 10388 | 05 10828 | 06 11182 | 07 11434 | 08 11742 | 09 12119 | 10 12387 | 11 12794 | 12 13058
+
+avg_ticket_client checkpoint (BRL, month_end)
+2026-01 4899 | 02 4924 | 03 4883 | 04 4959 | 05 4976 | 06 4986 | 07 5065 | 08 5068 | 09 5092 | 10 5186 | 11 5178 | 12 5184
+
+avg_ticket_contract checkpoint (BRL, month_end)
+2026-01 3426 | 02 3443 | 03 3415 | 04 3468 | 05 3480 | 06 3487 | 07 3542 | 08 3544 | 09 3561 | 10 3626 | 11 3621 | 12 3625
+
+# COMERCIAL (targets)
+sales_mrr_total_target (BRL, month_sum)
+2026-01 215000 | 02 215000 | 03 215000 | 04 240000 | 05 240000 | 06 240000 | 07 270000 | 08 270000 | 09 270000 | 10 300000 | 11 300000 | 12 300000
+
+sales_mrr_new_target (BRL, month_sum)
+2026-01 200000 | 02 200000 | 03 200000 | 04 220000 | 05 220000 | 06 220000 | 07 240000 | 08 240000 | 09 240000 | 10 260000 | 11 260000 | 12 260000
+
+sales_mrr_monetization_target (BRL, month_sum)
+2026-01 15000 | 02 15000 | 03 15000 | 04 20000 | 05 20000 | 06 20000 | 07 30000 | 08 30000 | 09 30000 | 10 40000 | 11 40000 | 12 40000
+
+sales_performance_share_pct (PCT, month_sum)
+2026-01..12 sempre 0.30
+
+sales_mrr_performance_target (BRL, month_sum)
+2026-01 64500 | 02 64500 | 03 64500 | 04 72000 | 05 72000 | 06 72000 | 07 81000 | 08 81000 | 09 81000 | 10 90000 | 11 90000 | 12 90000
+
+aov_performance (BRL, month_end)
+2026-01..12 sempre 3000
+
+contracts_performance (COUNT, month_sum)
+2026-01 22 | 02 22 | 03 22 | 04 24 | 05 24 | 06 24 | 07 27 | 08 27 | 09 27 | 10 30 | 11 30 | 12 30
+
+========================================================
+D) KPI LIBRARY (Admin)
+========================================================
+
+Criar página Admin > KPI Library:
+- lista de métricas do registry (metric_key, nome, unit, period_type, direction, source_type, group_key, derived/manual/auto)
+- permitir ativar/desativar
+- mostrar “Como totalizar”:
+  - month_sum BRL: soma 12 meses (Total)
+  - month_end BRL/COUNT: usar Dezembro (year_end). Opcional: avg.
+  - PCT: média simples (por enquanto)
+- botão: “Seed BP 2026” (chama endpoint seed)
+- botão: “Recompute KPIs” (chama /kpi/recompute)
+
+========================================================
+E) OKR TEMPLATE 2026 (Objectives + KRs plugados em KPIs)
+========================================================
+
+Criar “OKR Template 2026” (auto-seed) com Objectives e KRs:
+
+O1 — Crescer Receita Recorrente com qualidade
+KR1 mrr_active (up) w=0.20
+KR2 clients_active (up) w=0.08
+KR3 contracts_active (up) w=0.07
+KR4 avg_ticket_client (up) w=0.05 [checkpoint]
+KR5 avg_ticket_contract (up) w=0.05 [checkpoint]
+KR6 churn_mrr_month (down) w=0.10
+
+O2 — Aumentar lucro e eficiência (DRE)
+KR7  revenue_billable_total (up) w=0.08 [derived]
+KR8  revenue_net (up) w=0.08 [derived]
+KR9  gross_margin (up) w=0.06 [derived]
+KR10 ebitda (up) w=0.10 [derived]
+KR11 effective_tax_rate_pct (flat) w=0.03 [derived vs checkpoint]
+
+O3 — Gerar caixa e fortalecer balanço
+KR12 cash_generation (up) w=0.10 [derived]
+KR13 cash_generation_margin_pct (up) w=0.05 [derived vs checkpoint]
+KR14 cash_balance (up) w=0.05
+KR15 capex (down) w=0.02
+
+O4 — Escalar time com produtividade
+KR16 headcount_total (flat) w=0.04
+KR17 headcount_bucket_csv/cac/sga (flat) w=0.04
+KR18 revenue_per_head (up) w=0.03 [checkpoint]
+KR19 mrr_per_head (up) w=0.03 [checkpoint]
+
+O5 — Fortalecer motor comercial
+KR20 sales_mrr_total_target vs actual sales_mrr_total (up) w=0.08 [se actual não existir: manual override]
+KR21 sales_mrr_new_target vs actual (up) w=0.05
+KR22 sales_mrr_monetization_target vs actual (up) w=0.03
+KR23 sales_mrr_performance_target vs actual (up) w=0.02
+KR24 contracts_performance vs actual (up) w=0.01
+
+KR card deve ter:
+- Target (mês e quarter), Actual, Variance (abs e %)
+- Score 0..100
+  - up: score = min(actual/target,1.2) normalizado
+  - down: score = min(target/actual,1.2)
+  - flat: score = max(0, 1 - abs(actual-target)/target)
+- Semáforo
+- Check-in fields: confidence (0-100), commentary, iniciativas (links)
+
+========================================================
+F) DASHBOARDS
+========================================================
+
+F1) Overview (cards executivos):
+cards obrigatórios (Plan, Actual, Δ, semáforo, YTD, trend 6m):
+- mrr_active
+- revenue_billable_total (derived)
+- revenue_net (derived)
+- ebitda (derived)
+- cash_generation (derived)
+- cash_balance
+- headcount_total
+- clients_active
+- contracts_active
+- churn_mrr_month
+
+F2) BP Financeiro (tabela estilo BP):
+- Linhas: bases + derived + checkpoints (marcar “checkpoint”)
+- Colunas: Jan..Dez + Total
+- Total:
+  - month_sum BRL: soma
+  - month_end BRL/COUNT: Dezembro
+  - PCT: média simples
+- Se plan tiver dados e actual ainda não: mostrar targets normalmente e actual como “—” (sem quebrar a página)
+
+F3) OKR Board:
+- lista de KRs com filtros (YTD / Q1..Q4)
+- cada KR card mostra: target, actual, delta, score, semáforo + check-in
+
+========================================================
+G) MANUAL OVERRIDE (obrigatório nesta sprint)
+========================================================
+
+Criar UI/Admin para setar manual override mensal em kpi.metric_actuals_monthly:
+- metric_key, month, year, actual_value
+- flag is_manual=true
+- override sempre vence auto_sql
+Isso resolve agora: revenue_one_time, revenue_other, bad_debt, taxes_on_revenue, cogs_csv, cac_total, sga_total, tax_ir_csll, capex, cash_balance, churn_mrr_month e sales_* (se não existir actual).
+
+========================================================
+H) FIX DO ERRO ATUAL (BP Financeiro não carrega)
+========================================================
+
+Garantir:
+- Endpoint de BP Financeiro deve buscar plan.metric_targets_monthly year=2026
+- Se count=0: mostrar CTA “Rodar Seed BP 2026” (e botão)
+- Após seed, BP Financeiro deve renderizar sem erro.
+
+Adicionar checagem no backend:
+SELECT count(*) FROM plan.metric_targets_monthly WHERE year=2026;
+Se 0, retornar 404 com mensagem “bp_not_seeded” para UI tratar com CTA.
+
+========================================================
+I) DoD / ACEITE
+========================================================
+
+1) Rodar “Seed BP 2026 (UPSERT)” popula plan.metric_targets_monthly (year=2026) com todas as métricas acima + checkpoints.
+2) BP Financeiro carrega e mostra tabela completa de targets (mesmo sem actual).
+3) KPI Library lista tudo e permite recompute + override.
+4) Derived metrics aparecem e batem com checkpoints (alerta se divergência >1%).
+5) OKR Template 2026 cria Objectives + KRs e cada KR está vinculado a metric_key.
+6) Overview mostra pelo menos targets + placeholders de actual sem quebrar.
+ENTREGAR: migração registry + seed BP + KPI Library + BP Financeiro + Overview + OKR Board + manual override.
