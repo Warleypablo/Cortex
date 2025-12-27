@@ -232,67 +232,40 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Setores */}
+        {/* Menu Principal - Setores, G&G, Governança, Administração unidos */}
         <SidebarGroup>
-          <SidebarGroupLabel>Setores</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              {/* Setores */}
               {NAV_CONFIG.setores.map(category => renderCategory(category, 'setores'))}
+              
+              {/* G&G */}
+              {filterItems(NAV_CONFIG.gg.items).length > 0 && renderCategory(NAV_CONFIG.gg, 'gg')}
+              
+              {/* Governança */}
+              {NAV_CONFIG.governanca.map(category => renderCategory(category, 'governanca'))}
+              
+              {/* Administração */}
+              {NAV_CONFIG.admin.items.filter(item => hasAccess(item.url, item.permissionKey)).map((item) => {
+                const ItemIcon = getIcon(item.icon);
+                return (
+                  <SidebarMenuItem key={item.url}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={location === item.url || location.startsWith(item.url + "/")}
+                      data-testid={`nav-admin-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      <Link href={item.url} onClick={handleItemClick}>
+                        <ItemIcon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {/* G&G (Pessoas) */}
-        {filterItems(NAV_CONFIG.gg.items).length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Pessoas</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {renderCategory(NAV_CONFIG.gg, 'gg')}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Governança */}
-        {NAV_CONFIG.governanca.some(cat => filterItems(cat.items as Array<{ title: string; url: string; icon: string; permissionKey: string }>).length > 0) && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Governança</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {NAV_CONFIG.governanca.map(category => renderCategory(category, 'governanca'))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Administração */}
-        {filterItems(NAV_CONFIG.admin.items).length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Administração</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {NAV_CONFIG.admin.items.filter(item => hasAccess(item.url, item.permissionKey)).map((item) => {
-                  const ItemIcon = getIcon(item.icon);
-                  return (
-                    <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton 
-                        asChild 
-                        isActive={location === item.url || location.startsWith(item.url + "/")}
-                        data-testid={`nav-admin-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                      >
-                        <Link href={item.url} onClick={handleItemClick}>
-                          <ItemIcon />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
       </SidebarContent>
     </Sidebar>
   );
