@@ -34,13 +34,6 @@ async function initializeSquadMetasTable(db: any): Promise<void> {
 
 import { BP_2026_TARGETS } from "../okr2026/bp2026Targets";
 
-function isAdmin(req: any, res: any, next: any) {
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ error: "Forbidden - Admin access required" });
-  }
-  next();
-}
-
 export async function registerMetasRoutes(app: Express, db: any, storage: IStorage) {
   await initializeSquadMetasTable(db);
 
