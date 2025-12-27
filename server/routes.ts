@@ -11306,6 +11306,397 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== ADMIN CATALOGS API ====================
+  
+  const VALID_CATALOGS: Record<string, { table: string; description: string; specificFields: string[] }> = {
+    products: { 
+      table: 'catalog_products', 
+      description: 'Produtos e serviços oferecidos',
+      specificFields: ['bp_segment']
+    },
+    plans: { 
+      table: 'catalog_plans', 
+      description: 'Planos de contrato disponíveis',
+      specificFields: []
+    },
+    squads: { 
+      table: 'catalog_squads', 
+      description: 'Squads/equipes de atendimento',
+      specificFields: ['is_off']
+    },
+    clusters: { 
+      table: 'catalog_clusters', 
+      description: 'Clusters de categorização de clientes',
+      specificFields: []
+    },
+    contract_status: { 
+      table: 'catalog_contract_status', 
+      description: 'Status possíveis de contratos',
+      specificFields: ['counts_as_operating']
+    },
+    account_health: { 
+      table: 'catalog_account_health', 
+      description: 'Indicadores de saúde da conta',
+      specificFields: []
+    },
+    roi_bucket: { 
+      table: 'catalog_roi_bucket', 
+      description: 'Faixas de ROI',
+      specificFields: []
+    },
+    churn_reason: { 
+      table: 'catalog_churn_reason', 
+      description: 'Motivos de churn/cancelamento',
+      specificFields: []
+    }
+  };
+
+  app.get("/api/admin/catalogs", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      console.log("[admin/catalogs] Listing all catalogs");
+      const catalogs = Object.entries(VALID_CATALOGS).map(([name, config]) => ({
+        name,
+        table: config.table,
+        description: config.description,
+        specificFields: config.specificFields
+      }));
+      res.json(catalogs);
+    } catch (error) {
+      console.error("[admin/catalogs] Error listing catalogs:", error);
+      res.status(500).json({ error: "Failed to list catalogs" });
+    }
+  });
+
+  app.get("/api/admin/catalog/:catalogName", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { catalogName } = req.params;
+      console.log(`[admin/catalog] Fetching catalog: ${catalogName}`);
+      
+      const catalogConfig = VALID_CATALOGS[catalogName];
+      if (!catalogConfig) {
+        return res.status(404).json({ error: `Catalog '${catalogName}' not found. Valid catalogs: ${Object.keys(VALID_CATALOGS).join(', ')}` });
+      }
+      
+      const tableQueries: Record<string, any> = {
+        catalog_products: sql`SELECT * FROM catalog_products ORDER BY sort_order, name`,
+        catalog_plans: sql`SELECT * FROM catalog_plans ORDER BY sort_order, name`,
+        catalog_squads: sql`SELECT * FROM catalog_squads ORDER BY sort_order, name`,
+        catalog_clusters: sql`SELECT * FROM catalog_clusters ORDER BY sort_order, name`,
+        catalog_contract_status: sql`SELECT * FROM catalog_contract_status ORDER BY sort_order, name`,
+        catalog_account_health: sql`SELECT * FROM catalog_account_health ORDER BY sort_order, name`,
+        catalog_roi_bucket: sql`SELECT * FROM catalog_roi_bucket ORDER BY sort_order, name`,
+        catalog_churn_reason: sql`SELECT * FROM catalog_churn_reason ORDER BY sort_order, name`
+      };
+      
+      const result = await db.execute(tableQueries[catalogConfig.table]);
+      console.log(`[admin/catalog] Found ${result.rows.length} items in ${catalogName}`);
+      res.json(result.rows);
+    } catch (error) {
+      console.error(`[admin/catalog] Error fetching catalog:`, error);
+      res.status(500).json({ error: "Failed to fetch catalog items" });
+    }
+  });
+
+  app.post("/api/admin/catalog/:catalogName", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { catalogName } = req.params;
+      const body = req.body;
+      console.log(`[admin/catalog] Creating item in ${catalogName}:`, body);
+      
+      const catalogConfig = VALID_CATALOGS[catalogName];
+      if (!catalogConfig) {
+        return res.status(404).json({ error: `Catalog '${catalogName}' not found` });
+      }
+      
+      if (!body.slug || !body.name) {
+        return res.status(400).json({ error: "slug and name are required" });
+      }
+      
+      const slug = body.slug;
+      const name = body.name;
+      const sortOrder = body.sort_order ?? 0;
+      const active = body.active ?? true;
+      
+      let result;
+      switch (catalogConfig.table) {
+        case 'catalog_products':
+          result = await db.execute(sql`
+            INSERT INTO catalog_products (slug, name, bp_segment, sort_order, active)
+            VALUES (${slug}, ${name}, ${body.bp_segment || null}, ${sortOrder}, ${active})
+            RETURNING *
+          `);
+          break;
+        case 'catalog_squads':
+          result = await db.execute(sql`
+            INSERT INTO catalog_squads (slug, name, is_off, sort_order, active)
+            VALUES (${slug}, ${name}, ${body.is_off || false}, ${sortOrder}, ${active})
+            RETURNING *
+          `);
+          break;
+        case 'catalog_contract_status':
+          result = await db.execute(sql`
+            INSERT INTO catalog_contract_status (slug, name, counts_as_operating, sort_order, active)
+            VALUES (${slug}, ${name}, ${body.counts_as_operating || false}, ${sortOrder}, ${active})
+            RETURNING *
+          `);
+          break;
+        default:
+          result = await db.execute(sql`
+            INSERT INTO ${sql.raw(catalogConfig.table)} (slug, name, sort_order, active)
+            VALUES (${slug}, ${name}, ${sortOrder}, ${active})
+            RETURNING *
+          `);
+      }
+      
+      console.log(`[admin/catalog] Created item:`, result.rows[0]);
+      res.status(201).json(result.rows[0]);
+    } catch (error: any) {
+      console.error(`[admin/catalog] Error creating item:`, error);
+      if (error.code === '23505') {
+        return res.status(409).json({ error: "An item with this slug already exists" });
+      }
+      res.status(500).json({ error: "Failed to create catalog item" });
+    }
+  });
+
+  app.put("/api/admin/catalog/:catalogName/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { catalogName, id } = req.params;
+      const body = req.body;
+      const itemId = parseInt(id);
+      console.log(`[admin/catalog] Updating item ${id} in ${catalogName}:`, body);
+      
+      const catalogConfig = VALID_CATALOGS[catalogName];
+      if (!catalogConfig) {
+        return res.status(404).json({ error: `Catalog '${catalogName}' not found` });
+      }
+      
+      const existsResult = await db.execute(sql`
+        SELECT id FROM ${sql.raw(catalogConfig.table)} WHERE id = ${itemId}
+      `);
+      if (existsResult.rows.length === 0) {
+        return res.status(404).json({ error: "Item not found" });
+      }
+      
+      const name = body.name;
+      const active = body.active;
+      const sortOrder = body.sort_order;
+      
+      let result;
+      switch (catalogConfig.table) {
+        case 'catalog_products':
+          result = await db.execute(sql`
+            UPDATE catalog_products SET
+              name = COALESCE(${name}, name),
+              active = COALESCE(${active}, active),
+              sort_order = COALESCE(${sortOrder}, sort_order),
+              bp_segment = COALESCE(${body.bp_segment}, bp_segment)
+            WHERE id = ${itemId}
+            RETURNING *
+          `);
+          break;
+        case 'catalog_squads':
+          result = await db.execute(sql`
+            UPDATE catalog_squads SET
+              name = COALESCE(${name}, name),
+              active = COALESCE(${active}, active),
+              sort_order = COALESCE(${sortOrder}, sort_order),
+              is_off = COALESCE(${body.is_off}, is_off)
+            WHERE id = ${itemId}
+            RETURNING *
+          `);
+          break;
+        case 'catalog_contract_status':
+          result = await db.execute(sql`
+            UPDATE catalog_contract_status SET
+              name = COALESCE(${name}, name),
+              active = COALESCE(${active}, active),
+              sort_order = COALESCE(${sortOrder}, sort_order),
+              counts_as_operating = COALESCE(${body.counts_as_operating}, counts_as_operating)
+            WHERE id = ${itemId}
+            RETURNING *
+          `);
+          break;
+        case 'catalog_plans':
+          result = await db.execute(sql`
+            UPDATE catalog_plans SET
+              name = COALESCE(${name}, name),
+              active = COALESCE(${active}, active),
+              sort_order = COALESCE(${sortOrder}, sort_order)
+            WHERE id = ${itemId}
+            RETURNING *
+          `);
+          break;
+        case 'catalog_clusters':
+          result = await db.execute(sql`
+            UPDATE catalog_clusters SET
+              name = COALESCE(${name}, name),
+              active = COALESCE(${active}, active),
+              sort_order = COALESCE(${sortOrder}, sort_order)
+            WHERE id = ${itemId}
+            RETURNING *
+          `);
+          break;
+        case 'catalog_account_health':
+          result = await db.execute(sql`
+            UPDATE catalog_account_health SET
+              name = COALESCE(${name}, name),
+              active = COALESCE(${active}, active),
+              sort_order = COALESCE(${sortOrder}, sort_order)
+            WHERE id = ${itemId}
+            RETURNING *
+          `);
+          break;
+        case 'catalog_roi_bucket':
+          result = await db.execute(sql`
+            UPDATE catalog_roi_bucket SET
+              name = COALESCE(${name}, name),
+              active = COALESCE(${active}, active),
+              sort_order = COALESCE(${sortOrder}, sort_order)
+            WHERE id = ${itemId}
+            RETURNING *
+          `);
+          break;
+        case 'catalog_churn_reason':
+          result = await db.execute(sql`
+            UPDATE catalog_churn_reason SET
+              name = COALESCE(${name}, name),
+              active = COALESCE(${active}, active),
+              sort_order = COALESCE(${sortOrder}, sort_order)
+            WHERE id = ${itemId}
+            RETURNING *
+          `);
+          break;
+        default:
+          return res.status(400).json({ error: "Unknown catalog table" });
+      }
+      
+      console.log(`[admin/catalog] Updated item:`, result.rows[0]);
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error(`[admin/catalog] Error updating item:`, error);
+      res.status(500).json({ error: "Failed to update catalog item" });
+    }
+  });
+
+  app.delete("/api/admin/catalog/:catalogName/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { catalogName, id } = req.params;
+      const itemId = parseInt(id);
+      console.log(`[admin/catalog] Soft-deleting item ${id} in ${catalogName}`);
+      
+      const catalogConfig = VALID_CATALOGS[catalogName];
+      if (!catalogConfig) {
+        return res.status(404).json({ error: `Catalog '${catalogName}' not found` });
+      }
+      
+      const result = await db.execute(sql`
+        UPDATE ${sql.raw(catalogConfig.table)} SET active = false WHERE id = ${itemId} RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Item not found" });
+      }
+      
+      console.log(`[admin/catalog] Soft-deleted item:`, result.rows[0]);
+      res.json({ success: true, message: "Item deactivated", item: result.rows[0] });
+    } catch (error) {
+      console.error(`[admin/catalog] Error soft-deleting item:`, error);
+      res.status(500).json({ error: "Failed to delete catalog item" });
+    }
+  });
+
+  // ==================== ADMIN SYSTEM FIELDS API ====================
+
+  app.get("/api/admin/system-fields", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { entity } = req.query;
+      console.log(`[admin/system-fields] Fetching system fields, entity filter: ${entity || 'none'}`);
+      
+      let result;
+      if (entity && (entity === 'client' || entity === 'contract')) {
+        result = await db.execute(sql`
+          SELECT * FROM system_fields 
+          WHERE entity = ${entity}
+          ORDER BY sort_order, field_key
+        `);
+      } else {
+        result = await db.execute(sql`
+          SELECT * FROM system_fields 
+          ORDER BY entity, sort_order, field_key
+        `);
+      }
+      
+      console.log(`[admin/system-fields] Found ${result.rows.length} fields`);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[admin/system-fields] Error fetching fields:", error);
+      res.status(500).json({ error: "Failed to fetch system fields" });
+    }
+  });
+
+  app.get("/api/admin/system-fields/:fieldKey", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { fieldKey } = req.params;
+      console.log(`[admin/system-fields] Fetching field: ${fieldKey}`);
+      
+      const result = await db.execute(sql`
+        SELECT * FROM system_fields WHERE field_key = ${fieldKey}
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: `Field '${fieldKey}' not found` });
+      }
+      
+      console.log(`[admin/system-fields] Found field:`, result.rows[0]);
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[admin/system-fields] Error fetching field:", error);
+      res.status(500).json({ error: "Failed to fetch system field" });
+    }
+  });
+
+  app.put("/api/admin/system-fields/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const fieldId = parseInt(id);
+      const body = req.body;
+      console.log(`[admin/system-fields] Updating field ${id}:`, body);
+      
+      const existsResult = await db.execute(sql`
+        SELECT id FROM system_fields WHERE id = ${fieldId}
+      `);
+      if (existsResult.rows.length === 0) {
+        return res.status(404).json({ error: "Field not found" });
+      }
+      
+      const hasUpdates = body.label !== undefined || body.required !== undefined || 
+                         body.default_value !== undefined || body.help_text !== undefined || 
+                         body.active !== undefined;
+      
+      if (!hasUpdates) {
+        return res.status(400).json({ error: "No valid fields to update. Allowed: label, required, default_value, help_text, active" });
+      }
+      
+      const result = await db.execute(sql`
+        UPDATE system_fields SET
+          label = COALESCE(${body.label}, label),
+          required = COALESCE(${body.required}, required),
+          default_value = COALESCE(${body.default_value}, default_value),
+          help_text = COALESCE(${body.help_text}, help_text),
+          active = COALESCE(${body.active}, active)
+        WHERE id = ${fieldId}
+        RETURNING *
+      `);
+      
+      console.log(`[admin/system-fields] Updated field:`, result.rows[0]);
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[admin/system-fields] Error updating field:", error);
+      res.status(500).json({ error: "Failed to update system field" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
