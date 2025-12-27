@@ -1,0 +1,80 @@
+IMPLEMENTAR SPRINT 2 (OKR 2026) — foco em: UI Turbo, Iniciativas (Lista+Kanban), Import XLSX, Metas por Squad.
+
+CONTEXTO:
+- Já existe OKR 2026 com abas: Dashboard, KRs, Iniciativas, BP Financeiro.
+- Já existe Kanban de iniciativas (backlog/doing/done/blocked) e BP Financeiro com tabela.
+- 2026 não tem dados ainda: quando não existir actual, é NULL e deve renderizar “— / Sem dados” (não pode virar 0).
+
+OBJETIVOS (ENTREGÁVEIS):
+A) UI “Turbo padrão”
+1) Criar componentes reutilizáveis (shadcn + tailwind):
+- MetricStatusBadge: on_track/attention/off_track/no_data
+- ObjectiveBadge: O1..O5
+- QuarterBadge: Q1..Q4
+- TagBadge
+- EmptyState + Skeleton
+2) Padronizar:
+- Tabs (Dashboard/KRs/Iniciativas/BP) estilo pill consistente
+- Cards do dashboard com meta, % atingido, barra, status; se actual null => no_data
+- Tabelas com zebra leve, hover, header sticky
+
+B) Iniciativas: adicionar VIEW “Lista”
+1) Manter Kanban e adicionar toggle: [Kanban | Lista]
+2) Lista (table):
+- colunas: Title | Objective | Quarter | Status | Owner | Linked KRs | Tags | Due date | Progress
+- filtros: Objective, Quarter, Status, Owner, Tag, Search
+- ordenação: Due date, Status, Progress
+3) Row UI com badges (Objective/Quarter/Status) e chips de KR
+
+C) Seed Iniciativas Turbo 2026 (25 itens)
+- Criar ação admin “Seed Initiatives Turbo 2026”
+- UPSERT por stable_key
+- Inserir os 25 itens abaixo (copiar exatamente):
+1 [O1][Q1] Pacotes padrão por BU (Commerce/OH/Ventures) + catálogo de add-ons — CEO/COO — tags: padronização,produto — KRs: O1_KR1,O1_KR4,O1_KR5
+2 [O1][Q1] Revisão de pricing & tiers (Starter/Scale/Enterprise) com guardrails de margem — CEO/Finance — tags: pricing — KRs: O2_KR10,O1_KR4,O4_KR18
+3 [O1][Q1] Onboarding padrão (TTV 14 dias) + checklist operacional — Ops/CS — tags: delivery,retencao — KRs: O1_KR6,O1_KR2
+4 [O1][Q2] Health Score + “Churn Room” semanal — CS Lead — tags: retencao — KRs: O1_KR6,O1_KR2
+5 [O1][Q2] Programa de Monetização (upsell/cross-sell) — Sales/CS — tags: monetizacao — KRs: O1_KR4,O1_KR5,O5_KR22
+6 [O1][Q3] Máquina de indicação (referrals) — Growth/Sales — tags: aquisicao — KRs: O1_KR1,O5_KR21
+7 [O2][Q1] Category Mapping (Conta Azul) → DRE auto_classificado (read-only cup_/caz_) — Finance/Ops — tags: dados,dre — KRs: O2_KR7,O2_KR10
+8 [O2][Q1] Centro de custos por Squad (CSV/CAC/SGA) + regra alocação — Finance — tags: custos — KRs: O2_KR10,O4_KR17
+9 [O2][Q2] Capacity & alocação (hours) por squad — COO — tags: capacidade — KRs: O4_KR19,O2_KR10
+10 [O2][Q2] SLA de entrega + CSAT entregas — Ops/CS — tags: qualidade — KRs: O1_KR6,O2_KR10
+11 [O2][Q3] Redução de COGS com meta trimestral — COO — tags: cogs — KRs: O2_KR9,O2_KR10
+12 [O2][Q4] SOPs críticos + auditoria — COO — tags: padronizacao — KRs: O1_KR6,O2_KR10
+13 [O3][Q1] Cobrança Turbo (n8n + WhatsApp/email) — Finance/CS — tags: caixa — KRs: O3_KR12,O3_KR14
+14 [O3][Q1] Política de caixa + forecast 13 semanas — Finance — tags: previsibilidade — KRs: O3_KR14
+15 [O3][Q2] Renegociação/cronograma impostos — Finance — tags: impostos — KRs: O3_KR12,O2_KR11
+16 [O3][Q3] Governança de CAPEX no sistema — Finance — tags: capex — KRs: O3_KR15
+17 [O4][Q1] Organograma alvo 2026 + plano de contratação por quarter — CEO/COO — tags: pessoas — KRs: O4_KR16
+18 [O4][Q1] CHA por cadeira crítica + scorecards — COO/HR — tags: pessoas — KRs: O4_KR16,O4_KR19
+19 [O4][Q2] Rotina de performance (1:1/weekly/monthly) + check-in OKR — COO — tags: rituais — KRs: ALL
+20 [O4][Q2] Trilhas de treinamento + certificações — HR/Ops — tags: treinamento — KRs: O4_KR19
+21 [O4][Q3] Mix do time (CSV/CAC/SGA) batendo o plano — CEO/Finance — tags: headcount — KRs: O4_KR17
+22 [O5][Q1] Pipeline padrão + forecast + dashboard vendas MRR — Sales Lead — tags: vendas — KRs: O5_KR20,O5_KR21
+23 [O5][Q1] Outbound + ICP list + cadência + scripts — Sales/Growth — tags: aquisicao — KRs: O5_KR21,O5_KR20
+24 [O5][Q2] Parcerias nacionais (Brasil) — CEO/Sales — tags: parcerias — KRs: O5_KR21
+25 [O5][Q2] Performance deals (30% share, AOV 3k) + kit de oferta — Sales Lead — tags: performance — KRs: O5_KR23,O5_KR24
+
+D) Import XLSX (arquivo: “[Planejamento Tático] 2025 | V4 Company.xlsx”)
+1) Criar ação admin “Import Initiatives from XLSX”
+2) Ler aba “Portfólio” e mapear:
+- Projeto -> title
+- Programa -> tags
+- DRI -> owner_name (se não tiver email, owner_email null)
+- Prazo -> due_date
+- Status -> status (backlog/doing/done/blocked)
+- Progresso -> progress (0..1)
+3) Adicionar tag fixa “ref_v4_2025”
+4) Não sobrescrever seed Turbo 2026: separar por filtro (origem=seed_turbo_2026 vs ref_v4_2025)
+
+E) Metas por Squad (Operação) — scorecard
+1) Criar página “Metas por Squad”
+2) Criar tabela squad_goals com:
+squad, perspective, metric_name, unit, periodicity, data_source, owner_team, actual_value, target_value, score, weight, notes
+3) UI: tabela agrupada por perspective + edição inline + cálculo score padrão (up/down)
+
+REGRAS:
+- “Sem dados” é null. Nunca mostrar 0 quando não existe actual.
+- BRL numeric; percent como fração.
+- Manter consistência visual com badges e estados vazios.
