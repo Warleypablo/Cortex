@@ -73,6 +73,23 @@ interface ColaboradorFiltrado {
   squad: string | null;
 }
 
+type DetailType = 'demissao' | 'maContratacao' | 'salarioTempo';
+interface SelectedColaboradorDetail {
+  type: DetailType;
+  id: number;
+  nome: string;
+  cargo: string | null;
+  squad: string | null;
+  setor?: string | null;
+  admissao?: string | null;
+  demissao?: string | null;
+  tempoDeEmpresa?: number;
+  diasAteDesligamento?: number;
+  salario?: number;
+  nivel?: string | null;
+  tipoDesligamento?: string | null;
+}
+
 type PeriodoPreset = "mesAtual" | "trimestre" | "semestre" | "ano";
 
 interface PeriodoState {
@@ -309,6 +326,7 @@ export default function DashboardGeG() {
   const [cargo, setCargo] = useState("todos");
   const [diasExperiencia, setDiasExperiencia] = useState(30);
   const [selectedAlert, setSelectedAlert] = useState<SelectedAlert | null>(null);
+  const [selectedColaboradorDetail, setSelectedColaboradorDetail] = useState<SelectedColaboradorDetail | null>(null);
   const [ignoredAlerts, setIgnoredAlerts] = useState<string[]>([]);
   const [selectedHealthCategory, setSelectedHealthCategory] = useState<HealthCategory | null>(null);
   const [selectedChartFilter, setSelectedChartFilter] = useState<ChartFilter | null>(null);
@@ -1489,6 +1507,74 @@ export default function DashboardGeG() {
           </DialogContent>
         </Dialog>
 
+        {/* Dialog de Detalhe do Colaborador (Demissão/Má Contratação) */}
+        <Dialog open={!!selectedColaboradorDetail} onOpenChange={(open) => !open && setSelectedColaboradorDetail(null)}>
+          <DialogContent className="sm:max-w-md" data-testid="dialog-colaborador-detalhe">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {selectedColaboradorDetail?.type === 'demissao' && <UserMinus className="w-5 h-5 text-red-500" />}
+                {selectedColaboradorDetail?.type === 'maContratacao' && <AlertTriangle className="w-5 h-5 text-amber-500" />}
+                {selectedColaboradorDetail?.type === 'demissao' ? 'Detalhes da Demissão' : 'Má Contratação'}
+              </DialogTitle>
+              <DialogDescription>
+                {selectedColaboradorDetail?.type === 'demissao' && 'Informações sobre o desligamento'}
+                {selectedColaboradorDetail?.type === 'maContratacao' && 'Colaborador desligado em menos de 90 dias'}
+              </DialogDescription>
+            </DialogHeader>
+            {selectedColaboradorDetail && (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <h3 className="font-semibold text-lg">{selectedColaboradorDetail.nome}</h3>
+                  {selectedColaboradorDetail.cargo && (
+                    <p className="text-sm text-muted-foreground">{selectedColaboradorDetail.cargo}</p>
+                  )}
+                  {selectedColaboradorDetail.squad && (
+                    <p className="text-sm text-muted-foreground">{selectedColaboradorDetail.squad}</p>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {selectedColaboradorDetail.setor && (
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="text-xs text-muted-foreground">Setor</p>
+                      <p className="font-medium">{selectedColaboradorDetail.setor}</p>
+                    </div>
+                  )}
+                  {selectedColaboradorDetail.demissao && (
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="text-xs text-muted-foreground">Data Desligamento</p>
+                      <p className="font-medium">{new Date(selectedColaboradorDetail.demissao).toLocaleDateString('pt-BR')}</p>
+                    </div>
+                  )}
+                  {selectedColaboradorDetail.tempoDeEmpresa !== undefined && (
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="text-xs text-muted-foreground">Tempo de Empresa</p>
+                      <p className="font-medium">
+                        {selectedColaboradorDetail.tempoDeEmpresa < 1 
+                          ? 'Menos de 1 mês' 
+                          : `${selectedColaboradorDetail.tempoDeEmpresa} ${selectedColaboradorDetail.tempoDeEmpresa === 1 ? 'mês' : 'meses'}`}
+                      </p>
+                    </div>
+                  )}
+                  {selectedColaboradorDetail.diasAteDesligamento !== undefined && (
+                    <div className="p-2 bg-amber-500/10 rounded border border-amber-500/20">
+                      <p className="text-xs text-muted-foreground">Dias até Desligamento</p>
+                      <p className="font-medium text-amber-600">{selectedColaboradorDetail.diasAteDesligamento} dias</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" size="sm" asChild data-testid="btn-ver-perfil-detalhe">
+                <Link href={`/colaboradores/${selectedColaboradorDetail?.id}`}>
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Ver Perfil Completo
+                </Link>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Dialog de Colaboradores por Saúde */}
         <Dialog open={!!selectedHealthCategory} onOpenChange={(open) => !open && setSelectedHealthCategory(null)}>
           <DialogContent className="sm:max-w-lg max-h-[80vh]" data-testid="dialog-health-category">
@@ -2424,7 +2510,20 @@ export default function DashboardGeG() {
               ) : ultimasDemissoes && ultimasDemissoes.length > 0 ? (
                 <div className="space-y-2 max-h-[220px] overflow-y-auto">
                   {ultimasDemissoes.slice(0, 5).map((d) => (
-                    <div key={d.id} className="flex items-center justify-between p-2 bg-red-500/5 rounded-lg border border-red-500/20" data-testid={`ultima-demissao-${d.id}`}>
+                    <div 
+                      key={d.id} 
+                      className="flex items-center justify-between p-2 bg-red-500/5 rounded-lg border border-red-500/20 cursor-pointer hover-elevate" 
+                      data-testid={`ultima-demissao-${d.id}`}
+                      onClick={() => setSelectedColaboradorDetail({
+                        type: 'demissao',
+                        id: d.id,
+                        nome: d.nome,
+                        cargo: d.cargo,
+                        squad: d.squad,
+                        demissao: d.dataDesligamento,
+                        tempoDeEmpresa: d.tempoDeEmpresa
+                      })}
+                    >
                       <div>
                         <p className="font-medium text-sm">{d.nome}</p>
                         <p className="text-xs text-muted-foreground">{d.cargo || 'N/A'} - {d.squad || 'N/A'}</p>
@@ -2482,7 +2581,20 @@ export default function DashboardGeG() {
                   {masContratacoes?.colaboradores && masContratacoes.colaboradores.length > 0 ? (
                     <div className="space-y-2 max-h-[180px] overflow-y-auto">
                       {masContratacoes.colaboradores.slice(0, 5).map((c) => (
-                        <div key={c.id} className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20" data-testid={`ma-contratacao-${c.id}`}>
+                        <div 
+                          key={c.id} 
+                          className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20 cursor-pointer hover-elevate" 
+                          data-testid={`ma-contratacao-${c.id}`}
+                          onClick={() => setSelectedColaboradorDetail({
+                            type: 'maContratacao',
+                            id: c.id,
+                            nome: c.nome,
+                            cargo: null,
+                            squad: c.squad,
+                            setor: c.setor,
+                            diasAteDesligamento: c.diasAteDesligamento
+                          })}
+                        >
                           <div>
                             <p className="font-medium text-sm">{c.nome}</p>
                             <p className="text-xs text-muted-foreground">{c.setor || 'N/A'} - {c.squad || 'N/A'}</p>
