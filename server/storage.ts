@@ -159,7 +159,7 @@ export interface IStorage {
   getContasReceberByCliente(clienteId: string, limit?: number): Promise<ContaReceber[]>;
   getContasPagarByFornecedor(fornecedorId: string, limit?: number): Promise<ContaPagar[]>;
   getClienteRevenue(clienteId: string): Promise<{ mes: string; valor: number }[]>;
-  getColaboradores(): Promise<Colaborador[]>;
+  getColaboradores(filters?: { status?: string }): Promise<Colaborador[]>;
   getColaboradoresComPatrimonios(filters?: ColaboradoresComPatrimoniosFilters): Promise<ColaboradoresComPatrimoniosResponse>;
   createColaborador(colaborador: InsertColaborador): Promise<Colaborador>;
   updateColaborador(id: number, colaborador: Partial<InsertColaborador>, criadoPor?: string): Promise<Colaborador>;
@@ -477,7 +477,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getColaboradores(): Promise<Colaborador[]> {
+  async getColaboradores(filters?: { status?: string }): Promise<Colaborador[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1905,12 +1905,18 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getColaboradores(): Promise<Colaborador[]> {
-    const result = await db.select().from(schema.rhPessoal).orderBy(schema.rhPessoal.nome);
+  async getColaboradores(filters?: { status?: string }): Promise<Colaborador[]> {
+    let query = db.select().from(schema.rhPessoal);
+    
+    if (filters?.status) {
+      query = query.where(sql`LOWER(${schema.rhPessoal.status}) = LOWER(${filters.status})`) as any;
+    }
+    
+    const result = await query.orderBy(schema.rhPessoal.nome);
     console.log(`[STORAGE DEBUG] getColaboradores retornou ${result.length} registros do Google Cloud SQL`);
     if (result.length > 0) {
       console.log(`[STORAGE DEBUG] Primeiro colaborador: ${result[0].nome}, status: ${result[0].status}`);
-      const ativos = result.filter(c => c.status === 'ativo').length;
+      const ativos = result.filter(c => c.status?.toLowerCase() === 'ativo').length;
       console.log(`[STORAGE DEBUG] Total ativos: ${ativos}`);
     }
     return result;
