@@ -10898,6 +10898,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/okr2026/seed-bp", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { initializeBPTables } = await import("./db");
+      await initializeBPTables();
+      
+      const { BP_2026_TARGETS, BP_MONTHS } = await import("./okr2026/bp2026Targets");
+      
+      let upsertCount = 0;
+      let registryCount = 0;
+      
+      for (const metric of BP_2026_TARGETS) {
+        await db.execute(sql`
+          INSERT INTO kpi.metrics_registry_extended 
+            (metric_key, title, unit, period_type, direction, is_derived, formula_expr, dimension_key, dimension_value, sort_order)
+          VALUES 
+            (${metric.metric_key}, ${metric.title}, ${metric.unit}, ${metric.period_type}, ${metric.direction}, 
+             ${metric.is_derived}, ${metric.formula || null}, ${metric.dimension_key || null}, ${metric.dimension_value || null}, ${registryCount * 10})
+          ON CONFLICT (metric_key) DO UPDATE SET
+            title = EXCLUDED.title,
+            unit = EXCLUDED.unit,
+            period_type = EXCLUDED.period_type,
+            direction = EXCLUDED.direction,
+            is_derived = EXCLUDED.is_derived,
+            formula_expr = EXCLUDED.formula_expr,
+            dimension_key = EXCLUDED.dimension_key,
+            dimension_value = EXCLUDED.dimension_value,
+            updated_at = NOW()
+        `);
+        registryCount++;
+        
+        for (const monthKey of Object.keys(metric.months)) {
+          const [yearStr, monthStr] = monthKey.split("-");
+          const year = parseInt(yearStr);
+          const month = parseInt(monthStr);
+          const targetValue = metric.months[monthKey];
+          
+          await db.execute(sql`
+            INSERT INTO plan.metric_targets_monthly 
+              (year, month, metric_key, dimension_key, dimension_value, target_value)
+            VALUES 
+              (${year}, ${month}, ${metric.metric_key}, ${metric.dimension_key || null}, ${metric.dimension_value || null}, ${targetValue})
+            ON CONFLICT (year, month, metric_key, dimension_key, dimension_value) 
+            DO UPDATE SET
+              target_value = EXCLUDED.target_value,
+              updated_at = NOW()
+          `);
+          upsertCount++;
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: `BP 2026 seeded successfully`,
+        metricsRegistered: registryCount,
+        targetsUpserted: upsertCount
+      });
+    } catch (error) {
+      console.error("[api] Error seeding BP:", error);
+      res.status(500).json({ error: "Failed to seed BP data" });
+    }
+  });
+
+  app.get("/api/okr2026/bp-financeiro", isAuthenticated, async (req, res) => {
+    try {
+      const { BP_2026_TARGETS, BP_MONTHS, BP_METRIC_ORDER, getMetricByKey } = await import("./okr2026/bp2026Targets");
+      
+      const targetsResult = await db.execute(sql`
+        SELECT year, month, metric_key, dimension_key, dimension_value, target_value
+        FROM plan.metric_targets_monthly
+        WHERE year = 2026
+        ORDER BY metric_key, month
+      `);
+      
+      const actualsResult = await db.execute(sql`
+        SELECT year, month, metric_key, dimension_key, dimension_value, actual_value
+        FROM kpi.metric_actuals_monthly
+        WHERE year = 2026
+        ORDER BY metric_key, month
+      `);
+      
+      const targetsByMetric: Record<string, Record<string, number>> = {};
+      for (const row of targetsResult.rows as any[]) {
+        const key = row.metric_key;
+        const monthKey = `2026-${String(row.month).padStart(2, "0")}`;
+        if (!targetsByMetric[key]) targetsByMetric[key] = {};
+        targetsByMetric[key][monthKey] = parseFloat(row.target_value);
+      }
+      
+      const actualsByMetric: Record<string, Record<string, number>> = {};
+      for (const row of actualsResult.rows as any[]) {
+        const key = row.metric_key;
+        const monthKey = `2026-${String(row.month).padStart(2, "0")}`;
+        if (!actualsByMetric[key]) actualsByMetric[key] = {};
+        actualsByMetric[key][monthKey] = parseFloat(row.actual_value);
+      }
+      
+      const currentDate = new Date();
+      const currentMonth = currentDate.getFullYear() === 2026 
+        ? `2026-${String(currentDate.getMonth() + 1).padStart(2, "0")}`
+        : null;
+      
+      const getStatus = (actual: number | null, target: number, direction: string): "green" | "yellow" | "red" | "gray" => {
+        if (actual === null) return "gray";
+        
+        if (direction === "down") {
+          if (actual <= target) return "green";
+          const overshoot = ((actual - target) / target) * 100;
+          if (overshoot <= 10) return "yellow";
+          return "red";
+        } else {
+          const pct = (actual / target) * 100;
+          if (pct >= 100) return "green";
+          if (pct >= 90) return "yellow";
+          return "red";
+        }
+      };
+      
+      const metricsData = BP_METRIC_ORDER.map((metricKey, idx) => {
+        const def = getMetricByKey(metricKey);
+        if (!def) return null;
+        
+        const targets = targetsByMetric[metricKey] || def.months;
+        const actuals = actualsByMetric[metricKey] || {};
+        
+        const monthsData = BP_MONTHS.map(m => {
+          const plan = targets[m] ?? null;
+          const actual = actuals[m] ?? null;
+          const status = plan !== null ? getStatus(actual, plan, def.direction) : "gray";
+          const variance = (plan !== null && actual !== null) 
+            ? ((actual - plan) / Math.abs(plan)) * 100 
+            : null;
+          
+          return {
+            month: m,
+            plan,
+            actual,
+            variance,
+            status
+          };
+        });
+        
+        const planTotal = Object.values(targets).reduce((sum, v) => sum + (v || 0), 0);
+        const actualTotal = Object.values(actuals).reduce((sum, v) => sum + (v || 0), 0);
+        const hasActuals = Object.keys(actuals).length > 0;
+        
+        return {
+          metric_key: metricKey,
+          title: def.title,
+          unit: def.unit,
+          direction: def.direction,
+          is_derived: def.is_derived,
+          order: idx,
+          months: monthsData,
+          totals: {
+            plan: def.period_type === "month_end" ? (def.totals?.dec ?? targets["2026-12"]) : planTotal,
+            actual: def.period_type === "month_end" ? (actuals["2026-12"] ?? null) : (hasActuals ? actualTotal : null)
+          }
+        };
+      }).filter(Boolean);
+      
+      res.json({
+        year: 2026,
+        currentMonth,
+        months: BP_MONTHS,
+        metrics: metricsData,
+        meta: {
+          generatedAt: new Date().toISOString(),
+          totalMetrics: metricsData.length
+        }
+      });
+    } catch (error) {
+      console.error("[api] Error fetching BP financeiro:", error);
+      res.status(500).json({ error: "Failed to fetch BP financeiro data" });
+    }
+  });
+
   // ==================== SYSTEM FIELD OPTIONS ====================
   
   app.get("/api/system-fields", isAuthenticated, async (req, res) => {
