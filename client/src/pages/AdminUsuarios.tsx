@@ -1823,6 +1823,612 @@ function DatabaseExplorerContent() {
   );
 }
 
+// ==================== CATALOGS CONTENT ====================
+interface CatalogInfo {
+  name: string;
+  table: string;
+  description: string;
+  specificFields: string[];
+}
+
+interface CatalogItem {
+  id: number;
+  slug: string;
+  name: string;
+  active: boolean;
+  sort_order: number;
+  bp_segment?: string;
+  is_off?: boolean;
+  counts_as_operating?: boolean;
+  created_at?: string;
+}
+
+function AddEditCatalogItemDialog({
+  open,
+  onOpenChange,
+  catalogName,
+  catalogConfig,
+  editingItem
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  catalogName: string;
+  catalogConfig: CatalogInfo | null;
+  editingItem: CatalogItem | null;
+}) {
+  const { toast } = useToast();
+  const [slug, setSlug] = useState("");
+  const [name, setName] = useState("");
+  const [sortOrder, setSortOrder] = useState("0");
+  const [active, setActive] = useState(true);
+  const [bpSegment, setBpSegment] = useState("");
+  const [isOff, setIsOff] = useState(false);
+  const [countsAsOperating, setCountsAsOperating] = useState(true);
+
+  useEffect(() => {
+    if (open) {
+      if (editingItem) {
+        setSlug(editingItem.slug || "");
+        setName(editingItem.name || "");
+        setSortOrder(editingItem.sort_order?.toString() || "0");
+        setActive(editingItem.active ?? true);
+        setBpSegment(editingItem.bp_segment || "");
+        setIsOff(editingItem.is_off ?? false);
+        setCountsAsOperating(editingItem.counts_as_operating ?? true);
+      } else {
+        setSlug("");
+        setName("");
+        setSortOrder("0");
+        setActive(true);
+        setBpSegment("");
+        setIsOff(false);
+        setCountsAsOperating(true);
+      }
+    }
+  }, [open, editingItem]);
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Record<string, any>) => {
+      return await apiRequest('POST', `/api/admin/catalog/${catalogName}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/catalog', catalogName] });
+      toast({ title: "Item criado", description: "O item foi adicionado ao catálogo." });
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao criar item", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { id: number; body: Record<string, any> }) => {
+      return await apiRequest('PUT', `/api/admin/catalog/${catalogName}/${data.id}`, data.body);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/catalog', catalogName] });
+      toast({ title: "Item atualizado", description: "O item foi atualizado com sucesso." });
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao atualizar item", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    if (!slug.trim() || !name.trim()) {
+      toast({ title: "Campos obrigatórios", description: "Slug e Nome são obrigatórios.", variant: "destructive" });
+      return;
+    }
+
+    const body: Record<string, any> = {
+      slug,
+      name,
+      sort_order: parseInt(sortOrder) || 0,
+      active
+    };
+
+    if (catalogConfig?.specificFields.includes('bp_segment')) {
+      body.bp_segment = bpSegment;
+    }
+    if (catalogConfig?.specificFields.includes('is_off')) {
+      body.is_off = isOff;
+    }
+    if (catalogConfig?.specificFields.includes('counts_as_operating')) {
+      body.counts_as_operating = countsAsOperating;
+    }
+
+    if (editingItem) {
+      updateMutation.mutate({ id: editingItem.id, body });
+    } else {
+      createMutation.mutate(body);
+    }
+  };
+
+  const hasSpecificField = (field: string) => catalogConfig?.specificFields.includes(field);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{editingItem ? "Editar Item" : "Adicionar Item"}</DialogTitle>
+          <DialogDescription>
+            {editingItem ? "Edite os dados do item" : `Adicione um novo item ao catálogo ${catalogName}`}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="catalog-slug">Slug (identificador único) *</Label>
+            <Input
+              id="catalog-slug"
+              placeholder="meu_slug"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              disabled={!!editingItem}
+              data-testid="input-catalog-slug"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="catalog-name">Nome *</Label>
+            <Input
+              id="catalog-name"
+              placeholder="Nome de exibição"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              data-testid="input-catalog-name"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="catalog-sort-order">Ordem</Label>
+            <Input
+              id="catalog-sort-order"
+              type="number"
+              placeholder="0"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              data-testid="input-catalog-sort-order"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={active}
+              onCheckedChange={setActive}
+              data-testid="switch-catalog-active"
+            />
+            <Label>Ativo</Label>
+          </div>
+
+          {hasSpecificField('bp_segment') && (
+            <div className="space-y-2">
+              <Label htmlFor="catalog-bp-segment">Segmento BP</Label>
+              <Input
+                id="catalog-bp-segment"
+                placeholder="Segmento"
+                value={bpSegment}
+                onChange={(e) => setBpSegment(e.target.value)}
+                data-testid="input-catalog-bp-segment"
+              />
+            </div>
+          )}
+
+          {hasSpecificField('is_off') && (
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={isOff}
+                onCheckedChange={setIsOff}
+                data-testid="switch-catalog-is-off"
+              />
+              <Label>Is Off (Squad inativo)</Label>
+            </div>
+          )}
+
+          {hasSpecificField('counts_as_operating') && (
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={countsAsOperating}
+                onCheckedChange={setCountsAsOperating}
+                data-testid="switch-catalog-counts-as-operating"
+              />
+              <Label>Conta como operando</Label>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-catalog-cancel">
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={createMutation.isPending || updateMutation.isPending}
+            data-testid="button-catalog-save"
+          >
+            {createMutation.isPending || updateMutation.isPending ? "Salvando..." : "Salvar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CatalogsContent() {
+  const { toast } = useToast();
+  const [selectedCatalog, setSelectedCatalog] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
+
+  const { data: catalogs = [], isLoading: isLoadingCatalogs } = useQuery<CatalogInfo[]>({
+    queryKey: ['/api/admin/catalogs'],
+  });
+
+  const { data: items = [], isLoading: isLoadingItems } = useQuery<CatalogItem[]>({
+    queryKey: ['/api/admin/catalog', selectedCatalog],
+    enabled: !!selectedCatalog,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async ({ catalogName, id }: { catalogName: string; id: number }) => {
+      return await apiRequest('DELETE', `/api/admin/catalog/${catalogName}/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/catalog', selectedCatalog] });
+      toast({ title: "Item desativado", description: "O item foi desativado com sucesso." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao desativar item", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleAdd = () => {
+    setEditingItem(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleEdit = (item: CatalogItem) => {
+    setEditingItem(item);
+    setIsDialogOpen(true);
+  };
+
+  const handleDeactivate = (item: CatalogItem) => {
+    if (confirm(`Deseja realmente desativar o item "${item.name}"?`)) {
+      deleteMutation.mutate({ catalogName: selectedCatalog!, id: item.id });
+    }
+  };
+
+  const selectedCatalogConfig = catalogs.find(c => c.name === selectedCatalog);
+
+  return (
+    <div className="space-y-6" data-testid="catalogs-content">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Catálogos do Sistema</h2>
+          <p className="text-sm text-muted-foreground">
+            Gerencie os catálogos canônicos de produtos, planos, squads e outros
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {isLoadingCatalogs ? (
+          [1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <Skeleton className="h-12 w-full" />
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          catalogs.map((catalog) => (
+            <Card 
+              key={catalog.name}
+              className={`cursor-pointer transition-colors hover-elevate ${selectedCatalog === catalog.name ? 'border-primary bg-primary/5' : ''}`}
+              onClick={() => setSelectedCatalog(catalog.name)}
+              data-testid={`card-catalog-${catalog.name}`}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${selectedCatalog === catalog.name ? 'bg-primary/10' : 'bg-muted'}`}>
+                    <Layers className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{catalog.name}</p>
+                    <p className="text-xs text-muted-foreground">{catalog.description}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {selectedCatalog && (
+        <Card data-testid="card-catalog-items">
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Layers className="h-5 w-5" />
+                {selectedCatalog}
+              </CardTitle>
+              <CardDescription>
+                {selectedCatalogConfig?.description}
+              </CardDescription>
+            </div>
+            <Button onClick={handleAdd} data-testid="button-add-catalog-item">
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar Item
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {isLoadingItems ? (
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : items.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                Nenhum item neste catálogo
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Slug</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Ordem</TableHead>
+                    {selectedCatalogConfig?.specificFields.includes('bp_segment') && (
+                      <TableHead>Segmento BP</TableHead>
+                    )}
+                    {selectedCatalogConfig?.specificFields.includes('is_off') && (
+                      <TableHead>Is Off</TableHead>
+                    )}
+                    {selectedCatalogConfig?.specificFields.includes('counts_as_operating') && (
+                      <TableHead>Conta como Operando</TableHead>
+                    )}
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => (
+                    <TableRow key={item.id} data-testid={`row-catalog-item-${item.id}`}>
+                      <TableCell className="font-mono text-sm">{item.slug}</TableCell>
+                      <TableCell>{item.name}</TableCell>
+                      <TableCell>{item.sort_order}</TableCell>
+                      {selectedCatalogConfig?.specificFields.includes('bp_segment') && (
+                        <TableCell>{item.bp_segment || '-'}</TableCell>
+                      )}
+                      {selectedCatalogConfig?.specificFields.includes('is_off') && (
+                        <TableCell>
+                          {item.is_off ? (
+                            <Badge variant="secondary">Off</Badge>
+                          ) : (
+                            <Badge variant="outline">Ativo</Badge>
+                          )}
+                        </TableCell>
+                      )}
+                      {selectedCatalogConfig?.specificFields.includes('counts_as_operating') && (
+                        <TableCell>
+                          {item.counts_as_operating ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        {item.active ? (
+                          <Badge className="bg-green-600 hover:bg-green-700">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Ativo
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Inativo
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(item)}
+                            data-testid={`button-edit-catalog-item-${item.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          {item.active && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeactivate(item)}
+                              disabled={deleteMutation.isPending}
+                              data-testid={`button-deactivate-catalog-item-${item.id}`}
+                            >
+                              <XCircle className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <AddEditCatalogItemDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        catalogName={selectedCatalog || ''}
+        catalogConfig={selectedCatalogConfig || null}
+        editingItem={editingItem}
+      />
+    </div>
+  );
+}
+
+// ==================== FIELD REGISTRY CONTENT ====================
+interface SystemField {
+  id: number;
+  field_key: string;
+  label: string;
+  entity: string;
+  field_type: string;
+  required: boolean;
+  enum_catalog: string | null;
+  default_value: string | null;
+  help_text: string | null;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+}
+
+function FieldRegistryContent() {
+  const [entityFilter, setEntityFilter] = useState<string>("all");
+
+  const { data: fields = [], isLoading } = useQuery<SystemField[]>({
+    queryKey: ['/api/admin/system-fields', entityFilter === 'all' ? '' : entityFilter],
+    queryFn: async () => {
+      const url = entityFilter === 'all' 
+        ? '/api/admin/system-fields' 
+        : `/api/admin/system-fields?entity=${entityFilter}`;
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch system fields');
+      return response.json();
+    }
+  });
+
+  const getFieldTypeBadge = (type: string) => {
+    const variants: Record<string, { variant: "default" | "secondary" | "outline" | "destructive"; label: string }> = {
+      string: { variant: "outline", label: "Texto" },
+      enum: { variant: "default", label: "Enum" },
+      currency_cents: { variant: "secondary", label: "Moeda (cents)" },
+      date: { variant: "secondary", label: "Data" },
+      boolean: { variant: "outline", label: "Boolean" },
+      integer: { variant: "outline", label: "Inteiro" },
+    };
+    const config = variants[type] || { variant: "outline", label: type };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getEntityLabel = (entity: string) => {
+    const labels: Record<string, string> = {
+      client: 'Cliente',
+      contract: 'Contrato',
+    };
+    return labels[entity] || entity;
+  };
+
+  return (
+    <div className="space-y-6" data-testid="field-registry-content">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Registro de Campos do Sistema</h2>
+          <p className="text-sm text-muted-foreground">
+            Visualize todos os campos configurados para clientes e contratos
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+          <Label className="text-sm">Filtrar por entidade:</Label>
+        </div>
+        <Select value={entityFilter} onValueChange={setEntityFilter}>
+          <SelectTrigger className="w-[200px]" data-testid="select-entity-filter">
+            <SelectValue placeholder="Todas as entidades" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" data-testid="filter-all">Todos</SelectItem>
+            <SelectItem value="client" data-testid="filter-client">Cliente</SelectItem>
+            <SelectItem value="contract" data-testid="filter-contract">Contrato</SelectItem>
+          </SelectContent>
+        </Select>
+        <Badge variant="outline" className="ml-auto">
+          {fields.length} campos
+        </Badge>
+      </div>
+
+      <Card data-testid="card-field-registry">
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-6 space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : fields.length === 0 ? (
+            <div className="p-12 text-center text-muted-foreground">
+              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Nenhum campo encontrado</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Chave do Campo</TableHead>
+                  <TableHead>Label</TableHead>
+                  <TableHead>Entidade</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Obrigatório</TableHead>
+                  <TableHead>Catálogo Enum</TableHead>
+                  <TableHead>Ordem</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {fields.map((field) => (
+                  <TableRow key={field.id} data-testid={`row-field-${field.id}`}>
+                    <TableCell className="font-mono text-sm">{field.field_key}</TableCell>
+                    <TableCell>{field.label}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{getEntityLabel(field.entity)}</Badge>
+                    </TableCell>
+                    <TableCell>{getFieldTypeBadge(field.field_type)}</TableCell>
+                    <TableCell>
+                      {field.required ? (
+                        <Badge className="bg-amber-600 hover:bg-amber-700">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Sim
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">
+                          Não
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {field.enum_catalog ? (
+                        <Badge 
+                          variant="secondary" 
+                          className="cursor-pointer hover-elevate"
+                          data-testid={`badge-enum-catalog-${field.id}`}
+                        >
+                          <Layers className="h-3 w-3 mr-1" />
+                          {field.enum_catalog}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{field.sort_order}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function EditRuleDialog({ 
   rule, 
   open, 
@@ -2134,6 +2740,14 @@ export default function AdminUsuarios() {
             <Bot className="h-4 w-4 mr-2" />
             Configurações IA
           </TabsTrigger>
+          <TabsTrigger value="catalogs" data-testid="tab-catalogs">
+            <Layers className="h-4 w-4 mr-2" />
+            Catálogos
+          </TabsTrigger>
+          <TabsTrigger value="system-fields" data-testid="tab-system-fields">
+            <FileText className="h-4 w-4 mr-2" />
+            Registro de Campos
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="usuarios" className="space-y-6">
@@ -2355,6 +2969,14 @@ export default function AdminUsuarios() {
 
         <TabsContent value="ai-config">
           <AIConfigContent />
+        </TabsContent>
+
+        <TabsContent value="catalogs">
+          <CatalogsContent />
+        </TabsContent>
+
+        <TabsContent value="system-fields">
+          <FieldRegistryContent />
         </TabsContent>
       </Tabs>
     </div>

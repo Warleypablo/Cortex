@@ -1,0 +1,427 @@
+A meta dessa etapa é simples:
+
+Catálogos e listas canônicas (drop downs, enums, motivos, etc.)
+
+Campos personalizados canônicos (nome, tipo, obrigatoriedade, validação, regras)
+
+Preparar o terreno pra, depois, o sistema alimentar e melhorar a tabela do Google Cloud com consistência (mesmo que o ClickUp continue existindo).
+
+Abaixo está o documento/especificação pra você colar direto como instruções pro dev/Replit/Lovable e/ou implementar no teu Admin.
+
+SPEC — Administração: Campos do Sistema + Catálogos (v1)
+0) Regras de base (pra nunca virar bagunça)
+
+Todo campo tem field_key imutável (ex.: contract.mrr_value) e pode ter label editável (“Valor R / MRR”).
+
+Todo dropdown usa catálogo com IDs estáveis, não texto solto.
+
+Nunca apagar valor de catálogo: só active=false (histórico precisa sobreviver).
+
+Moeda sempre em centavos (int) no banco; formata no front.
+
+Datas sempre ISO + timezone (ou Date puro sem tz, mas consistente).
+
+1) Catálogos (listas) — criar primeiro
+1.1 Catálogo: Produtos (catalog_products)
+
+Campos:
+
+product_id (uuid/int)
+
+name (exibido)
+
+slug (imutável) ex: performance
+
+bp_segment (enum: performance|creators|social|community|others)
+
+active (bool)
+
+sort_order
+
+Produtos iniciais (alinhados ao que vocês já usam):
+
+Performance → bp_segment: performance
+
+Creators → creators
+
+Social Media → social
+
+Gestão de Comunidade → community
+
+Agente IA → others
+
+Blog Post → others
+
+Broadcast → others
+
+CRM de Vendas → others
+
+CRO & Alteração → others
+
+Dashboard → others
+
+Ecommerce → others
+
+Estruturação Comercial → others
+
+Estruturação Estratégica → others
+
+Gameplan → others
+
+Gestão & Atendimento → others
+
+ID Visual → others
+
+Landing Page → others
+
+Pacote Artes / Rótulos → others
+
+Régua de Automação → others
+
+SEO Full → others
+
+Site → others
+
+Sustentação → others
+
+Regra: BP trabalha com segmentos. O produto sempre mapeia para 1 segmento.
+
+1.2 Catálogo: Planos (catalog_plans)
+
+Starter
+
+Scale
+
+Enterprise
+
+Personalizado
+
+Projeto Pontual
+
+Antigo ⚠️ (desativável)
+
+Campos iguais: plan_id, name, slug, active, sort_order.
+
+1.3 Catálogo: Squads (catalog_squads)
+
+Campos:
+
+squad_id, name, slug, active, is_off (bool), sort_order
+
+Valores iniciais (exemplo):
+
+Squadra, Makers, Pulse, Tech, Selva, Hunters, Supreme, Squad X, Aurea, Chama, Turbo Interno, Bloomfield
+
+Se tiver “(OFF)”, marcar is_off=true.
+
+1.4 Catálogo: Clusters (catalog_clusters)
+
+Regulares
+
+Imperdíveis
+
+Chaves
+
+NFNC
+
+Empty (opcional)
+
+1.5 Catálogo: Status de Contrato (catalog_contract_status)
+
+Importante: status precisa ser enum fechado, não texto.
+
+Sugestão (mínimo operacional):
+
+TRIAGEM
+
+ONBOARDING
+
+ATIVO
+
+PAUSADO
+
+EM_CANCELAMENTO
+
+ENTREGUE
+
+CANCELADO
+
+Campos:
+
+status_id, name, slug, active, sort_order, counts_as_operating (bool)
+
+Regra recomendada:
+
+counts_as_operating=true para ATIVO e EM_CANCELAMENTO (quando vocês considerarem “operando”)
+
+1.6 Catálogo: Status de Saúde (catalog_account_health)
+
+Saudável
+
+Atenção
+
+Insatisfeito
+
+1.7 Catálogo: ROI Bucket (catalog_roi_bucket)
+
+ROI < 2
+
+ROI 2–4
+
+ROI > 4
+
+Sem dado
+
+1.8 Catálogo: Motivos de Cancelamento (catalog_churn_reason)
+
+Comece simples e útil (depois evolui):
+
+Resultado fraco / ROI
+
+Falta de verba
+
+Troca interna / Contratou in-house
+
+Troca por concorrente
+
+Problemas de entrega / qualidade
+
+Problemas de comunicação
+
+Timing / pausa estratégica
+
+Inadimplência
+
+Outros
+
+E submotivo como texto livre (por enquanto).
+
+2) Registro de Campos Personalizados (Field Registry)
+
+Crie no seu Admin uma tabela/config chamada system_fields (ou equivalente) com:
+
+field_key (imutável) ex: contract.mrr_value
+
+label (editável)
+
+entity (client | contract | health | event)
+
+type (string | int | decimal | currency | date | datetime | bool | enum | user | json)
+
+required (bool)
+
+default_value
+
+catalog_ref (se enum/dropdown)
+
+validation_rules (json: min/max, regex, etc.)
+
+help_text
+
+active
+
+external_mapping (json: ids/códigos do ClickUp e/ou do Google Cloud)
+
+2.1 Campos CORE — obrigatórios (MVP)
+
+Client
+
+client.name (string, required)
+
+client.cluster_id (enum→clusters, required)
+
+client.health_status_id (enum→account_health, default “Atenção”)
+
+client.cnpj (string, optional)
+
+client.contact_name (string, optional)
+
+client.contact_phone (string, optional)
+
+client.email (string, optional)
+
+client.instagram (string, optional)
+
+client.site (string, optional)
+
+Contract
+
+contract.client_id (FK, required)
+
+contract.product_id (enum→products, required)
+
+contract.plan_id (enum→plans, required)
+
+contract.squad_id (enum→squads, required)
+
+contract.status_id (enum→contract_status, required)
+
+contract.mrr_value_cents (currency, required* para recorrente)
+
+contract.one_time_value_cents (currency, required* para pontual)
+
+contract.first_payment_at (date/datetime, required para recorrente)
+
+contract.cancel_request_at (date/datetime, optional)
+
+contract.delivered_at (date/datetime, optional)
+
+contract.created_at (datetime, auto)
+
+*Regra de validação:
+
+Se mrr_value_cents > 0 então contrato é “Recorrente”
+
+Se one_time_value_cents > 0 então é “Pontual”
+
+Se ambos > 0 → “Híbrido” (permitir, mas marcar flag contract.is_hybrid=true)
+
+Se ambos = 0 → bloquear salvar ou salvar com missing_value=true (decisão de produto)
+
+3) Campos IMPORTANTES — segunda camada (alta alavancagem)
+3.1 Ownership (responsáveis)
+
+contract.sales_owner_user_id (user)
+
+contract.cs_owner_user_id (user)
+
+contract.delivery_owner_user_id (user) (analista/gestor)
+
+contract.designer_owner_user_id (user)
+
+Regra: pelo menos cs_owner_user_id obrigatório em contratos ATIVO.
+
+3.2 Saúde / Qualidade (por mês)
+
+Crie entidade “Health Monthly” (ou campos na tabela de cliente com carimbo de mês).
+
+Campos:
+
+health.month (YYYY-MM, required)
+
+health.roi_bucket_id (enum→roi_bucket)
+
+health.roi_value (decimal, opcional)
+
+health.hs_score (int 0–10)
+
+health.hs_reason (string)
+
+health.nps_score (int 0–10)
+
+health.nps_reason (string)
+
+Regra: se tiver ROI numérico, você pode calcular o bucket; senão bucket manual.
+
+3.3 Churn intelligence
+
+contract.churn_reason_id (enum→churn_reason)
+
+contract.churn_subreason (string)
+
+contract.retention_possible (enum: alta/média/baixa)
+
+contract.retained_flag (bool)
+
+contract.waive_churn_flag (bool) → “abonar churn”
+
+3.4 Ads / Receita do cliente (se quiser ROI real)
+
+contract.ads_investment_cents_monthly (currency, opcional)
+
+contract.client_revenue_cents_monthly (currency, opcional)
+
+4) Eventos (pra KPIs à prova de bala — recomendado, mesmo que depois)
+
+Mesmo que você só cadastre no Admin agora, já deixe planejado:
+
+Entidade contract_events:
+
+event_type enum: NEW, UPSELL, DOWNSELL, PAUSE, RESUME, CANCEL_NOTICE, CHURN, DELIVERED
+
+effective_date
+
+delta_mrr_cents
+
+delta_one_time_cents
+
+meta (json)
+
+Isso é o que transforma MRR em contabilidade, e não “foto do mês”.
+
+5) Como isso aparece no teu Admin (prático)
+
+No menu “Administração → Campos do sistema e estrutura do banco”, você implementa 3 telas:
+
+Catálogos
+
+Products (com bp_segment)
+
+Plans
+
+Squads
+
+Clusters
+
+Contract Status
+
+Health Status
+
+ROI Bucket
+
+Churn Reasons
+
+Campos do Sistema (Field Registry)
+
+CRUD de campos com external_mapping
+
+Definir required/validações
+
+Vincular campo a catálogo quando for enum
+
+Regras/Validações
+
+Validação de contrato recorrente vs pontual
+
+Obrigar owners conforme status
+
+Bloquear salvar com moeda inválida / datas incoerentes
+
+6) External mapping (sem implementar agora, mas já preparando)
+
+Em cada system_field, adicione external_mapping (json) com algo tipo:
+
+clickup.custom_field_id
+
+gcloud.column_name ou gcloud.path
+
+sync_direction enum: system_to_external | external_to_system | bidirectional
+
+conflict_policy: system_wins | external_wins | newest_wins
+
+Mesmo que hoje vocês “puxem do ClickUp”, isso te dá caminho limpo pra virar “system wins”.
+
+Ordem de implementação (pra não travar)
+Sprint 1 (agora)
+
+Catálogos (produtos/planos/squads/clusters/status)
+
+Field registry
+
+Campos CORE
+
+Validações de contrato
+
+Sprint 2
+
+Ownership + saúde (ROI/HS/NPS)
+
+Motivos de churn
+
+Tela “qualidade de dados” (missing fields)
+
+Sprint 3
+
+Eventos (contract_events) + KPIs robustos
+
+Gap Engine com BP (overview + geração de caixa)
