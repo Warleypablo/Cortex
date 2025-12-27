@@ -1,6 +1,6 @@
 "use client";
 
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { Bar, BarChart, XAxis } from "recharts";
 import {
   Card,
@@ -17,27 +17,39 @@ import {
 } from "./chart-container";
 import { Badge } from "@/components/ui/badge";
 
-const chartData = [
-  { month: "January", desktop: 342 },
-  { month: "February", desktop: 876 },
-  { month: "March", desktop: 512 },
-  { month: "April", desktop: 629 },
-  { month: "May", desktop: 458 },
-  { month: "June", desktop: 781 },
-  { month: "July", desktop: 394 },
-  { month: "August", desktop: 925 },
-  { month: "September", desktop: 647 },
-  { month: "October", desktop: 532 },
-  { month: "November", desktop: 803 },
-  { month: "December", desktop: 271 },
-];
+export interface HatchedBarDataPoint {
+  label: string;
+  value: number;
+}
 
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "hsl(var(--chart-1))",
-  },
-} satisfies ChartConfig;
+export interface HatchedBarChartProps {
+  title?: string;
+  description?: string;
+  data?: HatchedBarDataPoint[];
+  dataKey?: string;
+  trend?: {
+    value: number;
+    direction: 'up' | 'down';
+  };
+  color?: string;
+  showBackground?: boolean;
+  className?: string;
+}
+
+const defaultData: HatchedBarDataPoint[] = [
+  { label: "January", value: 342 },
+  { label: "February", value: 876 },
+  { label: "March", value: 512 },
+  { label: "April", value: 629 },
+  { label: "May", value: 458 },
+  { label: "June", value: 781 },
+  { label: "July", value: 394 },
+  { label: "August", value: 925 },
+  { label: "September", value: 647 },
+  { label: "October", value: 532 },
+  { label: "November", value: 803 },
+  { label: "December", value: 271 },
+];
 
 const DottedBackgroundPattern = () => (
   <pattern
@@ -59,9 +71,11 @@ const DottedBackgroundPattern = () => (
 );
 
 const CustomHatchedBar = (
-  props: React.SVGProps<SVGRectElement> & { dataKey?: string }
+  props: React.SVGProps<SVGRectElement> & { dataKey?: string; barColor?: string }
 ) => {
-  const { fill, x, y, width, height, dataKey } = props;
+  const { fill, x, y, width, height, dataKey, barColor } = props;
+  const patternId = `hatched-bar-pattern-${dataKey || 'default'}`;
+  const useFill = barColor || fill;
 
   return (
     <>
@@ -72,12 +86,12 @@ const CustomHatchedBar = (
         width={width}
         height={height}
         stroke="none"
-        fill={`url(#hatched-bar-pattern-${dataKey})`}
+        fill={`url(#${patternId})`}
       />
       <defs>
         <pattern
-          key={dataKey}
-          id={`hatched-bar-pattern-${dataKey}`}
+          key={patternId}
+          id={patternId}
           x="0"
           y="0"
           width="5"
@@ -85,44 +99,64 @@ const CustomHatchedBar = (
           patternUnits="userSpaceOnUse"
           patternTransform="rotate(-45)"
         >
-          <rect x="0" y="0" width="2" height="5" fill={fill} />
+          <rect x="0" y="0" width="2" height="5" fill={useFill} />
         </pattern>
       </defs>
     </>
   );
 };
 
-export default function HatchedBarChart() {
+export default function HatchedBarChart({
+  title = "Hatched Bar Chart",
+  description = "January - December 2025",
+  data = defaultData,
+  dataKey = "value",
+  trend = { value: 5.2, direction: 'up' },
+  color = "hsl(var(--chart-1))",
+  showBackground = true,
+  className,
+}: HatchedBarChartProps) {
+  const chartConfig = {
+    [dataKey]: {
+      label: dataKey.charAt(0).toUpperCase() + dataKey.slice(1),
+      color: color,
+    },
+  } satisfies ChartConfig;
+
   return (
-    <Card data-testid="chart-bar-hatched">
+    <Card className={className} data-testid="chart-bar-hatched">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          Hatched Bar Chart
-          <Badge
-            variant="outline"
-            className="text-green-500 bg-green-500/10 border-none"
-          >
-            <TrendingUp className="h-4 w-4" />
-            <span>5.2%</span>
-          </Badge>
+          {title}
+          {trend && (
+            <Badge
+              variant="outline"
+              className={`${trend.direction === 'up' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' : 'text-destructive bg-destructive/10'} border-none`}
+            >
+              {trend.direction === 'up' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+              <span>{trend.value}%</span>
+            </Badge>
+          )}
         </CardTitle>
-        <CardDescription>January - December 2025</CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig}>
-          <BarChart accessibilityLayer data={chartData}>
-            <rect
-              x="0"
-              y="0"
-              width="100%"
-              height="85%"
-              fill="url(#default-pattern-dots)"
-            />
+          <BarChart accessibilityLayer data={data}>
+            {showBackground && (
+              <rect
+                x="0"
+                y="0"
+                width="100%"
+                height="85%"
+                fill="url(#default-pattern-dots)"
+              />
+            )}
             <defs>
               <DottedBackgroundPattern />
             </defs>
             <XAxis
-              dataKey="month"
+              dataKey="label"
               tickLine={false}
               tickMargin={10}
               axisLine={false}
@@ -133,9 +167,9 @@ export default function HatchedBarChart() {
               content={<ChartTooltipContent hideLabel />}
             />
             <Bar
-              dataKey="desktop"
-              fill="var(--color-desktop)"
-              shape={<CustomHatchedBar />}
+              dataKey={dataKey}
+              fill={color}
+              shape={(props: any) => <CustomHatchedBar {...props} barColor={color} />}
               radius={4}
             />
           </BarChart>
