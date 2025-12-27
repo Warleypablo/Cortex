@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { useLocation, Link } from "wouter";
 import { Home } from "lucide-react";
 import {
@@ -127,20 +128,22 @@ export function Breadcrumbs() {
         </BreadcrumbItem>
         
         {items.map((item, index) => (
-          <BreadcrumbItem key={item.path}>
+          <Fragment key={item.path}>
             <BreadcrumbSeparator />
-            {item.isLast ? (
-              <BreadcrumbPage data-testid={`breadcrumb-page-${index}`}>
-                {item.label}
-              </BreadcrumbPage>
-            ) : (
-              <BreadcrumbLink asChild>
-                <Link href={item.path} data-testid={`breadcrumb-link-${index}`}>
+            <BreadcrumbItem>
+              {item.isLast ? (
+                <BreadcrumbPage data-testid={`breadcrumb-page-${index}`}>
                   {item.label}
-                </Link>
-              </BreadcrumbLink>
-            )}
-          </BreadcrumbItem>
+                </BreadcrumbPage>
+              ) : (
+                <BreadcrumbLink asChild>
+                  <Link href={item.path} data-testid={`breadcrumb-link-${index}`}>
+                    {item.label}
+                  </Link>
+                </BreadcrumbLink>
+              )}
+            </BreadcrumbItem>
+          </Fragment>
         ))}
       </BreadcrumbList>
     </Breadcrumb>
