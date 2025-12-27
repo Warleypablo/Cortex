@@ -58,7 +58,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, UserPlus, ClipboardList, Settings, Loader2, CheckCircle2, Clock, AlertCircle, Eye, Trash2 } from "lucide-react";
+import { Plus, UserPlus, ClipboardList, Settings, Loader2, CheckCircle2, Clock, AlertCircle, Eye, Trash2, AlertTriangle, TrendingUp } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -126,6 +127,21 @@ interface Colaborador {
   nome: string;
   cargo: string;
   squad: string;
+}
+
+interface ProximoVencimento {
+  colaboradorNome: string;
+  etapaTitulo: string;
+  diasRestantes: number;
+}
+
+interface OnboardingMetricas {
+  emAndamento: number;
+  concluidos: number;
+  pendentes: number;
+  atrasados: number;
+  tempoMedioConclusao: number;
+  proximosVencimentos: ProximoVencimento[];
 }
 
 const templateSchema = z.object({
@@ -389,6 +405,7 @@ function IniciarOnboardingDialog() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rh/onboarding"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/onboarding/metricas"] });
       toast({ title: "Onboarding iniciado com sucesso" });
       setOpen(false);
       form.reset();
@@ -504,6 +521,7 @@ function OnboardingDetailDialog({ colaboradorId }: { colaboradorId: number }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rh/onboarding", colaboradorId] });
       queryClient.invalidateQueries({ queryKey: ["/api/rh/onboarding"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/onboarding/metricas"] });
       refetch();
       toast({ title: "Progresso atualizado" });
     },
@@ -709,6 +727,10 @@ export default function OnboardingRH() {
     queryKey: ["/api/rh/onboarding/templates"],
   });
 
+  const { data: metricas } = useQuery<OnboardingMetricas>({
+    queryKey: ["/api/rh/onboarding/metricas"],
+  });
+
   return (
     <div className="p-6 space-y-6" data-testid="page-onboarding-rh">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -720,6 +742,85 @@ export default function OnboardingRH() {
           <IniciarOnboardingDialog />
         </div>
       </div>
+
+      {metricas && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card data-testid="kpi-em-andamento" className="bg-blue-100 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Em Andamento</span>
+                </div>
+                <p className="text-3xl font-bold text-blue-800 dark:text-blue-200 mt-2" data-testid="value-em-andamento">
+                  {metricas.emAndamento}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="kpi-concluidos" className="bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <span className="text-sm font-medium text-green-700 dark:text-green-300">Concluídos</span>
+                </div>
+                <p className="text-3xl font-bold text-green-800 dark:text-green-200 mt-2" data-testid="value-concluidos">
+                  {metricas.concluidos}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="kpi-pendentes" className="bg-yellow-100 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                  <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Pendentes</span>
+                </div>
+                <p className="text-3xl font-bold text-yellow-800 dark:text-yellow-200 mt-2" data-testid="value-pendentes">
+                  {metricas.pendentes}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="kpi-atrasados" className="bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  {metricas.atrasados > 0 ? (
+                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  ) : (
+                    <CheckCircle2 className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  )}
+                  <span className="text-sm font-medium text-red-700 dark:text-red-300">Atrasados</span>
+                </div>
+                <p className="text-3xl font-bold text-red-800 dark:text-red-200 mt-2" data-testid="value-atrasados">
+                  {metricas.atrasados}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card data-testid="card-tempo-medio-conclusao">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-muted-foreground" />
+                <span className="text-sm font-medium">Tempo Médio de Conclusão</span>
+              </div>
+              <p className="text-2xl font-bold mt-2">
+                {metricas.tempoMedioConclusao} {metricas.tempoMedioConclusao === 1 ? "dia" : "dias"}
+              </p>
+            </CardContent>
+          </Card>
+
+          {metricas.atrasados > 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Existem <strong>{metricas.atrasados}</strong> onboarding{metricas.atrasados > 1 ? "s" : ""} com etapas atrasadas. Verifique os processos pendentes.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
 
       <Tabs defaultValue="onboardings">
         <TabsList data-testid="tabs-list-onboarding">

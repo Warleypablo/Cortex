@@ -624,6 +624,92 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // ============ Onboarding Metricas Endpoint ============
+  app.get("/api/rh/onboarding/metricas", async (req, res) => {
+    try {
+      // Get counts by status
+      const countsResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) FILTER (WHERE status = 'in_progress') as "emAndamento",
+          COUNT(*) FILTER (WHERE status = 'completed') as "concluidos",
+          COUNT(*) FILTER (WHERE status = 'pending') as "pendentes"
+        FROM onboarding_colaborador
+      `);
+      const counts = countsResult.rows[0] as any;
+      
+      // Get count of onboardings with overdue steps
+      const atrasadosResult = await db.execute(sql`
+        SELECT COUNT(DISTINCT oc.id) as "atrasados"
+        FROM onboarding_colaborador oc
+        JOIN onboarding_progresso op ON op.onboarding_colaborador_id = oc.id
+        JOIN onboarding_etapas oe ON op.etapa_id = oe.id
+        WHERE op.status != 'completed'
+          AND oe.prazo_dias IS NOT NULL
+          AND oc.data_inicio IS NOT NULL
+          AND (oc.data_inicio::date + oe.prazo_dias) < CURRENT_DATE
+      `);
+      const atrasados = parseInt((atrasadosResult.rows[0] as any).atrasados) || 0;
+      
+      // Average completion time for completed onboardings
+      const tempoMedioResult = await db.execute(sql`
+        SELECT AVG(
+          EXTRACT(EPOCH FROM (
+            (SELECT MAX(op.data_conclusao) FROM onboarding_progresso op WHERE op.onboarding_colaborador_id = oc.id)::timestamp 
+            - oc.data_inicio::timestamp
+          )) / 86400
+        ) as "tempoMedio"
+        FROM onboarding_colaborador oc
+        WHERE oc.status = 'completed'
+          AND EXISTS (SELECT 1 FROM onboarding_progresso op WHERE op.onboarding_colaborador_id = oc.id AND op.data_conclusao IS NOT NULL)
+      `);
+      const tempoMedioConclusao = Math.round(parseFloat((tempoMedioResult.rows[0] as any).tempoMedio) || 0);
+      
+      // Steps due within 3 days
+      const proximosVencimentosResult = await db.execute(sql`
+        SELECT 
+          c.nome as "colaboradorNome",
+          oe.titulo as "etapaTitulo",
+          ((oc.data_inicio::date + oe.prazo_dias) - CURRENT_DATE) as "diasRestantes"
+        FROM onboarding_colaborador oc
+        JOIN onboarding_progresso op ON op.onboarding_colaborador_id = oc.id
+        JOIN onboarding_etapas oe ON op.etapa_id = oe.id
+        JOIN rh_pessoal c ON oc.colaborador_id = c.id
+        WHERE op.status != 'completed'
+          AND oe.prazo_dias IS NOT NULL
+          AND oc.data_inicio IS NOT NULL
+          AND ((oc.data_inicio::date + oe.prazo_dias) - CURRENT_DATE) BETWEEN 0 AND 3
+        ORDER BY "diasRestantes" ASC
+        LIMIT 10
+      `);
+      
+      res.json({
+        emAndamento: parseInt(counts.emAndamento) || 0,
+        concluidos: parseInt(counts.concluidos) || 0,
+        pendentes: parseInt(counts.pendentes) || 0,
+        atrasados,
+        tempoMedioConclusao,
+        proximosVencimentos: proximosVencimentosResult.rows.map((r: any) => ({
+          colaboradorNome: r.colaboradorNome,
+          etapaTitulo: r.etapaTitulo,
+          diasRestantes: parseInt(r.diasRestantes)
+        }))
+      });
+    } catch (error: any) {
+      if (error?.code === '42P01') {
+        return res.json({
+          emAndamento: 0,
+          concluidos: 0,
+          pendentes: 0,
+          atrasados: 0,
+          tempoMedioConclusao: 0,
+          proximosVencimentos: []
+        });
+      }
+      console.error("[api] Error fetching onboarding metricas:", error);
+      res.status(500).json({ error: "Failed to fetch metricas" });
+    }
+  });
+
   // ============ Onboarding Templates Endpoints ============
   app.get("/api/rh/onboarding/templates", async (req, res) => {
     try {
