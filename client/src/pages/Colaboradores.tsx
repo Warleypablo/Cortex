@@ -148,6 +148,8 @@ interface FilterState {
   setor: string;
   admissaoFrom: string;
   admissaoTo: string;
+  demissaoFrom: string;
+  demissaoTo: string;
 }
 
 const initialFilterState: FilterState = {
@@ -159,6 +161,8 @@ const initialFilterState: FilterState = {
   setor: "",
   admissaoFrom: "",
   admissaoTo: "",
+  demissaoFrom: "",
+  demissaoTo: "",
 };
 
 function getInitials(nome: string) {
@@ -262,6 +266,8 @@ function FilterDialog({
     if (localFilters.setor) count++;
     if (localFilters.admissaoFrom) count++;
     if (localFilters.admissaoTo) count++;
+    if (localFilters.demissaoFrom) count++;
+    if (localFilters.demissaoTo) count++;
     return count;
   }, [localFilters]);
 
@@ -275,6 +281,8 @@ function FilterDialog({
     if (filters.setor) count++;
     if (filters.admissaoFrom) count++;
     if (filters.admissaoTo) count++;
+    if (filters.demissaoFrom) count++;
+    if (filters.demissaoTo) count++;
     return count;
   }, [filters]);
 
@@ -453,6 +461,30 @@ function FilterDialog({
               </div>
             </div>
           </div>
+
+          <div className="space-y-2">
+            <Label>Data de Demissão</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">De</Label>
+                <Input
+                  type="date"
+                  value={localFilters.demissaoFrom}
+                  onChange={(e) => setLocalFilters({ ...localFilters, demissaoFrom: e.target.value })}
+                  data-testid="input-filter-demissao-from"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Até</Label>
+                <Input
+                  type="date"
+                  value={localFilters.demissaoTo}
+                  onChange={(e) => setLocalFilters({ ...localFilters, demissaoTo: e.target.value })}
+                  data-testid="input-filter-demissao-to"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         <DialogFooter className="flex gap-2">
@@ -516,6 +548,12 @@ function FilterChips({
   }
   if (filters.admissaoTo) {
     chips.push({ key: "admissaoTo", label: `Admissão até: ${formatDate(filters.admissaoTo)}` });
+  }
+  if (filters.demissaoFrom) {
+    chips.push({ key: "demissaoFrom", label: `Demissão de: ${formatDate(filters.demissaoFrom)}` });
+  }
+  if (filters.demissaoTo) {
+    chips.push({ key: "demissaoTo", label: `Demissão até: ${formatDate(filters.demissaoTo)}` });
   }
 
   if (chips.length === 0) return null;
@@ -2187,6 +2225,22 @@ export default function Colaboradores() {
       });
     }
 
+    if (filters.demissaoFrom) {
+      const fromDate = new Date(filters.demissaoFrom);
+      filtered = filtered.filter((col) => {
+        if (!col.demissao) return false;
+        return new Date(col.demissao) >= fromDate;
+      });
+    }
+
+    if (filters.demissaoTo) {
+      const toDate = new Date(filters.demissaoTo);
+      filtered = filtered.filter((col) => {
+        if (!col.demissao) return false;
+        return new Date(col.demissao) <= toDate;
+      });
+    }
+
     return filtered;
   }, [colaboradores, filters]);
 
@@ -2310,7 +2364,7 @@ export default function Colaboradores() {
   const handleRemoveFilter = useCallback((key: keyof FilterState) => {
     setFilters((prev) => ({
       ...prev,
-      [key]: key === "search" || key === "setor" || key === "admissaoFrom" || key === "admissaoTo" ? "" : "all",
+      [key]: key === "search" || key === "setor" || key === "admissaoFrom" || key === "admissaoTo" || key === "demissaoFrom" || key === "demissaoTo" ? "" : "all",
     }));
   }, []);
 
