@@ -240,6 +240,7 @@ export default function DashboardGeG() {
   const [setor, setSetor] = useState("todos");
   const [nivel, setNivel] = useState("todos");
   const [cargo, setCargo] = useState("todos");
+  const [diasExperiencia, setDiasExperiencia] = useState(30);
 
   const periodo = getPeriodoParaQuery(periodoState);
 
@@ -333,7 +334,7 @@ export default function DashboardGeG() {
   });
 
   const { data: alertas, isLoading: isLoadingAlertas } = useQuery<GegAlertas>({
-    queryKey: ['/api/geg/alertas', { squad, setor, nivel, cargo }],
+    queryKey: ['/api/geg/alertas', { squad, setor, nivel, cargo, diasExperiencia: String(diasExperiencia) }],
   });
 
   const { data: retencaoSaude, isLoading: isLoadingRetencaoSaude } = useQuery<RetencaoSaude>({
@@ -1074,7 +1075,7 @@ export default function DashboardGeG() {
                   </Badge>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xs text-muted-foreground mb-3">36+ meses sem promoção</p>
+                  <p className="text-xs text-muted-foreground mb-3">12+ meses sem promoção</p>
                   {isLoadingAlertas ? (
                     <div className="space-y-2">
                       {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
@@ -1114,7 +1115,21 @@ export default function DashboardGeG() {
                   </Badge>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xs text-muted-foreground mb-3">Próximos 30 dias</p>
+                  <div className="flex items-center gap-1 mb-3">
+                    <span className="text-xs text-muted-foreground">Próximos</span>
+                    {[30, 60, 90].map((dias) => (
+                      <Button
+                        key={dias}
+                        variant={diasExperiencia === dias ? "default" : "ghost"}
+                        size="sm"
+                        className="h-5 px-2 text-xs"
+                        onClick={() => setDiasExperiencia(dias)}
+                        data-testid={`btn-dias-experiencia-${dias}`}
+                      >
+                        {dias}d
+                      </Button>
+                    ))}
+                  </div>
                   {isLoadingAlertas ? (
                     <div className="space-y-2">
                       {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}

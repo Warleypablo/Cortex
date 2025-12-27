@@ -201,42 +201,14 @@ export function AppSidebar() {
       </SidebarHeader>
       
       <SidebarContent>
-        {/* Acesso Rápido */}
-        {visibleQuickAccess.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>
-              <Zap className="w-3 h-3 mr-1" />
-              Acesso Rápido
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {visibleQuickAccess.map((item) => {
-                  const ItemIcon = getIcon(item.icon);
-                  return (
-                    <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton 
-                        asChild 
-                        isActive={location === item.url}
-                        data-testid={`nav-quick-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                      >
-                        <Link href={item.url} onClick={handleItemClick}>
-                          <ItemIcon />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Menu Principal - Setores, G&G, Governança, Administração unidos */}
+        {/* Setores - Primeiro */}
         <SidebarGroup>
+          <SidebarGroupLabel>
+            <Layers className="w-3 h-3 mr-1" />
+            Setores
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {/* Setores */}
               {NAV_CONFIG.setores.map(category => renderCategory(category, 'setores'))}
               
               {/* G&G */}
@@ -266,6 +238,37 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Acesso Rápido - Por último */}
+        {visibleQuickAccess.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>
+              <Zap className="w-3 h-3 mr-1" />
+              Acesso Rápido
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleQuickAccess.map((item) => {
+                  const ItemIcon = getIcon(item.icon);
+                  return (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton 
+                        asChild 
+                        isActive={location === item.url}
+                        data-testid={`nav-quick-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        <Link href={item.url} onClick={handleItemClick}>
+                          <ItemIcon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   );
