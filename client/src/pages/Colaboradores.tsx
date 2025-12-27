@@ -544,8 +544,18 @@ function FilterChips({
   );
 }
 
+interface OnboardingTemplateOption {
+  id: number;
+  nome: string;
+  descricao: string | null;
+  ativo: boolean;
+}
+
 function AddColaboradorDialog() {
   const [open, setOpen] = useState(false);
+  const [showOnboardingPrompt, setShowOnboardingPrompt] = useState(false);
+  const [newColaboradorId, setNewColaboradorId] = useState<number | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const { toast } = useToast();
 
   const { data: cargos = [], isLoading: cargosLoading } = useQuery<CargoOption[]>({
@@ -562,6 +572,11 @@ function AddColaboradorDialog() {
 
   const { data: estados = [], isLoading: estadosLoading } = useQuery<EstadoOption[]>({
     queryKey: ["/api/geo/estados"],
+  });
+
+  const { data: onboardingTemplates = [], isLoading: templatesLoading } = useQuery<OnboardingTemplateOption[]>({
+    queryKey: ["/api/rh/onboarding/templates"],
+    enabled: showOnboardingPrompt,
   });
 
   const addColaboradorSchema = insertColaboradorSchema.extend({
@@ -610,13 +625,14 @@ function AddColaboradorDialog() {
       const response = await apiRequest("POST", "/api/colaboradores", data);
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/colaboradores/com-patrimonios"] });
       toast({
         title: "Colaborador adicionado",
         description: "O colaborador foi adicionado com sucesso.",
       });
-      setOpen(false);
+      setNewColaboradorId(result.id);
+      setShowOnboardingPrompt(true);
       form.reset();
     },
     onError: (error: Error) => {
@@ -628,12 +644,59 @@ function AddColaboradorDialog() {
     },
   });
 
+  const startOnboardingMutation = useMutation({
+    mutationFn: async ({ colaboradorId, templateId }: { colaboradorId: number; templateId: number }) => {
+      const response = await apiRequest("POST", "/api/rh/onboarding/iniciar", {
+        colaboradorId,
+        templateId,
+        dataInicio: new Date().toISOString().split("T")[0],
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/onboarding"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/onboarding/metricas"] });
+      toast({
+        title: "Onboarding iniciado com sucesso!",
+      });
+      handleCloseAll();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao iniciar onboarding",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCloseAll = () => {
+    setOpen(false);
+    setShowOnboardingPrompt(false);
+    setNewColaboradorId(null);
+    setSelectedTemplateId("");
+  };
+
+  const handleSkipOnboarding = () => {
+    handleCloseAll();
+  };
+
+  const handleStartOnboarding = () => {
+    if (newColaboradorId && selectedTemplateId) {
+      startOnboardingMutation.mutate({
+        colaboradorId: newColaboradorId,
+        templateId: parseInt(selectedTemplateId),
+      });
+    }
+  };
+
   const onSubmit = (data: InsertColaborador) => {
     createMutation.mutate(data);
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <>
+    <Dialog open={open && !showOnboardingPrompt} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button data-testid="button-add-colaborador">
           <Plus className="w-4 h-4 mr-2" />
@@ -1036,6 +1099,67 @@ function AddColaboradorDialog() {
         </Form>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={showOnboardingPrompt} onOpenChange={(isOpen) => {
+      if (!isOpen) handleCloseAll();
+    }}>
+      <DialogContent data-testid="dialog-onboarding-prompt">
+        <DialogHeader>
+          <DialogTitle>Colaborador criado com sucesso!</DialogTitle>
+          <DialogDescription>
+            Deseja iniciar o processo de onboarding?
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Template de Onboarding</Label>
+            <Select
+              value={selectedTemplateId}
+              onValueChange={setSelectedTemplateId}
+            >
+              <SelectTrigger data-testid="select-onboarding-template">
+                <SelectValue placeholder={templatesLoading ? "Carregando..." : "Selecione um template"} />
+              </SelectTrigger>
+              <SelectContent>
+                {onboardingTemplates.filter(t => t.ativo).map((template) => (
+                  <SelectItem key={template.id} value={template.id.toString()}>
+                    {template.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <DialogFooter className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleSkipOnboarding}
+            data-testid="button-skip-onboarding"
+          >
+            Não, fechar
+          </Button>
+          <Button
+            type="button"
+            onClick={handleStartOnboarding}
+            disabled={!selectedTemplateId || startOnboardingMutation.isPending}
+            data-testid="button-start-onboarding"
+          >
+            {startOnboardingMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Iniciando...
+              </>
+            ) : (
+              "Iniciar Onboarding"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
