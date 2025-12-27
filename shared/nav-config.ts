@@ -287,10 +287,10 @@ export const NAV_CONFIG = {
       icon: 'Briefcase',
       items: [
         { title: 'Visão Geral', url: '/visao-geral', icon: 'Eye', permissionKey: PERMISSION_KEYS.OPS.VISAO_GERAL },
+        { title: 'Clientes & Contratos', url: '/clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS },
         { title: 'Metas por Squad', url: '/metas-squad', icon: 'Target', permissionKey: PERMISSION_KEYS.OPS.METAS_SQUAD },
         { title: 'Análise de Retenção', url: '/dashboard/retencao', icon: 'UserCheck', permissionKey: PERMISSION_KEYS.OPS.RETENCAO },
         { title: 'Cohort de Retenção', url: '/dashboard/cohort', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.OPS.COHORT },
-        { title: 'Clientes & Contratos', url: '/clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS },
       ],
     },
     {
