@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { Users, FileText, BarChart3, UserCog, Building2, Wrench, MessageSquare, TrendingUp, UsersRound, ChevronRight, Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase, Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen, Lock, CalendarDays, ClipboardList } from "lucide-react";
+import { 
+  Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound, 
+  ChevronRight, Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase, 
+  Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, 
+  LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen, 
+  CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap
+} from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogoLight from "@assets/logo-preta_1766452973532.png";
 import turboLogoDark from "@assets/logo-branca_1766452973531.png";
@@ -21,6 +27,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { NAV_CONFIG, ROUTE_TO_PERMISSION, permissionsToRoutes } from "@shared/nav-config";
 
 interface User {
   id: string;
@@ -33,157 +40,16 @@ interface User {
   allowedRoutes: string[];
 }
 
-const menuItems = [
-  {
-    title: "Clientes & Contratos",
-    url: "/clientes",
-    icon: Users,
-  },
-  {
-    title: "Colaboradores",
-    url: "/colaboradores",
-    icon: UserCog,
-  },
-  {
-    title: "Patrimônio",
-    url: "/patrimonio",
-    icon: Building2,
-  },
-  {
-    title: "Acessos",
-    url: "/acessos",
-    icon: Key,
-  },
-  {
-    title: "Turbo Tools",
-    url: "/ferramentas",
-    icon: Wrench,
-  },
-  {
-    title: "TurboZap",
-    url: "/turbozap",
-    icon: MessageSquare,
-    locked: true,
-  },
-  {
-    title: "Atendimento",
-    url: "/atendimento",
-    icon: Headphones,
-    locked: true,
-  },
-  {
-    title: "GPTurbo",
-    url: "/cases/chat",
-    icon: Sparkles,
-  },
-  {
-    title: "Conhecimento",
-    url: "/conhecimentos",
-    icon: BookOpen,
-  },
-  {
-    title: "Clube Benefícios",
-    url: "/beneficios",
-    icon: Gift,
-  },
-  {
-    title: "Calendário Turbo",
-    url: "/calendario",
-    icon: CalendarDays,
-  },
-];
+// Icon mapping
+const ICONS: Record<string, any> = {
+  Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound,
+  Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase, Monitor,
+  Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
+  LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
+  CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap,
+};
 
-const dashboardCategories = [
-  {
-    title: "Financeiro",
-    icon: DollarSign,
-    baseUrl: "/dashboard/financeiro",
-    subItems: [
-      { title: "Visão Geral", url: "/dashboard/financeiro", icon: TrendingUp },
-      { title: "DFC", url: "/dashboard/dfc", icon: BarChart3 },
-      { title: "Fluxo de Caixa", url: "/dashboard/fluxo-caixa", icon: Wallet },
-      { title: "Revenue Goals", url: "/dashboard/revenue-goals", icon: Target },
-      { title: "Inadimplência", url: "/dashboard/inadimplencia", icon: AlertTriangle },
-      { title: "Auditoria de Sistemas", url: "/dashboard/auditoria-sistemas", icon: ShieldAlert },
-    ],
-  },
-  {
-    title: "Operação",
-    icon: Briefcase,
-    baseUrl: "/visao-geral",
-    subItems: [
-      { title: "Visão Geral", url: "/visao-geral", icon: Eye },
-      { title: "Metas por Squad", url: "/metas-squad", icon: Target },
-      { title: "Análise de Retenção", url: "/dashboard/retencao", icon: UserCheck },
-      { title: "Cohort de Retenção", url: "/dashboard/cohort", icon: BarChart3 },
-    ],
-  },
-  {
-    title: "Tech",
-    icon: Monitor,
-    baseUrl: "/dashboard/tech",
-    subItems: [
-      { title: "Visão Geral", url: "/dashboard/tech", icon: Eye },
-      { title: "Projetos", url: "/tech/projetos", icon: Rocket },
-    ],
-  },
-  {
-    title: "Comercial",
-    icon: Handshake,
-    baseUrl: "/dashboard/comercial",
-    subItems: [
-      { title: "Closers", url: "/dashboard/comercial/closers", icon: UserRound },
-      { title: "SDRs", url: "/dashboard/comercial/sdrs", icon: Headphones },
-      { title: "Detalhamento Closers", url: "/dashboard/comercial/detalhamento-closers", icon: UserSearch },
-      { title: "Detalhamento SDRs", url: "/dashboard/comercial/detalhamento-sdrs", icon: UserSearch },
-      { title: "Detalhamento Vendas", url: "/dashboard/comercial/detalhamento-vendas", icon: BarChart3 },
-      { title: "Análise de Vendas", url: "/dashboard/comercial/analise-vendas", icon: LineChart },
-    ],
-  },
-  {
-    title: "Growth",
-    icon: Sparkles,
-    baseUrl: "/growth",
-    subItems: [
-      { title: "Visão Geral", url: "/growth/visao-geral", icon: Eye },
-      { title: "Meta Ads", url: "/dashboard/meta-ads", icon: Target },
-      { title: "Por Plataforma", url: "/growth/performance-plataformas", icon: Layers },
-      { title: "Criativos", url: "/growth/criativos", icon: Image },
-    ],
-  },
-  {
-    title: "G&G",
-    icon: UsersRound,
-    baseUrl: "/dashboard/geg",
-    subItems: [
-      { title: "Visão Geral", url: "/dashboard/geg", icon: UsersRound },
-      { title: "Recrutamento", url: "/dashboard/recrutamento", icon: UserPlus },
-      { title: "Onboarding", url: "/rh/onboarding", icon: ClipboardList },
-    ],
-  },
-  {
-    title: "Jurídico",
-    icon: Scale,
-    baseUrl: "/juridico",
-    subItems: [
-      { title: "Clientes Inadimplentes", url: "/juridico/clientes", icon: Gavel },
-    ],
-  },
-  {
-    title: "Reports",
-    icon: FileText,
-    baseUrl: "/investors-report",
-    subItems: [
-      { title: "Investors Report", url: "/investors-report", icon: TrendingUp },
-    ],
-  },
-  {
-    title: "OKR 2026",
-    icon: Trophy,
-    url: "/okr-2026",
-  },
-];
-
+const getIcon = (iconName: string) => ICONS[iconName] || FileText;
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -191,14 +57,28 @@ export function AppSidebar() {
   const { state, setOpen } = useSidebar();
   const isCollapsed = state === "collapsed";
   const turboLogo = theme === "dark" ? turboLogoDark : turboLogoLight;
+  
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
-    dashboardCategories.forEach(cat => {
-      if (cat.subItems) {
-        const isActive = cat.subItems.some(sub => location === sub.url || location.startsWith(sub.url));
-        initial[cat.title] = isActive;
-      }
+    // Check setores
+    NAV_CONFIG.setores.forEach(cat => {
+      const isActive = cat.items.some(item => location === item.url || location.startsWith(item.url + "/"));
+      initial[cat.title] = isActive;
     });
+    // Check G&G
+    const ggActive = NAV_CONFIG.gg.items.some(item => location === item.url || location.startsWith(item.url + "/"));
+    initial[NAV_CONFIG.gg.title] = ggActive;
+    // Check governança
+    NAV_CONFIG.governanca.forEach(cat => {
+      const isActive = cat.items.some(item => location === item.url || location.startsWith(item.url + "/"));
+      initial[cat.title] = isActive;
+    });
+    // Check admin
+    const adminActive = NAV_CONFIG.admin.items.some(item => location === item.url || location.startsWith(item.url + "/"));
+    initial[NAV_CONFIG.admin.title] = adminActive;
+    // Check geral
+    const geralActive = NAV_CONFIG.geral.items.some(item => location === item.url || location.startsWith(item.url + "/"));
+    initial[NAV_CONFIG.geral.title] = geralActive;
     return initial;
   });
 
@@ -206,12 +86,23 @@ export function AppSidebar() {
     queryKey: ["/api/auth/me"],
   });
 
-  const hasAccess = (path: string) => {
+  // Check if user has access to a route - supports both old route-based and new permission-based systems
+  const hasAccess = (url: string, permissionKey?: string) => {
     if (!user) return false;
-    return user.role === 'admin' || (user.allowedRoutes && user.allowedRoutes.includes(path));
+    if (user.role === 'admin') return true;
+    
+    // Check new permission-based system first
+    if (permissionKey && user.allowedRoutes) {
+      if (user.allowedRoutes.includes(permissionKey)) return true;
+    }
+    
+    // Fallback to old route-based system for backwards compatibility
+    if (user.allowedRoutes && user.allowedRoutes.includes(url)) return true;
+    
+    // Check if any related routes are allowed
+    const relatedRoutes = permissionsToRoutes([permissionKey || '']);
+    return relatedRoutes.some(route => user.allowedRoutes?.includes(route));
   };
-
-  const visibleMenuItems = menuItems.filter((item) => hasAccess(item.url));
 
   const toggleCategory = (title: string) => {
     if (isCollapsed) {
@@ -225,6 +116,67 @@ export function AppSidebar() {
       setOpen(true);
     }
   };
+
+  // Filter items based on access
+  const filterItems = <T extends { url: string; permissionKey: string }>(items: T[]): T[] => {
+    return items.filter(item => hasAccess(item.url, item.permissionKey));
+  };
+
+  // Render a category with subitems
+  const renderCategory = (category: { title: string; icon: string; items: Array<{ title: string; url: string; icon: string; permissionKey: string }> }, sectionKey: string) => {
+    const visibleItems = filterItems(category.items);
+    if (visibleItems.length === 0) return null;
+    
+    const isOpen = openCategories[category.title] || false;
+    const isActive = category.items.some(item => location === item.url);
+    const CategoryIcon = getIcon(category.icon);
+
+    return (
+      <Collapsible
+        key={category.title}
+        open={isOpen}
+        onOpenChange={() => toggleCategory(category.title)}
+        className="group/collapsible"
+      >
+        <SidebarMenuItem>
+          <CollapsibleTrigger asChild>
+            <SidebarMenuButton 
+              data-testid={`nav-${category.title.toLowerCase().replace(/\s+/g, '-')}`}
+              className={isActive ? "bg-sidebar-accent" : ""}
+            >
+              <CategoryIcon />
+              <span>{category.title}</span>
+              <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+            </SidebarMenuButton>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <SidebarMenuSub>
+              {visibleItems.map((item) => {
+                const ItemIcon = getIcon(item.icon);
+                return (
+                  <SidebarMenuSubItem key={item.url}>
+                    <SidebarMenuSubButton
+                      asChild
+                      isActive={location === item.url || location.startsWith(item.url + "/")}
+                      data-testid={`nav-${category.title.toLowerCase()}-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      <Link href={item.url} onClick={handleItemClick}>
+                        <ItemIcon className="w-4 h-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                );
+              })}
+            </SidebarMenuSub>
+          </CollapsibleContent>
+        </SidebarMenuItem>
+      </Collapsible>
+    );
+  };
+
+  // Quick access items
+  const visibleQuickAccess = filterItems(NAV_CONFIG.quickAccess);
 
   return (
     <Sidebar collapsible="icon">
@@ -247,118 +199,100 @@ export function AppSidebar() {
           </div>
         </Link>
       </SidebarHeader>
+      
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Setores</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {dashboardCategories.map((category) => {
-                // Direct link items (no subItems)
-                if (category.url) {
-                  if (!hasAccess(category.url)) return null;
-                  const isActive = location === category.url || location.startsWith(category.url + "/");
+        {/* Acesso Rápido */}
+        {visibleQuickAccess.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>
+              <Zap className="w-3 h-3 mr-1" />
+              Acesso Rápido
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleQuickAccess.map((item) => {
+                  const ItemIcon = getIcon(item.icon);
                   return (
-                    <SidebarMenuItem key={category.title}>
+                    <SidebarMenuItem key={item.url}>
                       <SidebarMenuButton 
-                        asChild
-                        isActive={isActive}
-                        data-testid={`nav-${category.title.toLowerCase().replace(/\s+/g, '-')}`}
+                        asChild 
+                        isActive={location === item.url}
+                        data-testid={`nav-quick-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
                       >
-                        <Link href={category.url} onClick={handleItemClick}>
-                          <category.icon />
-                          <span>{category.title}</span>
+                        <Link href={item.url} onClick={handleItemClick}>
+                          <ItemIcon />
+                          <span>{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
-                }
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-                // Items with subItems (collapsible)
-                const visibleSubItems = category.subItems?.filter(sub => hasAccess(sub.url)) || [];
-                if (visibleSubItems.length === 0) return null;
-                
-                const isOpen = openCategories[category.title] || false;
-                const isActive = category.subItems?.some(sub => location === sub.url) || false;
-
-                return (
-                  <Collapsible
-                    key={category.title}
-                    open={isOpen}
-                    onOpenChange={() => toggleCategory(category.title)}
-                    className="group/collapsible"
-                  >
-                    <SidebarMenuItem>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton 
-                          data-testid={`nav-${category.title.toLowerCase()}`}
-                          className={isActive ? "bg-sidebar-accent" : ""}
-                        >
-                          <category.icon />
-                          <span>{category.title}</span>
-                          <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {visibleSubItems.map((item) => (
-                            <SidebarMenuSubItem key={item.url}>
-                              <SidebarMenuSubButton
-                                asChild
-                                isActive={location === item.url}
-                                data-testid={`nav-${category.title.toLowerCase()}-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                              >
-                                <Link href={item.url} onClick={handleItemClick}>
-                                  <item.icon className="w-4 h-4" />
-                                  <span>{item.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </SidebarMenuItem>
-                  </Collapsible>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
+        {/* Setores */}
         <SidebarGroup>
-          <SidebarGroupLabel>Menu</SidebarGroupLabel>
+          <SidebarGroupLabel>Setores</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  {item.locked ? (
-                    <SidebarMenuButton 
-                      isActive={false}
-                      data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                      className="opacity-50 cursor-not-allowed"
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      <item.icon />
-                      <span>{item.title}</span>
-                      <Lock className="ml-auto w-3.5 h-3.5 text-muted-foreground" />
-                    </SidebarMenuButton>
-                  ) : (
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={location === item.url || (item.url === "/clientes" && (location === "/" || location === "/contratos"))}
-                      data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                      <Link href={item.url} onClick={handleItemClick}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  )}
-                </SidebarMenuItem>
-              ))}
+              {NAV_CONFIG.setores.map(category => renderCategory(category, 'setores'))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* G&G (Pessoas) */}
+        {filterItems(NAV_CONFIG.gg.items).length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Pessoas</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {renderCategory(NAV_CONFIG.gg, 'gg')}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* Governança */}
+        {NAV_CONFIG.governanca.some(cat => filterItems(cat.items as Array<{ title: string; url: string; icon: string; permissionKey: string }>).length > 0) && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Governança</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {NAV_CONFIG.governanca.map(category => renderCategory(category, 'governanca'))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* Administração */}
+        {filterItems(NAV_CONFIG.admin.items).length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administração</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {NAV_CONFIG.admin.items.filter(item => hasAccess(item.url, item.permissionKey)).map((item) => {
+                  const ItemIcon = getIcon(item.icon);
+                  return (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton 
+                        asChild 
+                        isActive={location === item.url || location.startsWith(item.url + "/")}
+                        data-testid={`nav-admin-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        <Link href={item.url} onClick={handleItemClick}>
+                          <ItemIcon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   );
