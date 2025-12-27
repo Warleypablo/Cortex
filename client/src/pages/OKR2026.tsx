@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,10 +9,24 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   Target, TrendingUp, DollarSign, AlertTriangle, AlertCircle,
   ArrowUpRight, Info, Rocket, Clock, CheckCircle2, 
-  XCircle, Banknote, PiggyBank,
+  XCircle, Banknote, PiggyBank, ClipboardCheck, MessageSquare, History,
   CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building
 } from "lucide-react";
 import { 
@@ -145,6 +159,339 @@ interface Collaborator {
 
 interface CollaboratorsResponse {
   collaborators: Collaborator[];
+}
+
+interface KRCheckin {
+  id: number;
+  krId: string;
+  year: number;
+  periodType: string;
+  periodValue: string;
+  confidence: number;
+  commentary: string | null;
+  blockers: string | null;
+  nextActions: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+interface KRCheckinsResponse {
+  krId: string;
+  year: number;
+  checkins: KRCheckin[];
+}
+
+interface LatestCheckinsResponse {
+  year: number;
+  latestByKr: Record<string, KRCheckin>;
+}
+
+const CONFIDENCE_LEVELS = [
+  { value: 0, label: "Em risco", color: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30" },
+  { value: 33, label: "Com atenção", color: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30" },
+  { value: 66, label: "No caminho", color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+  { value: 100, label: "Garantido", color: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30" },
+];
+
+function getConfidenceLabel(confidence: number): { label: string; color: string } {
+  if (confidence <= 25) return CONFIDENCE_LEVELS[0];
+  if (confidence <= 50) return CONFIDENCE_LEVELS[1];
+  if (confidence <= 75) return CONFIDENCE_LEVELS[2];
+  return CONFIDENCE_LEVELS[3];
+}
+
+const krCheckinSchema = z.object({
+  periodValue: z.string().min(1, "Selecione o período"),
+  confidence: z.number().min(0).max(100),
+  commentary: z.string().optional(),
+  blockers: z.string().optional(),
+  nextActions: z.string().optional(),
+});
+
+type KRCheckinFormValues = z.infer<typeof krCheckinSchema>;
+
+function ConfidenceBadge({ confidence }: { confidence: number }) {
+  const { label, color } = getConfidenceLabel(confidence);
+  return (
+    <Badge variant="outline" className={`${color} text-[10px]`}>
+      {confidence}% - {label}
+    </Badge>
+  );
+}
+
+function KRCheckinModal({
+  kr,
+  open,
+  onOpenChange,
+}: {
+  kr: KR | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const currentQuarter = getCurrentQuarter();
+  
+  const form = useForm<KRCheckinFormValues>({
+    resolver: zodResolver(krCheckinSchema),
+    defaultValues: {
+      periodValue: currentQuarter,
+      confidence: 50,
+      commentary: "",
+      blockers: "",
+      nextActions: "",
+    },
+  });
+
+  const { data: checkinsData, isLoading: checkinsLoading } = useQuery<KRCheckinsResponse>({
+    queryKey: ["/api/okr2026/kr-checkins", kr?.id],
+    enabled: !!kr && open,
+  });
+
+  const createCheckinMutation = useMutation({
+    mutationFn: async (values: KRCheckinFormValues) => {
+      return apiRequest("/api/okr2026/kr-checkins", {
+        method: "POST",
+        body: JSON.stringify({
+          krId: kr?.id,
+          year: 2026,
+          periodType: "quarter",
+          periodValue: values.periodValue,
+          confidence: values.confidence,
+          commentary: values.commentary || null,
+          blockers: values.blockers || null,
+          nextActions: values.nextActions || null,
+        }),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Check-in registrado",
+        description: "O check-in do KR foi salvo com sucesso.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/okr2026/kr-checkins", kr?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/okr2026/kr-checkins-latest"] });
+      form.reset();
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao salvar check-in",
+        description: error.message || "Tente novamente.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (values: KRCheckinFormValues) => {
+    createCheckinMutation.mutate(values);
+  };
+
+  const checkins = checkinsData?.checkins || [];
+  const confidenceValue = form.watch("confidence");
+
+  if (!kr) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ClipboardCheck className="w-5 h-5 text-primary" />
+            Check-in: {kr.id}
+          </DialogTitle>
+          <DialogDescription className="text-left">
+            {kr.title}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+          <div className="space-y-4">
+            <h4 className="font-medium text-sm flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Novo Check-in
+            </h4>
+            
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="periodValue"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Período</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-checkin-period">
+                            <SelectValue placeholder="Selecione o trimestre" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
+                          <SelectItem value="Q2">Q2 (Abr-Jun)</SelectItem>
+                          <SelectItem value="Q3">Q3 (Jul-Set)</SelectItem>
+                          <SelectItem value="Q4">Q4 (Out-Dez)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="confidence"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center justify-between">
+                        <span>Nível de Confiança</span>
+                        <ConfidenceBadge confidence={confidenceValue} />
+                      </FormLabel>
+                      <FormControl>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[field.value]}
+                          onValueChange={(val) => field.onChange(val[0])}
+                          className="w-full"
+                          data-testid="slider-confidence"
+                        />
+                      </FormControl>
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>Em risco</span>
+                        <span>Com atenção</span>
+                        <span>No caminho</span>
+                        <span>Garantido</span>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="commentary"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Comentário</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Como está o progresso deste KR?"
+                          className="resize-none"
+                          rows={3}
+                          {...field}
+                          data-testid="textarea-commentary"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="blockers"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bloqueios</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Existe algo impedindo o progresso?"
+                          className="resize-none"
+                          rows={2}
+                          {...field}
+                          data-testid="textarea-blockers"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="nextActions"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Próximas Ações</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Quais são os próximos passos?"
+                          className="resize-none"
+                          rows={2}
+                          {...field}
+                          data-testid="textarea-next-actions"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={createCheckinMutation.isPending}
+                  data-testid="button-submit-checkin"
+                >
+                  {createCheckinMutation.isPending ? "Salvando..." : "Registrar Check-in"}
+                </Button>
+              </form>
+            </Form>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="font-medium text-sm flex items-center gap-2">
+              <History className="w-4 h-4" />
+              Histórico de Check-ins
+            </h4>
+            
+            {checkinsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : checkins.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Nenhum check-in registrado ainda
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                {checkins.map((checkin) => (
+                  <Card key={checkin.id} className="p-3" data-testid={`card-checkin-${checkin.id}`}>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <Badge variant="outline" className="text-[10px]">
+                        {checkin.periodValue}
+                      </Badge>
+                      <ConfidenceBadge confidence={checkin.confidence} />
+                    </div>
+                    {checkin.commentary && (
+                      <p className="text-sm text-muted-foreground mb-2">{checkin.commentary}</p>
+                    )}
+                    {checkin.blockers && (
+                      <div className="text-xs mb-1">
+                        <span className="font-medium text-red-600 dark:text-red-400">Bloqueios: </span>
+                        <span className="text-muted-foreground">{checkin.blockers}</span>
+                      </div>
+                    )}
+                    {checkin.nextActions && (
+                      <div className="text-xs mb-1">
+                        <span className="font-medium text-blue-600 dark:text-blue-400">Próximos: </span>
+                        <span className="text-muted-foreground">{checkin.nextActions}</span>
+                      </div>
+                    )}
+                    <div className="text-[10px] text-muted-foreground mt-2">
+                      {checkin.createdBy} • {format(new Date(checkin.createdAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function formatCurrency(value: number | null | undefined): string {
@@ -969,7 +1316,15 @@ function KRsTab({ data }: { data: SummaryResponse }) {
   const { objectives, krs } = data;
   const [objectiveFilter, setObjectiveFilter] = useState<string>("all");
   const [quarterFilter, setQuarterFilter] = useState<string>("all");
+  const [selectedKR, setSelectedKR] = useState<KR | null>(null);
+  const [checkinModalOpen, setCheckinModalOpen] = useState(false);
   const currentQuarter = getCurrentQuarter();
+
+  const { data: latestCheckinsData } = useQuery<LatestCheckinsResponse>({
+    queryKey: ["/api/okr2026/kr-checkins-latest"],
+  });
+
+  const latestCheckins = latestCheckinsData?.latestByKr || {};
 
   const filteredKRs = useMemo(() => {
     return krs.filter(kr => {
@@ -1124,21 +1479,24 @@ function KRsTab({ data }: { data: SummaryResponse }) {
                     <thead>
                       <tr className="text-xs text-muted-foreground border-b">
                         <th className="text-left py-2 px-2 min-w-[200px]">KR</th>
+                        <th className="text-center py-2 px-2">Confiança</th>
                         <th className="text-center py-2 px-2">Q1</th>
                         <th className="text-center py-2 px-2">Q2</th>
                         <th className="text-center py-2 px-2">Q3</th>
                         <th className="text-center py-2 px-2">Q4</th>
                         <th className="text-center py-2 px-2">Status</th>
+                        <th className="text-center py-2 px-2">Check-in</th>
                       </tr>
                     </thead>
                     <tbody>
                       {objKRs.map(kr => {
                         const currentStatus = getQuarterStatus(kr, currentQuarter);
+                        const latestCheckin = latestCheckins[kr.id];
                         
                         return (
                           <tr 
                             key={kr.id} 
-                            className="border-b last:border-0"
+                            className="border-b last:border-0 hover:bg-muted/30 transition-colors"
                             data-testid={`row-kr-${kr.id}`}
                           >
                             <td className="py-3 px-2">
@@ -1166,12 +1524,52 @@ function KRsTab({ data }: { data: SummaryResponse }) {
                                 </Tooltip>
                               </div>
                             </td>
+                            <td className="py-3 px-2 text-center">
+                              {latestCheckin ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="inline-block cursor-help">
+                                      <ConfidenceBadge confidence={latestCheckin.confidence} />
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <div className="space-y-1">
+                                      <div className="text-xs">Período: {latestCheckin.periodValue}</div>
+                                      {latestCheckin.commentary && (
+                                        <div className="text-xs">{latestCheckin.commentary}</div>
+                                      )}
+                                      <div className="text-[10px] text-muted-foreground">
+                                        Por {latestCheckin.createdBy}
+                                      </div>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <Badge variant="outline" className="text-[10px] bg-muted/50 text-muted-foreground">
+                                  Sem check-in
+                                </Badge>
+                              )}
+                            </td>
                             <td className="py-3 px-2">{renderQuarterCell(kr, "Q1")}</td>
                             <td className="py-3 px-2">{renderQuarterCell(kr, "Q2")}</td>
                             <td className="py-3 px-2">{renderQuarterCell(kr, "Q3")}</td>
                             <td className="py-3 px-2">{renderQuarterCell(kr, "Q4")}</td>
                             <td className="py-3 px-2 text-center">
                               <StatusBadge status={currentStatus} />
+                            </td>
+                            <td className="py-3 px-2 text-center">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedKR(kr);
+                                  setCheckinModalOpen(true);
+                                }}
+                                data-testid={`button-checkin-${kr.id}`}
+                              >
+                                <ClipboardCheck className="w-3.5 h-3.5 mr-1" />
+                                Check-in
+                              </Button>
                             </td>
                           </tr>
                         );
@@ -1184,7 +1582,138 @@ function KRsTab({ data }: { data: SummaryResponse }) {
           );
         })}
       </Accordion>
+
+      <KRCheckinModal
+        kr={selectedKR}
+        open={checkinModalOpen}
+        onOpenChange={setCheckinModalOpen}
+      />
     </div>
+  );
+}
+
+interface KanbanColumn {
+  id: string;
+  title: string;
+  icon: typeof Clock;
+  iconColor: string;
+  bgColor: string;
+  borderColor: string;
+  statuses: string[];
+}
+
+const KANBAN_COLUMNS: KanbanColumn[] = [
+  { 
+    id: "backlog", 
+    title: "Backlog", 
+    icon: Clock, 
+    iconColor: "text-slate-500",
+    bgColor: "bg-slate-500/5",
+    borderColor: "border-t-slate-500",
+    statuses: ["planned", "not_started"]
+  },
+  { 
+    id: "doing", 
+    title: "Em Andamento", 
+    icon: Rocket, 
+    iconColor: "text-blue-500",
+    bgColor: "bg-blue-500/5",
+    borderColor: "border-t-blue-500",
+    statuses: ["doing", "in_progress"]
+  },
+  { 
+    id: "done", 
+    title: "Concluído", 
+    icon: CheckCircle2, 
+    iconColor: "text-green-500",
+    bgColor: "bg-green-500/5",
+    borderColor: "border-t-green-500",
+    statuses: ["done", "completed"]
+  },
+  { 
+    id: "blocked", 
+    title: "Bloqueado", 
+    icon: XCircle, 
+    iconColor: "text-red-500",
+    bgColor: "bg-red-500/5",
+    borderColor: "border-t-red-500",
+    statuses: ["blocked"]
+  },
+];
+
+function InitiativeKanbanCard({
+  initiative,
+  resolveOwner,
+  getKRTitle,
+  krs,
+}: {
+  initiative: Initiative;
+  resolveOwner: (email: string | undefined) => string;
+  getKRTitle: (krId: string) => string;
+  krs: KR[];
+}) {
+  const title = initiative.title || initiative.name || "";
+  const krIds = initiative.krs || initiative.krIds || [];
+  const ownerEmail = initiative.owner_email || initiative.ownerRole;
+  const ownerName = resolveOwner(ownerEmail);
+  const initials = ownerName !== "—" 
+    ? ownerName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
+    : "?";
+
+  return (
+    <Card 
+      className="hover-elevate cursor-pointer mb-2" 
+      data-testid={`card-initiative-${initiative.id}`}
+    >
+      <CardContent className="p-3">
+        <div className="space-y-2">
+          <div className="flex items-start gap-2">
+            <Badge 
+              variant="outline" 
+              className="bg-primary/10 text-primary border-primary/30 text-[10px] shrink-0"
+            >
+              {initiative.objectiveId}
+            </Badge>
+            {initiative.quarter && (
+              <Badge variant="outline" className="text-[10px] shrink-0">
+                {initiative.quarter}
+              </Badge>
+            )}
+          </div>
+          
+          <p className="text-sm font-medium line-clamp-2">{title}</p>
+          
+          {krIds.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {krIds.map((krId) => (
+                <Tooltip key={krId}>
+                  <TooltipTrigger asChild>
+                    <Badge 
+                      variant="secondary" 
+                      className="text-[10px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30 cursor-help"
+                    >
+                      {krId}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    {getKRTitle(krId)}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          )}
+          
+          <div className="flex items-center gap-2 pt-1">
+            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium">
+              {initials}
+            </div>
+            <span className="text-xs text-muted-foreground truncate flex-1">
+              {ownerName}
+            </span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1196,7 +1725,6 @@ function InitiativesTab({
   collaborators: Collaborator[] 
 }) {
   const { initiatives, objectives, krs } = data;
-  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [objectiveFilter, setObjectiveFilter] = useState<string>("all");
   const [quarterFilter, setQuarterFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
@@ -1228,15 +1756,6 @@ function InitiativesTab({
 
   const filteredInitiatives = useMemo(() => {
     return initiatives.filter(ini => {
-      const status = ini.status;
-      if (statusFilter !== "all") {
-        const statusMatch = 
-          (statusFilter === "planned" && (status === "planned" || status === "not_started")) ||
-          (statusFilter === "doing" && (status === "doing" || status === "in_progress")) ||
-          (statusFilter === "done" && (status === "done" || status === "completed")) ||
-          (statusFilter === "blocked" && status === "blocked");
-        if (!statusMatch) return false;
-      }
       if (objectiveFilter !== "all" && ini.objectiveId !== objectiveFilter) return false;
       if (quarterFilter !== "all" && ini.quarter !== quarterFilter) return false;
       if (ownerFilter !== "all") {
@@ -1245,29 +1764,20 @@ function InitiativesTab({
       }
       return true;
     });
-  }, [initiatives, statusFilter, objectiveFilter, quarterFilter, ownerFilter]);
+  }, [initiatives, objectiveFilter, quarterFilter, ownerFilter]);
 
-  const stats = useMemo(() => {
-    const byObjective: Record<string, { planned: number; doing: number; blocked: number; done: number }> = {};
-    objectives.forEach(obj => {
-      byObjective[obj.id] = { planned: 0, doing: 0, blocked: 0, done: 0 };
+  const columnData = useMemo(() => {
+    const data: Record<string, Initiative[]> = {};
+    KANBAN_COLUMNS.forEach(col => {
+      data[col.id] = filteredInitiatives.filter(ini => 
+        col.statuses.includes(ini.status)
+      );
     });
-    
-    initiatives.forEach(ini => {
-      const objStats = byObjective[ini.objectiveId];
-      if (!objStats) return;
-      
-      if (ini.status === "planned" || ini.status === "not_started") objStats.planned++;
-      else if (ini.status === "doing" || ini.status === "in_progress") objStats.doing++;
-      else if (ini.status === "done" || ini.status === "completed") objStats.done++;
-      else if (ini.status === "blocked") objStats.blocked++;
-    });
-    
-    return byObjective;
-  }, [initiatives, objectives]);
+    return data;
+  }, [filteredInitiatives]);
 
   const totalStats = useMemo(() => ({
-    planned: initiatives.filter(i => i.status === "planned" || i.status === "not_started").length,
+    backlog: initiatives.filter(i => i.status === "planned" || i.status === "not_started").length,
     doing: initiatives.filter(i => i.status === "doing" || i.status === "in_progress").length,
     done: initiatives.filter(i => i.status === "done" || i.status === "completed").length,
     blocked: initiatives.filter(i => i.status === "blocked").length,
@@ -1279,210 +1789,109 @@ function InitiativesTab({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="hover-elevate cursor-pointer" onClick={() => setStatusFilter(statusFilter === "planned" ? "all" : "planned")}>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-2xl font-bold">{totalStats.planned}</div>
-                <div className="text-sm text-muted-foreground">Planejado</div>
-              </div>
-              <Clock className="w-8 h-8 text-slate-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover-elevate cursor-pointer" onClick={() => setStatusFilter(statusFilter === "doing" ? "all" : "doing")}>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-2xl font-bold">{totalStats.doing}</div>
-                <div className="text-sm text-muted-foreground">Em andamento</div>
-              </div>
-              <Rocket className="w-8 h-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover-elevate cursor-pointer" onClick={() => setStatusFilter(statusFilter === "blocked" ? "all" : "blocked")}>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-2xl font-bold">{totalStats.blocked}</div>
-                <div className="text-sm text-muted-foreground">Bloqueado</div>
-              </div>
-              <XCircle className="w-8 h-8 text-red-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover-elevate cursor-pointer" onClick={() => setStatusFilter(statusFilter === "done" ? "all" : "done")}>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-2xl font-bold">{totalStats.done}</div>
-                <div className="text-sm text-muted-foreground">Concluído</div>
-              </div>
-              <CheckCircle2 className="w-8 h-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardContent className="pt-4">
-          <div className="text-sm font-medium mb-3">Resumo por Objetivo</div>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-            {objectives.map(obj => {
-              const objStats = stats[obj.id];
-              if (!objStats) return null;
-              const total = objStats.planned + objStats.doing + objStats.blocked + objStats.done;
-              if (total === 0) return null;
-              
-              return (
-                <div 
-                  key={obj.id} 
-                  className="p-2 rounded-md bg-muted/50 text-xs cursor-pointer hover:bg-muted"
-                  onClick={() => setObjectiveFilter(objectiveFilter === obj.id ? "all" : obj.id)}
-                >
-                  <div className="font-medium mb-1">{obj.id}</div>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {objStats.planned > 0 && <Badge variant="outline" className="text-[10px] bg-slate-500/10">{objStats.planned}P</Badge>}
-                    {objStats.doing > 0 && <Badge variant="outline" className="text-[10px] bg-blue-500/10">{objStats.doing}D</Badge>}
-                    {objStats.blocked > 0 && <Badge variant="outline" className="text-[10px] bg-red-500/10">{objStats.blocked}B</Badge>}
-                    {objStats.done > 0 && <Badge variant="outline" className="text-[10px] bg-green-500/10">{objStats.done}C</Badge>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Select value={objectiveFilter} onValueChange={setObjectiveFilter}>
-          <SelectTrigger className="w-[180px]" data-testid="filter-initiative-objective">
-            <SelectValue placeholder="Objetivo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos Objetivos</SelectItem>
-            {objectives.map(obj => (
-              <SelectItem key={obj.id} value={obj.id}>{obj.id}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg">
+        <div className="flex items-center gap-2">
+          <Target className="w-4 h-4 text-muted-foreground" />
+          <Select value={objectiveFilter} onValueChange={setObjectiveFilter}>
+            <SelectTrigger className="w-[160px]" data-testid="filter-initiative-objective">
+              <SelectValue placeholder="Objetivo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos Objetivos</SelectItem>
+              {objectives.map(obj => (
+                <SelectItem key={obj.id} value={obj.id}>{obj.id} - {obj.title?.slice(0, 30)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
         <Select value={quarterFilter} onValueChange={setQuarterFilter}>
-          <SelectTrigger className="w-[130px]" data-testid="filter-initiative-quarter">
+          <SelectTrigger className="w-[120px]" data-testid="filter-initiative-quarter">
             <SelectValue placeholder="Trimestre" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">Todos Q</SelectItem>
             <SelectItem value="Q1">Q1</SelectItem>
             <SelectItem value="Q2">Q2</SelectItem>
             <SelectItem value="Q3">Q3</SelectItem>
             <SelectItem value="Q4">Q4</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[150px]" data-testid="filter-initiative-status">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos Status</SelectItem>
-            <SelectItem value="planned">Planejado</SelectItem>
-            <SelectItem value="doing">Em andamento</SelectItem>
-            <SelectItem value="blocked">Bloqueado</SelectItem>
-            <SelectItem value="done">Concluído</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-          <SelectTrigger className="w-[180px]" data-testid="filter-initiative-owner">
-            <SelectValue placeholder="Owner" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos Owners</SelectItem>
-            {uniqueOwners.map(owner => (
-              <SelectItem key={owner} value={owner}>
-                {resolveOwner(owner)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="text-sm text-muted-foreground">
-          {filteredInitiatives.length} iniciativa(s)
+        
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 text-muted-foreground" />
+          <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+            <SelectTrigger className="w-[180px]" data-testid="filter-initiative-owner">
+              <SelectValue placeholder="Owner" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos Owners</SelectItem>
+              {uniqueOwners.map(owner => (
+                <SelectItem key={owner} value={owner}>
+                  {resolveOwner(owner)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="ml-auto flex items-center gap-4 text-sm text-muted-foreground">
+          <span>{filteredInitiatives.length} iniciativa(s)</span>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-[10px] bg-slate-500/10">{totalStats.backlog} backlog</Badge>
+            <Badge variant="outline" className="text-[10px] bg-blue-500/10">{totalStats.doing} doing</Badge>
+            <Badge variant="outline" className="text-[10px] bg-green-500/10">{totalStats.done} done</Badge>
+            {totalStats.blocked > 0 && (
+              <Badge variant="outline" className="text-[10px] bg-red-500/10">{totalStats.blocked} blocked</Badge>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="space-y-3">
-        {filteredInitiatives.map(ini => {
-          const title = ini.title || ini.name || "";
-          const tags = ini.tags || [];
-          const krIds = ini.krs || ini.krIds || [];
-          const ownerEmail = ini.owner_email || ini.ownerRole;
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="kanban-board">
+        {KANBAN_COLUMNS.map(column => {
+          const Icon = column.icon;
+          const items = columnData[column.id] || [];
           
           return (
-            <Card key={ini.id} className="hover-elevate" data-testid={`card-initiative-${ini.id}`}>
-              <CardContent className="py-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-                        {ini.objectiveId}
-                      </Badge>
-                      {ini.quarter && (
-                        <Badge variant="outline" className="text-xs">
-                          {ini.quarter}
-                        </Badge>
-                      )}
-                      <span className="font-medium">{title}</span>
-                    </div>
-                    
-                    {tags.length > 0 && (
-                      <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                        {tags.map((tag, idx) => (
-                          <Badge key={idx} variant="secondary" className="text-[10px]">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
-                      <Users className="w-3.5 h-3.5" />
-                      <span>{resolveOwner(ownerEmail)}</span>
-                    </div>
-
-                    {krIds.length > 0 && (
-                      <div className="mt-2">
-                        <span className="text-xs text-muted-foreground">KRs: </span>
-                        <span className="text-xs">
-                          {krIds.map((krId, idx) => (
-                            <span key={krId}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="text-primary cursor-help">{krId}</span>
-                                </TooltipTrigger>
-                                <TooltipContent>{getKRTitle(krId)}</TooltipContent>
-                              </Tooltip>
-                              {idx < krIds.length - 1 && ", "}
-                            </span>
-                          ))}
-                        </span>
-                      </div>
-                    )}
+            <div 
+              key={column.id}
+              className={`rounded-lg border-t-4 ${column.borderColor} ${column.bgColor}`}
+              data-testid={`kanban-column-${column.id}`}
+            >
+              <div className="p-3 border-b border-border/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Icon className={`w-4 h-4 ${column.iconColor}`} />
+                    <span className="font-medium text-sm">{column.title}</span>
                   </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <InitiativeStatusBadge status={ini.status} />
-                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {items.length}
+                  </Badge>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              
+              <div className="p-2 min-h-[200px] max-h-[calc(100vh-400px)] overflow-y-auto">
+                {items.length === 0 ? (
+                  <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
+                    Nenhuma iniciativa
+                  </div>
+                ) : (
+                  items.map(initiative => (
+                    <InitiativeKanbanCard
+                      key={initiative.id}
+                      initiative={initiative}
+                      resolveOwner={resolveOwner}
+                      getKRTitle={getKRTitle}
+                      krs={krs}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
           );
         })}
-
-        {filteredInitiatives.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            Nenhuma iniciativa encontrada com os filtros selecionados
-          </div>
-        )}
       </div>
     </div>
   );
@@ -1521,7 +1930,11 @@ interface BPFinanceiroResponse {
   };
 }
 
+type BPDisplayMode = "actual" | "plan" | "variance";
+
 function BPFinanceiroTab() {
+  const [displayMode, setDisplayMode] = useState<BPDisplayMode>("actual");
+  
   const { data, isLoading, error } = useQuery<BPFinanceiroResponse>({
     queryKey: ["/api/okr2026/bp-financeiro"],
   });
@@ -1531,6 +1944,12 @@ function BPFinanceiroTab() {
     if (unit === "PCT") return `${(value * 100).toFixed(1)}%`;
     if (unit === "COUNT") return formatNumber(value);
     return formatCurrency(value);
+  };
+
+  const formatVariance = (variance: number | null) => {
+    if (variance === null) return "—";
+    const sign = variance >= 0 ? "+" : "";
+    return `${sign}${variance.toFixed(1)}%`;
   };
 
   const getStatusBg = (status: string) => {
@@ -1544,10 +1963,19 @@ function BPFinanceiroTab() {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "green": return "text-emerald-700 dark:text-emerald-400";
-      case "yellow": return "text-amber-700 dark:text-amber-400";
-      case "red": return "text-rose-700 dark:text-rose-400";
+      case "green": return "text-green-600 dark:text-green-400";
+      case "yellow": return "text-yellow-600 dark:text-yellow-400";
+      case "red": return "text-red-600 dark:text-red-400";
       default: return "text-muted-foreground";
+    }
+  };
+
+  const getSignalDot = (status: string) => {
+    switch (status) {
+      case "green": return "bg-green-500";
+      case "yellow": return "bg-yellow-500";
+      case "red": return "bg-red-500";
+      default: return "bg-muted-foreground/30";
     }
   };
 
@@ -1644,30 +2072,74 @@ function BPFinanceiroTab() {
 
       <Card className="border-0 shadow-lg overflow-hidden">
         <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent border-b pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-primary/10">
-                <DollarSign className="w-5 h-5 text-primary" />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-primary/10">
+                  <DollarSign className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">BP 2026 — Financeiro</CardTitle>
+                  <CardDescription className="mt-0.5">
+                    Acompanhamento Plan vs Actual por métrica e mês
+                  </CardDescription>
+                </div>
               </div>
-              <div>
-                <CardTitle className="text-xl">BP 2026 — Financeiro</CardTitle>
-                <CardDescription className="mt-0.5">
-                  Acompanhamento Plan vs Actual por métrica e mês
-                </CardDescription>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-3 h-3 rounded-full bg-green-500 shadow-sm shadow-green-500/50" />
+                  <span className="text-muted-foreground">No alvo</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500 shadow-sm shadow-yellow-500/50" />
+                  <span className="text-muted-foreground">Atenção</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-3 h-3 rounded-full bg-red-500 shadow-sm shadow-red-500/50" />
+                  <span className="text-muted-foreground">Fora</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-3 h-3 rounded-full bg-muted-foreground/30" />
+                  <span className="text-muted-foreground">Sem dados</span>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-1.5 text-xs">
-                <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
-                <span className="text-muted-foreground">No alvo</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs">
-                <div className="w-3 h-3 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50" />
-                <span className="text-muted-foreground">Atenção</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs">
-                <div className="w-3 h-3 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50" />
-                <span className="text-muted-foreground">Fora</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Exibir:</span>
+              <div className="inline-flex rounded-lg bg-muted p-1 gap-1" data-testid="toggle-bp-display-mode">
+                <button
+                  onClick={() => setDisplayMode("actual")}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    displayMode === "actual"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="toggle-bp-actual"
+                >
+                  Actual
+                </button>
+                <button
+                  onClick={() => setDisplayMode("plan")}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    displayMode === "plan"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="toggle-bp-plan"
+                >
+                  Plan
+                </button>
+                <button
+                  onClick={() => setDisplayMode("variance")}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    displayMode === "variance"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="toggle-bp-variance"
+                >
+                  Variance %
+                </button>
               </div>
             </div>
           </div>
@@ -1722,50 +2194,106 @@ function BPFinanceiroTab() {
                         </TooltipContent>
                       </Tooltip>
                     </td>
-                    {metric.months.map((m) => (
-                      <td key={m.month} className="py-2 px-1 text-center">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className={`inline-flex flex-col items-center justify-center rounded-lg px-2 py-1.5 min-w-[60px] transition-colors ${getStatusBg(m.status)} hover:brightness-95 dark:hover:brightness-110`}>
-                              <div className={`text-xs font-semibold ${getStatusText(m.status)}`}>
-                                {m.actual !== null ? formatValue(m.actual, metric.unit) : "—"}
+                    {metric.months.map((m) => {
+                      const displayValue = displayMode === "plan" 
+                        ? formatValue(m.plan, metric.unit)
+                        : displayMode === "variance" 
+                          ? formatVariance(m.variance)
+                          : formatValue(m.actual, metric.unit);
+                      
+                      const showSignal = displayMode !== "plan";
+                      const cellStatus = m.status || "gray";
+                      
+                      return (
+                        <td key={m.month} className="py-2 px-1 text-center">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 min-w-[70px] transition-colors ${showSignal ? getStatusBg(cellStatus) : "bg-muted/30"} hover:brightness-95 dark:hover:brightness-110`}>
+                                {showSignal && (
+                                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getSignalDot(cellStatus)}`} />
+                                )}
+                                <span className={`text-xs font-semibold ${showSignal ? getStatusText(cellStatus) : "text-foreground"}`}>
+                                  {displayValue}
+                                </span>
                               </div>
-                              <div className="text-[10px] text-muted-foreground/70 mt-0.5">
-                                {m.plan !== null ? formatValue(m.plan, metric.unit) : "—"}
-                              </div>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="space-y-2 min-w-[160px]">
-                              <div className="font-semibold border-b pb-1">{metric.title}</div>
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-muted-foreground">Meta:</span>
-                                <span className="font-medium">{formatValue(m.plan, metric.unit)}</span>
-                              </div>
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-muted-foreground">Realizado:</span>
-                                <span className="font-medium">{m.actual !== null ? formatValue(m.actual, metric.unit) : "Sem dados"}</span>
-                              </div>
-                              {m.variance !== null && (
-                                <div className={`flex items-center justify-between text-xs pt-1 border-t ${m.variance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
-                                  <span>Variação:</span>
-                                  <span className="font-semibold">{m.variance >= 0 ? "+" : ""}{m.variance.toFixed(1)}%</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="space-y-2 min-w-[160px]">
+                                <div className="font-semibold border-b pb-1">{metric.title}</div>
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground">Plan:</span>
+                                  <span className="font-medium">{formatValue(m.plan, metric.unit)}</span>
                                 </div>
-                              )}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </td>
-                    ))}
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground">Actual:</span>
+                                  <span className="font-medium">{m.actual !== null ? formatValue(m.actual, metric.unit) : "Sem dados"}</span>
+                                </div>
+                                {m.variance !== null && (
+                                  <div className={`flex items-center justify-between text-xs pt-1 border-t ${m.variance >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                                    <span>Variance:</span>
+                                    <span className="font-semibold">{formatVariance(m.variance)}</span>
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-1.5 text-xs pt-1 border-t">
+                                  <span className="text-muted-foreground">Status:</span>
+                                  <div className={`w-2 h-2 rounded-full ${getSignalDot(cellStatus)}`} />
+                                  <span className={`font-medium ${getStatusText(cellStatus)}`}>
+                                    {cellStatus === "green" ? "No alvo" : cellStatus === "yellow" ? "Atenção" : cellStatus === "red" ? "Fora" : "Sem dados"}
+                                  </span>
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </td>
+                      );
+                    })}
                     <td className="py-2 px-3 text-center border-l-2 border-primary/20 bg-primary/5">
-                      <div className="flex flex-col items-center">
-                        <div className="text-sm font-bold text-foreground">
-                          {metric.totals.actual !== null ? formatValue(metric.totals.actual, metric.unit) : "—"}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground font-medium">
-                          / {metric.totals.plan !== null ? formatValue(metric.totals.plan, metric.unit) : "—"}
-                        </div>
-                      </div>
+                      {(() => {
+                        const ytdVariance = metric.totals.actual !== null && metric.totals.plan !== null && metric.totals.plan !== 0
+                          ? ((metric.totals.actual - metric.totals.plan) / metric.totals.plan) * 100
+                          : null;
+                        const ytdDisplayValue = displayMode === "plan"
+                          ? formatValue(metric.totals.plan, metric.unit)
+                          : displayMode === "variance"
+                            ? formatVariance(ytdVariance)
+                            : formatValue(metric.totals.actual, metric.unit);
+                        
+                        return (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex flex-col items-center cursor-help">
+                                <div className="text-sm font-bold text-foreground">
+                                  {ytdDisplayValue}
+                                </div>
+                                {displayMode === "actual" && (
+                                  <div className="text-[10px] text-muted-foreground font-medium">
+                                    / {metric.totals.plan !== null ? formatValue(metric.totals.plan, metric.unit) : "—"}
+                                  </div>
+                                )}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="space-y-1 min-w-[140px]">
+                                <div className="font-semibold border-b pb-1">{metric.title} (YTD)</div>
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground">Plan:</span>
+                                  <span className="font-medium">{formatValue(metric.totals.plan, metric.unit)}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground">Actual:</span>
+                                  <span className="font-medium">{formatValue(metric.totals.actual, metric.unit)}</span>
+                                </div>
+                                {ytdVariance !== null && (
+                                  <div className={`flex items-center justify-between text-xs pt-1 border-t ${ytdVariance >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                                    <span>Variance:</span>
+                                    <span className="font-semibold">{formatVariance(ytdVariance)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}
@@ -1794,11 +2322,34 @@ const BUSINESS_UNITS = [
 ];
 
 export default function OKR2026() {
+  const { toast } = useToast();
   usePageTitle("OKR 2026");
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [selectedPeriod, setSelectedPeriod] = useState("YTD");
   const [selectedBU, setSelectedBU] = useState("all");
   const currentQuarter = getCurrentQuarter();
+
+  const seedBPMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("/api/okr2026/seed-bp", { method: "POST" });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Seed realizado com sucesso",
+        description: `Processadas ${data.metricsProcessed} métricas e ${data.targetsUpserted} targets.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/okr2026/summary"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro no seed",
+        description: error.message || "Falha ao processar o seed do BP 2026.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const { data, isLoading, error } = useQuery<SummaryResponse>({
     queryKey: ["/api/okr2026/summary", { period: selectedPeriod, bu: selectedBU }],
@@ -1900,6 +2451,19 @@ export default function OKR2026() {
               <Badge className="text-sm px-4 py-1.5 bg-primary text-primary-foreground shadow-lg shadow-primary/20">
                 {currentQuarter} 2026
               </Badge>
+              {user?.role === 'admin' && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => seedBPMutation.mutate()}
+                  disabled={seedBPMutation.isPending}
+                  className="bg-background/80 backdrop-blur-sm ml-2"
+                  data-testid="button-seed-bp"
+                >
+                  <Rocket className="w-4 h-4 mr-2" />
+                  {seedBPMutation.isPending ? "Processando..." : "Seed BP 2026"}
+                </Button>
+              )}
             </div>
           </div>
         </div>

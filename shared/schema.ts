@@ -962,6 +962,63 @@ export type FinanceiroContaBancaria = {
   empresa: string;
 };
 
+// OKR 2026 Tables
+export const metricTargetsMonthly = pgTable("metric_targets_monthly", {
+  id: serial("id").primaryKey(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  metricKey: varchar("metric_key", { length: 100 }).notNull(),
+  dimensionKey: varchar("dimension_key", { length: 100 }),
+  dimensionValue: varchar("dimension_value", { length: 255 }),
+  targetValue: decimal("target_value", { precision: 18, scale: 6 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => {
+  return {
+    unq: sql`UNIQUE (${table.year}, ${table.month}, ${table.metricKey}, ${table.dimensionKey}, ${table.dimensionValue})`
+  };
+});
+
+export const metricsRegistryExtended = pgTable("metrics_registry_extended", {
+  id: serial("id").primaryKey(),
+  metricKey: varchar("metric_key", { length: 100 }).unique().notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  unit: varchar("unit", { length: 20 }).notNull(),
+  periodType: varchar("period_type", { length: 20 }).notNull(),
+  direction: varchar("direction", { length: 10 }).notNull(),
+  isDerived: boolean("is_derived").default(false),
+  formulaExpr: text("formula_expr"),
+  tolerance: decimal("tolerance", { precision: 10, scale: 4 }).default("0.10"),
+  dimensionKey: varchar("dimension_key", { length: 100 }),
+  dimensionValue: varchar("dimension_value", { length: 255 }),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const metricActualsMonthly = pgTable("metric_actuals_monthly", {
+  id: serial("id").primaryKey(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  metricKey: varchar("metric_key", { length: 100 }).notNull(),
+  dimensionKey: varchar("dimension_key", { length: 100 }),
+  dimensionValue: varchar("dimension_value", { length: 255 }),
+  actualValue: decimal("actual_value", { precision: 18, scale: 6 }),
+  calculatedAt: timestamp("calculated_at").defaultNow(),
+  source: varchar("source", { length: 100 }),
+}, (table) => {
+  return {
+    unq: sql`UNIQUE (${table.year}, ${table.month}, ${table.metricKey}, ${table.dimensionKey}, ${table.dimensionValue})`
+  };
+});
+
+export const insertMetricTargetMonthlySchema = createInsertSchema(metricTargetsMonthly).omit({ id: true, createdAt: true, updatedAt: true });
+export type MetricTargetMonthly = typeof metricTargetsMonthly.$inferSelect;
+export type InsertMetricTargetMonthly = z.infer<typeof insertMetricTargetMonthlySchema>;
+
+export type MetricActualMonthly = typeof metricActualsMonthly.$inferSelect;
+export type MetricRegistryExtended = typeof metricsRegistryExtended.$inferSelect;
+
 // Recruitment Analytics Types (Power BI style G&G Dashboard)
 export type RecrutamentoKPIs = {
   totalCandidaturas: number;
