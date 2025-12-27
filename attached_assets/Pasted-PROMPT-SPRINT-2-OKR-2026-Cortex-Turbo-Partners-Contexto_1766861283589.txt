@@ -1,0 +1,155 @@
+PROMPT (SPRINT 2) — OKR 2026 (Cortex / Turbo Partners)
+
+Contexto
+- Já existe o sistema OKR 2026 com abas: Dashboard, KRs, Iniciativas (Kanban) e BP Financeiro.
+- Agora o foco é: (1) deixar MUITO mais bonito e consistente com o padrão do sistema (UI/UX), (2) adicionar “Lista” de iniciativas além do Kanban, (3) melhorar o Dashboard (mais útil + melhores empty states), (4) importar/semear iniciativas alinhadas ao BP 2026, e (5) criar “Metas por Squad (Operação)” no formato scorecard (baseado na tabela abaixo).
+
+Objetivo do Sprint 2 (o que tem que ficar visivelmente melhor)
+1) UI/Design System “Cortex”
+- Padronizar espaçamentos, tipografia, bordas, sombras e estados.
+- Criar componentes reutilizáveis (Card, MetricCard, Badge/Chip, EmptyState, SectionHeader, DataTable).
+- Status e cores coerentes (Sem dados ≠ Fora do alvo). “0” só quando for 0 de verdade.
+
+2) Iniciativas — Kanban + Lista (dentro da mesma tela)
+- Na aba “Iniciativas”, criar toggle: [Kanban] [Lista]
+- “Lista” deve ser um DataTable com:
+  Colunas: Iniciativa | Objetivo | KR(s) | Quarter | Owner | Status | Confiança | Prazo | Progresso
+  Recursos: busca, filtro por Objective/KR/Owner/Quarter/Status, ordenação por prazo e status
+  Ações rápidas: abrir detalhe (drawer), mudar status, editar owner/prazo, marcar “bloqueado”
+- Kanban atual:
+  - Melhorar visual (cabeçalho das colunas com ícone + contagem)
+  - Cards mais limpos: título, 2–3 badges (Objective, Quarter, Status), owner e prazo
+  - Ao clicar no card: abrir drawer lateral com detalhes
+
+3) Drawer de detalhe de iniciativa (padrão turbo)
+- Campos: Título, Descrição (markdown simples), Objective, KRs vinculados, Quarter, Owner, Prazo, Status, Confiança, Progresso (%), Checklist, Comentários/Discussão
+- Checklist simples (itens “todo/done”)
+- “Relacionamentos”: mostrar badges dos KRs (ex: O1_KR1 MRR Ativo)
+- CTA no topo: “Mover status” + “Salvar alterações”
+
+4) Dashboard — melhorar utilidade e estética
+- Topo (cards KPIs) manter, mas:
+  - Diferenciar “Sem dados” de “0” (exibir “—” + badge “Sem dados” quando não houver dado)
+  - Deixar os cards consistentes: ícone, nome, valor, meta, % atingido, mini barra, status (No alvo/Atenção/Fora/Sem dados)
+- Seção “Alertas de Métricas”:
+  - Redesenhar: menos “bloco vermelho gigante”, mais “lista de alertas” com ícone, motivo e CTA (“Ver KR”)
+- Adicionar 2 blocos novos no Dashboard:
+  A) “Prioridades do trimestre”
+     - Top 5 iniciativas do quarter (ordenar por: bloqueado > doing > backlog e por prazo)
+     - Mostrar mini chips: status, owner, prazo
+     - Link “Ver todas”
+  B) “Check-ins pendentes”
+     - Lista de KRs sem check-in no trimestre atual + CTA “Check-in”
+- Melhorar Empty States:
+  - Quando o ano for 2026 e estivermos em 2025, mostrar mensagem inteligente:
+    “BP 2026 carregado. Dados reais começam quando 2026 iniciar / quando integrar fontes.”
+  - Nos gráficos (ex: Evolução MRR): se tiver <2 pontos, renderizar um EmptyState com sugestão (“Importe dados” / “Seed exemplo”)
+
+5) Metas por Squad (Operação) — Scorecard
+- Criar uma nova página/tela: “Metas por Squad” dentro de “Operação”
+- Deve suportar:
+  - Perspectivas: Financeira, Governança, Gente & Gestão, Operação, CS
+  - Linhas com: Squad (ou “Todos”), Métrica, Objetivo Estratégico, Unidade, Periodicidade, Fonte, Responsável, Realizado, Meta, Score, Peso, Nota
+  - Cálculo padrão:
+    - Se “maior é melhor”: score = (Realizado/Meta)*100
+    - Se “menor é melhor” (ex: churn, inadimplência): score = (Meta/Realizado)*100
+    - “Nota” = score * peso (ou score normalizado, deixar claro no UI)
+  - Mostrar:
+    - Score por perspectiva (média ponderada)
+    - Score total (soma ponderada das perspectivas)
+  - UI:
+    - Tabela bonita com sticky header
+    - Badges de status (no alvo/atenção/fora/sem dados)
+    - Inputs inline para Realizado e Meta (com máscara % / R$)
+
+6) Semear iniciativas Turbo (alinhadas ao BP 2026)
+- Criar/atualizar um arquivo de seed no servidor (ex: server/okr/initiatives.seed.json) e garantir que o botão “Seed BP 2026” também semeie iniciativas caso não existam.
+- Além disso, criar “Importar planilha” (opcional, mas desejável):
+  - Botão na aba Iniciativas: “Importar XLSX”
+  - Usuário sobe .xlsx
+  - Mostrar preview (10 linhas)
+  - Mapear colunas conhecidas: “Iniciativa Estratégica”, “Projetos”, “DRI”, “Prazo”, “Status”
+  - Criar iniciativas no sistema com Objective/KR sugeridos (regra simples baseada em palavras-chave)
+
+Regras de Design (para ficar com cara de produto de verdade)
+- Espaçamento: usar grid consistente; evitar “card gigante vermelho”
+- Tipografia: títulos 18–22, subtítulo 12–14, números com destaque
+- Badges:
+  - Objective: azul
+  - Quarter: neutro
+  - Status: backlog (cinza), doing (azul), done (verde), blocked (vermelho)
+  - Confiança: baixa (vermelho), média (amarelo), alta (verde)
+- States:
+  - Sem dados: cinza + “—”
+  - Fora do alvo: vermelho suave (não chapar a tela)
+- Interações:
+  - Hover e focus states em cards/linhas
+  - Skeleton loading em tabelas e cards
+
+Seed — Iniciativas Turbo 2026 (criar exatamente assim, pode ajustar owners depois)
+- Criar as iniciativas abaixo (IDs estáveis). Linkar aos KRs conforme indicado.
+- Objetivos/KRs assumidos:
+  O1 (Ecossistema: Consolidação + Escala)
+    O1_KR1 MRR Ativo
+    O1_KR2 Receita Total Faturável
+    O1_KR3 Clientes Ativos
+    O1_KR4 Vendas Novas MRR
+    O1_KR5 Expansão/Monetização
+  O2 (Eficiência & Sistemas)
+    O2_KR1 EBITDA
+    O2_KR2 Geração de Caixa
+    O2_KR3 Inadimplência
+    O2_KR4 Net Churn
+    O2_KR5 Logo Churn
+
+[COLE ESTE JSON EM server/okr/initiatives.seed.json]
+[
+  {"id":"I2026_001","title":"Pacotes padrão por BU (Commerce/OH/Ventures)","objectiveId":"O1","linkedKrs":["O1_KR1","O1_KR4"],"quarter":"Q1","owner":"coo@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-03-31","tags":["produto","padronizacao"],"description":"Productizar entregas e escopos por BU para acelerar venda e reduzir fricção.","checklist":["Definir pacotes por BU","Definir preços e limites","Criar one-pager por pacote","Treinar time comercial"]},
+  {"id":"I2026_002","title":"Revisão de pricing e tiers (Starter/Scale/Enterprise)","objectiveId":"O1","linkedKrs":["O1_KR1","O1_KR2"],"quarter":"Q1","owner":"ceo@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-03-31","tags":["preco","margem"],"description":"Ajustar tiers para aumentar margem e ticket sem matar conversão.","checklist":["Mapear custos reais por plano","Definir nova grade","Atualizar propostas","Atualizar contrato/TSS"]},
+  {"id":"I2026_003","title":"Playbook de Upsell (CRM, Automações, Email, CRO)","objectiveId":"O1","linkedKrs":["O1_KR5","O1_KR1"],"quarter":"Q1","owner":"growth@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-03-31","tags":["upsell","monetizacao"],"description":"Criar oferta e fluxo de upsell na base atual para elevar MRR/head.","checklist":["Definir ofertas-padrão","Critérios de oportunidade","Scripts + materiais","Rotina mensal de upsell"]},
+  {"id":"I2026_004","title":"Cross-sell Commerce → TurboOH (playbook + oferta)","objectiveId":"O1","linkedKrs":["O1_KR5","O1_KR2"],"quarter":"Q2","owner":"turbooh@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-06-30","tags":["cross-sell","turbooh"],"description":"Transformar TurboOH em add-on simples para a base Commerce.","checklist":["Oferta + pricing","Segmentos ICP ideais","Argumentário + criativos","Rotina SDR/CS"]},
+  {"id":"I2026_005","title":"Máquina de Outbound ICP (lista + cadência + rotinas)","objectiveId":"O1","linkedKrs":["O1_KR4","O1_KR1"],"quarter":"Q1","owner":"comercial@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-03-31","tags":["outbound","vendas"],"description":"Cadência previsível para aquisição de ICP > R$100k/m.","checklist":["Critérios ICP","Fonte de leads","Cadências e scripts","Rotina semanal + métricas"]},
+  {"id":"I2026_006","title":"Inbound (LinkedIn) com automação n8n + iscas","objectiveId":"O1","linkedKrs":["O1_KR4","O1_KR3"],"quarter":"Q2","owner":"ceo@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-06-30","tags":["inbound","conteudo"],"description":"Gerar pipeline com conteúdo + entrega automatizada de materiais.","checklist":["Definir iscas principais","Fluxo n8n","Páginas/links","Rotina editorial"]},
+  {"id":"I2026_007","title":"Biblioteca de Cases + Calculadora de ROI (Sales enablement)","objectiveId":"O1","linkedKrs":["O1_KR4"],"quarter":"Q1","owner":"growth@turbopartners.com.br","status":"backlog","confidence":"high","progress":0,"dueDate":"2026-03-31","tags":["sales","cases"],"description":"Aumentar conversão de propostas com prova e ROI claro.","checklist":["Padrão de case","Top 10 cases","Planilha ROI","Deck comercial"]},
+  {"id":"I2026_008","title":"Política de ICP e Qualificação (anti-cliente ruim)","objectiveId":"O2","linkedKrs":["O2_KR4","O2_KR5","O2_KR1"],"quarter":"Q1","owner":"coo@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-03-31","tags":["churn","qualidade"],"description":"Reduzir churn e retrabalho via corte/qualificação melhor.","checklist":["Checklist de qualificação","Critérios de veto","Modelo de handoff","Auditoria mensal"]},
+  {"id":"I2026_009","title":"Jornada de Onboarding padrão (SOP + templates)","objectiveId":"O2","linkedKrs":["O2_KR4","O2_KR5"],"quarter":"Q1","owner":"operacao@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-03-31","tags":["onboarding","processo"],"description":"Padronizar kickoff, setup, tracking, e primeiras vitórias.","checklist":["Checklist kickoff","Templates docs","Rotina 7/14/30 dias","QA do setup"]},
+  {"id":"I2026_010","title":"Jornada Ongoing + QBR padrão","objectiveId":"O2","linkedKrs":["O2_KR4","O2_KR5"],"quarter":"Q2","owner":"operacao@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-06-30","tags":["retencao","ritual"],"description":"Rotina de performance e alinhamento para evitar churn silencioso.","checklist":["Modelo QBR","Agenda mensal fixa","Playbook de risco","Treinar CS/AM"]},
+  {"id":"I2026_011","title":"Health Score + NPS/CSAT automatizado (Hugz)","objectiveId":"O2","linkedKrs":["O2_KR4","O2_KR5"],"quarter":"Q2","owner":"tech@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-06-30","tags":["dados","cs"],"description":"Sinalizar risco cedo e criar fila de ação.","checklist":["Definir sinais","Modelo de score","Dashboard","Rotina de tratativa"]},
+  {"id":"I2026_012","title":"Cobrança e Dunning automation (WhatsApp + Email)","objectiveId":"O2","linkedKrs":["O2_KR3","O2_KR2"],"quarter":"Q1","owner":"financeiro@turbopartners.com.br","status":"backlog","confidence":"high","progress":0,"dueDate":"2026-03-31","tags":["inadimplencia","caixa"],"description":"Reduzir inadimplência com mensagens e política clara.","checklist":["Regras de cobrança","Templates WhatsApp","Integração pagamentos","Relatório semanal"]},
+  {"id":"I2026_013","title":"Modelo de Margem por BU + corte de custo (COGS)","objectiveId":"O2","linkedKrs":["O2_KR1"],"quarter":"Q1","owner":"financeiro@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-03-31","tags":["margem","cogs"],"description":"Enxergar margem real e atuar (freelas, escopo, pricing).","checklist":["DRE por BU","COGS por cliente","Política de freela","Revisão mensal"]},
+  {"id":"I2026_014","title":"Capacity Management (MRR/Head, Utilização, WIP)","objectiveId":"O2","linkedKrs":["O2_KR1"],"quarter":"Q2","owner":"operacao@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-06-30","tags":["capacidade","eficiencia"],"description":"Evitar over/understaffing e melhorar margem.","checklist":["Definir métricas","Dash capacity","Rituais (weekly)","Limites WIP por squad"]},
+  {"id":"I2026_015","title":"Padronização de Entregas (QA + checklist por serviço)","objectiveId":"O2","linkedKrs":["O2_KR5","O2_KR4"],"quarter":"Q2","owner":"operacao@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-06-30","tags":["qualidade","padrao"],"description":"Diminuir variância de entrega e aumentar satisfação.","checklist":["QA por serviço","Checklist por entrega","Auditorias amostrais","Treinamentos rápidos"]},
+  {"id":"I2026_016","title":"Contrato Turbo (TMA + TSS) final + gerador de proposta","objectiveId":"O2","linkedKrs":["O2_KR2","O2_KR1"],"quarter":"Q1","owner":"juridico@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-03-31","tags":["juridico","processo"],"description":"Reduzir risco, acelerar fechamento e evitar exceções.","checklist":["Final TMA","Final TSS por serviço","Templates proposta","Workflow aprovação"]},
+  {"id":"I2026_017","title":"Data House BP 2026 (fonte única de verdade)","objectiveId":"O2","linkedKrs":["O2_KR1","O2_KR2","O2_KR4","O2_KR5"],"quarter":"Q3","owner":"tech@turbopartners.com.br","status":"backlog","confidence":"low","progress":0,"dueDate":"2026-09-30","tags":["dados","bi"],"description":"Centralizar métricas e automatizar dashboards do OKR.","checklist":["Mapear fontes","Pipeline","Validação","Rotina de qualidade"]},
+  {"id":"I2026_018","title":"Programa Win-back (clientes perdidos ICP)","objectiveId":"O1","linkedKrs":["O1_KR1","O1_KR3"],"quarter":"Q3","owner":"comercial@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-09-30","tags":["retencao","revenue"],"description":"Reativar clientes com oferta objetiva e prazo curto.","checklist":["Lista ICP churn","Oferta win-back","Sequência","Playbook de reonboarding"]},
+  {"id":"I2026_019","title":"Oferta “Diagnóstico + Gameplan” (produto de entrada)","objectiveId":"O1","linkedKrs":["O1_KR4","O1_KR2"],"quarter":"Q2","owner":"ceo@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-06-30","tags":["produto","vendas"],"description":"Entrada mais fácil para gerar novos contratos.","checklist":["Escopo fechado","Preço","Modelo entrega","Materiais comercial"]},
+  {"id":"I2026_020","title":"Upsell de Ticket (revisão de contratos + reajustes)","objectiveId":"O1","linkedKrs":["O1_KR1"],"quarter":"Q4","owner":"financeiro@turbopartners.com.br","status":"backlog","confidence":"low","progress":0,"dueDate":"2026-12-31","tags":["ticket","contrato"],"description":"Reajustar onde há defasagem e vender escopo adicional.","checklist":["Mapa defasagem","Proposta reajuste","Negociação","Aditivos"]},
+  {"id":"I2026_021","title":"Turbo Academy (trilhas + certificações por função)","objectiveId":"O2","linkedKrs":["O2_KR1","O2_KR5"],"quarter":"Q3","owner":"gg@turbopartners.com.br","status":"backlog","confidence":"low","progress":0,"dueDate":"2026-09-30","tags":["people","treinamento"],"description":"Aumentar qualidade e produtividade com trilhas claras.","checklist":["Trilhas por função","Critérios certificação","Calendário","Métricas adoção"]},
+  {"id":"I2026_022","title":"Organograma + papéis (RACI) por squad","objectiveId":"O2","linkedKrs":["O2_KR1"],"quarter":"Q1","owner":"gg@turbopartners.com.br","status":"backlog","confidence":"high","progress":0,"dueDate":"2026-03-31","tags":["estrutura","processo"],"description":"Clareza de responsabilidade para reduzir gargalo e retrabalho.","checklist":["Org padrão","RACI","Publicar","Revisão trimestral"]},
+  {"id":"I2026_023","title":"Rotinas e rituais (Daily/Weekly/Monthly/1:1) padrão Turbo","objectiveId":"O2","linkedKrs":["O2_KR1","O2_KR5"],"quarter":"Q1","owner":"operacao@turbopartners.com.br","status":"backlog","confidence":"high","progress":0,"dueDate":"2026-03-31","tags":["ritual","execucao"],"description":"Cadência para execução e gestão de performance.","checklist":["Calendário padrão","Templates pauta","Ritos por squad","Auditoria de aderência"]},
+  {"id":"I2026_024","title":"Metas por Squad (scorecard) dentro do sistema","objectiveId":"O2","linkedKrs":["O2_KR1","O2_KR2","O2_KR3"],"quarter":"Q1","owner":"tech@turbopartners.com.br","status":"backlog","confidence":"high","progress":0,"dueDate":"2026-03-31","tags":["sistema","operacao"],"description":"Implementar scorecard de operação com pesos e cálculo.","checklist":["Modelo dados","Tela","Cálculos","Seed inicial"]},
+  {"id":"I2026_025","title":"Parcerias nacionais (pipeline)","objectiveId":"O1","linkedKrs":["O1_KR4"],"quarter":"Q3","owner":"comercial@turbopartners.com.br","status":"backlog","confidence":"low","progress":0,"dueDate":"2026-09-30","tags":["parcerias","vendas"],"description":"Canais parceiros para gerar leads ICP recorrentes.","checklist":["Lista parceiros","Oferta parceria","Materiais","Rotina pipeline"]},
+  {"id":"I2026_026","title":"Dashboard de Mídia e Vendas como add-on (escala)","objectiveId":"O1","linkedKrs":["O1_KR5","O1_KR2"],"quarter":"Q2","owner":"tech@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-06-30","tags":["dashboard","monetizacao"],"description":"Vender dashboard como produto com setup + manutenção.","checklist":["Página do produto","TSS","Processo setup","Processo manutenção"]},
+  {"id":"I2026_027","title":"Política de caixa mínimo + forecast mensal","objectiveId":"O2","linkedKrs":["O2_KR2"],"quarter":"Q1","owner":"financeiro@turbopartners.com.br","status":"backlog","confidence":"high","progress":0,"dueDate":"2026-03-31","tags":["caixa","financeiro"],"description":"Disciplina financeira com metas e rituais.","checklist":["Regra caixa mínimo","Modelo forecast","Ritual mensal","Alertas"]},
+  {"id":"I2026_028","title":"Programa de melhoria de inadimplência (termos + travas)","objectiveId":"O2","linkedKrs":["O2_KR3"],"quarter":"Q2","owner":"juridico@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-06-30","tags":["inadimplencia","contrato"],"description":"Evitar novos atrasos com termos, travas e gatilhos.","checklist":["Regras de suspensão","Aditivo padrão","Treinar CS/Finance","Monitoramento"]},
+  {"id":"I2026_029","title":"Programa NPS + plano de ação por faixa","objectiveId":"O2","linkedKrs":["O2_KR5"],"quarter":"Q3","owner":"operacao@turbopartners.com.br","status":"backlog","confidence":"low","progress":0,"dueDate":"2026-09-30","tags":["nps","qualidade"],"description":"NPS como instrumento de gestão e prevenção de churn.","checklist":["Coleta","Faixas e ações","Rotina mensal","Relatório executivo"]},
+  {"id":"I2026_030","title":"Modelo de expansão por cliente (menu de add-ons)","objectiveId":"O1","linkedKrs":["O1_KR5"],"quarter":"Q2","owner":"growth@turbopartners.com.br","status":"backlog","confidence":"medium","progress":0,"dueDate":"2026-06-30","tags":["expansao","produto"],"description":"Menu claro de add-ons para aumentar ARPA.","checklist":["Definir add-ons","Pricing","Materiais","Rotina CS->Sales"]},
+  {"id":"I2026_031","title":"Padronizar pré-venda: checklist + diagnóstico rápido","objectiveId":"O1","linkedKrs":["O1_KR4"],"quarter":"Q1","owner":"comercial@turbopartners.com.br","status":"backlog","confidence":"high","progress":0,"dueDate":"2026-03-31","tags":["prevenda","processo"],"description":"Aumentar win-rate reduzindo proposta genérica.","checklist":["Checklist diagnóstico","Template proposta","Perguntas padrão","Treinamento SDR"]},
+  {"id":"I2026_032","title":"Instrumentar check-ins (KR) com notas e próximos passos","objectiveId":"O2","linkedKrs":["O2_KR1","O2_KR4","O2_KR5"],"quarter":"Q1","owner":"tech@turbopartners.com.br","status":"backlog","confidence":"high","progress":0,"dueDate":"2026-03-31","tags":["okr","governanca"],"description":"Check-in vira gestão real: risco, decisão e ação.","checklist":["Campos check-in","UI","Persistência","Resumo no dashboard"]}
+]
+
+Seed — Metas por Squad (Operação) (usar como base)
+- Criar um seed inicial com as linhas do meu texto (Financeira/Governança/Gente & Gestão/Operação/CS).
+- Para cada métrica, guardar “direction”: 'up' (maior melhor) ou 'down' (menor melhor).
+- Implementar máscara e unidade (R$, %, S/N, escala, nº).
+
+Checklist de entrega (aceite)
+- [ ] Iniciativas: toggle Kanban/Lista funcionando com filtros
+- [ ] Drawer de iniciativa completo + edição básica
+- [ ] Dashboard mais “executivo”: prioridades + check-ins pendentes + empty states corretos
+- [ ] “Sem dados” não aparece como “Fora do alvo”
+- [ ] Página “Metas por Squad” com cálculo e visuais (status + pesos)
+- [ ] Seed cria iniciativas Turbo 2026 automaticamente
+- [ ] Visual geral mais premium e consistente (sem gambiarras no CSS)
+
+Implementar agora, sem quebrar o que já existe. Priorize refactor com componentes reutilizáveis.
