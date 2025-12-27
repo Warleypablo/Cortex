@@ -30,7 +30,8 @@ import {
   Wallet,
   ArrowLeftRight,
   Megaphone,
-  Construction
+  Construction,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { DealCelebration } from "@/components/DealCelebration";
 import { formatCurrency, formatCurrencyCompact, formatDecimal, formatPercent } from "@/lib/utils";
+import turboLogo from "@assets/Logo-Turbo-branca_(1)_1766081013390.png";
 
 interface CloserMetrics {
   mrrObtido: number;
@@ -443,28 +445,37 @@ export default function PresentationMode() {
 
   const getPositionIcon = (position: number) => {
     switch (position) {
-      case 1: return <Crown className="w-8 h-8 text-yellow-400" />;
-      case 2: return <Medal className="w-7 h-7 text-gray-300" />;
-      case 3: return <Medal className="w-6 h-6 text-amber-600" />;
+      case 1: return <Crown className="w-10 h-10 text-orange-400 drop-shadow-[0_0_12px_rgba(251,146,60,0.8)]" />;
+      case 2: return <Medal className="w-9 h-9 text-slate-300 drop-shadow-[0_0_8px_rgba(203,213,225,0.6)]" />;
+      case 3: return <Medal className="w-8 h-8 text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]" />;
       default: return null;
     }
   };
 
   const getPositionGradient = (position: number) => {
     switch (position) {
-      case 1: return "from-yellow-500/20 via-amber-500/10 to-orange-500/20";
-      case 2: return "from-gray-400/20 via-slate-400/10 to-gray-500/20";
-      case 3: return "from-amber-700/20 via-orange-600/10 to-amber-800/20";
+      case 1: return "from-orange-500/30 via-amber-500/20 to-yellow-500/30";
+      case 2: return "from-slate-400/25 via-slate-500/15 to-slate-400/25";
+      case 3: return "from-amber-600/25 via-orange-500/15 to-amber-600/25";
       default: return "from-slate-800/50 to-slate-900/50";
     }
   };
 
   const getPositionBorder = (position: number) => {
     switch (position) {
-      case 1: return "border-yellow-500/50 shadow-yellow-500/20";
-      case 2: return "border-gray-400/50 shadow-gray-400/20";
-      case 3: return "border-amber-600/50 shadow-amber-600/20";
+      case 1: return "border-orange-500/60 shadow-[0_0_30px_rgba(249,115,22,0.4)]";
+      case 2: return "border-slate-400/50 shadow-[0_0_20px_rgba(148,163,184,0.3)]";
+      case 3: return "border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.3)]";
       default: return "border-slate-700/50";
+    }
+  };
+
+  const getPositionGlow = (position: number) => {
+    switch (position) {
+      case 1: return "animate-pulse shadow-[0_0_40px_rgba(249,115,22,0.5),0_0_80px_rgba(249,115,22,0.2)]";
+      case 2: return "shadow-[0_0_25px_rgba(148,163,184,0.3)]";
+      case 3: return "shadow-[0_0_25px_rgba(245,158,11,0.3)]";
+      default: return "";
     }
   };
 
@@ -588,29 +599,93 @@ export default function PresentationMode() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  const getDashboardTitle = (view: DashboardView) => {
+    switch (view) {
+      case 'closers': return 'Dashboard Closers';
+      case 'sdrs': return 'Dashboard SDRs';
+      case 'visao-geral': return 'Visão Geral';
+      case 'retencao': return 'Análise de Retenção';
+      case 'financeiro-resumo': return 'Resumo Financeiro';
+      case 'fluxo-caixa': return 'Fluxo de Caixa';
+      case 'growth-visao-geral': return 'Growth Overview';
+      default: return 'Dashboard';
+    }
+  };
+
   return (
     <div 
       ref={containerRef}
-      className="h-screen w-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden relative flex flex-col"
+      className="h-screen w-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black text-white overflow-hidden relative flex flex-col"
       data-testid="presentation-mode-container"
     >
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className={`absolute top-0 left-1/4 w-96 h-96 ${currentView === 'closers' ? 'bg-violet-600/10' : 'bg-cyan-600/10'} rounded-full blur-3xl transition-colors duration-1000`} />
-        <div className={`absolute bottom-0 right-1/4 w-96 h-96 ${currentView === 'closers' ? 'bg-emerald-600/10' : 'bg-blue-600/10'} rounded-full blur-3xl transition-colors duration-1000`} />
-        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] ${currentView === 'closers' ? 'bg-blue-600/5' : 'bg-teal-600/5'} rounded-full blur-3xl transition-colors duration-1000`} />
+        <div className={`absolute -top-20 left-1/4 w-[500px] h-[500px] bg-orange-600/8 rounded-full blur-[120px] transition-all duration-1000`} />
+        <div className={`absolute -bottom-20 right-1/4 w-[500px] h-[500px] bg-amber-500/8 rounded-full blur-[120px] transition-all duration-1000`} />
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] ${currentView === 'closers' ? 'bg-orange-500/5' : 'bg-cyan-500/5'} rounded-full blur-[150px] transition-colors duration-1000`} />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0)_0%,rgba(0,0,0,0.3)_100%)]" />
       </div>
 
       <DealCelebration />
 
+      <motion.header 
+        className="relative z-20 flex items-center justify-between px-6 py-4 border-b border-slate-800/50 bg-slate-950/40 backdrop-blur-xl"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        data-testid="presentation-header"
+      >
+        <div className="flex items-center gap-6">
+          <motion.img 
+            src={turboLogo} 
+            alt="Turbo Partners" 
+            className="h-10 w-auto drop-shadow-[0_0_10px_rgba(249,115,22,0.3)]"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2 }}
+            data-testid="img-turbo-logo"
+          />
+          <div className="h-8 w-px bg-gradient-to-b from-transparent via-slate-600 to-transparent" />
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-white via-orange-100 to-orange-300 bg-clip-text text-transparent tracking-tight">
+              {getDashboardTitle(currentView)}
+            </h1>
+            <p className="text-sm text-slate-400 capitalize">{mesAtual}</p>
+          </motion.div>
+        </div>
+
+        <motion.div 
+          className="flex items-center gap-4"
+          initial={{ opacity: 0, x: 10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/60 border border-slate-700/50">
+            <Clock className="w-5 h-5 text-orange-400" />
+            <div className="text-right">
+              <div className="text-3xl font-mono font-bold text-white tracking-wider">
+                {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </div>
+              <div className="text-xs text-slate-400 uppercase tracking-wider">
+                {currentTime.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "short" })}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </motion.header>
+
       <AnimatePresence>
         {showControls && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="absolute top-4 left-1/2 -translate-x-1/2 z-50"
+            exit={{ opacity: 0, y: 20 }}
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50"
           >
-            <div className="flex items-center gap-2 px-4 py-2 bg-slate-900/95 backdrop-blur-md rounded-full border border-slate-700/50 shadow-xl">
+            <div className="flex items-center gap-3 px-5 py-3 bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-700/50 shadow-2xl shadow-black/50">
               <Button
                 variant="ghost"
                 size="icon"
@@ -618,13 +693,13 @@ export default function PresentationMode() {
                   setCurrentViewIndex(prev => (prev - 1 + activeDashboards.length) % activeDashboards.length);
                   setCountdown(config.interval / 1000);
                 }}
-                className="h-8 w-8 text-slate-400 hover:text-white"
+                className="h-10 w-10 text-slate-400 hover:text-orange-400 hover:bg-orange-500/10 transition-all"
                 data-testid="button-view-prev"
               >
-                <ChevronDown className="w-4 h-4 rotate-90" />
+                <ChevronDown className="w-5 h-5 rotate-90" />
               </Button>
               
-              <div className="flex items-center gap-1.5 px-2">
+              <div className="flex items-center gap-2 px-3">
                 {activeDashboards.map((_, idx) => (
                   <button
                     key={idx}
@@ -632,7 +707,11 @@ export default function PresentationMode() {
                       setCurrentViewIndex(idx);
                       setCountdown(config.interval / 1000);
                     }}
-                    className={`w-2 h-2 rounded-full transition-all ${idx === currentViewIndex ? 'bg-white scale-125' : 'bg-slate-600 hover:bg-slate-400'}`}
+                    className={`transition-all duration-300 ${
+                      idx === currentViewIndex 
+                        ? 'w-8 h-3 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 shadow-[0_0_12px_rgba(249,115,22,0.5)]' 
+                        : 'w-3 h-3 rounded-full bg-slate-600 hover:bg-slate-400'
+                    }`}
                   />
                 ))}
               </div>
@@ -644,330 +723,328 @@ export default function PresentationMode() {
                   setCurrentViewIndex(prev => (prev + 1) % activeDashboards.length);
                   setCountdown(config.interval / 1000);
                 }}
-                className="h-8 w-8 text-slate-400 hover:text-white"
+                className="h-10 w-10 text-slate-400 hover:text-orange-400 hover:bg-orange-500/10 transition-all"
                 data-testid="button-view-next"
               >
-                <ChevronUp className="w-4 h-4 rotate-90" />
+                <ChevronUp className="w-5 h-5 rotate-90" />
               </Button>
 
-              <div className="w-px h-5 bg-slate-700" />
+              <div className="w-px h-8 bg-gradient-to-b from-transparent via-slate-600 to-transparent" />
               
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsPaused(p => !p)}
-                className="h-8 w-8 text-slate-300 hover:text-white"
+                className={`h-10 w-10 transition-all ${isPaused ? 'text-orange-400 bg-orange-500/20' : 'text-slate-300 hover:text-white'}`}
                 data-testid="button-toggle-pause"
               >
-                {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
               </Button>
               
-              <span className="text-sm text-slate-400 w-8 text-center font-mono">{countdown}s</span>
+              <div className="flex flex-col items-center justify-center min-w-[48px]">
+                <span className="text-lg font-mono font-bold text-white">{countdown}</span>
+                <span className="text-[10px] text-slate-500 uppercase">seg</span>
+              </div>
 
-              <div className="w-px h-5 bg-slate-700" />
+              <div className="w-px h-8 bg-gradient-to-b from-transparent via-slate-600 to-transparent" />
 
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={toggleFullscreen}
-                className="h-8 w-8 text-slate-300 hover:text-white"
+                className="h-10 w-10 text-slate-300 hover:text-orange-400 hover:bg-orange-500/10 transition-all"
                 data-testid="button-toggle-fullscreen"
               >
-                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
               </Button>
 
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate('/dashboard/comercial/closers')}
-                className="h-8 w-8 text-slate-400 hover:text-red-400"
+                className="h-10 w-10 text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
                 data-testid="button-exit-presentation"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </Button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 flex-1 flex flex-col p-4 lg:p-5 overflow-hidden">
+      <div className="relative z-10 flex-1 flex flex-col p-5 lg:p-6 overflow-hidden">
         <AnimatePresence mode="wait">
           {currentView === 'closers' && (
             <motion.div
               key="closers"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.4 }}
-              className="h-full flex flex-col gap-3"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="h-full flex flex-col gap-4"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <motion.div 
-                    className="relative"
-                    animate={{ rotate: [0, 5, -5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                  >
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 shadow-xl shadow-violet-600/30">
-                      <Trophy className="w-8 h-8 text-white" />
+              <div className="grid grid-cols-5 gap-4">
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1, duration: 0.5 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-600/25 via-amber-600/15 to-yellow-600/20 border border-orange-500/40 p-4 shadow-lg shadow-orange-500/10"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-orange-400/5 to-transparent" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="p-2 rounded-lg bg-orange-500/30">
+                        <Repeat className="w-5 h-5 text-orange-400" />
+                      </div>
+                      <span className="text-sm font-semibold text-orange-200 uppercase tracking-wide">MRR Obtido</span>
                     </div>
-                    <motion.div
-                      className="absolute -top-1 -right-1"
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                    >
-                      <Sparkles className="w-4 h-4 text-yellow-400" />
-                    </motion.div>
-                  </motion.div>
-                  <div>
-                    <h1 className="text-3xl lg:text-4xl font-black bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-transparent">
-                      Dashboard Closers
-                    </h1>
-                    <p className="text-slate-400 text-sm capitalize">
-                      {mesAtual}
-                    </p>
+                    {isLoadingClosers ? (
+                      <Skeleton className="h-12 w-28 bg-slate-700" />
+                    ) : (
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-white drop-shadow-lg"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        key={closerMetrics?.mrrObtido}
+                      >
+                        {formatCurrencyCompact(closerMetrics?.mrrObtido || 0)}
+                      </motion.div>
+                    )}
                   </div>
-                </div>
-
-                <div className="text-right">
-                  <div className="text-xl font-mono font-bold text-white">
-                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                  <div className="text-slate-400 text-[10px]">
-                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-5 gap-3">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-600/20 to-teal-600/10 border border-emerald-500/30 p-3"
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Repeat className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-medium text-emerald-300">MRR Obtido</span>
-                  </div>
-                  {isLoadingClosers ? (
-                    <Skeleton className="h-8 w-24 bg-slate-700" />
-                  ) : (
-                    <motion.div 
-                      className="text-2xl lg:text-3xl font-black text-white"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      key={closerMetrics?.mrrObtido}
-                    >
-                      {formatCurrencyCompact(closerMetrics?.mrrObtido || 0)}
-                    </motion.div>
-                  )}
                 </motion.div>
 
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-600/20 to-indigo-600/10 border border-blue-500/30 p-3"
+                  transition={{ delay: 0.15, duration: 0.5 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600/25 via-yellow-600/15 to-orange-600/20 border border-amber-500/40 p-4 shadow-lg shadow-amber-500/10"
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    <DollarSign className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs font-medium text-blue-300">Pontual</span>
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-400/5 to-transparent" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="p-2 rounded-lg bg-amber-500/30">
+                        <DollarSign className="w-5 h-5 text-amber-400" />
+                      </div>
+                      <span className="text-sm font-semibold text-amber-200 uppercase tracking-wide">Pontual</span>
+                    </div>
+                    {isLoadingClosers ? (
+                      <Skeleton className="h-12 w-28 bg-slate-700" />
+                    ) : (
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-white drop-shadow-lg"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        key={closerMetrics?.pontualObtido}
+                      >
+                        {formatCurrencyCompact(closerMetrics?.pontualObtido || 0)}
+                      </motion.div>
+                    )}
                   </div>
-                  {isLoadingClosers ? (
-                    <Skeleton className="h-8 w-24 bg-slate-700" />
-                  ) : (
-                    <motion.div 
-                      className="text-2xl lg:text-3xl font-black text-white"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      key={closerMetrics?.pontualObtido}
-                    >
-                      {formatCurrencyCompact(closerMetrics?.pontualObtido || 0)}
-                    </motion.div>
-                  )}
                 </motion.div>
 
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-violet-600/20 to-purple-600/10 border border-violet-500/30 p-3"
+                  transition={{ delay: 0.2, duration: 0.5 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600/25 via-purple-600/15 to-indigo-600/20 border border-violet-500/40 p-4 shadow-lg shadow-violet-500/10"
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Users className="w-4 h-4 text-violet-400" />
-                    <span className="text-xs font-medium text-violet-300">Reuniões</span>
+                  <div className="absolute inset-0 bg-gradient-to-br from-violet-400/5 to-transparent" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="p-2 rounded-lg bg-violet-500/30">
+                        <Users className="w-5 h-5 text-violet-400" />
+                      </div>
+                      <span className="text-sm font-semibold text-violet-200 uppercase tracking-wide">Reuniões</span>
+                    </div>
+                    {isLoadingClosers ? (
+                      <Skeleton className="h-12 w-20 bg-slate-700" />
+                    ) : (
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-white drop-shadow-lg"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        key={closerMetrics?.reunioesRealizadas}
+                      >
+                        {closerMetrics?.reunioesRealizadas || 0}
+                      </motion.div>
+                    )}
                   </div>
-                  {isLoadingClosers ? (
-                    <Skeleton className="h-8 w-16 bg-slate-700" />
-                  ) : (
-                    <motion.div 
-                      className="text-2xl lg:text-3xl font-black text-white"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      key={closerMetrics?.reunioesRealizadas}
-                    >
-                      {closerMetrics?.reunioesRealizadas || 0}
-                    </motion.div>
-                  )}
                 </motion.div>
 
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-600/20 to-orange-600/10 border border-amber-500/30 p-3"
+                  transition={{ delay: 0.25, duration: 0.5 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600/25 via-teal-600/15 to-cyan-600/20 border border-emerald-500/40 p-4 shadow-lg shadow-emerald-500/10"
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Handshake className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs font-medium text-amber-300">Negócios</span>
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 to-transparent" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="p-2 rounded-lg bg-emerald-500/30">
+                        <Handshake className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <span className="text-sm font-semibold text-emerald-200 uppercase tracking-wide">Negócios</span>
+                    </div>
+                    {isLoadingClosers ? (
+                      <Skeleton className="h-12 w-20 bg-slate-700" />
+                    ) : (
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-white drop-shadow-lg"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        key={closerMetrics?.negociosGanhos}
+                      >
+                        {closerMetrics?.negociosGanhos || 0}
+                      </motion.div>
+                    )}
                   </div>
-                  {isLoadingClosers ? (
-                    <Skeleton className="h-8 w-16 bg-slate-700" />
-                  ) : (
-                    <motion.div 
-                      className="text-2xl lg:text-3xl font-black text-white"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      key={closerMetrics?.negociosGanhos}
-                    >
-                      {closerMetrics?.negociosGanhos || 0}
-                    </motion.div>
-                  )}
                 </motion.div>
 
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                  className="relative overflow-hidden rounded-xl bg-gradient-to-br from-rose-600/20 to-pink-600/10 border border-rose-500/30 p-3"
+                  transition={{ delay: 0.3, duration: 0.5 }}
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-600/25 via-blue-600/15 to-indigo-600/20 border border-cyan-500/40 p-4 shadow-lg shadow-cyan-500/10"
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    <Target className="w-4 h-4 text-rose-400" />
-                    <span className="text-xs font-medium text-rose-300">Conversão</span>
+                  <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/5 to-transparent" />
+                  <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="p-2 rounded-lg bg-cyan-500/30">
+                        <Target className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <span className="text-sm font-semibold text-cyan-200 uppercase tracking-wide">Conversão</span>
+                    </div>
+                    {isLoadingClosers ? (
+                      <Skeleton className="h-12 w-20 bg-slate-700" />
+                    ) : (
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-white drop-shadow-lg"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        key={closerMetrics?.taxaConversao}
+                      >
+                        {formatPercent(closerMetrics?.taxaConversao || 0)}
+                      </motion.div>
+                    )}
                   </div>
-                  {isLoadingClosers ? (
-                    <Skeleton className="h-8 w-16 bg-slate-700" />
-                  ) : (
-                    <motion.div 
-                      className="text-2xl lg:text-3xl font-black text-white"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      key={closerMetrics?.taxaConversao}
-                    >
-                      {formatPercent(closerMetrics?.taxaConversao || 0)}
-                    </motion.div>
-                  )}
                 </motion.div>
               </div>
 
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-5 min-h-0">
                 <div className="lg:col-span-2 flex flex-col">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-yellow-400" />
-                    <h2 className="text-xl font-bold text-white">Pódio</h2>
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-gradient-to-br from-orange-500/30 to-amber-500/20 border border-orange-500/30">
+                      <Trophy className="w-6 h-6 text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.6)]" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white">Pódio dos Campeões</h2>
                     <motion.div
-                      animate={{ rotate: [0, 10, -10, 0] }}
-                      transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
+                      animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.1, 1] }}
+                      transition={{ duration: 0.8, repeat: Infinity, repeatDelay: 2 }}
                     >
-                      <Flame className="w-4 h-4 text-orange-500" />
+                      <Flame className="w-6 h-6 text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
                     </motion.div>
                   </div>
 
                   {isLoadingClosers ? (
-                    <div className="flex-1 grid grid-cols-3 gap-3">
+                    <div className="flex-1 grid grid-cols-3 gap-4">
                       {[0, 1, 2].map(i => (
-                        <Skeleton key={i} className="bg-slate-800 rounded-xl" />
+                        <Skeleton key={i} className="bg-slate-800 rounded-2xl" />
                       ))}
                     </div>
                   ) : closerTop3.length > 0 ? (
-                    <div className="flex-1 grid grid-cols-3 gap-3 items-end">
+                    <div className="flex-1 grid grid-cols-3 gap-4 items-end">
                       {[1, 0, 2].map((orderIndex) => {
                         const closer = closerTop3[orderIndex];
                         if (!closer) return <div key={orderIndex} />;
                         
                         const isFirst = closer.position === 1;
-                        const heightPercents = { 0: '100%', 1: '85%', 2: '70%' };
+                        const heightPercents = { 0: '100%', 1: '88%', 2: '76%' };
                         
                         return (
                           <motion.div
                             key={closer.name}
-                            initial={{ opacity: 0, y: 50 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3 + orderIndex * 0.15 }}
+                            initial={{ opacity: 0, y: 60, scale: 0.9 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ delay: 0.4 + orderIndex * 0.15, duration: 0.6, ease: "easeOut" }}
                             className="relative"
                             style={{ height: heightPercents[orderIndex as keyof typeof heightPercents] }}
                           >
                             <div 
-                              className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${getPositionGradient(closer.position)} border-2 ${getPositionBorder(closer.position)} shadow-xl backdrop-blur-sm overflow-hidden`}
+                              className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${getPositionGradient(closer.position)} border-2 ${getPositionBorder(closer.position)} ${getPositionGlow(closer.position)} backdrop-blur-sm overflow-hidden transition-all duration-500`}
                             >
                               {isFirst && (
                                 <div className="absolute inset-0 overflow-hidden">
                                   <motion.div
-                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-yellow-400/10 to-transparent"
+                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/15 to-transparent"
                                     animate={{ x: ["-100%", "100%"] }}
-                                    transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+                                    transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1 }}
                                   />
                                 </div>
                               )}
 
-                              <div className="relative p-4 h-full flex flex-col">
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${
-                                    closer.position === 1 ? 'bg-yellow-500/20' :
-                                    closer.position === 2 ? 'bg-gray-400/20' : 'bg-amber-600/20'
-                                  }`}>
-                                    {closer.position === 1 && <Crown className="w-6 h-6 text-yellow-400" />}
-                                    {closer.position === 2 && <Medal className="w-5 h-5 text-gray-300" />}
-                                    {closer.position === 3 && <Medal className="w-5 h-5 text-amber-600" />}
-                                  </div>
-                                  <div className={`text-xs font-bold uppercase tracking-wide ${
-                                    closer.position === 1 ? 'text-yellow-400' :
-                                    closer.position === 2 ? 'text-gray-300' : 'text-amber-500'
+                              <div className="relative p-5 h-full flex flex-col">
+                                <div className="flex items-center justify-between mb-4">
+                                  <motion.div 
+                                    className={`flex items-center justify-center w-14 h-14 rounded-xl ${
+                                      closer.position === 1 ? 'bg-gradient-to-br from-orange-500/30 to-amber-500/20 border border-orange-500/40' :
+                                      closer.position === 2 ? 'bg-gradient-to-br from-slate-400/30 to-slate-500/20 border border-slate-400/40' : 
+                                      'bg-gradient-to-br from-amber-600/30 to-amber-700/20 border border-amber-500/40'
+                                    }`}
+                                    animate={isFirst ? { scale: [1, 1.05, 1] } : {}}
+                                    transition={{ duration: 2, repeat: Infinity }}
+                                  >
+                                    {closer.position === 1 && <Crown className="w-8 h-8 text-orange-400 drop-shadow-[0_0_10px_rgba(251,146,60,0.8)]" />}
+                                    {closer.position === 2 && <Medal className="w-7 h-7 text-slate-300 drop-shadow-[0_0_6px_rgba(203,213,225,0.6)]" />}
+                                    {closer.position === 3 && <Medal className="w-7 h-7 text-amber-500 drop-shadow-[0_0_6px_rgba(245,158,11,0.6)]" />}
+                                  </motion.div>
+                                  <div className={`text-sm font-black uppercase tracking-wider ${
+                                    closer.position === 1 ? 'text-orange-400' :
+                                    closer.position === 2 ? 'text-slate-300' : 'text-amber-500'
                                   }`}>
                                     {closer.position === 1 ? 'CAMPEÃO' : 
                                      closer.position === 2 ? 'VICE' : 'BRONZE'}
                                   </div>
                                 </div>
 
-                                <div className="flex items-center gap-3 mb-3">
+                                <div className="flex items-center gap-4 mb-4">
                                   {closerPhotos?.[closer.name] ? (
                                     <img 
                                       src={closerPhotos[closer.name]} 
                                       alt={closer.name}
-                                      className={`w-12 h-12 rounded-full object-cover border-2 ${
-                                        closer.position === 1 ? 'border-yellow-400' :
-                                        closer.position === 2 ? 'border-gray-300' : 'border-amber-500'
+                                      className={`w-16 h-16 rounded-full object-cover border-3 shadow-lg ${
+                                        closer.position === 1 ? 'border-orange-400 shadow-orange-500/30' :
+                                        closer.position === 2 ? 'border-slate-300 shadow-slate-400/20' : 'border-amber-500 shadow-amber-500/20'
                                       }`}
                                     />
                                   ) : (
-                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
-                                      closer.position === 1 ? 'bg-yellow-500/20 text-yellow-400' :
-                                      closer.position === 2 ? 'bg-gray-400/20 text-gray-300' : 'bg-amber-600/20 text-amber-500'
+                                    <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-black ${
+                                      closer.position === 1 ? 'bg-gradient-to-br from-orange-500/30 to-amber-500/20 text-orange-400 border-2 border-orange-500/40' :
+                                      closer.position === 2 ? 'bg-gradient-to-br from-slate-400/30 to-slate-500/20 text-slate-300 border-2 border-slate-400/40' : 
+                                      'bg-gradient-to-br from-amber-600/30 to-amber-700/20 text-amber-500 border-2 border-amber-500/40'
                                     }`}>
                                       {closer.name.charAt(0)}
                                     </div>
                                   )}
-                                  <h3 className="text-base lg:text-lg font-bold text-white truncate flex-1">
+                                  <h3 className="text-lg lg:text-xl font-black text-white truncate flex-1">
                                     {closer.name}
                                   </h3>
                                 </div>
 
-                                <div className="flex-1 space-y-2">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-xs text-slate-400">Total</span>
-                                    <span className="text-lg font-bold text-white">
+                                <div className="flex-1 space-y-3">
+                                  <div className="flex justify-between items-center p-2 rounded-lg bg-slate-900/40">
+                                    <span className="text-sm text-slate-400 font-medium">Total</span>
+                                    <span className="text-xl font-black text-white">
                                       {formatCurrencyCompact(closer.total)}
                                     </span>
                                   </div>
                                   <div className="flex justify-between items-center">
-                                    <span className="text-xs text-slate-400">MRR</span>
-                                    <span className="text-sm font-semibold text-emerald-400">
+                                    <span className="text-sm text-slate-400">MRR</span>
+                                    <span className="text-base font-bold text-orange-400">
                                       {formatCurrencyCompact(closer.mrr)}
                                     </span>
                                   </div>
                                   <div className="flex justify-between items-center">
-                                    <span className="text-xs text-slate-400">Pontual</span>
+                                    <span className="text-sm text-slate-400">Pontual</span>
                                     <span className="text-sm font-semibold text-blue-400">
                                       {formatCurrencyCompact(closer.pontual)}
                                     </span>
@@ -1001,15 +1078,17 @@ export default function PresentationMode() {
                   )}
                 </div>
 
-                <div className="flex flex-col gap-3 overflow-hidden">
+                <div className="flex flex-col gap-4 overflow-hidden">
                   <div className="flex-1 flex flex-col min-h-0">
-                    <div className="mb-2 flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-violet-400" />
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-500/30 to-amber-500/20 border border-orange-500/30">
+                        <Zap className="w-5 h-5 text-orange-400 drop-shadow-[0_0_6px_rgba(251,146,60,0.6)]" />
+                      </div>
                       <h2 className="text-lg font-bold text-white">Ranking Completo</h2>
                     </div>
 
-                    <div className="flex-1 bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl overflow-hidden flex flex-col">
-                      <div className="flex items-center gap-1 p-1.5 bg-slate-800/50 text-[7px] font-semibold text-slate-400 uppercase tracking-wider">
+                    <div className="flex-1 bg-slate-900/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden flex flex-col shadow-xl">
+                      <div className="flex items-center gap-1 p-2 bg-gradient-to-r from-slate-800/80 to-slate-800/50 text-[8px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-700/30">
                         <div className="w-5 shrink-0">#</div>
                         <div className="flex-1 min-w-0">Closer</div>
                         <div className="w-12 text-right shrink-0">MRR</div>
@@ -1041,21 +1120,21 @@ export default function PresentationMode() {
                             <div className="w-5 shrink-0">
                               {closer.position <= 3 ? (
                                 <div className="w-5 h-5 flex items-center justify-center">
-                                  {closer.position === 1 && <Crown className="w-4 h-4 text-yellow-400" />}
-                                  {closer.position === 2 && <Medal className="w-3 h-3 text-gray-300" />}
-                                  {closer.position === 3 && <Medal className="w-3 h-3 text-amber-600" />}
+                                  {closer.position === 1 && <Crown className="w-4 h-4 text-orange-400 drop-shadow-[0_0_4px_rgba(251,146,60,0.6)]" />}
+                                  {closer.position === 2 && <Medal className="w-3.5 h-3.5 text-slate-300" />}
+                                  {closer.position === 3 && <Medal className="w-3.5 h-3.5 text-amber-500" />}
                                 </div>
                               ) : (
                                 <span className="text-slate-500 font-mono text-[10px]">{closer.position}</span>
                               )}
                             </div>
-                            <div className="flex-1 min-w-0 font-medium text-white truncate text-[10px]">
+                            <div className="flex-1 min-w-0 font-semibold text-white truncate text-[11px]">
                               {closer.name}
                             </div>
-                            <div className="w-12 text-right font-bold text-emerald-400 text-[10px] shrink-0">
+                            <div className="w-12 text-right font-bold text-orange-400 text-[11px] shrink-0">
                               {formatCurrencyCompact(closer.mrr)}
                             </div>
-                            <div className="w-12 text-right font-semibold text-blue-400 text-[10px] shrink-0">
+                            <div className="w-12 text-right font-semibold text-amber-400 text-[11px] shrink-0">
                               {formatCurrencyCompact(closer.pontual)}
                             </div>
                             <div className="w-12 text-right font-bold text-white text-[10px] shrink-0">
@@ -1098,13 +1177,15 @@ export default function PresentationMode() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 }}
                   >
-                    <div className="mb-2 flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-blue-400" />
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500/30 to-orange-500/20 border border-amber-500/30">
+                        <Zap className="w-4 h-4 text-amber-400 drop-shadow-[0_0_6px_rgba(245,158,11,0.6)]" />
+                      </div>
                       <h2 className="text-sm font-bold text-white">Destaque Pontual</h2>
-                      <Badge className="bg-blue-500/20 text-blue-400 text-[9px]">Top Pontuais</Badge>
+                      <Badge className="bg-amber-500/20 text-amber-400 text-[9px] border border-amber-500/30">Top Pontuais</Badge>
                     </div>
 
-                    <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl overflow-hidden">
+                    <div className="bg-slate-900/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden shadow-lg">
                       {isLoadingClosers ? (
                         <div className="p-2 space-y-2">
                           {[1, 2, 3].map((i) => (
@@ -1112,31 +1193,31 @@ export default function PresentationMode() {
                           ))}
                         </div>
                       ) : closerTop3Pontual.length > 0 ? (
-                        <div className="divide-y divide-slate-800/50">
+                        <div className="divide-y divide-slate-700/30">
                           {closerTop3Pontual.map((closer, index) => (
                             <motion.div
                               key={closer.name}
                               initial={{ opacity: 0, x: 10 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: 0.1 * index }}
-                              className={`p-2 flex items-center gap-2 ${
-                                index === 0 ? 'bg-gradient-to-r from-blue-500/20 to-transparent' : ''
+                              className={`p-2.5 flex items-center gap-2 ${
+                                index === 0 ? 'bg-gradient-to-r from-amber-500/20 to-transparent' : ''
                               }`}
                             >
-                              <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                index === 0 ? 'bg-blue-500/30' :
-                                index === 1 ? 'bg-slate-600/30' :
-                                'bg-amber-600/30'
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                index === 0 ? 'bg-amber-500/30 border border-amber-500/40' :
+                                index === 1 ? 'bg-slate-600/30 border border-slate-500/30' :
+                                'bg-orange-600/30 border border-orange-500/30'
                               }`}>
-                                {index === 0 && <Crown className="w-3 h-3 text-blue-400" />}
-                                {index === 1 && <Medal className="w-2.5 h-2.5 text-gray-300" />}
-                                {index === 2 && <Medal className="w-2.5 h-2.5 text-amber-600" />}
+                                {index === 0 && <Crown className="w-4 h-4 text-amber-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.6)]" />}
+                                {index === 1 && <Medal className="w-3 h-3 text-slate-300" />}
+                                {index === 2 && <Medal className="w-3 h-3 text-orange-400" />}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium text-white truncate text-xs">{closer.name}</div>
+                                <div className="font-semibold text-white truncate text-xs">{closer.name}</div>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <div className="text-xs font-bold text-blue-400">{formatCurrencyCompact(closer.pontual)}</div>
+                                <div className="text-sm font-bold text-amber-400">{formatCurrencyCompact(closer.pontual)}</div>
                               </div>
                             </motion.div>
                           ))}
@@ -1153,17 +1234,18 @@ export default function PresentationMode() {
 
               {/* BARRA DE META */}
               <motion.div 
-                className="mt-2 relative"
+                className="mt-3 relative"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.6 }}
+                transition={{ delay: 0.6, duration: 0.6 }}
               >
-                <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/50 p-3">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800/90 to-slate-900 border border-orange-500/20 p-4 shadow-xl shadow-orange-500/5">
+                  <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 via-transparent to-orange-500/5" />
                   <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
                         <motion.div 
-                          className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30"
+                          className="p-2.5 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 shadow-lg shadow-orange-500/40"
                           animate={{ scale: [1, 1.05, 1] }}
                           transition={{ duration: 2, repeat: Infinity }}
                         >
@@ -1293,117 +1375,95 @@ export default function PresentationMode() {
           {currentView === 'sdrs' && (
             <motion.div
               key="sdrs"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.4 }}
-              className="h-full flex flex-col gap-2"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="h-full flex flex-col gap-4"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <motion.div 
-                    className="relative"
-                    animate={{ rotate: [0, 5, -5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                  >
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-600 to-teal-700 shadow-2xl shadow-cyan-600/30">
-                      <Headphones className="w-10 h-10 text-white" />
-                    </div>
-                    <motion.div
-                      className="absolute -top-1 -right-1"
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                    >
-                      <Sparkles className="w-5 h-5 text-yellow-400" />
-                    </motion.div>
-                  </motion.div>
-                  <div>
-                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-cyan-200 to-cyan-400 bg-clip-text text-transparent">
-                      Dashboard SDRs
-                    </h1>
-                    <p className="text-slate-400 text-lg mt-1 capitalize">
-                      {mesAtual}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <div className="text-2xl font-mono font-bold text-white">
-                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                  <div className="text-slate-400 text-xs">
-                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-4">
                 {[
                   { 
                     label: "Leads Criados", 
                     value: sdrMetrics?.leadsTotais || 0, 
                     icon: Users,
-                    gradient: "from-blue-600 to-indigo-600",
+                    gradient: "from-orange-600/25 via-amber-600/15 to-yellow-600/20",
+                    border: "border-orange-500/40",
+                    iconBg: "bg-orange-500/30",
+                    iconColor: "text-orange-400",
+                    shadow: "shadow-orange-500/10",
                     format: (v: number) => v.toString()
                   },
                   { 
                     label: "Reuniões Realizadas", 
                     value: sdrMetrics?.reunioesRealizadas || 0, 
                     icon: CalendarCheck,
-                    gradient: "from-cyan-600 to-teal-600",
+                    gradient: "from-cyan-600/25 via-teal-600/15 to-emerald-600/20",
+                    border: "border-cyan-500/40",
+                    iconBg: "bg-cyan-500/30",
+                    iconColor: "text-cyan-400",
+                    shadow: "shadow-cyan-500/10",
                     format: (v: number) => v.toString()
                   },
                   { 
                     label: "Taxa de Conversão", 
                     value: sdrMetrics?.taxaConversao || 0, 
                     icon: TrendingUp,
-                    gradient: "from-emerald-600 to-green-600",
+                    gradient: "from-emerald-600/25 via-teal-600/15 to-cyan-600/20",
+                    border: "border-emerald-500/40",
+                    iconBg: "bg-emerald-500/30",
+                    iconColor: "text-emerald-400",
+                    shadow: "shadow-emerald-500/10",
                     format: (v: number) => `${v.toFixed(1)}%`
                   },
                 ].map((kpi, index) => (
                   <motion.div
                     key={kpi.label}
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 * index }}
+                    transition={{ delay: 0.1 * index, duration: 0.5 }}
                   >
-                    <div className="relative overflow-hidden rounded-2xl bg-slate-900/60 backdrop-blur-sm border border-slate-800 p-4">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                    <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${kpi.gradient} ${kpi.border} border p-5 shadow-lg ${kpi.shadow}`}>
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent" />
                       
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className={`p-2.5 rounded-xl bg-gradient-to-br ${kpi.gradient} shadow-lg`}>
-                          <kpi.icon className="w-5 h-5 text-white" />
+                      <div className="relative">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className={`p-2 rounded-lg ${kpi.iconBg}`}>
+                            <kpi.icon className={`w-5 h-5 ${kpi.iconColor}`} />
+                          </div>
+                          <span className="text-sm font-semibold text-slate-200 uppercase tracking-wide">{kpi.label}</span>
                         </div>
-                        <span className="text-sm font-medium text-slate-400">{kpi.label}</span>
+                        
+                        {isLoadingSDRs ? (
+                          <Skeleton className="h-12 w-32 bg-slate-700" />
+                        ) : (
+                          <motion.div
+                            className="text-4xl lg:text-5xl font-black text-white drop-shadow-lg"
+                            initial={{ scale: 0.5 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: "spring", stiffness: 200, delay: 0.2 + 0.1 * index }}
+                          >
+                            {kpi.format(kpi.value)}
+                          </motion.div>
+                        )}
                       </div>
-                      
-                      {isLoadingSDRs ? (
-                        <Skeleton className="h-10 w-32 bg-slate-800" />
-                      ) : (
-                        <motion.div
-                          className="text-4xl font-black text-white"
-                          initial={{ scale: 0.5 }}
-                          animate={{ scale: 1 }}
-                          transition={{ type: "spring", stiffness: 200, delay: 0.2 + 0.1 * index }}
-                        >
-                          {kpi.format(kpi.value)}
-                        </motion.div>
-                      )}
                     </div>
                   </motion.div>
                 ))}
               </div>
 
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-5 min-h-0">
                 <div className="flex flex-col min-h-0">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-yellow-500" />
-                    <h2 className="text-lg font-bold text-white">Pódio dos Campeões</h2>
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-gradient-to-br from-orange-500/30 to-amber-500/20 border border-orange-500/30">
+                      <Trophy className="w-6 h-6 text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.6)]" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white">Pódio dos Campeões</h2>
                     <motion.div
-                      animate={{ rotate: [0, 15, -15, 0] }}
-                      transition={{ duration: 1, repeat: Infinity, repeatDelay: 2 }}
+                      animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.1, 1] }}
+                      transition={{ duration: 0.8, repeat: Infinity, repeatDelay: 2 }}
                     >
-                      <Flame className="w-5 h-5 text-orange-500" />
+                      <Flame className="w-6 h-6 text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
                     </motion.div>
                   </div>
                   
@@ -1414,94 +1474,100 @@ export default function PresentationMode() {
                       ))}
                     </div>
                   ) : sdrTop3.length > 0 ? (
-                    <div className="flex-1 grid grid-cols-3 gap-3 items-end">
+                    <div className="flex-1 grid grid-cols-3 gap-4 items-end">
                       {[1, 0, 2].map((orderIndex) => {
                         const sdr = sdrTop3[orderIndex];
                         if (!sdr) return <div key={orderIndex} />;
                         
                         const isFirst = sdr.position === 1;
-                        const heightPercents = { 0: '100%', 1: '85%', 2: '70%' };
+                        const heightPercents = { 0: '100%', 1: '88%', 2: '76%' };
                         
                         return (
                           <motion.div
                             key={sdr.name}
-                            initial={{ opacity: 0, y: 50 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3 + orderIndex * 0.15 }}
+                            initial={{ opacity: 0, y: 60, scale: 0.9 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ delay: 0.4 + orderIndex * 0.15, duration: 0.6, ease: "easeOut" }}
                             className="relative"
                             style={{ height: heightPercents[orderIndex as keyof typeof heightPercents] }}
                           >
                             <div 
-                              className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${getPositionGradient(sdr.position)} border-2 ${getPositionBorder(sdr.position)} shadow-xl backdrop-blur-sm overflow-hidden`}
+                              className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${getPositionGradient(sdr.position)} border-2 ${getPositionBorder(sdr.position)} ${getPositionGlow(sdr.position)} backdrop-blur-sm overflow-hidden transition-all duration-500`}
                             >
                               {isFirst && (
                                 <div className="absolute inset-0 overflow-hidden">
                                   <motion.div
-                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent"
+                                    className="absolute inset-0 bg-gradient-to-r from-transparent via-orange-400/15 to-transparent"
                                     animate={{ x: ["-100%", "100%"] }}
-                                    transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+                                    transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1 }}
                                   />
                                 </div>
                               )}
 
-                              <div className="relative p-4 h-full flex flex-col">
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${
-                                    sdr.position === 1 ? 'bg-yellow-500/20' :
-                                    sdr.position === 2 ? 'bg-gray-400/20' : 'bg-amber-600/20'
-                                  }`}>
-                                    {sdr.position === 1 && <Crown className="w-6 h-6 text-yellow-400" />}
-                                    {sdr.position === 2 && <Medal className="w-5 h-5 text-gray-300" />}
-                                    {sdr.position === 3 && <Medal className="w-5 h-5 text-amber-600" />}
-                                  </div>
-                                  <div className={`text-xs font-bold uppercase tracking-wide ${
-                                    sdr.position === 1 ? 'text-yellow-400' :
-                                    sdr.position === 2 ? 'text-gray-300' : 'text-amber-500'
+                              <div className="relative p-5 h-full flex flex-col">
+                                <div className="flex items-center justify-between mb-4">
+                                  <motion.div 
+                                    className={`flex items-center justify-center w-14 h-14 rounded-xl ${
+                                      sdr.position === 1 ? 'bg-gradient-to-br from-orange-500/30 to-amber-500/20 border border-orange-500/40' :
+                                      sdr.position === 2 ? 'bg-gradient-to-br from-slate-400/30 to-slate-500/20 border border-slate-400/40' : 
+                                      'bg-gradient-to-br from-amber-600/30 to-amber-700/20 border border-amber-500/40'
+                                    }`}
+                                    animate={isFirst ? { scale: [1, 1.05, 1] } : {}}
+                                    transition={{ duration: 2, repeat: Infinity }}
+                                  >
+                                    {sdr.position === 1 && <Crown className="w-8 h-8 text-orange-400 drop-shadow-[0_0_10px_rgba(251,146,60,0.8)]" />}
+                                    {sdr.position === 2 && <Medal className="w-7 h-7 text-slate-300 drop-shadow-[0_0_6px_rgba(203,213,225,0.6)]" />}
+                                    {sdr.position === 3 && <Medal className="w-7 h-7 text-amber-500 drop-shadow-[0_0_6px_rgba(245,158,11,0.6)]" />}
+                                  </motion.div>
+                                  <div className={`text-sm font-black uppercase tracking-wider ${
+                                    sdr.position === 1 ? 'text-orange-400' :
+                                    sdr.position === 2 ? 'text-slate-300' : 'text-amber-500'
                                   }`}>
                                     {sdr.position === 1 ? 'CAMPEÃO' : 
                                      sdr.position === 2 ? 'VICE' : 'BRONZE'}
                                   </div>
                                 </div>
 
-                                <div className="flex items-center gap-3 mb-3">
+                                <div className="flex items-center gap-4 mb-4">
                                   {sdrPhotos?.[sdr.name] ? (
                                     <img 
                                       src={sdrPhotos[sdr.name]} 
                                       alt={sdr.name}
-                                      className={`w-12 h-12 rounded-full object-cover border-2 ${
-                                        sdr.position === 1 ? 'border-yellow-400' :
-                                        sdr.position === 2 ? 'border-gray-300' : 'border-amber-500'
+                                      className={`w-16 h-16 rounded-full object-cover border-3 shadow-lg ${
+                                        sdr.position === 1 ? 'border-orange-400 shadow-orange-500/30' :
+                                        sdr.position === 2 ? 'border-slate-300 shadow-slate-400/20' : 'border-amber-500 shadow-amber-500/20'
                                       }`}
                                     />
                                   ) : (
-                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
-                                      sdr.position === 1 ? 'bg-yellow-500/20 text-yellow-400' :
-                                      sdr.position === 2 ? 'bg-gray-400/20 text-gray-300' : 'bg-amber-600/20 text-amber-500'
+                                    <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-black ${
+                                      sdr.position === 1 ? 'bg-gradient-to-br from-orange-500/30 to-amber-500/20 text-orange-400 border-2 border-orange-500/40' :
+                                      sdr.position === 2 ? 'bg-gradient-to-br from-slate-400/30 to-slate-500/20 text-slate-300 border-2 border-slate-400/40' : 
+                                      'bg-gradient-to-br from-amber-600/30 to-amber-700/20 text-amber-500 border-2 border-amber-500/40'
                                     }`}>
                                       {sdr.name.charAt(0)}
                                     </div>
                                   )}
-                                  <h3 className="text-base lg:text-lg font-bold text-white truncate flex-1">
+                                  <h3 className="text-lg lg:text-xl font-black text-white truncate flex-1">
                                     {sdr.name}
                                   </h3>
                                 </div>
 
-                                <div className="flex-1 space-y-2">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-xs text-slate-400">Reuniões</span>
-                                    <span className="text-lg font-bold text-cyan-400">
+                                <div className="flex-1 space-y-3">
+                                  <div className="flex justify-between items-center p-2 rounded-lg bg-slate-900/40">
+                                    <span className="text-sm text-slate-400 font-medium">Reuniões</span>
+                                    <span className="text-xl font-black text-orange-400">
                                       {sdr.reunioesRealizadas}
                                     </span>
                                   </div>
                                   <div className="flex justify-between items-center">
-                                    <span className="text-xs text-slate-400">MRR</span>
-                                    <span className="text-sm font-semibold text-emerald-400">
+                                    <span className="text-sm text-slate-400">MRR</span>
+                                    <span className="text-base font-bold text-emerald-400">
                                       {formatCurrencyCompact(sdr.mrr)}
                                     </span>
                                   </div>
                                   <div className="flex justify-between items-center">
-                                    <span className="text-xs text-slate-400">Pontual</span>
-                                    <span className="text-sm font-semibold text-blue-400">
+                                    <span className="text-sm text-slate-400">Pontual</span>
+                                    <span className="text-base font-bold text-amber-400">
                                       {formatCurrencyCompact(sdr.pontual)}
                                     </span>
                                   </div>
@@ -1509,16 +1575,16 @@ export default function PresentationMode() {
 
                                 <div className="mt-3 pt-3 border-t border-slate-700/50 grid grid-cols-3 gap-2 text-center">
                                   <div>
-                                    <div className="text-base font-bold text-white">{sdr.leads}</div>
-                                    <div className="text-[9px] text-slate-400 uppercase">Leads</div>
+                                    <div className="text-lg font-bold text-white">{sdr.leads}</div>
+                                    <div className="text-[10px] text-slate-400 uppercase font-medium">Leads</div>
                                   </div>
                                   <div>
-                                    <div className="text-base font-bold text-white">{sdr.contratos}</div>
-                                    <div className="text-[9px] text-slate-400 uppercase">Contratos</div>
+                                    <div className="text-lg font-bold text-white">{sdr.contratos}</div>
+                                    <div className="text-[10px] text-slate-400 uppercase font-medium">Contratos</div>
                                   </div>
                                   <div>
-                                    <div className="text-base font-bold text-white">{formatPercent(sdr.conversao)}</div>
-                                    <div className="text-[9px] text-slate-400 uppercase">Conv.</div>
+                                    <div className="text-lg font-bold text-white">{formatPercent(sdr.conversao)}</div>
+                                    <div className="text-[10px] text-slate-400 uppercase font-medium">Conv.</div>
                                   </div>
                                 </div>
                               </div>
@@ -1535,17 +1601,19 @@ export default function PresentationMode() {
                 </div>
 
                 <div className="flex flex-col min-h-0">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-cyan-400" />
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-500/30 to-amber-500/20 border border-orange-500/30">
+                      <Zap className="w-5 h-5 text-orange-400 drop-shadow-[0_0_6px_rgba(251,146,60,0.6)]" />
+                    </div>
                     <h2 className="text-lg font-bold text-white">Ranking Completo</h2>
                   </div>
 
-                  <div className="flex-1 bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl overflow-hidden flex flex-col min-h-0">
-                    <div className="grid grid-cols-12 gap-1 p-2 bg-slate-800/50 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <div className="flex-1 bg-slate-900/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl overflow-hidden flex flex-col min-h-0 shadow-xl">
+                    <div className="grid grid-cols-12 gap-1 p-2 bg-gradient-to-r from-slate-800/80 to-slate-800/50 text-[9px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-700/30">
                       <div className="col-span-1">#</div>
                       <div className="col-span-2">SDR</div>
                       <div className="col-span-1 text-right">Leads</div>
-                      <div className="col-span-1 text-right text-cyan-400">Reuniões</div>
+                      <div className="col-span-1 text-right text-orange-400">Reuniões</div>
                       <div className="col-span-1 text-right">% RR/L</div>
                       <div className="col-span-1 text-right">Contr.</div>
                       <div className="col-span-1 text-right">% V/RR</div>
@@ -1577,21 +1645,21 @@ export default function PresentationMode() {
                             <div className="col-span-1">
                               {sdr.position <= 3 ? (
                                 <div className="w-5 h-5 flex items-center justify-center">
-                                  {sdr.position === 1 && <Crown className="w-4 h-4 text-yellow-400" />}
-                                  {sdr.position === 2 && <Medal className="w-3 h-3 text-gray-300" />}
-                                  {sdr.position === 3 && <Medal className="w-3 h-3 text-amber-600" />}
+                                  {sdr.position === 1 && <Crown className="w-4 h-4 text-orange-400 drop-shadow-[0_0_4px_rgba(251,146,60,0.6)]" />}
+                                  {sdr.position === 2 && <Medal className="w-3.5 h-3.5 text-slate-300" />}
+                                  {sdr.position === 3 && <Medal className="w-3.5 h-3.5 text-amber-500" />}
                                 </div>
                               ) : (
                                 <span className="text-slate-500 font-mono text-xs">{sdr.position}</span>
                               )}
                             </div>
-                            <div className="col-span-2 font-medium text-white truncate text-xs">
+                            <div className="col-span-2 font-semibold text-white truncate text-xs">
                               {sdr.name}
                             </div>
                             <div className="col-span-1 text-right text-slate-300 text-xs">
                               {sdr.leads}
                             </div>
-                            <div className="col-span-1 text-right font-black text-cyan-400 text-sm">
+                            <div className="col-span-1 text-right font-black text-orange-400 text-sm">
                               {sdr.reunioesRealizadas}
                             </div>
                             <div className="col-span-1 text-right">
@@ -1790,51 +1858,13 @@ export default function PresentationMode() {
           {currentView === 'visao-geral' && (
             <motion.div
               key="visao-geral"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.4 }}
-              className="h-full flex flex-col"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="h-full flex flex-col gap-4"
             >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <motion.div 
-                    className="relative"
-                    animate={{ rotate: [0, 5, -5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                  >
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 shadow-2xl shadow-indigo-600/30">
-                      <BarChart3 className="w-10 h-10 text-white" />
-                    </div>
-                    <motion.div
-                      className="absolute -top-1 -right-1"
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                    >
-                      <Sparkles className="w-5 h-5 text-yellow-400" />
-                    </motion.div>
-                  </motion.div>
-                  <div>
-                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent">
-                      Visão Geral da Operação
-                    </h1>
-                    <p className="text-slate-400 text-lg mt-1 capitalize">
-                      {mesAtual}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <div className="text-2xl font-mono font-bold text-white">
-                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                  <div className="text-slate-400 text-xs">
-                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex-1 grid grid-cols-3 gap-4 lg:gap-6">
+              <div className="flex-1 grid grid-cols-3 gap-5 lg:gap-6">
                 {isLoadingVisaoGeral ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <motion.div
@@ -2021,50 +2051,12 @@ export default function PresentationMode() {
           {currentView === 'retencao' && (
             <motion.div
               key="retencao"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.4 }}
-              className="h-full flex flex-col"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="h-full flex flex-col gap-4"
             >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <motion.div 
-                    className="relative"
-                    animate={{ rotate: [0, 5, -5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                  >
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-600 to-emerald-700 shadow-2xl shadow-teal-600/30">
-                      <Shield className="w-10 h-10 text-white" />
-                    </div>
-                    <motion.div
-                      className="absolute -top-1 -right-1"
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                    >
-                      <Sparkles className="w-5 h-5 text-yellow-400" />
-                    </motion.div>
-                  </motion.div>
-                  <div>
-                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-teal-200 to-teal-400 bg-clip-text text-transparent">
-                      Análise de Retenção
-                    </h1>
-                    <p className="text-slate-400 text-lg mt-1 capitalize">
-                      {mesAtual}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <div className="text-2xl font-mono font-bold text-white">
-                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                  <div className="text-slate-400 text-xs">
-                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
-                  </div>
-                </div>
-              </div>
-
               <div className="flex-1 grid grid-cols-2 gap-4 lg:gap-6">
                 {/* Churn por Serviço - Left Column */}
                 <motion.div
@@ -2228,50 +2220,12 @@ export default function PresentationMode() {
           {currentView === 'financeiro-resumo' && (
             <motion.div
               key="financeiro-resumo"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.4 }}
-              className="h-full flex flex-col"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="h-full flex flex-col gap-4"
             >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <motion.div 
-                    className="relative"
-                    animate={{ rotate: [0, 5, -5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                  >
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-600 to-orange-700 shadow-2xl shadow-amber-600/30">
-                      <Wallet className="w-10 h-10 text-white" />
-                    </div>
-                    <motion.div
-                      className="absolute -top-1 -right-1"
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                    >
-                      <Sparkles className="w-5 h-5 text-yellow-400" />
-                    </motion.div>
-                  </motion.div>
-                  <div>
-                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-amber-200 to-amber-400 bg-clip-text text-transparent">
-                      Resumo Financeiro
-                    </h1>
-                    <p className="text-slate-400 text-lg mt-1 capitalize">
-                      {mesAtual}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <div className="text-2xl font-mono font-bold text-white">
-                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                  <div className="text-slate-400 text-xs">
-                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
-                  </div>
-                </div>
-              </div>
-
               <div className="flex-1 grid grid-cols-3 gap-4 lg:gap-6">
                 {isLoadingFinanceiroKPIs ? (
                   Array.from({ length: 6 }).map((_, i) => (
@@ -2469,50 +2423,12 @@ export default function PresentationMode() {
           {currentView === 'fluxo-caixa' && (
             <motion.div
               key="fluxo-caixa"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.4 }}
-              className="h-full flex flex-col"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="h-full flex flex-col gap-4"
             >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <motion.div 
-                    className="relative"
-                    animate={{ rotate: [0, 5, -5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                  >
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-600 to-sky-700 shadow-2xl shadow-blue-600/30">
-                      <ArrowLeftRight className="w-10 h-10 text-white" />
-                    </div>
-                    <motion.div
-                      className="absolute -top-1 -right-1"
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                    >
-                      <Sparkles className="w-5 h-5 text-yellow-400" />
-                    </motion.div>
-                  </motion.div>
-                  <div>
-                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-blue-200 to-blue-400 bg-clip-text text-transparent">
-                      Fluxo de Caixa
-                    </h1>
-                    <p className="text-slate-400 text-lg mt-1 capitalize">
-                      {mesAtual}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <div className="text-2xl font-mono font-bold text-white">
-                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                  <div className="text-slate-400 text-xs">
-                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
-                  </div>
-                </div>
-              </div>
-
               <div className="flex-1 flex flex-col gap-4 lg:gap-6">
                 <div className="grid grid-cols-4 gap-4 lg:gap-6">
                   {isLoadingFluxoCaixa ? (
@@ -2749,50 +2665,12 @@ export default function PresentationMode() {
           {currentView === 'growth-visao-geral' && (
             <motion.div
               key="growth-visao-geral"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.4 }}
-              className="h-full flex flex-col"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="h-full flex flex-col gap-4"
             >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <motion.div 
-                    className="relative"
-                    animate={{ rotate: [0, 5, -5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                  >
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-rose-600 to-pink-700 shadow-2xl shadow-rose-600/30">
-                      <Megaphone className="w-10 h-10 text-white" />
-                    </div>
-                    <motion.div
-                      className="absolute -top-1 -right-1"
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                    >
-                      <Sparkles className="w-5 h-5 text-yellow-400" />
-                    </motion.div>
-                  </motion.div>
-                  <div>
-                    <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-rose-200 to-rose-400 bg-clip-text text-transparent">
-                      Performance Marketing
-                    </h1>
-                    <p className="text-slate-400 text-lg mt-1 capitalize">
-                      {mesAtual}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <div className="text-2xl font-mono font-bold text-white">
-                    {currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                  <div className="text-slate-400 text-xs">
-                    {currentTime.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
-                  </div>
-                </div>
-              </div>
-
               <div className="flex-1 grid grid-cols-3 gap-4 lg:gap-6">
                 {isLoadingMetaAds ? (
                   Array.from({ length: 6 }).map((_, i) => (
