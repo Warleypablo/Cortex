@@ -792,6 +792,63 @@ export default function Patrimonio() {
                 )}
               </div>
 
+              {/* Quick Filter Badges */}
+              <div className="flex flex-wrap gap-4">
+                {/* Tipo de Bem Badges */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground font-medium">Tipo:</span>
+                  <Badge
+                    variant={filterTipoBem === "todos" ? "default" : "outline"}
+                    className="cursor-pointer hover:bg-primary/80 transition-colors"
+                    onClick={() => { setFilterTipoBem("todos"); setCurrentPage(1); }}
+                    data-testid="badge-filter-tipo-todos"
+                  >
+                    Todos
+                  </Badge>
+                  {uniqueTiposBem.slice(0, 6).map(tipo => (
+                    <Badge
+                      key={tipo}
+                      variant={filterTipoBem === tipo ? "default" : "outline"}
+                      className="cursor-pointer hover:bg-primary/80 transition-colors"
+                      onClick={() => { setFilterTipoBem(tipo); setCurrentPage(1); }}
+                      data-testid={`badge-filter-tipo-${tipo.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      {tipo}
+                    </Badge>
+                  ))}
+                </div>
+                
+                {/* Estado Badges */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground font-medium">Estado:</span>
+                  <Badge
+                    variant={filterEstado === "todos" ? "secondary" : "outline"}
+                    className="cursor-pointer hover:bg-secondary/80 transition-colors"
+                    onClick={() => { setFilterEstado("todos"); setCurrentPage(1); }}
+                    data-testid="badge-filter-estado-todos"
+                  >
+                    Todos
+                  </Badge>
+                  {uniqueEstados.map(estado => (
+                    <Badge
+                      key={estado}
+                      variant={filterEstado === estado ? "secondary" : "outline"}
+                      className={cn(
+                        "cursor-pointer transition-colors",
+                        estado === "Bom" && filterEstado === estado && "bg-green-600 hover:bg-green-700 text-white border-green-600",
+                        estado === "Regular" && filterEstado === estado && "bg-yellow-600 hover:bg-yellow-700 text-white border-yellow-600",
+                        estado === "Ruim" && filterEstado === estado && "bg-red-600 hover:bg-red-700 text-white border-red-600",
+                        filterEstado !== estado && "hover:bg-secondary/80"
+                      )}
+                      onClick={() => { setFilterEstado(estado); setCurrentPage(1); }}
+                      data-testid={`badge-filter-estado-${estado.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      {estado}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
               {/* Collapsible Filters */}
               <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
                 <CollapsibleContent>
