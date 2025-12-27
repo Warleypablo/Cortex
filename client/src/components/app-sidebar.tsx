@@ -5,7 +5,7 @@ import {
   Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, 
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen, 
   CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Tv, LogOut, Lock, Bell, Moon, Sun,
-  ChevronRight, ChevronDown
+  ChevronRight, ChevronDown, Presentation
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogoLight from "@assets/logo-preta_1766452973532.png";
@@ -387,6 +387,21 @@ export function AppSidebar() {
                 </TooltipTrigger>
                 <TooltipContent side={isCollapsed ? "right" : "top"}>
                   Notificações
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    href="/presentation"
+                    className="flex items-center justify-center h-8 w-8 rounded-md text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                    data-testid="button-presentation-sidebar"
+                  >
+                    <Tv className="h-4 w-4" />
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side={isCollapsed ? "right" : "top"}>
+                  Apresentação
                 </TooltipContent>
               </Tooltip>
               
