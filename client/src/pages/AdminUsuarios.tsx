@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText, TrendingUp, Building2, AlertTriangle, FileCheck, UserMinus, Target, GitBranch, ChevronDown, ChevronUp, Plug, Wifi, WifiOff, Cloud, RefreshCw, Bot, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText, TrendingUp, Building2, AlertTriangle, FileCheck, UserMinus, Target, GitBranch, ChevronDown, ChevronUp, RefreshCw, Bot, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -47,20 +47,6 @@ interface NotificationRule {
   config: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-interface ConnectionStatus {
-  name: string;
-  status: string;
-  latency?: number;
-  error?: string;
-  lastChecked: string;
-}
-
-interface ConnectionsData {
-  database: ConnectionStatus;
-  openai: ConnectionStatus;
-  google: ConnectionStatus;
 }
 
 const FIELD_TYPES = [
@@ -1235,177 +1221,6 @@ function NotificationRulesContent() {
   );
 }
 
-function ConnectionsContent() {
-  const { data, isLoading, refetch, isFetching } = useQuery<ConnectionsData>({
-    queryKey: ['/api/admin/connections/status'],
-  });
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'connected':
-      case 'configured':
-        return <Badge variant="default" className="bg-green-500 hover:bg-green-600" data-testid="badge-status-connected"><Wifi className="h-3 w-3 mr-1" />Conectado</Badge>;
-      case 'error':
-      case 'disconnected':
-        return <Badge variant="destructive" data-testid="badge-status-error"><WifiOff className="h-3 w-3 mr-1" />Erro</Badge>;
-      case 'not_configured':
-        return <Badge variant="secondary" className="bg-yellow-500 text-white hover:bg-yellow-600" data-testid="badge-status-not-configured"><AlertTriangle className="h-3 w-3 mr-1" />Não Configurado</Badge>;
-      default:
-        return <Badge variant="outline" data-testid="badge-status-unknown">{status}</Badge>;
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Conexões do Sistema</h2>
-            <p className="text-sm text-muted-foreground">
-              Verifique o status das conexões com serviços externos
-            </p>
-          </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-48" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-24" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6" data-testid="connections-content">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Conexões do Sistema</h2>
-          <p className="text-sm text-muted-foreground">
-            Verifique o status das conexões com serviços externos
-          </p>
-        </div>
-        <Button 
-          variant="outline" 
-          onClick={() => refetch()}
-          disabled={isFetching}
-          data-testid="button-refresh-connections"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-          {isFetching ? "Verificando..." : "Atualizar Status"}
-        </Button>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card data-testid="card-connection-database">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Database className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-base">{data?.database?.name || "Database"}</CardTitle>
-              </div>
-            </div>
-            {data?.database && getStatusBadge(data.database.status)}
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {data?.database?.latency !== undefined && (
-              <p className="text-sm text-muted-foreground" data-testid="text-db-latency">
-                Latência: <span className="font-medium">{data.database.latency}ms</span>
-              </p>
-            )}
-            {data?.database?.error && (
-              <p className="text-sm text-destructive" data-testid="text-db-error">
-                {data.database.error}
-              </p>
-            )}
-            {data?.database?.lastChecked && (
-              <p className="text-xs text-muted-foreground" data-testid="text-db-last-checked">
-                Última verificação: {format(new Date(data.database.lastChecked), "dd/MM/yyyy HH:mm:ss")}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card data-testid="card-connection-openai">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Cloud className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-base">{data?.openai?.name || "OpenAI API"}</CardTitle>
-              </div>
-            </div>
-            {data?.openai && getStatusBadge(data.openai.status)}
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {data?.openai?.latency !== undefined && (
-              <p className="text-sm text-muted-foreground" data-testid="text-openai-latency">
-                Latência: <span className="font-medium">{data.openai.latency}ms</span>
-              </p>
-            )}
-            {data?.openai?.error && (
-              <p className="text-sm text-destructive" data-testid="text-openai-error">
-                {data.openai.error}
-              </p>
-            )}
-            {data?.openai?.status === 'not_configured' && (
-              <p className="text-sm text-muted-foreground" data-testid="text-openai-not-configured">
-                A chave OPENAI_API_KEY não está configurada
-              </p>
-            )}
-            {data?.openai?.lastChecked && (
-              <p className="text-xs text-muted-foreground" data-testid="text-openai-last-checked">
-                Última verificação: {format(new Date(data.openai.lastChecked), "dd/MM/yyyy HH:mm:ss")}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card data-testid="card-connection-google">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Shield className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-base">{data?.google?.name || "Google OAuth"}</CardTitle>
-              </div>
-            </div>
-            {data?.google && getStatusBadge(data.google.status)}
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {data?.google?.status === 'configured' && (
-              <p className="text-sm text-muted-foreground" data-testid="text-google-configured">
-                GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET estão configurados
-              </p>
-            )}
-            {data?.google?.status === 'not_configured' && (
-              <p className="text-sm text-muted-foreground" data-testid="text-google-not-configured">
-                Credenciais do Google OAuth não configuradas
-              </p>
-            )}
-            {data?.google?.lastChecked && (
-              <p className="text-xs text-muted-foreground" data-testid="text-google-last-checked">
-                Última verificação: {format(new Date(data.google.lastChecked), "dd/MM/yyyy HH:mm:ss")}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
 interface AIProvider {
   id: string;
   name: string;
@@ -2311,10 +2126,6 @@ export default function AdminUsuarios() {
             <BellRing className="h-4 w-4 mr-2" />
             Regras de Notificação
           </TabsTrigger>
-          <TabsTrigger value="conexoes" data-testid="tab-conexoes">
-            <Plug className="h-4 w-4 mr-2" />
-            Conexões
-          </TabsTrigger>
           <TabsTrigger value="database" data-testid="tab-database">
             <Database className="h-4 w-4 mr-2" />
             Estrutura do Banco
@@ -2536,10 +2347,6 @@ export default function AdminUsuarios() {
 
         <TabsContent value="notifications">
           <NotificationRulesContent />
-        </TabsContent>
-
-        <TabsContent value="conexoes">
-          <ConnectionsContent />
         </TabsContent>
 
         <TabsContent value="database">
