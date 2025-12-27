@@ -10934,56 +10934,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { initializeBPTables } = await import("./db");
       await initializeBPTables();
       
-      const { BP_2026_TARGETS, BP_MONTHS } = await import("./okr2026/bp2026Targets");
+      const { BP_2026_TARGETS } = await import("./okr2026/bp2026Targets");
       
-      let upsertCount = 0;
-      let registryCount = 0;
+      // Delete existing data first for clean seed
+      await db.execute(sql`DELETE FROM plan.metric_targets_monthly WHERE year = 2026`);
+      await db.execute(sql`DELETE FROM kpi.metrics_registry_extended WHERE metric_key LIKE '%'`);
       
-      for (const metric of BP_2026_TARGETS) {
+      // Batch insert all metrics registry
+      for (let i = 0; i < BP_2026_TARGETS.length; i++) {
+        const metric = BP_2026_TARGETS[i];
         await db.execute(sql`
           INSERT INTO kpi.metrics_registry_extended 
             (metric_key, title, unit, period_type, direction, is_derived, formula_expr, dimension_key, dimension_value, sort_order)
           VALUES 
             (${metric.metric_key}, ${metric.title}, ${metric.unit}, ${metric.period_type}, ${metric.direction}, 
-             ${metric.is_derived}, ${metric.formula || null}, ${metric.dimension_key || null}, ${metric.dimension_value || null}, ${registryCount * 10})
-          ON CONFLICT (metric_key) DO UPDATE SET
-            title = EXCLUDED.title,
-            unit = EXCLUDED.unit,
-            period_type = EXCLUDED.period_type,
-            direction = EXCLUDED.direction,
-            is_derived = EXCLUDED.is_derived,
-            formula_expr = EXCLUDED.formula_expr,
-            dimension_key = EXCLUDED.dimension_key,
-            dimension_value = EXCLUDED.dimension_value,
-            updated_at = NOW()
+             ${metric.is_derived}, ${metric.formula || null}, ${metric.dimension_key || null}, ${metric.dimension_value || null}, ${i * 10})
         `);
-        registryCount++;
-        
+      }
+      
+      // Build values for batch insert of targets
+      const targetRows: Array<{year: number; month: number; metricKey: string; dimKey: string | null; dimVal: string | null; value: number}> = [];
+      for (const metric of BP_2026_TARGETS) {
         for (const monthKey of Object.keys(metric.months)) {
           const [yearStr, monthStr] = monthKey.split("-");
-          const year = parseInt(yearStr);
-          const month = parseInt(monthStr);
-          const targetValue = metric.months[monthKey];
-          
-          await db.execute(sql`
-            INSERT INTO plan.metric_targets_monthly 
-              (year, month, metric_key, dimension_key, dimension_value, target_value)
-            VALUES 
-              (${year}, ${month}, ${metric.metric_key}, ${metric.dimension_key || null}, ${metric.dimension_value || null}, ${targetValue})
-            ON CONFLICT (year, month, metric_key, dimension_key, dimension_value) 
-            DO UPDATE SET
-              target_value = EXCLUDED.target_value,
-              updated_at = NOW()
-          `);
-          upsertCount++;
+          targetRows.push({
+            year: parseInt(yearStr),
+            month: parseInt(monthStr),
+            metricKey: metric.metric_key,
+            dimKey: metric.dimension_key || null,
+            dimVal: metric.dimension_value || null,
+            value: metric.months[monthKey]
+          });
         }
+      }
+      
+      // Insert targets in batches of 50
+      const batchSize = 50;
+      for (let i = 0; i < targetRows.length; i += batchSize) {
+        const batch = targetRows.slice(i, i + batchSize);
+        const values = batch.map(r => 
+          sql`(${r.year}, ${r.month}, ${r.metricKey}, ${r.dimKey}, ${r.dimVal}, ${r.value})`
+        );
+        await db.execute(sql`
+          INSERT INTO plan.metric_targets_monthly 
+            (year, month, metric_key, dimension_key, dimension_value, target_value)
+          VALUES ${sql.join(values, sql`, `)}
+        `);
       }
       
       res.json({
         success: true,
         message: `BP 2026 seeded successfully`,
-        metricsRegistered: registryCount,
-        targetsUpserted: upsertCount
+        metricsRegistered: BP_2026_TARGETS.length,
+        targetsUpserted: targetRows.length
       });
     } catch (error) {
       console.error("[api] Error seeding BP:", error);
@@ -11409,6 +11412,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/okr2026/seed-squad-goals", isAuthenticated, isAdmin, async (req, res) => {
     try {
+      // Clear existing data first
+      await db.execute(sql`DELETE FROM squad_goals WHERE year = 2026`);
+      
       const squadGoalsSeed = [
         // Financeiro
         { squad: "Commerce", perspective: "Financeiro", metricName: "Meta de Vendas", unit: "BRL", periodicity: "monthly", targetValue: 2500000, actualValue: 1875000, ownerTeam: "Vendas", year: 2026, quarter: "Q1" },
@@ -11435,18 +11441,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { squad: "Commerce", perspective: "Pessoas", metricName: "Produtividade Vendedor", unit: "BRL", periodicity: "monthly", targetValue: 250000, actualValue: 187500, ownerTeam: "Comercial", year: 2026, quarter: "Q1" },
       ];
       
-      let count = 0;
-      for (const goal of squadGoalsSeed) {
-        await db.execute(sql`
-          INSERT INTO squad_goals (squad, perspective, metric_name, unit, periodicity, data_source, owner_team, actual_value, target_value, weight, notes, year, quarter)
-          VALUES (${goal.squad}, ${goal.perspective}, ${goal.metricName}, ${goal.unit}, ${goal.periodicity}, 
-                  'seed', ${goal.ownerTeam}, ${goal.actualValue}, ${goal.targetValue}, 1, ${goal.notes || null}, ${goal.year}, ${goal.quarter})
-          ON CONFLICT DO NOTHING
-        `);
-        count++;
-      }
+      // Batch insert
+      const values = squadGoalsSeed.map(g => 
+        sql`(${g.squad}, ${g.perspective}, ${g.metricName}, ${g.unit}, ${g.periodicity}, 'seed', ${g.ownerTeam}, ${g.actualValue}, ${g.targetValue}, 1, ${g.notes || null}, ${g.year}, ${g.quarter})`
+      );
       
-      res.json({ success: true, count });
+      await db.execute(sql`
+        INSERT INTO squad_goals (squad, perspective, metric_name, unit, periodicity, data_source, owner_team, actual_value, target_value, weight, notes, year, quarter)
+        VALUES ${sql.join(values, sql`, `)}
+      `);
+      
+      res.json({ success: true, count: squadGoalsSeed.length });
     } catch (error) {
       console.error("[api] Error seeding squad goals:", error);
       res.status(500).json({ error: "Failed to seed squad goals" });
