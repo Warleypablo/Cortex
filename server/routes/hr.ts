@@ -710,22 +710,120 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
-  // ============ Onboarding Templates Endpoints ============
-  app.get("/api/rh/onboarding/templates", async (req, res) => {
+  // ============ RH Colaboradores for Onboarding Dropdown ============
+  app.get("/api/rh/colaboradores", async (req, res) => {
     try {
       const result = await db.execute(sql`
+        SELECT id, nome, cargo, squad
+        FROM rh_pessoal
+        WHERE status = 'Ativo'
+        ORDER BY nome
+      `);
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("[api] Error fetching colaboradores for onboarding:", error);
+      res.status(500).json({ error: "Failed to fetch colaboradores" });
+    }
+  });
+
+  // ============ Onboarding Templates Endpoints ============
+  
+  // Helper function to create default template with steps
+  async function createDefaultOnboardingTemplate() {
+    try {
+      // Create default template
+      const templateResult = await db.execute(sql`
+        INSERT INTO onboarding_templates (nome, descricao, ativo)
+        VALUES ('Template Padrão', 'Template padrão de onboarding para novos colaboradores', true)
+        RETURNING id, nome, descricao, ativo, created_at as "createdAt"
+      `);
+      const template = templateResult.rows[0] as any;
+      
+      // Create default steps
+      const defaultSteps = [
+        { ordem: 1, titulo: 'Cadastro no sistema', descricao: 'Criar contas e acessos nos sistemas da empresa', prazoDias: 1 },
+        { ordem: 2, titulo: 'Configuração de equipamentos', descricao: 'Configurar computador, email e ferramentas de trabalho', prazoDias: 2 },
+        { ordem: 3, titulo: 'Treinamento inicial', descricao: 'Treinamentos introdutórios sobre a empresa e processos', prazoDias: 5 },
+        { ordem: 4, titulo: 'Integração com a equipe', descricao: 'Conhecer os colegas de equipe e entender as dinâmicas de trabalho', prazoDias: 7 },
+        { ordem: 5, titulo: 'Avaliação de experiência', descricao: 'Reunião de feedback sobre o processo de onboarding', prazoDias: 30 },
+      ];
+      
+      for (const step of defaultSteps) {
+        await db.execute(sql`
+          INSERT INTO onboarding_etapas (template_id, ordem, titulo, descricao, prazo_dias)
+          VALUES (${template.id}, ${step.ordem}, ${step.titulo}, ${step.descricao}, ${step.prazoDias})
+        `);
+      }
+      
+      return template;
+    } catch (error) {
+      console.error("[api] Error creating default template:", error);
+      throw error;
+    }
+  }
+  
+  app.get("/api/rh/onboarding/templates", async (req, res) => {
+    try {
+      let result = await db.execute(sql`
         SELECT id, nome, descricao, ativo, created_at as "createdAt"
         FROM onboarding_templates
         WHERE ativo = true
         ORDER BY nome
       `);
+      
+      // If no templates exist, create a default one
+      if (result.rows.length === 0) {
+        const defaultTemplate = await createDefaultOnboardingTemplate();
+        result = { rows: [defaultTemplate], rowCount: 1 } as any;
+      }
+      
       res.json(result.rows);
     } catch (error: any) {
       if (error?.code === '42P01') {
+        // Table doesn't exist - try to create it and return empty
         return res.json([]);
       }
       console.error("[api] Error fetching onboarding templates:", error);
       res.status(500).json({ error: "Failed to fetch templates" });
+    }
+  });
+
+  app.get("/api/rh/onboarding/templates/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid template ID" });
+      }
+      
+      // Get the template
+      const templateResult = await db.execute(sql`
+        SELECT id, nome, descricao, ativo, created_at as "createdAt"
+        FROM onboarding_templates
+        WHERE id = ${id}
+      `);
+      
+      if (templateResult.rows.length === 0) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      
+      const template = templateResult.rows[0] as any;
+      
+      // Get the steps
+      const etapasResult = await db.execute(sql`
+        SELECT id, template_id as "templateId", ordem, titulo, descricao, 
+               responsavel_padrao as "responsavelPadrao", prazo_dias as "prazoDias"
+        FROM onboarding_etapas
+        WHERE template_id = ${id}
+        ORDER BY ordem
+      `);
+      
+      res.json({ ...template, etapas: etapasResult.rows });
+    } catch (error: any) {
+      if (error?.code === '42P01') {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      console.error("[api] Error fetching onboarding template:", error);
+      res.status(500).json({ error: "Failed to fetch template" });
     }
   });
 
@@ -817,6 +915,57 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "Invalid etapa ID" });
       }
       await db.execute(sql`DELETE FROM onboarding_etapas WHERE id = ${id}`);
+      res.status(204).send();
+    } catch (error) {
+      console.error("[api] Error deleting onboarding etapa:", error);
+      res.status(500).json({ error: "Failed to delete etapa" });
+    }
+  });
+
+  // PUT /api/rh/onboarding/templates/:id/etapas/:etapaId - Update step
+  app.put("/api/rh/onboarding/templates/:id/etapas/:etapaId", isAdmin, async (req, res) => {
+    try {
+      const templateId = parseInt(req.params.id);
+      const etapaId = parseInt(req.params.etapaId);
+      if (isNaN(templateId) || isNaN(etapaId)) {
+        return res.status(400).json({ error: "Invalid template ID or etapa ID" });
+      }
+      
+      const { ordem, titulo, descricao, responsavelPadrao, prazoDias } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE onboarding_etapas
+        SET ordem = COALESCE(${ordem || null}, ordem),
+            titulo = COALESCE(${titulo || null}, titulo),
+            descricao = COALESCE(${descricao || null}, descricao),
+            responsavel_padrao = COALESCE(${responsavelPadrao || null}, responsavel_padrao),
+            prazo_dias = COALESCE(${prazoDias || null}, prazo_dias)
+        WHERE id = ${etapaId} AND template_id = ${templateId}
+        RETURNING id, template_id as "templateId", ordem, titulo, descricao, 
+                  responsavel_padrao as "responsavelPadrao", prazo_dias as "prazoDias"
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Etapa not found" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error updating onboarding etapa:", error);
+      res.status(500).json({ error: "Failed to update etapa" });
+    }
+  });
+
+  // DELETE /api/rh/onboarding/templates/:id/etapas/:etapaId - Delete step
+  app.delete("/api/rh/onboarding/templates/:id/etapas/:etapaId", isAdmin, async (req, res) => {
+    try {
+      const templateId = parseInt(req.params.id);
+      const etapaId = parseInt(req.params.etapaId);
+      if (isNaN(templateId) || isNaN(etapaId)) {
+        return res.status(400).json({ error: "Invalid template ID or etapa ID" });
+      }
+      
+      await db.execute(sql`DELETE FROM onboarding_etapas WHERE id = ${etapaId} AND template_id = ${templateId}`);
       res.status(204).send();
     } catch (error) {
       console.error("[api] Error deleting onboarding etapa:", error);
@@ -934,46 +1083,135 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // POST /api/rh/onboarding - Alternative to /iniciar for starting onboarding
+  app.post("/api/rh/onboarding", async (req, res) => {
+    try {
+      const { colaboradorId, templateId, dataInicio } = req.body;
+      if (!colaboradorId || !templateId || !dataInicio) {
+        return res.status(400).json({ error: "colaboradorId, templateId, and dataInicio are required" });
+      }
+      
+      const colabId = parseInt(String(colaboradorId));
+      const templId = parseInt(String(templateId));
+      
+      if (isNaN(colabId) || isNaN(templId)) {
+        return res.status(400).json({ error: "Invalid colaboradorId or templateId - must be numbers" });
+      }
+      
+      const onboardingResult = await db.execute(sql`
+        INSERT INTO onboarding_colaborador (colaborador_id, template_id, data_inicio, status)
+        VALUES (${colabId}, ${templId}, ${dataInicio}, 'in_progress')
+        RETURNING id, colaborador_id as "colaboradorId", template_id as "templateId", 
+                  data_inicio as "dataInicio", status, created_at as "createdAt"
+      `);
+      const onboarding = onboardingResult.rows[0] as any;
+      const etapasResult = await db.execute(sql`
+        SELECT id, ordem, titulo, responsavel_padrao as "responsavelPadrao"
+        FROM onboarding_etapas
+        WHERE template_id = ${templId}
+        ORDER BY ordem
+      `);
+      for (const etapa of etapasResult.rows as any[]) {
+        await db.execute(sql`
+          INSERT INTO onboarding_progresso (onboarding_colaborador_id, etapa_id, status)
+          VALUES (${onboarding.id}, ${etapa.id}, 'pending')
+        `);
+      }
+      res.status(201).json(onboarding);
+    } catch (error) {
+      console.error("[api] Error starting onboarding:", error);
+      res.status(500).json({ error: "Failed to start onboarding" });
+    }
+  });
+
+  // DELETE /api/rh/onboarding/:id - Delete onboarding instance
+  app.delete("/api/rh/onboarding/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid onboarding ID" });
+      }
+      
+      // First delete all progress records
+      await db.execute(sql`DELETE FROM onboarding_progresso WHERE onboarding_colaborador_id = ${id}`);
+      
+      // Then delete the onboarding record
+      await db.execute(sql`DELETE FROM onboarding_colaborador WHERE id = ${id}`);
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("[api] Error deleting onboarding:", error);
+      res.status(500).json({ error: "Failed to delete onboarding" });
+    }
+  });
+
   // ============ Update Onboarding Progress ============
+  // Helper function for updating progress
+  async function updateProgressHelper(id: number, body: any, db: any) {
+    const { status, responsavelId, observacoes } = body;
+    const dataConclusao = status === 'completed' ? new Date().toISOString() : null;
+    const result = await db.execute(sql`
+      UPDATE onboarding_progresso
+      SET status = COALESCE(${status}, status),
+          responsavel_id = COALESCE(${responsavelId || null}, responsavel_id),
+          observacoes = COALESCE(${observacoes || null}, observacoes),
+          data_conclusao = ${dataConclusao}
+      WHERE id = ${id}
+      RETURNING id, onboarding_colaborador_id as "onboardingColaboradorId", 
+                etapa_id as "etapaId", status, responsavel_id as "responsavelId",
+                data_conclusao as "dataConclusao", observacoes
+    `);
+    if (result.rows.length === 0) {
+      return null;
+    }
+    const progresso = result.rows[0] as any;
+    const checkResult = await db.execute(sql`
+      SELECT 
+        (SELECT COUNT(*) FROM onboarding_progresso WHERE onboarding_colaborador_id = ${progresso.onboardingColaboradorId}) as total,
+        (SELECT COUNT(*) FROM onboarding_progresso WHERE onboarding_colaborador_id = ${progresso.onboardingColaboradorId} AND status = 'completed') as completed
+    `);
+    const counts = checkResult.rows[0] as any;
+    if (counts.total === counts.completed) {
+      await db.execute(sql`
+        UPDATE onboarding_colaborador SET status = 'completed' WHERE id = ${progresso.onboardingColaboradorId}
+      `);
+    } else if (counts.completed > 0) {
+      await db.execute(sql`
+        UPDATE onboarding_colaborador SET status = 'in_progress' WHERE id = ${progresso.onboardingColaboradorId}
+      `);
+    }
+    return result.rows[0];
+  }
+
   app.patch("/api/rh/onboarding/progresso/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid progresso ID" });
       }
-      const { status, responsavelId, observacoes } = req.body;
-      const dataConclusao = status === 'completed' ? new Date().toISOString() : null;
-      const result = await db.execute(sql`
-        UPDATE onboarding_progresso
-        SET status = COALESCE(${status}, status),
-            responsavel_id = COALESCE(${responsavelId || null}, responsavel_id),
-            observacoes = COALESCE(${observacoes || null}, observacoes),
-            data_conclusao = ${dataConclusao}
-        WHERE id = ${id}
-        RETURNING id, onboarding_colaborador_id as "onboardingColaboradorId", 
-                  etapa_id as "etapaId", status, responsavel_id as "responsavelId",
-                  data_conclusao as "dataConclusao", observacoes
-      `);
-      if (result.rows.length === 0) {
+      const result = await updateProgressHelper(id, req.body, db);
+      if (!result) {
         return res.status(404).json({ error: "Progress record not found" });
       }
-      const progresso = result.rows[0] as any;
-      const checkResult = await db.execute(sql`
-        SELECT 
-          (SELECT COUNT(*) FROM onboarding_progresso WHERE onboarding_colaborador_id = ${progresso.onboardingColaboradorId}) as total,
-          (SELECT COUNT(*) FROM onboarding_progresso WHERE onboarding_colaborador_id = ${progresso.onboardingColaboradorId} AND status = 'completed') as completed
-      `);
-      const counts = checkResult.rows[0] as any;
-      if (counts.total === counts.completed) {
-        await db.execute(sql`
-          UPDATE onboarding_colaborador SET status = 'completed' WHERE id = ${progresso.onboardingColaboradorId}
-        `);
-      } else if (counts.completed > 0) {
-        await db.execute(sql`
-          UPDATE onboarding_colaborador SET status = 'in_progress' WHERE id = ${progresso.onboardingColaboradorId}
-        `);
+      res.json(result);
+    } catch (error) {
+      console.error("[api] Error updating onboarding progress:", error);
+      res.status(500).json({ error: "Failed to update progress" });
+    }
+  });
+
+  // PUT /api/rh/onboarding/progresso/:id - Update step progress
+  app.put("/api/rh/onboarding/progresso/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid progresso ID" });
       }
-      res.json(result.rows[0]);
+      const result = await updateProgressHelper(id, req.body, db);
+      if (!result) {
+        return res.status(404).json({ error: "Progress record not found" });
+      }
+      res.json(result);
     } catch (error) {
       console.error("[api] Error updating onboarding progress:", error);
       res.status(500).json({ error: "Failed to update progress" });
