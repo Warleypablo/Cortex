@@ -133,6 +133,56 @@ interface ChurnPorResponsavel {
   valorAtivoTotal: number;
 }
 
+interface FinanceiroKPIs {
+  saldoTotal: number;
+  aReceberTotal: number;
+  aReceberQtd: number;
+  aReceberVencidosQtd: number;
+  aReceberVencidoValor: number;
+  aPagarTotal: number;
+  aPagarQtd: number;
+  aPagarVencidosQtd: number;
+  aPagarVencidoValor: number;
+  receitaMesAtual: number;
+  despesaMesAtual: number;
+  receitaMesAnterior: number;
+  despesaMesAnterior: number;
+  lucroMesAtual: number;
+}
+
+interface FluxoCaixaInsights {
+  saldoHoje: number;
+  saldoFuturo30Dias: number;
+  entradasPrevistas30Dias: number;
+  saidasPrevistas30Dias: number;
+  entradasVencidas: number;
+  saidasVencidas: number;
+  diasAteNegativo: number | null;
+}
+
+interface FluxoProximosDias {
+  data: string;
+  tipo: 'RECEITA' | 'DESPESA';
+  valor: number;
+}
+
+interface MetaOverview {
+  totalSpend: number;
+  totalImpressions: number;
+  totalClicks: number;
+  totalReach: number;
+  avgCtr: number;
+  avgCpc: number;
+  avgCpm: number;
+  totalLeads: number;
+  totalWon: number;
+  totalWonValue: number;
+  roas: number;
+  costPerLead: number;
+  cac: number;
+  conversionRate: number;
+}
+
 type DashboardView = 'closers' | 'sdrs' | 'visao-geral' | 'retencao' | 'financeiro-resumo' | 'fluxo-caixa' | 'growth-visao-geral';
 
 const ALL_DASHBOARD_VIEWS: DashboardView[] = ['closers', 'sdrs', 'visao-geral', 'retencao', 'financeiro-resumo', 'fluxo-caixa', 'growth-visao-geral'];
@@ -282,6 +332,47 @@ export default function PresentationMode() {
     queryKey: ["/api/churn-por-responsavel"],
     queryFn: async () => {
       const res = await fetch("/api/churn-por-responsavel");
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
+  const { data: financeiroKPIs, isLoading: isLoadingFinanceiroKPIs } = useQuery<FinanceiroKPIs>({
+    queryKey: ["/api/financeiro/kpis-completos"],
+    queryFn: async () => {
+      const res = await fetch("/api/financeiro/kpis-completos");
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
+  const { data: fluxoCaixaInsights, isLoading: isLoadingFluxoCaixa } = useQuery<FluxoCaixaInsights>({
+    queryKey: ["/api/fluxo-caixa/insights"],
+    queryFn: async () => {
+      const res = await fetch("/api/fluxo-caixa/insights");
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
+  const { data: fluxoProximosDias, isLoading: isLoadingFluxoProximosDias } = useQuery<FluxoProximosDias[]>({
+    queryKey: ["/api/financeiro/fluxo-proximos-dias"],
+    queryFn: async () => {
+      const res = await fetch("/api/financeiro/fluxo-proximos-dias?dias=7");
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
+  const metaAdsQueryParams = new URLSearchParams({
+    startDate: inicioMes,
+    endDate: fimMes,
+  }).toString();
+
+  const { data: metaAdsOverview, isLoading: isLoadingMetaAds } = useQuery<MetaOverview>({
+    queryKey: ["/api/meta-ads/overview", metaAdsQueryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/meta-ads/overview?${metaAdsQueryParams}`);
       return res.json();
     },
     refetchInterval: 30000,
@@ -2181,19 +2272,196 @@ export default function PresentationMode() {
                 </div>
               </div>
 
-              <div className="flex-1 flex items-center justify-center">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.3 }}
-                  className="text-center"
-                >
-                  <div className="p-6 rounded-2xl bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm">
-                    <Construction className="w-16 h-16 text-amber-400 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold text-white mb-2">Dashboard em construção</h2>
-                    <p className="text-slate-400">Em breve, o resumo financeiro estará disponível aqui.</p>
-                  </div>
-                </motion.div>
+              <div className="flex-1 grid grid-cols-3 gap-4 lg:gap-6">
+                {isLoadingFinanceiroKPIs ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 * i }}
+                      className="rounded-2xl bg-slate-800/50 border border-slate-700/50 p-6"
+                    >
+                      <Skeleton className="h-6 w-24 bg-slate-700 mb-4" />
+                      <Skeleton className="h-12 w-32 bg-slate-700 mb-2" />
+                      <Skeleton className="h-4 w-20 bg-slate-700" />
+                    </motion.div>
+                  ))
+                ) : (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.1 }}
+                      className="rounded-2xl bg-gradient-to-br from-emerald-600/30 via-emerald-500/20 to-teal-600/30 border border-emerald-500/40 p-6 shadow-xl shadow-emerald-500/10"
+                      data-testid="card-saldo-bancos"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-lg bg-emerald-500/30">
+                          <Wallet className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">Saldo em Bancos</span>
+                      </div>
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-emerald-400"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.3, type: "spring" }}
+                      >
+                        {formatCurrencyCompact(financeiroKPIs?.saldoTotal || 0)}
+                      </motion.div>
+                      <div className="text-slate-400 text-sm mt-2">Saldo atual consolidado</div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.15 }}
+                      className="rounded-2xl bg-gradient-to-br from-amber-600/30 via-amber-500/20 to-orange-600/30 border border-amber-500/40 p-6 shadow-xl shadow-amber-500/10"
+                      data-testid="card-receita-mes"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-lg bg-amber-500/30">
+                          <TrendingUp className="w-5 h-5 text-amber-400" />
+                        </div>
+                        <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">Receita do Mês</span>
+                      </div>
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-amber-400"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.35, type: "spring" }}
+                      >
+                        {formatCurrencyCompact(financeiroKPIs?.receitaMesAtual || 0)}
+                      </motion.div>
+                      <div className="text-slate-400 text-sm mt-2 flex items-center gap-1">
+                        {financeiroKPIs?.receitaMesAnterior && financeiroKPIs.receitaMesAnterior > 0 && (
+                          <>
+                            <span className={financeiroKPIs.receitaMesAtual >= financeiroKPIs.receitaMesAnterior ? 'text-emerald-400' : 'text-rose-400'}>
+                              {financeiroKPIs.receitaMesAtual >= financeiroKPIs.receitaMesAnterior ? '+' : ''}
+                              {formatPercent(((financeiroKPIs.receitaMesAtual - financeiroKPIs.receitaMesAnterior) / financeiroKPIs.receitaMesAnterior) * 100)}
+                            </span>
+                            <span>vs mês anterior</span>
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="rounded-2xl bg-gradient-to-br from-rose-600/30 via-rose-500/20 to-red-600/30 border border-rose-500/40 p-6 shadow-xl shadow-rose-500/10"
+                      data-testid="card-despesa-mes"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-lg bg-rose-500/30">
+                          <TrendingUp className="w-5 h-5 text-rose-400 rotate-180" />
+                        </div>
+                        <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">Despesas do Mês</span>
+                      </div>
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-rose-400"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.4, type: "spring" }}
+                      >
+                        {formatCurrencyCompact(financeiroKPIs?.despesaMesAtual || 0)}
+                      </motion.div>
+                      <div className="text-slate-400 text-sm mt-2">Total de saídas no mês</div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.25 }}
+                      className={`rounded-2xl bg-gradient-to-br ${
+                        (financeiroKPIs?.lucroMesAtual || 0) >= 0 
+                          ? 'from-cyan-600/30 via-cyan-500/20 to-blue-600/30 border-cyan-500/40 shadow-cyan-500/10'
+                          : 'from-red-600/30 via-red-500/20 to-rose-600/30 border-red-500/40 shadow-red-500/10'
+                      } border p-6 shadow-xl`}
+                      data-testid="card-lucro-mes"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className={`p-2 rounded-lg ${(financeiroKPIs?.lucroMesAtual || 0) >= 0 ? 'bg-cyan-500/30' : 'bg-red-500/30'}`}>
+                          <DollarSign className={`w-5 h-5 ${(financeiroKPIs?.lucroMesAtual || 0) >= 0 ? 'text-cyan-400' : 'text-red-400'}`} />
+                        </div>
+                        <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">Resultado do Mês</span>
+                      </div>
+                      <motion.div 
+                        className={`text-4xl lg:text-5xl font-black ${(financeiroKPIs?.lucroMesAtual || 0) >= 0 ? 'text-cyan-400' : 'text-red-400'}`}
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.45, type: "spring" }}
+                      >
+                        {formatCurrencyCompact(financeiroKPIs?.lucroMesAtual || 0)}
+                      </motion.div>
+                      <div className="text-slate-400 text-sm mt-2">Receita - Despesas</div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="rounded-2xl bg-gradient-to-br from-violet-600/30 via-violet-500/20 to-purple-600/30 border border-violet-500/40 p-6 shadow-xl shadow-violet-500/10"
+                      data-testid="card-a-receber"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-lg bg-violet-500/30">
+                          <DollarSign className="w-5 h-5 text-violet-400" />
+                        </div>
+                        <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">A Receber</span>
+                      </div>
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-violet-400"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.5, type: "spring" }}
+                      >
+                        {formatCurrencyCompact(financeiroKPIs?.aReceberTotal || 0)}
+                      </motion.div>
+                      <div className="text-slate-400 text-sm mt-2 flex items-center gap-2">
+                        <span>{financeiroKPIs?.aReceberQtd || 0} títulos</span>
+                        {(financeiroKPIs?.aReceberVencidoValor || 0) > 0 && (
+                          <Badge className="bg-rose-500/20 text-rose-400 text-xs">
+                            {formatCurrencyCompact(financeiroKPIs?.aReceberVencidoValor || 0)} vencido
+                          </Badge>
+                        )}
+                      </div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.35 }}
+                      className="rounded-2xl bg-gradient-to-br from-orange-600/30 via-orange-500/20 to-amber-600/30 border border-orange-500/40 p-6 shadow-xl shadow-orange-500/10"
+                      data-testid="card-a-pagar"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-lg bg-orange-500/30">
+                          <DollarSign className="w-5 h-5 text-orange-400" />
+                        </div>
+                        <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">A Pagar</span>
+                      </div>
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-orange-400"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.55, type: "spring" }}
+                      >
+                        {formatCurrencyCompact(financeiroKPIs?.aPagarTotal || 0)}
+                      </motion.div>
+                      <div className="text-slate-400 text-sm mt-2 flex items-center gap-2">
+                        <span>{financeiroKPIs?.aPagarQtd || 0} títulos</span>
+                        {(financeiroKPIs?.aPagarVencidoValor || 0) > 0 && (
+                          <Badge className="bg-rose-500/20 text-rose-400 text-xs">
+                            {formatCurrencyCompact(financeiroKPIs?.aPagarVencidoValor || 0)} vencido
+                          </Badge>
+                        )}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
               </div>
             </motion.div>
           )}
@@ -2245,17 +2513,233 @@ export default function PresentationMode() {
                 </div>
               </div>
 
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex-1 flex flex-col gap-4 lg:gap-6">
+                <div className="grid grid-cols-4 gap-4 lg:gap-6">
+                  {isLoadingFluxoCaixa ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 * i }}
+                        className="rounded-2xl bg-slate-800/50 border border-slate-700/50 p-6"
+                      >
+                        <Skeleton className="h-6 w-24 bg-slate-700 mb-4" />
+                        <Skeleton className="h-12 w-32 bg-slate-700 mb-2" />
+                        <Skeleton className="h-4 w-20 bg-slate-700" />
+                      </motion.div>
+                    ))
+                  ) : (
+                    <>
+                      <motion.div
+                        initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ delay: 0.1 }}
+                        className="rounded-2xl bg-gradient-to-br from-blue-600/30 via-blue-500/20 to-sky-600/30 border border-blue-500/40 p-6 shadow-xl shadow-blue-500/10"
+                        data-testid="card-saldo-hoje"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="p-2 rounded-lg bg-blue-500/30">
+                            <Wallet className="w-5 h-5 text-blue-400" />
+                          </div>
+                          <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">Saldo Atual</span>
+                        </div>
+                        <motion.div 
+                          className="text-4xl lg:text-5xl font-black text-blue-400"
+                          initial={{ scale: 0.5 }}
+                          animate={{ scale: 1 }}
+                          transition={{ delay: 0.3, type: "spring" }}
+                        >
+                          {formatCurrencyCompact(fluxoCaixaInsights?.saldoHoje || 0)}
+                        </motion.div>
+                        <div className="text-slate-400 text-sm mt-2">Saldo consolidado hoje</div>
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ delay: 0.15 }}
+                        className="rounded-2xl bg-gradient-to-br from-emerald-600/30 via-emerald-500/20 to-teal-600/30 border border-emerald-500/40 p-6 shadow-xl shadow-emerald-500/10"
+                        data-testid="card-entradas-previstas"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="p-2 rounded-lg bg-emerald-500/30">
+                            <TrendingUp className="w-5 h-5 text-emerald-400" />
+                          </div>
+                          <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">Entradas (30d)</span>
+                        </div>
+                        <motion.div 
+                          className="text-4xl lg:text-5xl font-black text-emerald-400"
+                          initial={{ scale: 0.5 }}
+                          animate={{ scale: 1 }}
+                          transition={{ delay: 0.35, type: "spring" }}
+                        >
+                          {formatCurrencyCompact(fluxoCaixaInsights?.entradasPrevistas30Dias || 0)}
+                        </motion.div>
+                        <div className="text-slate-400 text-sm mt-2">
+                          {(fluxoCaixaInsights?.entradasVencidas || 0) > 0 && (
+                            <span className="text-rose-400">{formatCurrencyCompact(fluxoCaixaInsights?.entradasVencidas || 0)} vencido</span>
+                          )}
+                        </div>
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ delay: 0.2 }}
+                        className="rounded-2xl bg-gradient-to-br from-rose-600/30 via-rose-500/20 to-red-600/30 border border-rose-500/40 p-6 shadow-xl shadow-rose-500/10"
+                        data-testid="card-saidas-previstas"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="p-2 rounded-lg bg-rose-500/30">
+                            <TrendingUp className="w-5 h-5 text-rose-400 rotate-180" />
+                          </div>
+                          <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">Saídas (30d)</span>
+                        </div>
+                        <motion.div 
+                          className="text-4xl lg:text-5xl font-black text-rose-400"
+                          initial={{ scale: 0.5 }}
+                          animate={{ scale: 1 }}
+                          transition={{ delay: 0.4, type: "spring" }}
+                        >
+                          {formatCurrencyCompact(fluxoCaixaInsights?.saidasPrevistas30Dias || 0)}
+                        </motion.div>
+                        <div className="text-slate-400 text-sm mt-2">
+                          {(fluxoCaixaInsights?.saidasVencidas || 0) > 0 && (
+                            <span className="text-rose-400">{formatCurrencyCompact(fluxoCaixaInsights?.saidasVencidas || 0)} vencido</span>
+                          )}
+                        </div>
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ delay: 0.25 }}
+                        className={`rounded-2xl bg-gradient-to-br ${
+                          (fluxoCaixaInsights?.saldoFuturo30Dias || 0) >= 0 
+                            ? 'from-cyan-600/30 via-cyan-500/20 to-sky-600/30 border-cyan-500/40 shadow-cyan-500/10'
+                            : 'from-red-600/30 via-red-500/20 to-rose-600/30 border-red-500/40 shadow-red-500/10'
+                        } border p-6 shadow-xl`}
+                        data-testid="card-saldo-projetado"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className={`p-2 rounded-lg ${(fluxoCaixaInsights?.saldoFuturo30Dias || 0) >= 0 ? 'bg-cyan-500/30' : 'bg-red-500/30'}`}>
+                            <Target className={`w-5 h-5 ${(fluxoCaixaInsights?.saldoFuturo30Dias || 0) >= 0 ? 'text-cyan-400' : 'text-red-400'}`} />
+                          </div>
+                          <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">Saldo Projetado</span>
+                        </div>
+                        <motion.div 
+                          className={`text-4xl lg:text-5xl font-black ${(fluxoCaixaInsights?.saldoFuturo30Dias || 0) >= 0 ? 'text-cyan-400' : 'text-red-400'}`}
+                          initial={{ scale: 0.5 }}
+                          animate={{ scale: 1 }}
+                          transition={{ delay: 0.45, type: "spring" }}
+                        >
+                          {formatCurrencyCompact(fluxoCaixaInsights?.saldoFuturo30Dias || 0)}
+                        </motion.div>
+                        <div className="text-slate-400 text-sm mt-2">
+                          {fluxoCaixaInsights?.diasAteNegativo != null && fluxoCaixaInsights.diasAteNegativo > 0 && (
+                            <span className="text-amber-400">{fluxoCaixaInsights.diasAteNegativo} dias até ficar negativo</span>
+                          )}
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </div>
+
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="text-center"
+                  className="flex-1 rounded-2xl bg-slate-900/70 border border-slate-700/50 p-5"
+                  data-testid="card-fluxo-proximos-dias"
                 >
-                  <div className="p-6 rounded-2xl bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm">
-                    <Construction className="w-16 h-16 text-blue-400 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold text-white mb-2">Dashboard em construção</h2>
-                    <p className="text-slate-400">Em breve, o fluxo de caixa estará disponível aqui.</p>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 rounded-lg bg-blue-500/30">
+                      <BarChart3 className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <h2 className="text-xl font-bold text-white">Fluxo dos Próximos 7 Dias</h2>
+                  </div>
+                  
+                  <div className="grid grid-cols-7 gap-3 h-[calc(100%-3rem)]">
+                    {isLoadingFluxoProximosDias ? (
+                      Array.from({ length: 7 }).map((_, i) => (
+                        <div key={i} className="flex flex-col items-center justify-end">
+                          <Skeleton className="h-32 w-full bg-slate-800 rounded-lg" />
+                          <Skeleton className="h-4 w-12 bg-slate-700 mt-2" />
+                        </div>
+                      ))
+                    ) : (() => {
+                      const groupedByDate = new Map<string, { entradas: number; saidas: number }>();
+                      const today = new Date();
+                      for (let i = 0; i < 7; i++) {
+                        const d = new Date(today);
+                        d.setDate(d.getDate() + i);
+                        const key = d.toISOString().split('T')[0];
+                        groupedByDate.set(key, { entradas: 0, saidas: 0 });
+                      }
+                      (fluxoProximosDias || []).forEach(item => {
+                        const existing = groupedByDate.get(item.data);
+                        if (existing) {
+                          if (item.tipo === 'RECEITA') {
+                            existing.entradas += item.valor;
+                          } else {
+                            existing.saidas += item.valor;
+                          }
+                        }
+                      });
+                      const allValues = Array.from(groupedByDate.values()).flatMap(v => [v.entradas, v.saidas]);
+                      const maxValue = Math.max(...allValues, 1);
+
+                      return Array.from(groupedByDate.entries()).map(([date, values], index) => {
+                        const d = new Date(date + 'T12:00:00');
+                        const dayName = d.toLocaleDateString('pt-BR', { weekday: 'short' });
+                        const dayNum = d.getDate();
+                        const entradasHeight = (values.entradas / maxValue) * 100;
+                        const saidasHeight = (values.saidas / maxValue) * 100;
+
+                        return (
+                          <motion.div
+                            key={date}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.1 * index }}
+                            className="flex flex-col items-center h-full"
+                          >
+                            <div className="flex-1 flex items-end gap-1 w-full">
+                              <motion.div
+                                className="flex-1 bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-lg"
+                                initial={{ height: 0 }}
+                                animate={{ height: `${Math.max(entradasHeight, 2)}%` }}
+                                transition={{ delay: 0.3 + (0.1 * index), duration: 0.5 }}
+                                title={`Entradas: ${formatCurrencyCompact(values.entradas)}`}
+                              />
+                              <motion.div
+                                className="flex-1 bg-gradient-to-t from-rose-600 to-rose-400 rounded-t-lg"
+                                initial={{ height: 0 }}
+                                animate={{ height: `${Math.max(saidasHeight, 2)}%` }}
+                                transition={{ delay: 0.35 + (0.1 * index), duration: 0.5 }}
+                                title={`Saídas: ${formatCurrencyCompact(values.saidas)}`}
+                              />
+                            </div>
+                            <div className="text-center mt-2">
+                              <div className="text-slate-400 text-xs capitalize">{dayName}</div>
+                              <div className="text-white font-bold text-sm">{dayNum}</div>
+                            </div>
+                          </motion.div>
+                        );
+                      });
+                    })()}
+                  </div>
+                  
+                  <div className="flex items-center justify-center gap-6 mt-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-emerald-500" />
+                      <span className="text-slate-400 text-sm">Entradas</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-rose-500" />
+                      <span className="text-slate-400 text-sm">Saídas</span>
+                    </div>
                   </div>
                 </motion.div>
               </div>
@@ -2309,19 +2793,174 @@ export default function PresentationMode() {
                 </div>
               </div>
 
-              <div className="flex-1 flex items-center justify-center">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.3 }}
-                  className="text-center"
-                >
-                  <div className="p-6 rounded-2xl bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm">
-                    <Construction className="w-16 h-16 text-rose-400 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold text-white mb-2">Dashboard em construção</h2>
-                    <p className="text-slate-400">Em breve, métricas de performance de marketing estarão disponíveis aqui.</p>
-                  </div>
-                </motion.div>
+              <div className="flex-1 grid grid-cols-3 gap-4 lg:gap-6">
+                {isLoadingMetaAds ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 * i }}
+                      className="rounded-2xl bg-slate-800/50 border border-slate-700/50 p-6"
+                    >
+                      <Skeleton className="h-6 w-24 bg-slate-700 mb-4" />
+                      <Skeleton className="h-12 w-32 bg-slate-700 mb-2" />
+                      <Skeleton className="h-4 w-20 bg-slate-700" />
+                    </motion.div>
+                  ))
+                ) : (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.1 }}
+                      className="rounded-2xl bg-gradient-to-br from-rose-600/30 via-rose-500/20 to-pink-600/30 border border-rose-500/40 p-6 shadow-xl shadow-rose-500/10"
+                      data-testid="card-investimento-total"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-lg bg-rose-500/30">
+                          <DollarSign className="w-5 h-5 text-rose-400" />
+                        </div>
+                        <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">Investimento Total</span>
+                      </div>
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-rose-400"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.3, type: "spring" }}
+                      >
+                        {formatCurrencyCompact(metaAdsOverview?.totalSpend || 0)}
+                      </motion.div>
+                      <div className="text-slate-400 text-sm mt-2">Gasto em anúncios Meta</div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.15 }}
+                      className="rounded-2xl bg-gradient-to-br from-pink-600/30 via-pink-500/20 to-fuchsia-600/30 border border-pink-500/40 p-6 shadow-xl shadow-pink-500/10"
+                      data-testid="card-leads-gerados"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-lg bg-pink-500/30">
+                          <Users className="w-5 h-5 text-pink-400" />
+                        </div>
+                        <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">Leads Gerados</span>
+                      </div>
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-pink-400"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.35, type: "spring" }}
+                      >
+                        {metaAdsOverview?.totalLeads?.toLocaleString('pt-BR') || 0}
+                      </motion.div>
+                      <div className="text-slate-400 text-sm mt-2 flex items-center gap-1">
+                        <span className="text-emerald-400">{metaAdsOverview?.totalWon?.toLocaleString('pt-BR') || 0}</span>
+                        <span>conversões</span>
+                      </div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="rounded-2xl bg-gradient-to-br from-violet-600/30 via-violet-500/20 to-purple-600/30 border border-violet-500/40 p-6 shadow-xl shadow-violet-500/10"
+                      data-testid="card-cpl"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-lg bg-violet-500/30">
+                          <Target className="w-5 h-5 text-violet-400" />
+                        </div>
+                        <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">CPL</span>
+                      </div>
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-violet-400"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.4, type: "spring" }}
+                      >
+                        {formatCurrency(metaAdsOverview?.costPerLead || 0)}
+                      </motion.div>
+                      <div className="text-slate-400 text-sm mt-2">Custo por Lead</div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.25 }}
+                      className="rounded-2xl bg-gradient-to-br from-amber-600/30 via-amber-500/20 to-orange-600/30 border border-amber-500/40 p-6 shadow-xl shadow-amber-500/10"
+                      data-testid="card-cac"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-lg bg-amber-500/30">
+                          <Handshake className="w-5 h-5 text-amber-400" />
+                        </div>
+                        <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">CAC</span>
+                      </div>
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-amber-400"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.45, type: "spring" }}
+                      >
+                        {formatCurrency(metaAdsOverview?.cac || 0)}
+                      </motion.div>
+                      <div className="text-slate-400 text-sm mt-2">Custo de Aquisição</div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.3 }}
+                      className="rounded-2xl bg-gradient-to-br from-cyan-600/30 via-cyan-500/20 to-sky-600/30 border border-cyan-500/40 p-6 shadow-xl shadow-cyan-500/10"
+                      data-testid="card-ctr"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-lg bg-cyan-500/30">
+                          <TrendingUp className="w-5 h-5 text-cyan-400" />
+                        </div>
+                        <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">CTR</span>
+                      </div>
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-cyan-400"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.5, type: "spring" }}
+                      >
+                        {formatPercent(metaAdsOverview?.avgCtr || 0)}
+                      </motion.div>
+                      <div className="text-slate-400 text-sm mt-2">Taxa de Clique</div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.35 }}
+                      className="rounded-2xl bg-gradient-to-br from-emerald-600/30 via-emerald-500/20 to-teal-600/30 border border-emerald-500/40 p-6 shadow-xl shadow-emerald-500/10"
+                      data-testid="card-alcance"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 rounded-lg bg-emerald-500/30">
+                          <Megaphone className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <span className="text-slate-300 font-medium text-sm uppercase tracking-wider">Alcance</span>
+                      </div>
+                      <motion.div 
+                        className="text-4xl lg:text-5xl font-black text-emerald-400"
+                        initial={{ scale: 0.5 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.55, type: "spring" }}
+                      >
+                        {metaAdsOverview?.totalReach ? (metaAdsOverview.totalReach / 1000).toFixed(0) + 'K' : '0'}
+                      </motion.div>
+                      <div className="text-slate-400 text-sm mt-2 flex items-center gap-1">
+                        <span>{metaAdsOverview?.totalImpressions ? (metaAdsOverview.totalImpressions / 1000).toFixed(0) + 'K' : '0'}</span>
+                        <span>impressões</span>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
               </div>
             </motion.div>
           )}
