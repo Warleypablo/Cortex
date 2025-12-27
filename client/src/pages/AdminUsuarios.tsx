@@ -101,139 +101,39 @@ interface DebugData {
   totalKeys: number;
 }
 
-const AVAILABLE_ROUTES = [
-  // Menu Principal
-  { path: '/clientes', label: 'Clientes', category: 'Menu Principal' },
-  { path: '/contratos', label: 'Contratos', category: 'Menu Principal' },
-  { path: '/colaboradores', label: 'Colaboradores', category: 'Menu Principal' },
-  { path: '/colaboradores/analise', label: 'Análise Colaboradores', category: 'Menu Principal' },
-  { path: '/patrimonio', label: 'Patrimônio', category: 'Menu Principal' },
-  { path: '/ferramentas', label: 'Ferramentas', category: 'Menu Principal' },
-  { path: '/turbozap', label: 'TurboZap', category: 'Menu Principal' },
-  { path: '/acessos', label: 'Acessos', category: 'Menu Principal' },
-  { path: '/conhecimentos', label: 'Conhecimentos', category: 'Menu Principal' },
-  { path: '/beneficios', label: 'Benefícios', category: 'Menu Principal' },
-  { path: '/cases/chat', label: 'Assistente IA', category: 'Menu Principal' },
-  // Financeiro
-  { path: '/dashboard/financeiro', label: 'Visão Geral', category: 'Financeiro' },
-  { path: '/dashboard/dfc', label: 'DFC', category: 'Financeiro' },
-  { path: '/dashboard/fluxo-caixa', label: 'Fluxo de Caixa', category: 'Financeiro' },
-  { path: '/dashboard/revenue-goals', label: 'Revenue Goals', category: 'Financeiro' },
-  { path: '/dashboard/inadimplencia', label: 'Inadimplência', category: 'Financeiro' },
-  { path: '/dashboard/auditoria-sistemas', label: 'Auditoria de Sistemas', category: 'Financeiro' },
-  // G&G
-  { path: '/dashboard/geg', label: 'Visão Geral', category: 'G&G' },
-  { path: '/dashboard/inhire', label: 'Inhire', category: 'G&G' },
-  { path: '/dashboard/recrutamento', label: 'Recrutamento', category: 'G&G' },
-  // Operação
-  { path: '/visao-geral', label: 'Visão Geral', category: 'Operação' },
-  { path: '/dashboard/retencao', label: 'Análise de Retenção', category: 'Operação' },
-  { path: '/dashboard/meta-ads', label: 'Meta Ads', category: 'Operação' },
-  // Tech
-  { path: '/dashboard/tech', label: 'Visão Geral', category: 'Tech' },
-  { path: '/tech/projetos', label: 'Projetos', category: 'Tech' },
-  // Comercial
-  { path: '/dashboard/comercial/closers', label: 'Closers', category: 'Comercial' },
-  { path: '/dashboard/comercial/sdrs', label: 'SDRs', category: 'Comercial' },
-  { path: '/dashboard/comercial/detalhamento-closers', label: 'Detalhamento Closers', category: 'Comercial' },
-  { path: '/dashboard/comercial/detalhamento-sdrs', label: 'Detalhamento SDRs', category: 'Comercial' },
-  { path: '/dashboard/comercial/detalhamento-vendas', label: 'Detalhamento Vendas', category: 'Comercial' },
-  { path: '/dashboard/comercial/analise-vendas', label: 'Análise de Vendas', category: 'Comercial' },
-  { path: '/dashboard/comercial/apresentacao', label: 'Modo Apresentação', category: 'Comercial' },
-  // Growth
-  { path: '/growth/visao-geral', label: 'Visão Geral', category: 'Growth' },
-  { path: '/growth/criativos', label: 'Criativos', category: 'Growth' },
-  { path: '/growth/performance-plataformas', label: 'Por Plataforma', category: 'Growth' },
-  // Jurídico
-  { path: '/juridico/clientes', label: 'Clientes Cobrança', category: 'Jurídico' },
-  // Investidores
-  { path: '/investors-report', label: 'Relatório Investidores', category: 'Investidores' },
-  // Administração
-  { path: '/admin/usuarios', label: 'Gerenciar Usuários', category: 'Administração' },
-  { path: '/admin/regras-notificacoes', label: 'Regras de Notificação', category: 'Administração' },
-];
+import { 
+  PERMISSION_CATEGORIES, 
+  PERMISSION_LABELS, 
+  ACCESS_PROFILES, 
+  ALL_PERMISSION_KEYS,
+  permissionsToRoutes 
+} from "@shared/nav-config";
 
-// Pre-defined role presets with access to specific pages
-const ROLE_PRESETS: { id: string; label: string; description: string; routes: string[] }[] = [
+// New access profiles (Base, Time, Líder, Control Tower)
+const ROLE_PRESETS = [
   {
-    id: 'financeiro',
-    label: 'Financeiro',
-    description: 'Acesso a dashboards financeiros, DFC, fluxo de caixa e inadimplência',
-    routes: [
-      '/clientes', '/contratos', '/cases/chat',
-      '/dashboard/financeiro', '/dashboard/dfc', '/dashboard/fluxo-caixa',
-      '/dashboard/revenue-goals', '/dashboard/inadimplencia', '/dashboard/auditoria-sistemas'
-    ]
+    id: ACCESS_PROFILES.BASE.id,
+    label: ACCESS_PROFILES.BASE.label,
+    description: ACCESS_PROFILES.BASE.description,
+    permissions: ACCESS_PROFILES.BASE.permissions,
   },
   {
-    id: 'comercial',
-    label: 'Comercial',
-    description: 'Acesso a dashboards de vendas, closers e SDRs',
-    routes: [
-      '/clientes', '/contratos', '/cases/chat',
-      '/dashboard/comercial/closers', '/dashboard/comercial/sdrs',
-      '/dashboard/comercial/detalhamento-closers', '/dashboard/comercial/detalhamento-sdrs',
-      '/dashboard/comercial/detalhamento-vendas', '/dashboard/comercial/analise-vendas',
-      '/dashboard/comercial/apresentacao'
-    ]
+    id: ACCESS_PROFILES.TIME.id,
+    label: ACCESS_PROFILES.TIME.label,
+    description: ACCESS_PROFILES.TIME.description,
+    permissions: ACCESS_PROFILES.TIME.permissions,
   },
   {
-    id: 'growth',
-    label: 'Growth',
-    description: 'Acesso a dashboards de Growth, criativos e performance',
-    routes: [
-      '/clientes', '/contratos', '/cases/chat',
-      '/growth/visao-geral', '/growth/criativos', '/growth/performance-plataformas',
-      '/dashboard/meta-ads'
-    ]
+    id: ACCESS_PROFILES.LIDER.id,
+    label: ACCESS_PROFILES.LIDER.label,
+    description: ACCESS_PROFILES.LIDER.description,
+    permissions: ACCESS_PROFILES.LIDER.permissions,
   },
   {
-    id: 'operacao',
-    label: 'Operação',
-    description: 'Acesso a visão geral operacional e retenção',
-    routes: [
-      '/clientes', '/contratos', '/colaboradores', '/cases/chat',
-      '/visao-geral', '/dashboard/retencao'
-    ]
-  },
-  {
-    id: 'rh',
-    label: 'RH / G&G',
-    description: 'Acesso a gestão de pessoas e recrutamento',
-    routes: [
-      '/clientes', '/colaboradores', '/colaboradores/analise', '/cases/chat',
-      '/dashboard/geg', '/dashboard/inhire', '/dashboard/recrutamento'
-    ]
-  },
-  {
-    id: 'tech',
-    label: 'Tech',
-    description: 'Acesso a dashboards de tecnologia e projetos',
-    routes: [
-      '/clientes', '/ferramentas', '/acessos', '/cases/chat',
-      '/dashboard/tech', '/tech/projetos'
-    ]
-  },
-  {
-    id: 'juridico',
-    label: 'Jurídico',
-    description: 'Acesso a módulo jurídico e cobrança',
-    routes: [
-      '/clientes', '/contratos', '/cases/chat',
-      '/juridico/clientes', '/dashboard/inadimplencia'
-    ]
-  },
-  {
-    id: 'investidor',
-    label: 'Investidor',
-    description: 'Acesso apenas ao relatório de investidores',
-    routes: ['/investors-report']
-  },
-  {
-    id: 'visualizador',
-    label: 'Visualizador Básico',
-    description: 'Acesso apenas a clientes e contratos',
-    routes: ['/clientes', '/contratos', '/cases/chat']
+    id: ACCESS_PROFILES.CONTROL_TOWER.id,
+    label: ACCESS_PROFILES.CONTROL_TOWER.label,
+    description: ACCESS_PROFILES.CONTROL_TOWER.description,
+    permissions: ACCESS_PROFILES.CONTROL_TOWER.permissions,
   },
 ];
 
@@ -276,7 +176,7 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
   };
 
   const handleSelectAll = () => {
-    setSelectedRoutes(AVAILABLE_ROUTES.map((r) => r.path));
+    setSelectedRoutes([...ALL_PERMISSION_KEYS]);
   };
 
   const handleDeselectAll = () => {
@@ -286,7 +186,7 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
   const handleApplyPreset = (presetId: string) => {
     const preset = ROLE_PRESETS.find(p => p.id === presetId);
     if (preset) {
-      setSelectedRoutes(preset.routes);
+      setSelectedRoutes([...preset.permissions]);
       toast({
         title: "Perfil aplicado",
         description: `Perfil "${preset.label}" aplicado. Clique em Salvar para confirmar.`,
@@ -403,34 +303,28 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
                   Desmarcar Todas
                 </Button>
                 <div className="ml-auto text-sm text-muted-foreground">
-                  {selectedRoutes.length} de {AVAILABLE_ROUTES.length} selecionadas
+                  {selectedRoutes.length} de {ALL_PERMISSION_KEYS.length} selecionadas
                 </div>
               </div>
 
               <div className="space-y-6">
-                {Object.entries(
-                  AVAILABLE_ROUTES.reduce((acc, route) => {
-                    if (!acc[route.category]) acc[route.category] = [];
-                    acc[route.category].push(route);
-                    return acc;
-                  }, {} as Record<string, typeof AVAILABLE_ROUTES>)
-                ).map(([category, routes]) => (
-                  <div key={category}>
-                    <h4 className="text-sm font-semibold text-muted-foreground mb-3">{category}</h4>
+                {PERMISSION_CATEGORIES.map((category) => (
+                  <div key={category.key}>
+                    <h4 className="text-sm font-semibold text-muted-foreground mb-3">{category.label}</h4>
                     <div className="grid grid-cols-2 gap-3">
-                      {routes.map((route) => (
-                        <div key={route.path} className="flex items-center space-x-2">
+                      {category.permissions.map((permission) => (
+                        <div key={permission.key} className="flex items-center space-x-2">
                           <Checkbox
-                            id={`route-${route.path}`}
-                            checked={selectedRoutes.includes(route.path)}
-                            onCheckedChange={() => handleToggleRoute(route.path)}
-                            data-testid={`checkbox-${route.path}`}
+                            id={`route-${permission.key}`}
+                            checked={selectedRoutes.includes(permission.key)}
+                            onCheckedChange={() => handleToggleRoute(permission.key)}
+                            data-testid={`checkbox-${permission.key}`}
                           />
                           <Label
-                            htmlFor={`route-${route.path}`}
+                            htmlFor={`route-${permission.key}`}
                             className="text-sm font-normal cursor-pointer"
                           >
-                            {route.label}
+                            {PERMISSION_LABELS[permission.key] || permission.label}
                           </Label>
                         </div>
                       ))}
@@ -526,7 +420,7 @@ function AddUserDialog({ open, onOpenChange }: {
   };
 
   const handleSelectAll = () => {
-    setSelectedRoutes(AVAILABLE_ROUTES.map((r) => r.path));
+    setSelectedRoutes([...ALL_PERMISSION_KEYS]);
   };
 
   const handleDeselectAll = () => {
@@ -536,7 +430,7 @@ function AddUserDialog({ open, onOpenChange }: {
   const handleApplyPreset = (presetId: string) => {
     const preset = ROLE_PRESETS.find(p => p.id === presetId);
     if (preset) {
-      setSelectedRoutes(preset.routes);
+      setSelectedRoutes([...preset.permissions]);
       toast({
         title: "Perfil aplicado",
         description: `Perfil "${preset.label}" aplicado.`,
@@ -684,34 +578,28 @@ function AddUserDialog({ open, onOpenChange }: {
                   Desmarcar Todas
                 </Button>
                 <div className="ml-auto text-sm text-muted-foreground">
-                  {selectedRoutes.length} de {AVAILABLE_ROUTES.length} selecionadas
+                  {selectedRoutes.length} de {ALL_PERMISSION_KEYS.length} selecionadas
                 </div>
               </div>
 
               <div className="space-y-6">
-                {Object.entries(
-                  AVAILABLE_ROUTES.reduce((acc, route) => {
-                    if (!acc[route.category]) acc[route.category] = [];
-                    acc[route.category].push(route);
-                    return acc;
-                  }, {} as Record<string, typeof AVAILABLE_ROUTES>)
-                ).map(([category, routes]) => (
-                  <div key={category}>
-                    <h4 className="text-sm font-semibold text-muted-foreground mb-3">{category}</h4>
+                {PERMISSION_CATEGORIES.map((category) => (
+                  <div key={category.key}>
+                    <h4 className="text-sm font-semibold text-muted-foreground mb-3">{category.label}</h4>
                     <div className="grid grid-cols-2 gap-3">
-                      {routes.map((route) => (
-                        <div key={route.path} className="flex items-center space-x-2">
+                      {category.permissions.map((permission) => (
+                        <div key={permission.key} className="flex items-center space-x-2">
                           <Checkbox
-                            id={`add-route-${route.path}`}
-                            checked={selectedRoutes.includes(route.path)}
-                            onCheckedChange={() => handleToggleRoute(route.path)}
-                            data-testid={`add-checkbox-${route.path}`}
+                            id={`add-route-${permission.key}`}
+                            checked={selectedRoutes.includes(permission.key)}
+                            onCheckedChange={() => handleToggleRoute(permission.key)}
+                            data-testid={`add-checkbox-${permission.key}`}
                           />
                           <Label
-                            htmlFor={`add-route-${route.path}`}
+                            htmlFor={`add-route-${permission.key}`}
                             className="text-sm font-normal cursor-pointer"
                           >
-                            {route.label}
+                            {PERMISSION_LABELS[permission.key] || permission.label}
                           </Label>
                         </div>
                       ))}
