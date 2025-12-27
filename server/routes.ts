@@ -6717,9 +6717,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           break;
         case 'squad':
           filtered = colaboradores.filter(c => {
-            const squadName = removeEmoji(c.squad || '');
-            const valorClean = removeEmoji(valor);
-            return squadName === valorClean || c.squad === valor;
+            const squadName = removeEmoji(c.squad || '').toLowerCase().trim();
+            const valorClean = removeEmoji(valor).toLowerCase().trim();
+            return squadName.includes(valorClean) || 
+                   valorClean.includes(squadName) ||
+                   c.squad === valor;
           });
           break;
         case 'cargo':

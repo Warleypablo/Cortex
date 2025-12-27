@@ -2013,18 +2013,21 @@ export default function DashboardGeG() {
                           return acc;
                         }, [] as { nome: string; total: number }[]);
                         const totalSquad = aggregatedSquads.reduce((sum, item) => sum + item.total, 0);
-                        return aggregatedSquads.map((item, index) => (
-                          <TableRow 
-                            key={item.nome} 
-                            data-testid={`squad-dist-${index}`}
-                            className="cursor-pointer hover:bg-muted/50"
-                            onClick={() => handleChartClick('squad', item.nome, `Squad: ${item.nome}`)}
-                          >
-                            <TableCell className="font-medium">{item.nome}</TableCell>
-                            <TableCell className="text-right">{item.total}</TableCell>
-                            <TableCell className="text-right">{totalSquad > 0 ? ((item.total / totalSquad) * 100).toFixed(1) : 0}%</TableCell>
-                          </TableRow>
-                        ));
+                        return aggregatedSquads.map((item, index) => {
+                          const cleanName = removeEmoji(item.nome);
+                          return (
+                            <TableRow 
+                              key={item.nome} 
+                              data-testid={`squad-dist-${index}`}
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => handleChartClick('squad', cleanName, `Squad: ${item.nome}`)}
+                            >
+                              <TableCell className="font-medium">{item.nome}</TableCell>
+                              <TableCell className="text-right">{item.total}</TableCell>
+                              <TableCell className="text-right">{totalSquad > 0 ? ((item.total / totalSquad) * 100).toFixed(1) : 0}%</TableCell>
+                            </TableRow>
+                          );
+                        });
                       })()}
                     </TableBody>
                   </Table>
