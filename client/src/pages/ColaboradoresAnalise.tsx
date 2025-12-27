@@ -141,8 +141,8 @@ function getInitials(nome: string) {
 }
 
 function HealthGauge({ score }: { score: number }) {
-  const color = score >= 80 ? "text-green-500" : score >= 50 ? "text-yellow-500" : "text-red-500";
-  const bgColor = score >= 80 ? "stroke-green-500" : score >= 50 ? "stroke-yellow-500" : "stroke-red-500";
+  const color = score >= 70 ? "text-green-500" : score >= 50 ? "text-yellow-500" : "text-red-500";
+  const bgColor = score >= 70 ? "stroke-green-500" : score >= 50 ? "stroke-yellow-500" : "stroke-red-500";
   const radius = 36;
   const circumference = 2 * Math.PI * radius;
   const progress = (score / 100) * circumference;
@@ -666,7 +666,7 @@ export default function ColaboradoresAnalise() {
                 </div>
               </div>
               <CardDescription>
-                Score de saúde calculado a partir de E-NPS, 1x1, PDI e ações pendentes
+                Score calculado a partir de Estabilidade, Crescimento, Desenvolvimento e Engajamento
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -784,6 +784,24 @@ export default function ColaboradoresAnalise() {
                                     {colab.reasons[0]}
                                   </p>
                                 )}
+                                <div className="grid grid-cols-4 gap-0.5 mt-2 w-full" data-testid={`breakdown-${colab.id}`}>
+                                  <div className="text-center">
+                                    <div className="text-[9px] text-muted-foreground">Est</div>
+                                    <div className="text-[10px] font-medium">{colab.breakdown.stability}</div>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="text-[9px] text-muted-foreground">Cres</div>
+                                    <div className="text-[10px] font-medium">{colab.breakdown.growth}</div>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="text-[9px] text-muted-foreground">Des</div>
+                                    <div className="text-[10px] font-medium">{colab.breakdown.development}</div>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="text-[9px] text-muted-foreground">Eng</div>
+                                    <div className="text-[10px] font-medium">{colab.breakdown.engagement}</div>
+                                  </div>
+                                </div>
                               </div>
                               <HealthGauge score={colab.healthScore} />
                             </div>
