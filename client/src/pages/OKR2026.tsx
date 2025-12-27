@@ -667,9 +667,6 @@ function HeroCard({
               <TooltipContent>Atenção: entre 90-99% da meta</TooltipContent>
             </Tooltip>
           )}
-          {quarterLabel && (
-            <Badge variant="outline" className="text-[10px]">{quarterLabel}</Badge>
-          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -1667,7 +1664,7 @@ function StrategicInitiativesSection({
                       {init.title || init.name}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <ObjectiveBadge objectiveId={init.objectiveId} />
+                      <ObjectiveBadge objective={init.objectiveId} />
                       <InitiativeStatusBadge status={init.status} />
                       {linkedKRs.slice(0, 2).map(krId => (
                         <Badge key={krId} variant="outline" className="text-[10px] font-mono">
@@ -1845,7 +1842,7 @@ function NextActionsSection({
                 data-testid={`next-action-${idx}`}
               >
                 <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <ObjectiveBadge objectiveId={action.objectiveId} />
+                  <ObjectiveBadge objective={action.objectiveId} />
                   <span className="text-sm truncate">{action.title || action.name}</span>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
