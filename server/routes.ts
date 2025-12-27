@@ -6750,6 +6750,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Salário médio por cargo
+  app.get("/api/geg/salario-por-cargo", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
+
+      const colaboradores = await storage.getColaboradores({ status: 'Ativo' });
+      
+      let filtered = colaboradores;
+      if (squad !== 'todos') filtered = filtered.filter(c => c.squad === squad);
+      if (setor !== 'todos') filtered = filtered.filter(c => c.setor === setor);
+      if (nivel !== 'todos') filtered = filtered.filter(c => c.nivel === nivel);
+      if (cargo !== 'todos') filtered = filtered.filter(c => c.cargo === cargo);
+
+      const salarioPorCargo: Record<string, { total: number; sum: number }> = {};
+      
+      filtered.forEach(c => {
+        const cargoNome = c.cargo || 'Não informado';
+        const salario = c.salario || 0;
+        if (salario > 0) {
+          if (!salarioPorCargo[cargoNome]) {
+            salarioPorCargo[cargoNome] = { total: 0, sum: 0 };
+          }
+          salarioPorCargo[cargoNome].total += 1;
+          salarioPorCargo[cargoNome].sum += salario;
+        }
+      });
+
+      const result = Object.entries(salarioPorCargo)
+        .map(([cargoNome, data]) => ({
+          cargo: cargoNome,
+          salarioMedio: data.total > 0 ? data.sum / data.total : 0,
+          total: data.total
+        }))
+        .sort((a, b) => b.salarioMedio - a.salarioMedio);
+
+      res.json(result);
+    } catch (error) {
+      console.error("[api] Error fetching salario por cargo:", error);
+      res.status(500).json({ error: "Failed to fetch salario por cargo" });
+    }
+  });
+
+  // Salário médio por squad
+  app.get("/api/geg/salario-por-squad", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
+
+      const colaboradores = await storage.getColaboradores({ status: 'Ativo' });
+      
+      let filtered = colaboradores;
+      if (squad !== 'todos') filtered = filtered.filter(c => c.squad === squad);
+      if (setor !== 'todos') filtered = filtered.filter(c => c.setor === setor);
+      if (nivel !== 'todos') filtered = filtered.filter(c => c.nivel === nivel);
+      if (cargo !== 'todos') filtered = filtered.filter(c => c.cargo === cargo);
+
+      const salarioPorSquad: Record<string, { total: number; sum: number }> = {};
+      
+      filtered.forEach(c => {
+        const squadNome = c.squad || 'Não informado';
+        const salario = c.salario || 0;
+        if (salario > 0) {
+          if (!salarioPorSquad[squadNome]) {
+            salarioPorSquad[squadNome] = { total: 0, sum: 0 };
+          }
+          salarioPorSquad[squadNome].total += 1;
+          salarioPorSquad[squadNome].sum += salario;
+        }
+      });
+
+      const result = Object.entries(salarioPorSquad)
+        .map(([squadNome, data]) => ({
+          squad: squadNome,
+          salarioMedio: data.total > 0 ? data.sum / data.total : 0,
+          total: data.total
+        }))
+        .sort((a, b) => b.salarioMedio - a.salarioMedio);
+
+      res.json(result);
+    } catch (error) {
+      console.error("[api] Error fetching salario por squad:", error);
+      res.status(500).json({ error: "Failed to fetch salario por squad" });
+    }
+  });
+
   app.get("/api/inhire/metrics", async (req, res) => {
     try {
       const metrics = await storage.getInhireMetrics();

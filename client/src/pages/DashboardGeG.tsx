@@ -31,6 +31,19 @@ interface SelectedAlert {
   nivel?: string | null;
   admissao?: string | null;
   mediaCargo?: number;
+  mesesDeTurbo?: number;
+}
+
+interface SalarioPorCargo {
+  cargo: string;
+  salarioMedio: number;
+  total: number;
+}
+
+interface SalarioPorSquad {
+  squad: string;
+  salarioMedio: number;
+  total: number;
 }
 
 type HealthCategory = 'saudavel' | 'atencao' | 'critico';
@@ -413,6 +426,14 @@ export default function DashboardGeG() {
 
   const { data: colaboradoresPorNivel, isLoading: isLoadingColaboradoresPorNivel } = useQuery<Distribuicao[]>({
     queryKey: ['/api/geg/colaboradores-por-nivel', { squad, setor, nivel, cargo }],
+  });
+
+  const { data: salarioPorCargo, isLoading: isLoadingSalarioPorCargo } = useQuery<SalarioPorCargo[]>({
+    queryKey: ['/api/geg/salario-por-cargo', { squad, setor, nivel, cargo }],
+  });
+
+  const { data: salarioPorSquad, isLoading: isLoadingSalarioPorSquad } = useQuery<SalarioPorSquad[]>({
+    queryKey: ['/api/geg/salario-por-squad', { squad, setor, nivel, cargo }],
   });
 
   const { data: distribuicaoGeografica, isLoading: isLoadingDistribuicaoGeografica } = useQuery<DistribuicaoGeografica>({
@@ -1208,11 +1229,11 @@ export default function DashboardGeG() {
                                   cargo: v.cargo,
                                   squad: v.squad,
                                   detail: v.mesesUltAumento ? `${v.mesesUltAumento} meses sem aumento` : 'Nunca recebeu aumento',
-                                  extra: `${v.mesesDeTurbo} meses de empresa`,
                                   salario: v.salario,
                                   setor: v.setor,
                                   nivel: v.nivel,
-                                  admissao: v.admissao
+                                  admissao: v.admissao,
+                                  mesesDeTurbo: v.mesesDeTurbo
                                 })}
                               >
                                 <div>
@@ -1336,12 +1357,12 @@ export default function DashboardGeG() {
                                   cargo: s.cargo,
                                   squad: s.squad,
                                   detail: `${s.diferenca}% abaixo da média`,
-                                  extra: `${s.mesesDeTurbo} meses de empresa`,
                                   salario: s.salario,
                                   setor: s.setor,
                                   nivel: s.nivel,
                                   admissao: s.admissao,
-                                  mediaCargo: s.mediaCargo
+                                  mediaCargo: s.mediaCargo,
+                                  mesesDeTurbo: s.mesesDeTurbo
                                 })}
                               >
                                 <div>
@@ -1415,6 +1436,16 @@ export default function DashboardGeG() {
                     <div className="p-2 bg-muted/50 rounded">
                       <p className="text-xs text-muted-foreground">Data de Admissão</p>
                       <p className="font-medium">{formatData(selectedAlert.admissao)}</p>
+                    </div>
+                  )}
+                  {selectedAlert.mesesDeTurbo !== undefined && selectedAlert.mesesDeTurbo > 0 && (
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="text-xs text-muted-foreground">Tempo na Turbo</p>
+                      <p className="font-medium">
+                        {selectedAlert.mesesDeTurbo >= 12
+                          ? `${Math.floor(selectedAlert.mesesDeTurbo / 12)} ${Math.floor(selectedAlert.mesesDeTurbo / 12) === 1 ? 'ano' : 'anos'}${selectedAlert.mesesDeTurbo % 12 > 0 ? ` e ${selectedAlert.mesesDeTurbo % 12} ${selectedAlert.mesesDeTurbo % 12 === 1 ? 'mês' : 'meses'}` : ''}`
+                          : `${selectedAlert.mesesDeTurbo} ${selectedAlert.mesesDeTurbo === 1 ? 'mês' : 'meses'}`}
+                      </p>
                     </div>
                   )}
                   {selectedAlert.type === 'salario' && selectedAlert.mediaCargo && (
@@ -2121,11 +2152,11 @@ export default function DashboardGeG() {
                   ))}
                 </div>
               ) : aniversariantesMes && aniversariantesMes.length > 0 ? (
-                <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                <div className="space-y-2 max-h-[350px] overflow-y-auto">
                   {aniversariantesMes.map((aniv) => (
-                    <div key={aniv.id} className="flex items-center justify-between p-3 bg-card rounded-lg border" data-testid={`aniversariante-${aniv.id}`}>
+                    <div key={aniv.id} className="flex items-center justify-between p-4 bg-card rounded-lg border" data-testid={`aniversariante-${aniv.id}`}>
                       <div>
-                        <p className="font-medium text-sm">{aniv.nome}</p>
+                        <p className="font-medium text-base">{aniv.nome}</p>
                         <p className="text-xs text-muted-foreground">{aniv.cargo || 'N/A'} - {aniv.squad || 'N/A'}</p>
                       </div>
                       <div className="text-right">
@@ -2159,7 +2190,7 @@ export default function DashboardGeG() {
                   ))}
                 </div>
               ) : aniversariosEmpresa && aniversariosEmpresa.filter(a => a.anosDeEmpresa > 0).length > 0 ? (
-                <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                <div className="space-y-2 max-h-[350px] overflow-y-auto">
                   {aniversariosEmpresa.filter(a => a.anosDeEmpresa > 0).map((aniv) => {
                     const getYearBadgeColor = (anos: number) => {
                       if (anos >= 5) return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
@@ -2168,9 +2199,9 @@ export default function DashboardGeG() {
                       return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
                     };
                     return (
-                      <div key={aniv.id} className="flex items-center justify-between p-3 bg-card rounded-lg border" data-testid={`aniversario-empresa-${aniv.id}`}>
+                      <div key={aniv.id} className="flex items-center justify-between p-4 bg-card rounded-lg border" data-testid={`aniversario-empresa-${aniv.id}`}>
                         <div>
-                          <p className="font-medium text-sm">{aniv.nome}</p>
+                          <p className="font-medium text-base">{aniv.nome}</p>
                           <p className="text-xs text-muted-foreground">{aniv.cargo || 'N/A'} - {aniv.squad || 'N/A'}</p>
                         </div>
                         <div className="text-right flex items-center gap-2">
@@ -2190,6 +2221,133 @@ export default function DashboardGeG() {
               ) : (
                 <div className="flex items-center justify-center h-[200px]" data-testid="text-no-aniversarios-empresa">
                   <p className="text-muted-foreground">Nenhum aniversário de empresa próximo</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Seção Salário Médio por Cargo e Squad */}
+        <div className="flex items-center gap-2 mb-4 pb-2 border-b">
+          <DollarSign className="w-5 h-5 text-green-500" />
+          <h2 className="text-lg font-semibold">Análise Salarial</h2>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card data-testid="card-salario-por-cargo">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-purple-500" />
+                <CardTitle>Salário Médio por Cargo</CardTitle>
+              </div>
+              <CardDescription>Top 10 cargos por salário médio</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingSalarioPorCargo ? (
+                <Skeleton className="h-[300px] w-full" />
+              ) : salarioPorCargo && salarioPorCargo.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={salarioPorCargo.slice(0, 10)} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} />
+                    <XAxis 
+                      type="number" 
+                      tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                      stroke="hsl(var(--muted-foreground))" 
+                      fontSize={11}
+                    />
+                    <YAxis 
+                      dataKey="cargo" 
+                      type="category" 
+                      width={120} 
+                      tick={{ fontSize: 10 }}
+                      stroke="hsl(var(--muted-foreground))"
+                    />
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload as SalarioPorCargo;
+                          return (
+                            <div className="bg-popover border rounded-md shadow-md p-2">
+                              <p className="font-medium text-sm">{data.cargo}</p>
+                              <p className="text-xs text-muted-foreground">
+                                R$ {data.salarioMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{data.total} colaboradores</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar dataKey="salarioMedio" name="Salário Médio" radius={[0, 4, 4, 0]}>
+                      {salarioPorCargo.slice(0, 10).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[300px]" data-testid="text-no-data-salario-cargo">
+                  <p className="text-muted-foreground">Nenhum dado disponível</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-salario-por-squad">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-500" />
+                <CardTitle>Salário Médio por Squad</CardTitle>
+              </div>
+              <CardDescription>Comparativo entre squads</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingSalarioPorSquad ? (
+                <Skeleton className="h-[300px] w-full" />
+              ) : salarioPorSquad && salarioPorSquad.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={salarioPorSquad} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} />
+                    <XAxis 
+                      type="number" 
+                      tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                      stroke="hsl(var(--muted-foreground))" 
+                      fontSize={11}
+                    />
+                    <YAxis 
+                      dataKey="squad" 
+                      type="category" 
+                      width={120} 
+                      tick={{ fontSize: 10 }}
+                      stroke="hsl(var(--muted-foreground))"
+                    />
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload as SalarioPorSquad;
+                          return (
+                            <div className="bg-popover border rounded-md shadow-md p-2">
+                              <p className="font-medium text-sm">{data.squad}</p>
+                              <p className="text-xs text-muted-foreground">
+                                R$ {data.salarioMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{data.total} colaboradores</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar dataKey="salarioMedio" name="Salário Médio" radius={[0, 4, 4, 0]}>
+                      {salarioPorSquad.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[300px]" data-testid="text-no-data-salario-squad">
+                  <p className="text-muted-foreground">Nenhum dado disponível</p>
                 </div>
               )}
             </CardContent>
