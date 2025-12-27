@@ -26,6 +26,25 @@ interface SelectedAlert {
   squad: string | null;
   detail: string;
   extra?: string;
+  salario?: number;
+  setor?: string | null;
+  nivel?: string | null;
+  admissao?: string | null;
+  mediaCargo?: number;
+}
+
+type HealthCategory = 'saudavel' | 'atencao' | 'critico';
+interface ColaboradorSaude {
+  id: number;
+  nome: string;
+  cargo: string | null;
+  squad: string | null;
+  reasons: string[];
+}
+interface ColaboradoresPorSaude {
+  saudavel: ColaboradorSaude[];
+  atencao: ColaboradorSaude[];
+  critico: ColaboradorSaude[];
 }
 
 type PeriodoPreset = "mesAtual" | "trimestre" | "semestre" | "ano";
@@ -215,9 +234,9 @@ interface DistribuicaoGeografica {
 }
 
 interface GegAlertas {
-  veteranosSemAumento: { id: number; nome: string; cargo: string | null; squad: string | null; mesesDeTurbo: number; mesesUltAumento: number | null }[];
-  fimExperiencia: { id: number; nome: string; cargo: string | null; squad: string | null; admissao: string; diasRestantes: number }[];
-  salarioAbaixoMedia: { id: number; nome: string; cargo: string | null; squad: string | null; salario: number; mediaCargo: number; diferenca: string }[];
+  veteranosSemAumento: { id: number; nome: string; cargo: string | null; squad: string | null; mesesDeTurbo: number; mesesUltAumento: number | null; salario: number; setor: string | null; nivel: string | null; admissao: string | null }[];
+  fimExperiencia: { id: number; nome: string; cargo: string | null; squad: string | null; admissao: string; diasRestantes: number; salario: number; setor: string | null; nivel: string | null }[];
+  salarioAbaixoMedia: { id: number; nome: string; cargo: string | null; squad: string | null; salario: number; mediaCargo: number; diferenca: string; setor: string | null; nivel: string | null; admissao: string | null; mesesDeTurbo: number }[];
   totalAlertas: number;
 }
 
@@ -256,6 +275,7 @@ export default function DashboardGeG() {
   const [diasExperiencia, setDiasExperiencia] = useState(30);
   const [selectedAlert, setSelectedAlert] = useState<SelectedAlert | null>(null);
   const [ignoredAlerts, setIgnoredAlerts] = useState<string[]>([]);
+  const [selectedHealthCategory, setSelectedHealthCategory] = useState<HealthCategory | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('geg-ignored-alerts');
@@ -378,6 +398,11 @@ export default function DashboardGeG() {
 
   const { data: retencaoSaude, isLoading: isLoadingRetencaoSaude } = useQuery<RetencaoSaude>({
     queryKey: ['/api/geg/retencao-saude', { periodo, squad, setor, nivel, cargo }],
+  });
+
+  const { data: colaboradoresPorSaude, isLoading: isLoadingColaboradoresPorSaude } = useQuery<ColaboradoresPorSaude>({
+    queryKey: ['/api/geg/colaboradores-por-saude'],
+    enabled: selectedHealthCategory !== null,
   });
 
   const formatMesAno = (mesAno: string) => {
@@ -1147,7 +1172,11 @@ export default function DashboardGeG() {
                                   cargo: v.cargo,
                                   squad: v.squad,
                                   detail: v.mesesUltAumento ? `${v.mesesUltAumento} meses sem aumento` : 'Nunca recebeu aumento',
-                                  extra: `${v.mesesDeTurbo} meses de empresa`
+                                  extra: `${v.mesesDeTurbo} meses de empresa`,
+                                  salario: v.salario,
+                                  setor: v.setor,
+                                  nivel: v.nivel,
+                                  admissao: v.admissao
                                 })}
                               >
                                 <div>
@@ -1214,7 +1243,11 @@ export default function DashboardGeG() {
                                   cargo: f.cargo,
                                   squad: f.squad,
                                   detail: `${f.diasRestantes} dias restantes`,
-                                  extra: `Admissão: ${f.admissao ? new Date(f.admissao).toLocaleDateString('pt-BR') : 'N/A'}`
+                                  extra: `Admissão: ${f.admissao ? new Date(f.admissao).toLocaleDateString('pt-BR') : 'N/A'}`,
+                                  salario: f.salario,
+                                  setor: f.setor,
+                                  nivel: f.nivel,
+                                  admissao: f.admissao
                                 })}
                               >
                                 <div>
@@ -1266,8 +1299,13 @@ export default function DashboardGeG() {
                                   nome: s.nome,
                                   cargo: s.cargo,
                                   squad: s.squad,
-                                  detail: s.diferenca,
-                                  extra: `Salário atual: R$ ${s.salario != null ? s.salario.toLocaleString('pt-BR') : 'N/A'} | Média do cargo: R$ ${s.mediaCargo != null ? s.mediaCargo.toLocaleString('pt-BR') : 'N/A'}`
+                                  detail: `${s.diferenca}% abaixo da média`,
+                                  extra: `${s.mesesDeTurbo} meses de empresa`,
+                                  salario: s.salario,
+                                  setor: s.setor,
+                                  nivel: s.nivel,
+                                  admissao: s.admissao,
+                                  mediaCargo: s.mediaCargo
                                 })}
                               >
                                 <div>
@@ -1318,6 +1356,38 @@ export default function DashboardGeG() {
                     <p className="text-sm text-muted-foreground">{selectedAlert.squad}</p>
                   )}
                 </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {selectedAlert.salario !== undefined && selectedAlert.salario > 0 && (
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="text-xs text-muted-foreground">Salário Atual</p>
+                      <p className="font-medium">R$ {selectedAlert.salario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  )}
+                  {selectedAlert.setor && (
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="text-xs text-muted-foreground">Setor</p>
+                      <p className="font-medium">{selectedAlert.setor}</p>
+                    </div>
+                  )}
+                  {selectedAlert.nivel && (
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="text-xs text-muted-foreground">Nível</p>
+                      <p className="font-medium">{selectedAlert.nivel}</p>
+                    </div>
+                  )}
+                  {selectedAlert.admissao && (
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="text-xs text-muted-foreground">Data de Admissão</p>
+                      <p className="font-medium">{formatData(selectedAlert.admissao)}</p>
+                    </div>
+                  )}
+                  {selectedAlert.type === 'salario' && selectedAlert.mediaCargo && (
+                    <div className="p-2 bg-muted/50 rounded col-span-2">
+                      <p className="text-xs text-muted-foreground">Média do Cargo</p>
+                      <p className="font-medium">R$ {selectedAlert.mediaCargo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
                     <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
@@ -1347,6 +1417,85 @@ export default function DashboardGeG() {
               >
                 <XCircle className="w-4 h-4 mr-2" />
                 Ignorar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de Colaboradores por Saúde */}
+        <Dialog open={!!selectedHealthCategory} onOpenChange={(open) => !open && setSelectedHealthCategory(null)}>
+          <DialogContent className="sm:max-w-lg max-h-[80vh]" data-testid="dialog-health-category">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {selectedHealthCategory === 'saudavel' && <Heart className="w-5 h-5 text-green-500" />}
+                {selectedHealthCategory === 'atencao' && <AlertTriangle className="w-5 h-5 text-amber-500" />}
+                {selectedHealthCategory === 'critico' && <AlertTriangle className="w-5 h-5 text-red-500" />}
+                Colaboradores - {selectedHealthCategory === 'saudavel' ? 'Saudável' : selectedHealthCategory === 'atencao' ? 'Atenção' : 'Crítico'}
+              </DialogTitle>
+              <DialogDescription>
+                {selectedHealthCategory === 'saudavel' && 'Colaboradores em boas condições de carreira'}
+                {selectedHealthCategory === 'atencao' && 'Colaboradores que precisam de atenção (12+ meses sem aumento ou salário <85% da média)'}
+                {selectedHealthCategory === 'critico' && 'Colaboradores em situação crítica (24+ meses sem aumento ou salário <70% da média)'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[50vh] overflow-y-auto space-y-2">
+              {isLoadingColaboradoresPorSaude ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+                </div>
+              ) : colaboradoresPorSaude && selectedHealthCategory ? (
+                colaboradoresPorSaude[selectedHealthCategory].length > 0 ? (
+                  colaboradoresPorSaude[selectedHealthCategory].map((c) => (
+                    <div 
+                      key={c.id} 
+                      className={`p-3 rounded-lg border ${
+                        selectedHealthCategory === 'saudavel' ? 'bg-green-500/5 border-green-500/20' :
+                        selectedHealthCategory === 'atencao' ? 'bg-amber-500/5 border-amber-500/20' :
+                        'bg-red-500/5 border-red-500/20'
+                      }`}
+                      data-testid={`health-colaborador-${c.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <Link href={`/colaboradores/${c.id}`} className="hover:underline">
+                            <p className="font-medium text-sm truncate">{c.nome}</p>
+                          </Link>
+                          <p className="text-xs text-muted-foreground">{c.cargo || 'N/A'}</p>
+                          {c.squad && <p className="text-xs text-muted-foreground">{c.squad}</p>}
+                        </div>
+                        <Button variant="ghost" size="icon" asChild className="flex-shrink-0">
+                          <Link href={`/colaboradores/${c.id}`}>
+                            <ExternalLink className="w-4 h-4" />
+                          </Link>
+                        </Button>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {c.reasons.map((reason, idx) => (
+                          <Badge 
+                            key={idx} 
+                            variant="outline" 
+                            className={`text-[10px] ${
+                              selectedHealthCategory === 'saudavel' ? 'text-green-600 border-green-500/30' :
+                              selectedHealthCategory === 'atencao' ? 'text-amber-600 border-amber-500/30' :
+                              'text-red-600 border-red-500/30'
+                            }`}
+                          >
+                            {reason}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">Nenhum colaborador nesta categoria</p>
+                )
+              ) : (
+                <p className="text-center text-muted-foreground py-8">Carregando...</p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSelectedHealthCategory(null)} data-testid="btn-fechar-health">
+                Fechar
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1432,17 +1581,29 @@ export default function DashboardGeG() {
                             />
                           </div>
                           <div className="grid grid-cols-3 gap-2 text-center">
-                            <div className="p-2 bg-green-500/10 rounded-lg border border-green-500/20" data-testid="health-saudavel">
+                            <div 
+                              className="p-2 bg-green-500/10 rounded-lg border border-green-500/20 cursor-pointer hover-elevate" 
+                              data-testid="health-saudavel"
+                              onClick={() => setSelectedHealthCategory('saudavel')}
+                            >
                               <div className="text-lg font-bold text-green-600">{retencaoSaude.healthDistribution.saudavel || 0}</div>
                               <p className="text-[10px] text-muted-foreground">Saudável</p>
                               <p className="text-[10px] text-green-600">{saudavelPct.toFixed(1)}%</p>
                             </div>
-                            <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20" data-testid="health-atencao">
+                            <div 
+                              className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20 cursor-pointer hover-elevate" 
+                              data-testid="health-atencao"
+                              onClick={() => setSelectedHealthCategory('atencao')}
+                            >
                               <div className="text-lg font-bold text-amber-600">{retencaoSaude.healthDistribution.atencao || 0}</div>
                               <p className="text-[10px] text-muted-foreground">Atenção</p>
                               <p className="text-[10px] text-amber-600">{atencaoPct.toFixed(1)}%</p>
                             </div>
-                            <div className="p-2 bg-red-500/10 rounded-lg border border-red-500/20" data-testid="health-critico">
+                            <div 
+                              className="p-2 bg-red-500/10 rounded-lg border border-red-500/20 cursor-pointer hover-elevate" 
+                              data-testid="health-critico"
+                              onClick={() => setSelectedHealthCategory('critico')}
+                            >
                               <div className="text-lg font-bold text-red-600">{retencaoSaude.healthDistribution.critico || 0}</div>
                               <p className="text-[10px] text-muted-foreground">Crítico</p>
                               <p className="text-[10px] text-red-600">{criticoPct.toFixed(1)}%</p>
