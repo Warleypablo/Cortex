@@ -973,44 +973,103 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
-  // ============ Onboarding Iniciar (Start for Colaborador) ============
+  // Etapas padrão fixas para onboarding (sem template)
+  const DEFAULT_ONBOARDING_STEPS = [
+    { ordem: 1, titulo: 'Cadastro no sistema', descricao: 'Criar contas de email, acessos a sistemas e ferramentas internas', prazoDias: 1 },
+    { ordem: 2, titulo: 'Configuração de equipamentos', descricao: 'Setup do computador, instalação de softwares necessários', prazoDias: 2 },
+    { ordem: 3, titulo: 'Treinamento inicial', descricao: 'Apresentação da empresa, cultura, processos e equipe', prazoDias: 5 },
+    { ordem: 4, titulo: 'Integração com equipe', descricao: 'Reuniões com gestores e colegas de trabalho', prazoDias: 10 },
+    { ordem: 5, titulo: 'Avaliação de experiência', descricao: 'Reunião de feedback sobre o processo de onboarding', prazoDias: 30 },
+  ];
+
+  // ============ Onboarding Iniciar (Start for Colaborador) - Simplificado sem template ============
   app.post("/api/rh/onboarding/iniciar", async (req, res) => {
     try {
-      const { colaboradorId, templateId, dataInicio } = req.body;
-      if (!colaboradorId || !templateId || !dataInicio) {
-        return res.status(400).json({ error: "colaboradorId, templateId, and dataInicio are required" });
+      const { colaboradorId, dataInicio } = req.body;
+      if (!colaboradorId || !dataInicio) {
+        return res.status(400).json({ error: "colaboradorId e dataInicio são obrigatórios" });
       }
       
       const colabId = parseInt(String(colaboradorId));
-      const templId = parseInt(String(templateId));
       
-      if (isNaN(colabId) || isNaN(templId)) {
-        return res.status(400).json({ error: "Invalid colaboradorId or templateId - must be numbers" });
+      if (isNaN(colabId)) {
+        return res.status(400).json({ error: "colaboradorId inválido - deve ser um número" });
       }
       
+      // Verificar se já existe onboarding ativo para este colaborador
+      const existingResult = await db.execute(sql`
+        SELECT id FROM onboarding_colaborador 
+        WHERE colaborador_id = ${colabId} AND status = 'in_progress'
+      `);
+      
+      if (existingResult.rows.length > 0) {
+        return res.status(400).json({ error: "Colaborador já possui um onboarding em andamento" });
+      }
+      
+      // Criar ou buscar template padrão (para compatibilidade com estrutura existente)
+      let templateResult = await db.execute(sql`
+        SELECT id FROM onboarding_templates WHERE nome = 'Padrão Turbo' AND ativo = true LIMIT 1
+      `);
+      
+      let templateId: number;
+      
+      if (templateResult.rows.length === 0) {
+        // Criar template padrão
+        const newTemplateResult = await db.execute(sql`
+          INSERT INTO onboarding_templates (nome, descricao, ativo)
+          VALUES ('Padrão Turbo', 'Template padrão de onboarding Turbo Partners', true)
+          RETURNING id
+        `);
+        templateId = (newTemplateResult.rows[0] as any).id;
+      } else {
+        templateId = (templateResult.rows[0] as any).id;
+      }
+      
+      // Verificar se template tem etapas - se não, recriar etapas padrão
+      const existingEtapas = await db.execute(sql`
+        SELECT COUNT(*) as count FROM onboarding_etapas WHERE template_id = ${templateId}
+      `);
+      
+      const etapaCount = parseInt((existingEtapas.rows[0] as any).count) || 0;
+      
+      if (etapaCount === 0) {
+        // Criar etapas padrão para o template
+        for (const step of DEFAULT_ONBOARDING_STEPS) {
+          await db.execute(sql`
+            INSERT INTO onboarding_etapas (template_id, ordem, titulo, descricao, prazo_dias)
+            VALUES (${templateId}, ${step.ordem}, ${step.titulo}, ${step.descricao}, ${step.prazoDias})
+          `);
+        }
+      }
+      
+      // Criar onboarding
       const onboardingResult = await db.execute(sql`
         INSERT INTO onboarding_colaborador (colaborador_id, template_id, data_inicio, status)
-        VALUES (${colabId}, ${templId}, ${dataInicio}, 'in_progress')
+        VALUES (${colabId}, ${templateId}, ${dataInicio}, 'in_progress')
         RETURNING id, colaborador_id as "colaboradorId", template_id as "templateId", 
                   data_inicio as "dataInicio", status, created_at as "createdAt"
       `);
       const onboarding = onboardingResult.rows[0] as any;
+      
+      // Buscar etapas do template e criar progresso
       const etapasResult = await db.execute(sql`
-        SELECT id, ordem, titulo, responsavel_padrao as "responsavelPadrao"
+        SELECT id, ordem, titulo
         FROM onboarding_etapas
-        WHERE template_id = ${templId}
+        WHERE template_id = ${templateId}
         ORDER BY ordem
       `);
+      
       for (const etapa of etapasResult.rows as any[]) {
         await db.execute(sql`
           INSERT INTO onboarding_progresso (onboarding_colaborador_id, etapa_id, status)
           VALUES (${onboarding.id}, ${etapa.id}, 'pending')
         `);
       }
+      
       res.status(201).json(onboarding);
     } catch (error) {
       console.error("[api] Error starting onboarding:", error);
-      res.status(500).json({ error: "Failed to start onboarding" });
+      res.status(500).json({ error: "Falha ao iniciar onboarding" });
     }
   });
 
