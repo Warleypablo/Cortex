@@ -9095,7 +9095,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             SUM(p.valor_bruto) as total_devido,
             cl.nome as cliente_nome
           FROM caz_parcelas p
-          LEFT JOIN cup_clientes cl ON cl.cnpj = p.id_cliente
+          LEFT JOIN cup_clientes cl ON cl.cnpj = p.id_cliente::text
           WHERE p.data_vencimento < CURRENT_DATE - INTERVAL '1 day' * ${diasAtraso}
             AND p.status != 'Pago'
             AND p.id_cliente IS NOT NULL
@@ -9272,7 +9272,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     entityType: 'cliente',
                     priority,
                     uniqueKey,
-                    link: '/juridico/clientes',
                   });
                   created.push(notification);
                 }
