@@ -12388,6 +12388,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/admin/generate-snapshot - Generate a new cup_data_hist snapshot from current cup_contratos data
+  app.post("/api/admin/generate-snapshot", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { snapshotDate } = req.body;
+      
+      // Default to current date if not provided
+      const targetDate = snapshotDate ? new Date(snapshotDate) : new Date();
+      
+      // Validate date
+      if (isNaN(targetDate.getTime())) {
+        return res.status(400).json({ error: "Invalid snapshot date" });
+      }
+      
+      // Check if snapshot already exists for this date
+      const existingCheck = await db.execute(sql`
+        SELECT COUNT(*) as count FROM cup_data_hist 
+        WHERE DATE(data_snapshot) = DATE(${targetDate})
+      `);
+      
+      const existingCount = Number((existingCheck.rows[0] as any)?.count || 0);
+      if (existingCount > 0) {
+        return res.status(409).json({ 
+          error: `Snapshot already exists for ${targetDate.toISOString().split('T')[0]}`,
+          existingRecords: existingCount 
+        });
+      }
+      
+      // Insert snapshot records from cup_contratos (let DB generate IDs)
+      const insertResult = await db.execute(sql`
+        INSERT INTO cup_data_hist (data_snapshot, servico, status, valorr, valorp, id_task, id_subtask, 
+                                   data_inicio, data_encerramento, data_pausa, squad, produto, responsavel, cs_responsavel, vendedor)
+        SELECT 
+          ${targetDate}::timestamp as data_snapshot,
+          servico, status, valorr, valorp, id_task, id_subtask,
+          data_inicio, data_encerramento, data_pausa, squad, produto, responsavel, cs_responsavel, vendedor
+        FROM cup_contratos
+      `);
+      
+      // Count inserted records
+      const countResult = await db.execute(sql`
+        SELECT COUNT(*) as count FROM cup_data_hist 
+        WHERE DATE(data_snapshot) = DATE(${targetDate})
+      `);
+      
+      const insertedCount = Number((countResult.rows[0] as any)?.count || 0);
+      
+      console.log(`[admin/generate-snapshot] Generated ${insertedCount} records for ${targetDate.toISOString()}`);
+      
+      res.json({ 
+        success: true, 
+        message: `Snapshot generated successfully`,
+        snapshotDate: targetDate.toISOString(),
+        recordsInserted: insertedCount
+      });
+    } catch (error) {
+      console.error("[admin/generate-snapshot] Error:", error);
+      res.status(500).json({ error: "Failed to generate snapshot" });
+    }
+  });
+
+  // GET /api/admin/snapshot-status - Check available snapshots in cup_data_hist
+  app.get("/api/admin/snapshot-status", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          date_trunc('month', data_snapshot)::date as month,
+          MAX(data_snapshot) as latest_snapshot,
+          COUNT(*) as record_count
+        FROM cup_data_hist 
+        GROUP BY date_trunc('month', data_snapshot)
+        ORDER BY month DESC
+        LIMIT 12
+      `);
+      
+      res.json({
+        snapshots: result.rows,
+        message: "Available monthly snapshots"
+      });
+    } catch (error) {
+      console.error("[admin/snapshot-status] Error:", error);
+      res.status(500).json({ error: "Failed to get snapshot status" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
