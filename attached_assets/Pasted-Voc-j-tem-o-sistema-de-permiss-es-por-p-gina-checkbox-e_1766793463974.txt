@@ -1,0 +1,134 @@
+Você já tem o sistema de permissões por página (checkbox) e a tela de “Gerenciar Usuários” com “Aplicar Perfil de Acesso”. Agora implemente APENAS reorganização do menu + criação de perfis padrão (presets) sem mudar rotas.
+
+OBJETIVO
+1) Reorganizar o MENU LATERAL em 3 blocos: “Acesso Rápido”, “Setores”, “Governança/Admin”.
+2) Transformar itens hoje soltos no menu (“Clientes & Contratos”, “Colaboradores”, “Patrimônio”, “OKR 2026”) em páginas dentro das categorias certas.
+3) Criar 4 Perfis de Acesso (presets) que, ao selecionar, marcam/desmarcam os checkboxes automaticamente.
+
+REGRAS DE IA/DEV (importante)
+- NÃO criar páginas novas, NÃO alterar rotas, NÃO alterar componentes de conteúdo.
+- Somente mover itens de navegação e mapear permissões.
+- “Acesso Rápido” é somente atalho (links) para páginas do módulo “Geral”.
+- Se o usuário não tem permissão para uma página: (a) ela não aparece no menu, (b) rota protegida (redirect para /unauthorized ou /).
+
+1) NOVA ESTRUTURA DO MENU (NAV)
+
+A) ACESSO RÁPIDO (atalhos fixos)
+- Meu Perfil
+- Calendário
+- Acessos
+- Conhecimento
+- Clube Benefícios
+- GPTurbo
+- Turbo Tools
+
+B) GERAL (módulo)
+- Meu Perfil
+- Calendário
+- Acessos
+- Conhecimento
+- Clube Benefícios
+- GPTurbo
+- Turbo Tools
+- OKR 2026   (hoje está solto → mover para Geral)
+
+C) SETORES (já existe)
+Financeiro
+- Visão Geral
+- DFC
+- Fluxo de Caixa
+- Revenue Goals
+- Inadimplência
+- Auditoria de Sistemas
+
+Operação
+- Visão Geral
+- Metas por Squad
+- Análise de Retenção
+- Cohort de Retenção
+- Clientes & Contratos   (hoje está no Menu inferior → mover para Operação)
+
+Tech
+- Visão Geral
+- Projetos
+
+Comercial
+- Closers
+- SDRs
+- Detalhamento Closers
+- Detalhamento SDRs
+- Detalhamento Vendas
+- Análise de Vendas
+
+Growth
+- Visão Geral
+- Meta Ads
+- Por Plataforma
+- Criativos
+
+D) G&G (pessoas)
+- Visão Geral
+- Recrutamento
+- Onboarding
+- Colaboradores  (hoje está no Menu inferior → mover para G&G)
+- Patrimônio     (hoje está no Menu inferior → mover para G&G)
+
+E) GOVERNANÇA
+Jurídico
+- Clientes Inadimplentes
+
+Reports
+- Investors Report
+
+F) ADMINISTRAÇÃO
+- Gerenciar Usuários
+  - subtelas: Usuários, Logs do Sistema, Notificações (e as que já existirem)
+
+2) SISTEMA DE PERMISSÕES (CHECKBOXES) — AJUSTE DE CATEGORIAS
+Hoje você já tem categorias como “Menu Principal”, “Financeiro”, “G&G” etc.
+Atualize para refletir a estrutura acima:
+- “Menu Principal” deve virar “Geral” (ou manter “Menu Principal” mas com os itens do Geral).
+- “Acesso Rápido” NÃO precisa de checkbox (é só renderização condicional baseada no Geral).
+- Criar/ajustar categorias: Geral, Financeiro, Operação, Tech, Comercial, Growth, G&G, Jurídico, Reports, Administração.
+- “Clientes” e “Contratos” hoje aparecem no “Menu Principal”; ajuste o nome para “Clientes & Contratos” e associe ao módulo Operação (sem quebrar a rota atual).
+- “Conhecimentos” padronizar para “Conhecimento”.
+- “Benefícios” padronizar para “Clube Benefícios”.
+- “Assistente IA” padronizar para “GPTurbo” (se for a mesma rota; se forem diferentes, manter os dois e mapear no Geral).
+- “Ferramentas” = “Turbo Tools”.
+
+3) PERFIS DE ACESSO (PRESETS)
+Crie 4 perfis (por enquanto com nomes internos: P1, P2, P3, P4) que setam as permissões automaticamente.
+
+P1: “Somente Geral”
+- Allow: tudo do Geral (Meu Perfil, Calendário, Acessos, Conhecimento, Clube Benefícios, GPTurbo, Turbo Tools, OKR 2026)
+- Deny: Financeiro, Operação, Tech, Comercial, Growth, G&G, Jurídico, Reports, Administração
+
+P2: “Operação do Negócio (sem áreas sensíveis)”
+- Allow: Geral + Operação + Tech + Comercial + Growth
+- Deny: Financeiro + G&G + Jurídico + Reports + Administração
+
+P3: “Tudo exceto Financeiro”
+- Allow: Geral + Operação + Tech + Comercial + Growth + G&G + Jurídico + Reports + Administração
+- Deny: Financeiro
+
+P4: “Acesso Total”
+- Allow: tudo
+
+4) IMPLEMENTAÇÃO (o que eu espero no código)
+- Criar um enum/objeto `PERMISSION_KEYS` para cada página/rota (ex: GENERAL.PROFILE, GENERAL.CALENDAR, OPS.CLIENTS_CONTRACTS, FIN.DFC, etc.).
+- Criar `ACCESS_PROFILES` com arrays de permission keys para P1/P2/P3/P4.
+- No modal “Adicionar Novo Usuário” / “Editar Permissões”: ao selecionar um perfil, preencher o set de permissões (e permitir ajuste manual depois).
+- O menu deve ser gerado a partir de um `NAV_CONFIG` com: label, icon, route, permissionKey, e grupos (Geral, Setores...).
+- Renderizar apenas itens cujo `permissionKey` o usuário possui.
+- Proteger rotas: se não tiver permissão, bloquear acesso.
+
+ENTREGÁVEL
+1) NAV_CONFIG atualizado com a nova estrutura.
+2) ACCESS_PROFILES implementado.
+3) Migração/compatibilidade: manter as permissões existentes dos usuários atuais (mapear chaves antigas → novas se necessário).
+4) Menu final batendo com a estrutura pedida.
+
+NÃO PERGUNTE nada; assuma que as rotas atuais permanecem. Se alguma rota não existir, mantenha o item oculto e logue um TODO.
+
+
+os nomes são dos acessos são: Base, Time, Líder, Control Tower
