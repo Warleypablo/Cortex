@@ -223,6 +223,15 @@ interface DemissoesPorTipo {
   percentual: number;
 }
 
+interface UltimaDemissao {
+  id: number;
+  nome: string;
+  cargo: string | null;
+  squad: string | null;
+  dataDesligamento: string;
+  tempoDeEmpresa: number;
+}
+
 interface CustoPorSetor {
   setor: string;
   custoTotal: number;
@@ -375,6 +384,10 @@ export default function DashboardGeG() {
 
   const { data: demissoesPorTipo, isLoading: isLoadingDemissoesPorTipo } = useQuery<DemissoesPorTipo[]>({
     queryKey: ['/api/geg/demissoes-por-tipo', { squad, setor, nivel, cargo }],
+  });
+
+  const { data: ultimasDemissoes, isLoading: isLoadingUltimasDemissoes } = useQuery<UltimaDemissao[]>({
+    queryKey: ['/api/geg/ultimas-demissoes', { squad, setor, nivel, cargo, limit: 10 }],
   });
 
   const { data: custoPorSetor, isLoading: isLoadingCustoPorSetor } = useQuery<CustoPorSetor[]>({
@@ -2183,6 +2196,102 @@ export default function DashboardGeG() {
           </Card>
         </div>
 
+        {/* Row 1: Salário Médio por Tempo de Empresa + Últimas Demissões */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card data-testid="card-salario-tempo-empresa">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-blue-500" />
+                <CardTitle>Salário Médio por Tempo de Empresa</CardTitle>
+              </div>
+              <CardDescription>Correlação entre tempo de casa e remuneração</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingSalarioByTempo ? (
+                <Skeleton className="h-[250px] w-full" />
+              ) : salarioByTempo?.salarioByTempo ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart
+                    data={Object.entries(salarioByTempo.salarioByTempo).map(([tempo, data]) => ({
+                      tempo,
+                      avg: data.avg,
+                    }))}
+                    margin={{ left: 20, right: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" />
+                    <XAxis dataKey="tempo" tick={{ fill: 'hsl(var(--muted-foreground))' }} fontSize={11} />
+                    <YAxis 
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }} 
+                      fontSize={12}
+                      tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px',
+                        color: 'hsl(var(--foreground))'
+                      }} 
+                      formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Salário Médio']}
+                    />
+                    <Bar dataKey="avg" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Salário Médio" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-salario">
+                  <p className="text-muted-foreground">Nenhum dado disponível</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-ultimas-demissoes" className="border-red-500/20">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <UserMinus className="w-5 h-5 text-red-500" />
+                <CardTitle>Últimas Demissões</CardTitle>
+              </div>
+              <CardDescription>Desligamentos recentes</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingUltimasDemissoes ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : ultimasDemissoes && ultimasDemissoes.length > 0 ? (
+                <div className="space-y-2 max-h-[220px] overflow-y-auto">
+                  {ultimasDemissoes.slice(0, 5).map((d) => (
+                    <div key={d.id} className="flex items-center justify-between p-2 bg-red-500/5 rounded-lg border border-red-500/20" data-testid={`ultima-demissao-${d.id}`}>
+                      <div>
+                        <p className="font-medium text-sm">{d.nome}</p>
+                        <p className="text-xs text-muted-foreground">{d.cargo || 'N/A'} - {d.squad || 'N/A'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium">{d.dataDesligamento ? new Date(d.dataDesligamento).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                        <p className="text-xs text-muted-foreground text-red-600">
+                          {d.tempoDeEmpresa < 1 ? 'Menos de 1 mês' : `${d.tempoDeEmpresa} ${d.tempoDeEmpresa === 1 ? 'mês' : 'meses'}`}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {ultimasDemissoes.length > 5 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      +{ultimasDemissoes.length - 5} outros
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[200px]" data-testid="text-no-ultimas-demissoes">
+                  <p className="text-muted-foreground text-sm">Nenhum desligamento registrado</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Row 2: Más Contratações + Demissões por Tipo */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card data-testid="card-mas-contratacoes" className="border-amber-500/20">
             <CardHeader>
@@ -2298,54 +2407,6 @@ export default function DashboardGeG() {
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-demissoes-tipo">
-                  <p className="text-muted-foreground">Nenhum dado disponível</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Salário Médio por Tempo de Empresa */}
-          <Card data-testid="card-salario-tempo-empresa">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-blue-500" />
-                <CardTitle>Salário Médio por Tempo de Empresa</CardTitle>
-              </div>
-              <CardDescription>Correlação entre tempo de casa e remuneração</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingSalarioByTempo ? (
-                <Skeleton className="h-[250px] w-full" />
-              ) : salarioByTempo?.salarioByTempo ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart
-                    data={Object.entries(salarioByTempo.salarioByTempo).map(([tempo, data]) => ({
-                      tempo,
-                      avg: data.avg,
-                    }))}
-                    margin={{ left: 20, right: 20 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" />
-                    <XAxis dataKey="tempo" tick={{ fill: 'hsl(var(--muted-foreground))' }} fontSize={11} />
-                    <YAxis 
-                      tick={{ fill: 'hsl(var(--muted-foreground))' }} 
-                      fontSize={12}
-                      tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px',
-                        color: 'hsl(var(--foreground))'
-                      }} 
-                      formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Salário Médio']}
-                    />
-                    <Bar dataKey="avg" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Salário Médio" />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-[250px]" data-testid="text-no-data-salario">
                   <p className="text-muted-foreground">Nenhum dado disponível</p>
                 </div>
               )}

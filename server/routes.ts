@@ -5891,6 +5891,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/geg/ultimas-demissoes", async (req, res) => {
+    try {
+      const squad = req.query.squad as string || 'todos';
+      const setor = req.query.setor as string || 'todos';
+      const nivel = req.query.nivel as string || 'todos';
+      const cargo = req.query.cargo as string || 'todos';
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      const resultado = await storage.getGegUltimasDemissoes(squad, setor, nivel, cargo, limit);
+      res.json(resultado);
+    } catch (error) {
+      console.error("[api] Error fetching GEG ultimas demissoes:", error);
+      res.status(500).json({ error: "Failed to fetch GEG ultimas demissoes" });
+    }
+  });
+
   app.get("/api/geg/headcount-por-tenure", async (req, res) => {
     try {
       const squad = req.query.squad as string || 'todos';
