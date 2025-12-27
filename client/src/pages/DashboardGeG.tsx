@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, TrendingUp, TrendingDown, UserPlus, UserMinus, Clock, Cake, Award, Gift, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet, Filter, Info, X } from "lucide-react";
+import { Users, TrendingUp, TrendingDown, UserPlus, UserMinus, Clock, Cake, Award, Gift, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet, Filter, Info, X, MapPin, Heart, Activity, ShieldCheck } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ComposedChart } from "recharts";
@@ -194,6 +194,29 @@ interface SalarioByTempo {
   [key: string]: { total: number; count: number; avg: number };
 }
 
+interface DistribuicaoGeografica {
+  byEstado: { estado: string; total: number }[];
+  byCidade: { cidade: string; total: number }[];
+  grandeVitoria: { cidade: string; total: number }[];
+  modalidade: { presencial: number; remoto: number; total: number };
+}
+
+interface GegAlertas {
+  veteranosSemAumento: { id: number; nome: string; cargo: string | null; squad: string | null; mesesDeTurbo: number; mesesUltAumento: number | null }[];
+  fimExperiencia: { id: number; nome: string; cargo: string | null; squad: string | null; admissao: string; diasRestantes: number }[];
+  salarioAbaixoMedia: { id: number; nome: string; cargo: string | null; squad: string | null; salario: number; mediaCargo: number; diferenca: string }[];
+  totalAlertas: number;
+}
+
+interface RetencaoSaude {
+  taxaRetencao: number;
+  ativosInicio: number;
+  ativosAtual: number;
+  demitidosPeriodo: number;
+  healthDistribution: { saudavel: number; atencao: number; critico: number };
+  periodo: string;
+}
+
 const CHART_COLORS = [
   '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', 
   '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#22c55e'
@@ -303,6 +326,18 @@ export default function DashboardGeG() {
 
   const { data: colaboradoresPorNivel, isLoading: isLoadingColaboradoresPorNivel } = useQuery<Distribuicao[]>({
     queryKey: ['/api/geg/colaboradores-por-nivel', { squad, setor, nivel, cargo }],
+  });
+
+  const { data: distribuicaoGeografica, isLoading: isLoadingDistribuicaoGeografica } = useQuery<DistribuicaoGeografica>({
+    queryKey: ['/api/geg/distribuicao-geografica', { squad, setor, nivel, cargo }],
+  });
+
+  const { data: alertas, isLoading: isLoadingAlertas } = useQuery<GegAlertas>({
+    queryKey: ['/api/geg/alertas', { squad, setor, nivel, cargo }],
+  });
+
+  const { data: retencaoSaude, isLoading: isLoadingRetencaoSaude } = useQuery<RetencaoSaude>({
+    queryKey: ['/api/geg/retencao-saude', { squad, setor, nivel, cargo }],
   });
 
   const formatMesAno = (mesAno: string) => {
@@ -453,6 +488,255 @@ export default function DashboardGeG() {
           </CardContent>
         </Card>
 
+        {/* Seção Alertas e Atenção */}
+        {alertas && alertas.totalAlertas > 0 && (
+          <div className="mb-6" data-testid="section-alertas">
+            <div className="flex items-center gap-2 mb-4 pb-2 border-b">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              <h2 className="text-lg font-semibold">Alertas e Atenção</h2>
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
+                {alertas.totalAlertas} {alertas.totalAlertas === 1 ? 'alerta' : 'alertas'}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Veteranos sem Aumento */}
+              <Card className="border-amber-500/20" data-testid="card-alerta-veteranos">
+                <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    <CardTitle className="text-sm font-medium">Veteranos sem Aumento</CardTitle>
+                  </div>
+                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">
+                    {alertas.veteranosSemAumento?.length || 0}
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground mb-3">36+ meses sem promoção</p>
+                  {isLoadingAlertas ? (
+                    <div className="space-y-2">
+                      {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+                    </div>
+                  ) : alertas.veteranosSemAumento && alertas.veteranosSemAumento.length > 0 ? (
+                    <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                      {alertas.veteranosSemAumento.slice(0, 5).map((v) => (
+                        <div key={v.id} className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20" data-testid={`alerta-veterano-${v.id}`}>
+                          <div>
+                            <p className="font-medium text-xs">{v.nome}</p>
+                            <p className="text-[10px] text-muted-foreground">{v.cargo || 'N/A'} - {v.squad || 'N/A'}</p>
+                          </div>
+                          <Badge variant="outline" className="text-amber-600 text-[10px]">
+                            {v.mesesUltAumento ? `${v.mesesUltAumento}m` : 'Nunca'}
+                          </Badge>
+                        </div>
+                      ))}
+                      {alertas.veteranosSemAumento.length > 5 && (
+                        <p className="text-[10px] text-muted-foreground text-center">+{alertas.veteranosSemAumento.length - 5} outros</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-4">Nenhum alerta</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Fim de Experiência */}
+              <Card className="border-amber-500/20" data-testid="card-alerta-experiencia">
+                <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-500" />
+                    <CardTitle className="text-sm font-medium">Fim de Experiência</CardTitle>
+                  </div>
+                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">
+                    {alertas.fimExperiencia?.length || 0}
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground mb-3">Próximos 30 dias</p>
+                  {isLoadingAlertas ? (
+                    <div className="space-y-2">
+                      {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+                    </div>
+                  ) : alertas.fimExperiencia && alertas.fimExperiencia.length > 0 ? (
+                    <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                      {alertas.fimExperiencia.slice(0, 5).map((f) => (
+                        <div key={f.id} className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20" data-testid={`alerta-experiencia-${f.id}`}>
+                          <div>
+                            <p className="font-medium text-xs">{f.nome}</p>
+                            <p className="text-[10px] text-muted-foreground">{f.cargo || 'N/A'} - {f.squad || 'N/A'}</p>
+                          </div>
+                          <Badge variant="outline" className="text-amber-600 text-[10px]">
+                            {f.diasRestantes}d
+                          </Badge>
+                        </div>
+                      ))}
+                      {alertas.fimExperiencia.length > 5 && (
+                        <p className="text-[10px] text-muted-foreground text-center">+{alertas.fimExperiencia.length - 5} outros</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-4">Nenhum alerta</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Salário Abaixo da Média */}
+              <Card className="border-amber-500/20" data-testid="card-alerta-salario">
+                <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-amber-500" />
+                    <CardTitle className="text-sm font-medium">Salário Abaixo da Média</CardTitle>
+                  </div>
+                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">
+                    {alertas.salarioAbaixoMedia?.length || 0}
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground mb-3">Abaixo da média do cargo</p>
+                  {isLoadingAlertas ? (
+                    <div className="space-y-2">
+                      {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+                    </div>
+                  ) : alertas.salarioAbaixoMedia && alertas.salarioAbaixoMedia.length > 0 ? (
+                    <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                      {alertas.salarioAbaixoMedia.slice(0, 5).map((s) => (
+                        <div key={s.id} className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20" data-testid={`alerta-salario-${s.id}`}>
+                          <div>
+                            <p className="font-medium text-xs">{s.nome}</p>
+                            <p className="text-[10px] text-muted-foreground">{s.cargo || 'N/A'}</p>
+                          </div>
+                          <Badge variant="outline" className="text-amber-600 text-[10px]">
+                            {s.diferenca}
+                          </Badge>
+                        </div>
+                      ))}
+                      {alertas.salarioAbaixoMedia.length > 5 && (
+                        <p className="text-[10px] text-muted-foreground text-center">+{alertas.salarioAbaixoMedia.length - 5} outros</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-4">Nenhum alerta</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* Seção Retenção e Saúde */}
+        <div className="mb-6" data-testid="section-retencao-saude">
+          <div className="flex items-center gap-2 mb-4 pb-2 border-b">
+            <Heart className="w-5 h-5 text-green-500" />
+            <h2 className="text-lg font-semibold">Retenção e Saúde</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Taxa de Retenção KPI */}
+            <Card data-testid="card-taxa-retencao">
+              <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-green-500" />
+                  <CardTitle className="text-sm font-medium">Taxa de Retenção</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingRetencaoSaude ? (
+                  <Skeleton className="h-16 w-full" />
+                ) : (
+                  <div className="text-center">
+                    <div className={`text-4xl font-bold ${
+                      (retencaoSaude?.taxaRetencao || 0) >= 90 ? 'text-green-600' :
+                      (retencaoSaude?.taxaRetencao || 0) >= 70 ? 'text-amber-600' : 'text-red-600'
+                    }`} data-testid="text-taxa-retencao">
+                      {retencaoSaude?.taxaRetencao?.toFixed(1) || '0.0'}%
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {retencaoSaude?.periodo || 'Período não definido'}
+                    </p>
+                    <div className="flex justify-center gap-4 mt-3 text-xs text-muted-foreground">
+                      <span>Início: {retencaoSaude?.ativosInicio || 0}</span>
+                      <span>Atual: {retencaoSaude?.ativosAtual || 0}</span>
+                      <span className="text-red-500">-{retencaoSaude?.demitidosPeriodo || 0}</span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Health Distribution */}
+            <Card className="md:col-span-2" data-testid="card-health-distribution">
+              <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-blue-500" />
+                  <CardTitle className="text-sm font-medium">Distribuição de Saúde</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingRetencaoSaude ? (
+                  <Skeleton className="h-24 w-full" />
+                ) : retencaoSaude?.healthDistribution ? (
+                  <div className="space-y-4">
+                    {(() => {
+                      const total = (retencaoSaude.healthDistribution.saudavel || 0) + 
+                                    (retencaoSaude.healthDistribution.atencao || 0) + 
+                                    (retencaoSaude.healthDistribution.critico || 0);
+                      const saudavelPct = total > 0 ? ((retencaoSaude.healthDistribution.saudavel / total) * 100) : 0;
+                      const atencaoPct = total > 0 ? ((retencaoSaude.healthDistribution.atencao / total) * 100) : 0;
+                      const criticoPct = total > 0 ? ((retencaoSaude.healthDistribution.critico / total) * 100) : 0;
+                      
+                      return (
+                        <>
+                          <div className="flex h-6 rounded-full overflow-hidden bg-muted" data-testid="progress-health">
+                            <div 
+                              className="bg-green-500 transition-all" 
+                              style={{ width: `${saudavelPct}%` }}
+                              title={`Saudável: ${saudavelPct.toFixed(1)}%`}
+                            />
+                            <div 
+                              className="bg-amber-500 transition-all" 
+                              style={{ width: `${atencaoPct}%` }}
+                              title={`Atenção: ${atencaoPct.toFixed(1)}%`}
+                            />
+                            <div 
+                              className="bg-red-500 transition-all" 
+                              style={{ width: `${criticoPct}%` }}
+                              title={`Crítico: ${criticoPct.toFixed(1)}%`}
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            <div className="p-2 bg-green-500/10 rounded-lg border border-green-500/20" data-testid="health-saudavel">
+                              <div className="text-lg font-bold text-green-600">{retencaoSaude.healthDistribution.saudavel || 0}</div>
+                              <p className="text-[10px] text-muted-foreground">Saudável</p>
+                              <p className="text-[10px] text-green-600">{saudavelPct.toFixed(1)}%</p>
+                            </div>
+                            <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20" data-testid="health-atencao">
+                              <div className="text-lg font-bold text-amber-600">{retencaoSaude.healthDistribution.atencao || 0}</div>
+                              <p className="text-[10px] text-muted-foreground">Atenção</p>
+                              <p className="text-[10px] text-amber-600">{atencaoPct.toFixed(1)}%</p>
+                            </div>
+                            <div className="p-2 bg-red-500/10 rounded-lg border border-red-500/20" data-testid="health-critico">
+                              <div className="text-lg font-bold text-red-600">{retencaoSaude.healthDistribution.critico || 0}</div>
+                              <p className="text-[10px] text-muted-foreground">Crítico</p>
+                              <p className="text-[10px] text-red-600">{criticoPct.toFixed(1)}%</p>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-24" data-testid="text-no-health-data">
+                    <p className="text-muted-foreground text-sm">Dados não disponíveis</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Seção Métricas Principais */}
+        <div className="flex items-center gap-2 mb-4 pb-2 border-b">
+          <Users className="w-5 h-5 text-blue-500" />
+          <h2 className="text-lg font-semibold">Métricas Principais</h2>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
           <Card data-testid="card-headcount">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
@@ -1011,6 +1295,143 @@ export default function DashboardGeG() {
           </Card>
         </div>
 
+        {/* Seção Distribuição Geográfica */}
+        <div className="mb-8" data-testid="section-distribuicao-geografica">
+          <div className="flex items-center gap-2 mb-4 pb-2 border-b">
+            <MapPin className="w-5 h-5 text-teal-500" />
+            <h2 className="text-lg font-semibold">Distribuição Geográfica</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Modalidade Presencial vs Remoto */}
+            <Card data-testid="card-modalidade">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Building className="w-4 h-4 text-teal-500" />
+                  <CardTitle className="text-sm">Modalidade de Trabalho</CardTitle>
+                </div>
+                <CardDescription>Presencial vs Remoto</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingDistribuicaoGeografica ? (
+                  <Skeleton className="h-[200px] w-full" />
+                ) : distribuicaoGeografica?.modalidade ? (
+                  <div className="flex flex-col items-center">
+                    <ResponsiveContainer width="100%" height={160}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Presencial', value: distribuicaoGeografica.modalidade.presencial },
+                            { name: 'Remoto', value: distribuicaoGeografica.modalidade.remoto }
+                          ]}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={60}
+                          label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                          labelLine={false}
+                        >
+                          <Cell fill="#14b8a6" />
+                          <Cell fill="#8b5cf6" />
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="flex gap-4 mt-2 text-xs">
+                      <div className="flex items-center gap-1" data-testid="modalidade-presencial">
+                        <div className="w-2 h-2 rounded-full bg-teal-500" />
+                        <span>Presencial: {distribuicaoGeografica.modalidade.presencial}</span>
+                      </div>
+                      <div className="flex items-center gap-1" data-testid="modalidade-remoto">
+                        <div className="w-2 h-2 rounded-full bg-purple-500" />
+                        <span>Remoto: {distribuicaoGeografica.modalidade.remoto}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-[200px]" data-testid="text-no-data-modalidade">
+                    <p className="text-muted-foreground text-sm">Nenhum dado disponível</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Grande Vitória */}
+            <Card data-testid="card-grande-vitoria">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-blue-500" />
+                  <CardTitle className="text-sm">Grande Vitória</CardTitle>
+                </div>
+                <CardDescription>Distribuição por cidade</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingDistribuicaoGeografica ? (
+                  <Skeleton className="h-[200px] w-full" />
+                ) : distribuicaoGeografica?.grandeVitoria && distribuicaoGeografica.grandeVitoria.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={distribuicaoGeografica.grandeVitoria} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis dataKey="cidade" type="category" width={80} tick={{ fontSize: 10 }} />
+                      <Tooltip />
+                      <Bar dataKey="total" name="Colaboradores" radius={[0, 4, 4, 0]}>
+                        {distribuicaoGeografica.grandeVitoria.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-[200px]" data-testid="text-no-data-grande-vitoria">
+                    <p className="text-muted-foreground text-sm">Nenhum dado disponível</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Por Estado */}
+            <Card data-testid="card-por-estado">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-amber-500" />
+                  <CardTitle className="text-sm">Por Estado</CardTitle>
+                </div>
+                <CardDescription>Distribuição por UF</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingDistribuicaoGeografica ? (
+                  <Skeleton className="h-[200px] w-full" />
+                ) : distribuicaoGeografica?.byEstado && distribuicaoGeografica.byEstado.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={distribuicaoGeografica.byEstado} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis dataKey="estado" type="category" width={40} tick={{ fontSize: 10 }} />
+                      <Tooltip />
+                      <Bar dataKey="total" name="Colaboradores" radius={[0, 4, 4, 0]}>
+                        {distribuicaoGeografica.byEstado.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-[200px]" data-testid="text-no-data-estado">
+                    <p className="text-muted-foreground text-sm">Nenhum dado disponível</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Seção Distribuições */}
+        <div className="flex items-center gap-2 mb-4 pb-2 border-b">
+          <Users className="w-5 h-5 text-purple-500" />
+          <h2 className="text-lg font-semibold">Distribuições por Categoria</h2>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card data-testid="card-colaboradores-por-squad">
             <CardHeader>
