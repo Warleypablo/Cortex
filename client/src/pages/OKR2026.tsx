@@ -52,11 +52,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { 
-  ResponsiveContainer, 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
-  LineChart, Line
-} from "recharts";
 
 interface DashboardMetrics {
   mrr_ativo: number;
@@ -575,61 +570,6 @@ function getKRStatus(
   }
 }
 
-interface SparklineData {
-  month: string;
-  value: number;
-}
-
-function Sparkline({ 
-  data, 
-  height = 32 
-}: { 
-  data: SparklineData[]; 
-  height?: number;
-}) {
-  if (!data || data.length < 2) return null;
-
-  const lastSix = data.slice(-6);
-  const firstValue = lastSix[0]?.value ?? 0;
-  const lastValue = lastSix[lastSix.length - 1]?.value ?? 0;
-  
-  const gradientId = `sparklineGradient-${Math.round(firstValue)}-${Math.round(lastValue)}-${lastSix.length}`;
-  
-  let trendColor = "hsl(var(--muted-foreground))";
-  let fillColor = "hsl(var(--muted-foreground))";
-  
-  if (lastValue > firstValue) {
-    trendColor = "#22c55e";
-    fillColor = "#22c55e";
-  } else if (lastValue < firstValue) {
-    trendColor = "#ef4444";
-    fillColor = "#ef4444";
-  }
-
-  return (
-    <div className="w-full" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={lastSix} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={fillColor} stopOpacity={0.2} />
-              <stop offset="95%" stopColor={fillColor} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke={trendColor}
-            strokeWidth={1.5}
-            fill={`url(#${gradientId})`}
-            dot={false}
-            isAnimationActive={false}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
 
 function HeroCard({ 
   title, 
@@ -639,9 +579,7 @@ function HeroCard({
   direction = "higher",
   icon: Icon, 
   tooltip,
-  status,
-  quarterLabel,
-  series
+  status
 }: {
   title: string;
   value: number | null;
@@ -651,8 +589,6 @@ function HeroCard({
   icon: typeof TrendingUp;
   tooltip?: string;
   status?: "green" | "yellow" | "red";
-  quarterLabel?: string;
-  series?: SparklineData[];
 }) {
   const formatValue = (v: number) => {
     if (format === "currency") return formatCurrency(v);
@@ -751,11 +687,6 @@ function HeroCard({
             {progress !== null && (
               <Progress value={progress} className="h-1.5" />
             )}
-          </div>
-        )}
-        {series && series.length >= 2 && (
-          <div className="pt-1">
-            <Sparkline data={series} height={32} />
           </div>
         )}
       </CardContent>
@@ -985,69 +916,6 @@ function SmartEmptyState({
         }
       </div>
     </div>
-  );
-}
-
-function MRRChart({ data }: { data: { month: string; value: number }[] }) {
-  const hasValidData = data && data.length >= 2 && data.some(d => d.value > 0);
-  
-  if (!hasValidData) {
-    return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-primary" />
-            Evolução MRR
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="h-48">
-          <SmartEmptyState 
-            title="Aguardando dados"
-            description="São necessários ao menos 2 pontos para exibir o gráfico."
-            icon={TrendingUp}
-          />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-primary" />
-          Evolução MRR
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data}>
-              <defs>
-                <linearGradient id="mrrGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="month" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
-              <YAxis tickFormatter={(v) => `${(v/1000000).toFixed(1)}M`} tick={{ fontSize: 10 }} width={50} />
-              <RechartsTooltip 
-                formatter={(value: number) => [formatCurrency(value), "MRR"]}
-                labelFormatter={(label) => `Mês: ${label}`}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="value" 
-                stroke="hsl(var(--primary))" 
-                strokeWidth={2} 
-                fill="url(#mrrGradient)" 
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -2046,8 +1914,6 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           tooltip={viewMode === "month"
             ? `${selectedMonthData?.label} (${effectiveQuarter})`
             : `Meta ${selectedQuarter}: ${mrrTarget ? formatCurrency(mrrTarget) : "—"}`}
-          quarterLabel={viewMode === "month" ? selectedMonthData?.label || selectedMonth : selectedQuarter}
-          series={series.mrr || metrics.mrr_serie}
         />
         <HeroCard
           title="EBITDA"
@@ -2061,8 +1927,6 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           tooltip={viewMode === "month"
             ? `${selectedMonthData?.label} (${effectiveQuarter})`
             : `Meta ${selectedQuarter}: ${ebitdaTarget ? formatCurrency(ebitdaTarget) : "—"}`}
-          quarterLabel={viewMode === "month" ? selectedMonthData?.label || selectedMonth : selectedQuarter}
-          series={series.ebitda}
         />
         <HeroCard
           title="Geração Caixa"
@@ -2074,7 +1938,6 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           tooltip={viewMode === "month"
             ? `${selectedMonthData?.label} (${effectiveQuarter})`
             : `Meta ${selectedQuarter}: ${cashGenTarget ? formatCurrency(cashGenTarget) : "—"}`}
-          quarterLabel={viewMode === "month" ? selectedMonthData?.label || selectedMonth : selectedQuarter}
         />
         <HeroCard
           title="Inadimplência %"
@@ -2101,7 +1964,6 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
             ? `${selectedMonthData?.label} (Meta: ≤${netChurnTarget}%)`
             : `Meta ${selectedQuarter}: <= ${netChurnTarget}%`}
           status={netChurnStatus}
-          series={series.churn}
         />
         <HeroCard
           title="Logo Churn %"
@@ -2147,13 +2009,6 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
         <HugzBlock metrics={metrics} initiatives={initiatives} />
       </div>
 
-      <PendingCheckinsSection 
-        krs={krs} 
-        latestCheckins={latestCheckins}
-        currentQuarter={effectiveQuarter}
-      />
-
-      <MRRChart data={series.mrr || metrics.mrr_serie || []} />
     </div>
   );
 }
