@@ -6084,12 +6084,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const colaboradores = await storage.getColaboradores({ status: 'Ativo' });
       
-      // Veterans without raise (36+ months tenure, 24+ months without raise)
+      // Veterans without raise (12+ months tenure, 12+ months without raise)
       const veteranosSemAumento = colaboradores
         .filter(c => {
           const mesesTurbo = c.mesesDeTurbo ?? 0;
           const mesesUltAumento = c.mesesUltAumento;
-          return mesesTurbo >= 36 && (mesesUltAumento === null || mesesUltAumento >= 24);
+          return mesesTurbo >= 12 && (mesesUltAumento === null || mesesUltAumento >= 12);
         })
         .map(c => ({
           id: c.id,
@@ -6102,25 +6102,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .sort((a, b) => (b.mesesUltAumento ?? 999) - (a.mesesUltAumento ?? 999))
         .slice(0, 10);
 
-      // Employees ending probation (3 months mark)
+      // Employees ending probation (within 90 days of hire)
       const hoje = new Date();
+      const diasFiltro = parseInt(req.query.diasExperiencia as string) || 90;
       const fimExperiencia = colaboradores
         .filter(c => {
           if (!c.admissao) return false;
           const admissao = new Date(c.admissao);
-          const mesesTurbo = c.mesesDeTurbo ?? 0;
-          return mesesTurbo >= 2 && mesesTurbo <= 4;
+          const diasTrabalhados = Math.floor((hoje.getTime() - admissao.getTime()) / (1000 * 60 * 60 * 24));
+          const diasRestantes = 90 - diasTrabalhados;
+          return diasRestantes > 0 && diasRestantes <= diasFiltro;
         })
-        .map(c => ({
-          id: c.id,
-          nome: c.nome,
-          cargo: c.cargo,
-          squad: c.squad,
-          admissao: c.admissao,
-          diasRestantes: c.mesesDeTurbo ? Math.max(0, 90 - (c.mesesDeTurbo * 30)) : 90
-        }))
+        .map(c => {
+          const admissao = new Date(c.admissao!);
+          const diasTrabalhados = Math.floor((hoje.getTime() - admissao.getTime()) / (1000 * 60 * 60 * 24));
+          const diasRestantes = Math.max(0, 90 - diasTrabalhados);
+          return {
+            id: c.id,
+            nome: c.nome,
+            cargo: c.cargo,
+            squad: c.squad,
+            admissao: c.admissao,
+            diasRestantes
+          };
+        })
         .sort((a, b) => a.diasRestantes - b.diasRestantes)
-        .slice(0, 10);
+        .slice(0, 15);
 
       // Salary below average by role
       const salarioPorCargo: Record<string, { total: number; count: number }> = {};
