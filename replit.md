@@ -65,9 +65,17 @@ Preferred communication style: Simple, everyday language.
 
 ### Authentication & Authorization
 - **Authentication**: Google OAuth2.0 via Passport.js, storing user data in Replit Database. Supports dynamic callback URLs for development and production environments.
-- **Authorization**: Role-Based Access Control (RBAC) with `admin` and `user` roles. `admin` has full access; `user` has limited `allowedRoutes`.
+- **Authorization**: Role-Based Access Control (RBAC) with `admin` and `user` roles. `admin` has full access; `user` has limited permissions.
+- **Permission System**: Hierarchical permission keys (e.g., 'general.profile', 'fin.dfc', 'ops.clientes_contratos') defined in `shared/nav-config.ts`.
+- **Access Profiles**: Four standardized profiles for quick permission assignment:
+  - **Base**: Basic access (Geral module only)
+  - **Time**: Business operations (without sensitive financial areas)
+  - **Líder**: Full access except Financeiro
+  - **Control Tower**: Full system access
+- **Navigation Structure**: Organized into categories: Acesso Rápido (shortcuts), Geral (general tools), Setores (Financeiro/Operação/Tech/Comercial/Growth), G&G (Pessoas), Governança (Jurídico/Reports), Administração.
+- **Backward Compatibility**: Helper functions `routesToPermissions()` and `permissionsToRoutes()` maintain compatibility with legacy route-based allowedRoutes.
 - **Protected Routes**: Backend API routes secured with middleware; frontend routes protected by `ProtectedRoute` component.
-- **Admin Interface**: `/admin/usuarios` for managing user permissions and roles.
+- **Admin Interface**: `/admin/usuarios` for managing user permissions using the new profile selector or granular permission checkboxes.
 
 ## External Dependencies
 
