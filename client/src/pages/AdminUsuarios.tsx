@@ -1696,6 +1696,318 @@ function AIConfigContent() {
   );
 }
 
+// Types for database explorer
+interface DatabaseTable {
+  name: string;
+  columnCount: number;
+  rowCount: number;
+}
+
+interface DatabaseColumn {
+  column_name: string;
+  data_type: string;
+  is_nullable: string;
+  column_default: string | null;
+  is_primary_key: boolean;
+}
+
+interface TableDetails {
+  name: string;
+  columns: DatabaseColumn[];
+  rowCount: number;
+  sampleData: Record<string, any>[];
+}
+
+interface TablesData {
+  tables: DatabaseTable[];
+  totalTables: number;
+}
+
+// Helper to group tables by prefix
+function groupTablesByCategory(tables: DatabaseTable[]): Record<string, DatabaseTable[]> {
+  const groups: Record<string, DatabaseTable[]> = {
+    'RH (rh_)': [],
+    'ContaAzul (caz_)': [],
+    'ClickUp (cup_)': [],
+    'Meta Ads (meta_)': [],
+    'Sistema': [],
+  };
+
+  tables.forEach(table => {
+    if (table.name.startsWith('rh_')) {
+      groups['RH (rh_)'].push(table);
+    } else if (table.name.startsWith('caz_')) {
+      groups['ContaAzul (caz_)'].push(table);
+    } else if (table.name.startsWith('cup_')) {
+      groups['ClickUp (cup_)'].push(table);
+    } else if (table.name.startsWith('meta_')) {
+      groups['Meta Ads (meta_)'].push(table);
+    } else {
+      groups['Sistema'].push(table);
+    }
+  });
+
+  // Remove empty groups
+  return Object.fromEntries(
+    Object.entries(groups).filter(([_, tables]) => tables.length > 0)
+  );
+}
+
+function DatabaseExplorerContent() {
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+
+  const { data, isLoading, refetch, isFetching } = useQuery<TablesData>({
+    queryKey: ['/api/admin/database/tables'],
+  });
+
+  const { data: tableDetails, isLoading: isLoadingDetails } = useQuery<TableDetails>({
+    queryKey: ['/api/admin/database/tables', selectedTable],
+    enabled: !!selectedTable,
+  });
+
+  const groupedTables = useMemo(() => {
+    if (!data?.tables) return {};
+    return groupTablesByCategory(data.tables);
+  }, [data?.tables]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Estrutura do Banco de Dados</h2>
+            <p className="text-sm text-muted-foreground">
+              Visualize todas as tabelas e suas estruturas
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium">Total de Tabelas</CardTitle>
+              <Database className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-16" />
+            </CardContent>
+          </Card>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-32" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-3 w-24" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6" data-testid="database-explorer-content">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Estrutura do Banco de Dados</h2>
+          <p className="text-sm text-muted-foreground">
+            Visualize todas as tabelas e suas estruturas
+          </p>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={() => refetch()}
+          disabled={isFetching}
+          data-testid="button-refresh-tables"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+          {isFetching ? "Atualizando..." : "Atualizar"}
+        </Button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card data-testid="card-total-tables">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+            <CardTitle className="text-sm font-medium">Total de Tabelas</CardTitle>
+            <Database className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-total-tables">
+              {data?.totalTables || 0}
+            </div>
+          </CardContent>
+        </Card>
+        {Object.entries(groupedTables).slice(0, 3).map(([category, tables]) => (
+          <Card key={category}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium">{category}</CardTitle>
+              <Layers className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{tables.length}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {Object.entries(groupedTables).map(([category, tables]) => (
+        <div key={category} className="space-y-4">
+          <h3 className="text-md font-semibold flex items-center gap-2">
+            <Layers className="h-4 w-4" />
+            {category}
+            <Badge variant="secondary">{tables.length} tabelas</Badge>
+          </h3>
+          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+            {tables.map((table) => (
+              <Card 
+                key={table.name}
+                className="cursor-pointer transition-colors hover-elevate"
+                onClick={() => setSelectedTable(table.name)}
+                data-testid={`card-table-${table.name}`}
+              >
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Database className="h-4 w-4 text-primary" />
+                    {table.name}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    {table.columnCount} colunas
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    ~{table.rowCount.toLocaleString('pt-BR')} linhas
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <Dialog open={!!selectedTable} onOpenChange={(open) => !open && setSelectedTable(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              {selectedTable}
+            </DialogTitle>
+            <DialogDescription>
+              Estrutura e dados de amostra da tabela
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoadingDetails ? (
+            <div className="space-y-4">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-48 w-full" />
+            </div>
+          ) : tableDetails ? (
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <Badge variant="outline">{tableDetails.columns.length} colunas</Badge>
+                <Badge variant="outline">~{tableDetails.rowCount.toLocaleString('pt-BR')} linhas</Badge>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-semibold">Estrutura da Tabela</h4>
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Coluna</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Nulável</TableHead>
+                        <TableHead>Valor Padrão</TableHead>
+                        <TableHead>PK</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tableDetails.columns.map((col) => (
+                        <TableRow key={col.column_name}>
+                          <TableCell className="font-mono text-sm" data-testid={`cell-column-${col.column_name}`}>
+                            {col.column_name}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {col.data_type}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={col.is_nullable === 'YES' ? 'secondary' : 'outline'} className="text-xs">
+                              {col.is_nullable === 'YES' ? 'Sim' : 'Não'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-xs font-mono max-w-[200px] truncate">
+                            {col.column_default || '-'}
+                          </TableCell>
+                          <TableCell>
+                            {col.is_primary_key && (
+                              <Badge variant="default" className="text-xs">PK</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {tableDetails.sampleData.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-semibold">Dados de Amostra (5 linhas)</h4>
+                  <div className="border rounded-lg overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          {tableDetails.columns.slice(0, 6).map((col) => (
+                            <TableHead key={col.column_name} className="text-xs whitespace-nowrap">
+                              {col.column_name}
+                            </TableHead>
+                          ))}
+                          {tableDetails.columns.length > 6 && (
+                            <TableHead className="text-xs">...</TableHead>
+                          )}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tableDetails.sampleData.map((row, idx) => (
+                          <TableRow key={idx}>
+                            {tableDetails.columns.slice(0, 6).map((col) => (
+                              <TableCell key={col.column_name} className="text-xs max-w-[150px] truncate">
+                                {row[col.column_name] !== null && row[col.column_name] !== undefined 
+                                  ? String(row[col.column_name]).substring(0, 50) 
+                                  : <span className="text-muted-foreground italic">null</span>
+                                }
+                              </TableCell>
+                            ))}
+                            {tableDetails.columns.length > 6 && (
+                              <TableCell className="text-xs text-muted-foreground">...</TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-muted-foreground">Tabela não encontrada.</p>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedTable(null)} data-testid="button-close-table-details">
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function EditRuleDialog({ 
   rule, 
   open, 
@@ -2003,6 +2315,10 @@ export default function AdminUsuarios() {
             <Plug className="h-4 w-4 mr-2" />
             Conexões
           </TabsTrigger>
+          <TabsTrigger value="database" data-testid="tab-database">
+            <Database className="h-4 w-4 mr-2" />
+            Estrutura do Banco
+          </TabsTrigger>
           <TabsTrigger value="ai-config" data-testid="tab-ai-config">
             <Bot className="h-4 w-4 mr-2" />
             Configurações IA
@@ -2224,6 +2540,10 @@ export default function AdminUsuarios() {
 
         <TabsContent value="conexoes">
           <ConnectionsContent />
+        </TabsContent>
+
+        <TabsContent value="database">
+          <DatabaseExplorerContent />
         </TabsContent>
 
         <TabsContent value="ai-config">

@@ -735,6 +735,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Database Structure Explorer API
+  app.get("/api/admin/database/tables", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      // Get all tables from public schema
+      const tablesResult = await db.execute(sql`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+      `);
+      
+      const tables = tablesResult.rows as { table_name: string }[];
+      
+      // Get column counts and approximate row counts for each table
+      const tableDetails = await Promise.all(
+        tables.map(async (table) => {
+          const tableName = table.table_name;
+          
+          // Get column count
+          const columnResult = await db.execute(sql`
+            SELECT COUNT(*) as column_count 
+            FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+            AND table_name = ${tableName}
+          `);
+          
+          // Get approximate row count using pg_stat_user_tables
+          const rowCountResult = await db.execute(sql`
+            SELECT n_live_tup as row_count 
+            FROM pg_stat_user_tables 
+            WHERE relname = ${tableName}
+          `);
+          
+          const columnCount = Number((columnResult.rows[0] as any)?.column_count || 0);
+          const rowCount = Number((rowCountResult.rows[0] as any)?.row_count || 0);
+          
+          return {
+            name: tableName,
+            columnCount,
+            rowCount,
+          };
+        })
+      );
+      
+      res.json({ tables: tableDetails, totalTables: tableDetails.length });
+    } catch (error) {
+      console.error("[api] Error fetching database tables:", error);
+      res.status(500).json({ error: "Failed to fetch database tables" });
+    }
+  });
+
+  app.get("/api/admin/database/tables/:tableName", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { tableName } = req.params;
+      
+      // Validate table exists
+      const tableExistsResult = await db.execute(sql`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = ${tableName}
+      `);
+      
+      if (tableExistsResult.rows.length === 0) {
+        return res.status(404).json({ error: "Table not found" });
+      }
+      
+      // Get columns with details
+      const columnsResult = await db.execute(sql`
+        SELECT 
+          c.column_name,
+          c.data_type,
+          c.is_nullable,
+          c.column_default,
+          CASE 
+            WHEN tc.constraint_type = 'PRIMARY KEY' THEN true 
+            ELSE false 
+          END as is_primary_key
+        FROM information_schema.columns c
+        LEFT JOIN information_schema.key_column_usage kcu 
+          ON c.table_schema = kcu.table_schema 
+          AND c.table_name = kcu.table_name 
+          AND c.column_name = kcu.column_name
+        LEFT JOIN information_schema.table_constraints tc 
+          ON kcu.constraint_name = tc.constraint_name 
+          AND tc.constraint_type = 'PRIMARY KEY'
+        WHERE c.table_schema = 'public' 
+        AND c.table_name = ${tableName}
+        ORDER BY c.ordinal_position
+      `);
+      
+      // Get approximate row count
+      const rowCountResult = await db.execute(sql`
+        SELECT n_live_tup as row_count 
+        FROM pg_stat_user_tables 
+        WHERE relname = ${tableName}
+      `);
+      
+      const rowCount = Number((rowCountResult.rows[0] as any)?.row_count || 0);
+      
+      // Get sample data (first 5 rows) - use dynamic query with proper escaping
+      let sampleData: any[] = [];
+      try {
+        const sampleResult = await db.execute(
+          sql.raw(`SELECT * FROM "${tableName}" LIMIT 5`)
+        );
+        sampleData = sampleResult.rows as any[];
+      } catch (sampleError) {
+        console.error(`[api] Error fetching sample data for ${tableName}:`, sampleError);
+      }
+      
+      res.json({
+        name: tableName,
+        columns: columnsResult.rows,
+        rowCount,
+        sampleData,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching table details:", error);
+      res.status(500).json({ error: "Failed to fetch table details" });
+    }
+  });
+
   // System Settings API
   app.get("/api/system/settings", isAuthenticated, isAdmin, async (req, res) => {
     try {
