@@ -1070,6 +1070,66 @@ async function applySysValidationRules(): Promise<void> {
   console.log('[database] sys validation_rules applied');
 }
 
+export async function initializeBPTables(): Promise<void> {
+  try {
+    await db.execute(sql`CREATE SCHEMA IF NOT EXISTS plan`);
+    await db.execute(sql`CREATE SCHEMA IF NOT EXISTS kpi`);
+    
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS plan.metric_targets_monthly (
+        id SERIAL PRIMARY KEY,
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        metric_key VARCHAR(100) NOT NULL,
+        dimension_key VARCHAR(100) DEFAULT NULL,
+        dimension_value VARCHAR(255) DEFAULT NULL,
+        target_value NUMERIC(18, 6) NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (year, month, metric_key, dimension_key, dimension_value)
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS kpi.metrics_registry_extended (
+        id SERIAL PRIMARY KEY,
+        metric_key VARCHAR(100) UNIQUE NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        unit VARCHAR(20) NOT NULL,
+        period_type VARCHAR(20) NOT NULL,
+        direction VARCHAR(10) NOT NULL,
+        is_derived BOOLEAN DEFAULT false,
+        formula_expr TEXT,
+        tolerance NUMERIC(10, 4) DEFAULT 0.10,
+        dimension_key VARCHAR(100),
+        dimension_value VARCHAR(255),
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS kpi.metric_actuals_monthly (
+        id SERIAL PRIMARY KEY,
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        metric_key VARCHAR(100) NOT NULL,
+        dimension_key VARCHAR(100) DEFAULT NULL,
+        dimension_value VARCHAR(255) DEFAULT NULL,
+        actual_value NUMERIC(18, 6),
+        calculated_at TIMESTAMP DEFAULT NOW(),
+        source VARCHAR(100),
+        UNIQUE (year, month, metric_key, dimension_key, dimension_value)
+      )
+    `);
+    
+    console.log('[database] BP tables initialized (plan.metric_targets_monthly, kpi.metrics_registry_extended, kpi.metric_actuals_monthly)');
+  } catch (error) {
+    console.error('[database] Error initializing BP tables:', error);
+  }
+}
+
 async function createCanonicalContractsView(): Promise<void> {
   // Create or replace the canonical view for contracts
   // Maps raw cup_contratos data to canonical slugs via sys.catalog_aliases
