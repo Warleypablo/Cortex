@@ -1171,3 +1171,95 @@ async function createCanonicalContractsView(): Promise<void> {
   
   console.log('[database] vw_contratos_canon view created');
 }
+
+export async function initializeDashboardTables(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS dashboard_views (
+        id SERIAL PRIMARY KEY,
+        key VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(200) NOT NULL,
+        description TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS dashboard_cards (
+        id SERIAL PRIMARY KEY,
+        view_key VARCHAR(50) NOT NULL,
+        metric_key VARCHAR(100) NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0,
+        size VARCHAR(10) NOT NULL DEFAULT 'md',
+        show_trend BOOLEAN NOT NULL DEFAULT true,
+        trend_months INTEGER NOT NULL DEFAULT 6,
+        show_ytd BOOLEAN NOT NULL DEFAULT true,
+        show_variance BOOLEAN NOT NULL DEFAULT true,
+        show_status BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS metric_actual_overrides_monthly (
+        id SERIAL PRIMARY KEY,
+        metric_key VARCHAR(100) NOT NULL,
+        year INTEGER NOT NULL,
+        month VARCHAR(7) NOT NULL,
+        dimension_key VARCHAR(50),
+        dimension_value VARCHAR(100),
+        actual_value NUMERIC(18, 2) NOT NULL,
+        notes TEXT,
+        updated_by VARCHAR(100),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (metric_key, year, month, dimension_key, dimension_value)
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS kr_checkins (
+        id SERIAL PRIMARY KEY,
+        kr_id VARCHAR(50) NOT NULL,
+        year INTEGER NOT NULL,
+        period_type VARCHAR(10) NOT NULL,
+        period_value VARCHAR(10) NOT NULL,
+        confidence INTEGER NOT NULL DEFAULT 50,
+        commentary TEXT,
+        blockers TEXT,
+        next_actions TEXT,
+        created_by VARCHAR(100),
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    console.log('[database] Dashboard and KR check-in tables initialized');
+  } catch (error) {
+    console.error('[database] Error initializing dashboard tables:', error);
+  }
+}
+
+export async function seedDefaultDashboardViews(): Promise<void> {
+  try {
+    const views = [
+      { key: 'overview', name: 'Visão Geral', description: 'KPIs principais do negócio' },
+      { key: 'financeiro', name: 'Financeiro', description: 'Métricas financeiras detalhadas' },
+      { key: 'pessoas', name: 'Pessoas', description: 'Métricas de headcount e produtividade' },
+      { key: 'comercial', name: 'Comercial', description: 'Métricas de vendas e MRR' },
+    ];
+    
+    for (const v of views) {
+      await db.execute(sql`
+        INSERT INTO dashboard_views (key, name, description)
+        VALUES (${v.key}, ${v.name}, ${v.description})
+        ON CONFLICT (key) DO UPDATE SET 
+          name = EXCLUDED.name,
+          description = EXCLUDED.description
+      `);
+    }
+    
+    console.log('[database] Default dashboard views seeded');
+  } catch (error) {
+    console.error('[database] Error seeding dashboard views:', error);
+  }
+}

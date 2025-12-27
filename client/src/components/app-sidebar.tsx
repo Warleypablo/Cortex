@@ -264,9 +264,6 @@ export function AppSidebar() {
                 <span className="text-xs font-bold text-primary uppercase tracking-wider">
                   Setores
                 </span>
-                <Badge className="h-4 px-1.5 text-[9px] bg-primary/20 text-primary border-primary/30 hover:bg-primary/20">
-                  {NAV_CONFIG.setores.length + 3}
-                </Badge>
               </div>
             )}
             
@@ -275,20 +272,15 @@ export function AppSidebar() {
             {NAV_CONFIG.governanca.map(category => renderCategorySection(category))}
             {user?.role === 'admin' && renderCategorySection(NAV_CONFIG.admin)}
             
-            {!isCollapsed && <Separator className="my-3 bg-sidebar-border" />}
-            
             {/* Acesso Rápido - Segundo */}
             {!isCollapsed && (
-              <div className="flex items-center gap-2 px-3 py-2 mb-1">
+              <div className="flex items-center gap-2 px-3 py-2 mb-1 mt-2">
                 <div className="flex items-center justify-center h-6 w-6 rounded-md bg-primary/10">
                   <Zap className="h-3.5 w-3.5 text-primary/70" />
                 </div>
                 <span className="text-xs font-bold text-primary/70 uppercase tracking-wider">
                   Acesso Rápido
                 </span>
-                <Badge className="h-4 px-1.5 text-[9px] bg-primary/10 text-primary/70 border-primary/20 hover:bg-primary/10">
-                  {NAV_CONFIG.quickAccess.length}
-                </Badge>
               </div>
             )}
             <div className="space-y-0.5">
@@ -366,12 +358,13 @@ export function AppSidebar() {
               
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <Link
+                    href="/avisos"
                     className="flex items-center justify-center h-8 w-8 rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
                     data-testid="button-notifications-sidebar"
                   >
                     <Bell className="h-4 w-4" />
-                  </button>
+                  </Link>
                 </TooltipTrigger>
                 <TooltipContent side={isCollapsed ? "right" : "top"}>
                   Notificações
@@ -396,7 +389,7 @@ export function AppSidebar() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Link
-                    href="/meu-perfil"
+                    href="/admin/usuarios"
                     className="flex items-center justify-center h-8 w-8 rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
                     data-testid="button-settings-sidebar"
                   >
@@ -404,7 +397,7 @@ export function AppSidebar() {
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent side={isCollapsed ? "right" : "top"}>
-                  Configurações
+                  Administração
                 </TooltipContent>
               </Tooltip>
               
