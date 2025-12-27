@@ -21,8 +21,18 @@ import {
   Component,
   Sparkles,
   Sun,
-  Moon
+  Moon,
+  BarChart3
 } from "lucide-react";
+
+import RoundedPieChart from "@/components/ui/charts/pie-chart-demo";
+import PingingDotChart from "@/components/ui/charts/line-chart-pinging";
+import GlowingLineChart from "@/components/ui/charts/line-chart-glowing";
+import GlowingBarChart from "@/components/ui/charts/bar-chart-glowing";
+import HatchedBarChart from "@/components/ui/charts/bar-chart-hatched";
+import DetailedIncidentReportCard from "@/components/ui/charts/horizontal-bar-report";
+import StackedAreaReport from "@/components/ui/charts/stacked-area-chart";
+import StatisticCard from "@/components/ui/charts/statistics-card";
 
 export default function AdminDesignSystem() {
   return (
@@ -58,6 +68,10 @@ export default function AdminDesignSystem() {
           <TabsTrigger value="spacing" data-testid="tab-spacing">
             <Layout className="h-4 w-4 mr-2" />
             Espaçamento
+          </TabsTrigger>
+          <TabsTrigger value="charts" data-testid="tab-charts">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Gráficos
           </TabsTrigger>
         </TabsList>
 
@@ -443,6 +457,113 @@ export default function AdminDesignSystem() {
                     <div className="h-16 w-16 bg-primary rounded-full" />
                     <code className="text-xs text-muted-foreground">rounded-full</code>
                   </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="charts" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                Biblioteca de Gráficos
+              </CardTitle>
+              <CardDescription>
+                Componentes reutilizáveis para visualização de dados. Importar de <code className="text-xs bg-muted px-1.5 py-0.5 rounded">@/components/ui/charts</code>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Gráficos de Pizza</h3>
+                <p className="text-sm text-muted-foreground">Ideal para distribuição de categorias em percentual ou proporção.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <RoundedPieChart />
+                </div>
+                <div className="bg-muted/50 rounded-lg p-4 mt-2">
+                  <code className="text-xs text-muted-foreground">
+                    import {"{"} RoundedPieChart {"}"} from "@/components/ui/charts";
+                  </code>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Gráficos de Linha</h3>
+                <p className="text-sm text-muted-foreground">Ideal para séries temporais e tendências.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <PingingDotChart />
+                  <GlowingLineChart />
+                </div>
+                <div className="bg-muted/50 rounded-lg p-4 mt-2 space-y-1">
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} PingingDotChart {"}"} from "@/components/ui/charts"; // Com animação de pulsação
+                  </code>
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} GlowingLineChart {"}"} from "@/components/ui/charts"; // Com efeito de brilho
+                  </code>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Gráficos de Barra</h3>
+                <p className="text-sm text-muted-foreground">Ideal para comparações entre categorias.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <GlowingBarChart />
+                  <HatchedBarChart />
+                </div>
+                <div className="bg-muted/50 rounded-lg p-4 mt-2 space-y-1">
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} GlowingBarChart {"}"} from "@/components/ui/charts"; // Com seletor de propriedade e brilho
+                  </code>
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} HatchedBarChart {"}"} from "@/components/ui/charts"; // Com padrão hachurado
+                  </code>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Cards de Relatório</h3>
+                <p className="text-sm text-muted-foreground">Combinam gráficos com métricas detalhadas. Usam a biblioteca Reaviz.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <DetailedIncidentReportCard />
+                  <StackedAreaReport />
+                  <StatisticCard />
+                </div>
+                <div className="bg-muted/50 rounded-lg p-4 mt-2 space-y-1">
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} DetailedIncidentReportCard {"}"} from "@/components/ui/charts"; // Barra horizontal com métricas
+                  </code>
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} StackedAreaReport {"}"} from "@/components/ui/charts"; // Área empilhada normalizada
+                  </code>
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} StatisticCard {"}"} from "@/components/ui/charts"; // Card de estatísticas com trend
+                  </code>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Utilidades</h3>
+                <p className="text-sm text-muted-foreground">Componentes auxiliares para construir gráficos customizados.</p>
+                <div className="bg-muted/50 rounded-lg p-4 space-y-1">
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} ChartContainer, ChartTooltip, ChartTooltipContent {"}"} from "@/components/ui/charts";
+                  </code>
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} ChartLegend, ChartLegendContent {"}"} from "@/components/ui/charts";
+                  </code>
+                  <code className="text-xs text-muted-foreground block">
+                    import type {"{"} ChartConfig {"}"} from "@/components/ui/charts";
+                  </code>
                 </div>
               </div>
             </CardContent>
