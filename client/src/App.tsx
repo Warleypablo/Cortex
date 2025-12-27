@@ -63,6 +63,7 @@ const Conhecimentos = lazy(() => import("@/pages/Conhecimentos"));
 const Beneficios = lazy(() => import("@/pages/Beneficios"));
 const OKR2026 = lazy(() => import("@/pages/OKR2026"));
 const AdminNotificationRules = lazy(() => import("@/pages/AdminNotificationRules"));
+const AdminDesignSystem = lazy(() => import("@/pages/AdminDesignSystem"));
 const Calendario = lazy(() => import("@/pages/Calendario"));
 const MetasSquad = lazy(() => import("@/pages/MetasSquad"));
 const OnboardingRH = lazy(() => import("@/pages/OnboardingRH"));
@@ -224,6 +225,7 @@ function ProtectedRouter() {
       {/* Admin */}
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/admin/regras-notificacoes">{() => <ProtectedRoute path="/admin/regras-notificacoes" component={AdminNotificationRules} />}</Route>
+      <Route path="/admin/design-system">{() => <ProtectedRoute path="/admin/design-system" component={AdminDesignSystem} />}</Route>
       
       {/* Homepage - Dashboard baseado no perfil do usuário (placed at end to avoid shadowing other routes) */}
       <Route path="/">{() => (
