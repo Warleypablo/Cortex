@@ -593,6 +593,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const memUsage = process.memoryUsage();
       const uptime = process.uptime();
       
+      // Get OKR/BP statistics
+      let okrStats = {
+        targetsCount: 0,
+        metricsCount: 0,
+        actualsCount: 0,
+        overridesCount: 0
+      };
+      
+      try {
+        const [targetsResult, metricsResult, actualsResult] = await Promise.all([
+          db.execute(sql`SELECT COUNT(*) as count FROM plan.metric_targets_monthly`),
+          db.execute(sql`SELECT COUNT(*) as count FROM kpi.metrics_registry_extended`),
+          db.execute(sql`SELECT COUNT(*) as count FROM kpi.metric_actuals_monthly`)
+        ]);
+        
+        okrStats.targetsCount = parseInt((targetsResult.rows[0] as any)?.count || '0');
+        okrStats.metricsCount = parseInt((metricsResult.rows[0] as any)?.count || '0');
+        okrStats.actualsCount = parseInt((actualsResult.rows[0] as any)?.count || '0');
+        
+        // Check for overrides table
+        try {
+          const overridesResult = await db.execute(sql`SELECT COUNT(*) as count FROM kpi.metric_overrides_monthly`);
+          okrStats.overridesCount = parseInt((overridesResult.rows[0] as any)?.count || '0');
+        } catch {
+          okrStats.overridesCount = -1; // table doesn't exist
+        }
+      } catch (e) {
+        console.log("[health] OKR stats tables may not exist yet");
+      }
+      
       res.json({
         status: "healthy",
         timestamp: new Date().toISOString(),
@@ -609,7 +639,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uptime: {
           seconds: Math.round(uptime),
           formatted: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${Math.round(uptime % 60)}s`
-        }
+        },
+        okr: okrStats
       });
     } catch (error) {
       console.error("[api] Health check failed:", error);
