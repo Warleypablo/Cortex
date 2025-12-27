@@ -1,0 +1,278 @@
+Contexto
+Estamos finalizando o Dashboard Executivo do sistema OKR 2026 – Bigger & Better, que já possui:
+
+BP 2026 com metas trimestrais e mensais
+
+KPIs, KRs e Iniciativas conectados
+
+Visões: Dashboard, KRs, Iniciativas (Kanban), BP Financeiro
+
+Agora o objetivo é REDESIGN VISUAL + UX FINAL, mantendo toda a lógica existente, mas elevando o sistema para nível CEO / Conselho / Diretoria.
+
+🧠 PRINCÍPIOS DE DESIGN (OBRIGATÓRIOS)
+
+Hierarchy First
+
+O olho deve entender em 3 segundos:
+
+Estamos bem ou mal?
+
+Onde dói?
+
+O que estamos fazendo a respeito?
+
+Menos BI, mais decisão
+
+Cada bloco precisa responder uma pergunta clara.
+
+Nada decorativo.
+
+Padrão Turbo
+
+Clean
+
+Executivo
+
+Forte contraste entre ok vs atenção
+
+Sem poluição visual
+
+1️⃣ TOPO DO DASHBOARD — EXECUTIVE SUMMARY (FIXO)
+Bloco: “Status Geral — Qx / YTD”
+
+Criar um header fixo com:
+
+Título:
+
+OKR 2026 — Status Executivo (Qx)
+
+Subtítulo:
+
+Bigger & Better · Consolidação, Escala e Padronização
+
+À direita:
+
+Filtros compactos (Quarter | YTD | Todas BUs)
+
+Badge de status geral:
+
+🟢 On Track
+
+🟡 Atenção
+
+🔴 Fora do Plano
+
+👉 Esse status deve ser calculado automaticamente:
+
+% de KRs “no alvo”
+
+Peso maior para Financeiro
+
+2️⃣ BLOCO PRINCIPAL — CARDS ESTRATÉGICOS (REFORMULAR)
+Cards obrigatórios (ordem fixa):
+
+MRR Ativo
+
+EBITDA
+
+Geração de Caixa
+
+Inadimplência %
+
+Net Churn %
+
+Logo Churn %
+
+Redesign dos cards:
+
+Cada card deve ter:
+
+Ícone simples (outline)
+
+Valor grande
+
+Meta menor abaixo
+
+Barra de progresso fina
+
+% de atingimento clara
+
+Badge de status no canto superior
+
+Remover:
+
+Bordas vermelhas muito grossas
+
+Ícones chamativos demais
+
+Adicionar:
+
+Fundo levemente colorido apenas quando crítico
+
+Tooltip com:
+
+Meta do BP
+
+Diferença absoluta
+
+Tendência vs trimestre anterior (↑ ↓ →)
+
+3️⃣ BLOCO “ONDE ESTÁ DOENDO” (CRÍTICO)
+
+Transformar o atual Alertas de Métricas em:
+
+🔥 Painel: “Riscos Ativos do Quarter”
+
+Para cada métrica crítica:
+
+Nome
+
+Atual vs Meta
+
+% de desvio
+
+KR afetado
+
+Link direto para iniciativas relacionadas
+
+Exemplo visual:
+
+🔴 EBITDA — 46% da meta
+KR: O2_KR1
+Iniciativas ativas: 3
+[ Ver iniciativas ]
+
+
+👉 Esse bloco substitui BI tradicional por ação.
+
+4️⃣ BLOCO “O QUE ESTÁ SENDO FEITO” (NOVO)
+
+Adicionar no Dashboard um bloco obrigatório:
+
+🚀 Iniciativas Estratégicas Ativas (Qx)
+
+Exibir apenas iniciativas que:
+
+Estão em andamento
+
+Estão ligadas a KRs fora do alvo
+
+Formato:
+
+Lista vertical (não Kanban)
+
+Máx. 5 iniciativas
+
+Cada item:
+
+Nome
+
+Objetivo (O1–O5)
+
+KR(s)
+
+Owner
+
+Status badge (Doing / Blocked)
+
+SLA visual (dias em andamento)
+
+👉 Isso fecha o ciclo:
+Problema → KR → Iniciativa
+
+5️⃣ BLOCO PERFORMANCE POR VERTICAL (REFINAR)
+
+Manter TurboOH / Hugz etc, mas:
+
+Visual mais compacto
+
+Menos métricas
+
+Foco em:
+
+Receita
+
+Resultado
+
+Métrica crítica da vertical
+
+Adicionar badge:
+
+“Impacta MRR”
+
+“Impacta Churn”
+
+“Impacta Caixa”
+
+6️⃣ BLOCO FINAL — EVOLUÇÃO & PRODUTIVIDADE
+Evolução MRR
+
+Linha simples
+
+Meta do BP como linha tracejada
+
+Destaque do mês atual
+
+Resumo Operacional
+
+Cards pequenos:
+
+Clientes ativos
+
+Headcount
+
+Receita / Head
+
+MRR / Head
+
+Visual neutro. Sem alerta aqui.
+
+7️⃣ PADRÕES VISUAIS (CHECKLIST)
+
+Badges:
+
+Verde = no alvo
+
+Amarelo = atenção
+
+Vermelho = fora
+
+Tipografia:
+
+Números > títulos > labels
+
+Espaçamento:
+
+Mais respiro vertical
+
+Nada de:
+
+Scroll infinito sem seção
+
+Cards todos iguais sem hierarquia
+
+8️⃣ REGRA DE OURO
+
+Se um CEO abrir isso por 2 minutos e não souber onde agir, o design falhou.
+
+🎯 RESULTADO ESPERADO
+
+Ao final:
+
+Dashboard responde:
+
+Estamos fora do plano?
+
+Onde?
+
+Por quê?
+
+O que está sendo feito?
+
+Sistema pronto para:
+
+Conselho
+
+Sócios
+
+Heads

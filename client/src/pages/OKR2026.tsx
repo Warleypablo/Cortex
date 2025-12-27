@@ -28,11 +28,11 @@ import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
   Target, TrendingUp, DollarSign, AlertTriangle, AlertCircle,
-  ArrowUpRight, Info, Rocket, Clock, CheckCircle2, 
+  ArrowUpRight, Info, Rocket, Clock, CheckCircle2, CheckCircle,
   XCircle, Banknote, PiggyBank, ClipboardCheck, MessageSquare, History,
   CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building,
   LayoutGrid, List, Search, Loader2, Database, FileText, ListChecks, Calendar,
-  ChevronRight, X, ExternalLink, Tag
+  ChevronRight, X, ExternalLink, Tag, Lightbulb
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -1218,6 +1218,163 @@ function PendingCheckinsSection({
   );
 }
 
+interface ObjectiveSummary {
+  id: string;
+  title: string;
+  krsTotal: number;
+  krsOnTrack: number;
+  krsWarning: number;
+  krsOffTrack: number;
+  initiativesCount: number;
+}
+
+const OBJECTIVE_COLORS: Record<string, { bg: string; border: string; icon: string }> = {
+  O1: { bg: "bg-sky-500/10", border: "border-sky-500/30", icon: "text-sky-500" },
+  O2: { bg: "bg-violet-500/10", border: "border-violet-500/30", icon: "text-violet-500" },
+  O3: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", icon: "text-emerald-500" },
+  O4: { bg: "bg-amber-500/10", border: "border-amber-500/30", icon: "text-amber-500" },
+  O5: { bg: "bg-rose-500/10", border: "border-rose-500/30", icon: "text-rose-500" },
+};
+
+function ObjectiveSummaryCards({ 
+  objectives, 
+  krs, 
+  initiatives,
+  currentQuarter,
+  onObjectiveClick
+}: { 
+  objectives: Objective[];
+  krs: KR[];
+  initiatives: Initiative[];
+  currentQuarter: string;
+  onObjectiveClick?: (objectiveId: string) => void;
+}) {
+  const computeSummaries = useMemo((): ObjectiveSummary[] => {
+    return objectives.map(obj => {
+      const objectiveKRs = krs.filter(kr => kr.objectiveId === obj.id);
+      const objectiveInitiatives = initiatives.filter(init => 
+        init.objectiveId === obj.id
+      );
+      
+      let onTrack = 0;
+      let warning = 0;
+      let offTrack = 0;
+      
+      objectiveKRs.forEach(kr => {
+        const status = kr.status;
+        if (status === "gray") return;
+        
+        if (status === "green") onTrack++;
+        else if (status === "yellow") warning++;
+        else if (status === "red") offTrack++;
+      });
+      
+      return {
+        id: obj.id,
+        title: obj.title,
+        krsTotal: objectiveKRs.length,
+        krsOnTrack: onTrack,
+        krsWarning: warning,
+        krsOffTrack: offTrack,
+        initiativesCount: objectiveInitiatives.length,
+      };
+    });
+  }, [objectives, krs, initiatives, currentQuarter]);
+  
+  if (objectives.length === 0) return null;
+  
+  return (
+    <Card data-testid="section-objective-summaries">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Target className="w-4 h-4 text-primary" />
+          Objetivos 2026
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {computeSummaries.map(summary => {
+            const colors = OBJECTIVE_COLORS[summary.id] || OBJECTIVE_COLORS.O1;
+            const hasIssues = summary.krsOffTrack > 0;
+            const hasWarnings = summary.krsWarning > 0;
+            
+            return (
+              <div
+                key={summary.id}
+                className={`p-3 rounded-lg border cursor-pointer hover-elevate ${colors.bg} ${colors.border}`}
+                data-testid={`objective-card-${summary.id}`}
+                onClick={() => onObjectiveClick?.(summary.id)}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <Badge className={`text-[10px] font-mono ${colors.bg} ${colors.icon} border-0`}>
+                    {summary.id}
+                  </Badge>
+                  {hasIssues && (
+                    <AlertCircle className="w-3.5 h-3.5 text-red-500" />
+                  )}
+                  {!hasIssues && hasWarnings && (
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                  )}
+                  {!hasIssues && !hasWarnings && summary.krsTotal > 0 && (
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  )}
+                </div>
+                <h4 className="text-xs font-medium line-clamp-2 h-8 mb-2">{summary.title}</h4>
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1">
+                          <Target className="w-3 h-3" />
+                          <span>{summary.krsTotal}</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="space-y-0.5">
+                          <p className="text-emerald-400">On Track: {summary.krsOnTrack}</p>
+                          <p className="text-amber-400">Warning: {summary.krsWarning}</p>
+                          <p className="text-red-400">Off Track: {summary.krsOffTrack}</p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <span className="text-muted-foreground/50">|</span>
+                  <div className="flex items-center gap-1">
+                    <Lightbulb className="w-3 h-3" />
+                    <span>{summary.initiativesCount}</span>
+                  </div>
+                </div>
+                {summary.krsTotal > 0 && (
+                  <div className="mt-2 flex gap-0.5">
+                    {summary.krsOnTrack > 0 && (
+                      <div 
+                        className="h-1 rounded-full bg-emerald-500"
+                        style={{ flex: summary.krsOnTrack }}
+                      />
+                    )}
+                    {summary.krsWarning > 0 && (
+                      <div 
+                        className="h-1 rounded-full bg-amber-500"
+                        style={{ flex: summary.krsWarning }}
+                      />
+                    )}
+                    {summary.krsOffTrack > 0 && (
+                      <div 
+                        className="h-1 rounded-full bg-red-500"
+                        style={{ flex: summary.krsOffTrack }}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 interface AlertItem {
   name: string;
   currentValue: number | null;
@@ -1303,7 +1460,7 @@ function AlertsSection({
 }
 
 function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChange?: (tab: string) => void }) {
-  const { metrics, highlights, series, initiatives, krs } = data;
+  const { metrics, highlights, series, initiatives, krs, objectives } = data;
   const currentQuarter = getCurrentQuarter();
   const [selectedQuarter, setSelectedQuarter] = useState<"Q1" | "Q2" | "Q3" | "Q4">(currentQuarter);
 
@@ -1473,6 +1630,14 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           status={logoChurnStatus}
         />
       </div>
+
+      <ObjectiveSummaryCards
+        objectives={objectives}
+        krs={krs}
+        initiatives={initiatives}
+        currentQuarter={selectedQuarter}
+        onObjectiveClick={onTabChange ? (id) => onTabChange("krs") : undefined}
+      />
 
       {computeAlerts.length > 0 && (
         <AlertsSection alerts={computeAlerts} selectedQuarter={selectedQuarter} />
