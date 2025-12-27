@@ -196,6 +196,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/comercial/analise-vendas">{() => <ProtectedRoute path="/dashboard/comercial/analise-vendas" component={AnaliseVendas} />}</Route>
       <Route path="/dashboard/comercial/detalhamento-vendas">{() => <ProtectedRoute path="/dashboard/comercial/detalhamento-vendas" component={DetalhamentoVendas} />}</Route>
       <Route path="/dashboard/comercial/apresentacao">{() => <ProtectedRoute path="/dashboard/comercial/apresentacao" component={PresentationMode} />}</Route>
+      <Route path="/presentation">{() => <ProtectedRoute path="/presentation" component={PresentationMode} />}</Route>
       
       {/* Growth */}
       <Route path="/growth/visao-geral">{() => <ProtectedRoute path="/growth/visao-geral" component={GrowthVisaoGeral} />}</Route>
@@ -262,7 +263,7 @@ function DealNotificationsHandler() {
 function AppLayout() {
   const [location] = useLocation();
   const isLoginPage = location === "/login";
-  const isPresentationMode = location === "/dashboard/comercial/apresentacao";
+  const isPresentationMode = location === "/dashboard/comercial/apresentacao" || location === "/presentation";
 
   const style = {
     "--sidebar-width": "16rem",
