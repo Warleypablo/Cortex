@@ -301,10 +301,14 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border bg-sidebar p-3">
         {user && (
           <div className="flex flex-col gap-3">
-            <div className={cn(
-              "flex items-center gap-3",
-              isCollapsed && "justify-center"
-            )}>
+            <Link
+              href="/meu-perfil"
+              className={cn(
+                "flex items-center gap-3 rounded-md p-2 -m-2 hover:bg-sidebar-accent transition-colors cursor-pointer",
+                isCollapsed && "justify-center"
+              )}
+              data-testid="link-user-profile"
+            >
               <Avatar className="h-9 w-9 border border-sidebar-border">
                 <AvatarImage src={user.picture} alt={user.name} />
                 <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground text-xs">
@@ -333,7 +337,7 @@ export function AppSidebar() {
                   )}
                 </div>
               )}
-            </div>
+            </Link>
             
             <Separator className="bg-sidebar-border" />
             
