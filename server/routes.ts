@@ -11250,6 +11250,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== OKR 2026: SEED INITIATIVES ====================
+  
+  app.post("/api/okr2026/seed-initiatives", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const initiativesData = await import("./okr2026/initiatives.json");
+      const initiatives = initiativesData.initiatives || [];
+      
+      let upsertCount = 0;
+      
+      for (const ini of initiatives) {
+        const stableKey = ini.stable_key || ini.id;
+        const tags = ini.tags ? `{${ini.tags.join(",")}}` : null;
+        const krs = ini.krs ? `{${ini.krs.join(",")}}` : null;
+        
+        await db.execute(sql`
+          INSERT INTO okr_initiatives 
+            (stable_key, objective_id, title, quarter, status, owner_email, owner_name, tags, krs, origin)
+          VALUES 
+            (${stableKey}, ${ini.objectiveId}, ${ini.title}, ${ini.quarter || null}, ${ini.status}, 
+             ${ini.owner_email || null}, ${ini.owner_name || null}, ${sql.raw(`'${tags}'::text[]`)}, ${sql.raw(`'${krs}'::text[]`)}, ${ini.origin || 'seed_turbo_2026'})
+          ON CONFLICT (stable_key) DO UPDATE SET
+            objective_id = EXCLUDED.objective_id,
+            title = EXCLUDED.title,
+            quarter = EXCLUDED.quarter,
+            status = EXCLUDED.status,
+            owner_email = EXCLUDED.owner_email,
+            owner_name = EXCLUDED.owner_name,
+            tags = EXCLUDED.tags,
+            krs = EXCLUDED.krs,
+            origin = EXCLUDED.origin,
+            updated_at = NOW()
+        `);
+        upsertCount++;
+      }
+      
+      res.json({
+        success: true,
+        message: `Initiatives seeded successfully`,
+        count: upsertCount
+      });
+    } catch (error) {
+      console.error("[api] Error seeding initiatives:", error);
+      res.status(500).json({ error: "Failed to seed initiatives" });
+    }
+  });
+
+  // ==================== OKR 2026: SQUAD GOALS ====================
+  
+  app.get("/api/okr2026/squad-goals", isAuthenticated, async (req, res) => {
+    try {
+      const { squad, perspective, year } = req.query;
+      
+      let query = sql`
+        SELECT id, squad, perspective, metric_name, unit, periodicity, data_source, owner_team,
+               actual_value, target_value, score, weight, notes, year, quarter, month, updated_at
+        FROM squad_goals
+        WHERE 1=1
+      `;
+      
+      if (squad) query = sql`${query} AND squad = ${squad}`;
+      if (perspective) query = sql`${query} AND perspective = ${perspective}`;
+      if (year) query = sql`${query} AND year = ${parseInt(year as string)}`;
+      
+      query = sql`${query} ORDER BY perspective, squad, metric_name`;
+      
+      const result = await db.execute(query);
+      
+      res.json({
+        goals: result.rows.map((r: any) => ({
+          id: r.id,
+          squad: r.squad,
+          perspective: r.perspective,
+          metricName: r.metric_name,
+          unit: r.unit,
+          periodicity: r.periodicity,
+          dataSource: r.data_source,
+          ownerTeam: r.owner_team,
+          actualValue: r.actual_value ? parseFloat(r.actual_value) : null,
+          targetValue: r.target_value ? parseFloat(r.target_value) : null,
+          score: r.score ? parseFloat(r.score) : null,
+          weight: r.weight ? parseFloat(r.weight) : 1,
+          notes: r.notes,
+          year: r.year,
+          quarter: r.quarter,
+          month: r.month,
+          updatedAt: r.updated_at
+        }))
+      });
+    } catch (error) {
+      console.error("[api] Error fetching squad goals:", error);
+      res.status(500).json({ error: "Failed to fetch squad goals" });
+    }
+  });
+  
+  app.post("/api/okr2026/squad-goals", isAuthenticated, async (req, res) => {
+    try {
+      const { squad, perspective, metricName, unit, periodicity, dataSource, ownerTeam, actualValue, targetValue, score, weight, notes, year, quarter, month } = req.body;
+      
+      if (!squad || !perspective || !metricName || !unit) {
+        return res.status(400).json({ error: "squad, perspective, metricName and unit are required" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO squad_goals (squad, perspective, metric_name, unit, periodicity, data_source, owner_team, actual_value, target_value, score, weight, notes, year, quarter, month)
+        VALUES (${squad}, ${perspective}, ${metricName}, ${unit}, ${periodicity || 'monthly'}, ${dataSource || null}, ${ownerTeam || null}, ${actualValue || null}, ${targetValue || null}, ${score || null}, ${weight || 1}, ${notes || null}, ${year || 2026}, ${quarter || null}, ${month || null})
+        RETURNING *
+      `);
+      
+      res.json({ goal: result.rows[0] });
+    } catch (error) {
+      console.error("[api] Error creating squad goal:", error);
+      res.status(500).json({ error: "Failed to create squad goal" });
+    }
+  });
+  
+  app.patch("/api/okr2026/squad-goals/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { actualValue, targetValue, score, notes } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE squad_goals 
+        SET actual_value = COALESCE(${actualValue}, actual_value),
+            target_value = COALESCE(${targetValue}, target_value),
+            score = COALESCE(${score}, score),
+            notes = COALESCE(${notes}, notes),
+            updated_at = NOW()
+        WHERE id = ${parseInt(id)}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Goal not found" });
+      }
+      
+      res.json({ goal: result.rows[0] });
+    } catch (error) {
+      console.error("[api] Error updating squad goal:", error);
+      res.status(500).json({ error: "Failed to update squad goal" });
+    }
+  });
+  
+  app.delete("/api/okr2026/squad-goals/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      await db.execute(sql`DELETE FROM squad_goals WHERE id = ${parseInt(id)}`);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting squad goal:", error);
+      res.status(500).json({ error: "Failed to delete squad goal" });
+    }
+  });
+
   // ==================== SYSTEM FIELD OPTIONS ====================
   
   app.get("/api/system-fields", isAuthenticated, async (req, res) => {
