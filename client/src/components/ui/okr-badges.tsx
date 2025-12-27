@@ -282,7 +282,23 @@ const initiativeStatusConfig: Record<string, {
     label: "Backlog",
     className: "bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300 border-slate-200 dark:border-slate-700",
   },
+  planned: {
+    label: "Backlog",
+    className: "bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300 border-slate-200 dark:border-slate-700",
+  },
+  not_started: {
+    label: "Backlog",
+    className: "bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300 border-slate-200 dark:border-slate-700",
+  },
   doing: {
+    label: "Em andamento",
+    className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+  },
+  in_progress: {
+    label: "Em andamento",
+    className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+  },
+  "em andamento": {
     label: "Em andamento",
     className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800",
   },
@@ -290,14 +306,26 @@ const initiativeStatusConfig: Record<string, {
     label: "Concluído",
     className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800",
   },
+  completed: {
+    label: "Concluído",
+    className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800",
+  },
+  "concluído": {
+    label: "Concluído",
+    className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800",
+  },
   blocked: {
+    label: "Bloqueado",
+    className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800",
+  },
+  bloqueado: {
     label: "Bloqueado",
     className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800",
   },
 };
 
 export function InitiativeStatusBadge({ status, className }: InitiativeStatusBadgeProps) {
-  const statusLower = status.toLowerCase();
+  const statusLower = status.toLowerCase().trim();
   const config = initiativeStatusConfig[statusLower] || {
     label: status,
     className: "bg-gray-100 text-gray-700 dark:bg-gray-800/50 dark:text-gray-300 border-gray-200 dark:border-gray-700",
@@ -307,7 +335,7 @@ export function InitiativeStatusBadge({ status, className }: InitiativeStatusBad
     <Badge 
       variant="outline" 
       className={cn(config.className, "font-medium", className)}
-      data-testid={`badge-initiative-status-${statusLower}`}
+      data-testid={`badge-initiative-status-${statusLower.replace(/\s+/g, '-')}`}
     >
       {config.label}
     </Badge>
