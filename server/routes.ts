@@ -10964,34 +10964,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { BP_2026_TARGETS, BP_MONTHS, BP_METRIC_ORDER, getMetricByKey } = await import("./okr2026/bp2026Targets");
       
-      const targetsResult = await db.execute(sql`
-        SELECT year, month, metric_key, dimension_key, dimension_value, target_value
-        FROM plan.metric_targets_monthly
-        WHERE year = 2026
-        ORDER BY metric_key, month
-      `);
-      
-      const actualsResult = await db.execute(sql`
-        SELECT year, month, metric_key, dimension_key, dimension_value, actual_value
-        FROM kpi.metric_actuals_monthly
-        WHERE year = 2026
-        ORDER BY metric_key, month
-      `);
-      
       const targetsByMetric: Record<string, Record<string, number>> = {};
-      for (const row of targetsResult.rows as any[]) {
-        const key = row.metric_key;
-        const monthKey = `2026-${String(row.month).padStart(2, "0")}`;
-        if (!targetsByMetric[key]) targetsByMetric[key] = {};
-        targetsByMetric[key][monthKey] = parseFloat(row.target_value);
+      const actualsByMetric: Record<string, Record<string, number>> = {};
+      
+      try {
+        const targetsResult = await db.execute(sql`
+          SELECT year, month, metric_key, dimension_key, dimension_value, target_value
+          FROM plan.metric_targets_monthly
+          WHERE year = 2026
+          ORDER BY metric_key, month
+        `);
+        
+        for (const row of targetsResult.rows as any[]) {
+          const key = row.metric_key;
+          const monthKey = `2026-${String(row.month).padStart(2, "0")}`;
+          if (!targetsByMetric[key]) targetsByMetric[key] = {};
+          targetsByMetric[key][monthKey] = parseFloat(row.target_value);
+        }
+      } catch (dbError) {
+        console.log("[api] BP financeiro: Using hardcoded targets (DB unavailable)");
       }
       
-      const actualsByMetric: Record<string, Record<string, number>> = {};
-      for (const row of actualsResult.rows as any[]) {
-        const key = row.metric_key;
-        const monthKey = `2026-${String(row.month).padStart(2, "0")}`;
-        if (!actualsByMetric[key]) actualsByMetric[key] = {};
-        actualsByMetric[key][monthKey] = parseFloat(row.actual_value);
+      try {
+        const actualsResult = await db.execute(sql`
+          SELECT year, month, metric_key, dimension_key, dimension_value, actual_value
+          FROM kpi.metric_actuals_monthly
+          WHERE year = 2026
+          ORDER BY metric_key, month
+        `);
+        
+        for (const row of actualsResult.rows as any[]) {
+          const key = row.metric_key;
+          const monthKey = `2026-${String(row.month).padStart(2, "0")}`;
+          if (!actualsByMetric[key]) actualsByMetric[key] = {};
+          actualsByMetric[key][monthKey] = parseFloat(row.actual_value);
+        }
+      } catch (dbError) {
+        console.log("[api] BP financeiro: No actuals available (DB unavailable)");
       }
       
       const currentDate = new Date();
