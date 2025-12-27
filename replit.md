@@ -90,6 +90,35 @@ Preferred communication style: Simple, everyday language.
   - **Google OAuth**: Configuration status (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
   - Refresh button for manual status check, color-coded badges (green/red/yellow)
 
+### Canonical Data Layer (sys schema)
+The system includes a canonical data layer in the `sys` PostgreSQL schema for standardized data governance:
+
+- **Schema Structure**: 5 tables in `sys` schema
+  - `sys.catalogs`: Master catalog definitions (catalog_key PK)
+  - `sys.catalog_items`: Catalog items with slugs (catalog_key + slug composite PK)
+  - `sys.catalog_aliases`: Raw value to slug mappings for data normalization (catalog_key + alias composite PK)
+  - `sys.system_fields`: Field definitions with types, requirements, and enum references
+  - `sys.validation_rules`: Business rule definitions as JSONB
+
+- **Catalogs Defined**:
+  - `catalog_contract_status`: Contract lifecycle statuses (ativo, em_cancelamento, cancelado, pausado, em_implantacao)
+  - `catalog_products`: Service products (social_media, performance, inbound, etc.)
+  - `catalog_squads`: Team squads with emoji alias support for ClickUp data
+  - `catalog_clusters`: Client segmentation clusters
+  - `catalog_account_health`: Account health statuses
+  - `catalog_churn_reason`: Cancellation reason categories
+
+- **Canonical View**: `public.vw_contratos_canon` maps raw cup_contratos data to canonical slugs via LEFT JOIN on sys.catalog_aliases with COALESCE fallback
+
+- **API Endpoints** (Admin only):
+  - `GET /api/admin/sys/catalogs` - List catalogs with item counts
+  - `GET /api/admin/sys/catalog-items/:catalogKey` - List items with aliases
+  - `GET /api/admin/sys/aliases/:catalogKey` - List all aliases for a catalog
+  - `GET /api/admin/sys/test-view` - Sample from vw_contratos_canon with stats
+  - `GET /api/admin/sys/unmapped` - Find raw values without matching aliases
+
+- **Initialization**: All spec apply functions use `ON CONFLICT DO UPDATE` for idempotent reinitialization
+
 ## External Dependencies
 
 ### Third-Party UI Libraries
