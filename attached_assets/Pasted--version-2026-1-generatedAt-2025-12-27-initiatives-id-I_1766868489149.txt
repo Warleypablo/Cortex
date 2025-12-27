@@ -1,0 +1,202 @@
+{
+  "version": "2026.1",
+  "generatedAt": "2025-12-27",
+  "initiatives": [
+    {
+      "id": "I-2026-001",
+      "title": "Pacotes padrão por BU (Commerce / OOH / Ventures)",
+      "objectiveId": "O1",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "coo@turbopartners.com.br", "name": "COO" },
+      "linkedKRs": ["O1_KR1", "O1_KR4"],
+      "tags": ["produto", "padronizacao"],
+      "impact": ["MRR", "ESCALA"],
+      "notes": "Padronizar oferta por BU com escopos, entregáveis, limites e precificação base."
+    },
+    {
+      "id": "I-2026-002",
+      "title": "Revisão de pricing e tiers (Starter / Scale / Enterprise)",
+      "objectiveId": "O1",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "ceo@turbopartners.com.br", "name": "CEO" },
+      "linkedKRs": ["O1_KR1", "O1_KR2"],
+      "tags": ["preco", "margem"],
+      "impact": ["MRR", "MARGEM"],
+      "notes": "Refazer tiers com âncoras de valor e margem mínima por plano."
+    },
+    {
+      "id": "I-2026-003",
+      "title": "Playbook de Upsell (CRM, Automações, Email, CRO)",
+      "objectiveId": "O1",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "growth@turbopartners.com.br", "name": "Growth" },
+      "linkedKRs": ["O1_KR5"],
+      "tags": ["upsell", "monetizacao"],
+      "impact": ["MRR", "CAIXA"],
+      "notes": "Criar catálogo de upsell + gatilhos + abordagem + tracking de conversão."
+    },
+    {
+      "id": "I-2026-004",
+      "title": "Cross-sell Commerce → TurboOH (playbook + oferta)",
+      "objectiveId": "O1",
+      "quarter": "Q2",
+      "status": "backlog",
+      "owner": { "email": "turbooh@turbopartners.com.br", "name": "TurboOH" },
+      "linkedKRs": ["O1_KR5"],
+      "tags": ["cross-sell", "turbooh"],
+      "impact": ["RECEITA", "MRR"],
+      "notes": "Oferta padrão, pitch, casos e operação do handoff."
+    },
+    {
+      "id": "I-2026-005",
+      "title": "Máquina de Outbound ICP (lista + cadência + rotina)",
+      "objectiveId": "O1",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "comercial@turbopartners.com.br", "name": "Comercial" },
+      "linkedKRs": ["O1_KR4"],
+      "tags": ["outbound", "vendas"],
+      "impact": ["VENDAS", "MRR"],
+      "notes": "Definir ICP, listas, scripts, cadência e metas semanais."
+    },
+
+    {
+      "id": "I-2026-006",
+      "title": "Política de ICP e Qualificação (anti-cliente ruim)",
+      "objectiveId": "O2",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "coo@turbopartners.com.br", "name": "COO" },
+      "linkedKRs": ["O2_KR1"],
+      "tags": ["qualidade", "churn"],
+      "impact": ["CHURN", "MARGEM"],
+      "notes": "Criar checklist + gates de qualificação + critérios de veto."
+    },
+    {
+      "id": "I-2026-007",
+      "title": "Padronização de escopos por plano (TMA/TSS + volumetria)",
+      "objectiveId": "O2",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "operacao@turbopartners.com.br", "name": "Operações" },
+      "linkedKRs": ["O2_KR2"],
+      "tags": ["escopo", "padronizacao"],
+      "impact": ["EBITDA", "EFICIENCIA"],
+      "notes": "Limites de entrega, SLA, e rotina por plano."
+    },
+    {
+      "id": "I-2026-008",
+      "title": "Capacity Planning por Squad (modelo + rotina semanal)",
+      "objectiveId": "O2",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "ops@turbopartners.com.br", "name": "Ops" },
+      "linkedKRs": ["O2_KR3"],
+      "tags": ["operacao", "capacidade"],
+      "impact": ["MARGEM", "QUALIDADE"],
+      "notes": "Capacidade por pessoa/squad, WIP limit, forecast de demanda."
+    },
+    {
+      "id": "I-2026-009",
+      "title": "Automação Financeira (Conta Azul → Data House) + DRE padrão",
+      "objectiveId": "O2",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "financeiro@turbopartners.com.br", "name": "Financeiro" },
+      "linkedKRs": ["O2_KR4"],
+      "tags": ["financeiro", "dados"],
+      "impact": ["CAIXA", "GOVERNANCA"],
+      "notes": "Integração + padronização DRE e plano de contas."
+    },
+
+    {
+      "id": "I-2026-010",
+      "title": "Régua de cobrança inteligente (reduzir inadimplência)",
+      "objectiveId": "O3",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "financeiro@turbopartners.com.br", "name": "Financeiro" },
+      "linkedKRs": ["O3_KR1"],
+      "tags": ["inadimplencia", "cobranca"],
+      "impact": ["CAIXA"],
+      "notes": "Mensagens, cadência, acordos, gatilhos e playbook de escalonamento."
+    },
+    {
+      "id": "I-2026-011",
+      "title": "Health Score de Clientes (definição + instrumentação)",
+      "objectiveId": "O3",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "cs@turbopartners.com.br", "name": "CS" },
+      "linkedKRs": ["O3_KR2"],
+      "tags": ["healthscore", "retencao"],
+      "impact": ["CHURN", "RECEITA"],
+      "notes": "Score com sinais: entrega, resultado, engajamento, tickets, risco."
+    },
+    {
+      "id": "I-2026-012",
+      "title": "Ritual mensal de retenção (CS + Ops) + plano de ação",
+      "objectiveId": "O3",
+      "quarter": "Q2",
+      "status": "backlog",
+      "owner": { "email": "cslead@turbopartners.com.br", "name": "CS Lead" },
+      "linkedKRs": ["O3_KR3"],
+      "tags": ["ritual", "retencao"],
+      "impact": ["NET_CHURN"],
+      "notes": "Revisão mensal por carteira com ações, responsáveis e prazos."
+    },
+
+    {
+      "id": "I-2026-013",
+      "title": "Modelo de oferta e precificação TurboOH (planos + upsells)",
+      "objectiveId": "O4",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "turbooh@turbopartners.com.br", "name": "TurboOH" },
+      "linkedKRs": ["O4_KR1"],
+      "tags": ["turbooh", "oferta"],
+      "impact": ["RECEITA"],
+      "notes": "Definir planos, faixas, margens e playbook comercial."
+    },
+    {
+      "id": "I-2026-014",
+      "title": "Integração TurboOH no CRM + faturamento (pipeline e cobrança)",
+      "objectiveId": "O4",
+      "quarter": "Q2",
+      "status": "backlog",
+      "owner": { "email": "tech@turbopartners.com.br", "name": "Tech" },
+      "linkedKRs": ["O4_KR2"],
+      "tags": ["crm", "integracao"],
+      "impact": ["CAIXA", "GOVERNANCA"],
+      "notes": "Pipeline padrão, campos obrigatórios e regras de billing."
+    },
+
+    {
+      "id": "I-2026-015",
+      "title": "Biblioteca de Cases + Calculadora de ROI (sales enablement)",
+      "objectiveId": "O5",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "growth@turbopartners.com.br", "name": "Growth" },
+      "linkedKRs": ["O5_KR1"],
+      "tags": ["cases", "sales"],
+      "impact": ["VENDAS", "MRR"],
+      "notes": "Cases por nicho + calculadora simples para qualificação e proposta."
+    },
+    {
+      "id": "I-2026-016",
+      "title": "Templates padrão de entrega por serviço (qualidade + escala)",
+      "objectiveId": "O5",
+      "quarter": "Q1",
+      "status": "backlog",
+      "owner": { "email": "ops@turbopartners.com.br", "name": "Ops" },
+      "linkedKRs": ["O5_KR2"],
+      "tags": ["template", "qualidade"],
+      "impact": ["EFICIENCIA", "QUALIDADE"],
+      "notes": "Templates de reporte, kick-off, weekly, QBR e planos de ação."
+    }
+  ]
+}
