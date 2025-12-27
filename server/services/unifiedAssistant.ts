@@ -168,45 +168,74 @@ Também considere o contexto da página atual do usuário (se fornecido).
 Responda APENAS com o nome do contexto em minúsculas: "financeiro", "cases", "clientes" ou "geral".
 Não adicione explicações, apenas a palavra do contexto.`;
 
-const TURBO_PARTNERS_SYSTEM_PROMPT = `Você é o assistente virtual da Turbo Partners, uma agência de marketing digital especializada em performance e growth hacking.
+const TURBO_PARTNERS_SYSTEM_PROMPT = `Você é o GPTurbo, assistente virtual interno da Turbo Partners integrado ao Turbo Cortex.
+
+🚨 REGRA DE OURO - OBRIGATÓRIA:
+- Você opera EXCLUSIVAMENTE com base nos dados fornecidos pela nossa integração
+- NÃO utilize conhecimentos externos ou da internet
+- NÃO invente dados, valores, nomes ou informações que não estejam nos dados fornecidos
+- Se a resposta não estiver contida nos dados fornecidos, responda educadamente: "Não tenho essa informação nos dados disponíveis. Você pode verificar diretamente na página correspondente do Turbo Cortex."
 
 Sobre a Turbo Partners:
-- Somos uma agência focada em resultados mensuráveis
-- Oferecemos serviços de Tráfego Pago, Growth Marketing, Branding, Social Media, SEO e desenvolvimento de estratégias digitais
-- Nossa missão é acelerar o crescimento dos nossos clientes através de marketing digital data-driven
-- Trabalhamos com empresas de diversos segmentos, desde startups até grandes corporações
+- Agência de marketing digital especializada em performance e growth hacking
+- Serviços: Tráfego Pago, Growth Marketing, Branding, Social Media, SEO, Inbound Marketing
+- Foco em resultados mensuráveis e data-driven
 
-Você está integrado ao Turbo Cortex, nossa plataforma interna de gestão e análise de dados.
-
-Diretrizes:
+Diretrizes de Resposta:
 - Sempre responda em português brasileiro
-- Seja objetivo e útil nas respostas
-- Quando não souber algo específico, sugira onde o usuário pode encontrar a informação
-- Mantenha um tom profissional mas acessível
+- Seja objetivo e direto
+- Use APENAS os dados fornecidos no contexto
 - Formate valores monetários como R$ X.XXX,XX
-- Use markdown para estruturar respostas longas`;
+- Use markdown para estruturar respostas
+- Se não tiver dados suficientes, oriente o usuário a verificar na página específica do Cortex`;
 
 const CLIENTES_SYSTEM_PROMPT = `${TURBO_PARTNERS_SYSTEM_PROMPT}
 
-Contexto adicional: Você está ajudando com informações sobre clientes da agência.
-- Pode auxiliar com dúvidas sobre contratos, status de clientes, histórico de faturamento
-- Sugira consultas na plataforma quando apropriado
-- Se precisar de dados específicos que não possui, oriente o usuário a verificar na página de clientes`;
+Contexto adicional: Você está ajudando com informações sobre CLIENTES da agência.
+- Use APENAS os dados de clientes fornecidos abaixo
+- NÃO invente nomes de clientes, valores ou informações
+- Se um cliente específico não estiver na lista, informe que não possui essa informação`;
 
 async function chatGeral(request: UnifiedAssistantRequest): Promise<UnifiedAssistantResponse> {
-  const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
-    { role: "system", content: TURBO_PARTNERS_SYSTEM_PROMPT }
-  ];
-
-  if (request.historico) {
-    for (const msg of request.historico) {
-      messages.push({ role: msg.role, content: msg.content });
-    }
-  }
-
-  messages.push({ role: "user", content: request.message });
-
   try {
+    // Buscar dados básicos para o contexto geral
+    const topClientes = await storage.getTopClientesByLTV(10);
+    const clientesCount = topClientes.length;
+    
+    // Formatar resumo de dados disponíveis
+    const dadosDisponiveisContext = `
+
+📊 DADOS DISPONÍVEIS NO TURBO CORTEX (Use APENAS estes dados):
+
+RESUMO DE CLIENTES:
+- Total de clientes no top ranking: ${clientesCount}
+- Top 5 clientes por LTV:
+${topClientes.slice(0, 5).map((c, i) => `  ${i + 1}. ${c.nome} - LTV: R$ ${c.ltv.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`).join('\n')}
+
+MÓDULOS DISPONÍVEIS NO CORTEX:
+- Clientes e Contratos: Gestão de clientes ativos e contratos
+- Financeiro: DFC, Inadimplência, Faturamento
+- Comercial: Pipeline SDR/Closer, Bitrix CRM
+- Growth: Meta Ads, Google Ads, Criativos
+- G&G (Pessoas): Colaboradores, Patrimônio, Telefones
+- OKR 2026: Objetivos e resultados chave
+
+⚠️ LEMBRETE: Se o usuário perguntar algo fora desses dados, responda que não possui essa informação e oriente a verificar na página correspondente.`;
+
+    const systemPromptComDados = TURBO_PARTNERS_SYSTEM_PROMPT + dadosDisponiveisContext;
+
+    const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+      { role: "system", content: systemPromptComDados }
+    ];
+
+    if (request.historico) {
+      for (const msg of request.historico) {
+        messages.push({ role: msg.role, content: msg.content });
+      }
+    }
+
+    messages.push({ role: "user", content: request.message });
+
     const config = await getAIConfig();
     const client = getAIClient(config.provider);
     
