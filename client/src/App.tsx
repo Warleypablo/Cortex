@@ -65,7 +65,6 @@ const OKR2026 = lazy(() => import("@/pages/OKR2026"));
 const AdminNotificationRules = lazy(() => import("@/pages/AdminNotificationRules"));
 const AdminDesignSystem = lazy(() => import("@/pages/AdminDesignSystem"));
 const Calendario = lazy(() => import("@/pages/Calendario"));
-const MetasSquad = lazy(() => import("@/pages/MetasSquad"));
 const OnboardingRH = lazy(() => import("@/pages/OnboardingRH"));
 const MeuPerfil = lazy(() => import("@/pages/MeuPerfil"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -215,9 +214,6 @@ function ProtectedRouter() {
       
       {/* Calendário */}
       <Route path="/calendario">{() => <ProtectedRoute path="/calendario" component={Calendario} />}</Route>
-      
-      {/* Metas por Squad */}
-      <Route path="/metas-squad">{() => <ProtectedRoute path="/metas-squad" component={MetasSquad} />}</Route>
       
       {/* Meu Perfil */}
       <Route path="/meu-perfil">{() => <ProtectedRoute path="/meu-perfil" component={MeuPerfil} />}</Route>

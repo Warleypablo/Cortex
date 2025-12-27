@@ -25,7 +25,6 @@ export const PERMISSION_KEYS = {
   // Operação
   OPS: {
     VISAO_GERAL: 'ops.visao_geral',
-    METAS_SQUAD: 'ops.metas_squad',
     RETENCAO: 'ops.retencao',
     COHORT: 'ops.cohort',
     CLIENTES_CONTRATOS: 'ops.clientes_contratos',
@@ -151,7 +150,6 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/auditoria-sistemas': PERMISSION_KEYS.FIN.AUDITORIA,
   // Operação
   '/visao-geral': PERMISSION_KEYS.OPS.VISAO_GERAL,
-  '/metas-squad': PERMISSION_KEYS.OPS.METAS_SQUAD,
   '/dashboard/retencao': PERMISSION_KEYS.OPS.RETENCAO,
   '/dashboard/cohort': PERMISSION_KEYS.OPS.COHORT,
   '/clientes': PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS,
@@ -289,7 +287,6 @@ export const NAV_CONFIG = {
       items: [
         { title: 'Visão Geral', url: '/visao-geral', icon: 'Eye', permissionKey: PERMISSION_KEYS.OPS.VISAO_GERAL },
         { title: 'Clientes & Contratos', url: '/clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS },
-        { title: 'Metas por Squad', url: '/metas-squad', icon: 'Target', permissionKey: PERMISSION_KEYS.OPS.METAS_SQUAD },
         { title: 'Análise de Retenção', url: '/dashboard/retencao', icon: 'UserCheck', permissionKey: PERMISSION_KEYS.OPS.RETENCAO },
         { title: 'Cohort de Retenção', url: '/dashboard/cohort', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.OPS.COHORT },
       ],
@@ -469,7 +466,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.FIN.INADIMPLENCIA]: 'Inadimplência',
   [PERMISSION_KEYS.FIN.AUDITORIA]: 'Auditoria de Sistemas',
   [PERMISSION_KEYS.OPS.VISAO_GERAL]: 'Visão Geral',
-  [PERMISSION_KEYS.OPS.METAS_SQUAD]: 'Metas por Squad',
   [PERMISSION_KEYS.OPS.RETENCAO]: 'Análise de Retenção',
   [PERMISSION_KEYS.OPS.COHORT]: 'Cohort de Retenção',
   [PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS]: 'Clientes & Contratos',
