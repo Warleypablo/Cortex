@@ -1537,19 +1537,39 @@ export default function DashboardGeG() {
                 {isLoadingDistribuicaoGeografica ? (
                   <Skeleton className="h-[200px] w-full" />
                 ) : distribuicaoGeografica?.grandeVitoria && distribuicaoGeografica.grandeVitoria.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={distribuicaoGeografica.grandeVitoria} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="cidade" type="category" width={80} tick={{ fontSize: 10 }} />
-                      <Tooltip />
-                      <Bar dataKey="total" name="Colaboradores" radius={[0, 4, 4, 0]}>
-                        {distribuicaoGeografica.grandeVitoria.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  (() => {
+                    const totalGV = distribuicaoGeografica.grandeVitoria.reduce((acc, item) => acc + item.total, 0);
+                    return (
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={distribuicaoGeografica.grandeVitoria} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" />
+                          <YAxis dataKey="cidade" type="category" width={80} tick={{ fontSize: 10 }} />
+                          <Tooltip 
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0].payload as { cidade: string; total: number };
+                                const pct = totalGV > 0 ? ((data.total / totalGV) * 100).toFixed(1) : '0';
+                                return (
+                                  <div className="bg-popover border rounded-md shadow-md p-2">
+                                    <p className="font-medium text-sm">{data.cidade}</p>
+                                    <p className="text-xs text-muted-foreground">Colaboradores: {data.total}</p>
+                                    <p className="text-xs text-muted-foreground">{pct}%</p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Bar dataKey="total" name="Colaboradores" radius={[0, 4, 4, 0]}>
+                            {distribuicaoGeografica.grandeVitoria.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    );
+                  })()
                 ) : (
                   <div className="flex items-center justify-center h-[200px]" data-testid="text-no-data-grande-vitoria">
                     <p className="text-muted-foreground text-sm">Nenhum dado disponível</p>
@@ -1571,19 +1591,39 @@ export default function DashboardGeG() {
                 {isLoadingDistribuicaoGeografica ? (
                   <Skeleton className="h-[200px] w-full" />
                 ) : distribuicaoGeografica?.byEstado && distribuicaoGeografica.byEstado.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={distribuicaoGeografica.byEstado} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="estado" type="category" width={40} tick={{ fontSize: 10 }} />
-                      <Tooltip />
-                      <Bar dataKey="total" name="Colaboradores" radius={[0, 4, 4, 0]}>
-                        {distribuicaoGeografica.byEstado.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  (() => {
+                    const totalEstado = distribuicaoGeografica.byEstado.reduce((acc, item) => acc + item.total, 0);
+                    return (
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={distribuicaoGeografica.byEstado} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" />
+                          <YAxis dataKey="estado" type="category" width={40} tick={{ fontSize: 10 }} />
+                          <Tooltip 
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                const data = payload[0].payload as { estado: string; total: number };
+                                const pct = totalEstado > 0 ? ((data.total / totalEstado) * 100).toFixed(1) : '0';
+                                return (
+                                  <div className="bg-popover border rounded-md shadow-md p-2">
+                                    <p className="font-medium text-sm">{data.estado}</p>
+                                    <p className="text-xs text-muted-foreground">Colaboradores: {data.total}</p>
+                                    <p className="text-xs text-muted-foreground">{pct}%</p>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Bar dataKey="total" name="Colaboradores" radius={[0, 4, 4, 0]}>
+                            {distribuicaoGeografica.byEstado.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    );
+                  })()
                 ) : (
                   <div className="flex items-center justify-center h-[200px]" data-testid="text-no-data-estado">
                     <p className="text-muted-foreground text-sm">Nenhum dado disponível</p>
