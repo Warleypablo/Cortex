@@ -1,0 +1,125 @@
+Você é o dev do sistema OKR 2026 (Cortex). Sprint 2 agora é “polir visual + tornar iniciativas operáveis + trazer iniciativas do seed do planejamento”.
+
+OBJETIVO DO SPRINT
+1) Deixar o Dashboard com hierarquia visual forte, “cara de produto”, e estados vazios decentes.
+2) Iniciativas: manter Kanban (pipeline), MAS adicionar uma VIEW “Lista” (tabela) com filtros, busca, badges e quick actions.
+3) Importar/seedar iniciativas no padrão do sistema (Turbo) com base no JSON abaixo (extraído da planilhão de iniciativas). Essas iniciativas devem aparecer no Kanban e na Lista.
+4) Padronizar UI: badges, espaçamentos, tipografia, componentes reutilizáveis e tokens de cor.
+
+REGRAS DE UI (PADRÃO DO SISTEMA)
+- Use componentes reutilizáveis: MetricCard, StatusBadge, ObjectiveBadge, QuarterBadge, OwnerPill.
+- Nada de “vermelhão” gigante no dashboard: use fundo neutro + alertas com tint leve.
+- Bordas, sombras e radius consistentes (ex: rounded-xl/2xl). Grid com espaçamento fixo.
+- Para dados vazios (2026 ainda não rodou): sempre mostrar EMPTY STATE elegante (ícone + texto curto + sugestão do que fazer).
+- Status padrão (para badges e colunas):
+  - backlog/planned = cinza
+  - doing/in_progress = azul
+  - done = verde
+  - blocked = vermelho
+  - at_risk = amarelo (se existir)
+- Badges devem aparecer SEMPRE em iniciativas e KRs.
+
+(1) DASHBOARD — MELHORIAS
+- Topo: manter cards de KPIs do trimestre, mas melhorar:
+  - Mostrar: Atual, Meta, %atingimento, gap (Δ), e um “status” (no alvo/atenção/fora/sem dados).
+  - Se não houver série para gráfico, mostrar “Sem dados ainda — faça o seed / check-in”.
+- Seção “Alertas de Métricas”:
+  - Ordenar por pior gap primeiro.
+  - Cada alerta com: nome, meta, atual, % e badge de status.
+  - Visual: fundo branco, borda leve, badge e ícone — sem bloco vermelho enorme.
+- Adicionar “Foco do Trimestre”:
+  - Um card/lista com as 6 principais iniciativas do trimestre (prioridade: blocked > doing > backlog).
+  - Mostrar: título, objective badge, KR badges, owner pill, status badge.
+  - CTA: “Ver todas iniciativas”.
+- Adicionar “Resumo por Objetivo” (O1..O5):
+  - Mini-cards com: % KRs no alvo, # iniciativas doing/blocked, e um indicador de risco.
+- Melhorar o card “Evolução MRR”:
+  - Se não tem dados: empty state.
+  - Se tem dados: linha simples, sem poluição.
+
+(2) INICIATIVAS — KANBAN + LISTA
+- Manter Kanban com colunas: Backlog / Em andamento / Concluído / Bloqueado.
+- Adicionar toggle: [Kanban] [Lista]
+- VIEW LISTA (tabela):
+  - Colunas: Iniciativa | Objetivo | Quarter | KRs | Owner | Status | Tags
+  - Filtros no topo: Objetivo, Quarter, Owner, Status + Search
+  - Ordenação: padrão por Status (blocked/doing primeiro) e depois por Objective/Quarter.
+  - Row click abre Drawer/Modal de detalhes com:
+    - descrição (se existir)
+    - KRs linkados
+    - checklist (subtarefas — simples)
+    - histórico de updates (placeholder se ainda não existir)
+- Kanban cards: melhorar visual:
+  - Título forte
+  - Linha de badges (Objective + Quarter + KRs)
+  - Owner pill
+  - Status badge claro
+
+(3) DATA MODEL (mínimo necessário)
+- Garantir que Initiative suporta:
+  id, title, objectiveId, quarter, status, owner, linkedKRs[], tags[].
+- Se linkedKRs tiver IDs que não existam ainda, mostrar badge “Sem KR mapeado” (não quebrar).
+
+(4) SEED — IMPORTAR INICIATIVAS (Turbo 2026)
+- Criar arquivo seed (ex: server/okr/initiatives_seed_2026.json) com o JSON abaixo.
+- No load do app, se não existir iniciativas no storage/db local, carregar esse seed.
+- Depois disso, as iniciativas devem aparecer em:
+  - Kanban (com status default backlog/planned)
+  - Lista (com filtros funcionando)
+
+JSON DO SEED (extraído e adaptado p/ Turbo/OKR 2026)
+Cole exatamente:
+
+[
+  {"id":"I001","objectiveId":"O1","quarter":"Q1","title":"CRIAR Jornada/Processo de RevOps Journey (processo completo até onboarding + primeiros 60 dias)","owner":"André / OPS","linkedKRs":["O1_KR3","O1_KR1"],"tags":["REVOPS JOURNEY 2025","Build-It","onboarding"]},
+  {"id":"I002","objectiveId":"O1","quarter":"Q1","title":"IMPLEMENTAR Onboarding padrão (kickoff, setup, primeiros 14 dias, marcos e handoff)","owner":"André / OPS","linkedKRs":["O1_KR3","O1_KR1"],"tags":["REVOPS JOURNEY 2025","Build-It","onboarding"]},
+  {"id":"I003","objectiveId":"O1","quarter":"Q1","title":"CRM: fluxo de cross-sell e playbook de expansão (do sinal ao fechamento)","owner":"Omar / Comercial","linkedKRs":["O1_KR4","O1_KR5","O1_KR1"],"tags":["REVOPS JOURNEY 2025","Build-It","crm"]},
+  {"id":"I004","objectiveId":"O1","quarter":"Q1","title":"Retenção: implementar “Hugs”/rotina de prevenção de churn (gatilhos, cadência, owners)","owner":"André / OPS","linkedKRs":["O1_KR1","O2_KR4","O2_KR5"],"tags":["REVOPS JOURNEY 2025","Build-It","retenção"]},
+  {"id":"I005","objectiveId":"O2","quarter":"Q1","title":"Capar headcount em 150 e travas por squad (capacidade + margem)","owner":"Rodrigo / CEO","linkedKRs":["O2_KR1","O2_KR2"],"tags":["REVOPS JOURNEY 2025","Ongoing"]},
+
+  {"id":"I006","objectiveId":"O5","quarter":"Q1","title":"Delivery Data Model v1 (modelo de dados para operacional + performance + capacidade)","owner":"André / OPS","linkedKRs":["O5_KR1"],"tags":["SGQ & OPERACIONAL","Build-It","data"]},
+  {"id":"I007","objectiveId":"O3","quarter":"Q1","title":"Orientação ao Cliente: padrão de entrega (rotina, expectativas, acordos e linguagem)","owner":"André / OPS","linkedKRs":["O3_KR1"],"tags":["SGQ & OPERACIONAL","Ongoing"]},
+  {"id":"I008","objectiveId":"O3","quarter":"Q1","title":"Supply Chain da Delivery (brief → produção → QA → publicação → reporte)","owner":"André / OPS","linkedKRs":["O3_KR1"],"tags":["SGQ & OPERACIONAL","Build-It"]},
+  {"id":"I009","objectiveId":"O5","quarter":"Q1","title":"Instrumentação de medição no MKT Lab (com n8n) para abastecer KPIs e rotinas","owner":"Tech/Data","linkedKRs":["O5_KR1"],"tags":["SGQ & OPERACIONAL","Build-It","automação"]},
+  {"id":"I010","objectiveId":"O3","quarter":"Q1","title":"Jornada do Cliente (Onboarding) — processo padrão auditável","owner":"Delivery Manager","linkedKRs":["O3_KR1"],"tags":["SGQ & OPERACIONAL","Ongoing","onboarding"]},
+  {"id":"I011","objectiveId":"O3","quarter":"Q1","title":"Jornada do Cliente (Ongoing) — processo padrão auditável","owner":"Delivery Manager","linkedKRs":["O3_KR1"],"tags":["SGQ & OPERACIONAL","Ongoing"]},
+  {"id":"I012","objectiveId":"O3","quarter":"Q1","title":"Scopo/BO: padronizar execução e governança de backlog (o que entra/saí)","owner":"André / OPS","linkedKRs":["O3_KR1"],"tags":["SGQ & OPERACIONAL","Ongoing"]},
+  {"id":"I013","objectiveId":"O2","quarter":"Q1","title":"Ongoing Workflow 2.0 (eficiência + qualidade + previsibilidade)","owner":"André / OPS","linkedKRs":["O2_KR1","O2_KR2"],"tags":["SGQ & OPERACIONAL","Build-It"]},
+  {"id":"I014","objectiveId":"O2","quarter":"Q1","title":"Alocação de tempo por squad (capacidade real vs demanda, com regras)","owner":"André / OPS","linkedKRs":["O2_KR1","O2_KR2"],"tags":["SGQ & OPERACIONAL","Build-It"]},
+  {"id":"I015","objectiveId":"O3","quarter":"Q1","title":"Comitê de Qualidade: rotina, critérios de auditoria e correções","owner":"André / OPS","linkedKRs":["O3_KR1"],"tags":["SGQ & OPERACIONAL","Ongoing"]},
+  {"id":"I016","objectiveId":"O2","quarter":"Q1","title":"NPS/CSAT: processo + cadência + responsáveis + fechamento de loop","owner":"CS/Delivery","linkedKRs":["O2_KR4","O2_KR5"],"tags":["SGQ & OPERACIONAL","Ongoing","retenção"]},
+  {"id":"I017","objectiveId":"O2","quarter":"Q1","title":"Feedback “always on” (liveness): coleta contínua + triagem + ação","owner":"CS/Delivery","linkedKRs":["O2_KR4","O2_KR5"],"tags":["SGQ & OPERACIONAL","Ongoing","retenção"]},
+
+  {"id":"I018","objectiveId":"O3","quarter":"Q1","title":"Unificar Comercial + Delivery: acordos de handoff e padrões mínimos","owner":"Ops + Comercial","linkedKRs":["O3_KR1"],"tags":["13 PLAYBOOKS","Ongoing"]},
+  {"id":"I019","objectiveId":"O3","quarter":"Q1","title":"Playbooks por serviço (mínimo viável) — execução e QA","owner":"Ops","linkedKRs":["O3_KR1"],"tags":["13 PLAYBOOKS","Build-It","playbook"]},
+  {"id":"I020","objectiveId":"O3","quarter":"Q1","title":"SOPs: meta 100% aderência (auditoria + correção)","owner":"Ops","linkedKRs":["O3_KR1"],"tags":["13 PLAYBOOKS","Ongoing"]},
+  {"id":"I021","objectiveId":"O2","quarter":"Q1","title":"Plano de volumetria por squad (capacidade vs metas, por quarter)","owner":"Ops","linkedKRs":["O2_KR1","O2_KR2"],"tags":["13 PLAYBOOKS","Build-It"]},
+  {"id":"I022","objectiveId":"O5","quarter":"Q1","title":"Playbook de BI: definição de métricas, fontes, periodicidade e dono","owner":"Tech/Data","linkedKRs":["O5_KR1"],"tags":["13 PLAYBOOKS","Build-It","data"]},
+  {"id":"I023","objectiveId":"O3","quarter":"Q1","title":"Links semanais: rotina padrão de reporting e rituais","owner":"Ops","linkedKRs":["O3_KR1"],"tags":["13 PLAYBOOKS","Ongoing"]},
+  {"id":"I024","objectiveId":"O3","quarter":"Q1","title":"OPS Weekly: ritual padrão (pauta, decisões, follow-ups)","owner":"Ops","linkedKRs":["O3_KR1"],"tags":["13 PLAYBOOKS","Ongoing"]},
+  {"id":"I025","objectiveId":"O3","quarter":"Q1","title":"Reinício do pilar: comunicação interna + alinhamento de execução","owner":"Ops","linkedKRs":["O3_KR1"],"tags":["13 PLAYBOOKS","Ongoing"]},
+  {"id":"I026","objectiveId":"O3","quarter":"Q1","title":"Feedback loops: padronizar “aprender e corrigir” (semanal/mensal)","owner":"Ops","linkedKRs":["O3_KR1"],"tags":["13 PLAYBOOKS","Ongoing","retenção"]},
+  {"id":"I027","objectiveId":"O5","quarter":"Q1","title":"Centralizar treinamento e conhecimento (hub único, trilhas por função)","owner":"G&G/Edu","linkedKRs":["O5_KR1"],"tags":["13 PLAYBOOKS","Build-It"]},
+
+  {"id":"I028","objectiveId":"O5","quarter":"Q2","title":"Automatizar entrada de contratos (CRM → MKT Lab) sem retrabalho","owner":"Tech/Data","linkedKRs":["O5_KR1"],"tags":["JORNADAS - TECH & DATA","Build-It","automação"]},
+  {"id":"I029","objectiveId":"O5","quarter":"Q2","title":"Conectar MKT Lab aos KPIs (camada de métricas confiável)","owner":"Tech/Data","linkedKRs":["O5_KR1"],"tags":["JORNADAS - TECH & DATA","Build-It","data"]},
+  {"id":"I030","objectiveId":"O5","quarter":"Q2","title":"Automatizar forecast mensal no PowerBI (inputs + validação + publicação)","owner":"Tech/Data","linkedKRs":["O5_KR1"],"tags":["JORNADAS - TECH & DATA","Build-It","data"]},
+
+  {"id":"I031","objectiveId":"O2","quarter":"Q3","title":"Implementar stack de IA (GPT/ops) para produtividade e padronização","owner":"Tech + Ops","linkedKRs":["O2_KR1","O2_KR2"],"tags":["EFICIÊNCIA - IA","Build-It","ia"]},
+  {"id":"I032","objectiveId":"O2","quarter":"Q3","title":"Automatizações internas (rotinas, reporting, cobrança e alertas) via IA/n8n","owner":"Tech + Ops","linkedKRs":["O2_KR1","O2_KR2","O2_KR3"],"tags":["EFICIÊNCIA - IA","Build-It","automação","ia"]},
+  {"id":"I033","objectiveId":"O2","quarter":"Q3","title":"Produtividade: padrões de comunicação, templates e checks automáticos","owner":"Ops","linkedKRs":["O2_KR1","O2_KR2"],"tags":["EFICIÊNCIA - IA","Ongoing"]},
+
+  {"id":"I034","objectiveId":"O1","quarter":"Q2","title":"Pipeline de parcerias nacionais (Brasil) para aquisição e expansão","owner":"Comercial","linkedKRs":["O1_KR4","O1_KR5","O1_KR1"],"tags":["REVOPS JOURNEY 2025","Ongoing"]},
+  {"id":"I035","objectiveId":"O1","quarter":"Q2","title":"Cross-sell Commerce → TurboOH (playbook + oferta + ativação em carteira)","owner":"Comercial + TurboOH","linkedKRs":["O1_KR4","O1_KR5","O1_KR1"],"tags":["REVOPS JOURNEY 2025","Build-It"]}
+]
+
+ACEITE (CHECKLIST)
+- Dashboard mais limpo, com “Foco do Trimestre” e “Resumo por Objetivo”.
+- Alertas sem bloco vermelho agressivo; ordenados por pior gap.
+- Iniciativas com toggle Kanban/Lista.
+- Lista com filtros e busca funcionando.
+- Badges padronizados (Objective/Quarter/Status/KRs/Tags).
+- Seed carregando automaticamente (sem quebrar se KR não existir).
+- Empty states bonitos (gráfico sem dados, KPIs sem série, etc.).
+
+Implemente agora.
