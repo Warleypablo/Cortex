@@ -16,59 +16,77 @@ import {
   ChartTooltipContent,
 } from "./chart-container";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 
-export const description = "A pie chart with a label list";
+export interface PieChartDataItem {
+  name: string;
+  value: number;
+  fill?: string;
+}
 
-const chartData = [
-  { browser: "chrome", visitors: 275, fill: "var(--color-chrome)" },
-  { browser: "safari", visitors: 200, fill: "var(--color-safari)" },
-  { browser: "firefox", visitors: 187, fill: "var(--color-firefox)" },
-  { browser: "edge", visitors: 173, fill: "var(--color-edge)" },
-  { browser: "other", visitors: 90, fill: "var(--color-other)" },
+export interface RoundedPieChartProps {
+  title?: string;
+  description?: string;
+  data?: PieChartDataItem[];
+  trend?: {
+    value: number;
+    direction: 'up' | 'down';
+  };
+  innerRadius?: number;
+  cornerRadius?: number;
+  paddingAngle?: number;
+  showLabels?: boolean;
+  className?: string;
+}
+
+const defaultData: PieChartDataItem[] = [
+  { name: "chrome", value: 275, fill: "hsl(var(--chart-1))" },
+  { name: "safari", value: 200, fill: "hsl(var(--chart-2))" },
+  { name: "firefox", value: 187, fill: "hsl(var(--chart-3))" },
+  { name: "edge", value: 173, fill: "hsl(var(--chart-4))" },
+  { name: "other", value: 90, fill: "hsl(var(--chart-5))" },
 ];
 
-const chartConfig = {
-  visitors: {
-    label: "Visitors",
-  },
-  chrome: {
-    label: "Chrome",
-    color: "hsl(var(--chart-1))",
-  },
-  safari: {
-    label: "Safari",
-    color: "hsl(var(--chart-2))",
-  },
-  firefox: {
-    label: "Firefox",
-    color: "hsl(var(--chart-3))",
-  },
-  edge: {
-    label: "Edge",
-    color: "hsl(var(--chart-4))",
-  },
-  other: {
-    label: "Other",
-    color: "hsl(var(--chart-5))",
-  },
-} satisfies ChartConfig;
+export default function RoundedPieChart({
+  title = "Pie Chart",
+  description = "January - June 2024",
+  data = defaultData,
+  trend = { value: 5.2, direction: 'up' },
+  innerRadius = 30,
+  cornerRadius = 8,
+  paddingAngle = 4,
+  showLabels = true,
+  className,
+}: RoundedPieChartProps) {
+  const chartConfig = data.reduce((acc, item, index) => {
+    acc[item.name] = {
+      label: item.name.charAt(0).toUpperCase() + item.name.slice(1),
+      color: item.fill || `hsl(var(--chart-${(index % 5) + 1}))`,
+    };
+    return acc;
+  }, { value: { label: "Value" } } as ChartConfig);
 
-export default function RoundedPieChart() {
+  const chartData = data.map((item, index) => ({
+    ...item,
+    fill: item.fill || `hsl(var(--chart-${(index % 5) + 1}))`,
+  }));
+
   return (
-    <Card className="flex flex-col" data-testid="chart-pie-rounded">
+    <Card className={`flex flex-col ${className}`} data-testid="chart-pie-rounded">
       <CardHeader className="items-center pb-0">
         <CardTitle className="flex items-center gap-2">
-          Pie Chart
-          <Badge
-            variant="outline"
-            className="text-green-500 bg-green-500/10 border-none"
-          >
-            <TrendingUp className="h-4 w-4" />
-            <span>5.2%</span>
-          </Badge>
+          {title}
+          {trend && (
+            <Badge
+              variant="outline"
+              className={`${trend.direction === 'up' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' : 'text-destructive bg-destructive/10'} border-none`}
+            >
+              {trend.direction === 'up' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+              <span>{trend.value}%</span>
+            </Badge>
+          )}
         </CardTitle>
-        <CardDescription>January - June 2024</CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
         <ChartContainer
@@ -77,23 +95,26 @@ export default function RoundedPieChart() {
         >
           <PieChart>
             <ChartTooltip
-              content={<ChartTooltipContent nameKey="visitors" hideLabel />}
+              content={<ChartTooltipContent nameKey="value" hideLabel />}
             />
             <Pie
               data={chartData}
-              innerRadius={30}
-              dataKey="visitors"
-              cornerRadius={8}
-              paddingAngle={4}
+              innerRadius={innerRadius}
+              dataKey="value"
+              nameKey="name"
+              cornerRadius={cornerRadius}
+              paddingAngle={paddingAngle}
             >
-              <LabelList
-                dataKey="visitors"
-                stroke="none"
-                fontSize={12}
-                fontWeight={500}
-                fill="currentColor"
-                formatter={(value: number) => value.toString()}
-              />
+              {showLabels && (
+                <LabelList
+                  dataKey="value"
+                  stroke="none"
+                  fontSize={12}
+                  fontWeight={500}
+                  fill="currentColor"
+                  formatter={(value: number) => value.toString()}
+                />
+              )}
             </Pie>
           </PieChart>
         </ChartContainer>

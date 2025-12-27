@@ -16,23 +16,35 @@ import {
   ChartTooltipContent,
 } from "./chart-container";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 
-const chartData = [
-  { month: "January", desktop: 186 },
-  { month: "February", desktop: 305 },
-  { month: "March", desktop: 237 },
-  { month: "April", desktop: 73 },
-  { month: "May", desktop: 209 },
-  { month: "June", desktop: 214 },
+export interface LineChartDataPoint {
+  label: string;
+  value: number;
+}
+
+export interface PingingDotChartProps {
+  title?: string;
+  description?: string;
+  data?: LineChartDataPoint[];
+  dataKey?: string;
+  trend?: {
+    value: number;
+    direction: 'up' | 'down';
+  };
+  color?: string;
+  showGrid?: boolean;
+  className?: string;
+}
+
+const defaultData: LineChartDataPoint[] = [
+  { label: "January", value: 186 },
+  { label: "February", value: 305 },
+  { label: "March", value: 237 },
+  { label: "April", value: 73 },
+  { label: "May", value: 209 },
+  { label: "June", value: 214 },
 ];
-
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "hsl(var(--chart-2))",
-  },
-} satisfies ChartConfig;
 
 const CustomizedDot = (props: React.SVGProps<SVGCircleElement>) => {
   const { cx, cy, stroke } = props;
@@ -66,35 +78,53 @@ const CustomizedDot = (props: React.SVGProps<SVGCircleElement>) => {
   );
 };
 
-export default function PingingDotChart() {
+export default function PingingDotChart({
+  title = "Pinging Dot Chart",
+  description = "January - June 2024",
+  data = defaultData,
+  dataKey = "value",
+  trend = { value: 5.2, direction: 'up' },
+  color = "hsl(var(--chart-2))",
+  showGrid = true,
+  className,
+}: PingingDotChartProps) {
+  const chartConfig = {
+    [dataKey]: {
+      label: dataKey.charAt(0).toUpperCase() + dataKey.slice(1),
+      color: color,
+    },
+  } satisfies ChartConfig;
+
   return (
-    <Card data-testid="chart-line-pinging">
+    <Card className={className} data-testid="chart-line-pinging">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          Pinging Dot Chart
-          <Badge
-            variant="outline"
-            className="text-green-500 bg-green-500/10 border-none"
-          >
-            <TrendingUp className="h-4 w-4" />
-            <span>5.2%</span>
-          </Badge>
+          {title}
+          {trend && (
+            <Badge
+              variant="outline"
+              className={`${trend.direction === 'up' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' : 'text-destructive bg-destructive/10'} border-none`}
+            >
+              {trend.direction === 'up' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+              <span>{trend.value}%</span>
+            </Badge>
+          )}
         </CardTitle>
-        <CardDescription>January - June 2024</CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig}>
           <LineChart
             accessibilityLayer
-            data={chartData}
+            data={data}
             margin={{
               left: 12,
               right: 12,
             }}
           >
-            <CartesianGrid vertical={false} />
+            {showGrid && <CartesianGrid vertical={false} />}
             <XAxis
-              dataKey="month"
+              dataKey="label"
               tickLine={false}
               axisLine={false}
               tickMargin={8}
@@ -105,9 +135,9 @@ export default function PingingDotChart() {
               content={<ChartTooltipContent hideLabel />}
             />
             <Line
-              dataKey="desktop"
+              dataKey={dataKey}
               type="linear"
-              stroke="var(--color-desktop)"
+              stroke={color}
               strokeDasharray="4 4"
               dot={<CustomizedDot />}
             />

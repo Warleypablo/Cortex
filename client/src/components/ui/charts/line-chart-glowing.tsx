@@ -16,57 +16,91 @@ import {
   ChartTooltipContent,
 } from "./chart-container";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 
-const chartData = [
-  { month: "January", desktop: 186, mobile: 87 },
-  { month: "February", desktop: 305, mobile: 163 },
-  { month: "March", desktop: 237, mobile: 142 },
-  { month: "April", desktop: 73, mobile: 195 },
-  { month: "May", desktop: 209, mobile: 118 },
-  { month: "June", desktop: 214, mobile: 231 },
+export interface GlowingLineDataPoint {
+  label: string;
+  [key: string]: string | number;
+}
+
+export interface GlowingLineChartProps {
+  title?: string;
+  description?: string;
+  data?: GlowingLineDataPoint[];
+  lines?: Array<{
+    dataKey: string;
+    label: string;
+    color?: string;
+  }>;
+  trend?: {
+    value: number;
+    direction: 'up' | 'down';
+  };
+  showGrid?: boolean;
+  className?: string;
+}
+
+const defaultData: GlowingLineDataPoint[] = [
+  { label: "January", desktop: 186, mobile: 87 },
+  { label: "February", desktop: 305, mobile: 163 },
+  { label: "March", desktop: 237, mobile: 142 },
+  { label: "April", desktop: 73, mobile: 195 },
+  { label: "May", desktop: 209, mobile: 118 },
+  { label: "June", desktop: 214, mobile: 231 },
 ];
 
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "hsl(var(--chart-2))",
-  },
-  mobile: {
-    label: "Mobile",
-    color: "hsl(var(--chart-5))",
-  },
-} satisfies ChartConfig;
+const defaultLines = [
+  { dataKey: "desktop", label: "Desktop", color: "hsl(var(--chart-2))" },
+  { dataKey: "mobile", label: "Mobile", color: "hsl(var(--chart-5))" },
+];
 
-export default function GlowingLineChart() {
+export default function GlowingLineChart({
+  title = "Glowing Line Chart",
+  description = "January - June 2024",
+  data = defaultData,
+  lines = defaultLines,
+  trend = { value: 5.2, direction: 'up' },
+  showGrid = true,
+  className,
+}: GlowingLineChartProps) {
+  const chartConfig = lines.reduce((acc, line, index) => {
+    acc[line.dataKey] = {
+      label: line.label,
+      color: line.color || `hsl(var(--chart-${(index % 5) + 1}))`,
+    };
+    return acc;
+  }, {} as ChartConfig);
+
   return (
-    <Card data-testid="chart-line-glowing">
+    <Card className={className} data-testid="chart-line-glowing">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          Glowing Line Chart
-          <Badge
-            variant="outline"
-            className="text-green-500 bg-green-500/10 border-none"
-          >
-            <TrendingUp className="h-4 w-4" />
-            <span>5.2%</span>
-          </Badge>
+          {title}
+          {trend && (
+            <Badge
+              variant="outline"
+              className={`${trend.direction === 'up' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' : 'text-destructive bg-destructive/10'} border-none`}
+            >
+              {trend.direction === 'up' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+              <span>{trend.value}%</span>
+            </Badge>
+          )}
         </CardTitle>
-        <CardDescription>January - June 2024</CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig}>
           <LineChart
             accessibilityLayer
-            data={chartData}
+            data={data}
             margin={{
               left: 12,
               right: 12,
             }}
           >
-            <CartesianGrid vertical={false} />
+            {showGrid && <CartesianGrid vertical={false} />}
             <XAxis
-              dataKey="month"
+              dataKey="label"
               tickLine={false}
               axisLine={false}
               tickMargin={8}
@@ -76,22 +110,17 @@ export default function GlowingLineChart() {
               cursor={false}
               content={<ChartTooltipContent hideLabel />}
             />
-            <Line
-              dataKey="desktop"
-              type="bump"
-              stroke="var(--color-desktop)"
-              dot={false}
-              strokeWidth={2}
-              filter="url(#rainbow-line-glow)"
-            />
-            <Line
-              dataKey="mobile"
-              type="bump"
-              stroke="var(--color-mobile)"
-              dot={false}
-              strokeWidth={2}
-              filter="url(#rainbow-line-glow)"
-            />
+            {lines.map((line, index) => (
+              <Line
+                key={line.dataKey}
+                dataKey={line.dataKey}
+                type="bump"
+                stroke={line.color || `hsl(var(--chart-${(index % 5) + 1}))`}
+                dot={false}
+                strokeWidth={2}
+                filter="url(#rainbow-line-glow)"
+              />
+            ))}
             <defs>
               <filter
                 id="rainbow-line-glow"

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import {
   BarChart,
   LinearYAxis,
@@ -15,112 +15,100 @@ import {
 } from 'reaviz';
 import { motion } from 'framer-motion';
 
-interface ChartCategoryData {
+export interface BarDataItem {
   key: string;
-  data: number | null;
+  data: number;
 }
 
-const baseCategoryDataRaw: ChartCategoryData[] = [
-  { key: 'Brute Force', data: 100 },
-  { key: 'Web Attack', data: 80 },
-  { key: 'Malware', data: 120 },
-  { key: 'Phishing', data: 90 },
-  { key: 'DDoS', data: 70 },
-  { key: 'Insider Threat', data: 50 },
-];
-
-const validatedBaseCategoryData = baseCategoryDataRaw.map(item => ({
-  ...item,
-  data: (typeof item.data === 'number' && !isNaN(item.data)) ? item.data : 0,
-}));
-
-const chartColors = ['#9152EE', '#40D3F4', '#40E5D1', '#4C86FF'];
-
-interface MetricItem {
+export interface MetricItem {
   id: string;
   label: string;
   value: string;
   trend: 'up' | 'down';
-  delay: number;
 }
 
-const metrics: MetricItem[] = [
-  {
-    id: 'mttRespond',
-    label: 'Mean Time to Respond',
-    value: '6 Hours',
-    trend: 'up',
-    delay: 0,
-  },
-  {
-    id: 'incidentResponseTime',
-    label: 'Incident Response Time',
-    value: '4 Hours',
-    trend: 'up',
-    delay: 0.05,
-  },
-  {
-    id: 'incidentEscalationRate',
-    label: 'Incident Escalation Rate',
-    value: '10%',
-    trend: 'down',
-    delay: 0.1,
-  },
-];
+export interface SummaryMetric {
+  label: string;
+  count: number;
+  percentage: number;
+  comparisonText: string;
+  trend: 'up' | 'down';
+}
 
-const criticalIncidentsData = {
-  count: 321,
-  percentage: 12,
-  comparisonText: 'Compared to 293 last week',
-};
-
-const totalIncidentsData = {
-  count: 1120,
-  percentage: 4,
-  comparisonText: 'Compared to 1.06k last week',
-};
-
-interface DetailedIncidentReportCardProps {
+export interface DetailedIncidentReportCardProps {
+  title?: string;
+  data?: BarDataItem[];
+  metrics?: MetricItem[];
+  summaryLeft?: SummaryMetric;
+  summaryRight?: SummaryMetric;
+  colorScheme?: string[];
+  height?: number;
   className?: string;
 }
 
-function DetailedIncidentReportCard({ className }: DetailedIncidentReportCardProps) {
-  const [timeRange, setTimeRange] = useState('last-7-days');
+const defaultData: BarDataItem[] = [
+  { key: 'Brute Force', data: 100 },
+  { key: 'Web Attack', data: 80 },
+  { key: 'Malware', data: 120 },
+  { key: 'Phishing', data: 90 },
+];
 
-  const handleTimeRangeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setTimeRange(event.target.value);
-  };
+const defaultMetrics: MetricItem[] = [
+  { id: 'mttRespond', label: 'Mean Time to Respond', value: '6 Hours', trend: 'up' },
+  { id: 'incidentResponseTime', label: 'Incident Response Time', value: '4 Hours', trend: 'up' },
+  { id: 'incidentEscalationRate', label: 'Incident Escalation Rate', value: '10%', trend: 'down' },
+];
 
+const defaultSummaryLeft: SummaryMetric = {
+  label: 'Critical Incidents',
+  count: 321,
+  percentage: 12,
+  comparisonText: 'Compared to 293 last week',
+  trend: 'up',
+};
+
+const defaultSummaryRight: SummaryMetric = {
+  label: 'Total Incidents',
+  count: 1120,
+  percentage: 4,
+  comparisonText: 'Compared to 1.06k last week',
+  trend: 'down',
+};
+
+const defaultColorScheme = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+];
+
+function DetailedIncidentReportCard({
+  title = "Incident Report",
+  data = defaultData,
+  metrics = defaultMetrics,
+  summaryLeft = defaultSummaryLeft,
+  summaryRight = defaultSummaryRight,
+  colorScheme = defaultColorScheme,
+  height = 200,
+  className,
+}: DetailedIncidentReportCardProps) {
   const chartData = useMemo(() => {
-    if (timeRange === 'last-7-days') {
-      return validatedBaseCategoryData.slice(0, 4);
-    }
-    return validatedBaseCategoryData;
-  }, [timeRange]);
+    return data.map(item => ({
+      ...item,
+      data: (typeof item.data === 'number' && !isNaN(item.data)) ? item.data : 0,
+    }));
+  }, [data]);
 
   return (
     <div className={`flex flex-col justify-between pt-4 pb-4 bg-card rounded-xl border w-full max-w-[600px] overflow-hidden transition-colors duration-300 ${className}`} data-testid="chart-horizontal-bar-report">
       <div className="flex justify-between items-center p-6 pb-4">
-        <h3 className="text-xl font-bold text-foreground">
-          Incident Report
-        </h3>
-        <select
-          value={timeRange}
-          onChange={handleTimeRangeChange}
-          aria-label="Select time range for incident report"
-          className="bg-muted text-foreground p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-          data-testid="select-time-range"
-        >
-          <option value="last-7-days">Last 7 Days</option>
-          <option value="last-30-days">Last 30 Days</option>
-          <option value="last-90-days">Last 90 Days</option>
-        </select>
+        <h3 className="text-xl font-bold text-foreground">{title}</h3>
       </div>
 
-      <div className="flex-grow px-4 h-[200px]">
+      <div className="flex-grow px-4" style={{ height }}>
         <BarChart
           id="detailed-horizontal-incident-chart"
-          height={200}
+          height={height}
           data={chartData}
           yAxis={
             <LinearYAxis
@@ -162,7 +150,7 @@ function DetailedIncidentReportCard({ className }: DetailedIncidentReportCardPro
                   gradient={null}
                 />
               }
-              colorScheme={chartColors}
+              colorScheme={colorScheme}
               padding={0.1}
             />
           }
@@ -176,54 +164,60 @@ function DetailedIncidentReportCard({ className }: DetailedIncidentReportCardPro
 
       <div className="flex w-full px-6 justify-between pb-2 pt-6">
         <div className="flex flex-col gap-2 w-1/2">
-          <span className="text-base text-muted-foreground">Critical Incidents</span>
+          <span className="text-base text-muted-foreground">{summaryLeft.label}</span>
           <div className="flex items-center gap-2">
             <span className="font-mono text-2xl font-semibold text-foreground">
-              {criticalIncidentsData.count}
+              {summaryLeft.count}
             </span>
-            <div className="flex bg-destructive/20 p-1 px-2 items-center rounded-full text-destructive text-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 21" fill="none">
-                <path d="M5.50134 9.11119L10.0013 4.66675M10.0013 4.66675L14.5013 9.11119M10.0013 4.66675L10.0013 16.3334" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
-              </svg>
-              {criticalIncidentsData.percentage}%
+            <div className={`flex p-1 px-2 items-center rounded-full text-sm ${summaryLeft.trend === 'up' ? 'bg-destructive/20 text-destructive' : 'bg-emerald-500/20 text-emerald-500'}`}>
+              {summaryLeft.trend === 'up' ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 21" fill="none">
+                  <path d="M5.50134 9.11119L10.0013 4.66675M10.0013 4.66675L14.5013 9.11119M10.0013 4.66675L10.0013 16.3334" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 21" fill="none">
+                  <path d="M14.4987 11.8888L9.99866 16.3333M9.99866 16.3333L5.49866 11.8888M9.99866 16.3333V4.66658" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+                </svg>
+              )}
+              {summaryLeft.percentage}%
             </div>
           </div>
-          <span className="text-muted-foreground text-xs">
-            {criticalIncidentsData.comparisonText}
-          </span>
+          <span className="text-muted-foreground text-xs">{summaryLeft.comparisonText}</span>
         </div>
         <div className="flex flex-col gap-2 w-1/2">
-          <span className="text-base text-muted-foreground">Total Incidents</span>
+          <span className="text-base text-muted-foreground">{summaryRight.label}</span>
           <div className="flex items-center gap-2">
             <span className="font-mono text-2xl font-semibold text-foreground">
-              {totalIncidentsData.count}
+              {summaryRight.count}
             </span>
-            <div className="flex bg-emerald-500/20 p-1 px-2 items-center rounded-full text-emerald-500 text-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 21" fill="none">
-                <path d="M14.4987 11.8888L9.99866 16.3333M9.99866 16.3333L5.49866 11.8888M9.99866 16.3333V4.66658" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
-              </svg>
-              {totalIncidentsData.percentage}%
+            <div className={`flex p-1 px-2 items-center rounded-full text-sm ${summaryRight.trend === 'up' ? 'bg-destructive/20 text-destructive' : 'bg-emerald-500/20 text-emerald-500'}`}>
+              {summaryRight.trend === 'up' ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 21" fill="none">
+                  <path d="M5.50134 9.11119L10.0013 4.66675M10.0013 4.66675L14.5013 9.11119M10.0013 4.66675L10.0013 16.3334" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 20 21" fill="none">
+                  <path d="M14.4987 11.8888L9.99866 16.3333M9.99866 16.3333L5.49866 11.8888M9.99866 16.3333V4.66658" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
+                </svg>
+              )}
+              {summaryRight.percentage}%
             </div>
           </div>
-          <span className="text-muted-foreground text-xs">
-            {totalIncidentsData.comparisonText}
-          </span>
+          <span className="text-muted-foreground text-xs">{summaryRight.comparisonText}</span>
         </div>
       </div>
 
       <div className="flex flex-col px-6 font-mono divide-y divide-border">
-        {metrics.map(metric => (
+        {metrics.map((metric, index) => (
           <motion.div
             key={metric.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: metric.delay }}
+            transition={{ delay: index * 0.05 }}
             className="flex w-full py-3 items-center gap-2"
           >
             <div className="flex flex-row gap-2 items-center text-sm w-1/2 text-muted-foreground">
-              <span className="truncate" title={metric.label}>
-                {metric.label}
-              </span>
+              <span className="truncate" title={metric.label}>{metric.label}</span>
             </div>
             <div className="flex gap-2 w-1/2 justify-end items-center">
               <span className="font-semibold text-lg text-foreground">{metric.value}</span>

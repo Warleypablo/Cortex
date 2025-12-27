@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   StackedNormalizedAreaChart,
@@ -17,124 +18,123 @@ import {
   Gridline,
 } from 'reaviz';
 
-interface ChartDataPoint {
+export interface AreaDataPoint {
   key: Date;
-  data: number | null | undefined;
+  data: number;
 }
 
-interface ChartSeries {
+export interface AreaSeriesData {
   key: string;
-  data: ChartDataPoint[];
+  data: AreaDataPoint[];
 }
 
-interface LegendItem {
-  name: string;
-  color: string;
-}
-
-interface MetricInfo {
+export interface AreaMetricInfo {
   id: string;
   label: string;
-  tooltip: string;
   value: string;
   trend: 'up' | 'down';
-  delay: number;
 }
 
-const LEGEND_ITEMS: LegendItem[] = [
-  { name: 'Threat Intel', color: '#FAE5F6' },
-  { name: 'DLP', color: '#EE4094' },
-  { name: 'SysLog', color: '#BB015A' },
-];
-
-const CHART_COLOR_SCHEME = ['#FAE5F6', '#EE4094', '#BB015A'];
-
-const now = new Date();
-const generateDate = (offsetDays: number): Date => {
-  const date = new Date(now);
-  date.setDate(now.getDate() - offsetDays);
-  return date;
-};
-
-const initialMultiDateData: ChartSeries[] = [
-  {
-    key: 'Threat Intel',
-    data: Array.from({ length: 7 }, (_, i) => ({ key: generateDate(6 - i), data: Math.floor(Math.random() * 20) + 10 })),
-  },
-  {
-    key: 'DLP',
-    data: Array.from({ length: 7 }, (_, i) => ({ key: generateDate(6 - i), data: Math.floor(Math.random() * 25) + 15 })),
-  },
-  {
-    key: 'SysLog',
-    data: Array.from({ length: 7 }, (_, i) => ({ key: generateDate(6 - i), data: Math.floor(Math.random() * 15) + 5 })),
-  },
-];
-
-const validateChartData = (data: ChartSeries[]) => {
-  return data.map(series => ({
-    ...series,
-    data: series.data.map(item => ({
-      ...item,
-      data: (typeof item.data !== 'number' || isNaN(item.data)) ? 0 : item.data,
-    })),
-  }));
-};
-
-const validatedChartData = validateChartData(initialMultiDateData);
-
-const METRICS_DATA: MetricInfo[] = [
-  {
-    id: 'mttd',
-    label: 'Mean Time to Respond',
-    tooltip: 'Mean Time to Respond',
-    value: '6 Hours',
-    trend: 'up',
-    delay: 0,
-  },
-  {
-    id: 'irt',
-    label: 'Incident Response Time',
-    tooltip: 'Incident Response Time',
-    value: '4 Hours',
-    trend: 'up',
-    delay: 0.05,
-  },
-  {
-    id: 'ier',
-    label: 'Incident Escalation Rate',
-    tooltip: 'Incident Escalation Rate',
-    value: '10%',
-    trend: 'down',
-    delay: 0.1,
-  },
-];
-
-interface StackedAreaReportProps {
+export interface StackedAreaReportProps {
+  title?: string;
+  data?: AreaSeriesData[];
+  metrics?: AreaMetricInfo[];
+  colorScheme?: string[];
+  height?: number;
+  showLegend?: boolean;
   className?: string;
 }
 
-const StackedAreaReport = ({ className }: StackedAreaReportProps) => {
+const generateDefaultData = (): AreaSeriesData[] => {
+  const now = new Date();
+  const generateDate = (offsetDays: number): Date => {
+    const date = new Date(now);
+    date.setDate(now.getDate() - offsetDays);
+    return date;
+  };
+
+  return [
+    {
+      key: 'Series A',
+      data: Array.from({ length: 7 }, (_, i) => ({ 
+        key: generateDate(6 - i), 
+        data: Math.floor(Math.random() * 20) + 10 
+      })),
+    },
+    {
+      key: 'Series B',
+      data: Array.from({ length: 7 }, (_, i) => ({ 
+        key: generateDate(6 - i), 
+        data: Math.floor(Math.random() * 25) + 15 
+      })),
+    },
+    {
+      key: 'Series C',
+      data: Array.from({ length: 7 }, (_, i) => ({ 
+        key: generateDate(6 - i), 
+        data: Math.floor(Math.random() * 15) + 5 
+      })),
+    },
+  ];
+};
+
+const defaultMetrics: AreaMetricInfo[] = [
+  { id: 'mttd', label: 'Mean Time to Respond', value: '6 Hours', trend: 'up' },
+  { id: 'irt', label: 'Incident Response Time', value: '4 Hours', trend: 'up' },
+  { id: 'ier', label: 'Incident Escalation Rate', value: '10%', trend: 'down' },
+];
+
+const defaultColorScheme = [
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+];
+
+const StackedAreaReport = ({
+  title = "Area Report",
+  data,
+  metrics = defaultMetrics,
+  colorScheme = defaultColorScheme,
+  height = 200,
+  showLegend = true,
+  className,
+}: StackedAreaReportProps) => {
+  const chartData = useMemo(() => {
+    const rawData = data || generateDefaultData();
+    return rawData.map(series => ({
+      ...series,
+      data: series.data.map(item => ({
+        ...item,
+        data: (typeof item.data !== 'number' || isNaN(item.data)) ? 0 : item.data,
+      })),
+    }));
+  }, [data]);
+
+  const legendItems = chartData.map((series, index) => ({
+    name: series.key,
+    color: colorScheme[index % colorScheme.length],
+  }));
+
   return (
     <div className={`flex flex-col pt-4 pb-4 bg-card rounded-xl border w-full max-w-md min-h-[500px] overflow-hidden transition-colors duration-300 ${className}`} data-testid="chart-stacked-area">
-      <h3 className="text-xl text-left p-6 pb-4 font-bold text-foreground">
-        Incident Report
-      </h3>
+      <h3 className="text-xl text-left p-6 pb-4 font-bold text-foreground">{title}</h3>
       
-      <div className="flex justify-between w-full px-6 mb-4">
-        {LEGEND_ITEMS.map((item) => (
-          <div key={item.name} className="flex gap-2 items-center">
-            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
-            <span className="text-muted-foreground text-xs">{item.name}</span>
-          </div>
-        ))}
-      </div>
+      {showLegend && (
+        <div className="flex justify-between w-full px-6 mb-4">
+          {legendItems.map((item) => (
+            <div key={item.name} className="flex gap-2 items-center">
+              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
+              <span className="text-muted-foreground text-xs">{item.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div className="h-[200px] px-2">
+      <div className="px-2" style={{ height }}>
         <StackedNormalizedAreaChart
-          height={200}
+          height={height}
           id="stacked-normalized-details"
-          data={validatedChartData}
+          data={chartData}
           xAxis={
             <LinearXAxis
               type="time"
@@ -172,7 +172,7 @@ const StackedAreaReport = ({ className }: StackedAreaReportProps) => {
                   }
                 />
               }
-              colorScheme={CHART_COLOR_SCHEME}
+              colorScheme={colorScheme}
             />
           }
           gridlines={<GridlineSeries line={<Gridline strokeColor="hsl(var(--border))" />} />}
@@ -180,18 +180,16 @@ const StackedAreaReport = ({ className }: StackedAreaReportProps) => {
       </div>
 
       <div className="flex flex-col px-6 pt-6 font-mono divide-y divide-border">
-        {METRICS_DATA.map((metric) => (
+        {metrics.map((metric, index) => (
           <motion.div
             key={metric.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: metric.delay }}
+            transition={{ delay: index * 0.05 }}
             className="flex w-full py-3 items-center gap-2"
           >
             <div className="flex flex-row gap-2 items-center text-sm w-1/2 text-muted-foreground">
-              <span className="truncate" title={metric.tooltip}>
-                {metric.label}
-              </span>
+              <span className="truncate" title={metric.label}>{metric.label}</span>
             </div>
             <div className="flex gap-2 w-1/2 justify-end items-center">
               <span className="font-semibold text-lg text-foreground">{metric.value}</span>
