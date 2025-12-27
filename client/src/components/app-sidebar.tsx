@@ -4,7 +4,7 @@ import {
   ChevronRight, Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase, 
   Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, 
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen, 
-  CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap
+  CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Tv, LogOut
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogoLight from "@assets/logo-preta_1766452973532.png";
@@ -22,8 +22,18 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
   SidebarHeader,
+  SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Play, Handshake as HandshakeDash, BarChart3 as BarChart3Dash, DollarSign as DollarSignDash, TrendingUp as TrendingUpDash } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -203,9 +213,11 @@ export function AppSidebar() {
       <SidebarContent>
         {/* Setores - Primeiro */}
         <SidebarGroup>
-          <SidebarGroupLabel>
-            <Layers className="w-3 h-3 mr-1" />
-            Setores
+          <SidebarGroupLabel className="flex items-center gap-2">
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500/20 border border-blue-500/40">
+              <Layers className="w-3 h-3 text-blue-500" />
+            </span>
+            <span className="text-blue-500 font-medium">Setores</span>
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -242,9 +254,11 @@ export function AppSidebar() {
         {/* Acesso Rápido - Por último */}
         {visibleQuickAccess.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel>
-              <Zap className="w-3 h-3 mr-1" />
-              Acesso Rápido
+            <SidebarGroupLabel className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500/20 border border-blue-500/40">
+                <Zap className="w-3 h-3 text-blue-500" />
+              </span>
+              <span className="text-blue-500 font-medium">Acesso Rápido</span>
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -270,6 +284,338 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
       </SidebarContent>
+      
+      <SidebarFooter className="border-t border-sidebar-border p-2">
+        <div className="flex flex-col gap-1 group-data-[collapsible=icon]:items-center">
+          <PresentationModeItem isCollapsed={isCollapsed} />
+          {user && <LogoutItem isCollapsed={isCollapsed} />}
+        </div>
+      </SidebarFooter>
     </Sidebar>
+  );
+}
+
+// Presentation Mode component for sidebar
+interface DashboardCategory {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  dashboards: { id: string; label: string; description: string }[];
+}
+
+const DASHBOARD_CATEGORIES: DashboardCategory[] = [
+  {
+    id: "comercial",
+    label: "Comercial",
+    icon: HandshakeDash,
+    dashboards: [
+      { id: "closers", label: "Closers", description: "Ranking e métricas de closers" },
+      { id: "sdrs", label: "SDRs", description: "Ranking e métricas de SDRs" },
+    ],
+  },
+  {
+    id: "operacao",
+    label: "Operação",
+    icon: BarChart3Dash,
+    dashboards: [
+      { id: "visao-geral", label: "Visão Geral", description: "MRR, clientes ativos e métricas gerais" },
+      { id: "retencao", label: "Análise de Retenção", description: "Churn por serviço e responsável" },
+    ],
+  },
+  {
+    id: "financeiro",
+    label: "Financeiro",
+    icon: DollarSignDash,
+    dashboards: [
+      { id: "financeiro-resumo", label: "Resumo Financeiro", description: "Receitas, despesas e saldo" },
+      { id: "fluxo-caixa", label: "Fluxo de Caixa", description: "Projeção de entradas e saídas" },
+    ],
+  },
+  {
+    id: "growth",
+    label: "Growth",
+    icon: TrendingUpDash,
+    dashboards: [
+      { id: "growth-visao-geral", label: "Performance Marketing", description: "ROI, CAC e métricas de anúncios" },
+    ],
+  },
+];
+
+const ALL_DASHBOARDS = DASHBOARD_CATEGORIES.flatMap(cat => cat.dashboards);
+
+function PresentationModeItem({ isCollapsed }: { isCollapsed: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [selectedDashboards, setSelectedDashboards] = useState<string[]>(["closers", "sdrs"]);
+  const [rotationInterval, setRotationInterval] = useState("30");
+  const [, setLocation] = useLocation();
+
+  const handleStart = () => {
+    sessionStorage.setItem("presentationConfig", JSON.stringify({
+      dashboards: selectedDashboards,
+      interval: parseInt(rotationInterval) * 1000
+    }));
+    setOpen(false);
+    setLocation("/dashboard/comercial/apresentacao");
+  };
+
+  const toggleCategory = (categoryId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const category = DASHBOARD_CATEGORIES.find(c => c.id === categoryId);
+    if (!category) return;
+    
+    const categoryDashboardIds = category.dashboards.map(d => d.id);
+    const allSelected = categoryDashboardIds.every(id => selectedDashboards.includes(id));
+    
+    if (allSelected) {
+      setSelectedDashboards(selectedDashboards.filter(id => !categoryDashboardIds.includes(id)));
+    } else {
+      const combined = [...selectedDashboards, ...categoryDashboardIds];
+      setSelectedDashboards(combined.filter((id, index) => combined.indexOf(id) === index));
+    }
+  };
+
+  const isCategoryFullySelected = (categoryId: string) => {
+    const category = DASHBOARD_CATEGORIES.find(c => c.id === categoryId);
+    if (!category) return false;
+    return category.dashboards.every(d => selectedDashboards.includes(d.id));
+  };
+
+  const isCategoryPartiallySelected = (categoryId: string) => {
+    const category = DASHBOARD_CATEGORIES.find(c => c.id === categoryId);
+    if (!category) return false;
+    const selected = category.dashboards.filter(d => selectedDashboards.includes(d.id));
+    return selected.length > 0 && selected.length < category.dashboards.length;
+  };
+
+  const getSelectedCount = (categoryId: string) => {
+    const category = DASHBOARD_CATEGORIES.find(c => c.id === categoryId);
+    if (!category) return 0;
+    return category.dashboards.filter(d => selectedDashboards.includes(d.id)).length;
+  };
+
+  if (isCollapsed) {
+    return (
+      <Dialog open={open} onOpenChange={setOpen}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DialogTrigger asChild>
+              <button
+                className="flex items-center justify-center h-8 w-8 rounded-md hover:bg-sidebar-accent transition-colors"
+                data-testid="button-presentation-mode-sidebar"
+              >
+                <Tv className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </DialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="right">Modo Apresentação</TooltipContent>
+        </Tooltip>
+        <PresentationModeDialogContent
+          open={open}
+          selectedDashboards={selectedDashboards}
+          setSelectedDashboards={setSelectedDashboards}
+          rotationInterval={rotationInterval}
+          setRotationInterval={setRotationInterval}
+          handleStart={handleStart}
+          toggleCategory={toggleCategory}
+          isCategoryFullySelected={isCategoryFullySelected}
+          isCategoryPartiallySelected={isCategoryPartiallySelected}
+          getSelectedCount={getSelectedCount}
+        />
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-md hover:bg-sidebar-accent transition-colors"
+          data-testid="button-presentation-mode-sidebar"
+        >
+          <Tv className="h-4 w-4" />
+          <span>Modo Apresentação</span>
+        </button>
+      </DialogTrigger>
+      <PresentationModeDialogContent
+        open={open}
+        selectedDashboards={selectedDashboards}
+        setSelectedDashboards={setSelectedDashboards}
+        rotationInterval={rotationInterval}
+        setRotationInterval={setRotationInterval}
+        handleStart={handleStart}
+        toggleCategory={toggleCategory}
+        isCategoryFullySelected={isCategoryFullySelected}
+        isCategoryPartiallySelected={isCategoryPartiallySelected}
+        getSelectedCount={getSelectedCount}
+      />
+    </Dialog>
+  );
+}
+
+function PresentationModeDialogContent({
+  selectedDashboards,
+  setSelectedDashboards,
+  rotationInterval,
+  setRotationInterval,
+  handleStart,
+  toggleCategory,
+  isCategoryFullySelected,
+  isCategoryPartiallySelected,
+  getSelectedCount,
+}: {
+  open: boolean;
+  selectedDashboards: string[];
+  setSelectedDashboards: (val: string[]) => void;
+  rotationInterval: string;
+  setRotationInterval: (val: string) => void;
+  handleStart: () => void;
+  toggleCategory: (id: string, e: React.MouseEvent) => void;
+  isCategoryFullySelected: (id: string) => boolean;
+  isCategoryPartiallySelected: (id: string) => boolean;
+  getSelectedCount: (id: string) => number;
+}) {
+  return (
+    <DialogContent className="max-w-md">
+      <DialogHeader>
+        <DialogTitle>Modo Apresentação</DialogTitle>
+        <DialogDescription>
+          Selecione os dashboards para exibir em tela cheia com rotação automática.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4">
+        <ScrollArea className="h-[300px] pr-3">
+          <Accordion type="multiple" defaultValue={["comercial"]} className="w-full">
+            {DASHBOARD_CATEGORIES.map(category => {
+              const Icon = category.icon;
+              const isFullySelected = isCategoryFullySelected(category.id);
+              const isPartiallySelected = isCategoryPartiallySelected(category.id);
+              const selectedCount = getSelectedCount(category.id);
+              
+              return (
+                <AccordionItem key={category.id} value={category.id} className="border-b">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <div className="flex items-center gap-3 flex-1">
+                      <Checkbox
+                        checked={isFullySelected || (isPartiallySelected ? "indeterminate" : false)}
+                        onCheckedChange={() => {}}
+                        onClick={(e) => toggleCategory(category.id, e)}
+                        data-testid={`checkbox-category-${category.id}`}
+                      />
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-semibold">{category.label}</span>
+                      {selectedCount > 0 && (
+                        <span className="text-xs text-muted-foreground ml-auto mr-2">
+                          {selectedCount}/{category.dashboards.length}
+                        </span>
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="ml-7 space-y-1.5 pb-2">
+                      {category.dashboards.map(d => (
+                        <label 
+                          key={d.id} 
+                          className="flex items-start gap-2 cursor-pointer hover:bg-accent/30 rounded-md p-1.5"
+                        >
+                          <Checkbox
+                            checked={selectedDashboards.includes(d.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedDashboards([...selectedDashboards, d.id]);
+                              } else {
+                                setSelectedDashboards(selectedDashboards.filter(id => id !== d.id));
+                              }
+                            }}
+                            data-testid={`checkbox-dashboard-${d.id}`}
+                          />
+                          <div className="grid gap-0.5 leading-none">
+                            <span className="text-sm font-medium">
+                              {d.label}
+                            </span>
+                            <p className="text-xs text-muted-foreground">{d.description}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        </ScrollArea>
+        
+        <div className="space-y-2 pt-2 border-t">
+          <label className="text-sm font-medium">Intervalo de rotação:</label>
+          <Select value={rotationInterval} onValueChange={setRotationInterval}>
+            <SelectTrigger data-testid="select-rotation-interval">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 segundos</SelectItem>
+              <SelectItem value="20">20 segundos</SelectItem>
+              <SelectItem value="30">30 segundos</SelectItem>
+              <SelectItem value="60">1 minuto</SelectItem>
+              <SelectItem value="120">2 minutos</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>{selectedDashboards.length} de {ALL_DASHBOARDS.length} dashboards selecionados</span>
+        </div>
+        
+        <Button 
+          onClick={handleStart} 
+          disabled={selectedDashboards.length === 0}
+          className="w-full"
+          data-testid="button-start-presentation"
+        >
+          <Play className="mr-2 h-4 w-4" />
+          Iniciar Apresentação
+        </Button>
+      </div>
+    </DialogContent>
+  );
+}
+
+function LogoutItem({ isCollapsed }: { isCollapsed: boolean }) {
+  const [, setLocation] = useLocation();
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+      queryClient.clear();
+      setLocation("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
+  if (isCollapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={handleLogout}
+            className="flex items-center justify-center h-8 w-8 rounded-md hover:bg-destructive/10 transition-colors"
+            data-testid="button-logout-sidebar"
+          >
+            <LogOut className="h-4 w-4 text-destructive" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right">Sair</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleLogout}
+      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-md text-destructive hover:bg-destructive/10 transition-colors"
+      data-testid="button-logout-sidebar"
+    >
+      <LogOut className="h-4 w-4" />
+      <span>Sair</span>
+    </button>
   );
 }
