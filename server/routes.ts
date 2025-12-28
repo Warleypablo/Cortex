@@ -404,6 +404,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return digits.padStart(11, '0');
   };
 
+  // =============================================================================
+  // Internal API Routes (BEFORE global auth middleware)
+  // Uses Bearer token authentication via INTERNAL_API_TOKEN for external systems
+  // =============================================================================
+  
+  const internalApiAuth = (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    const expectedToken = process.env.INTERNAL_API_TOKEN;
+    
+    if (!expectedToken) {
+      return res.status(500).json({ error: "INTERNAL_API_TOKEN not configured" });
+    }
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "Missing or invalid Authorization header" });
+    }
+    
+    const token = authHeader.slice(7);
+    if (token !== expectedToken) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+    
+    next();
+  };
+  
+  // GET /api/internal/metrics - List all clients with metrics
+  app.get("/api/internal/metrics", internalApiAuth, async (req, res) => {
+    try {
+      const clientsResult = await db.execute(sql`
+        SELECT 
+          c.cnpj,
+          c.nome as nome_cliente,
+          COALESCE(SUM(COALESCE(p.nao_pago, 0)), 0) as faturamento_pendente
+        FROM caz_clientes c
+        LEFT JOIN caz_parcelas p ON c.nome = p.empresa
+        WHERE c.cnpj IS NOT NULL AND c.cnpj != ''
+        GROUP BY c.cnpj, c.nome
+        LIMIT 100
+      `);
+      
+      const now = new Date();
+      const currentStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+      const currentEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+      const previousStart = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().split('T')[0];
+      const previousEnd = new Date(now.getFullYear(), now.getMonth() - 1, 0).toISOString().split('T')[0];
+      
+      const clients = (clientsResult.rows as any[]).map((row, idx) => ({
+        client: {
+          id: `client-${idx}`,
+          name: row.nome_cliente || 'Cliente',
+          cnpj: row.cnpj,
+        },
+        period: {
+          current: { start: currentStart, end: currentEnd },
+          previous: { start: previousStart, end: previousEnd },
+        },
+        metrics: {
+          pendingRevenue: { current: parseFloat(row.faturamento_pendente) || 0, previous: 0, growth: 0 },
+          adSpend: { current: 0, previous: 0, growth: 0 },
+          roas: { current: 0, previous: 0, growth: 0 },
+          purchases: { current: 0, previous: 0, growth: 0 },
+          cpa: { current: 0, previous: 0, growth: 0 },
+          avgTicket: { current: 0, previous: 0, growth: 0 },
+          sessions: { current: 0, previous: 0, growth: 0 },
+          cps: { current: 0, previous: 0, growth: 0 },
+          conversionRate: { current: 0, previous: 0, growth: 0 },
+          recurrenceRate: { current: 0, previous: 0, growth: 0 },
+        },
+      }));
+      
+      res.json({
+        total: clients.length,
+        period: {
+          current: { start: currentStart, end: currentEnd },
+          previous: { start: previousStart, end: previousEnd },
+        },
+        clients,
+      });
+    } catch (error) {
+      console.error("[internal/metrics] Error:", error);
+      res.status(500).json({ error: "Failed to fetch metrics" });
+    }
+  });
+  
+  // GET /api/internal/metrics/:cnpj - Get metrics for a specific client
+  app.get("/api/internal/metrics/:cnpj", internalApiAuth, async (req, res) => {
+    try {
+      const cnpj = req.params.cnpj.replace(/\D/g, '');
+      
+      if (cnpj.length < 11 || cnpj.length > 14) {
+        return res.status(400).json({ error: "CNPJ inválido" });
+      }
+      
+      const clientResult = await db.execute(sql`
+        SELECT 
+          c.cnpj,
+          c.nome as nome_cliente,
+          COALESCE(SUM(COALESCE(p.nao_pago, 0)), 0) as faturamento_pendente
+        FROM caz_clientes c
+        LEFT JOIN caz_parcelas p ON c.nome = p.empresa
+        WHERE REGEXP_REPLACE(c.cnpj, '[^0-9]', '', 'g') = ${cnpj}
+        GROUP BY c.cnpj, c.nome
+        LIMIT 1
+      `);
+      
+      if (clientResult.rows.length === 0) {
+        return res.status(404).json({ error: "Cliente não encontrado" });
+      }
+      
+      const row = clientResult.rows[0] as any;
+      const now = new Date();
+      const currentStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+      const currentEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+      const previousStart = new Date(now.getFullYear(), now.getMonth() - 2, 1).toISOString().split('T')[0];
+      const previousEnd = new Date(now.getFullYear(), now.getMonth() - 1, 0).toISOString().split('T')[0];
+      
+      res.json({
+        client: {
+          id: `client-${cnpj}`,
+          name: row.nome_cliente || 'Cliente',
+          cnpj: row.cnpj,
+        },
+        period: {
+          current: { start: currentStart, end: currentEnd },
+          previous: { start: previousStart, end: previousEnd },
+        },
+        metrics: {
+          pendingRevenue: { current: parseFloat(row.faturamento_pendente) || 0, previous: 0, growth: 0 },
+          adSpend: { current: 0, previous: 0, growth: 0 },
+          roas: { current: 0, previous: 0, growth: 0 },
+          purchases: { current: 0, previous: 0, growth: 0 },
+          cpa: { current: 0, previous: 0, growth: 0 },
+          avgTicket: { current: 0, previous: 0, growth: 0 },
+          sessions: { current: 0, previous: 0, growth: 0 },
+          cps: { current: 0, previous: 0, growth: 0 },
+          conversionRate: { current: 0, previous: 0, growth: 0 },
+          recurrenceRate: { current: 0, previous: 0, growth: 0 },
+        },
+      });
+    } catch (error) {
+      console.error("[internal/metrics/:cnpj] Error:", error);
+      res.status(500).json({ error: "Failed to fetch client metrics" });
+    }
+  });
+
   app.use("/api", isAuthenticated);
   
   app.get("/api/debug/users", isAdmin, async (req, res) => {
@@ -12478,7 +12623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // =============================================================================
-  // TurboDash Integration Routes
+  // TurboDash Integration Routes (for internal frontend use)
   // =============================================================================
   
   app.get("/api/integrations/turbodash/client/:cnpj", isAuthenticated, async (req, res) => {
