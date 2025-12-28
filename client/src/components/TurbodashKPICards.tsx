@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, TrendingDown, DollarSign, ShoppingCart, Target, Users, Percent, BarChart3 } from "lucide-react";
+import { RefreshCw, TrendingUp, TrendingDown, DollarSign, ShoppingCart, Target, Users, Percent, BarChart3, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TurbodashClientResponse } from "@shared/schema";
 
@@ -198,6 +198,14 @@ export function TurbodashKPICards({ cnpj, className }: TurbodashKPICardsProps) {
   
   return (
     <div className={cn("space-y-4", className)} data-testid="turbodash-kpi-cards">
+      {data.is_demo && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+          <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            Exibindo dados de demonstração. Conecte o TurboDash para dados reais.
+          </p>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-foreground">Performance TurboDash</h3>

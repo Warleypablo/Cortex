@@ -76,15 +76,60 @@ function isCacheStale(lastSyncedAt: Date | null): boolean {
   return diffMinutes > CACHE_TTL_MINUTES;
 }
 
+// Demo data for when table doesn't exist or no data available
+function getDemoKPIs(cnpj: string): TurbodashClientResponse {
+  return {
+    cnpj,
+    nome_cliente: 'Cliente Demo',
+    periodo_inicio: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    periodo_fim: new Date().toISOString().split('T')[0],
+    kpis: {
+      faturamento: 125000,
+      faturamento_variacao: 12.5,
+      investimento: 15000,
+      investimento_variacao: -5.2,
+      roas: 8.33,
+      roas_variacao: 18.7,
+      compras: 450,
+      compras_variacao: 8.3,
+      cpa: 33.33,
+      cpa_variacao: -12.1,
+      ticket_medio: 277.78,
+      ticket_medio_variacao: 3.8,
+      sessoes: 12500,
+      sessoes_variacao: 15.2,
+      cps: 1.2,
+      cps_variacao: -17.4,
+      taxa_conversao: 3.6,
+      taxa_conversao_variacao: -5.9,
+      taxa_recorrencia: 28.5,
+      taxa_recorrencia_variacao: 4.2,
+    },
+    ultima_atualizacao: new Date().toISOString(),
+    is_demo: true,
+  };
+}
+
 export async function getKPIsByCNPJ(cnpj: string, forceRefresh = false): Promise<TurbodashClientResponse | null> {
   const cnpjLimpo = cnpj.replace(/\D/g, '');
   
-  const cached = await db
-    .select()
-    .from(turbodashKpis)
-    .where(eq(turbodashKpis.cnpj, cnpjLimpo))
-    .orderBy(desc(turbodashKpis.lastSyncedAt))
-    .limit(1);
+  let cached: any[] = [];
+  try {
+    cached = await db
+      .select()
+      .from(turbodashKpis)
+      .where(eq(turbodashKpis.cnpj, cnpjLimpo))
+      .orderBy(desc(turbodashKpis.lastSyncedAt))
+      .limit(1);
+  } catch (error: any) {
+    // If table doesn't exist, return demo data
+    if (error.code === '42P01') {
+      console.warn('[TurboDash] Table does not exist, returning demo data');
+      return getDemoKPIs(cnpjLimpo);
+    }
+    console.error('[TurboDash] Database error:', error);
+    return getDemoKPIs(cnpjLimpo);
+  }
   
   if (cached.length > 0 && !forceRefresh && !isCacheStale(cached[0].lastSyncedAt)) {
     const c = cached[0];
