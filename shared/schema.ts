@@ -2254,6 +2254,52 @@ export type TurbodashKpi = typeof turbodashKpis.$inferSelect;
 export type TurbodashSyncStatus = "fresh" | "stale" | "error";
 
 // TurboDash API Response types (shared between frontend and backend)
+// Matches the actual TurboDash API format
+export const turbodashMetricSchema = z.object({
+  current: z.number(),
+  previous: z.number(),
+  growth: z.number(),
+});
+
+export const turbodashApiMetricsSchema = z.object({
+  revenue: turbodashMetricSchema,
+  adSpend: turbodashMetricSchema,
+  roas: turbodashMetricSchema,
+  purchases: turbodashMetricSchema,
+  cpa: turbodashMetricSchema,
+  avgTicket: turbodashMetricSchema,
+  sessions: turbodashMetricSchema,
+  cps: turbodashMetricSchema,
+  conversionRate: turbodashMetricSchema,
+  recurrenceRate: turbodashMetricSchema,
+});
+
+export const turbodashApiResponseSchema = z.object({
+  client: z.object({
+    id: z.string(),
+    name: z.string(),
+    cnpj: z.string(),
+  }),
+  period: z.object({
+    current: z.object({ start: z.string(), end: z.string() }),
+    previous: z.object({ start: z.string(), end: z.string() }),
+  }),
+  metrics: turbodashApiMetricsSchema,
+});
+
+// API list response - can be either an array or a structured object
+export const turbodashApiListResponseSchema = z.object({
+  total: z.number().optional(),
+  period: z.object({
+    current: z.object({ start: z.string(), end: z.string() }),
+    previous: z.object({ start: z.string(), end: z.string() }),
+  }).optional(),
+  clients: z.array(turbodashApiResponseSchema),
+});
+
+export type TurbodashApiListResponse = z.infer<typeof turbodashApiListResponseSchema>;
+
+// Internal normalized format for frontend consumption
 export const turbodashKPIsPayloadSchema = z.object({
   faturamento: z.number(),
   faturamento_variacao: z.number(),
@@ -2297,6 +2343,9 @@ export const cnpjParamSchema = z.object({
   cnpj: z.string().min(11).max(18).regex(/^[\d.\-\/]+$/, "CNPJ inválido"),
 });
 
+export type TurbodashMetric = z.infer<typeof turbodashMetricSchema>;
+export type TurbodashApiMetrics = z.infer<typeof turbodashApiMetricsSchema>;
+export type TurbodashApiResponse = z.infer<typeof turbodashApiResponseSchema>;
 export type TurbodashKPIsPayload = z.infer<typeof turbodashKPIsPayloadSchema>;
 export type TurbodashClientResponse = z.infer<typeof turbodashClientResponseSchema>;
 export type TurbodashListResponse = z.infer<typeof turbodashListResponseSchema>;

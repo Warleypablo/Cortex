@@ -3,13 +3,50 @@ import { db } from '../db';
 import { 
   turbodashKpis,
   type TurbodashClientResponse,
-  type TurbodashListResponse
+  type TurbodashListResponse,
+  type TurbodashApiResponse,
+  type TurbodashApiListResponse
 } from '@shared/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 
 const TURBODASH_API_URL = process.env.TURBODASH_API_URL || 'https://app.turbodash.com.br';
 const TURBODASH_API_SECRET = process.env.TURBODASH_API_SECRET;
 const CACHE_TTL_MINUTES = 15;
+
+// Transform TurboDash API response to internal normalized format
+function transformApiResponse(apiData: TurbodashApiResponse): TurbodashClientResponse {
+  const { client, period, metrics } = apiData;
+  
+  return {
+    cnpj: client.cnpj,
+    nome_cliente: client.name,
+    periodo_inicio: period.current.start,
+    periodo_fim: period.current.end,
+    kpis: {
+      faturamento: metrics.revenue.current,
+      faturamento_variacao: metrics.revenue.growth,
+      investimento: metrics.adSpend.current,
+      investimento_variacao: metrics.adSpend.growth,
+      roas: metrics.roas.current,
+      roas_variacao: metrics.roas.growth,
+      compras: metrics.purchases.current,
+      compras_variacao: metrics.purchases.growth,
+      cpa: metrics.cpa.current,
+      cpa_variacao: metrics.cpa.growth,
+      ticket_medio: metrics.avgTicket.current,
+      ticket_medio_variacao: metrics.avgTicket.growth,
+      sessoes: metrics.sessions.current,
+      sessoes_variacao: metrics.sessions.growth,
+      cps: metrics.cps.current,
+      cps_variacao: metrics.cps.growth,
+      taxa_conversao: metrics.conversionRate.current,
+      taxa_conversao_variacao: metrics.conversionRate.growth,
+      taxa_recorrencia: metrics.recurrenceRate.current,
+      taxa_recorrencia_variacao: metrics.recurrenceRate.growth,
+    },
+    ultima_atualizacao: new Date().toISOString(),
+  };
+}
 
 function generateToken(): string {
   if (!TURBODASH_API_SECRET) {
@@ -126,7 +163,11 @@ export async function getKPIsByCNPJ(cnpj: string, forceRefresh = false): Promise
   }
   
   try {
-    const data = await fetchFromTurbodash<TurbodashClientResponse>(`/api/kpis/${cnpjLimpo}`);
+    // Fetch from TurboDash API using new format
+    const apiData = await fetchFromTurbodash<TurbodashApiResponse>(`/api/internal/metrics/${cnpjLimpo}`);
+    
+    // Transform to internal normalized format
+    const data = transformApiResponse(apiData);
     
     await saveKPIToCache(data);
     
@@ -257,13 +298,41 @@ export async function getAllKPIs(forceRefresh = false): Promise<TurbodashListRes
   }
   
   try {
-    const data = await fetchFromTurbodash<TurbodashListResponse>('/api/kpis/lista');
+    // Fetch list of all clients from TurboDash API
+    // API can return either a structured response or an array
+    const rawData = await fetchFromTurbodash<TurbodashApiListResponse | TurbodashApiResponse[]>('/api/internal/metrics');
     
-    for (const cliente of data.clientes) {
+    let clientes: TurbodashClientResponse[];
+    let periodStart: string;
+    let periodEnd: string;
+    let total: number;
+    
+    if (Array.isArray(rawData)) {
+      // API returned a simple array
+      clientes = rawData.map(transformApiResponse);
+      const firstCliente = clientes[0];
+      periodStart = firstCliente?.periodo_inicio || new Date().toISOString().split('T')[0];
+      periodEnd = firstCliente?.periodo_fim || new Date().toISOString().split('T')[0];
+      total = clientes.length;
+    } else {
+      // API returned a structured response
+      clientes = rawData.clients.map(transformApiResponse);
+      periodStart = rawData.period?.current.start || clientes[0]?.periodo_inicio || new Date().toISOString().split('T')[0];
+      periodEnd = rawData.period?.current.end || clientes[0]?.periodo_fim || new Date().toISOString().split('T')[0];
+      total = rawData.total ?? clientes.length;
+    }
+    
+    // Cache each client's data
+    for (const cliente of clientes) {
       await saveKPIToCache(cliente);
     }
     
-    return data;
+    return {
+      total,
+      periodo_inicio: periodStart,
+      periodo_fim: periodEnd,
+      clientes,
+    };
   } catch (error) {
     console.error('[TurboDash] Error fetching KPI list:', error);
     return {
