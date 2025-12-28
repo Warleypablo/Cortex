@@ -17,6 +17,21 @@ Turbo Cortex é a plataforma interna exclusiva da equipe Turbo Partners, oferece
 
 Preferred communication style: Simple, everyday language.
 
+### Development Rules (MANDATORY)
+
+1. **External Database Only**: Never use Replit's internal database. All database connections must use the external PostgreSQL via `DB_HOST` environment variable (Google Cloud SQL).
+
+2. **Staging Schema for New Tables**: When creating new database tables, always use the `staging` schema (e.g., `staging.table_name`). This keeps new development isolated from production tables.
+
+3. **Security First**: Never expose credentials outside of environment variables (`process.env`). All API keys, database passwords, and secrets must be stored in `.env` or Replit Secrets. No hardcoded credentials in code under any circumstances.
+
+4. **Database Design Standards**:
+   - Create tables with clear purpose and meaningful names
+   - Design for easy relationships with existing tables (use consistent foreign key patterns)
+   - Build for scalability from the start (proper indexing, normalized structure)
+   - Avoid creating redundant or throwaway tables
+   - Follow existing naming conventions (snake_case for columns, prefixes like `rh_`, `caz_`, `cup_` for domain grouping)
+
 ## System Architecture
 
 ### Frontend Architecture
