@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
 import { TurbodashKPICards } from "@/components/TurbodashKPICards";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus, ChevronsUpDown, XCircle, Star, MessageCircle } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus, ChevronsUpDown, XCircle, Star, MessageCircle, Wrench, Lock, Settings, Plug } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -1203,6 +1203,96 @@ export default function ClientDetail() {
               </Button>
             </Link>
             <div className="flex items-center gap-3">
+              {/* Quick Actions Bar */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs gap-1.5"
+                disabled={!cliente.telefone}
+                onClick={() => {
+                  if (cliente.telefone) {
+                    let phoneDigits = cliente.telefone.replace(/\D/g, '');
+                    if (phoneDigits.length <= 11 && !phoneDigits.startsWith('55')) {
+                      phoneDigits = '55' + phoneDigits;
+                    }
+                    window.open(`https://wa.me/${phoneDigits}`, '_blank');
+                    createEventMutation.mutate({
+                      tipo: "whatsapp",
+                      titulo: "WhatsApp enviado",
+                      descricao: `Contato via WhatsApp para ${cliente?.nome}`
+                    });
+                  }
+                }}
+                data-testid="quick-action-whatsapp"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                WhatsApp
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs gap-1.5"
+                disabled={!cliente.email}
+                onClick={() => {
+                  if (cliente.email) {
+                    window.location.href = `mailto:${cliente.email}`;
+                    createEventMutation.mutate({
+                      tipo: "email",
+                      titulo: "Email enviado",
+                      descricao: `Email enviado para ${cliente?.email}`
+                    });
+                  }
+                }}
+                data-testid="quick-action-email"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                Email
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs gap-1.5"
+                disabled={!cliente.linkListaClickup}
+                onClick={() => {
+                  if (cliente.linkListaClickup) {
+                    window.open(cliente.linkListaClickup, '_blank');
+                  }
+                }}
+                data-testid="quick-action-clickup"
+              >
+                <ListTodo className="w-3.5 h-3.5" />
+                ClickUp
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs gap-1.5"
+                onClick={() => {
+                  createEventMutation.mutate({
+                    tipo: "contrato",
+                    titulo: "Contrato visualizado/adicionado",
+                    descricao: `Ação de contrato para ${cliente?.nome}`
+                  });
+                  toast({
+                    title: "Novo Contrato",
+                    description: "Funcionalidade em desenvolvimento.",
+                  });
+                }}
+                data-testid="quick-action-novo-contrato"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Contrato
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs gap-1.5"
+                onClick={() => setNotaDialogOpen(true)}
+                data-testid="quick-action-adicionar-nota"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Nota
+              </Button>
               {temInadimplencia && (
                 <Badge variant="destructive" data-testid="badge-inadimplente">
                   Inadimplente
@@ -1330,256 +1420,15 @@ export default function ClientDetail() {
           />
         </div>
 
-        {/* Quick Actions Bar */}
-        <div className="mb-6 flex flex-wrap items-center gap-2" data-testid="quick-actions-bar">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 px-3 text-xs gap-1.5"
-            disabled={!cliente.telefone}
-            onClick={() => {
-              if (cliente.telefone) {
-                let phoneDigits = cliente.telefone.replace(/\D/g, '');
-                if (phoneDigits.length <= 11 && !phoneDigits.startsWith('55')) {
-                  phoneDigits = '55' + phoneDigits;
-                }
-                window.open(`https://wa.me/${phoneDigits}`, '_blank');
-                createEventMutation.mutate({
-                  tipo: "whatsapp",
-                  titulo: "WhatsApp enviado",
-                  descricao: `Contato via WhatsApp para ${cliente?.nome}`
-                });
-              }
-            }}
-            data-testid="quick-action-whatsapp"
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            WhatsApp
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 px-3 text-xs gap-1.5"
-            disabled={!cliente.email}
-            onClick={() => {
-              if (cliente.email) {
-                window.location.href = `mailto:${cliente.email}`;
-                createEventMutation.mutate({
-                  tipo: "email",
-                  titulo: "Email enviado",
-                  descricao: `Email enviado para ${cliente?.email}`
-                });
-              }
-            }}
-            data-testid="quick-action-email"
-          >
-            <Mail className="w-3.5 h-3.5" />
-            Email
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 px-3 text-xs gap-1.5"
-            disabled={!cliente.linkListaClickup}
-            onClick={() => {
-              if (cliente.linkListaClickup) {
-                window.open(cliente.linkListaClickup, '_blank');
-              }
-            }}
-            data-testid="quick-action-clickup"
-          >
-            <ListTodo className="w-3.5 h-3.5" />
-            ClickUp
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 px-3 text-xs gap-1.5"
-            onClick={() => {
-              createEventMutation.mutate({
-                tipo: "contrato",
-                titulo: "Contrato visualizado/adicionado",
-                descricao: `Ação de contrato para ${cliente?.nome}`
-              });
-              toast({
-                title: "Novo Contrato",
-                description: "Funcionalidade em desenvolvimento.",
-              });
-            }}
-            data-testid="quick-action-novo-contrato"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Contrato
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 px-3 text-xs gap-1.5"
-            onClick={() => setNotaDialogOpen(true)}
-            data-testid="quick-action-adicionar-nota"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Nota
-          </Button>
-        </div>
-
-        {/* Timeline de Eventos */}
-        <Card className="mb-6 p-4" data-testid="timeline-section">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Clock className="w-4 h-4 text-primary" />
-            </div>
-            <h2 className="text-base font-semibold">Timeline de Eventos</h2>
-          </div>
-          
-          {isLoadingTimeline ? (
-            <div className="flex items-center justify-center py-6" data-testid="timeline-loading">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : !timeline || timeline.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground" data-testid="timeline-empty">
-              <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">
-                <CalendarIcon className="w-6 h-6 opacity-40" />
-              </div>
-              <p className="text-sm font-medium">Nenhum evento registrado</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">Os eventos aparecerão aqui conforme forem registrados</p>
-            </div>
-          ) : (
-            <div className="relative" data-testid="timeline-container">
-              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
-              <div className="space-y-4">
-                {(showAllTimeline ? timeline : timeline.slice(0, 10)).map((event) => {
-                  const getEventIcon = () => {
-                    switch (event.type) {
-                      case 'payment_received':
-                        return <Check className="w-4 h-4" />;
-                      case 'payment_due':
-                        return <CalendarIcon className="w-4 h-4" />;
-                      case 'payment_overdue':
-                        return <AlertTriangle className="w-4 h-4" />;
-                      case 'contract_started':
-                      case 'contract_ended':
-                      case 'contract_cancelled':
-                      case 'contrato':
-                        return <FileText className="w-4 h-4" />;
-                      case 'whatsapp':
-                        return <MessageSquare className="w-4 h-4" />;
-                      case 'email':
-                        return <Mail className="w-4 h-4" />;
-                      case 'nota':
-                        return <FileText className="w-4 h-4" />;
-                      case 'responsavel_change':
-                        return <User className="w-4 h-4" />;
-                      case 'encerramento':
-                        return <XCircle className="w-4 h-4" />;
-                      case 'nps':
-                        return <Star className="w-4 h-4" />;
-                      case 'comunicacao':
-                        return <MessageCircle className="w-4 h-4" />;
-                      default:
-                        return <Clock className="w-4 h-4" />;
-                    }
-                  };
-
-                  const getEventColor = () => {
-                    switch (event.type) {
-                      case 'payment_received':
-                        return 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400';
-                      case 'payment_overdue':
-                        return 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400';
-                      case 'contract_started':
-                        return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400';
-                      case 'contract_ended':
-                        return 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400';
-                      case 'contract_cancelled':
-                      case 'encerramento':
-                        return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
-                      case 'whatsapp':
-                        return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400';
-                      case 'email':
-                        return 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400';
-                      case 'nota':
-                        return 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400';
-                      case 'contrato':
-                        return 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400';
-                      case 'responsavel_change':
-                        return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
-                      case 'nps':
-                        return 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400';
-                      case 'comunicacao':
-                        return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400';
-                      case 'payment_due':
-                      default:
-                        return 'bg-muted text-muted-foreground';
-                    }
-                  };
-
-                  const eventDate = new Date(event.date);
-                  const formattedDate = format(eventDate, "dd 'de' MMM, yyyy", { locale: ptBR });
-
-                  return (
-                    <div key={event.id} className="relative flex items-start gap-4 pl-8" data-testid={`timeline-event-${event.id}`}>
-                      <div className={`absolute left-2 w-5 h-5 rounded-full flex items-center justify-center ${getEventColor()}`}>
-                        {getEventIcon()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <span className="text-sm font-medium" data-testid={`timeline-event-title-${event.id}`}>
-                            {event.title}
-                          </span>
-                          {event.amount !== undefined && event.amount > 0 && (
-                            <Badge variant="outline" className="text-xs" data-testid={`timeline-event-amount-${event.id}`}>
-                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(event.amount)}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground truncate" data-testid={`timeline-event-description-${event.id}`}>
-                          {event.description}
-                        </p>
-                        <span className="text-xs text-muted-foreground" data-testid={`timeline-event-date-${event.id}`}>
-                          {formattedDate}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              {timeline.length > 10 && (
-                <div className="mt-4 text-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAllTimeline(!showAllTimeline)}
-                    data-testid="button-toggle-timeline"
-                  >
-                    {showAllTimeline ? (
-                      <>
-                        <ChevronUp className="w-4 h-4 mr-1" />
-                        Ver menos
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="w-4 h-4 mr-1" />
-                        Ver mais ({timeline.length - 10} eventos)
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </Card>
-
         <Tabs defaultValue="dados-cadastrais" className="w-full" data-testid="client-detail-tabs">
-          <TabsList className="grid w-full grid-cols-5 mb-4 h-11 p-1 bg-muted/60" data-testid="tabs-list">
+          <TabsList className="grid w-full grid-cols-6 mb-4 h-11 p-1 bg-muted/60" data-testid="tabs-list">
             <TabsTrigger value="dados-cadastrais" className="text-sm font-medium gap-1.5" data-testid="tab-dados-cadastrais">
               <Building2 className="w-3.5 h-3.5" />
-              Dados
+              Dados & Cobranças
             </TabsTrigger>
-            <TabsTrigger value="performance" className="text-sm font-medium gap-1.5" data-testid="tab-performance">
-              <Activity className="w-3.5 h-3.5" />
-              Performance
+            <TabsTrigger value="servicos" className="text-sm font-medium gap-1.5" data-testid="tab-servicos">
+              <Wrench className="w-3.5 h-3.5" />
+              Serviços
             </TabsTrigger>
             <TabsTrigger value="tarefas" className="text-sm font-medium gap-1.5" data-testid="tab-tarefas">
               <ListTodo className="w-3.5 h-3.5" />
@@ -1589,9 +1438,13 @@ export default function ClientDetail() {
               <MessageSquare className="w-3.5 h-3.5" />
               Comunicação
             </TabsTrigger>
-            <TabsTrigger value="situacao-financeira" className="text-sm font-medium gap-1.5" data-testid="tab-situacao-financeira">
-              <Scale className="w-3.5 h-3.5" />
-              Financeiro
+            <TabsTrigger value="performance" className="text-sm font-medium gap-1.5" data-testid="tab-performance">
+              <Activity className="w-3.5 h-3.5" />
+              Performance
+            </TabsTrigger>
+            <TabsTrigger value="em-breve" className="text-sm font-medium gap-1.5 opacity-50 cursor-not-allowed" disabled data-testid="tab-em-breve">
+              <Lock className="w-3.5 h-3.5" />
+              Em breve
             </TabsTrigger>
           </TabsList>
 
@@ -3192,6 +3045,156 @@ export default function ClientDetail() {
             )}
           </Card>
         </div>
+
+        {/* Cards de Inadimplência/Jurídico */}
+        {isLoadingSituacao ? (
+          <div className="flex items-center justify-center py-8" data-testid="loading-situacao">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="p-6" data-testid="card-inadimplencia">
+              <div className="flex items-center gap-3 mb-6">
+                <AlertTriangle className={`w-5 h-5 ${situacaoJuridica?.hasInadimplencia ? 'text-red-500' : 'text-muted-foreground'}`} />
+                <h2 className="text-lg font-semibold">Inadimplência</h2>
+              </div>
+              {situacaoJuridica?.hasInadimplencia && situacaoJuridica.inadimplencia ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Ação</p>
+                    <Badge 
+                      className={
+                        situacaoJuridica.inadimplencia.acao?.toLowerCase().includes('resolvido') || 
+                        situacaoJuridica.inadimplencia.acao?.toLowerCase().includes('quitado')
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                      }
+                      variant="outline"
+                      data-testid="inadimplencia-acao"
+                    >
+                      {situacaoJuridica.inadimplencia.acao || 'Não definido'}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Status Financeiro</p>
+                    <p className="font-medium" data-testid="inadimplencia-status">
+                      {situacaoJuridica.inadimplencia.statusFinanceiro || 'Não informado'}
+                    </p>
+                  </div>
+                  {situacaoJuridica.inadimplencia.contexto && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Contexto</p>
+                      <p className="text-sm text-muted-foreground" data-testid="inadimplencia-contexto">
+                        {situacaoJuridica.inadimplencia.contexto}
+                      </p>
+                    </div>
+                  )}
+                  {situacaoJuridica.inadimplencia.valorAcordado && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Valor Acordado</p>
+                      <p className="font-semibold text-green-600" data-testid="inadimplencia-valor">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(situacaoJuridica.inadimplencia.valorAcordado))}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center" data-testid="no-inadimplencia">
+                  <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
+                  <p className="text-muted-foreground">Nenhum registro de inadimplência</p>
+                </div>
+              )}
+            </Card>
+
+            <Card className="p-6" data-testid="card-juridico">
+              <div className="flex items-center gap-3 mb-6">
+                <Scale className={`w-5 h-5 ${situacaoJuridica?.hasJuridico ? 'text-red-500' : 'text-muted-foreground'}`} />
+                <h2 className="text-lg font-semibold">Jurídico</h2>
+              </div>
+              {situacaoJuridica?.hasJuridico && situacaoJuridica.juridico ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Procedimento</p>
+                    <Badge 
+                      className={
+                        situacaoJuridica.juridico.statusJuridico?.toLowerCase().includes('encerrado') || 
+                        situacaoJuridica.juridico.statusJuridico?.toLowerCase().includes('arquivado')
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                      }
+                      variant="outline"
+                      data-testid="juridico-procedimento"
+                    >
+                      {situacaoJuridica.juridico.procedimento || 'Não definido'}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Status Jurídico</p>
+                    <p className="font-medium" data-testid="juridico-status">
+                      {situacaoJuridica.juridico.statusJuridico || 'Não informado'}
+                    </p>
+                  </div>
+                  {situacaoJuridica.juridico.advogadoResponsavel && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Advogado Responsável</p>
+                      <p className="font-medium" data-testid="juridico-advogado">
+                        {situacaoJuridica.juridico.advogadoResponsavel}
+                      </p>
+                    </div>
+                  )}
+                  {situacaoJuridica.juridico.protocoloProcesso && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Protocolo do Processo</p>
+                      <p className="font-mono text-sm" data-testid="juridico-protocolo">
+                        {situacaoJuridica.juridico.protocoloProcesso}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center" data-testid="no-juridico">
+                  <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
+                  <p className="text-muted-foreground">Nenhum registro jurídico</p>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+          </TabsContent>
+
+          {/* Aba Serviços */}
+          <TabsContent value="servicos" className="mt-0" data-testid="tabcontent-servicos">
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Wrench className="w-5 h-5 text-primary" />
+                <div>
+                  <h2 className="text-lg font-semibold">Serviços Contratados</h2>
+                  <p className="text-sm text-muted-foreground">Gerenciamento de serviços, integrações e configurações</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <Card className="p-4 border-dashed border-2 bg-muted/20 flex flex-col items-center justify-center text-center" data-testid="card-servicos-ativos">
+                  <Settings className="w-8 h-8 text-muted-foreground mb-3" />
+                  <h3 className="font-medium text-sm mb-1">Serviços Ativos</h3>
+                  <p className="text-xs text-muted-foreground">Em desenvolvimento</p>
+                </Card>
+                <Card className="p-4 border-dashed border-2 bg-muted/20 flex flex-col items-center justify-center text-center" data-testid="card-integracoes">
+                  <Plug className="w-8 h-8 text-muted-foreground mb-3" />
+                  <h3 className="font-medium text-sm mb-1">Integrações</h3>
+                  <p className="text-xs text-muted-foreground">Em desenvolvimento</p>
+                </Card>
+                <Card className="p-4 border-dashed border-2 bg-muted/20 flex flex-col items-center justify-center text-center" data-testid="card-configuracoes">
+                  <Wrench className="w-8 h-8 text-muted-foreground mb-3" />
+                  <h3 className="font-medium text-sm mb-1">Configurações</h3>
+                  <p className="text-xs text-muted-foreground">Em desenvolvimento</p>
+                </Card>
+              </div>
+              <div className="flex flex-col items-center justify-center py-8 text-center border rounded-lg bg-muted/10" data-testid="servicos-em-breve">
+                <Lock className="w-12 h-12 text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground font-medium">Módulo em desenvolvimento</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">Esta seção permitirá gerenciar serviços contratados, integrações com sistemas externos e configurações específicas do cliente.</p>
+              </div>
+            </Card>
           </TabsContent>
 
           <TabsContent value="performance" className="mt-0" data-testid="tabcontent-performance">
@@ -3409,6 +3412,154 @@ export default function ClientDetail() {
 
           <TabsContent value="comunicacao" data-testid="tabcontent-comunicacao">
             <div className="space-y-6">
+              {/* Timeline de Eventos */}
+              <Card className="p-4" data-testid="timeline-section">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-primary" />
+                  </div>
+                  <h2 className="text-base font-semibold">Timeline de Eventos</h2>
+                </div>
+                
+                {isLoadingTimeline ? (
+                  <div className="flex items-center justify-center py-6" data-testid="timeline-loading">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : !timeline || timeline.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground" data-testid="timeline-empty">
+                    <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+                      <CalendarIcon className="w-6 h-6 opacity-40" />
+                    </div>
+                    <p className="text-sm font-medium">Nenhum evento registrado</p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">Os eventos aparecerão aqui conforme forem registrados</p>
+                  </div>
+                ) : (
+                  <div className="relative" data-testid="timeline-container">
+                    <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
+                    <div className="space-y-4">
+                      {(showAllTimeline ? timeline : timeline.slice(0, 10)).map((event) => {
+                        const getEventIcon = () => {
+                          switch (event.type) {
+                            case 'payment_received':
+                              return <Check className="w-4 h-4" />;
+                            case 'payment_due':
+                              return <CalendarIcon className="w-4 h-4" />;
+                            case 'payment_overdue':
+                              return <AlertTriangle className="w-4 h-4" />;
+                            case 'contract_started':
+                            case 'contract_ended':
+                            case 'contract_cancelled':
+                            case 'contrato':
+                              return <FileText className="w-4 h-4" />;
+                            case 'whatsapp':
+                              return <MessageSquare className="w-4 h-4" />;
+                            case 'email':
+                              return <Mail className="w-4 h-4" />;
+                            case 'nota':
+                              return <FileText className="w-4 h-4" />;
+                            case 'responsavel_change':
+                              return <User className="w-4 h-4" />;
+                            case 'encerramento':
+                              return <XCircle className="w-4 h-4" />;
+                            case 'nps':
+                              return <Star className="w-4 h-4" />;
+                            case 'comunicacao':
+                              return <MessageCircle className="w-4 h-4" />;
+                            default:
+                              return <Clock className="w-4 h-4" />;
+                          }
+                        };
+
+                        const getEventColor = () => {
+                          switch (event.type) {
+                            case 'payment_received':
+                              return 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400';
+                            case 'payment_overdue':
+                              return 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400';
+                            case 'contract_started':
+                              return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400';
+                            case 'contract_ended':
+                              return 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400';
+                            case 'contract_cancelled':
+                            case 'encerramento':
+                              return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
+                            case 'whatsapp':
+                              return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400';
+                            case 'email':
+                              return 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400';
+                            case 'nota':
+                              return 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400';
+                            case 'contrato':
+                              return 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400';
+                            case 'responsavel_change':
+                              return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
+                            case 'nps':
+                              return 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400';
+                            case 'comunicacao':
+                              return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400';
+                            case 'payment_due':
+                            default:
+                              return 'bg-muted text-muted-foreground';
+                          }
+                        };
+
+                        const eventDate = new Date(event.date);
+                        const formattedDate = format(eventDate, "dd 'de' MMM, yyyy", { locale: ptBR });
+
+                        return (
+                          <div key={event.id} className="relative flex items-start gap-4 pl-8" data-testid={`timeline-event-${event.id}`}>
+                            <div className={`absolute left-2 w-5 h-5 rounded-full flex items-center justify-center ${getEventColor()}`}>
+                              {getEventIcon()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-1">
+                                <span className="text-sm font-medium" data-testid={`timeline-event-title-${event.id}`}>
+                                  {event.title}
+                                </span>
+                                {event.amount !== undefined && event.amount > 0 && (
+                                  <Badge variant="outline" className="text-xs" data-testid={`timeline-event-amount-${event.id}`}>
+                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(event.amount)}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground truncate" data-testid={`timeline-event-description-${event.id}`}>
+                                {event.description}
+                              </p>
+                              <span className="text-xs text-muted-foreground" data-testid={`timeline-event-date-${event.id}`}>
+                                {formattedDate}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {timeline.length > 10 && (
+                      <div className="mt-4 text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowAllTimeline(!showAllTimeline)}
+                          data-testid="button-toggle-timeline"
+                        >
+                          {showAllTimeline ? (
+                            <>
+                              <ChevronUp className="w-4 h-4 mr-1" />
+                              Ver menos
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-4 h-4 mr-1" />
+                              Ver mais ({timeline.length - 10} eventos)
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+
               <Card className="p-6">
                 <div className="flex items-center gap-3 mb-6">
                   <Plus className="w-5 h-5 text-primary" />
@@ -3566,122 +3717,6 @@ export default function ClientDetail() {
                 )}
               </Card>
             </div>
-          </TabsContent>
-
-          <TabsContent value="situacao-financeira" data-testid="tabcontent-situacao-financeira">
-            {isLoadingSituacao ? (
-              <div className="flex items-center justify-center py-8" data-testid="loading-situacao">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="p-6" data-testid="card-inadimplencia">
-                  <div className="flex items-center gap-3 mb-6">
-                    <AlertTriangle className={`w-5 h-5 ${situacaoJuridica?.hasInadimplencia ? 'text-red-500' : 'text-muted-foreground'}`} />
-                    <h2 className="text-lg font-semibold">Inadimplência</h2>
-                  </div>
-                  {situacaoJuridica?.hasInadimplencia && situacaoJuridica.inadimplencia ? (
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Ação</p>
-                        <Badge 
-                          className={
-                            situacaoJuridica.inadimplencia.acao?.toLowerCase().includes('resolvido') || 
-                            situacaoJuridica.inadimplencia.acao?.toLowerCase().includes('quitado')
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                          }
-                          variant="outline"
-                          data-testid="inadimplencia-acao"
-                        >
-                          {situacaoJuridica.inadimplencia.acao || 'Não definido'}
-                        </Badge>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Status Financeiro</p>
-                        <p className="font-medium" data-testid="inadimplencia-status">
-                          {situacaoJuridica.inadimplencia.statusFinanceiro || 'Não informado'}
-                        </p>
-                      </div>
-                      {situacaoJuridica.inadimplencia.contexto && (
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Contexto</p>
-                          <p className="text-sm text-muted-foreground" data-testid="inadimplencia-contexto">
-                            {situacaoJuridica.inadimplencia.contexto}
-                          </p>
-                        </div>
-                      )}
-                      {situacaoJuridica.inadimplencia.valorAcordado && (
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Valor Acordado</p>
-                          <p className="font-semibold text-green-600" data-testid="inadimplencia-valor">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(situacaoJuridica.inadimplencia.valorAcordado))}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8 text-center" data-testid="no-inadimplencia">
-                      <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
-                      <p className="text-muted-foreground">Nenhum registro de inadimplência</p>
-                    </div>
-                  )}
-                </Card>
-
-                <Card className="p-6" data-testid="card-juridico">
-                  <div className="flex items-center gap-3 mb-6">
-                    <Scale className={`w-5 h-5 ${situacaoJuridica?.hasJuridico ? 'text-red-500' : 'text-muted-foreground'}`} />
-                    <h2 className="text-lg font-semibold">Jurídico</h2>
-                  </div>
-                  {situacaoJuridica?.hasJuridico && situacaoJuridica.juridico ? (
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Procedimento</p>
-                        <Badge 
-                          className={
-                            situacaoJuridica.juridico.statusJuridico?.toLowerCase().includes('encerrado') || 
-                            situacaoJuridica.juridico.statusJuridico?.toLowerCase().includes('arquivado')
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                          }
-                          variant="outline"
-                          data-testid="juridico-procedimento"
-                        >
-                          {situacaoJuridica.juridico.procedimento || 'Não definido'}
-                        </Badge>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Status Jurídico</p>
-                        <p className="font-medium" data-testid="juridico-status">
-                          {situacaoJuridica.juridico.statusJuridico || 'Não informado'}
-                        </p>
-                      </div>
-                      {situacaoJuridica.juridico.advogadoResponsavel && (
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Advogado Responsável</p>
-                          <p className="font-medium" data-testid="juridico-advogado">
-                            {situacaoJuridica.juridico.advogadoResponsavel}
-                          </p>
-                        </div>
-                      )}
-                      {situacaoJuridica.juridico.protocoloProcesso && (
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Protocolo do Processo</p>
-                          <p className="font-mono text-sm" data-testid="juridico-protocolo">
-                            {situacaoJuridica.juridico.protocoloProcesso}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8 text-center" data-testid="no-juridico">
-                      <CheckCircle className="w-12 h-12 text-green-500 mb-4" />
-                      <p className="text-muted-foreground">Nenhum registro jurídico</p>
-                    </div>
-                  )}
-                </Card>
-              </div>
-            )}
           </TabsContent>
         </Tabs>
 
