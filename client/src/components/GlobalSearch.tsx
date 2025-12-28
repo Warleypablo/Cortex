@@ -381,7 +381,7 @@ export default function GlobalSearch() {
   return (
     <>
       <div className="relative group">
-        <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-blue-500 to-primary rounded-lg opacity-30 group-hover:opacity-60 blur-sm transition-all duration-500 animate-pulse" />
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-blue-500 to-primary rounded-lg opacity-20 group-hover:opacity-50 blur-sm transition-all duration-500" style={{ animation: 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
         <Button
           variant="outline"
           className="relative h-9 w-full justify-start rounded-md text-sm text-muted-foreground sm:pr-12 md:w-40 lg:w-64 bg-background border-primary/30 hover:border-primary/60 transition-all duration-300"
