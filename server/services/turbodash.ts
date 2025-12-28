@@ -8,10 +8,11 @@ import {
 } from '@shared/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 
-// Internal API configuration - uses INTERNAL_API_TOKEN for authentication
-const INTERNAL_API_URL = process.env.INTERNAL_API_URL || 'http://localhost:5000';
+// TurboDash API configuration - uses environment variables for security
+// TURBODASH_API_URL: Production (https://app.turbodash.com.br) or Development URL
+// INTERNAL_API_TOKEN: Bearer token for authentication
+const TURBODASH_API_URL = process.env.TURBODASH_API_URL || 'https://app.turbodash.com.br';
 const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
-const TURBODASH_API_SECRET = process.env.TURBODASH_API_SECRET;
 const CACHE_TTL_MINUTES = 15;
 
 // Transform TurboDash API response to internal normalized format
@@ -49,12 +50,15 @@ function transformApiResponse(apiData: TurbodashApiResponse): TurbodashClientRes
   };
 }
 
-async function fetchFromInternalAPI<T>(endpoint: string): Promise<T> {
+async function fetchFromTurboDashAPI<T>(endpoint: string): Promise<T> {
   if (!INTERNAL_API_TOKEN) {
     throw new Error('INTERNAL_API_TOKEN not configured');
   }
   
-  const response = await fetch(`${INTERNAL_API_URL}${endpoint}`, {
+  const url = `${TURBODASH_API_URL}${endpoint}`;
+  console.log(`[TurboDash] Fetching from: ${url}`);
+  
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${INTERNAL_API_TOKEN}`,
@@ -64,7 +68,7 @@ async function fetchFromInternalAPI<T>(endpoint: string): Promise<T> {
   
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Internal API error: ${response.status} - ${error}`);
+    throw new Error(`TurboDash API error: ${response.status} - ${error}`);
   }
   
   return response.json();
@@ -198,14 +202,14 @@ export async function getKPIsByCNPJ(cnpj: string, forceRefresh = false): Promise
     ultima_atualizacao: c.last_synced_at?.toISOString() || new Date().toISOString(),
   });
 
-  if (!TURBODASH_API_SECRET) {
-    console.warn('[TurboDash] API secret not configured, returning cached data only');
+  if (!INTERNAL_API_TOKEN) {
+    console.warn('[TurboDash] INTERNAL_API_TOKEN not configured, returning cached/demo data only');
     return cached.length > 0 ? transformCachedRow(cached[0]) : getDemoKPIs(cnpjLimpo);
   }
   
   try {
-    // Fetch from TurboDash API using new format
-    const apiData = await fetchFromInternalAPI<TurbodashApiResponse>(`/api/internal/metrics/${cnpjLimpo}`);
+    // Fetch from TurboDash API using Bearer token authentication
+    const apiData = await fetchFromTurboDashAPI<TurbodashApiResponse>(`/api/internal/metrics/${cnpjLimpo}`);
     
     // Transform to internal normalized format
     const data = transformApiResponse(apiData);
@@ -291,8 +295,8 @@ export async function getAllKPIs(forceRefresh = false): Promise<TurbodashListRes
     };
   }
   
-  if (!TURBODASH_API_SECRET) {
-    console.warn('[TurboDash] API secret not configured, returning cached data only');
+  if (!INTERNAL_API_TOKEN) {
+    console.warn('[TurboDash] INTERNAL_API_TOKEN not configured, returning cached data only');
     return {
       total: cached.length,
       periodo_inicio: cached[0]?.periodo_inicio || new Date().toISOString().split('T')[0],
@@ -304,7 +308,7 @@ export async function getAllKPIs(forceRefresh = false): Promise<TurbodashListRes
   try {
     // Fetch list of all clients from TurboDash API
     // API can return either a structured response or an array
-    const rawData = await fetchFromInternalAPI<TurbodashApiListResponse | TurbodashApiResponse[]>('/api/internal/metrics');
+    const rawData = await fetchFromTurboDashAPI<TurbodashApiListResponse | TurbodashApiResponse[]>('/api/internal/metrics');
     
     let clientes: TurbodashClientResponse[];
     let periodStart: string;
@@ -436,12 +440,12 @@ async function findClienteIdByCNPJ(cnpj: string): Promise<number | null> {
 }
 
 export async function verifyTurbodashCNPJ(cnpj: string): Promise<{ existe: boolean; nome_cliente?: string }> {
-  if (!TURBODASH_API_SECRET) {
+  if (!INTERNAL_API_TOKEN) {
     return { existe: false };
   }
   
   try {
-    const data = await fetchFromInternalAPI<{ existe: boolean; cnpj: string; nome_cliente?: string }>(
+    const data = await fetchFromTurboDashAPI<{ existe: boolean; cnpj: string; nome_cliente?: string }>(
       `/api/clientes/verificar/${cnpj.replace(/\D/g, '')}`
     );
     return data;
