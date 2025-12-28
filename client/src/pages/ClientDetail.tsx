@@ -833,6 +833,34 @@ export default function ClientDetail() {
     return statusLower.includes("ativo") || statusLower.includes("active");
   }) || false;
   
+  const isClienteAtivo = (statusClickup: string | null | undefined): boolean => {
+    if (!statusClickup) return false;
+    const statusLower = statusClickup.toLowerCase();
+    const statusAtivos = ['ativo', 'onboarding', 'triagem', 'em cancelamento'];
+    return statusAtivos.some(s => statusLower.includes(s));
+  };
+  
+  const getStatusClickupColor = (statusClickup: string | null | undefined): string => {
+    if (!statusClickup) return '';
+    const statusLower = statusClickup.toLowerCase();
+    if (statusLower === 'ativo') {
+      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+    } else if (statusLower.includes('cancelado') || statusLower.includes('inativo')) {
+      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+    } else if (statusLower === 'onboarding') {
+      return 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300';
+    } else if (statusLower === 'triagem') {
+      return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
+    } else if (statusLower.includes('em cancelamento')) {
+      return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
+    } else if (statusLower === 'pausado') {
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300';
+    } else if (statusLower === 'entregue') {
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+    }
+    return '';
+  };
+  
   const temInadimplencia = sortedReceitas?.some(r => {
     if (!r.dataVencimento || r.status?.toUpperCase() === "PAGO") return false;
     const vencimento = new Date(r.dataVencimento);
@@ -1207,11 +1235,11 @@ export default function ClientDetail() {
           />
           <StatsCard
             title="Status"
-            value={temContratoAtivo ? "Ativo" : "Inativo"}
+            value={cliente.statusClickup ? (cliente.statusClickup.charAt(0).toUpperCase() + cliente.statusClickup.slice(1)) : (temContratoAtivo ? "Ativo" : "Sem status")}
             icon={Activity}
             variant="status"
-            statusActive={temContratoAtivo}
-            subtitle={temContratoAtivo ? "Cliente possui contratos ativos" : "Nenhum contrato ativo no momento"}
+            statusActive={cliente.statusClickup ? isClienteAtivo(cliente.statusClickup) : temContratoAtivo}
+            subtitle={cliente.statusClickup ? `Status do cliente no ClickUp` : (temContratoAtivo ? "Cliente possui contratos ativos" : "Status não definido")}
           />
           <StatsCard
             title="Financeiro"
@@ -2064,8 +2092,12 @@ export default function ClientDetail() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Status</p>
-                  <Badge variant={temContratoAtivo ? "default" : "secondary"} className="text-xs" data-testid="badge-status-cliente">
-                    {temContratoAtivo ? "Ativo" : "Inativo"}
+                  <Badge 
+                    variant={isClienteAtivo(cliente.statusClickup) ? "default" : "secondary"} 
+                    className={`text-xs ${getStatusClickupColor(cliente.statusClickup)}`} 
+                    data-testid="badge-status-cliente"
+                  >
+                    {cliente.statusClickup ? (cliente.statusClickup.charAt(0).toUpperCase() + cliente.statusClickup.slice(1)) : "Não definido"}
                   </Badge>
                 </div>
               </div>
