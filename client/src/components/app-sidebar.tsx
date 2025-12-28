@@ -8,8 +8,8 @@ import {
   ChevronRight, ChevronDown, Presentation
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
-import turboLogoLight from "@assets/logo-preta_1766452973532.png";
-import turboLogoDark from "@assets/logo-branca_1766452973531.png";
+import turboLogoLight from "@assets/Logo_(15)_1766960214260.png";
+import turboLogoDark from "@assets/Logo_(14)_1766960225379.png";
 import {
   Sidebar,
   SidebarContent,
