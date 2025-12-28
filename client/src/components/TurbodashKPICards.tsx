@@ -1,11 +1,35 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, TrendingDown, DollarSign, ShoppingCart, Target, Users, Percent, BarChart3, AlertCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RefreshCw, TrendingUp, TrendingDown, DollarSign, ShoppingCart, Target, Users, Percent, BarChart3, AlertCircle, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TurbodashClientResponse } from "@shared/schema";
+
+const MESES = [
+  { value: "01", label: "Janeiro" },
+  { value: "02", label: "Fevereiro" },
+  { value: "03", label: "Março" },
+  { value: "04", label: "Abril" },
+  { value: "05", label: "Maio" },
+  { value: "06", label: "Junho" },
+  { value: "07", label: "Julho" },
+  { value: "08", label: "Agosto" },
+  { value: "09", label: "Setembro" },
+  { value: "10", label: "Outubro" },
+  { value: "11", label: "Novembro" },
+  { value: "12", label: "Dezembro" },
+];
+
+const currentYear = new Date().getFullYear();
+const ANOS = [
+  { value: String(currentYear - 1), label: String(currentYear - 1) },
+  { value: String(currentYear), label: String(currentYear) },
+  { value: String(currentYear + 1), label: String(currentYear + 1) },
+];
 
 interface KPICardProps {
   label: string;
@@ -75,8 +99,16 @@ interface TurbodashKPICardsProps {
 }
 
 export function TurbodashKPICards({ cnpj, className }: TurbodashKPICardsProps) {
+  // Default to previous month for better data availability
+  const now = new Date();
+  const defaultMonth = now.getMonth() === 0 ? "12" : String(now.getMonth()).padStart(2, '0');
+  const defaultYear = now.getMonth() === 0 ? String(now.getFullYear() - 1) : String(now.getFullYear());
+  
+  const [selectedMes, setSelectedMes] = useState<string>(defaultMonth);
+  const [selectedAno, setSelectedAno] = useState<string>(defaultYear);
+  
   const { data, isLoading, isError, refetch, isFetching } = useQuery<TurbodashClientResponse>({
-    queryKey: ['/api/integrations/turbodash/client', cnpj],
+    queryKey: [`/api/integrations/turbodash/client/${cnpj}`, { mes: selectedMes, ano: selectedAno }],
     enabled: !!cnpj,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -206,23 +238,52 @@ export function TurbodashKPICards({ cnpj, className }: TurbodashKPICardsProps) {
           </p>
         </div>
       )}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-foreground">Performance TurboDash</h3>
           <p className="text-xs text-muted-foreground">
             Período: {new Date(data.periodo_inicio).toLocaleDateString('pt-BR')} - {new Date(data.periodo_fim).toLocaleDateString('pt-BR')}
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          data-testid="button-refresh-turbodash"
-        >
-          <RefreshCw className={cn("w-4 h-4 mr-2", isFetching && "animate-spin")} />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <Select value={selectedMes} onValueChange={setSelectedMes}>
+              <SelectTrigger className="w-[130px]" data-testid="select-mes-turbodash">
+                <SelectValue placeholder="Mês" />
+              </SelectTrigger>
+              <SelectContent>
+                {MESES.map((mes) => (
+                  <SelectItem key={mes.value} value={mes.value}>
+                    {mes.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedAno} onValueChange={setSelectedAno}>
+              <SelectTrigger className="w-[90px]" data-testid="select-ano-turbodash">
+                <SelectValue placeholder="Ano" />
+              </SelectTrigger>
+              <SelectContent>
+                {ANOS.map((ano) => (
+                  <SelectItem key={ano.value} value={ano.value}>
+                    {ano.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            data-testid="button-refresh-turbodash"
+          >
+            <RefreshCw className={cn("w-4 h-4 mr-2", isFetching && "animate-spin")} />
+            Atualizar
+          </Button>
+        </div>
       </div>
       
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
