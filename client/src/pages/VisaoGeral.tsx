@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
-import { DollarSign, TrendingUp, TrendingDown, Users, PauseCircle, Info } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, PauseCircle, Info, CheckCircle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useQuery } from "@tanstack/react-query";
@@ -204,28 +204,28 @@ export default function VisaoGeral() {
               </CardContent>
             </Card>
 
-            <Card data-testid="card-cac">
+            <Card data-testid="card-receita-pontual-entregue">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
                   <span className="flex items-center gap-1.5">
-                    CAC
+                    Receita Pontual Entregue
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Custo de Aquisição de Cliente</p>
+                        <p>Valor de projetos pontuais entregues no mês</p>
                       </TooltipContent>
                     </Tooltip>
                   </span>
                 </CardTitle>
-                <Users className="w-4 h-4 text-muted-foreground" />
+                <CheckCircle className="w-4 h-4 text-purple-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-muted-foreground" data-testid="text-cac">
-                  -
+                <div className="text-2xl font-bold text-purple-600" data-testid="text-receita-pontual-entregue">
+                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.receitaPontualEntregue || 0)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Em breve</p>
+                <p className="text-xs text-muted-foreground mt-1">Projetos entregues</p>
               </CardContent>
             </Card>
 
