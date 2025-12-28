@@ -12477,6 +12477,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =============================================================================
+  // TurboDash Integration Routes
+  // =============================================================================
+  
+  app.get("/api/integrations/turbodash/client/:cnpj", isAuthenticated, async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      
+      // Validate CNPJ format (11-18 chars, only digits and formatting chars)
+      const cnpjClean = cnpj.replace(/\D/g, '');
+      if (cnpjClean.length < 11 || cnpjClean.length > 14) {
+        return res.status(400).json({ error: "CNPJ inválido: deve ter entre 11 e 14 dígitos" });
+      }
+      
+      const forceRefresh = req.query.refresh === 'true';
+      
+      const { getKPIsByCNPJ } = await import('./services/turbodash');
+      const data = await getKPIsByCNPJ(cnpjClean, forceRefresh);
+      
+      if (!data) {
+        return res.status(404).json({ error: "Cliente não encontrado no TurboDash" });
+      }
+      
+      res.json(data);
+    } catch (error) {
+      console.error("[turbodash] Error fetching client KPIs:", error);
+      res.status(500).json({ error: "Erro ao buscar KPIs do cliente" });
+    }
+  });
+  
+  app.get("/api/integrations/turbodash/overview", isAuthenticated, async (req, res) => {
+    try {
+      const forceRefresh = req.query.refresh === 'true';
+      
+      const { getAllKPIs } = await import('./services/turbodash');
+      const data = await getAllKPIs(forceRefresh);
+      
+      res.json(data);
+    } catch (error) {
+      console.error("[turbodash] Error fetching KPI list:", error);
+      res.status(500).json({ error: "Erro ao buscar lista de KPIs" });
+    }
+  });
+  
+  app.get("/api/integrations/turbodash/verify/:cnpj", isAuthenticated, async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      
+      // Validate CNPJ format
+      const cnpjClean = cnpj.replace(/\D/g, '');
+      if (cnpjClean.length < 11 || cnpjClean.length > 14) {
+        return res.status(400).json({ error: "CNPJ inválido: deve ter entre 11 e 14 dígitos" });
+      }
+      
+      const { verifyTurbodashCNPJ } = await import('./services/turbodash');
+      const result = await verifyTurbodashCNPJ(cnpjClean);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("[turbodash] Error verifying CNPJ:", error);
+      res.status(500).json({ error: "Erro ao verificar CNPJ" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
