@@ -671,6 +671,15 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       const { cnpj } = req.params;
       const normalizedCnpj = cnpj.replace(/[^\d]/g, '');
       
+      // Get the client name from caz_clientes for the aggregated display name
+      const clientNameResult = await db.execute(sql`
+        SELECT nome FROM caz_clientes 
+        WHERE REGEXP_REPLACE(cnpj, '[^0-9]', '', 'g') = ${normalizedCnpj}
+        LIMIT 1
+      `);
+      
+      const cazClientName = (clientNameResult.rows[0] as any)?.nome || null;
+      
       const result = await db.execute(sql`
         SELECT 
           c.id as client_id,
@@ -692,19 +701,18 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         ORDER BY cr.platform
       `);
       
-      const grouped: { [key: string]: any } = {};
+      // Aggregate all credentials into a single group with preserved IDs
+      const allCredentials: any[] = [];
+      let firstClientId: any = null;
+      let firstClientName: string | null = null;
       
       for (const row of result.rows as any[]) {
-        const clientId = row.client_id;
-        if (!grouped[clientId]) {
-          grouped[clientId] = {
-            id: clientId,
-            name: row.client_name,
-            credentials: []
-          };
+        if (firstClientId === null) {
+          firstClientId = row.client_id;
+          firstClientName = row.client_name;
         }
         if (row.credential_id) {
-          grouped[clientId].credentials.push({
+          allCredentials.push({
             id: row.credential_id,
             platform: row.platform,
             username: row.username,
@@ -715,7 +723,17 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         }
       }
       
-      res.json(Object.values(grouped));
+      // Return a single aggregated group preserving the first client's ID
+      // Use Conta Azul name if available, otherwise use the first client name
+      if (allCredentials.length > 0) {
+        res.json([{
+          id: firstClientId,
+          name: cazClientName || firstClientName || 'Cliente',
+          credentials: allCredentials
+        }]);
+      } else {
+        res.json([]);
+      }
     } catch (error) {
       console.error("[api] Error fetching credentials by CNPJ:", error);
       res.status(500).json({ error: "Failed to fetch credentials" });
