@@ -380,19 +380,22 @@ export default function GlobalSearch() {
 
   return (
     <>
-      <Button
-        variant="outline"
-        className="relative h-9 w-full justify-start rounded-md text-sm text-muted-foreground sm:pr-12 md:w-40 lg:w-64"
-        onClick={() => setOpen(true)}
-        data-testid="button-global-search"
-      >
-        <Search className="mr-2 h-4 w-4" />
-        <span className="hidden lg:inline-flex">Pesquisar...</span>
-        <span className="inline-flex lg:hidden">Pesquisar</span>
-        <kbd className="pointer-events-none absolute right-1.5 top-1.5 hidden h-6 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-          <span className="text-xs">⌘</span>K
-        </kbd>
-      </Button>
+      <div className="relative group">
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-primary via-blue-500 to-primary rounded-lg opacity-30 group-hover:opacity-60 blur-sm transition-all duration-500 animate-pulse" />
+        <Button
+          variant="outline"
+          className="relative h-9 w-full justify-start rounded-md text-sm text-muted-foreground sm:pr-12 md:w-40 lg:w-64 bg-background border-primary/30 hover:border-primary/60 transition-all duration-300"
+          onClick={() => setOpen(true)}
+          data-testid="button-global-search"
+        >
+          <Search className="mr-2 h-4 w-4 text-primary" />
+          <span className="hidden lg:inline-flex">Pesquisar...</span>
+          <span className="inline-flex lg:hidden">Pesquisar</span>
+          <kbd className="pointer-events-none absolute right-1.5 top-1.5 hidden h-6 select-none items-center gap-1 rounded border border-primary/20 bg-primary/10 px-1.5 font-mono text-[10px] font-medium text-primary sm:flex">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </Button>
+      </div>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
         <div className="relative">
