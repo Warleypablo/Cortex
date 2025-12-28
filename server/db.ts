@@ -5,17 +5,23 @@ import * as schema from '@shared/schema';
 
 const pool = new Pool({
   host: process.env.DB_HOST,
-  port: 5432,
+  port: parseInt(process.env.DB_PORT || '5432', 10),
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'false' 
+    ? { rejectUnauthorized: false } 
+    : { rejectUnauthorized: true },
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 20,
 });
 
 pool.on('error', (err) => {
-  console.error('[database] Unexpected error on idle client', err);
+  console.error('[database] Pool error occurred');
+  if (process.env.NODE_ENV !== 'production') {
+    console.error('[database] Details:', err.message);
+  }
 });
 
 export const db = drizzle(pool, { schema });
@@ -883,7 +889,7 @@ async function generateSysAliases(): Promise<void> {
     }
     
     // Insert aliases
-    for (const alias of aliases) {
+    for (const alias of Array.from(aliases)) {
       if (alias && alias.length > 0) {
         await db.execute(sql`
           INSERT INTO sys.catalog_aliases (catalog_key, alias, slug)
