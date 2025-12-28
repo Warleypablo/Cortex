@@ -71,6 +71,7 @@ const MeuPerfil = lazy(() => import("@/pages/MeuPerfil"));
 const Avisos = lazy(() => import("@/pages/Avisos"));
 const AdminHealth = lazy(() => import("@/pages/AdminHealth"));
 const AdminOverrides = lazy(() => import("@/pages/AdminOverrides"));
+const TurbodashOverview = lazy(() => import("@/pages/TurbodashOverview"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -207,6 +208,7 @@ function ProtectedRouter() {
       <Route path="/growth/visao-geral">{() => <ProtectedRoute path="/growth/visao-geral" component={GrowthVisaoGeral} />}</Route>
       <Route path="/growth/criativos">{() => <ProtectedRoute path="/growth/criativos" component={Criativos} />}</Route>
       <Route path="/growth/performance-plataformas">{() => <ProtectedRoute path="/growth/performance-plataformas" component={PerformancePlataformas} />}</Route>
+      <Route path="/growth/turbodash">{() => <ProtectedRoute path="/growth/turbodash" component={TurbodashOverview} />}</Route>
       
       {/* Jurídico */}
       <Route path="/juridico/clientes">{() => <ProtectedRoute path="/juridico/clientes" component={JuridicoClientes} />}</Route>
