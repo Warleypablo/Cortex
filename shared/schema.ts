@@ -2330,6 +2330,7 @@ export const turbodashClientResponseSchema = z.object({
   periodo_fim: z.string(),
   kpis: turbodashKPIsPayloadSchema,
   ultima_atualizacao: z.string(),
+  is_demo: z.boolean().optional(),
 });
 
 export const turbodashListResponseSchema = z.object({
