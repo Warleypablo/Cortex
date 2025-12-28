@@ -15,7 +15,94 @@ const TURBODASH_API_URL = process.env.TURBODASH_API_URL || 'https://app.turbodas
 const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
 const CACHE_TTL_MINUTES = 15;
 
-// Transform TurboDash API response to internal normalized format
+// Real TurboDash API response format
+interface TurboDashRealApiResponse {
+  success: boolean;
+  timestamp: string;
+  dateRange: {
+    start: string;
+    end: string;
+  };
+  clients: Array<{
+    id: string;
+    name: string;
+    cnpj: string;
+    current: {
+      revenue: number;
+      adSpend: number;
+      roas: number;
+      purchases: number;
+      cpa: number;
+      avgTicket: number;
+      sessions: number;
+      cps: number;
+      conversionRate: number;
+      recurrenceRate: number;
+    };
+    previous: {
+      revenue: number;
+      adSpend: number;
+      roas: number;
+      purchases: number;
+      cpa: number;
+      avgTicket: number;
+      sessions: number;
+      cps: number;
+      conversionRate: number;
+      recurrenceRate: number;
+    };
+    growth: {
+      revenue: number;
+      adSpend: number;
+      roas: number;
+      purchases: number;
+      cpa: number;
+      avgTicket: number;
+      sessions: number;
+      cps: number;
+      conversionRate: number;
+      recurrenceRate: number;
+    };
+  }>;
+}
+
+// Transform real TurboDash API client data to internal normalized format
+function transformRealApiClient(
+  client: TurboDashRealApiResponse['clients'][0], 
+  dateRange: TurboDashRealApiResponse['dateRange']
+): TurbodashClientResponse {
+  return {
+    cnpj: client.cnpj.replace(/\D/g, ''),
+    nome_cliente: client.name,
+    periodo_inicio: dateRange.start,
+    periodo_fim: dateRange.end,
+    kpis: {
+      faturamento: client.current.revenue,
+      faturamento_variacao: client.growth.revenue,
+      investimento: client.current.adSpend,
+      investimento_variacao: client.growth.adSpend,
+      roas: client.current.roas,
+      roas_variacao: client.growth.roas,
+      compras: client.current.purchases,
+      compras_variacao: client.growth.purchases,
+      cpa: client.current.cpa,
+      cpa_variacao: client.growth.cpa,
+      ticket_medio: client.current.avgTicket,
+      ticket_medio_variacao: client.growth.avgTicket,
+      sessoes: client.current.sessions,
+      sessoes_variacao: client.growth.sessions,
+      cps: client.current.cps,
+      cps_variacao: client.growth.cps,
+      taxa_conversao: client.current.conversionRate,
+      taxa_conversao_variacao: client.growth.conversionRate,
+      taxa_recorrencia: client.current.recurrenceRate,
+      taxa_recorrencia_variacao: client.growth.recurrenceRate,
+    },
+    ultima_atualizacao: new Date().toISOString(),
+  };
+}
+
+// Legacy transform function for old API format (if ever needed)
 function transformApiResponse(apiData: TurbodashApiResponse): TurbodashClientResponse {
   const { client, period, metrics } = apiData;
   
@@ -209,10 +296,19 @@ export async function getKPIsByCNPJ(cnpj: string, forceRefresh = false): Promise
   
   try {
     // Fetch from TurboDash API using Bearer token authentication
-    const apiData = await fetchFromTurboDashAPI<TurbodashApiResponse>(`/api/internal/metrics/${cnpjLimpo}`);
+    // Real API format: { success, timestamp, dateRange, clients: [...] }
+    const apiResponse = await fetchFromTurboDashAPI<TurboDashRealApiResponse>(`/api/internal/metrics/${cnpjLimpo}`);
     
-    // Transform to internal normalized format
-    const data = transformApiResponse(apiData);
+    if (!apiResponse.success || !apiResponse.clients || apiResponse.clients.length === 0) {
+      console.warn('[TurboDash] No data returned from API for CNPJ:', cnpjLimpo);
+      return cached.length > 0 ? transformCachedRow(cached[0]) : getDemoKPIs(cnpjLimpo);
+    }
+    
+    // Transform the first client (API returns array even for single CNPJ query)
+    const clientData = apiResponse.clients[0];
+    const data = transformRealApiClient(clientData, apiResponse.dateRange);
+    
+    console.log('[TurboDash] Fetched data for client:', data.nome_cliente);
     
     await saveKPIToCache(data);
     
@@ -307,28 +403,25 @@ export async function getAllKPIs(forceRefresh = false): Promise<TurbodashListRes
   
   try {
     // Fetch list of all clients from TurboDash API
-    // API can return either a structured response or an array
-    const rawData = await fetchFromTurboDashAPI<TurbodashApiListResponse | TurbodashApiResponse[]>('/api/internal/metrics');
+    // Real API format: { success, timestamp, dateRange, clients: [...] }
+    const apiResponse = await fetchFromTurboDashAPI<TurboDashRealApiResponse>('/api/internal/metrics');
     
-    let clientes: TurbodashClientResponse[];
-    let periodStart: string;
-    let periodEnd: string;
-    let total: number;
-    
-    if (Array.isArray(rawData)) {
-      // API returned a simple array
-      clientes = rawData.map(transformApiResponse);
-      const firstCliente = clientes[0];
-      periodStart = firstCliente?.periodo_inicio || new Date().toISOString().split('T')[0];
-      periodEnd = firstCliente?.periodo_fim || new Date().toISOString().split('T')[0];
-      total = clientes.length;
-    } else {
-      // API returned a structured response
-      clientes = rawData.clients.map(transformApiResponse);
-      periodStart = rawData.period?.current.start || clientes[0]?.periodo_inicio || new Date().toISOString().split('T')[0];
-      periodEnd = rawData.period?.current.end || clientes[0]?.periodo_fim || new Date().toISOString().split('T')[0];
-      total = rawData.total ?? clientes.length;
+    if (!apiResponse.success || !apiResponse.clients || apiResponse.clients.length === 0) {
+      console.warn('[TurboDash] No data returned from API for getAllKPIs');
+      return {
+        total: cached.length,
+        periodo_inicio: cached[0]?.periodo_inicio || new Date().toISOString().split('T')[0],
+        periodo_fim: cached[0]?.periodo_fim || new Date().toISOString().split('T')[0],
+        clientes: cached.map(transformCachedRowFromDb),
+      };
     }
+    
+    // Transform all clients using the real API format
+    const clientes = apiResponse.clients.map(client => 
+      transformRealApiClient(client, apiResponse.dateRange)
+    );
+    
+    console.log(`[TurboDash] Fetched ${clientes.length} clients from API`);
     
     // Cache each client's data
     for (const cliente of clientes) {
@@ -336,9 +429,9 @@ export async function getAllKPIs(forceRefresh = false): Promise<TurbodashListRes
     }
     
     return {
-      total,
-      periodo_inicio: periodStart,
-      periodo_fim: periodEnd,
+      total: clientes.length,
+      periodo_inicio: apiResponse.dateRange.start,
+      periodo_fim: apiResponse.dateRange.end,
       clientes,
     };
   } catch (error) {
