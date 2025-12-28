@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
+import { TurbodashKPICards } from "@/components/TurbodashKPICards";
 import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus, ChevronsUpDown, XCircle, Star, MessageCircle } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
@@ -1462,10 +1463,14 @@ export default function ClientDetail() {
         </Card>
 
         <Tabs defaultValue="dados-cadastrais" className="w-full" data-testid="client-detail-tabs">
-          <TabsList className="grid w-full grid-cols-4 mb-4 h-11 p-1 bg-muted/60" data-testid="tabs-list">
+          <TabsList className="grid w-full grid-cols-5 mb-4 h-11 p-1 bg-muted/60" data-testid="tabs-list">
             <TabsTrigger value="dados-cadastrais" className="text-sm font-medium gap-1.5" data-testid="tab-dados-cadastrais">
               <Building2 className="w-3.5 h-3.5" />
               Dados
+            </TabsTrigger>
+            <TabsTrigger value="performance" className="text-sm font-medium gap-1.5" data-testid="tab-performance">
+              <Activity className="w-3.5 h-3.5" />
+              Performance
             </TabsTrigger>
             <TabsTrigger value="tarefas" className="text-sm font-medium gap-1.5" data-testid="tab-tarefas">
               <ListTodo className="w-3.5 h-3.5" />
@@ -3074,6 +3079,31 @@ export default function ClientDetail() {
             )}
           </Card>
         </div>
+          </TabsContent>
+
+          <TabsContent value="performance" className="mt-0" data-testid="tabcontent-performance">
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Activity className="w-5 h-5 text-primary" />
+                <div>
+                  <h2 className="text-lg font-semibold">Performance do Cliente</h2>
+                  <p className="text-sm text-muted-foreground">Métricas de desempenho via TurboDash</p>
+                </div>
+              </div>
+              {isLoadingCliente ? (
+                <div className="flex items-center justify-center py-12" data-testid="loading-performance">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : cliente?.cnpj ? (
+                <TurbodashKPICards cnpj={cliente.cnpj} />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center" data-testid="no-cnpj-performance">
+                  <Activity className="w-12 h-12 text-muted-foreground/50 mb-4" />
+                  <p className="text-muted-foreground font-medium">CNPJ não cadastrado</p>
+                  <p className="text-sm text-muted-foreground/70 mt-1">Cadastre o CNPJ do cliente para visualizar métricas de performance</p>
+                </div>
+              )}
+            </Card>
           </TabsContent>
 
           <TabsContent value="tarefas" data-testid="tabcontent-tarefas">
