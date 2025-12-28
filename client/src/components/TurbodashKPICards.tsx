@@ -99,10 +99,10 @@ interface TurbodashKPICardsProps {
 }
 
 export function TurbodashKPICards({ cnpj, className }: TurbodashKPICardsProps) {
-  // Default to previous month for better data availability
+  // Default to current month
   const now = new Date();
-  const defaultMonth = now.getMonth() === 0 ? "12" : String(now.getMonth()).padStart(2, '0');
-  const defaultYear = now.getMonth() === 0 ? String(now.getFullYear() - 1) : String(now.getFullYear());
+  const defaultMonth = String(now.getMonth() + 1).padStart(2, '0');
+  const defaultYear = String(now.getFullYear());
   
   const [selectedMes, setSelectedMes] = useState<string>(defaultMonth);
   const [selectedAno, setSelectedAno] = useState<string>(defaultYear);
