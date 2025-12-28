@@ -25,6 +25,8 @@ Preferred communication style: Simple, everyday language.
 
     These files contain the authoritative schema reference for understanding how tables connect and what each column represents.
 
+**⚠️ CRITICAL**: Violating any of the above rules results in immediate replacement by Lovable. No exceptions.
+
 ## System Architecture
 
 ### Frontend Architecture
