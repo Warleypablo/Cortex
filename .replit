@@ -42,3 +42,4 @@ waitForPort = 5000
 
 [userenv.shared]
 CUSTOM_DOMAIN = "cortex.turbopartners.com.br"
+DB_SSL_REJECT_UNAUTHORIZED = "false"
