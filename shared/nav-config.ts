@@ -11,7 +11,6 @@ export const PERMISSION_KEYS = {
     BENEFICIOS: 'general.beneficios',
     GPTURBO: 'general.gpturbo',
     TURBO_TOOLS: 'general.turbo_tools',
-    OKR_2026: 'general.okr_2026',
   },
   // Financeiro
   FIN: {
@@ -71,6 +70,7 @@ export const PERMISSION_KEYS = {
   // Administração
   ADMIN: {
     USUARIOS: 'admin.usuarios',
+    OKR_2026: 'admin.okr_2026',
   },
 } as const;
 
@@ -142,7 +142,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/beneficios': PERMISSION_KEYS.GENERAL.BENEFICIOS,
   '/cases/chat': PERMISSION_KEYS.GENERAL.GPTURBO,
   '/ferramentas': PERMISSION_KEYS.GENERAL.TURBO_TOOLS,
-  '/okr-2026': PERMISSION_KEYS.GENERAL.OKR_2026,
+  '/okr-2026': PERMISSION_KEYS.ADMIN.OKR_2026,
   // Financeiro
   '/dashboard/financeiro': PERMISSION_KEYS.FIN.VISAO_GERAL,
   '/dashboard/dfc': PERMISSION_KEYS.FIN.DFC,
@@ -245,7 +245,7 @@ export interface NavSection {
 export const NAV_CONFIG = {
   // Acesso Rápido - shortcuts to Geral pages
   quickAccess: [
-    { title: 'OKR 2026', url: '/okr-2026', icon: 'Target', permissionKey: PERMISSION_KEYS.GENERAL.OKR_2026 },
+    { title: 'OKR 2026', url: '/okr-2026', icon: 'Target', permissionKey: PERMISSION_KEYS.ADMIN.OKR_2026 },
     { title: 'Meu Perfil', url: '/meu-perfil', icon: 'UserRound', permissionKey: PERMISSION_KEYS.GENERAL.PROFILE },
     { title: 'Calendário', url: '/calendario', icon: 'CalendarDays', permissionKey: PERMISSION_KEYS.GENERAL.CALENDAR },
     { title: 'Acessos', url: '/acessos', icon: 'Key', permissionKey: PERMISSION_KEYS.GENERAL.ACESSOS },
@@ -267,7 +267,7 @@ export const NAV_CONFIG = {
       { title: 'Clube Benefícios', url: '/beneficios', icon: 'Gift', permissionKey: PERMISSION_KEYS.GENERAL.BENEFICIOS },
       { title: 'GPTurbo', url: '/cases/chat', icon: 'Sparkles', permissionKey: PERMISSION_KEYS.GENERAL.GPTURBO },
       { title: 'Turbo Tools', url: '/ferramentas', icon: 'Wrench', permissionKey: PERMISSION_KEYS.GENERAL.TURBO_TOOLS },
-      { title: 'OKR 2026', url: '/okr-2026', icon: 'Trophy', permissionKey: PERMISSION_KEYS.GENERAL.OKR_2026 },
+      { title: 'OKR 2026', url: '/okr-2026', icon: 'Trophy', permissionKey: PERMISSION_KEYS.ADMIN.OKR_2026 },
     ],
   },
   
@@ -464,7 +464,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GENERAL.BENEFICIOS]: 'Clube Benefícios',
   [PERMISSION_KEYS.GENERAL.GPTURBO]: 'GPTurbo',
   [PERMISSION_KEYS.GENERAL.TURBO_TOOLS]: 'Turbo Tools',
-  [PERMISSION_KEYS.GENERAL.OKR_2026]: 'OKR 2026',
+  [PERMISSION_KEYS.ADMIN.OKR_2026]: 'OKR 2026',
   [PERMISSION_KEYS.FIN.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.FIN.DFC]: 'DFC',
   [PERMISSION_KEYS.FIN.FLUXO_CAIXA]: 'Fluxo de Caixa',
