@@ -12638,8 +12638,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const forceRefresh = req.query.refresh === 'true';
       
+      // Parse month/year parameters for period filtering
+      const mes = req.query.mes as string | undefined;
+      const ano = req.query.ano as string | undefined;
+      
       const { getKPIsByCNPJ } = await import('./services/turbodash');
-      const data = await getKPIsByCNPJ(cnpjClean, forceRefresh);
+      const data = await getKPIsByCNPJ(cnpjClean, forceRefresh, mes, ano);
       
       if (!data) {
         return res.status(404).json({ error: "Cliente não encontrado no TurboDash" });
