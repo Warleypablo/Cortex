@@ -2208,3 +2208,95 @@ export const okrInitiatives = pgTable("okr_initiatives", {
 export const insertOkrInitiativeSchema = createInsertSchema(okrInitiatives).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertOkrInitiative = z.infer<typeof insertOkrInitiativeSchema>;
 export type OkrInitiative = typeof okrInitiatives.$inferSelect;
+
+// ==================== TURBODASH INTEGRATION (KPIs Cache) ====================
+
+export const turbodashKpis = pgTable("staging.turbodash_kpis", {
+  id: serial("id").primaryKey(),
+  cnpj: varchar("cnpj", { length: 20 }).notNull(),
+  clienteNome: varchar("cliente_nome", { length: 255 }),
+  clienteIdCortex: integer("cliente_id_cortex"),
+  periodoInicio: date("periodo_inicio").notNull(),
+  periodoFim: date("periodo_fim").notNull(),
+  faturamento: decimal("faturamento", { precision: 18, scale: 2 }),
+  faturamentoVariacao: decimal("faturamento_variacao", { precision: 8, scale: 2 }),
+  investimento: decimal("investimento", { precision: 18, scale: 2 }),
+  investimentoVariacao: decimal("investimento_variacao", { precision: 8, scale: 2 }),
+  roas: decimal("roas", { precision: 10, scale: 4 }),
+  roasVariacao: decimal("roas_variacao", { precision: 8, scale: 2 }),
+  compras: integer("compras"),
+  comprasVariacao: decimal("compras_variacao", { precision: 8, scale: 2 }),
+  cpa: decimal("cpa", { precision: 12, scale: 2 }),
+  cpaVariacao: decimal("cpa_variacao", { precision: 8, scale: 2 }),
+  ticketMedio: decimal("ticket_medio", { precision: 12, scale: 2 }),
+  ticketMedioVariacao: decimal("ticket_medio_variacao", { precision: 8, scale: 2 }),
+  sessoes: integer("sessoes"),
+  sessoesVariacao: decimal("sessoes_variacao", { precision: 8, scale: 2 }),
+  cps: decimal("cps", { precision: 12, scale: 2 }),
+  cpsVariacao: decimal("cps_variacao", { precision: 8, scale: 2 }),
+  taxaConversao: decimal("taxa_conversao", { precision: 8, scale: 4 }),
+  taxaConversaoVariacao: decimal("taxa_conversao_variacao", { precision: 8, scale: 2 }),
+  taxaRecorrencia: decimal("taxa_recorrencia", { precision: 8, scale: 4 }),
+  taxaRecorrenciaVariacao: decimal("taxa_recorrencia_variacao", { precision: 8, scale: 2 }),
+  syncStatus: varchar("sync_status", { length: 20 }).notNull().default("fresh"),
+  lastSyncedAt: timestamp("last_synced_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTurbodashKpiSchema = createInsertSchema(turbodashKpis).omit({ 
+  id: true, 
+  createdAt: true,
+  lastSyncedAt: true 
+});
+export type InsertTurbodashKpi = z.infer<typeof insertTurbodashKpiSchema>;
+export type TurbodashKpi = typeof turbodashKpis.$inferSelect;
+
+export type TurbodashSyncStatus = "fresh" | "stale" | "error";
+
+// TurboDash API Response types (shared between frontend and backend)
+export const turbodashKPIsPayloadSchema = z.object({
+  faturamento: z.number(),
+  faturamento_variacao: z.number(),
+  investimento: z.number(),
+  investimento_variacao: z.number(),
+  roas: z.number(),
+  roas_variacao: z.number(),
+  compras: z.number(),
+  compras_variacao: z.number(),
+  cpa: z.number(),
+  cpa_variacao: z.number(),
+  ticket_medio: z.number(),
+  ticket_medio_variacao: z.number(),
+  sessoes: z.number(),
+  sessoes_variacao: z.number(),
+  cps: z.number(),
+  cps_variacao: z.number(),
+  taxa_conversao: z.number(),
+  taxa_conversao_variacao: z.number(),
+  taxa_recorrencia: z.number(),
+  taxa_recorrencia_variacao: z.number(),
+});
+
+export const turbodashClientResponseSchema = z.object({
+  cnpj: z.string(),
+  nome_cliente: z.string(),
+  periodo_inicio: z.string(),
+  periodo_fim: z.string(),
+  kpis: turbodashKPIsPayloadSchema,
+  ultima_atualizacao: z.string(),
+});
+
+export const turbodashListResponseSchema = z.object({
+  total: z.number(),
+  periodo_inicio: z.string(),
+  periodo_fim: z.string(),
+  clientes: z.array(turbodashClientResponseSchema),
+});
+
+export const cnpjParamSchema = z.object({
+  cnpj: z.string().min(11).max(18).regex(/^[\d.\-\/]+$/, "CNPJ inválido"),
+});
+
+export type TurbodashKPIsPayload = z.infer<typeof turbodashKPIsPayloadSchema>;
+export type TurbodashClientResponse = z.infer<typeof turbodashClientResponseSchema>;
+export type TurbodashListResponse = z.infer<typeof turbodashListResponseSchema>;

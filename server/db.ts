@@ -25,7 +25,7 @@ pool.on('error', (err) => {
 });
 
 export const db = drizzle(pool, { schema });
-export { schema };
+export { pool, schema };
 
 export async function initializeNotificationsTable(): Promise<void> {
   try {
