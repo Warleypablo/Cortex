@@ -701,15 +701,13 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         ORDER BY cr.platform
       `);
       
-      // Aggregate all credentials into a single group with preserved IDs
+      // Aggregate all credentials into a single group
       const allCredentials: any[] = [];
-      let firstClientId: any = null;
-      let firstClientName: string | null = null;
+      const clientNames: string[] = [];
       
       for (const row of result.rows as any[]) {
-        if (firstClientId === null) {
-          firstClientId = row.client_id;
-          firstClientName = row.client_name;
+        if (row.client_name && !clientNames.includes(row.client_name)) {
+          clientNames.push(row.client_name);
         }
         if (row.credential_id) {
           allCredentials.push({
@@ -723,12 +721,14 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         }
       }
       
-      // Return a single aggregated group preserving the first client's ID
-      // Use Conta Azul name if available, otherwise use the first client name
+      // Use stable ID based on normalized CNPJ for React keys
+      // Use Conta Azul name if available, otherwise first alphabetically sorted client name
+      const displayName = cazClientName || (clientNames.length > 0 ? clientNames.sort()[0] : 'Cliente');
+      
       if (allCredentials.length > 0) {
         res.json([{
-          id: firstClientId,
-          name: cazClientName || firstClientName || 'Cliente',
+          id: `cnpj-${normalizedCnpj}`,
+          name: displayName,
           credentials: allCredentials
         }]);
       } else {
