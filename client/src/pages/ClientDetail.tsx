@@ -861,6 +861,23 @@ export default function ClientDetail() {
   const totalReceitas = sortedReceitas?.reduce((sum, r) => sum + parseFloat(r.pago || "0"), 0) || 0;
   const ticketMedio = lt > 0 ? totalReceitas / lt : 0;
   
+  // MRR Ativo - soma do valor recorrente dos contratos ativos
+  const mrrAtivo = useMemo(() => {
+    if (!contratos || contratos.length === 0) return 0;
+    
+    const statusAtivos = ['ativo', 'onboarding', 'triagem', 'em cancelamento'];
+    
+    return contratos.reduce((sum, c) => {
+      const statusLower = c.status?.toLowerCase() || "";
+      const isAtivo = statusAtivos.some(s => statusLower.includes(s));
+      
+      if (isAtivo && c.valorr) {
+        return sum + parseFloat(c.valorr.toString());
+      }
+      return sum;
+    }, 0);
+  }, [contratos]);
+  
   const temContratoAtivo = contratos?.some(c => {
     const statusLower = c.status?.toLowerCase() || "";
     if (statusLower.includes("inativo") || statusLower.includes("inactive") || 
@@ -1372,7 +1389,7 @@ export default function ClientDetail() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6" data-testid="stats-grid">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6" data-testid="stats-grid">
           <StatsCard
             title="Receita Total"
             value={new Intl.NumberFormat('pt-BR', { 
@@ -1385,14 +1402,25 @@ export default function ClientDetail() {
             subtitle="Soma de todos os pagamentos recebidos deste cliente"
           />
           <StatsCard
+            title="MRR Ativo"
+            value={new Intl.NumberFormat('pt-BR', { 
+              style: 'currency', 
+              currency: 'BRL',
+              minimumFractionDigits: 0
+            }).format(mrrAtivo)}
+            icon={TrendingUp}
+            variant="info"
+            subtitle="Receita mensal recorrente dos contratos ativos"
+          />
+          <StatsCard
             title="Ticket Médio"
             value={new Intl.NumberFormat('pt-BR', { 
               style: 'currency', 
               currency: 'BRL',
               minimumFractionDigits: 0
             }).format(ticketMedio)}
-            icon={TrendingUp}
-            variant="info"
+            icon={Receipt}
+            variant="default"
             subtitle="Valor médio por pagamento recebido"
           />
           <StatsCard
