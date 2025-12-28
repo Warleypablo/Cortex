@@ -230,7 +230,11 @@ export async function getKPIsByCNPJ(
     return getDemoKPIs(cnpjLimpo);
   }
   
-  if (cached.length > 0 && !forceRefresh && !isCacheStale(cached[0].last_synced_at)) {
+  const lastSyncedAt = cached.length > 0 && cached[0].last_synced_at 
+    ? new Date(cached[0].last_synced_at) 
+    : null;
+  
+  if (cached.length > 0 && !forceRefresh && !isCacheStale(lastSyncedAt)) {
     const c = cached[0];
     return {
       cnpj: c.cnpj,
