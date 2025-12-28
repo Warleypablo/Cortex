@@ -40,7 +40,10 @@ export default function RevenueChart({ data, onBarClick, selectedMonth }: Revenu
               backgroundColor: 'hsl(var(--card))',
               border: '1px solid hsl(var(--border))',
               borderRadius: '0.5rem',
+              color: 'hsl(var(--card-foreground))',
             }}
+            labelStyle={{ color: 'hsl(var(--card-foreground))' }}
+            itemStyle={{ color: 'hsl(var(--card-foreground))' }}
             formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Faturamento']}
           />
           <Bar 
