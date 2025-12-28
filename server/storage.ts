@@ -3621,20 +3621,20 @@ export class DbStorage implements IStorage {
   async getMrrEvolucaoMensal(mesAnoFim: string): Promise<import("@shared/schema").MrrEvolucaoMensal[]> {
     const [anoFim, mesFim] = mesAnoFim.split('-').map(Number);
     
-    // Gerar lista de meses desde novembro/2025 até mesAnoFim
+    // Gerar lista dos últimos 12 meses até mesAnoFim
     const meses: string[] = [];
-    const mesInicio = new Date(2025, 10, 1); // Novembro 2025 (mês 10 = novembro)
     const mesFimDate = new Date(anoFim, mesFim - 1, 1);
     
-    let mesAtual = new Date(mesInicio);
-    while (mesAtual <= mesFimDate) {
-      const ano = mesAtual.getFullYear();
-      const mes = mesAtual.getMonth() + 1;
+    // Calcular 11 meses antes do mês atual (total de 12 meses)
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(mesFimDate);
+      d.setMonth(d.getMonth() - i);
+      const ano = d.getFullYear();
+      const mes = d.getMonth() + 1;
       meses.push(`${ano}-${String(mes).padStart(2, '0')}`);
-      mesAtual = new Date(ano, mes, 1);
     }
 
-    // Para cada mês, buscar MRR do último snapshot disponível daquele mês
+    // Para cada mês, buscar MRR e Receita Pontual Entregue
     const resultado: import("@shared/schema").MrrEvolucaoMensal[] = [];
     
     for (const mes of meses) {
@@ -3643,7 +3643,7 @@ export class DbStorage implements IStorage {
       const fimMes = new Date(ano, mesNum, 0, 23, 59, 59);
 
       // Buscar o último snapshot do mês e somar valor_r dos contratos ativos
-      const query = await db.execute(sql`
+      const mrrQuery = await db.execute(sql`
         WITH ultimo_snapshot AS (
           SELECT MAX(data_snapshot) as data_ultimo_snapshot
           FROM ${schema.cupDataHist}
@@ -3660,16 +3660,28 @@ export class DbStorage implements IStorage {
         GROUP BY us.data_ultimo_snapshot
       `);
 
-      const row = query.rows[0] as any;
+      // Buscar Receita Pontual Entregue (projetos encerrados no mês)
+      const pontualQuery = await db.execute(sql`
+        SELECT COALESCE(SUM(valorp::numeric), 0) as receita_pontual
+        FROM ${schema.cupContratos}
+        WHERE data_encerramento >= ${inicioMes}
+          AND data_encerramento <= ${fimMes}
+          AND valorp IS NOT NULL
+          AND valorp > 0
+      `);
+
+      const mrrRow = mrrQuery.rows[0] as any;
+      const pontualRow = pontualQuery.rows[0] as any;
       
-      // Só adiciona o mês se houver snapshot disponível (data_ultimo_snapshot não é NULL)
-      if (row?.data_ultimo_snapshot) {
-        const mrr = parseFloat(row.mrr || '0');
-        resultado.push({
-          mes,
-          mrr,
-        });
-      }
+      // Adiciona o mês mesmo se não houver snapshot (para mostrar os 12 meses)
+      const mrr = mrrRow?.data_ultimo_snapshot ? parseFloat(mrrRow.mrr || '0') : 0;
+      const receitaPontualEntregue = parseFloat(pontualRow?.receita_pontual || '0');
+      
+      resultado.push({
+        mes,
+        mrr,
+        receitaPontualEntregue,
+      });
     }
 
     return resultado;

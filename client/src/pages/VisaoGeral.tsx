@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { DollarSign, TrendingUp, TrendingDown, PauseCircle, Info, CheckCircle } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend } from "recharts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
@@ -75,7 +75,7 @@ export default function VisaoGeral() {
     },
   });
 
-  const { data: mrrEvolucaoData, isLoading: isLoadingMrrEvolucao } = useQuery<{ mes: string; mrr: number }[]>({
+  const { data: mrrEvolucaoData, isLoading: isLoadingMrrEvolucao } = useQuery<{ mes: string; mrr: number; receitaPontualEntregue: number }[]>({
     queryKey: ['/api/visao-geral/mrr-evolucao', mesVisaoGeral],
     queryFn: async () => {
       const response = await fetch(`/api/visao-geral/mrr-evolucao?mesAno=${mesVisaoGeral}`);
@@ -95,8 +95,9 @@ export default function VisaoGeral() {
   };
 
   const mrrEvolution = (mrrEvolucaoData || []).map(item => ({
-    mes: formatMesLabel(item.mes),
+    mes: item.mes,
     mrr: item.mrr,
+    receitaPontualEntregue: item.receitaPontualEntregue || 0,
   }));
 
   const squadColors: Record<string, string> = {
@@ -283,8 +284,8 @@ export default function VisaoGeral() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="lg:col-span-2" data-testid="card-evolucao-mrr">
               <CardHeader>
-                <CardTitle>Evolução MRR Mensal</CardTitle>
-                <CardDescription>Histórico de receita recorrente mensal desde Nov/2025</CardDescription>
+                <CardTitle>Evolução MRR e Receita Pontual</CardTitle>
+                <CardDescription>Histórico dos últimos 12 meses</CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoadingMrrEvolucao ? (
@@ -297,28 +298,51 @@ export default function VisaoGeral() {
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={mrrEvolution}>
+                    <ComposedChart data={mrrEvolution}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis 
                         dataKey="mes" 
                         className="text-sm"
                         tick={{ fill: 'currentColor' }}
+                        tickFormatter={(value) => {
+                          const [ano, mes] = value.split('-');
+                          const mesesAbrev = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                          return `${mesesAbrev[parseInt(mes) - 1]}/${ano.slice(2)}`;
+                        }}
                       />
                       <YAxis 
                         className="text-sm"
                         tick={{ fill: 'currentColor' }}
-                        tickFormatter={(value) => formatCurrency(value)}
+                        tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
                       />
                       <RechartsTooltip 
-                        formatter={(value: number) => [formatCurrency(value), 'MRR']}
+                        formatter={(value: number, name: string) => [
+                          formatCurrency(value), 
+                          name === 'mrr' ? 'MRR' : 'Pontual Entregue'
+                        ]}
+                        labelFormatter={(label) => {
+                          const [ano, mes] = label.split('-');
+                          const mesesNomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+                          return `${mesesNomes[parseInt(mes) - 1]} ${ano}`;
+                        }}
                         contentStyle={{ 
                           backgroundColor: 'hsl(var(--background))',
                           border: '1px solid hsl(var(--border))',
                           borderRadius: '6px',
                         }}
                       />
-                      <Bar dataKey="mrr" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
-                    </BarChart>
+                      <Legend 
+                        formatter={(value) => value === 'mrr' ? 'MRR' : 'Pontual Entregue'}
+                      />
+                      <Bar dataKey="mrr" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="receitaPontualEntregue" 
+                        stroke="#9333ea" 
+                        strokeWidth={2}
+                        dot={{ fill: '#9333ea', strokeWidth: 2, r: 4 }}
+                      />
+                    </ComposedChart>
                   </ResponsiveContainer>
                 )}
               </CardContent>
