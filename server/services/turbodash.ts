@@ -11,6 +11,7 @@ import { eq, desc, sql } from 'drizzle-orm';
 // Internal API configuration - uses INTERNAL_API_TOKEN for authentication
 const INTERNAL_API_URL = process.env.INTERNAL_API_URL || 'http://localhost:5000';
 const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN;
+const TURBODASH_API_SECRET = process.env.TURBODASH_API_SECRET;
 const CACHE_TTL_MINUTES = 15;
 
 // Transform TurboDash API response to internal normalized format
@@ -115,12 +116,14 @@ export async function getKPIsByCNPJ(cnpj: string, forceRefresh = false): Promise
   
   let cached: any[] = [];
   try {
-    cached = await db
-      .select()
-      .from(turbodashKpis)
-      .where(eq(turbodashKpis.cnpj, cnpjLimpo))
-      .orderBy(desc(turbodashKpis.lastSyncedAt))
-      .limit(1);
+    // Use raw SQL to properly access staging schema
+    const result = await db.execute(sql`
+      SELECT * FROM staging.turbodash_kpis 
+      WHERE cnpj = ${cnpjLimpo}
+      ORDER BY last_synced_at DESC
+      LIMIT 1
+    `);
+    cached = result.rows as any[];
   } catch (error: any) {
     // If table doesn't exist, return demo data
     if (error.code === '42P01') {
@@ -131,70 +134,73 @@ export async function getKPIsByCNPJ(cnpj: string, forceRefresh = false): Promise
     return getDemoKPIs(cnpjLimpo);
   }
   
-  if (cached.length > 0 && !forceRefresh && !isCacheStale(cached[0].lastSyncedAt)) {
+  if (cached.length > 0 && !forceRefresh && !isCacheStale(cached[0].last_synced_at)) {
     const c = cached[0];
     return {
       cnpj: c.cnpj,
-      nome_cliente: c.clienteNome || '',
-      periodo_inicio: c.periodoInicio,
-      periodo_fim: c.periodoFim,
+      nome_cliente: c.cliente_nome || '',
+      periodo_inicio: c.periodo_inicio,
+      periodo_fim: c.periodo_fim,
       kpis: {
         faturamento: Number(c.faturamento) || 0,
-        faturamento_variacao: Number(c.faturamentoVariacao) || 0,
+        faturamento_variacao: Number(c.faturamento_variacao) || 0,
         investimento: Number(c.investimento) || 0,
-        investimento_variacao: Number(c.investimentoVariacao) || 0,
+        investimento_variacao: Number(c.investimento_variacao) || 0,
         roas: Number(c.roas) || 0,
-        roas_variacao: Number(c.roasVariacao) || 0,
+        roas_variacao: Number(c.roas_variacao) || 0,
         compras: c.compras || 0,
-        compras_variacao: Number(c.comprasVariacao) || 0,
+        compras_variacao: Number(c.compras_variacao) || 0,
         cpa: Number(c.cpa) || 0,
-        cpa_variacao: Number(c.cpaVariacao) || 0,
-        ticket_medio: Number(c.ticketMedio) || 0,
-        ticket_medio_variacao: Number(c.ticketMedioVariacao) || 0,
+        cpa_variacao: Number(c.cpa_variacao) || 0,
+        ticket_medio: Number(c.ticket_medio) || 0,
+        ticket_medio_variacao: Number(c.ticket_medio_variacao) || 0,
         sessoes: c.sessoes || 0,
-        sessoes_variacao: Number(c.sessoesVariacao) || 0,
+        sessoes_variacao: Number(c.sessoes_variacao) || 0,
         cps: Number(c.cps) || 0,
-        cps_variacao: Number(c.cpsVariacao) || 0,
-        taxa_conversao: Number(c.taxaConversao) || 0,
-        taxa_conversao_variacao: Number(c.taxaConversaoVariacao) || 0,
-        taxa_recorrencia: Number(c.taxaRecorrencia) || 0,
-        taxa_recorrencia_variacao: Number(c.taxaRecorrenciaVariacao) || 0,
+        cps_variacao: Number(c.cps_variacao) || 0,
+        taxa_conversao: Number(c.taxa_conversao) || 0,
+        taxa_conversao_variacao: Number(c.taxa_conversao_variacao) || 0,
+        taxa_recorrencia: Number(c.taxa_recorrencia) || 0,
+        taxa_recorrencia_variacao: Number(c.taxa_recorrencia_variacao) || 0,
       },
-      ultima_atualizacao: c.lastSyncedAt?.toISOString() || new Date().toISOString(),
+      ultima_atualizacao: c.last_synced_at?.toISOString() || new Date().toISOString(),
     };
   }
   
+  // Helper to transform cached row to response format
+  const transformCachedRow = (c: any): TurbodashClientResponse => ({
+    cnpj: c.cnpj,
+    nome_cliente: c.cliente_nome || '',
+    periodo_inicio: c.periodo_inicio,
+    periodo_fim: c.periodo_fim,
+    kpis: {
+      faturamento: Number(c.faturamento) || 0,
+      faturamento_variacao: Number(c.faturamento_variacao) || 0,
+      investimento: Number(c.investimento) || 0,
+      investimento_variacao: Number(c.investimento_variacao) || 0,
+      roas: Number(c.roas) || 0,
+      roas_variacao: Number(c.roas_variacao) || 0,
+      compras: c.compras || 0,
+      compras_variacao: Number(c.compras_variacao) || 0,
+      cpa: Number(c.cpa) || 0,
+      cpa_variacao: Number(c.cpa_variacao) || 0,
+      ticket_medio: Number(c.ticket_medio) || 0,
+      ticket_medio_variacao: Number(c.ticket_medio_variacao) || 0,
+      sessoes: c.sessoes || 0,
+      sessoes_variacao: Number(c.sessoes_variacao) || 0,
+      cps: Number(c.cps) || 0,
+      cps_variacao: Number(c.cps_variacao) || 0,
+      taxa_conversao: Number(c.taxa_conversao) || 0,
+      taxa_conversao_variacao: Number(c.taxa_conversao_variacao) || 0,
+      taxa_recorrencia: Number(c.taxa_recorrencia) || 0,
+      taxa_recorrencia_variacao: Number(c.taxa_recorrencia_variacao) || 0,
+    },
+    ultima_atualizacao: c.last_synced_at?.toISOString() || new Date().toISOString(),
+  });
+
   if (!TURBODASH_API_SECRET) {
     console.warn('[TurboDash] API secret not configured, returning cached data only');
-    return cached.length > 0 ? {
-      cnpj: cached[0].cnpj,
-      nome_cliente: cached[0].clienteNome || '',
-      periodo_inicio: cached[0].periodoInicio,
-      periodo_fim: cached[0].periodoFim,
-      kpis: {
-        faturamento: Number(cached[0].faturamento) || 0,
-        faturamento_variacao: Number(cached[0].faturamentoVariacao) || 0,
-        investimento: Number(cached[0].investimento) || 0,
-        investimento_variacao: Number(cached[0].investimentoVariacao) || 0,
-        roas: Number(cached[0].roas) || 0,
-        roas_variacao: Number(cached[0].roasVariacao) || 0,
-        compras: cached[0].compras || 0,
-        compras_variacao: Number(cached[0].comprasVariacao) || 0,
-        cpa: Number(cached[0].cpa) || 0,
-        cpa_variacao: Number(cached[0].cpaVariacao) || 0,
-        ticket_medio: Number(cached[0].ticketMedio) || 0,
-        ticket_medio_variacao: Number(cached[0].ticketMedioVariacao) || 0,
-        sessoes: cached[0].sessoes || 0,
-        sessoes_variacao: Number(cached[0].sessoesVariacao) || 0,
-        cps: Number(cached[0].cps) || 0,
-        cps_variacao: Number(cached[0].cpsVariacao) || 0,
-        taxa_conversao: Number(cached[0].taxaConversao) || 0,
-        taxa_conversao_variacao: Number(cached[0].taxaConversaoVariacao) || 0,
-        taxa_recorrencia: Number(cached[0].taxaRecorrencia) || 0,
-        taxa_recorrencia_variacao: Number(cached[0].taxaRecorrenciaVariacao) || 0,
-      },
-      ultima_atualizacao: cached[0].lastSyncedAt?.toISOString() || new Date().toISOString(),
-    } : null;
+    return cached.length > 0 ? transformCachedRow(cached[0]) : getDemoKPIs(cnpjLimpo);
   }
   
   try {
@@ -211,86 +217,77 @@ export async function getKPIsByCNPJ(cnpj: string, forceRefresh = false): Promise
     console.error('[TurboDash] Error fetching KPIs:', error);
     
     if (cached.length > 0) {
-      await db
-        .update(turbodashKpis)
-        .set({ syncStatus: 'error' })
-        .where(eq(turbodashKpis.id, cached[0].id));
+      try {
+        await db.execute(sql`
+          UPDATE staging.turbodash_kpis 
+          SET sync_status = 'error' 
+          WHERE id = ${cached[0].id}
+        `);
+      } catch (updateError) {
+        console.error('[TurboDash] Error updating sync status:', updateError);
+      }
     }
     
-    return cached.length > 0 ? {
-      cnpj: cached[0].cnpj,
-      nome_cliente: cached[0].clienteNome || '',
-      periodo_inicio: cached[0].periodoInicio,
-      periodo_fim: cached[0].periodoFim,
-      kpis: {
-        faturamento: Number(cached[0].faturamento) || 0,
-        faturamento_variacao: Number(cached[0].faturamentoVariacao) || 0,
-        investimento: Number(cached[0].investimento) || 0,
-        investimento_variacao: Number(cached[0].investimentoVariacao) || 0,
-        roas: Number(cached[0].roas) || 0,
-        roas_variacao: Number(cached[0].roasVariacao) || 0,
-        compras: cached[0].compras || 0,
-        compras_variacao: Number(cached[0].comprasVariacao) || 0,
-        cpa: Number(cached[0].cpa) || 0,
-        cpa_variacao: Number(cached[0].cpaVariacao) || 0,
-        ticket_medio: Number(cached[0].ticketMedio) || 0,
-        ticket_medio_variacao: Number(cached[0].ticketMedioVariacao) || 0,
-        sessoes: cached[0].sessoes || 0,
-        sessoes_variacao: Number(cached[0].sessoesVariacao) || 0,
-        cps: Number(cached[0].cps) || 0,
-        cps_variacao: Number(cached[0].cpsVariacao) || 0,
-        taxa_conversao: Number(cached[0].taxaConversao) || 0,
-        taxa_conversao_variacao: Number(cached[0].taxaConversaoVariacao) || 0,
-        taxa_recorrencia: Number(cached[0].taxaRecorrencia) || 0,
-        taxa_recorrencia_variacao: Number(cached[0].taxaRecorrenciaVariacao) || 0,
-      },
-      ultima_atualizacao: cached[0].lastSyncedAt?.toISOString() || new Date().toISOString(),
-    } : null;
+    return cached.length > 0 ? transformCachedRow(cached[0]) : getDemoKPIs(cnpjLimpo);
   }
 }
 
+// Helper to transform cached row to response format (for getAllKPIs)
+function transformCachedRowFromDb(c: any): TurbodashClientResponse {
+  return {
+    cnpj: c.cnpj,
+    nome_cliente: c.cliente_nome || '',
+    periodo_inicio: c.periodo_inicio,
+    periodo_fim: c.periodo_fim,
+    kpis: {
+      faturamento: Number(c.faturamento) || 0,
+      faturamento_variacao: Number(c.faturamento_variacao) || 0,
+      investimento: Number(c.investimento) || 0,
+      investimento_variacao: Number(c.investimento_variacao) || 0,
+      roas: Number(c.roas) || 0,
+      roas_variacao: Number(c.roas_variacao) || 0,
+      compras: c.compras || 0,
+      compras_variacao: Number(c.compras_variacao) || 0,
+      cpa: Number(c.cpa) || 0,
+      cpa_variacao: Number(c.cpa_variacao) || 0,
+      ticket_medio: Number(c.ticket_medio) || 0,
+      ticket_medio_variacao: Number(c.ticket_medio_variacao) || 0,
+      sessoes: c.sessoes || 0,
+      sessoes_variacao: Number(c.sessoes_variacao) || 0,
+      cps: Number(c.cps) || 0,
+      cps_variacao: Number(c.cps_variacao) || 0,
+      taxa_conversao: Number(c.taxa_conversao) || 0,
+      taxa_conversao_variacao: Number(c.taxa_conversao_variacao) || 0,
+      taxa_recorrencia: Number(c.taxa_recorrencia) || 0,
+      taxa_recorrencia_variacao: Number(c.taxa_recorrencia_variacao) || 0,
+    },
+    ultima_atualizacao: c.last_synced_at?.toISOString() || new Date().toISOString(),
+  };
+}
+
 export async function getAllKPIs(forceRefresh = false): Promise<TurbodashListResponse> {
-  const cached = await db
-    .select()
-    .from(turbodashKpis)
-    .orderBy(desc(turbodashKpis.faturamento));
+  let cached: any[] = [];
+  try {
+    const result = await db.execute(sql`
+      SELECT * FROM staging.turbodash_kpis ORDER BY faturamento DESC
+    `);
+    cached = result.rows as any[];
+  } catch (error: any) {
+    if (error.code === '42P01') {
+      console.warn('[TurboDash] Table does not exist for getAllKPIs');
+    } else {
+      console.error('[TurboDash] Error fetching all KPIs:', error);
+    }
+  }
   
-  const hasStaleData = cached.some(c => isCacheStale(c.lastSyncedAt));
+  const hasStaleData = cached.some(c => isCacheStale(c.last_synced_at));
   
   if (!forceRefresh && !hasStaleData && cached.length > 0) {
     return {
       total: cached.length,
-      periodo_inicio: cached[0]?.periodoInicio || new Date().toISOString().split('T')[0],
-      periodo_fim: cached[0]?.periodoFim || new Date().toISOString().split('T')[0],
-      clientes: cached.map(c => ({
-        cnpj: c.cnpj,
-        nome_cliente: c.clienteNome || '',
-        periodo_inicio: c.periodoInicio,
-        periodo_fim: c.periodoFim,
-        kpis: {
-          faturamento: Number(c.faturamento) || 0,
-          faturamento_variacao: Number(c.faturamentoVariacao) || 0,
-          investimento: Number(c.investimento) || 0,
-          investimento_variacao: Number(c.investimentoVariacao) || 0,
-          roas: Number(c.roas) || 0,
-          roas_variacao: Number(c.roasVariacao) || 0,
-          compras: c.compras || 0,
-          compras_variacao: Number(c.comprasVariacao) || 0,
-          cpa: Number(c.cpa) || 0,
-          cpa_variacao: Number(c.cpaVariacao) || 0,
-          ticket_medio: Number(c.ticketMedio) || 0,
-          ticket_medio_variacao: Number(c.ticketMedioVariacao) || 0,
-          sessoes: c.sessoes || 0,
-          sessoes_variacao: Number(c.sessoesVariacao) || 0,
-          cps: Number(c.cps) || 0,
-          cps_variacao: Number(c.cpsVariacao) || 0,
-          taxa_conversao: Number(c.taxaConversao) || 0,
-          taxa_conversao_variacao: Number(c.taxaConversaoVariacao) || 0,
-          taxa_recorrencia: Number(c.taxaRecorrencia) || 0,
-          taxa_recorrencia_variacao: Number(c.taxaRecorrenciaVariacao) || 0,
-        },
-        ultima_atualizacao: c.lastSyncedAt?.toISOString() || new Date().toISOString(),
-      })),
+      periodo_inicio: cached[0]?.periodo_inicio || new Date().toISOString().split('T')[0],
+      periodo_fim: cached[0]?.periodo_fim || new Date().toISOString().split('T')[0],
+      clientes: cached.map(transformCachedRowFromDb),
     };
   }
   
@@ -298,37 +295,9 @@ export async function getAllKPIs(forceRefresh = false): Promise<TurbodashListRes
     console.warn('[TurboDash] API secret not configured, returning cached data only');
     return {
       total: cached.length,
-      periodo_inicio: cached[0]?.periodoInicio || new Date().toISOString().split('T')[0],
-      periodo_fim: cached[0]?.periodoFim || new Date().toISOString().split('T')[0],
-      clientes: cached.map(c => ({
-        cnpj: c.cnpj,
-        nome_cliente: c.clienteNome || '',
-        periodo_inicio: c.periodoInicio,
-        periodo_fim: c.periodoFim,
-        kpis: {
-          faturamento: Number(c.faturamento) || 0,
-          faturamento_variacao: Number(c.faturamentoVariacao) || 0,
-          investimento: Number(c.investimento) || 0,
-          investimento_variacao: Number(c.investimentoVariacao) || 0,
-          roas: Number(c.roas) || 0,
-          roas_variacao: Number(c.roasVariacao) || 0,
-          compras: c.compras || 0,
-          compras_variacao: Number(c.comprasVariacao) || 0,
-          cpa: Number(c.cpa) || 0,
-          cpa_variacao: Number(c.cpaVariacao) || 0,
-          ticket_medio: Number(c.ticketMedio) || 0,
-          ticket_medio_variacao: Number(c.ticketMedioVariacao) || 0,
-          sessoes: c.sessoes || 0,
-          sessoes_variacao: Number(c.sessoesVariacao) || 0,
-          cps: Number(c.cps) || 0,
-          cps_variacao: Number(c.cpsVariacao) || 0,
-          taxa_conversao: Number(c.taxaConversao) || 0,
-          taxa_conversao_variacao: Number(c.taxaConversaoVariacao) || 0,
-          taxa_recorrencia: Number(c.taxaRecorrencia) || 0,
-          taxa_recorrencia_variacao: Number(c.taxaRecorrenciaVariacao) || 0,
-        },
-        ultima_atualizacao: c.lastSyncedAt?.toISOString() || new Date().toISOString(),
-      })),
+      periodo_inicio: cached[0]?.periodo_inicio || new Date().toISOString().split('T')[0],
+      periodo_fim: cached[0]?.periodo_fim || new Date().toISOString().split('T')[0],
+      clientes: cached.map(transformCachedRowFromDb),
     };
   }
   
@@ -372,37 +341,9 @@ export async function getAllKPIs(forceRefresh = false): Promise<TurbodashListRes
     console.error('[TurboDash] Error fetching KPI list:', error);
     return {
       total: cached.length,
-      periodo_inicio: cached[0]?.periodoInicio || new Date().toISOString().split('T')[0],
-      periodo_fim: cached[0]?.periodoFim || new Date().toISOString().split('T')[0],
-      clientes: cached.map(c => ({
-        cnpj: c.cnpj,
-        nome_cliente: c.clienteNome || '',
-        periodo_inicio: c.periodoInicio,
-        periodo_fim: c.periodoFim,
-        kpis: {
-          faturamento: Number(c.faturamento) || 0,
-          faturamento_variacao: Number(c.faturamentoVariacao) || 0,
-          investimento: Number(c.investimento) || 0,
-          investimento_variacao: Number(c.investimentoVariacao) || 0,
-          roas: Number(c.roas) || 0,
-          roas_variacao: Number(c.roasVariacao) || 0,
-          compras: c.compras || 0,
-          compras_variacao: Number(c.comprasVariacao) || 0,
-          cpa: Number(c.cpa) || 0,
-          cpa_variacao: Number(c.cpaVariacao) || 0,
-          ticket_medio: Number(c.ticketMedio) || 0,
-          ticket_medio_variacao: Number(c.ticketMedioVariacao) || 0,
-          sessoes: c.sessoes || 0,
-          sessoes_variacao: Number(c.sessoesVariacao) || 0,
-          cps: Number(c.cps) || 0,
-          cps_variacao: Number(c.cpsVariacao) || 0,
-          taxa_conversao: Number(c.taxaConversao) || 0,
-          taxa_conversao_variacao: Number(c.taxaConversaoVariacao) || 0,
-          taxa_recorrencia: Number(c.taxaRecorrencia) || 0,
-          taxa_recorrencia_variacao: Number(c.taxaRecorrenciaVariacao) || 0,
-        },
-        ultima_atualizacao: c.lastSyncedAt?.toISOString() || new Date().toISOString(),
-      })),
+      periodo_inicio: cached[0]?.periodo_inicio || new Date().toISOString().split('T')[0],
+      periodo_fim: cached[0]?.periodo_fim || new Date().toISOString().split('T')[0],
+      clientes: cached.map(transformCachedRowFromDb),
     };
   }
 }
@@ -412,49 +353,72 @@ async function saveKPIToCache(data: TurbodashClientResponse): Promise<void> {
   
   const clienteIdCortex = await findClienteIdByCNPJ(cnpjLimpo);
   
-  const existing = await db
-    .select()
-    .from(turbodashKpis)
-    .where(eq(turbodashKpis.cnpj, cnpjLimpo))
-    .limit(1);
-  
-  const kpiData = {
-    cnpj: cnpjLimpo,
-    clienteNome: data.nome_cliente,
-    clienteIdCortex,
-    periodoInicio: data.periodo_inicio,
-    periodoFim: data.periodo_fim,
-    faturamento: String(data.kpis.faturamento),
-    faturamentoVariacao: String(data.kpis.faturamento_variacao),
-    investimento: String(data.kpis.investimento),
-    investimentoVariacao: String(data.kpis.investimento_variacao),
-    roas: String(data.kpis.roas),
-    roasVariacao: String(data.kpis.roas_variacao),
-    compras: data.kpis.compras,
-    comprasVariacao: String(data.kpis.compras_variacao),
-    cpa: String(data.kpis.cpa),
-    cpaVariacao: String(data.kpis.cpa_variacao),
-    ticketMedio: String(data.kpis.ticket_medio),
-    ticketMedioVariacao: String(data.kpis.ticket_medio_variacao),
-    sessoes: data.kpis.sessoes,
-    sessoesVariacao: String(data.kpis.sessoes_variacao),
-    cps: String(data.kpis.cps),
-    cpsVariacao: String(data.kpis.cps_variacao),
-    taxaConversao: String(data.kpis.taxa_conversao),
-    taxaConversaoVariacao: String(data.kpis.taxa_conversao_variacao),
-    taxaRecorrencia: String(data.kpis.taxa_recorrencia),
-    taxaRecorrenciaVariacao: String(data.kpis.taxa_recorrencia_variacao),
-    syncStatus: 'fresh' as const,
-    lastSyncedAt: new Date(),
-  };
-  
-  if (existing.length > 0) {
-    await db
-      .update(turbodashKpis)
-      .set(kpiData)
-      .where(eq(turbodashKpis.id, existing[0].id));
-  } else {
-    await db.insert(turbodashKpis).values(kpiData);
+  try {
+    // Check if exists using raw SQL
+    const existingResult = await db.execute(sql`
+      SELECT id FROM staging.turbodash_kpis WHERE cnpj = ${cnpjLimpo} LIMIT 1
+    `);
+    const existing = existingResult.rows as { id: number }[];
+    
+    if (existing.length > 0) {
+      await db.execute(sql`
+        UPDATE staging.turbodash_kpis SET
+          cliente_nome = ${data.nome_cliente},
+          cliente_id_cortex = ${clienteIdCortex},
+          periodo_inicio = ${data.periodo_inicio},
+          periodo_fim = ${data.periodo_fim},
+          faturamento = ${data.kpis.faturamento},
+          faturamento_variacao = ${data.kpis.faturamento_variacao},
+          investimento = ${data.kpis.investimento},
+          investimento_variacao = ${data.kpis.investimento_variacao},
+          roas = ${data.kpis.roas},
+          roas_variacao = ${data.kpis.roas_variacao},
+          compras = ${data.kpis.compras},
+          compras_variacao = ${data.kpis.compras_variacao},
+          cpa = ${data.kpis.cpa},
+          cpa_variacao = ${data.kpis.cpa_variacao},
+          ticket_medio = ${data.kpis.ticket_medio},
+          ticket_medio_variacao = ${data.kpis.ticket_medio_variacao},
+          sessoes = ${data.kpis.sessoes},
+          sessoes_variacao = ${data.kpis.sessoes_variacao},
+          cps = ${data.kpis.cps},
+          cps_variacao = ${data.kpis.cps_variacao},
+          taxa_conversao = ${data.kpis.taxa_conversao},
+          taxa_conversao_variacao = ${data.kpis.taxa_conversao_variacao},
+          taxa_recorrencia = ${data.kpis.taxa_recorrencia},
+          taxa_recorrencia_variacao = ${data.kpis.taxa_recorrencia_variacao},
+          sync_status = 'fresh',
+          last_synced_at = NOW()
+        WHERE id = ${existing[0].id}
+      `);
+    } else {
+      await db.execute(sql`
+        INSERT INTO staging.turbodash_kpis (
+          cnpj, cliente_nome, cliente_id_cortex, periodo_inicio, periodo_fim,
+          faturamento, faturamento_variacao, investimento, investimento_variacao,
+          roas, roas_variacao, compras, compras_variacao, cpa, cpa_variacao,
+          ticket_medio, ticket_medio_variacao, sessoes, sessoes_variacao,
+          cps, cps_variacao, taxa_conversao, taxa_conversao_variacao,
+          taxa_recorrencia, taxa_recorrencia_variacao, sync_status, last_synced_at
+        ) VALUES (
+          ${cnpjLimpo}, ${data.nome_cliente}, ${clienteIdCortex}, 
+          ${data.periodo_inicio}, ${data.periodo_fim},
+          ${data.kpis.faturamento}, ${data.kpis.faturamento_variacao},
+          ${data.kpis.investimento}, ${data.kpis.investimento_variacao},
+          ${data.kpis.roas}, ${data.kpis.roas_variacao},
+          ${data.kpis.compras}, ${data.kpis.compras_variacao},
+          ${data.kpis.cpa}, ${data.kpis.cpa_variacao},
+          ${data.kpis.ticket_medio}, ${data.kpis.ticket_medio_variacao},
+          ${data.kpis.sessoes}, ${data.kpis.sessoes_variacao},
+          ${data.kpis.cps}, ${data.kpis.cps_variacao},
+          ${data.kpis.taxa_conversao}, ${data.kpis.taxa_conversao_variacao},
+          ${data.kpis.taxa_recorrencia}, ${data.kpis.taxa_recorrencia_variacao},
+          'fresh', NOW()
+        )
+      `);
+    }
+  } catch (error) {
+    console.error('[TurboDash] Error saving to cache:', error);
   }
 }
 
