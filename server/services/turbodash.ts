@@ -202,7 +202,12 @@ function getDemoKPIs(cnpj: string): TurbodashClientResponse {
   };
 }
 
-export async function getKPIsByCNPJ(cnpj: string, forceRefresh = false): Promise<TurbodashClientResponse | null> {
+export async function getKPIsByCNPJ(
+  cnpj: string, 
+  forceRefresh = false,
+  mes?: string,
+  ano?: string
+): Promise<TurbodashClientResponse | null> {
   const cnpjLimpo = cnpj.replace(/\D/g, '');
   
   let cached: any[] = [];
@@ -295,9 +300,16 @@ export async function getKPIsByCNPJ(cnpj: string, forceRefresh = false): Promise
   }
   
   try {
+    // Build API URL with optional period parameters
+    let apiUrl = `/api/internal/metrics/${cnpjLimpo}`;
+    const params = new URLSearchParams();
+    if (mes) params.append('mes', mes);
+    if (ano) params.append('ano', ano);
+    if (params.toString()) apiUrl += `?${params.toString()}`;
+    
     // Fetch from TurboDash API using Bearer token authentication
     // Real API format: { success, timestamp, dateRange, clients: [...] }
-    const apiResponse = await fetchFromTurboDashAPI<TurboDashRealApiResponse>(`/api/internal/metrics/${cnpjLimpo}`);
+    const apiResponse = await fetchFromTurboDashAPI<TurboDashRealApiResponse>(apiUrl);
     
     if (!apiResponse.success || !apiResponse.clients || apiResponse.clients.length === 0) {
       console.warn('[TurboDash] No data returned from API for CNPJ:', cnpjLimpo);
