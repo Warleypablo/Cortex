@@ -487,6 +487,7 @@ export type DfcHierarchicalResponse = {
 export type MrrEvolucaoMensal = {
   mes: string;
   mrr: number;
+  receitaPontualEntregue: number;
 };
 
 export const rhCandidaturas = pgTable("rh_candidaturas", {
