@@ -128,6 +128,7 @@ export async function createExternalUser(email: string): Promise<User> {
   const newUser: User = {
     ...newUserData,
     createdAt: new Date().toISOString(),
+    department: null,
   };
   
   setCachedUser(newUser);
@@ -148,6 +149,7 @@ const ALL_ROUTES = [
   '/beneficios',
   '/cases/chat',
   '/visao-geral',
+  '/okr-2026',
   '/dashboard/financeiro',
   '/dashboard/geg',
   '/dashboard/inhire',
@@ -171,6 +173,7 @@ const ALL_ROUTES = [
   '/growth/visao-geral',
   '/growth/criativos',
   '/growth/performance-plataformas',
+  '/growth/turbodash',
   '/juridico/clientes',
   '/investors-report',
   '/admin/usuarios',
@@ -425,6 +428,7 @@ export async function createOrUpdateUser(profile: {
     ...newUserData,
     createdAt: new Date().toISOString(),
     role: newUserData.role as 'admin' | 'user',
+    department: null,
   };
   
   setCachedUser(newUser);
@@ -472,6 +476,7 @@ export async function createManualUser(data: {
   const newUser: User = {
     ...newUserData,
     createdAt: new Date().toISOString(),
+    department: null,
   };
   
   setCachedUser(newUser);
