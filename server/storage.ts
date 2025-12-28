@@ -128,7 +128,7 @@ export interface VisaoGeralMetricas {
   mrr: number;
   aquisicaoMrr: number;
   aquisicaoPontual: number;
-  cac: number;
+  receitaPontualEntregue: number;
   churn: number;
   pausados: number;
 }
@@ -3508,7 +3508,7 @@ export class DbStorage implements IStorage {
         mrr: 0,
         aquisicaoMrr: 0,
         aquisicaoPontual: 0,
-        cac: 0,
+        receitaPontualEntregue: 0,
         churn: 0,
         pausados: 0,
       };
@@ -3581,7 +3581,19 @@ export class DbStorage implements IStorage {
             THEN valorr::numeric
             ELSE 0 
           END
-        ), 0) as pausados
+        ), 0) as pausados,
+        
+        -- Receita Pontual Entregue: valor pontual de contratos encerrados no período (projeto entregue)
+        COALESCE(SUM(
+          CASE 
+            WHEN data_encerramento >= ${inicioMes}
+              AND data_encerramento <= ${fimMes}
+              AND valorp IS NOT NULL
+              AND valorp > 0
+            THEN valorp::numeric
+            ELSE 0 
+          END
+        ), 0) as receita_pontual_entregue
       FROM ${schema.cupContratos}
     `);
 
@@ -3593,13 +3605,14 @@ export class DbStorage implements IStorage {
     const aquisicaoPontual = parseFloat(transRow.aquisicao_pontual || '0');
     const churn = parseFloat(transRow.churn || '0');
     const pausados = parseFloat(transRow.pausados || '0');
+    const receitaPontualEntregue = parseFloat(transRow.receita_pontual_entregue || '0');
 
     return {
       receitaTotal: mrr + aquisicaoPontual,
       mrr,
       aquisicaoMrr,
       aquisicaoPontual,
-      cac: 0,
+      receitaPontualEntregue,
       churn,
       pausados,
     };
