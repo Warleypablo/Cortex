@@ -77,6 +77,7 @@ interface ClienteDb {
   cnpj: string | null;
   endereco: string | null;
   ativo: string | null;
+  statusClickup: string | null;
   createdAt: string | null;
   empresa: string | null;
   ids: string | null;
@@ -513,7 +514,7 @@ export default function ClientDetail() {
         linksContrato: cliente.linksContrato || "",
         linkListaClickup: cliente.linkListaClickup || "",
         cluster: cliente.cluster || "",
-        statusCliente: cliente.ativo || "",
+        statusCliente: cliente.statusClickup || "",
         statusConta: cliente.statusConta || "",
         tipoNegocio: cliente.tipoNegocio || "",
         faturamentoMensal: formatStoredCurrency(cliente.faturamentoMensal),
@@ -587,7 +588,7 @@ export default function ClientDetail() {
       dataInicio: contrato.dataInicio ? new Date(contrato.dataInicio).toISOString().split('T')[0] : "",
       valorr: formatCurrency(contrato.valorr),
       valorp: formatCurrency(contrato.valorp),
-      produto: contrato.plano || contrato.produto || "",
+      produto: contrato.produto || "",
     });
   };
 
@@ -2694,7 +2695,7 @@ export default function ClientDetail() {
                               }
                             </TableCell>
                             <TableCell className="text-muted-foreground" data-testid={`text-plano-${contrato.idSubtask}`}>
-                              {contrato.plano || '-'}
+                              {contrato.produto || '-'}
                             </TableCell>
                             <TableCell className="text-center font-medium" data-testid={`text-lt-${contrato.idSubtask}`}>
                               {calcularLTContrato(contrato)}
