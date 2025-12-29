@@ -3618,15 +3618,15 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getMrrEvolucaoMensal(mesAnoFim: string): Promise<import("@shared/schema").MrrEvolucaoMensal[]> {
+  async getMrrEvolucaoMensal(mesAnoFim: string, qtdMeses: number = 12): Promise<import("@shared/schema").MrrEvolucaoMensal[]> {
     const [anoFim, mesFim] = mesAnoFim.split('-').map(Number);
     
-    // Gerar lista dos últimos 12 meses até mesAnoFim
+    // Gerar lista dos últimos N meses até mesAnoFim
     const meses: string[] = [];
     const mesFimDate = new Date(anoFim, mesFim - 1, 1);
     
-    // Calcular 11 meses antes do mês atual (total de 12 meses)
-    for (let i = 11; i >= 0; i--) {
+    // Calcular (qtdMeses - 1) meses antes do mês atual (total de qtdMeses meses)
+    for (let i = qtdMeses - 1; i >= 0; i--) {
       const d = new Date(mesFimDate);
       d.setMonth(d.getMonth() - i);
       const ano = d.getFullYear();
