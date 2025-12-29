@@ -2642,10 +2642,30 @@ function FinanceiroTab({ colaboradorId }: { colaboradorId: string }) {
   const [selectedPagamento, setSelectedPagamento] = useState<PagamentoItem | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [viewingNf, setViewingNf] = useState<number | null>(null);
 
   const { data: pagamentos = [], isLoading } = useQuery<PagamentoItem[]>({
     queryKey: ["/api/rh/pagamentos", colaboradorId],
   });
+
+  const handleViewNf = async (pagamentoId: number) => {
+    try {
+      setViewingNf(pagamentoId);
+      const res = await fetch(`/api/rh/pagamentos/${pagamentoId}/nf`, { credentials: "include" });
+      if (!res.ok) throw new Error("Erro ao buscar NF");
+      const nf = await res.json();
+      if (nf?.arquivo_path) {
+        window.open(nf.arquivo_path, "_blank");
+      } else {
+        toast({ title: "NF não encontrada", description: "O arquivo da nota fiscal não está disponível.", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Error viewing NF:", error);
+      toast({ title: "Erro", description: "Não foi possível visualizar a nota fiscal.", variant: "destructive" });
+    } finally {
+      setViewingNf(null);
+    }
+  };
 
   const getStatusBadge = (status: string, hasNf: boolean) => {
     if (hasNf || status === "nf_anexada") {
@@ -2847,10 +2867,15 @@ function FinanceiroTab({ colaboradorId }: { colaboradorId: string }) {
                             size="sm" 
                             variant="ghost" 
                             className="gap-1"
-                            onClick={() => window.open(`/objects/${pagamento.id}`, "_blank")}
+                            onClick={() => handleViewNf(pagamento.id)}
+                            disabled={viewingNf === pagamento.id}
                             data-testid={`button-view-nf-${pagamento.id}`}
                           >
-                            <Eye className="w-4 h-4" />
+                            {viewingNf === pagamento.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
                             Ver NF
                           </Button>
                         ) : (
