@@ -1888,9 +1888,9 @@ function getCurrentMonth(): MonthKey {
 function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChange?: (tab: string) => void }) {
   const { metrics, highlights, series, initiatives, krs, objectives } = data;
   const currentQuarter = getCurrentQuarter();
-  const [viewMode, setViewMode] = useState<ViewMode>("quarter");
-  const [selectedQuarter, setSelectedQuarter] = useState<"Q1" | "Q2" | "Q3" | "Q4">(currentQuarter);
-  const [selectedMonth, setSelectedMonth] = useState<MonthKey>(getCurrentMonth());
+  const [viewMode, setViewMode] = useState<ViewMode>("month");
+  const [selectedQuarter, setSelectedQuarter] = useState<"Q1" | "Q2" | "Q3" | "Q4">("Q1");
+  const [selectedMonth, setSelectedMonth] = useState<MonthKey>("jan");
 
   const { data: latestCheckinsData } = useQuery<LatestCheckinsResponse>({
     queryKey: ["/api/okr2026/kr-checkins-latest"],
@@ -3861,7 +3861,6 @@ function SquadGoalsTab() {
   );
 }
 
-const PERIODS = ["YTD", "Q1", "Q2", "Q3", "Q4"];
 const BUSINESS_UNITS = [
   { id: "all", label: "Todas" },
   { id: "turbooh", label: "TurboOH" },
@@ -3874,7 +3873,6 @@ export default function OKR2026() {
   usePageTitle("OKR 2026");
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [selectedPeriod, setSelectedPeriod] = useState("YTD");
   const [selectedBU, setSelectedBU] = useState("all");
   const currentQuarter = getCurrentQuarter();
 
@@ -3900,7 +3898,7 @@ export default function OKR2026() {
   });
 
   const { data, isLoading, error } = useQuery<SummaryResponse>({
-    queryKey: ["/api/okr2026/summary", { period: selectedPeriod, bu: selectedBU }],
+    queryKey: ["/api/okr2026/summary", { bu: selectedBU }],
   });
 
   const { data: collaboratorsData } = useQuery<CollaboratorsResponse>({
@@ -3978,16 +3976,6 @@ export default function OKR2026() {
               </div>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-[120px] bg-background/80 backdrop-blur-sm" data-testid="select-period">
-                  <SelectValue placeholder="Período" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PERIODS.map(p => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select value={selectedBU} onValueChange={setSelectedBU}>
                 <SelectTrigger className="w-[130px] bg-background/80 backdrop-blur-sm" data-testid="select-bu">
                   <SelectValue placeholder="Unidade" />
@@ -3999,7 +3987,7 @@ export default function OKR2026() {
                 </SelectContent>
               </Select>
               <Badge className="text-sm px-4 py-1.5 bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-                {currentQuarter} 2026
+                2026
               </Badge>
               {user?.role === 'admin' && (
                 <Button 
