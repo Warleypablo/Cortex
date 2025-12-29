@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
+import { KpiCardGrid } from "@/components/ui/charts";
+import type { KpiCard } from "@/components/ui/charts";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -492,40 +494,42 @@ function DashboardAdmin() {
     return <LoadingSkeleton />;
   }
 
+  const kpiCards: KpiCard[] = [
+    {
+      title: "MRR Ativo",
+      subtitle: "Receita mensal recorrente",
+      value: formatCurrency(visaoGeralData?.mrr || 0),
+      icon: DollarSign,
+      href: "/visao-geral",
+    },
+    {
+      title: "Aquisição MRR",
+      subtitle: "Novos contratos no mês",
+      value: formatCurrency(visaoGeralData?.aquisicaoMrr || 0),
+      icon: TrendingUp,
+      href: "/dashboard/comercial/closers",
+    },
+    {
+      title: "Inadimplência",
+      subtitle: `${inadimplenciaData?.quantidadeClientes || 0} clientes`,
+      value: formatCurrency(inadimplenciaData?.totalInadimplente || 0),
+      icon: AlertTriangle,
+      href: "/dashboard/inadimplencia",
+    },
+    {
+      title: "Negócios Fechados",
+      subtitle: `Taxa: ${formatPercent(closersMetrics?.taxaConversao || 0)}`,
+      value: String(closersMetrics?.negociosGanhos || 0),
+      icon: Handshake,
+      href: "/dashboard/comercial/closers",
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold mb-4">Indicadores Principais</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            title="MRR Ativo"
-            value={formatCurrency(visaoGeralData?.mrr || 0)}
-            subtitle="Receita mensal recorrente"
-            icon={<DollarSign className="w-4 h-4" />}
-            href="/visao-geral"
-          />
-          <MetricCard
-            title="Aquisição MRR"
-            value={formatCurrency(visaoGeralData?.aquisicaoMrr || 0)}
-            subtitle="Novos contratos no mês"
-            icon={<TrendingUp className="w-4 h-4" />}
-            href="/dashboard/comercial/closers"
-          />
-          <MetricCard
-            title="Inadimplência"
-            value={formatCurrency(inadimplenciaData?.totalInadimplente || 0)}
-            subtitle={`${inadimplenciaData?.quantidadeClientes || 0} clientes`}
-            icon={<AlertTriangle className="w-4 h-4" />}
-            href="/dashboard/inadimplencia"
-          />
-          <MetricCard
-            title="Negócios Fechados"
-            value={closersMetrics?.negociosGanhos || 0}
-            subtitle={`Taxa: ${formatPercent(closersMetrics?.taxaConversao || 0)}`}
-            icon={<Handshake className="w-4 h-4" />}
-            href="/dashboard/comercial/closers"
-          />
-        </div>
+        <KpiCardGrid cards={kpiCards} columns={4} />
       </div>
 
       {/* Widgets personalizados */}
