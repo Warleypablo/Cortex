@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SelectWithAdd } from "@/components/ui/select-with-add";
-import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, TrendingDown, Minus, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp, Hash, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, TrendingDown, Minus, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp, Hash, Clock, CheckCircle2, AlertTriangle, Upload, Receipt, Download, Eye } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceArea, ReferenceLine, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -116,6 +116,35 @@ interface TelefoneItem {
   setor: string | null;
   ultimaRecarga: string | null;
   status: string;
+}
+
+interface PagamentoItem {
+  id: number;
+  colaborador_id: number;
+  mes_referencia: number;
+  ano_referencia: number;
+  valor_bruto: string;
+  valor_liquido: string | null;
+  data_pagamento: string | null;
+  status: string;
+  observacoes: string | null;
+  criado_em: string;
+  atualizado_em: string;
+  total_nfs: string;
+}
+
+interface NotaFiscalItem {
+  id: number;
+  pagamento_id: number;
+  colaborador_id: number;
+  numero_nf: string | null;
+  valor_nf: string | null;
+  arquivo_path: string | null;
+  arquivo_nome: string | null;
+  data_emissao: string | null;
+  status: string;
+  criado_em: string;
+  criado_por: string | null;
 }
 
 interface SystemUser {
@@ -2605,6 +2634,298 @@ interface HealthHistoryItem {
   healthScore: number;
 }
 
+const MONTH_NAMES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const MONTH_NAMES_SHORT = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+function FinanceiroTab({ colaboradorId }: { colaboradorId: string }) {
+  const { toast } = useToast();
+  const [selectedPagamento, setSelectedPagamento] = useState<PagamentoItem | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const { data: pagamentos = [], isLoading } = useQuery<PagamentoItem[]>({
+    queryKey: ["/api/rh/pagamentos", colaboradorId],
+  });
+
+  const getStatusBadge = (status: string, hasNf: boolean) => {
+    if (hasNf || status === "nf_anexada") {
+      return <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">NF Anexada</Badge>;
+    }
+    switch (status) {
+      case "pendente":
+        return <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Pendente</Badge>;
+      case "pago":
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Pago</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!selectedPagamento) return;
+
+    try {
+      setUploading(true);
+      
+      const requestRes = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type || "application/pdf",
+        }),
+      });
+
+      if (!requestRes.ok) {
+        throw new Error("Falha ao solicitar URL de upload");
+      }
+
+      const { uploadURL, objectPath } = await requestRes.json();
+
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/pdf" },
+        body: file,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Falha ao fazer upload do arquivo");
+      }
+
+      await apiRequest("POST", `/api/rh/pagamentos/${selectedPagamento.id}/nf`, {
+        arquivoPath: objectPath,
+        arquivoNome: file.name,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/pagamentos", colaboradorId] });
+
+      toast({
+        title: "Nota fiscal anexada",
+        description: `A NF foi enviada com sucesso para ${MONTH_NAMES[selectedPagamento.mes_referencia]}/${selectedPagamento.ano_referencia}`,
+      });
+
+      setUploadDialogOpen(false);
+      setSelectedPagamento(null);
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Erro no upload",
+        description: "Não foi possível anexar a nota fiscal. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (pagamentos.length === 0) {
+    return (
+      <Card className="p-8" data-testid="card-no-pagamentos">
+        <div className="text-center py-12">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted mb-6">
+            <Receipt className="w-10 h-10 text-muted-foreground" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Nenhum pagamento registrado</h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Os pagamentos deste colaborador serão exibidos aqui assim que forem registrados no sistema.
+          </p>
+        </div>
+      </Card>
+    );
+  }
+
+  const totalBruto = pagamentos.reduce((sum, p) => sum + parseFloat(p.valor_bruto || "0"), 0);
+  const ultimoAno = pagamentos.length > 0 ? pagamentos[0].ano_referencia : new Date().getFullYear();
+  const pagamentosAnoAtual = pagamentos.filter(p => p.ano_referencia === ultimoAno);
+  const totalAnoAtual = pagamentosAnoAtual.reduce((sum, p) => sum + parseFloat(p.valor_bruto || "0"), 0);
+  const nfsAnexadas = pagamentos.filter(p => parseInt(p.total_nfs || "0") > 0 || p.status === "nf_anexada").length;
+
+  return (
+    <div className="space-y-6" data-testid="tab-content-financeiro">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card className="p-5 hover-elevate" data-testid="card-total-ano">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+              <DollarSign className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Total {ultimoAno}</p>
+              <p className="text-xl font-bold">R$ {totalAnoAtual.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5 hover-elevate" data-testid="card-pagamentos-count">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+              <Receipt className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Pagamentos</p>
+              <p className="text-xl font-bold">{pagamentos.length} registros</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-5 hover-elevate" data-testid="card-nfs-count">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+              <FileText className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">NFs Anexadas</p>
+              <p className="text-xl font-bold">{nfsAnexadas} / {pagamentos.length}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      <Card className="p-6" data-testid="card-pagamentos-lista">
+        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Receipt className="w-5 h-5" />
+            Histórico de Pagamentos
+          </h3>
+        </div>
+
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Referência</TableHead>
+                <TableHead>Valor Bruto</TableHead>
+                <TableHead>Valor Líquido</TableHead>
+                <TableHead>Data Pagamento</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pagamentos.map((pagamento) => {
+                const hasNf = parseInt(pagamento.total_nfs || "0") > 0;
+                return (
+                  <TableRow key={pagamento.id} data-testid={`row-pagamento-${pagamento.id}`}>
+                    <TableCell className="font-medium">
+                      {MONTH_NAMES[pagamento.mes_referencia]}/{pagamento.ano_referencia}
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      R$ {parseFloat(pagamento.valor_bruto).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="font-mono text-muted-foreground">
+                      {pagamento.valor_liquido 
+                        ? `R$ ${parseFloat(pagamento.valor_liquido).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                        : "-"
+                      }
+                    </TableCell>
+                    <TableCell>
+                      {pagamento.data_pagamento 
+                        ? format(new Date(pagamento.data_pagamento), "dd/MM/yyyy")
+                        : "-"
+                      }
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(pagamento.status, hasNf)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {hasNf ? (
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="gap-1"
+                            onClick={() => window.open(`/objects/${pagamento.id}`, "_blank")}
+                            data-testid={`button-view-nf-${pagamento.id}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                            Ver NF
+                          </Button>
+                        ) : (
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="gap-1"
+                            onClick={() => {
+                              setSelectedPagamento(pagamento);
+                              setUploadDialogOpen(true);
+                            }}
+                            data-testid={`button-upload-nf-${pagamento.id}`}
+                          >
+                            <Upload className="w-4 h-4" />
+                            Anexar NF
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Anexar Nota Fiscal</DialogTitle>
+            <DialogDescription>
+              {selectedPagamento && (
+                <>Referência: {MONTH_NAMES[selectedPagamento.mes_referencia]}/{selectedPagamento.ano_referencia}</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label 
+              htmlFor="nf-upload"
+              className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+            >
+              {uploading ? (
+                <div className="flex flex-col items-center">
+                  <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
+                  <p className="text-sm text-muted-foreground">Enviando arquivo...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center">
+                  <Upload className="w-10 h-10 text-muted-foreground mb-3" />
+                  <p className="text-sm font-medium">Clique para selecionar o arquivo</p>
+                  <p className="text-xs text-muted-foreground mt-1">PDF, PNG, JPG (máx. 10MB)</p>
+                </div>
+              )}
+              <input 
+                id="nf-upload"
+                type="file"
+                className="hidden"
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={handleFileSelect}
+                disabled={uploading}
+              />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadDialogOpen(false)} disabled={uploading}>
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 const MONTH_LABELS: Record<string, string> = {
   '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr', '05': 'Mai', '06': 'Jun',
   '07': 'Jul', '08': 'Ago', '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez'
@@ -3069,6 +3390,7 @@ function HealthCard({ colaboradorId }: { colaboradorId: string }) {
 export default function DetailColaborador() {
   usePageTitle("Detalhes do Colaborador");
   const { setPageInfo } = usePageInfo();
+  const { user } = useAuth();
   const [, params] = useRoute("/colaborador/:id");
   const colaboradorId = params?.id || "";
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -3107,6 +3429,16 @@ export default function DetailColaborador() {
       }
     }
     return null;
+  };
+
+  // Verificar se usuário pode ver a aba Financeiro (admin ou próprio colaborador)
+  const canViewFinanceiro = () => {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    // Verificar se o email do usuário coincide com o email do colaborador
+    const userEmail = user.email?.toLowerCase().trim();
+    const colaboradorEmail = colaborador?.emailTurbo?.toLowerCase().trim();
+    return userEmail && colaboradorEmail && userEmail === colaboradorEmail;
   };
 
   useEffect(() => {
@@ -3276,6 +3608,12 @@ export default function DetailColaborador() {
               <TrendingUp className="w-4 h-4" />
               Desenvolvimento
             </TabsTrigger>
+            {canViewFinanceiro() && (
+              <TabsTrigger value="financeiro" className="gap-2" data-testid="tab-financeiro">
+                <Receipt className="w-4 h-4" />
+                Financeiro
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="informacoes" data-testid="tab-content-informacoes">
@@ -3740,6 +4078,12 @@ export default function DetailColaborador() {
               </Card>
             </div>
           </TabsContent>
+
+          {canViewFinanceiro() && (
+            <TabsContent value="financeiro">
+              <FinanceiroTab colaboradorId={colaboradorId} />
+            </TabsContent>
+          )}
         </Tabs>
 
         <EditColaboradorDialog 
