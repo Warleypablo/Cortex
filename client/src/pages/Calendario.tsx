@@ -44,6 +44,14 @@ const getEventTypeInfo = (tipo: string) => {
   return EVENT_TYPES.find((t) => t.value === tipo) || EVENT_TYPES[3];
 };
 
+const COMMON_LOCATIONS = [
+  { value: "escritorio", label: "Escritório" },
+  { value: "sala_reuniao", label: "Sala de Reunião" },
+  { value: "auditorio", label: "Auditório" },
+  { value: "online", label: "Online (Google Meet)" },
+  { value: "externo", label: "Local Externo" },
+];
+
 function EventForm({ 
   evento, 
   onClose, 
@@ -58,7 +66,7 @@ function EventForm({
   
   const [titulo, setTitulo] = useState(evento?.titulo || "");
   const [descricao, setDescricao] = useState(evento?.descricao || "");
-  const [tipo, setTipo] = useState(evento?.tipo || "outro");
+  const [tipo, setTipo] = useState(evento?.tipo || "reuniao_resultado");
   const [dataInicio, setDataInicio] = useState(
     evento?.dataInicio 
       ? format(parseISO(evento.dataInicio), "yyyy-MM-dd'T'HH:mm")
@@ -71,7 +79,8 @@ function EventForm({
       ? format(parseISO(evento.dataFim), "yyyy-MM-dd'T'HH:mm")
       : ""
   );
-  const [local, setLocal] = useState(evento?.local || "");
+  const [localType, setLocalType] = useState("escritorio");
+  const [local, setLocal] = useState(evento?.local || "Escritório");
   
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -100,6 +109,16 @@ function EventForm({
       toast({ title: "Erro ao atualizar evento", variant: "destructive" });
     },
   });
+
+  const handleLocalTypeChange = (value: string) => {
+    setLocalType(value);
+    const locationInfo = COMMON_LOCATIONS.find(l => l.value === value);
+    if (locationInfo && value !== "externo") {
+      setLocal(locationInfo.label);
+    } else if (value === "externo") {
+      setLocal("");
+    }
+  };
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,93 +141,141 @@ function EventForm({
   };
   
   const isPending = createMutation.isPending || updateMutation.isPending;
+  const selectedTypeInfo = getEventTypeInfo(tipo);
   
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-2">
-        <Label htmlFor="titulo">Título *</Label>
+        <Label htmlFor="titulo" className="text-sm font-medium">Título do evento *</Label>
         <Input
           id="titulo"
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
-          placeholder="Nome do evento"
+          placeholder="Ex: Reunião de resultado Q4"
           required
+          className="h-11"
           data-testid="input-evento-titulo"
         />
       </div>
       
-      <div className="space-y-2">
-        <Label htmlFor="tipo">Tipo de Evento</Label>
-        <Select value={tipo} onValueChange={setTipo}>
-          <SelectTrigger data-testid="select-evento-tipo">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {EVENT_TYPES.map((t) => (
-              <SelectItem key={t.value} value={t.value}>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />
-                  {t.label}
+      <div className="space-y-3">
+        <Label className="text-sm font-medium">Tipo de evento</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {EVENT_TYPES.map((t) => {
+            const Icon = t.icon;
+            const isSelected = tipo === t.value;
+            return (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setTipo(t.value)}
+                className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left hover-elevate ${
+                  isSelected 
+                    ? "border-primary bg-primary/5" 
+                    : "border-border"
+                }`}
+                data-testid={`button-tipo-${t.value}`}
+              >
+                <div 
+                  className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: `${t.color}20` }}
+                >
+                  <Icon className="w-4 h-4" style={{ color: t.color }} />
                 </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+                <span className={`text-sm font-medium ${isSelected ? "text-foreground" : "text-muted-foreground"}`}>
+                  {t.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
       
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="dataInicio">Data/Hora Início *</Label>
+          <Label htmlFor="dataInicio" className="text-sm font-medium flex items-center gap-2">
+            <Clock className="w-4 h-4 text-muted-foreground" />
+            Início *
+          </Label>
           <Input
             id="dataInicio"
             type="datetime-local"
             value={dataInicio}
             onChange={(e) => setDataInicio(e.target.value)}
             required
+            className="h-11"
             data-testid="input-evento-data-inicio"
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="dataFim">Data/Hora Fim</Label>
+          <Label htmlFor="dataFim" className="text-sm font-medium flex items-center gap-2">
+            <Clock className="w-4 h-4 text-muted-foreground" />
+            Término
+          </Label>
           <Input
             id="dataFim"
             type="datetime-local"
             value={dataFim}
             onChange={(e) => setDataFim(e.target.value)}
+            className="h-11"
             data-testid="input-evento-data-fim"
           />
         </div>
       </div>
       
-      <div className="space-y-2">
-        <Label htmlFor="local">Local</Label>
-        <Input
-          id="local"
-          value={local}
-          onChange={(e) => setLocal(e.target.value)}
-          placeholder="Local do evento"
-          data-testid="input-evento-local"
-        />
+      <div className="space-y-3">
+        <Label className="text-sm font-medium flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-muted-foreground" />
+          Local
+        </Label>
+        <Select value={localType} onValueChange={handleLocalTypeChange}>
+          <SelectTrigger className="h-11" data-testid="select-local-tipo">
+            <SelectValue placeholder="Selecione o local" />
+          </SelectTrigger>
+          <SelectContent>
+            {COMMON_LOCATIONS.map((loc) => (
+              <SelectItem key={loc.value} value={loc.value}>
+                {loc.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {localType === "externo" && (
+          <Input
+            value={local}
+            onChange={(e) => setLocal(e.target.value)}
+            placeholder="Informe o endereço ou local"
+            className="h-11"
+            data-testid="input-evento-local-externo"
+          />
+        )}
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="descricao">Descrição</Label>
+        <Label htmlFor="descricao" className="text-sm font-medium">Descrição (opcional)</Label>
         <Textarea
           id="descricao"
           value={descricao}
           onChange={(e) => setDescricao(e.target.value)}
-          placeholder="Detalhes do evento..."
+          placeholder="Adicione detalhes sobre o evento..."
           rows={3}
+          className="resize-none"
           data-testid="input-evento-descricao"
         />
       </div>
       
-      <div className="flex justify-end gap-2 pt-4">
+      <div className="flex justify-end gap-3 pt-4 border-t">
         <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={isPending || !titulo} data-testid="button-salvar-evento">
-          {isPending ? "Salvando..." : isEdit ? "Atualizar" : "Criar Evento"}
+        <Button 
+          type="submit" 
+          disabled={isPending || !titulo} 
+          data-testid="button-salvar-evento"
+          style={{ backgroundColor: selectedTypeInfo.color }}
+          className="text-white hover:opacity-90"
+        >
+          {isPending ? "Salvando..." : isEdit ? "Atualizar Evento" : "Criar Evento"}
         </Button>
       </div>
     </form>
@@ -557,53 +624,105 @@ export default function Calendario() {
           </Card>
           
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Próximos Eventos</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <CalendarIcon className="w-4 h-4 text-primary" />
+                Próximos Eventos
+              </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {isLoading ? (
-                <div className="space-y-2">
+                <div className="space-y-2 px-4 pb-4">
                   {[1, 2, 3].map((i) => (
                     <Skeleton key={i} className="h-16 rounded-lg" />
                   ))}
                 </div>
               ) : upcomingEvents.length > 0 ? (
-                <div className="space-y-2">
+                <div className="divide-y">
                   {upcomingEvents.map((evento) => {
                     const typeInfo = getEventTypeInfo(evento.tipo);
                     const TypeIcon = typeInfo.icon;
                     const eventDate = parseISO(evento.dataInicio);
+                    const isEventToday = isToday(eventDate);
                     
                     return (
                       <div 
                         key={evento.id} 
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                        className="flex items-start gap-3 p-4 hover:bg-muted/30 transition-colors cursor-pointer group"
                         onClick={() => {
                           setSelectedDay(eventDate);
                           setCurrentMonth(eventDate);
                         }}
                         data-testid={`upcoming-${evento.id}`}
                       >
-                        <div 
-                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: `${evento.cor || typeInfo.color}20` }}
-                        >
-                          <TypeIcon className="w-4 h-4" style={{ color: evento.cor || typeInfo.color }} />
+                        <div className="flex flex-col items-center text-center min-w-[44px]">
+                          <span className="text-[10px] uppercase text-muted-foreground font-medium">
+                            {format(eventDate, "MMM", { locale: ptBR })}
+                          </span>
+                          <span className={`text-xl font-bold ${isEventToday ? "text-primary" : ""}`}>
+                            {format(eventDate, "d")}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {format(eventDate, "EEE", { locale: ptBR })}
+                          </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{evento.titulo}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(eventDate, "d MMM", { locale: ptBR })} às {format(eventDate, "HH:mm")}
-                          </p>
+                          <div className="flex items-start gap-2">
+                            <div 
+                              className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 mt-0.5"
+                              style={{ backgroundColor: `${evento.cor || typeInfo.color}15` }}
+                            >
+                              <TypeIcon className="w-3.5 h-3.5" style={{ color: evento.cor || typeInfo.color }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{evento.titulo}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                                <Clock className="w-3 h-3" />
+                                <span>{format(eventDate, "HH:mm")}</span>
+                                {evento.local && (
+                                  <>
+                                    <span className="mx-1">•</span>
+                                    <MapPin className="w-3 h-3" />
+                                    <span className="truncate">{evento.local}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditEvent(evento);
+                              }}
+                              data-testid={`button-edit-upcoming-${evento.id}`}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Nenhum evento futuro
-                </p>
+                <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                    <CalendarIcon className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Nenhum evento futuro
+                  </p>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="mt-2 text-primary"
+                    onClick={handleAddEvent}
+                  >
+                    Criar primeiro evento
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
