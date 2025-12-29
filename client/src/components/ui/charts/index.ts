@@ -32,3 +32,12 @@ export type { AreaDataPoint, AreaSeriesData, AreaMetricInfo, StackedAreaReportPr
 
 export { default as StatisticCard } from './statistics-card';
 export type { StatisticDetail, StatisticCardProps } from './statistics-card';
+
+export { default as StatisticsCard7 } from '../statistics-card-7';
+export type { StatCard, StatisticsCard7Props } from '../statistics-card-7';
+
+export { default as CinematicSwitch } from '../cinematic-switch';
+export type { CinematicSwitchProps } from '../cinematic-switch';
+
+export { default as InteractiveLineChart } from '../line-chart-interactive';
+export type { InteractiveLineChartProps, MetricConfig, DataPoint } from '../line-chart-interactive';
