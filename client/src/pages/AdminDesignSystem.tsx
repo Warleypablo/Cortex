@@ -22,7 +22,90 @@ import {
   Sparkles,
   Sun,
   Moon,
-  BarChart3
+  BarChart3,
+  Smile,
+  Home,
+  Settings,
+  User,
+  Users,
+  Bell,
+  Calendar,
+  Mail,
+  Search,
+  Plus,
+  Minus,
+  Edit,
+  Trash2,
+  Save,
+  Download,
+  Upload,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowDown,
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  Heart,
+  Star,
+  Bookmark,
+  Share,
+  Link,
+  Copy,
+  Clipboard,
+  FileText,
+  Folder,
+  Image,
+  Video,
+  Music,
+  Phone,
+  MessageCircle,
+  Send,
+  Filter,
+  SortAsc,
+  SortDesc,
+  Grid,
+  List,
+  Menu,
+  X,
+  MoreHorizontal,
+  MoreVertical,
+  ExternalLink,
+  Clock,
+  Target,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  Zap,
+  Award,
+  Gift,
+  ShoppingCart,
+  CreditCard,
+  DollarSign,
+  Briefcase,
+  Building,
+  Globe,
+  Map,
+  MapPin,
+  Navigation,
+  Wifi,
+  WifiOff,
+  Battery,
+  Cpu,
+  Database,
+  Server,
+  Cloud,
+  CloudOff,
+  Terminal,
+  Code,
+  GitBranch,
+  Github
 } from "lucide-react";
 
 import {
@@ -78,6 +161,10 @@ export default function AdminDesignSystem() {
           <TabsTrigger value="charts" data-testid="tab-charts">
             <BarChart3 className="h-4 w-4 mr-2" />
             Gráficos
+          </TabsTrigger>
+          <TabsTrigger value="icons" data-testid="tab-icons">
+            <Smile className="h-4 w-4 mr-2" />
+            Ícones
           </TabsTrigger>
         </TabsList>
 
@@ -708,7 +795,206 @@ export default function AdminDesignSystem() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="icons" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Smile className="h-5 w-5 text-primary" />
+                Biblioteca de Ícones
+              </CardTitle>
+              <CardDescription>
+                Ícones do Lucide React disponíveis no sistema. Importar de <code className="text-xs bg-muted px-1.5 py-0.5 rounded">lucide-react</code>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Navegação</h3>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3">
+                  <IconItem icon={Home} name="Home" />
+                  <IconItem icon={Menu} name="Menu" />
+                  <IconItem icon={Search} name="Search" />
+                  <IconItem icon={Settings} name="Settings" />
+                  <IconItem icon={ChevronLeft} name="ChevronLeft" />
+                  <IconItem icon={ChevronRight} name="ChevronRight" />
+                  <IconItem icon={ChevronUp} name="ChevronUp" />
+                  <IconItem icon={ChevronDown} name="ChevronDown" />
+                  <IconItem icon={ArrowLeft} name="ArrowLeft" />
+                  <IconItem icon={ArrowRight} name="ArrowRight" />
+                  <IconItem icon={ArrowUp} name="ArrowUp" />
+                  <IconItem icon={ArrowDown} name="ArrowDown" />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Ações</h3>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3">
+                  <IconItem icon={Plus} name="Plus" />
+                  <IconItem icon={Minus} name="Minus" />
+                  <IconItem icon={Edit} name="Edit" />
+                  <IconItem icon={Trash2} name="Trash2" />
+                  <IconItem icon={Save} name="Save" />
+                  <IconItem icon={Download} name="Download" />
+                  <IconItem icon={Upload} name="Upload" />
+                  <IconItem icon={RefreshCw} name="RefreshCw" />
+                  <IconItem icon={Copy} name="Copy" />
+                  <IconItem icon={Share} name="Share" />
+                  <IconItem icon={ExternalLink} name="ExternalLink" />
+                  <IconItem icon={X} name="X" />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Usuários e Comunicação</h3>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3">
+                  <IconItem icon={User} name="User" />
+                  <IconItem icon={Users} name="Users" />
+                  <IconItem icon={Bell} name="Bell" />
+                  <IconItem icon={Mail} name="Mail" />
+                  <IconItem icon={MessageCircle} name="MessageCircle" />
+                  <IconItem icon={Send} name="Send" />
+                  <IconItem icon={Phone} name="Phone" />
+                  <IconItem icon={Calendar} name="Calendar" />
+                  <IconItem icon={Clock} name="Clock" />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Status e Feedback</h3>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3">
+                  <IconItem icon={Check} name="Check" />
+                  <IconItem icon={AlertCircle} name="AlertCircle" />
+                  <IconItem icon={Info} name="Info" />
+                  <IconItem icon={Eye} name="Eye" />
+                  <IconItem icon={EyeOff} name="EyeOff" />
+                  <IconItem icon={Lock} name="Lock" />
+                  <IconItem icon={Unlock} name="Unlock" />
+                  <IconItem icon={Heart} name="Heart" />
+                  <IconItem icon={Star} name="Star" />
+                  <IconItem icon={Bookmark} name="Bookmark" />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Negócios e Finanças</h3>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3">
+                  <IconItem icon={DollarSign} name="DollarSign" />
+                  <IconItem icon={CreditCard} name="CreditCard" />
+                  <IconItem icon={ShoppingCart} name="ShoppingCart" />
+                  <IconItem icon={Briefcase} name="Briefcase" />
+                  <IconItem icon={Building} name="Building" />
+                  <IconItem icon={Target} name="Target" />
+                  <IconItem icon={TrendingUp} name="TrendingUp" />
+                  <IconItem icon={TrendingDown} name="TrendingDown" />
+                  <IconItem icon={Activity} name="Activity" />
+                  <IconItem icon={Award} name="Award" />
+                  <IconItem icon={Gift} name="Gift" />
+                  <IconItem icon={Zap} name="Zap" />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Arquivos e Mídia</h3>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3">
+                  <IconItem icon={FileText} name="FileText" />
+                  <IconItem icon={Folder} name="Folder" />
+                  <IconItem icon={Image} name="Image" />
+                  <IconItem icon={Video} name="Video" />
+                  <IconItem icon={Music} name="Music" />
+                  <IconItem icon={Clipboard} name="Clipboard" />
+                  <IconItem icon={Link} name="Link" />
+                  <IconItem icon={Grid} name="Grid" />
+                  <IconItem icon={List} name="List" />
+                  <IconItem icon={Filter} name="Filter" />
+                  <IconItem icon={SortAsc} name="SortAsc" />
+                  <IconItem icon={SortDesc} name="SortDesc" />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Tecnologia</h3>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3">
+                  <IconItem icon={Database} name="Database" />
+                  <IconItem icon={Server} name="Server" />
+                  <IconItem icon={Cloud} name="Cloud" />
+                  <IconItem icon={CloudOff} name="CloudOff" />
+                  <IconItem icon={Wifi} name="Wifi" />
+                  <IconItem icon={WifiOff} name="WifiOff" />
+                  <IconItem icon={Terminal} name="Terminal" />
+                  <IconItem icon={Code} name="Code" />
+                  <IconItem icon={GitBranch} name="GitBranch" />
+                  <IconItem icon={Github} name="Github" />
+                  <IconItem icon={Cpu} name="Cpu" />
+                  <IconItem icon={Battery} name="Battery" />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Localização</h3>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3">
+                  <IconItem icon={Globe} name="Globe" />
+                  <IconItem icon={Map} name="Map" />
+                  <IconItem icon={MapPin} name="MapPin" />
+                  <IconItem icon={Navigation} name="Navigation" />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Outros</h3>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-3">
+                  <IconItem icon={MoreHorizontal} name="MoreHorizontal" />
+                  <IconItem icon={MoreVertical} name="MoreVertical" />
+                  <IconItem icon={Sun} name="Sun" />
+                  <IconItem icon={Moon} name="Moon" />
+                </div>
+              </div>
+
+              <div className="bg-muted/50 rounded-lg p-4 mt-4">
+                <p className="text-sm text-muted-foreground mb-2">
+                  Para usar um ícone, importe-o do pacote <code className="bg-muted px-1.5 py-0.5 rounded text-xs">lucide-react</code>:
+                </p>
+                <code className="text-xs text-muted-foreground block">
+                  import {"{"} Home, User, Settings {"}"} from "lucide-react";
+                </code>
+                <code className="text-xs text-muted-foreground block mt-2">
+                  {"<Home className=\"h-5 w-5\" />"}
+                </code>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function IconItem({ icon: Icon, name }: { icon: any; name: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex flex-col items-center justify-center p-3 rounded-lg bg-muted/50 hover-elevate cursor-pointer transition-all" data-testid={`icon-${name.toLowerCase()}`}>
+          <Icon className="h-5 w-5 text-foreground" />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="font-mono text-xs">{name}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }
