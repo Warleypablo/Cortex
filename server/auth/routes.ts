@@ -38,9 +38,16 @@ router.get("/auth/google", (req, res, next) => {
 
 router.get("/auth/google/callback",
   (req, res, next) => {
-    console.log("📥 Callback do Google recebido");
-    console.log("Query params:", req.query);
+    console.log("📥 Callback do Google recebido - URL:", req.originalUrl);
+    console.log("Headers host:", req.headers.host);
+    console.log("Query params:", JSON.stringify(req.query));
+    console.log("Session ID antes do authenticate:", req.sessionID);
+    
     passport.authenticate("google", { failureRedirect: "/login" }, (err, user, info) => {
+      console.log("🔐 Passport authenticate concluído");
+      console.log("Err:", err);
+      console.log("User:", user ? user.email : "null");
+      console.log("Info:", info);
       if (err) {
         console.error("❌ Erro na autenticação Google:", err);
         return res.redirect("/login");
