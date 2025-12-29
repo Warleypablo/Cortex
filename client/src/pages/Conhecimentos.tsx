@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Course, InsertCourse } from "@shared/schema";
 import { insertCourseSchema, courseStatusEnum } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Loader2, ChevronDown, ChevronRight, GraduationCap, BookOpen, LayoutGrid, Table2, ArrowUpDown } from "lucide-react";
+import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Loader2, ChevronDown, ChevronRight, GraduationCap, BookOpen, LayoutGrid, Table2, ArrowUpDown, Star } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +73,23 @@ const statusLabels: Record<string, string> = {
   cancelado: "Cancelado",
   sem_status: "Sem Status",
 };
+
+const PRIORITY_COURSES = [
+  "Turbo Class",
+  "Gestor de Performance",
+  "G4",
+  "Cientista do Marketing",
+  "Pedro Sobral",
+  "Comunidade Sobral",
+  "Rocketseat",
+  "Rocktseat",
+];
+
+function isPriorityCourse(name: string | null): boolean {
+  if (!name) return false;
+  const lowerName = name.toLowerCase();
+  return PRIORITY_COURSES.some(p => lowerName.includes(p.toLowerCase()));
+}
 
 function AddCourseDialog() {
   const [open, setOpen] = useState(false);
@@ -488,6 +505,7 @@ function CourseCard({
   const [expanded, setExpanded] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+  const isPriority = isPriorityCourse(course.nome);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -499,18 +517,32 @@ function CourseCard({
 
   return (
     <Card
-      className="hover-elevate cursor-pointer"
+      className={cn(
+        "hover-elevate cursor-pointer",
+        isPriority && "ring-2 ring-primary/30 border-primary/40"
+      )}
       data-testid={`card-course-${course.id}`}
     >
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <GraduationCap className="w-5 h-5 text-muted-foreground shrink-0" />
+            {isPriority ? (
+              <Star className="w-5 h-5 text-primary fill-primary shrink-0" />
+            ) : (
+              <GraduationCap className="w-5 h-5 text-muted-foreground shrink-0" />
+            )}
             <CardTitle className="text-base truncate">{course.nome}</CardTitle>
           </div>
-          <Badge className={statusColors[course.status || "sem_status"]} variant="secondary">
-            {statusLabels[course.status || "sem_status"]}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {isPriority && (
+              <Badge className="bg-primary/10 text-primary border-primary/20" variant="outline">
+                Destaque
+              </Badge>
+            )}
+            <Badge className={statusColors[course.status || "sem_status"]} variant="secondary">
+              {statusLabels[course.status || "sem_status"]}
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -708,6 +740,12 @@ export default function Conhecimentos() {
 
   const sortedCourses = useMemo(() => {
     return [...filteredCourses].sort((a, b) => {
+      const aIsPriority = isPriorityCourse(a.nome);
+      const bIsPriority = isPriorityCourse(b.nome);
+      
+      if (aIsPriority && !bIsPriority) return -1;
+      if (!aIsPriority && bIsPriority) return 1;
+      
       let aVal = a[sortField] || '';
       let bVal = b[sortField] || '';
       
@@ -903,6 +941,7 @@ export default function Conhecimentos() {
               {sortedCourses.map((course) => {
                 const isExpanded = expandedRows.has(course.id);
                 const isPasswordVisible = visiblePasswords.has(course.id);
+                const isPriority = isPriorityCourse(course.nome);
                 
                 return (
                   <>
@@ -910,7 +949,8 @@ export default function Conhecimentos() {
                       key={course.id}
                       className={cn(
                         "cursor-pointer hover-elevate",
-                        isExpanded && "bg-muted/50"
+                        isExpanded && "bg-muted/50",
+                        isPriority && "bg-primary/5"
                       )}
                       onClick={() => toggleRowExpand(course.id)}
                       data-testid={`row-course-${course.id}`}
@@ -926,8 +966,17 @@ export default function Conhecimentos() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <GraduationCap className="w-4 h-4 text-muted-foreground shrink-0" />
+                          {isPriority ? (
+                            <Star className="w-4 h-4 text-primary fill-primary shrink-0" />
+                          ) : (
+                            <GraduationCap className="w-4 h-4 text-muted-foreground shrink-0" />
+                          )}
                           <span className="font-medium">{course.nome}</span>
+                          {isPriority && (
+                            <Badge className="bg-primary/10 text-primary border-primary/20 text-xs" variant="outline">
+                              Destaque
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
