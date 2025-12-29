@@ -1990,7 +1990,7 @@ function LogsTab() {
   );
 }
 
-type SortField = 'name' | 'status' | 'credential_count' | 'createdAt';
+type SortField = 'name' | 'status' | 'credential_count';
 type SortDirection = 'asc' | 'desc';
 
 interface CupCliente {
@@ -2177,10 +2177,6 @@ function ClientsTab() {
           aVal = a.aggregatedCredentialCount || 0;
           bVal = b.aggregatedCredentialCount || 0;
           break;
-        case 'createdAt':
-          aVal = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          bVal = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-          break;
         default:
           return 0;
       }
@@ -2267,8 +2263,10 @@ function ClientsTab() {
       )}
 
       {sortedAndFilteredClients.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Building2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Building2 className="w-8 h-8 text-muted-foreground" />
+          </div>
           <p className="text-lg font-medium">
             {searchQuery 
               ? "Nenhum cliente encontrado" 
@@ -2276,7 +2274,7 @@ function ClientsTab() {
                 ? "Nenhum cliente linkado" 
                 : "Nenhum cliente cadastrado"}
           </p>
-          <p className="text-sm">
+          <p className="text-sm text-muted-foreground mt-1 max-w-sm">
             {searchQuery 
               ? "Tente buscar por outro termo" 
               : showOnlyLinked
@@ -2288,7 +2286,7 @@ function ClientsTab() {
         <div className="border rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/30">
                 <TableHead className="w-[40px]"></TableHead>
                 <TableHead>
                   <SortableHeader field="name">Empresa</SortableHeader>
@@ -2300,10 +2298,7 @@ function ClientsTab() {
                 <TableHead className="text-center">
                   <SortableHeader field="credential_count">Credenciais</SortableHeader>
                 </TableHead>
-                <TableHead>
-                  <SortableHeader field="createdAt">Data Criação</SortableHeader>
-                </TableHead>
-                <TableHead className="w-[100px]">Ações</TableHead>
+                <TableHead className="w-[100px] text-center">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -2396,7 +2391,6 @@ function ClientsTab() {
                         {client.credential_count || 0}
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatDate(client.createdAt)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         <Button
@@ -2488,45 +2482,48 @@ export default function Acessos() {
   useSetPageInfo("Acessos", "Gerenciamento de credenciais de clientes");
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" data-testid="page-acessos">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Key className="w-5 h-5 text-primary" />
+            </div>
+            Acessos
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Gerencie credenciais e logins de clientes em diferentes plataformas
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <AIMatchDialog />
+          <AddClientDialog />
+        </div>
+      </div>
+      
       <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="w-5 h-5" />
-                Clientes e Credenciais
-              </CardTitle>
-              <CardDescription>
-                Gerencie os acessos e credenciais dos clientes
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <AIMatchDialog />
-              <AddClientDialog />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="clientes">
-            <TabsList className="mb-4">
-              <TabsTrigger value="clientes" data-testid="tab-clientes">
-                <Building2 className="w-4 h-4 mr-2" />
+        <Tabs defaultValue="clientes">
+          <CardHeader className="pb-0">
+            <TabsList className="w-fit">
+              <TabsTrigger value="clientes" data-testid="tab-clientes" className="gap-2">
+                <Building2 className="w-4 h-4" />
                 Clientes
               </TabsTrigger>
-              <TabsTrigger value="logs" data-testid="tab-logs">
-                <History className="w-4 h-4 mr-2" />
-                Logs
+              <TabsTrigger value="logs" data-testid="tab-logs" className="gap-2">
+                <History className="w-4 h-4" />
+                Histórico
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="clientes">
+          </CardHeader>
+          <CardContent className="pt-6">
+            <TabsContent value="clientes" className="m-0">
               <ClientsTab />
             </TabsContent>
-            <TabsContent value="logs">
+            <TabsContent value="logs" className="m-0">
               <LogsTab />
             </TabsContent>
-          </Tabs>
-        </CardContent>
+          </CardContent>
+        </Tabs>
       </Card>
     </div>
   );
