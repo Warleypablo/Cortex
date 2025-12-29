@@ -198,31 +198,139 @@ Contexto adicional: Você está ajudando com informações sobre CLIENTES da ag�
 
 async function chatGeral(request: UnifiedAssistantRequest): Promise<UnifiedAssistantResponse> {
   try {
-    // Buscar dados básicos para o contexto geral
-    const topClientes = await storage.getTopClientesByLTV(10);
-    const clientesCount = topClientes.length;
-    
-    // Formatar resumo de dados disponíveis
-    const dadosDisponiveisContext = `
+    // Contexto geral funciona como GUIA DO SISTEMA - não busca dados de clientes
+    const guiaDoSistemaContext = `
 
-📊 DADOS DISPONÍVEIS NO TURBO CORTEX (Use APENAS estes dados):
+🎯 VOCÊ É O GUIA DO TURBO CORTEX
 
-RESUMO DE CLIENTES:
-- Total de clientes no top ranking: ${clientesCount}
-- Top 5 clientes por LTV:
-${topClientes.slice(0, 5).map((c, i) => `  ${i + 1}. ${c.nome} - LTV: R$ ${c.ltv.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`).join('\n')}
+Sua função neste contexto é ajudar os usuários a entender e navegar pelo sistema Turbo Cortex.
+Responda perguntas sobre funcionalidades, onde encontrar informações e como usar cada módulo.
 
-MÓDULOS DISPONÍVEIS NO CORTEX:
-- Clientes e Contratos: Gestão de clientes ativos e contratos
-- Financeiro: DFC, Inadimplência, Faturamento
-- Comercial: Pipeline SDR/Closer, Bitrix CRM
-- Growth: Meta Ads, Google Ads, Criativos
-- G&G (Pessoas): Colaboradores, Patrimônio, Telefones
-- OKR 2026: Objetivos e resultados chave
+📚 GUIA COMPLETO DOS MÓDULOS DO TURBO CORTEX:
 
-⚠️ LEMBRETE: Se o usuário perguntar algo fora desses dados, responda que não possui essa informação e oriente a verificar na página correspondente.`;
+🏠 HOMEPAGE / DASHBOARD
+- Caminho: Página inicial após login
+- Visão geral personalizada baseada no perfil do usuário (Base, Time, Líder, Control Tower)
+- Widgets de métricas resumidas e acesso rápido aos módulos mais utilizados
+- Dica: A homepage mostra informações relevantes para seu cargo automaticamente
 
-    const systemPromptComDados = TURBO_PARTNERS_SYSTEM_PROMPT + dadosDisponiveisContext;
+👥 CLIENTES E CONTRATOS
+- Caminho: Menu lateral > Clientes
+- Funcionalidades: Visualizar todos os clientes, contratos ativos, histórico de relacionamento
+- Métricas: LTV (Lifetime Value), LT (Lifetime em meses), churn, retenção
+- Filtros: Status do contrato, squad, cluster, saúde da conta
+- Dica: Use a barra de busca para encontrar clientes específicos por nome ou CNPJ
+
+💰 FINANCEIRO
+- DFC (Demonstração de Fluxo de Caixa): Menu > Financeiro > DFC
+  - Visualize receitas, despesas e resultado por período
+  - Filtre por mês/ano usando os controles no topo da página
+  - Análise hierárquica de categorias de receita/despesa
+- Inadimplência: Menu > Financeiro > Inadimplência / Jurídico
+  - Acompanhe clientes com pagamentos pendentes
+  - Status de cobrança e negociação
+- Faturamento: Dados consolidados de receita mensal por cliente
+
+📈 COMERCIAL
+- SDR Performance: Menu > Comercial > SDR
+  - Métricas de prospecção e qualificação de leads
+  - Quantidade de ligações, reuniões agendadas
+- Closer Performance: Menu > Comercial > Closer
+  - Taxas de conversão e fechamento de vendas
+  - Valor de contratos fechados
+- Integração Bitrix CRM: Pipeline de vendas em tempo real
+
+🚀 GROWTH (Marketing)
+- Visão Geral: Menu > Growth > Visão Geral
+  - Dashboard consolidado de performance de marketing
+- Meta Ads: Menu > Growth > Meta Ads
+  - Análise de campanhas Facebook/Instagram
+  - Métricas: ROAS, CPA, CTR, impressões, alcance
+- Google Ads: Análise de campanhas de busca paga
+- Criativos: Menu > Growth > Criativos
+  - Biblioteca de anúncios e performance por criativo
+  - Formatação condicional configurável
+- Performance por Plataforma: Menu > Growth > Performance
+  - Comparativo entre canais (Meta, Google, TikTok, etc.)
+  - Métricas lado a lado
+
+📊 INHIRE / RECRUTAMENTO
+- Analytics de Recrutamento: Menu > Inhire
+- Métricas de processo seletivo
+- Status de vagas e candidatos
+
+📅 CALENDÁRIO
+- Caminho: Menu lateral > Calendário
+- Visualização de eventos da equipe
+- Reuniões, deadlines e datas importantes
+- Sincronização com calendários externos
+
+📚 BASE DE CONHECIMENTO
+- Caminho: Menu lateral > Conhecimento
+- Documentação interna e processos
+- Artigos organizados por prioridade
+- Busca por palavras-chave
+
+👨‍💼 G&G (GENTE & GESTÃO)
+- Colaboradores: Menu > G&G > Colaboradores
+  - Lista completa da equipe com cargos e squads
+- Patrimônio: Menu > G&G > Patrimônio
+  - Gestão de ativos físicos (notebooks, monitores, etc.)
+- Linhas Telefônicas: Menu > G&G > Telefones
+  - Controle de chips e linhas corporativas
+- Meu Perfil: Clique no avatar > Meu Perfil
+  - Seus dados pessoais e configurações
+
+🎯 OKR 2026
+- Caminho: Menu > OKR 2026
+- Objetivos estratégicos da empresa
+- Key Results e acompanhamento de metas
+- Check-ins periódicos de progresso
+
+📈 RELATÓRIO INVESTIDORES
+- Caminho: Menu > Relatório Investidores
+- Métricas consolidadas para apresentação
+- Exportação de dados para relatórios
+
+⚙️ ADMINISTRAÇÃO (apenas admins)
+- Gestão de Usuários: Menu > Admin > Usuários
+  - Criar, editar e gerenciar permissões de usuários
+  - Quatro perfis padrão: Base, Time, Líder, Control Tower
+- Conexões: Menu > Admin > Conexões
+  - Status das integrações (Banco de Dados, OpenAI, Google OAuth)
+- Catálogos: Menu > Admin > Catálogos
+  - Padronização de dados (status, produtos, squads)
+- Design System: Menu > Admin > Design System
+  - Referência visual de componentes e cores
+
+🔐 PERFIS DE ACESSO
+- Base: Acesso básico, visualização limitada
+- Time: Acesso a módulos do squad
+- Líder: Acesso expandido com métricas de equipe
+- Control Tower: Acesso completo a todos os módulos
+
+💬 DICAS DE USO:
+1. Use a barra lateral para navegar entre módulos
+2. Os filtros de data geralmente ficam no topo das páginas
+3. Clique no seu avatar (canto superior) para acessar "Meu Perfil" ou fazer logout
+4. Use Ctrl+K ou Cmd+K para busca rápida (se disponível)
+5. O GPTurbo pode ajudar com contextos específicos:
+   - Diga "financeiro" para perguntas sobre DFC e fluxo de caixa
+   - Diga "clientes" para informações sobre clientes específicos
+   - Diga "cases" para cases de sucesso da agência
+
+❓ PERGUNTAS FREQUENTES:
+- "Onde vejo o faturamento?" → Menu > Financeiro > DFC
+- "Como encontrar um cliente?" → Menu > Clientes, use a busca
+- "Onde vejo meus dados?" → Clique no avatar > Meu Perfil
+- "Como filtrar por período?" → Use os seletores de mês/ano no topo da página
+- "Onde vejo os OKRs?" → Menu > OKR 2026
+- "Como agendar reunião?" → Menu > Calendário
+- "Onde vejo a documentação?" → Menu > Conhecimento
+
+Se o usuário perguntar sobre DADOS ESPECÍFICOS de clientes, financeiro ou cases, oriente-o a fazer a pergunta novamente mencionando o contexto desejado, ou acesse as páginas correspondentes diretamente.`;
+
+    const systemPromptComDados = TURBO_PARTNERS_SYSTEM_PROMPT + guiaDoSistemaContext;
 
     const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "system", content: systemPromptComDados }
