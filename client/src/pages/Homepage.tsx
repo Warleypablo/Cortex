@@ -527,8 +527,8 @@ function DashboardAdmin() {
     },
     {
       title: "Aquisição Pontual",
-      subtitle: formatCurrency(aquisicaoPontual),
-      value: formatPercent(aquisicaoPontualPercent),
+      subtitle: "Vendas pontuais no mês",
+      value: formatCurrency(aquisicaoPontual),
       icon: Target,
       badge: aquisicaoPontual ? {
         text: "+8.3%",
