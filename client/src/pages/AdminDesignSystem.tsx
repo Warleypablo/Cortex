@@ -32,6 +32,9 @@ import {
   GlowingBarChart,
   HatchedBarChart,
   StatisticCard,
+  StatisticsCard7,
+  CinematicSwitch,
+  InteractiveLineChart,
 } from "@/components/ui/charts";
 
 export default function AdminDesignSystem() {
@@ -593,6 +596,49 @@ export default function AdminDesignSystem() {
   trend={{ value: 12.5, direction: 'up' }}
 />`}
                   </pre>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Cards de Estatísticas em Grid (3 Colunas)</h3>
+                <p className="text-sm text-muted-foreground">Layout de 3 cards de métricas lado a lado com badges e comparativos.</p>
+                <StatisticsCard7 />
+                <div className="bg-muted/50 rounded-lg p-4 mt-2 space-y-1">
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} StatisticsCard7 {"}"} from "@/components/ui/charts";
+                  </code>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Gráfico de Linha Interativo</h3>
+                <p className="text-sm text-muted-foreground">Gráfico com seletor de métricas e badges de variação.</p>
+                <div className="max-w-2xl">
+                  <InteractiveLineChart />
+                </div>
+                <div className="bg-muted/50 rounded-lg p-4 mt-2 space-y-1">
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} InteractiveLineChart {"}"} from "@/components/ui/charts";
+                  </code>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Toggle Animado (Cinematic Switch)</h3>
+                <p className="text-sm text-muted-foreground">Switch com animação suave usando Framer Motion.</p>
+                <div className="flex justify-center">
+                  <CinematicSwitch />
+                </div>
+                <div className="bg-muted/50 rounded-lg p-4 mt-2 space-y-1">
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} CinematicSwitch {"}"} from "@/components/ui/charts";
+                  </code>
                 </div>
               </div>
 
