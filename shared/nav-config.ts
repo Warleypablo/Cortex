@@ -278,6 +278,15 @@ export const NAV_CONFIG = {
     ],
   },
   
+  // OKR 2026 section (displayed above Setores)
+  okr2026: {
+    title: 'OKR 2026',
+    icon: 'Target',
+    items: [
+      { title: 'Dashboard OKR', url: '/okr-2026', icon: 'Trophy', permissionKey: PERMISSION_KEYS.ADMIN.OKR_2026 },
+    ],
+  },
+  
   // Setores section
   setores: [
     {

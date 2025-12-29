@@ -60,6 +60,7 @@ export function AppSidebar() {
 
   // Track open categories
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
+    'OKR 2026': true,
     'Financeiro': false,
     'Operação': true,
     'Tech': false,
@@ -267,6 +268,9 @@ export function AppSidebar() {
                 </span>
               </div>
             )}
+            
+            {/* OKR 2026 - displayed before Setores */}
+            {renderCategorySection(NAV_CONFIG.okr2026)}
             
             {NAV_CONFIG.setores.map(category => renderCategorySection(category))}
             {renderCategorySection(NAV_CONFIG.gg)}
