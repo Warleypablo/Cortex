@@ -31,8 +31,6 @@ import {
   GlowingLineChart,
   GlowingBarChart,
   HatchedBarChart,
-  DetailedIncidentReportCard,
-  StackedAreaReport,
   StatisticCard,
 } from "@/components/ui/charts";
 
@@ -531,20 +529,12 @@ export default function AdminDesignSystem() {
               <Separator />
 
               <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-foreground">Cards de Relatório</h3>
-                <p className="text-sm text-muted-foreground">Combinam gráficos com métricas detalhadas. Usam a biblioteca Reaviz.</p>
+                <h3 className="text-sm font-semibold text-foreground">Cards de Estatísticas</h3>
+                <p className="text-sm text-muted-foreground">Cards com métricas, tendências e detalhes.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <DetailedIncidentReportCard />
-                  <StackedAreaReport />
                   <StatisticCard />
                 </div>
                 <div className="bg-muted/50 rounded-lg p-4 mt-2 space-y-1">
-                  <code className="text-xs text-muted-foreground block">
-                    import {"{"} DetailedIncidentReportCard {"}"} from "@/components/ui/charts"; // Barra horizontal com métricas
-                  </code>
-                  <code className="text-xs text-muted-foreground block">
-                    import {"{"} StackedAreaReport {"}"} from "@/components/ui/charts"; // Área empilhada normalizada
-                  </code>
                   <code className="text-xs text-muted-foreground block">
                     import {"{"} StatisticCard {"}"} from "@/components/ui/charts"; // Card de estatísticas com trend
                   </code>
