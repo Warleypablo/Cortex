@@ -54,8 +54,15 @@ router.get("/auth/google/callback",
           console.error("❌ Erro ao fazer login:", loginErr);
           return res.redirect("/login");
         }
-        console.log("✅ Login bem-sucedido!");
-        res.redirect("/");
+        // Força o salvamento da sessão antes de redirecionar
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("❌ Erro ao salvar sessão:", saveErr);
+            return res.redirect("/login");
+          }
+          console.log("✅ Login bem-sucedido!");
+          res.redirect("/");
+        });
       });
     })(req, res, next);
   }
@@ -96,8 +103,15 @@ router.post("/auth/dev-login", (req, res) => {
       console.error("Dev login error:", err);
       return res.status(500).json({ message: "Dev login failed" });
     }
-    console.log("✅ Dev Admin login successful");
-    res.json({ message: "Dev login successful", user: devUser });
+    // Força o salvamento da sessão antes de retornar resposta
+    req.session.save((saveErr) => {
+      if (saveErr) {
+        console.error("Dev login session save error:", saveErr);
+        return res.status(500).json({ message: "Session save failed" });
+      }
+      console.log("✅ Dev Admin login successful");
+      res.json({ message: "Dev login successful", user: devUser });
+    });
   });
 });
 
@@ -165,8 +179,15 @@ router.post("/auth/external-login", async (req, res) => {
         console.error("Erro no login externo:", err);
         return res.status(500).json({ message: "Erro ao fazer login" });
       }
-      console.log(`✅ Login externo bem-sucedido: ${normalizedEmail}`);
-      res.json({ message: "Login realizado com sucesso", user });
+      // Força o salvamento da sessão antes de retornar resposta
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error("Erro ao salvar sessão externa:", saveErr);
+          return res.status(500).json({ message: "Erro ao salvar sessão" });
+        }
+        console.log(`✅ Login externo bem-sucedido: ${normalizedEmail}`);
+        res.json({ message: "Login realizado com sucesso", user });
+      });
     });
   } catch (error) {
     console.error("Erro ao criar usuário externo:", error);
