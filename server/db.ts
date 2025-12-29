@@ -1349,3 +1349,62 @@ export async function initializeRhPagamentosTable(): Promise<void> {
     console.error('[database] Error initializing RH Pagamentos tables:', error);
   }
 }
+
+export async function initializeRhPesquisasTables(): Promise<void> {
+  try {
+    // Criar tabela de e-NPS
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS rh_enps (
+        id SERIAL PRIMARY KEY,
+        colaborador_id INTEGER NOT NULL REFERENCES rh_pessoal(id),
+        score INTEGER NOT NULL CHECK (score >= 0 AND score <= 10),
+        comentario TEXT,
+        data DATE DEFAULT CURRENT_DATE,
+        criado_em TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Criar tabela de 1x1
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS rh_one_on_one (
+        id SERIAL PRIMARY KEY,
+        colaborador_id INTEGER NOT NULL REFERENCES rh_pessoal(id),
+        lider_id INTEGER REFERENCES rh_pessoal(id),
+        data DATE NOT NULL,
+        tipo VARCHAR(50) DEFAULT 'regular',
+        anotacoes TEXT,
+        proximos_passos TEXT,
+        criado_em TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Criar tabela de PDI
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS rh_pdi (
+        id SERIAL PRIMARY KEY,
+        colaborador_id INTEGER NOT NULL REFERENCES rh_pessoal(id),
+        titulo VARCHAR(200) NOT NULL,
+        descricao TEXT,
+        status VARCHAR(50) DEFAULT 'em_andamento',
+        progresso INTEGER DEFAULT 0 CHECK (progresso >= 0 AND progresso <= 100),
+        data_inicio DATE DEFAULT CURRENT_DATE,
+        data_alvo DATE,
+        data_conclusao DATE,
+        criado_em TIMESTAMP DEFAULT NOW(),
+        atualizado_em TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Criar índices
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_enps_colaborador ON rh_enps(colaborador_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_enps_data ON rh_enps(data)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_one_on_one_colaborador ON rh_one_on_one(colaborador_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_one_on_one_data ON rh_one_on_one(data)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_pdi_colaborador ON rh_pdi(colaborador_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_pdi_status ON rh_pdi(status)`);
+    
+    console.log('[database] RH Pesquisas tables (e-NPS, 1x1, PDI) initialized');
+  } catch (error) {
+    console.error('[database] Error initializing RH Pesquisas tables:', error);
+  }
+}
