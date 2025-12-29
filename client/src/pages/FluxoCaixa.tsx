@@ -30,7 +30,7 @@ import {
   Loader2, X
 } from "lucide-react";
 import {
-  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, Cell
+  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, Cell, Area
 } from "recharts";
 import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsightsPeriodo, ContaBanco } from "@shared/schema";
 
@@ -471,6 +471,10 @@ export default function FluxoCaixa() {
                         <stop offset="0%" stopColor="#ef4444" stopOpacity={1} />
                         <stop offset="100%" stopColor="#dc2626" stopOpacity={0.8} />
                       </linearGradient>
+                      <linearGradient id="gradientSaldo" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.02} />
+                      </linearGradient>
                     </defs>
                     
                     <CartesianGrid 
@@ -515,22 +519,51 @@ export default function FluxoCaixa() {
                     
                     <Tooltip
                       cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3, radius: 4 }}
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '12px',
-                        boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.3)',
-                        padding: '12px 16px',
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        const data = payload[0]?.payload as typeof chartData[0];
+                        const saldo = (data?.entradas || 0) - (data?.saidas || 0);
+                        return (
+                          <div className="bg-background/95 backdrop-blur-sm border rounded-xl shadow-xl p-4 min-w-[200px]">
+                            <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+                              <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                              <p className="font-semibold">{label}</p>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                                  <span className="text-sm text-muted-foreground">Entradas</span>
+                                </div>
+                                <span className="text-sm font-semibold text-green-600">{formatCurrency(data?.entradas || 0)}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                                  <span className="text-sm text-muted-foreground">Saídas</span>
+                                </div>
+                                <span className="text-sm font-semibold text-red-600">{formatCurrency(data?.saidas || 0)}</span>
+                              </div>
+                              <div className="flex justify-between items-center pt-2 border-t mt-2">
+                                <span className="text-sm font-medium">Saldo do Dia</span>
+                                <span className={`text-sm font-bold ${saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {formatCurrency(saldo)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-cyan-500" />
+                                  <span className="text-sm text-muted-foreground">Acumulado</span>
+                                </div>
+                                <span className="text-sm font-semibold text-cyan-600">{formatCurrency(data?.saldoAcumulado || 0)}</span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-3 pt-2 border-t text-center">
+                              Clique para ver detalhes
+                            </p>
+                          </div>
+                        );
                       }}
-                      formatter={(value: number, name: string) => {
-                        const labels: Record<string, string> = {
-                          entradas: 'Entradas',
-                          saidas: 'Saídas',
-                          saldoAcumulado: 'Saldo'
-                        };
-                        return [formatCurrency(value), labels[name] || name];
-                      }}
-                      labelFormatter={(label) => `Data: ${label}`}
                     />
                     
                     <Bar 
@@ -549,6 +582,14 @@ export default function FluxoCaixa() {
                       fill="url(#gradientSaidas)"
                       radius={[4, 4, 0, 0]}
                       maxBarSize={20}
+                    />
+                    
+                    <Area
+                      yAxisId="line"
+                      type="monotone"
+                      dataKey="saldoAcumulado"
+                      fill="url(#gradientSaldo)"
+                      stroke="none"
                     />
                     
                     <Line 
