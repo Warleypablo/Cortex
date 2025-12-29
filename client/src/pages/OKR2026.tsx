@@ -2473,7 +2473,7 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
     iconColor: "text-slate-500",
     bgColor: "bg-slate-500/5",
     borderColor: "border-t-slate-500",
-    statuses: ["planned", "not_started"]
+    statuses: ["planned", "not_started", "backlog", "Backlog"]
   },
   { 
     id: "doing", 
@@ -2482,7 +2482,7 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
     iconColor: "text-blue-500",
     bgColor: "bg-blue-500/5",
     borderColor: "border-t-blue-500",
-    statuses: ["doing", "in_progress"]
+    statuses: ["doing", "in_progress", "Doing", "In Progress"]
   },
   { 
     id: "done", 
@@ -2491,7 +2491,7 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
     iconColor: "text-green-500",
     bgColor: "bg-green-500/5",
     borderColor: "border-t-green-500",
-    statuses: ["done", "completed"]
+    statuses: ["done", "completed", "Done", "Completed"]
   },
   { 
     id: "blocked", 
@@ -2500,7 +2500,7 @@ const KANBAN_COLUMNS: KanbanColumn[] = [
     iconColor: "text-red-500",
     bgColor: "bg-red-500/5",
     borderColor: "border-t-red-500",
-    statuses: ["blocked"]
+    statuses: ["blocked", "Blocked"]
   },
 ];
 
@@ -2841,10 +2841,10 @@ function InitiativesTab({
   }, [filteredInitiatives]);
 
   const totalStats = useMemo(() => ({
-    backlog: initiatives.filter(i => i.status === "planned" || i.status === "not_started").length,
-    doing: initiatives.filter(i => i.status === "doing" || i.status === "in_progress").length,
-    done: initiatives.filter(i => i.status === "done" || i.status === "completed").length,
-    blocked: initiatives.filter(i => i.status === "blocked").length,
+    backlog: initiatives.filter(i => ["planned", "not_started", "backlog", "Backlog"].includes(i.status)).length,
+    doing: initiatives.filter(i => ["doing", "in_progress", "Doing", "In Progress"].includes(i.status)).length,
+    done: initiatives.filter(i => ["done", "completed", "Done", "Completed"].includes(i.status)).length,
+    blocked: initiatives.filter(i => ["blocked", "Blocked"].includes(i.status)).length,
   }), [initiatives]);
 
   const getKRTitle = (krId: string) => {
