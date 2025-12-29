@@ -1245,6 +1245,30 @@ export async function initializeDashboardTables(): Promise<void> {
   }
 }
 
+export async function initializeTurboEventosTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.turbo_eventos (
+        id SERIAL PRIMARY KEY,
+        titulo VARCHAR(255) NOT NULL,
+        descricao TEXT,
+        tipo VARCHAR(50) NOT NULL DEFAULT 'outro',
+        data_inicio TIMESTAMP WITH TIME ZONE NOT NULL,
+        data_fim TIMESTAMP WITH TIME ZONE,
+        local VARCHAR(255),
+        organizador_id INTEGER,
+        organizador_nome VARCHAR(255),
+        cor VARCHAR(20),
+        criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        criado_por VARCHAR(255)
+      )
+    `);
+    console.log('[database] Turbo eventos table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing turbo eventos table:', error);
+  }
+}
+
 export async function seedDefaultDashboardViews(): Promise<void> {
   try {
     const views = [
