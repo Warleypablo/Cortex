@@ -1293,3 +1293,59 @@ export async function seedDefaultDashboardViews(): Promise<void> {
     console.error('[database] Error seeding dashboard views:', error);
   }
 }
+
+export async function initializeRhPagamentosTable(): Promise<void> {
+  try {
+    // Criar tabela de pagamentos
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.rh_pagamentos (
+        id SERIAL PRIMARY KEY,
+        colaborador_id INTEGER NOT NULL,
+        mes_referencia INTEGER NOT NULL,
+        ano_referencia INTEGER NOT NULL,
+        valor_bruto DECIMAL NOT NULL,
+        valor_liquido DECIMAL,
+        data_pagamento DATE,
+        status VARCHAR(50) DEFAULT 'pendente',
+        observacoes TEXT,
+        criado_em TIMESTAMP DEFAULT NOW(),
+        atualizado_em TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Criar tabela de notas fiscais
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.rh_notas_fiscais (
+        id SERIAL PRIMARY KEY,
+        pagamento_id INTEGER NOT NULL,
+        colaborador_id INTEGER NOT NULL,
+        numero_nf VARCHAR(50),
+        valor_nf DECIMAL,
+        arquivo_path TEXT,
+        arquivo_nome TEXT,
+        data_emissao DATE,
+        status VARCHAR(50) DEFAULT 'pendente',
+        criado_em TIMESTAMP DEFAULT NOW(),
+        criado_por VARCHAR(100)
+      )
+    `);
+    
+    // Criar índices
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_rh_pagamentos_colaborador ON staging.rh_pagamentos(colaborador_id)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_rh_pagamentos_periodo ON staging.rh_pagamentos(ano_referencia, mes_referencia)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_rh_notas_fiscais_pagamento ON staging.rh_notas_fiscais(pagamento_id)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_rh_notas_fiscais_colaborador ON staging.rh_notas_fiscais(colaborador_id)
+    `);
+    
+    console.log('[database] RH Pagamentos and Notas Fiscais tables initialized');
+  } catch (error) {
+    console.error('[database] Error initializing RH Pagamentos tables:', error);
+  }
+}
