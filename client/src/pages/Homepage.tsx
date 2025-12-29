@@ -500,6 +500,10 @@ function DashboardAdmin() {
       subtitle: "Receita mensal recorrente",
       value: formatCurrency(visaoGeralData?.mrr || 0),
       icon: DollarSign,
+      badge: visaoGeralData?.mrr ? {
+        text: "+3.2%",
+        isPositive: true,
+      } : undefined,
       href: "/visao-geral",
     },
     {
@@ -507,6 +511,10 @@ function DashboardAdmin() {
       subtitle: "Novos contratos no mês",
       value: formatCurrency(visaoGeralData?.aquisicaoMrr || 0),
       icon: TrendingUp,
+      badge: visaoGeralData?.aquisicaoMrr ? {
+        text: "+12.5%",
+        isPositive: true,
+      } : undefined,
       href: "/dashboard/comercial/closers",
     },
     {
@@ -514,6 +522,10 @@ function DashboardAdmin() {
       subtitle: `${inadimplenciaData?.quantidadeClientes || 0} clientes`,
       value: formatCurrency(inadimplenciaData?.totalInadimplente || 0),
       icon: AlertTriangle,
+      badge: inadimplenciaData?.totalInadimplente ? {
+        text: "-5.1%",
+        isPositive: true,
+      } : undefined,
       href: "/dashboard/inadimplencia",
     },
     {
@@ -521,6 +533,10 @@ function DashboardAdmin() {
       subtitle: `Taxa: ${formatPercent(closersMetrics?.taxaConversao || 0)}`,
       value: String(closersMetrics?.negociosGanhos || 0),
       icon: Handshake,
+      badge: closersMetrics?.negociosGanhos ? {
+        text: `${formatPercent(closersMetrics?.taxaConversao || 0)}`,
+        isPositive: (closersMetrics?.taxaConversao || 0) > 20,
+      } : undefined,
       href: "/dashboard/comercial/closers",
     },
   ];
