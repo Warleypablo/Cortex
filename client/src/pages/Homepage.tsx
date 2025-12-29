@@ -516,7 +516,7 @@ function DashboardAdmin() {
     },
     {
       title: "Aquisição MRR",
-      subtitle: formatCurrency(aquisicaoMrr),
+      subtitle: "Novos contratos no mês",
       value: formatCurrency(aquisicaoMrr),
       icon: TrendingUp,
       badge: aquisicaoMrr ? {
