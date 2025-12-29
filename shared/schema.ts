@@ -2351,3 +2351,41 @@ export type TurbodashApiResponse = z.infer<typeof turbodashApiResponseSchema>;
 export type TurbodashKPIsPayload = z.infer<typeof turbodashKPIsPayloadSchema>;
 export type TurbodashClientResponse = z.infer<typeof turbodashClientResponseSchema>;
 export type TurbodashListResponse = z.infer<typeof turbodashListResponseSchema>;
+
+// Tabela de pagamentos de colaboradores (staging schema)
+export const rhPagamentos = pgTable("staging.rh_pagamentos", {
+  id: serial("id").primaryKey(),
+  colaboradorId: integer("colaborador_id").notNull(),
+  mesReferencia: integer("mes_referencia").notNull(),
+  anoReferencia: integer("ano_referencia").notNull(),
+  valorBruto: decimal("valor_bruto").notNull(),
+  valorLiquido: decimal("valor_liquido"),
+  dataPagamento: date("data_pagamento"),
+  status: varchar("status", { length: 50 }).default("pendente"),
+  observacoes: text("observacoes"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+// Tabela de notas fiscais dos colaboradores (staging schema)
+export const rhNotasFiscais = pgTable("staging.rh_notas_fiscais", {
+  id: serial("id").primaryKey(),
+  pagamentoId: integer("pagamento_id").notNull(),
+  colaboradorId: integer("colaborador_id").notNull(),
+  numeroNf: varchar("numero_nf", { length: 50 }),
+  valorNf: decimal("valor_nf"),
+  arquivoPath: text("arquivo_path"),
+  arquivoNome: text("arquivo_nome"),
+  dataEmissao: date("data_emissao"),
+  status: varchar("status", { length: 50 }).default("pendente"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  criadoPor: varchar("criado_por", { length: 100 }),
+});
+
+export const insertRhPagamentoSchema = createInsertSchema(rhPagamentos).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export const insertRhNotaFiscalSchema = createInsertSchema(rhNotasFiscais).omit({ id: true, criadoEm: true });
+
+export type RhPagamento = typeof rhPagamentos.$inferSelect;
+export type InsertRhPagamento = z.infer<typeof insertRhPagamentoSchema>;
+export type RhNotaFiscal = typeof rhNotasFiscais.$inferSelect;
+export type InsertRhNotaFiscal = z.infer<typeof insertRhNotaFiscalSchema>;
