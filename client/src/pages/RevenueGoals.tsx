@@ -3,9 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatPercent } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -14,9 +16,25 @@ import {
   CheckCircle,
   Clock,
   Target,
-  BarChart3
+  BarChart3,
+  ArrowUpRight,
+  ArrowDownRight,
+  CalendarDays,
+  Zap
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { 
+  ComposedChart, 
+  Bar, 
+  Line,
+  Area,
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  ReferenceLine
+} from "recharts";
 
 interface RevenueGoalsData {
   resumo: {
@@ -46,6 +64,8 @@ const mesesNomes = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
+const mesesAbreviados = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
 interface KPICardProps {
   title: string;
   value: string;
@@ -54,41 +74,70 @@ interface KPICardProps {
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
   color?: 'default' | 'success' | 'warning' | 'danger';
+  progress?: number;
 }
 
-function KPICard({ title, value, subtitle, icon, trend, trendValue, color = 'default' }: KPICardProps) {
-  const colorClasses = {
-    default: 'bg-primary/10 text-primary',
-    success: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
-    warning: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400',
-    danger: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+function KPICard({ title, value, subtitle, icon, trend, trendValue, color = 'default', progress }: KPICardProps) {
+  const colorConfig = {
+    default: {
+      bg: 'bg-primary/10',
+      text: 'text-primary',
+      border: 'border-primary/20',
+      gradient: 'from-primary/5 to-primary/10'
+    },
+    success: {
+      bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+      text: 'text-emerald-600 dark:text-emerald-400',
+      border: 'border-emerald-200 dark:border-emerald-800',
+      gradient: 'from-emerald-500/5 to-emerald-500/10'
+    },
+    warning: {
+      bg: 'bg-amber-100 dark:bg-amber-900/30',
+      text: 'text-amber-600 dark:text-amber-400',
+      border: 'border-amber-200 dark:border-amber-800',
+      gradient: 'from-amber-500/5 to-amber-500/10'
+    },
+    danger: {
+      bg: 'bg-red-100 dark:bg-red-900/30',
+      text: 'text-red-600 dark:text-red-400',
+      border: 'border-red-200 dark:border-red-800',
+      gradient: 'from-red-500/5 to-red-500/10'
+    },
   };
 
+  const config = colorConfig[color];
+
   return (
-    <Card data-testid={`card-kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-2">
+    <Card className={`relative overflow-hidden border ${config.border}`} data-testid={`card-kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <div className={`absolute inset-0 bg-gradient-to-br ${config.gradient} opacity-50`} />
+      <CardContent className="relative p-5">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-muted-foreground font-medium truncate">{title}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
+            <p className="text-sm text-muted-foreground font-medium">{title}</p>
+            <p className="text-2xl font-bold mt-1.5 tracking-tight">{value}</p>
             {subtitle && (
-              <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+              <p className="text-xs text-muted-foreground mt-1.5">{subtitle}</p>
             )}
             {trend && trendValue && (
-              <div className="flex items-center gap-1 mt-1">
+              <div className="flex items-center gap-1.5 mt-2">
                 {trend === 'up' ? (
-                  <TrendingUp className="w-3 h-3 text-green-600" />
+                  <ArrowUpRight className="w-4 h-4 text-emerald-600" />
                 ) : trend === 'down' ? (
-                  <TrendingDown className="w-3 h-3 text-red-500" />
+                  <ArrowDownRight className="w-4 h-4 text-red-500" />
                 ) : null}
-                <span className={`text-xs font-medium ${trend === 'up' ? 'text-green-600' : trend === 'down' ? 'text-red-500' : 'text-muted-foreground'}`}>
+                <span className={`text-xs font-medium ${trend === 'up' ? 'text-emerald-600' : trend === 'down' ? 'text-red-500' : 'text-muted-foreground'}`}>
                   {trendValue}
                 </span>
               </div>
             )}
+            {progress !== undefined && (
+              <div className="mt-3">
+                <Progress value={progress} className="h-1.5" />
+              </div>
+            )}
           </div>
-          <div className={`p-2 rounded-lg shrink-0 ${colorClasses[color]}`}>
-            {icon}
+          <div className={`p-2.5 rounded-xl shrink-0 ${config.bg}`}>
+            <div className={config.text}>{icon}</div>
           </div>
         </div>
       </CardContent>
@@ -98,23 +147,76 @@ function KPICard({ title, value, subtitle, icon, trend, trendValue, color = 'def
 
 function CustomTooltip({ active, payload, label }: any) {
   if (active && payload && payload.length) {
+    const data = payload[0]?.payload;
+    const totalDia = (data?.recebido || 0) + (data?.pendente || 0) + (data?.inadimplente || 0);
+    
     return (
-      <div className="bg-background border rounded-lg shadow-lg p-3">
-        <p className="font-medium mb-2">Dia {label}</p>
-        {payload.map((entry: any, index: number) => (
-          <div key={index} className="flex items-center gap-2 text-sm">
-            <div 
-              className="w-3 h-3 rounded-sm" 
-              style={{ backgroundColor: entry.color }}
-            />
-            <span className="text-muted-foreground">{entry.name}:</span>
-            <span className="font-medium">{formatCurrency(entry.value)}</span>
+      <div className="bg-background/95 backdrop-blur-sm border rounded-xl shadow-xl p-4 min-w-[220px]">
+        <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+          <CalendarDays className="w-4 h-4 text-muted-foreground" />
+          <p className="font-semibold">Dia {label}</p>
+        </div>
+        
+        <div className="space-y-2.5">
+          {payload.map((entry: any, index: number) => {
+            if (entry.dataKey === 'metaAcumulada' || entry.dataKey === 'recebidoAcumulado') return null;
+            const percentage = totalDia > 0 ? ((entry.value / totalDia) * 100).toFixed(1) : '0';
+            return (
+              <div key={index} className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-3 h-3 rounded-full" 
+                    style={{ backgroundColor: entry.color }}
+                  />
+                  <span className="text-sm text-muted-foreground">{entry.name}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-semibold">{formatCurrency(entry.value)}</span>
+                  <span className="text-xs text-muted-foreground ml-1">({percentage}%)</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        
+        <div className="mt-3 pt-2 border-t">
+          <div className="flex justify-between">
+            <span className="text-sm text-muted-foreground">Total do dia</span>
+            <span className="text-sm font-bold">{formatCurrency(totalDia)}</span>
           </div>
-        ))}
+        </div>
       </div>
     );
   }
   return null;
+}
+
+function CustomLegend({ payload }: any) {
+  const visibleItems = payload?.filter((item: any) => 
+    !['metaAcumulada', 'recebidoAcumulado'].includes(item.dataKey)
+  ) || [];
+  
+  return (
+    <div className="flex flex-wrap justify-center gap-4 mt-4">
+      {visibleItems.map((entry: any, index: number) => (
+        <div key={index} className="flex items-center gap-2">
+          <div 
+            className="w-3 h-3 rounded-full" 
+            style={{ backgroundColor: entry.color }}
+          />
+          <span className="text-sm text-muted-foreground">{entry.value}</span>
+        </div>
+      ))}
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-0.5 bg-blue-500" />
+        <span className="text-sm text-muted-foreground">Meta Acumulada</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-0.5 bg-emerald-500" style={{ borderStyle: 'dashed' }} />
+        <span className="text-sm text-muted-foreground">Recebido Acumulado</span>
+      </div>
+    </div>
+  );
 }
 
 export default function RevenueGoals() {
@@ -133,16 +235,62 @@ export default function RevenueGoals() {
     },
   });
 
-  const chartData = data?.porDia.map(d => ({
-    dia: d.dia,
-    recebido: d.recebido,
-    pendente: d.pendente,
-    inadimplente: d.inadimplente,
-  })) || [];
+  const chartData = useMemo(() => {
+    if (!data?.porDia) return [];
+    
+    let metaAcumulada = 0;
+    let recebidoAcumulado = 0;
+    
+    return data.porDia.map(d => {
+      metaAcumulada += d.previsto;
+      recebidoAcumulado += d.recebido;
+      
+      return {
+        dia: d.dia,
+        recebido: d.recebido,
+        pendente: d.pendente,
+        inadimplente: d.inadimplente,
+        metaAcumulada,
+        recebidoAcumulado,
+      };
+    });
+  }, [data]);
+
+  const diasRestantes = useMemo(() => {
+    const ultimoDia = new Date(selectedMonth.year, selectedMonth.month, 0).getDate();
+    const diaAtual = selectedMonth.month === hoje.getMonth() + 1 && selectedMonth.year === hoje.getFullYear() 
+      ? hoje.getDate() 
+      : ultimoDia;
+    return ultimoDia - diaAtual;
+  }, [selectedMonth, hoje]);
+
+  const mediaDiariaRecebida = useMemo(() => {
+    if (!data || data.resumo.quantidadeRecebidas === 0) return 0;
+    const diasComRecebimento = data.porDia.filter(d => d.recebido > 0).length;
+    return diasComRecebimento > 0 ? data.resumo.totalRecebido / diasComRecebimento : 0;
+  }, [data]);
+
+  const projecaoFinal = useMemo(() => {
+    if (!data) return 0;
+    return data.resumo.totalRecebido + (mediaDiariaRecebida * diasRestantes);
+  }, [data, mediaDiariaRecebida, diasRestantes]);
+
+  const atingimentoMeta = useMemo(() => {
+    if (!data || data.resumo.totalPrevisto === 0) return 0;
+    return (data.resumo.totalRecebido / data.resumo.totalPrevisto) * 100;
+  }, [data]);
   
   return (
     <div className="p-6 space-y-6" data-testid="page-revenue-goals">
-      <div className="flex justify-end">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            {mesesNomes[selectedMonth.month - 1]} {selectedMonth.year}
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Acompanhamento de metas e recebimentos
+          </p>
+        </div>
         <MonthYearPicker
           value={selectedMonth}
           onChange={setSelectedMonth}
@@ -150,18 +298,19 @@ export default function RevenueGoals() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-[120px]" />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <Skeleton key={i} className="h-[140px]" />
           ))}
         </div>
       ) : data ? (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {/* KPIs Principais */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <KPICard
-              title="Previsto"
+              title="Meta do Mês"
               value={formatCurrency(data.resumo.totalPrevisto)}
-              subtitle={`${data.resumo.quantidadeParcelas} parcelas`}
+              subtitle={`${data.resumo.quantidadeParcelas} parcelas previstas`}
               icon={<Target className="w-5 h-5" />}
               color="default"
             />
@@ -170,9 +319,10 @@ export default function RevenueGoals() {
               value={formatCurrency(data.resumo.totalRecebido)}
               subtitle={`${data.resumo.quantidadeRecebidas} parcelas`}
               icon={<CheckCircle className="w-5 h-5" />}
-              trend={data.resumo.percentualRecebido > 50 ? 'up' : 'neutral'}
-              trendValue={formatPercent(data.resumo.percentualRecebido)}
+              trend={atingimentoMeta >= 80 ? 'up' : atingimentoMeta >= 50 ? 'neutral' : 'down'}
+              trendValue={`${atingimentoMeta.toFixed(1)}% da meta`}
               color="success"
+              progress={Math.min(atingimentoMeta, 100)}
             />
             <KPICard
               title="Pendente"
@@ -186,141 +336,272 @@ export default function RevenueGoals() {
               value={formatCurrency(data.resumo.totalInadimplente)}
               subtitle={`${data.resumo.quantidadeInadimplentes} parcelas`}
               icon={<AlertTriangle className="w-5 h-5" />}
+              trend={data.resumo.percentualInadimplencia > 10 ? 'down' : 'up'}
+              trendValue={formatPercent(data.resumo.percentualInadimplencia)}
               color="danger"
             />
             <KPICard
-              title="Taxa Inadimplência"
-              value={formatPercent(data.resumo.percentualInadimplencia)}
-              subtitle="Do total previsto"
-              icon={<TrendingDown className="w-5 h-5" />}
-              trend={data.resumo.percentualInadimplencia > 10 ? 'down' : 'up'}
-              trendValue={data.resumo.percentualInadimplencia > 10 ? 'Acima do ideal' : 'Dentro do esperado'}
-              color={data.resumo.percentualInadimplencia > 10 ? 'danger' : 'success'}
+              title="Projeção Final"
+              value={formatCurrency(projecaoFinal)}
+              subtitle={`${diasRestantes} dias restantes`}
+              icon={<Zap className="w-5 h-5" />}
+              trend={projecaoFinal >= data.resumo.totalPrevisto ? 'up' : 'down'}
+              trendValue={projecaoFinal >= data.resumo.totalPrevisto ? 'Acima da meta' : 'Abaixo da meta'}
+              color={projecaoFinal >= data.resumo.totalPrevisto ? 'success' : 'warning'}
+            />
+            <KPICard
+              title="Média Diária"
+              value={formatCurrency(mediaDiariaRecebida)}
+              subtitle="Por dia com recebimento"
+              icon={<BarChart3 className="w-5 h-5" />}
+              color="default"
             />
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5" />
-                Recebimentos por Dia - {mesesNomes[selectedMonth.month - 1]} {selectedMonth.year}
-              </CardTitle>
+          {/* Gráfico Principal */}
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-2">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <BarChart3 className="w-5 h-5 text-primary" />
+                    Evolução de Recebimentos
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Análise diária com comparativo de meta acumulada
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-800">
+                    <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
+                    {formatCurrency(data.resumo.totalRecebido)}
+                  </Badge>
+                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-800">
+                    <Clock className="w-3.5 h-3.5 mr-1.5" />
+                    {formatCurrency(data.resumo.totalPendente)}
+                  </Badge>
+                  <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-200 dark:border-red-800">
+                    <AlertTriangle className="w-3.5 h-3.5 mr-1.5" />
+                    {formatCurrency(data.resumo.totalInadimplente)}
+                  </Badge>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="h-[400px]">
+            <CardContent className="pt-4">
+              <div className="h-[420px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} barCategoryGap="10%">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                    <defs>
+                      <linearGradient id="recebidoGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.9}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.6}/>
+                      </linearGradient>
+                      <linearGradient id="pendenteGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.9}/>
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.6}/>
+                      </linearGradient>
+                      <linearGradient id="inadimplenteGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.9}/>
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0.6}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                     <XAxis 
                       dataKey="dia" 
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                       tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
                     />
                     <YAxis 
+                      yAxisId="bars"
                       tickFormatter={(value) => {
                         if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
                         if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                        return value;
+                        return value.toString();
                       }}
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                       tickLine={false}
                       axisLine={false}
                     />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: 20 }}
-                      formatter={(value) => <span className="text-sm">{value}</span>}
+                    <YAxis 
+                      yAxisId="lines"
+                      orientation="right"
+                      tickFormatter={(value) => {
+                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                        if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                        return value.toString();
+                      }}
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                      tickLine={false}
+                      axisLine={false}
                     />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }} />
+                    <Legend content={<CustomLegend />} />
+                    
                     <Bar 
+                      yAxisId="bars"
                       dataKey="recebido" 
                       name="Recebido" 
                       stackId="a" 
-                      fill="#22c55e"
+                      fill="url(#recebidoGradient)"
                       radius={[0, 0, 0, 0]}
                     />
                     <Bar 
+                      yAxisId="bars"
                       dataKey="pendente" 
                       name="Pendente" 
                       stackId="a" 
-                      fill="#eab308"
+                      fill="url(#pendenteGradient)"
                       radius={[0, 0, 0, 0]}
                     />
                     <Bar 
+                      yAxisId="bars"
                       dataKey="inadimplente" 
                       name="Inadimplente" 
                       stackId="a" 
-                      fill="#ef4444"
+                      fill="url(#inadimplenteGradient)"
                       radius={[4, 4, 0, 0]}
                     />
-                  </BarChart>
+                    
+                    <Line 
+                      yAxisId="lines"
+                      type="monotone" 
+                      dataKey="metaAcumulada" 
+                      name="Meta Acumulada"
+                      stroke="#3b82f6" 
+                      strokeWidth={2.5}
+                      dot={false}
+                      activeDot={{ r: 6, strokeWidth: 2, fill: '#3b82f6' }}
+                    />
+                    <Line 
+                      yAxisId="lines"
+                      type="monotone" 
+                      dataKey="recebidoAcumulado" 
+                      name="Recebido Acumulado"
+                      stroke="#10b981" 
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      dot={false}
+                      activeDot={{ r: 5, strokeWidth: 2, fill: '#10b981' }}
+                    />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
 
+          {/* Cards de Métricas Detalhadas */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="border-green-200 dark:border-green-900">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                    <DollarSign className="w-6 h-6 text-green-600 dark:text-green-400" />
+            <Card className="border-emerald-200 dark:border-emerald-900 overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
+              <CardContent className="p-5">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
+                    <DollarSign className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ticket Médio Recebido</p>
-                    <p className="text-xl font-bold">
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground font-medium">Ticket Médio Recebido</p>
+                    <p className="text-2xl font-bold mt-0.5">
                       {data.resumo.quantidadeRecebidas > 0 
                         ? formatCurrency(data.resumo.totalRecebido / data.resumo.quantidadeRecebidas)
                         : 'R$ 0'
                       }
                     </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-yellow-200 dark:border-yellow-900">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                    <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ticket Médio Pendente</p>
-                    <p className="text-xl font-bold">
-                      {data.resumo.quantidadePendentes > 0 
-                        ? formatCurrency(data.resumo.totalPendente / data.resumo.quantidadePendentes)
-                        : 'R$ 0'
-                      }
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Base: {data.resumo.quantidadeRecebidas} parcelas
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="border-red-200 dark:border-red-900">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+            <Card className="border-amber-200 dark:border-amber-900 overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-amber-500" />
+              <CardContent className="p-5">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
+                    <Clock className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground font-medium">Ticket Médio Pendente</p>
+                    <p className="text-2xl font-bold mt-0.5">
+                      {data.resumo.quantidadePendentes > 0 
+                        ? formatCurrency(data.resumo.totalPendente / data.resumo.quantidadePendentes)
+                        : 'R$ 0'
+                      }
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Base: {data.resumo.quantidadePendentes} parcelas
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-red-200 dark:border-red-900 overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
+              <CardContent className="p-5">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-xl">
                     <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ticket Médio Inadimplente</p>
-                    <p className="text-xl font-bold">
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground font-medium">Ticket Médio Inadimplente</p>
+                    <p className="text-2xl font-bold mt-0.5">
                       {data.resumo.quantidadeInadimplentes > 0 
                         ? formatCurrency(data.resumo.totalInadimplente / data.resumo.quantidadeInadimplentes)
                         : 'R$ 0'
                       }
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Base: {data.resumo.quantidadeInadimplentes} parcelas
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          {/* Resumo de Atingimento */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                <div className="flex-1">
+                  <h3 className="font-semibold mb-2">Atingimento da Meta</h3>
+                  <div className="flex items-end gap-3">
+                    <span className="text-4xl font-bold">{atingimentoMeta.toFixed(1)}%</span>
+                    <span className="text-muted-foreground pb-1">do objetivo mensal</span>
+                  </div>
+                  <Progress value={Math.min(atingimentoMeta, 100)} className="h-3 mt-4" />
+                </div>
+                <div className="lg:w-px lg:h-20 lg:bg-border" />
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Falta Receber</p>
+                    <p className="text-xl font-bold text-amber-600">
+                      {formatCurrency(data.resumo.totalPendente + data.resumo.totalInadimplente)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Gap para Meta</p>
+                    <p className={`text-xl font-bold ${data.resumo.totalRecebido >= data.resumo.totalPrevisto ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {formatCurrency(Math.abs(data.resumo.totalPrevisto - data.resumo.totalRecebido))}
+                      {data.resumo.totalRecebido >= data.resumo.totalPrevisto && (
+                        <span className="text-sm font-normal text-emerald-600 ml-2">acima</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </>
       ) : (
-        <div className="text-center py-12 text-muted-foreground">
-          Nenhum dado disponível para o período selecionado.
-        </div>
+        <Card className="p-12">
+          <div className="text-center text-muted-foreground">
+            Nenhum dado disponível para o período selecionado.
+          </div>
+        </Card>
       )}
     </div>
   );
