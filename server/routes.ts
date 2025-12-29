@@ -12887,6 +12887,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============ RH PAGAMENTOS ENDPOINTS ============
+  
+  // Helper: Verificar se usuário pode acessar dados do colaborador
+  // Admin e RH podem ver todos; colaboradores só podem ver os próprios dados
+  async function canAccessColaboradorRH(user: any, colaboradorId: number): Promise<boolean> {
+    if (!user) return false;
+    
+    // Admin tem acesso total
+    if (user.role === 'admin') return true;
+    
+    // Verificar se usuário está vinculado ao colaborador pelo email
+    const colaboradorResult = await db.execute(sql`
+      SELECT email_turbo FROM rh_colaboradores WHERE id = ${colaboradorId}
+    `);
+    
+    if (colaboradorResult.rows.length === 0) return false;
+    
+    const emailTurbo = (colaboradorResult.rows[0] as any).email_turbo?.toLowerCase();
+    const userEmail = user.email?.toLowerCase();
+    
+    // Usuário pode acessar se for o próprio colaborador
+    return emailTurbo && userEmail && emailTurbo === userEmail;
+  }
+  
+  // Listar pagamentos de um colaborador
+  app.get("/api/rh/pagamentos/:colaboradorId", isAuthenticated, async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.colaboradorId);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "ID de colaborador inválido" });
+      }
+      
+      const user = req.user as any;
+      const hasAccess = await canAccessColaboradorRH(user, colaboradorId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Acesso negado aos dados de pagamentos" });
+      }
+      
+      const result = await db.execute(sql`
+        SELECT 
+          p.*,
+          (SELECT COUNT(*) FROM staging.rh_notas_fiscais WHERE pagamento_id = p.id) as total_nfs
+        FROM staging.rh_pagamentos p
+        WHERE p.colaborador_id = ${colaboradorId}
+        ORDER BY p.ano_referencia DESC, p.mes_referencia DESC
+      `);
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[rh-pagamentos] Error fetching payments:", error);
+      res.status(500).json({ error: "Erro ao buscar pagamentos" });
+    }
+  });
+  
+  // Buscar nota fiscal de um pagamento
+  app.get("/api/rh/pagamentos/:pagamentoId/nf", isAuthenticated, async (req, res) => {
+    try {
+      const pagamentoId = parseInt(req.params.pagamentoId);
+      if (isNaN(pagamentoId)) {
+        return res.status(400).json({ error: "ID de pagamento inválido" });
+      }
+      
+      // Verificar permissão via colaborador_id do pagamento
+      const pagamentoCheck = await db.execute(sql`
+        SELECT colaborador_id FROM staging.rh_pagamentos WHERE id = ${pagamentoId}
+      `);
+      
+      if (pagamentoCheck.rows.length === 0) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+      
+      const colaboradorId = (pagamentoCheck.rows[0] as any).colaborador_id;
+      const user = req.user as any;
+      const hasAccess = await canAccessColaboradorRH(user, colaboradorId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Acesso negado à nota fiscal" });
+      }
+      
+      const result = await db.execute(sql`
+        SELECT * FROM staging.rh_notas_fiscais
+        WHERE pagamento_id = ${pagamentoId}
+        ORDER BY criado_em DESC
+        LIMIT 1
+      `);
+      
+      res.json(result.rows[0] || null);
+    } catch (error) {
+      console.error("[rh-pagamentos] Error fetching NF:", error);
+      res.status(500).json({ error: "Erro ao buscar nota fiscal" });
+    }
+  });
+  
+  // Registrar nota fiscal anexada
+  app.post("/api/rh/pagamentos/:pagamentoId/nf", isAuthenticated, async (req, res) => {
+    try {
+      const pagamentoId = parseInt(req.params.pagamentoId);
+      if (isNaN(pagamentoId)) {
+        return res.status(400).json({ error: "ID de pagamento inválido" });
+      }
+      
+      const { arquivoPath, arquivoNome, numeroNf, valorNf, dataEmissao } = req.body;
+      
+      if (!arquivoPath || !arquivoNome) {
+        return res.status(400).json({ error: "Arquivo é obrigatório" });
+      }
+      
+      // Buscar dados do pagamento para validação
+      const pagamentoResult = await db.execute(sql`
+        SELECT colaborador_id FROM staging.rh_pagamentos WHERE id = ${pagamentoId}
+      `);
+      
+      if (pagamentoResult.rows.length === 0) {
+        return res.status(404).json({ error: "Pagamento não encontrado" });
+      }
+      
+      const colaboradorId = (pagamentoResult.rows[0] as any).colaborador_id;
+      const user = req.user as any;
+      
+      // Verificar permissão: apenas o próprio colaborador ou admin pode anexar NF
+      const hasAccess = await canAccessColaboradorRH(user, colaboradorId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Acesso negado para anexar nota fiscal" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO staging.rh_notas_fiscais (
+          pagamento_id, colaborador_id, numero_nf, valor_nf, 
+          arquivo_path, arquivo_nome, data_emissao, status, criado_por
+        ) VALUES (
+          ${pagamentoId}, ${colaboradorId}, ${numeroNf || null}, ${valorNf || null},
+          ${arquivoPath}, ${arquivoNome}, ${dataEmissao || null}, 'anexada', ${user?.email || 'sistema'}
+        )
+        RETURNING *
+      `);
+      
+      // Atualizar status do pagamento
+      await db.execute(sql`
+        UPDATE staging.rh_pagamentos 
+        SET status = 'nf_anexada', atualizado_em = NOW()
+        WHERE id = ${pagamentoId}
+      `);
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[rh-pagamentos] Error saving NF:", error);
+      res.status(500).json({ error: "Erro ao salvar nota fiscal" });
+    }
+  });
+  
+  // Listar notas fiscais de um colaborador
+  app.get("/api/rh/colaborador/:colaboradorId/nfs", isAuthenticated, async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.colaboradorId);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "ID de colaborador inválido" });
+      }
+      
+      const user = req.user as any;
+      const hasAccess = await canAccessColaboradorRH(user, colaboradorId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Acesso negado às notas fiscais" });
+      }
+      
+      const result = await db.execute(sql`
+        SELECT nf.*, p.mes_referencia, p.ano_referencia, p.valor_bruto
+        FROM staging.rh_notas_fiscais nf
+        JOIN staging.rh_pagamentos p ON p.id = nf.pagamento_id
+        WHERE nf.colaborador_id = ${colaboradorId}
+        ORDER BY p.ano_referencia DESC, p.mes_referencia DESC
+      `);
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[rh-pagamentos] Error fetching collaborator NFs:", error);
+      res.status(500).json({ error: "Erro ao buscar notas fiscais do colaborador" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
