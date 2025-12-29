@@ -50,3 +50,6 @@ export type { StatisticsCard10Props, DetailItem } from '../statistics-card-10';
 
 export { default as LineCharts6 } from '../line-charts-6';
 export type { LineCharts6Props, MetricDef, ChartDataPoint } from '../line-charts-6';
+
+export { default as KpiCardGrid, KpiCardItem } from '../kpi-card-grid';
+export type { KpiCard, KpiCardGridProps } from '../kpi-card-grid';
