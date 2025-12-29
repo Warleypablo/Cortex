@@ -52,6 +52,37 @@ const COMMON_LOCATIONS = [
   { value: "externo", label: "Local Externo" },
 ];
 
+const TITLE_EXAMPLES = [
+  "Reunião de Resultado Q4",
+  "Daily do Time de Marketing",
+  "Confraternização de Fim de Ano",
+  "Workshop de Vendas",
+  "Alinhamento Semanal",
+  "Review de Campanha",
+  "Treinamento de Onboarding",
+  "Happy Hour da Equipe",
+  "Planejamento Estratégico 2026",
+  "Apresentação de Metas",
+];
+
+const roundDateToNearestFiveMinutes = (date: Date): Date => {
+  const ms = date.getTime();
+  const fiveMinutesMs = 5 * 60 * 1000;
+  const roundedMs = Math.round(ms / fiveMinutesMs) * fiveMinutesMs;
+  return new Date(roundedMs);
+};
+
+const formatDateTimeLocal = (date: Date): string => {
+  const rounded = roundDateToNearestFiveMinutes(date);
+  const year = rounded.getFullYear();
+  const month = (rounded.getMonth() + 1).toString().padStart(2, '0');
+  const day = rounded.getDate().toString().padStart(2, '0');
+  const hours = rounded.getHours().toString().padStart(2, '0');
+  const minutes = rounded.getMinutes().toString().padStart(2, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
 function EventForm({ 
   evento, 
   onClose, 
@@ -67,20 +98,40 @@ function EventForm({
   const [titulo, setTitulo] = useState(evento?.titulo || "");
   const [descricao, setDescricao] = useState(evento?.descricao || "");
   const [tipo, setTipo] = useState(evento?.tipo || "reuniao_resultado");
-  const [dataInicio, setDataInicio] = useState(
-    evento?.dataInicio 
-      ? format(parseISO(evento.dataInicio), "yyyy-MM-dd'T'HH:mm")
-      : selectedDate 
-        ? format(selectedDate, "yyyy-MM-dd") + "T09:00"
-        : format(new Date(), "yyyy-MM-dd'T'HH:mm")
-  );
-  const [dataFim, setDataFim] = useState(
-    evento?.dataFim 
-      ? format(parseISO(evento.dataFim), "yyyy-MM-dd'T'HH:mm")
-      : ""
-  );
+  const [dataInicio, setDataInicio] = useState(() => {
+    if (evento?.dataInicio) {
+      return formatDateTimeLocal(parseISO(evento.dataInicio));
+    }
+    if (selectedDate) {
+      return format(selectedDate, "yyyy-MM-dd") + "T09:00";
+    }
+    return formatDateTimeLocal(new Date());
+  });
+  const [dataFim, setDataFim] = useState(() => {
+    if (evento?.dataFim) {
+      return formatDateTimeLocal(parseISO(evento.dataFim));
+    }
+    return "";
+  });
   const [localType, setLocalType] = useState("escritorio");
   const [local, setLocal] = useState(evento?.local || "Escritório");
+  
+  const randomExample = useMemo(() => {
+    return TITLE_EXAMPLES[Math.floor(Math.random() * TITLE_EXAMPLES.length)];
+  }, []);
+  
+  const handleTimeChange = (value: string, setter: (v: string) => void) => {
+    if (value) {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        setter(formatDateTimeLocal(date));
+      } else {
+        setter(value);
+      }
+    } else {
+      setter(value);
+    }
+  };
   
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -151,7 +202,7 @@ function EventForm({
           id="titulo"
           value={titulo}
           onChange={(e) => setTitulo(e.target.value)}
-          placeholder="Ex: Reunião de resultado Q4"
+          placeholder={`Ex: ${randomExample}`}
           required
           className="h-11"
           data-testid="input-evento-titulo"
@@ -201,7 +252,8 @@ function EventForm({
             id="dataInicio"
             type="datetime-local"
             value={dataInicio}
-            onChange={(e) => setDataInicio(e.target.value)}
+            onChange={(e) => handleTimeChange(e.target.value, setDataInicio)}
+            step={300}
             required
             className="h-11"
             data-testid="input-evento-data-inicio"
@@ -216,7 +268,8 @@ function EventForm({
             id="dataFim"
             type="datetime-local"
             value={dataFim}
-            onChange={(e) => setDataFim(e.target.value)}
+            onChange={(e) => handleTimeChange(e.target.value, setDataFim)}
+            step={300}
             className="h-11"
             data-testid="input-evento-data-fim"
           />
@@ -515,54 +568,61 @@ export default function Calendario() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
               {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
-                <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
+                <div key={day} className="text-center text-xs font-semibold text-muted-foreground py-3 bg-muted/30">
                   {day}
                 </div>
               ))}
               
               {isLoading ? (
                 Array(35).fill(0).map((_, i) => (
-                  <Skeleton key={i} className="aspect-square rounded-md" />
+                  <div key={i} className="aspect-square bg-background p-2">
+                    <Skeleton className="h-full w-full rounded-md" />
+                  </div>
                 ))
               ) : (
                 days.map((day, i) => {
                   if (!day) {
-                    return <div key={`empty-${i}`} className="aspect-square" />;
+                    return <div key={`empty-${i}`} className="aspect-square bg-muted/10" />;
                   }
                   
                   const dayEvents = getEventsForDay(day);
                   const isSelected = selectedDay && isSameDay(day, selectedDay);
                   const isCurrentDay = isToday(day);
+                  const hasEvents = dayEvents.length > 0;
                   
                   return (
                     <button
                       key={day.toISOString()}
                       onClick={() => handleDayClick(day)}
-                      className={`aspect-square p-1 rounded-md text-sm transition-colors relative flex flex-col items-center justify-start hover-elevate ${
+                      className={`aspect-square p-1.5 text-sm transition-all relative flex flex-col items-center justify-start bg-background hover-elevate ${
                         isSelected 
-                          ? "bg-primary text-primary-foreground" 
-                          : isCurrentDay
-                            ? "bg-accent"
-                            : "hover:bg-muted"
-                      } ${!isSameMonth(day, currentMonth) ? "text-muted-foreground" : ""}`}
+                          ? "ring-2 ring-primary ring-inset bg-primary/5" 
+                          : ""
+                      } ${!isSameMonth(day, currentMonth) ? "text-muted-foreground/50" : ""}`}
                       data-testid={`day-${format(day, "yyyy-MM-dd")}`}
                     >
-                      <span className={`${isCurrentDay && !isSelected ? "font-bold" : ""}`}>
+                      <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-medium ${
+                        isCurrentDay 
+                          ? "bg-primary text-primary-foreground" 
+                          : isSelected 
+                            ? "bg-primary/10 text-primary"
+                            : ""
+                      }`}>
                         {format(day, "d")}
                       </span>
-                      {dayEvents.length > 0 && (
-                        <div className="flex gap-0.5 mt-1 flex-wrap justify-center">
+                      {hasEvents && (
+                        <div className="flex gap-0.5 mt-1 flex-wrap justify-center max-w-full">
                           {dayEvents.slice(0, 3).map((e) => (
                             <div
                               key={e.id}
-                              className="w-1.5 h-1.5 rounded-full"
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
                               style={{ backgroundColor: e.cor || getEventTypeInfo(e.tipo).color }}
                             />
                           ))}
                           {dayEvents.length > 3 && (
-                            <span className="text-[8px] text-muted-foreground">+{dayEvents.length - 3}</span>
+                            <span className="text-[8px] text-muted-foreground ml-0.5">+{dayEvents.length - 3}</span>
                           )}
                         </div>
                       )}
