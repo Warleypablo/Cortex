@@ -9033,7 +9033,7 @@ export class DbStorage implements IStorage {
         data_inicio as "dataInicio", data_fim as "dataFim",
         local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
         cor, criado_em as "criadoEm", criado_por as "criadoPor"
-      FROM turbo_eventos
+      FROM staging.turbo_eventos
     `;
     
     if (startDate && endDate) {
@@ -9042,7 +9042,7 @@ export class DbStorage implements IStorage {
           data_inicio as "dataInicio", data_fim as "dataFim",
           local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
           cor, criado_em as "criadoEm", criado_por as "criadoPor"
-        FROM turbo_eventos
+        FROM staging.turbo_eventos
         WHERE data_inicio >= ${startDate}::timestamp AND data_inicio <= ${endDate}::timestamp
         ORDER BY data_inicio
       `;
@@ -9052,7 +9052,7 @@ export class DbStorage implements IStorage {
           data_inicio as "dataInicio", data_fim as "dataFim",
           local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
           cor, criado_em as "criadoEm", criado_por as "criadoPor"
-        FROM turbo_eventos
+        FROM staging.turbo_eventos
         ORDER BY data_inicio
       `;
     }
@@ -9067,7 +9067,7 @@ export class DbStorage implements IStorage {
         data_inicio as "dataInicio", data_fim as "dataFim",
         local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
         cor, criado_em as "criadoEm", criado_por as "criadoPor"
-      FROM turbo_eventos
+      FROM staging.turbo_eventos
       WHERE id = ${id}
     `);
     return (result.rows[0] as TurboEvento) || null;
@@ -9075,7 +9075,7 @@ export class DbStorage implements IStorage {
 
   async createTurboEvento(data: InsertTurboEvento): Promise<TurboEvento> {
     const result = await db.execute(sql`
-      INSERT INTO turbo_eventos (titulo, descricao, tipo, data_inicio, data_fim, local, organizador_id, organizador_nome, cor, criado_por)
+      INSERT INTO staging.turbo_eventos (titulo, descricao, tipo, data_inicio, data_fim, local, organizador_id, organizador_nome, cor, criado_por)
       VALUES (${data.titulo}, ${data.descricao || null}, ${data.tipo}, ${data.dataInicio}, ${data.dataFim || null}, ${data.local || null}, ${data.organizadorId || null}, ${data.organizadorNome || null}, ${data.cor || '#f97316'}, ${data.criadoPor || null})
       RETURNING id, titulo, descricao, tipo, 
         data_inicio as "dataInicio", data_fim as "dataFim",
@@ -9087,7 +9087,7 @@ export class DbStorage implements IStorage {
 
   async updateTurboEvento(id: number, data: Partial<InsertTurboEvento>): Promise<TurboEvento> {
     const result = await db.execute(sql`
-      UPDATE turbo_eventos 
+      UPDATE staging.turbo_eventos 
       SET 
         titulo = COALESCE(${data.titulo ?? null}, titulo),
         descricao = COALESCE(${data.descricao ?? null}, descricao),
@@ -9108,7 +9108,7 @@ export class DbStorage implements IStorage {
   }
 
   async deleteTurboEvento(id: number): Promise<void> {
-    await db.execute(sql`DELETE FROM turbo_eventos WHERE id = ${id}`);
+    await db.execute(sql`DELETE FROM staging.turbo_eventos WHERE id = ${id}`);
   }
 
   // System Settings
