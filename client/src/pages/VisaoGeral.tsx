@@ -4,6 +4,7 @@ import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { DollarSign, TrendingUp, TrendingDown, PauseCircle, Info, CheckCircle } from "lucide-react";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend } from "recharts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -15,6 +16,7 @@ export default function VisaoGeral() {
     const now = new Date();
     return { month: now.getMonth() + 1, year: now.getFullYear() };
   });
+  const [qtdMesesGrafico, setQtdMesesGrafico] = useState<number>(12);
 
   const mesVisaoGeral = useMemo(() => {
     return `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}`;
@@ -76,9 +78,9 @@ export default function VisaoGeral() {
   });
 
   const { data: mrrEvolucaoData, isLoading: isLoadingMrrEvolucao } = useQuery<{ mes: string; mrr: number; receitaPontualEntregue: number }[]>({
-    queryKey: ['/api/visao-geral/mrr-evolucao', mesVisaoGeral],
+    queryKey: ['/api/visao-geral/mrr-evolucao', mesVisaoGeral, qtdMesesGrafico],
     queryFn: async () => {
-      const response = await fetch(`/api/visao-geral/mrr-evolucao?mesAno=${mesVisaoGeral}`);
+      const response = await fetch(`/api/visao-geral/mrr-evolucao?mesAno=${mesVisaoGeral}&qtdMeses=${qtdMesesGrafico}`);
       if (!response.ok) throw new Error('Failed to fetch MRR evolucao');
       return response.json();
     },
@@ -283,9 +285,24 @@ export default function VisaoGeral() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="lg:col-span-2" data-testid="card-evolucao-mrr">
-              <CardHeader>
-                <CardTitle>Evolução MRR e Receita Pontual</CardTitle>
-                <CardDescription>Histórico dos últimos 12 meses</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Evolução MRR e Receita Pontual</CardTitle>
+                  <CardDescription>Histórico dos últimos {qtdMesesGrafico} meses</CardDescription>
+                </div>
+                <Select
+                  value={String(qtdMesesGrafico)}
+                  onValueChange={(value) => setQtdMesesGrafico(Number(value))}
+                >
+                  <SelectTrigger className="w-28" data-testid="select-periodo-grafico">
+                    <SelectValue placeholder="Período" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="6">6 meses</SelectItem>
+                    <SelectItem value="9">9 meses</SelectItem>
+                    <SelectItem value="12">12 meses</SelectItem>
+                  </SelectContent>
+                </Select>
               </CardHeader>
               <CardContent>
                 {isLoadingMrrEvolucao ? (
