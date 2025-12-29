@@ -31,6 +31,10 @@ import {
   Calendar,
   MapPin,
   ExternalLink,
+  Bell,
+  FileText,
+  Phone,
+  Plus,
 } from "lucide-react";
 
 interface HomeOverview {
@@ -56,6 +60,14 @@ interface HomeOverview {
     dataFim: string | null;
     local: string | null;
     cor: string | null;
+  }>;
+  alertas: Array<{
+    tipo: 'cobranca_vencida' | 'contrato_vencendo' | 'cliente_risco';
+    clienteNome: string;
+    cnpj: string;
+    data: string;
+    valor: number;
+    dias: number;
   }>;
 }
 
@@ -211,6 +223,138 @@ function MeusClientes({ clientes, mrrTotal, contratosAtivos }: {
               </div>
             </Link>
           ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AlertasWidget({ alertas }: { alertas: HomeOverview['alertas'] }) {
+  if (!alertas || alertas.length === 0) {
+    return (
+      <Card data-testid="card-alertas-empty">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Bell className="w-4 h-4" />
+              Alertas & Pendências
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-4">
+            <div className="text-center">
+              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-2">
+                <ShieldCheck className="w-5 h-5 text-green-600" />
+              </div>
+              <p className="text-sm text-muted-foreground">Tudo em dia!</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card data-testid="card-alertas">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Bell className="w-4 h-4" />
+            Alertas & Pendências
+            <Badge variant="destructive" className="ml-1 text-xs">
+              {alertas.length}
+            </Badge>
+          </CardTitle>
+          <Link href="/dashboard/inadimplencia">
+            <Button variant="ghost" size="sm" data-testid="button-ver-alertas">
+              Ver todos
+              <ExternalLink className="w-3 h-3 ml-1" />
+            </Button>
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {alertas.slice(0, 4).map((alerta, idx) => (
+          <Link key={idx} href={`/clientes/${alerta.cnpj}`}>
+            <div 
+              className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+              data-testid={`alerta-item-${idx}`}
+            >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                alerta.tipo === 'cobranca_vencida' 
+                  ? 'bg-red-100 dark:bg-red-900/30' 
+                  : alerta.tipo === 'cliente_risco'
+                  ? 'bg-orange-100 dark:bg-orange-900/30'
+                  : 'bg-yellow-100 dark:bg-yellow-900/30'
+              }`}>
+                {alerta.tipo === 'cobranca_vencida' ? (
+                  <Receipt className="w-4 h-4 text-red-600" />
+                ) : alerta.tipo === 'cliente_risco' ? (
+                  <AlertTriangle className="w-4 h-4 text-orange-600" />
+                ) : (
+                  <FileText className="w-4 h-4 text-yellow-600" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{alerta.clienteNome}</p>
+                <p className="text-xs text-muted-foreground">
+                  {alerta.tipo === 'cobranca_vencida' 
+                    ? `${alerta.dias} dias em atraso`
+                    : alerta.tipo === 'cliente_risco'
+                    ? 'Atenção: cliente em risco'
+                    : `Vence em ${format(parseISO(alerta.data), 'dd/MM', { locale: ptBR })}`
+                  }
+                </p>
+              </div>
+              <div className="text-right">
+                <p className={`text-sm font-medium ${alerta.tipo === 'cobranca_vencida' ? 'text-red-600' : alerta.tipo === 'cliente_risco' ? 'text-orange-600' : ''}`}>
+                  {formatCurrency(alerta.valor)}
+                </p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function QuickActions() {
+  return (
+    <Card data-testid="card-quick-actions">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Plus className="w-4 h-4" />
+          Ações Rápidas
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-2">
+          <Link href="/clientes">
+            <Button variant="outline" className="w-full justify-start" size="sm" data-testid="action-novo-cliente">
+              <Building2 className="w-4 h-4 mr-2" />
+              Ver Clientes
+            </Button>
+          </Link>
+          <Link href="/dashboard/comercial/closers">
+            <Button variant="outline" className="w-full justify-start" size="sm" data-testid="action-pipeline">
+              <Target className="w-4 h-4 mr-2" />
+              Pipeline
+            </Button>
+          </Link>
+          <Link href="/dashboard/inadimplencia">
+            <Button variant="outline" className="w-full justify-start" size="sm" data-testid="action-cobrancas">
+              <Receipt className="w-4 h-4 mr-2" />
+              Cobranças
+            </Button>
+          </Link>
+          <Link href="/calendario">
+            <Button variant="outline" className="w-full justify-start" size="sm" data-testid="action-calendario">
+              <Calendar className="w-4 h-4 mr-2" />
+              Calendário
+            </Button>
+          </Link>
         </div>
       </CardContent>
     </Card>
@@ -384,14 +528,18 @@ function DashboardAdmin() {
         </div>
       </div>
 
-      {/* Widgets personalizados: Meus Clientes e Mini Calendário */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Widgets personalizados */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <MeusClientes 
           clientes={homeOverview?.clientes || []} 
           mrrTotal={homeOverview?.mrrTotal || 0}
           contratosAtivos={homeOverview?.contratosAtivos || 0}
         />
-        <MiniCalendar eventos={homeOverview?.proximosEventos || []} />
+        <AlertasWidget alertas={homeOverview?.alertas || []} />
+        <div className="space-y-6">
+          <MiniCalendar eventos={homeOverview?.proximosEventos || []} />
+          <QuickActions />
+        </div>
       </div>
 
       <div>
@@ -812,11 +960,45 @@ function DashboardOperacao() {
   );
 }
 
+function getGreeting(): { greeting: string; message: string } {
+  const hour = new Date().getHours();
+  const dayOfWeek = new Date().getDay();
+  
+  let greeting = '';
+  if (hour >= 5 && hour < 12) {
+    greeting = 'Bom dia';
+  } else if (hour >= 12 && hour < 18) {
+    greeting = 'Boa tarde';
+  } else {
+    greeting = 'Boa noite';
+  }
+  
+  const messages = [
+    'Pronto para mais um dia de conquistas?',
+    'Vamos fazer acontecer!',
+    'Bora acelerar os resultados!',
+    'Mais um dia, mais oportunidades!',
+    'Foco no que importa!',
+  ];
+  
+  const weekendMessages = [
+    'Descanse bem, você merece!',
+    'Aproveite o final de semana!',
+  ];
+  
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const messagePool = isWeekend ? weekendMessages : messages;
+  const randomMessage = messagePool[Math.floor(Math.random() * messagePool.length)];
+  
+  return { greeting, message: randomMessage };
+}
+
 export default function Homepage() {
   usePageTitle("Home");
   const { user } = useAuth();
   
   const department = user?.department || (user?.role === 'admin' ? 'admin' : null);
+  const { greeting, message } = getGreeting();
   
   const getPageTitle = () => {
     switch (department) {
@@ -865,8 +1047,11 @@ export default function Homepage() {
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground">
-                Olá, <span className="font-medium text-foreground">{user?.name?.split(' ')[0] || 'Usuário'}</span>
+              <h1 className="text-xl font-semibold" data-testid="text-greeting">
+                {greeting}, <span className="text-primary">{user?.name?.split(' ')[0] || 'Usuário'}</span>
+              </h1>
+              <p className="text-sm text-muted-foreground" data-testid="text-message">
+                {message}
               </p>
             </div>
             {department && department !== 'admin' && (
