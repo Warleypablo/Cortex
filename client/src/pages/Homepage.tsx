@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   DollarSign,
   TrendingUp,
@@ -26,7 +28,194 @@ import {
   Receipt,
   ShieldCheck,
   Briefcase,
+  Calendar,
+  MapPin,
+  ExternalLink,
 } from "lucide-react";
+
+interface HomeOverview {
+  hasActiveContracts: boolean;
+  colaboradorNome: string | null;
+  mrrTotal: number;
+  contratosAtivos: number;
+  clientes: Array<{
+    id: number;
+    nome: string;
+    cnpj: string;
+    status: string;
+    mrr: number;
+    contratosAtivos: number;
+    produto: string;
+    squad: string;
+  }>;
+  proximosEventos: Array<{
+    id: number;
+    titulo: string;
+    tipo: string;
+    dataInicio: string;
+    dataFim: string | null;
+    local: string | null;
+    cor: string | null;
+  }>;
+}
+
+function MiniCalendar({ eventos }: { eventos: HomeOverview['proximosEventos'] }) {
+  if (eventos.length === 0) {
+    return (
+      <Card data-testid="card-mini-calendar">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Próximos Eventos
+            </CardTitle>
+            <Link href="/calendario">
+              <Button variant="ghost" size="sm" data-testid="button-ver-calendario">
+                Ver todos
+                <ExternalLink className="w-3 h-3 ml-1" />
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Nenhum evento nos próximos 14 dias
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card data-testid="card-mini-calendar">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Próximos Eventos
+          </CardTitle>
+          <Link href="/calendario">
+            <Button variant="ghost" size="sm" data-testid="button-ver-calendario">
+              Ver todos
+              <ExternalLink className="w-3 h-3 ml-1" />
+            </Button>
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {eventos.map((evento) => (
+          <div 
+            key={evento.id} 
+            className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors"
+            data-testid={`event-item-${evento.id}`}
+          >
+            <div 
+              className="w-1 h-full min-h-[40px] rounded-full" 
+              style={{ backgroundColor: evento.cor || '#3b82f6' }}
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{evento.titulo}</p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                <Clock className="w-3 h-3" />
+                {format(parseISO(evento.dataInicio), "dd MMM, HH:mm", { locale: ptBR })}
+              </div>
+              {evento.local && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                  <MapPin className="w-3 h-3" />
+                  <span className="truncate">{evento.local}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MeusClientes({ clientes, mrrTotal, contratosAtivos }: { 
+  clientes: HomeOverview['clientes']; 
+  mrrTotal: number;
+  contratosAtivos: number;
+}) {
+  if (clientes.length === 0) {
+    return (
+      <Card data-testid="card-meus-clientes-empty">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Meus Clientes
+            </CardTitle>
+            <Link href="/clientes">
+              <Button variant="ghost" size="sm" data-testid="button-ver-clientes">
+                Ver todos
+                <ExternalLink className="w-3 h-3 ml-1" />
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Nenhum cliente vinculado ao seu perfil
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card data-testid="card-meus-clientes">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Meus Clientes
+            </CardTitle>
+            <CardDescription className="mt-1">
+              {contratosAtivos} contratos • {formatCurrency(mrrTotal)} MRR
+            </CardDescription>
+          </div>
+          <Link href="/clientes">
+            <Button variant="ghost" size="sm" data-testid="button-ver-clientes">
+              Ver todos
+              <ExternalLink className="w-3 h-3 ml-1" />
+            </Button>
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {clientes.slice(0, 5).map((cliente) => (
+            <Link key={cliente.id} href={`/clientes/${cliente.cnpj}`}>
+              <div 
+                className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+                data-testid={`cliente-item-${cliente.id}`}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{cliente.nome}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <Badge variant="outline" className="text-xs px-1.5 py-0">
+                      {cliente.produto}
+                    </Badge>
+                    {cliente.squad && (
+                      <span className="text-xs text-muted-foreground">{cliente.squad}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium">{formatCurrency(cliente.mrr)}</p>
+                  <p className="text-xs text-muted-foreground">MRR</p>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 interface MetricCardProps {
   title: string;
@@ -113,6 +302,10 @@ function LoadingSkeleton() {
 }
 
 function DashboardAdmin() {
+  const { data: homeOverview, isLoading: isLoadingOverview } = useQuery<HomeOverview>({
+    queryKey: ['/api/home/overview'],
+  });
+
   const { data: visaoGeralData, isLoading: isLoadingVisaoGeral } = useQuery<{
     mrr: number;
     aquisicaoMrr: number;
@@ -151,7 +344,7 @@ function DashboardAdmin() {
     },
   });
 
-  if (isLoadingVisaoGeral || isLoadingInadimplencia || isLoadingClosers) {
+  if (isLoadingVisaoGeral || isLoadingInadimplencia || isLoadingClosers || isLoadingOverview) {
     return <LoadingSkeleton />;
   }
 
@@ -189,6 +382,16 @@ function DashboardAdmin() {
             href="/dashboard/comercial/closers"
           />
         </div>
+      </div>
+
+      {/* Widgets personalizados: Meus Clientes e Mini Calendário */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <MeusClientes 
+          clientes={homeOverview?.clientes || []} 
+          mrrTotal={homeOverview?.mrrTotal || 0}
+          contratosAtivos={homeOverview?.contratosAtivos || 0}
+        />
+        <MiniCalendar eventos={homeOverview?.proximosEventos || []} />
       </div>
 
       <div>

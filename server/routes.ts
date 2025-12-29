@@ -11902,6 +11902,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== HOME OVERVIEW ====================
+  
+  app.get("/api/home/overview", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const userEmail = user?.email;
+      const userName = user?.name;
+      
+      // Buscar colaborador vinculado ao usuário
+      let colaboradorNome: string | null = null;
+      let meusClientes: any[] = [];
+      let mrrTotal = 0;
+      let contratosAtivos = 0;
+      
+      if (userName) {
+        // Tentar encontrar o colaborador pelo nome ou email
+        const colaboradorQuery = await db.execute(sql`
+          SELECT nome FROM rh_pessoal 
+          WHERE LOWER(nome) LIKE ${`%${userName.toLowerCase().split(' ')[0]}%`}
+          AND status IN ('ativo', 'Ativo')
+          LIMIT 1
+        `);
+        
+        if (colaboradorQuery.rows.length > 0) {
+          colaboradorNome = colaboradorQuery.rows[0].nome as string;
+          
+          // Buscar clientes vinculados ao colaborador (como responsável ou CS)
+          // Agrupa por cliente e calcula totais por cliente
+          const clientesQuery = await db.execute(sql`
+            SELECT 
+              c.id,
+              c.nome,
+              c.cnpj,
+              COALESCE(SUM(ct.valorr::numeric), 0) as mrr,
+              COUNT(DISTINCT ct.id_task) as contratos_ativos,
+              ARRAY_AGG(DISTINCT ct.produto) FILTER (WHERE ct.produto IS NOT NULL) as produtos,
+              ARRAY_AGG(DISTINCT ct.squad) FILTER (WHERE ct.squad IS NOT NULL) as squads
+            FROM cup_clientes c
+            INNER JOIN cup_contratos ct ON c.id_task = ct.id_task
+            WHERE (ct.responsavel ILIKE ${`%${colaboradorNome}%`} OR ct.cs_responsavel ILIKE ${`%${colaboradorNome}%`})
+              AND ct.status IN ('ativo', 'onboarding', 'triagem')
+            GROUP BY c.id, c.nome, c.cnpj
+            ORDER BY mrr DESC
+            LIMIT 10
+          `);
+          
+          meusClientes = clientesQuery.rows.map((row: any) => ({
+            id: row.id,
+            nome: row.nome,
+            cnpj: row.cnpj,
+            mrr: parseFloat(row.mrr || '0'),
+            contratosAtivos: parseInt(row.contratos_ativos || '0'),
+            produto: Array.isArray(row.produtos) ? row.produtos[0] : null,
+            squad: Array.isArray(row.squads) ? row.squads[0] : null,
+          }));
+          
+          // Calcular totais de forma separada para evitar duplicatas
+          const totaisQuery = await db.execute(sql`
+            SELECT 
+              COALESCE(SUM(ct.valorr::numeric), 0) as mrr_total,
+              COUNT(DISTINCT ct.id_task) as contratos_total
+            FROM cup_contratos ct
+            WHERE (ct.responsavel ILIKE ${`%${colaboradorNome}%`} OR ct.cs_responsavel ILIKE ${`%${colaboradorNome}%`})
+              AND ct.status IN ('ativo', 'onboarding', 'triagem')
+          `);
+          
+          if (totaisQuery.rows.length > 0) {
+            mrrTotal = parseFloat(totaisQuery.rows[0].mrr_total || '0');
+            contratosAtivos = parseInt(totaisQuery.rows[0].contratos_total || '0');
+          }
+        }
+      }
+      
+      // Buscar próximos eventos (próximos 14 dias)
+      const hoje = new Date();
+      const em14Dias = new Date();
+      em14Dias.setDate(em14Dias.getDate() + 14);
+      
+      const eventosQuery = await db.execute(sql`
+        SELECT id, titulo, tipo, data_inicio, data_fim, local, cor
+        FROM turbo_eventos
+        WHERE data_inicio >= ${hoje.toISOString()}
+          AND data_inicio <= ${em14Dias.toISOString()}
+        ORDER BY data_inicio ASC
+        LIMIT 5
+      `);
+      
+      const proximosEventos = eventosQuery.rows.map((row: any) => ({
+        id: row.id,
+        titulo: row.titulo,
+        tipo: row.tipo,
+        dataInicio: row.data_inicio,
+        dataFim: row.data_fim,
+        local: row.local,
+        cor: row.cor,
+      }));
+      
+      res.json({
+        hasActiveContracts: meusClientes.length > 0,
+        colaboradorNome,
+        mrrTotal,
+        contratosAtivos,
+        clientes: meusClientes,
+        proximosEventos,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching home overview:", error);
+      res.status(500).json({ error: "Failed to fetch home overview" });
+    }
+  });
+
   // ==================== TURBO CALENDAR ====================
   
   app.get("/api/calendario/eventos", isAuthenticated, async (req, res) => {
