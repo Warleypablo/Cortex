@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Bell, BellRing, Calendar, AlertTriangle, FileText, Save, RefreshCw, Settings } from "lucide-react";
+import { Bell, BellRing, Calendar, AlertTriangle, FileText, Save, RefreshCw, Settings, DollarSign, Target, UserPlus, TrendingUp, Clock, Users, Briefcase } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSetPageInfo } from "@/contexts/PageContext";
@@ -31,6 +31,8 @@ interface RuleConfig {
   valorMinimo?: number;
   diasAntecedencia?: number;
   priority?: 'high' | 'medium' | 'low';
+  metaPercentual?: number;
+  diasOnboarding?: number;
 }
 
 const PRIORITY_OPTIONS = [
@@ -43,12 +45,39 @@ const RULE_TYPE_ICONS: Record<string, typeof Bell> = {
   'inadimplencia': AlertTriangle,
   'contrato_vencendo': FileText,
   'aniversario': Calendar,
+  'nova_venda': DollarSign,
+  'meta_atingida': Target,
+  'onboarding_pendente': UserPlus,
+  'renovacao_contrato': TrendingUp,
+  'reuniao_agendada': Clock,
+  'novo_colaborador': Users,
+  'projeto_atrasado': Briefcase,
 };
 
 const RULE_TYPE_LABELS: Record<string, string> = {
   'inadimplencia': 'Inadimplência',
   'contrato_vencendo': 'Contrato Vencendo',
   'aniversario': 'Aniversário',
+  'nova_venda': 'Nova Venda',
+  'meta_atingida': 'Meta Atingida',
+  'onboarding_pendente': 'Onboarding Pendente',
+  'renovacao_contrato': 'Renovação de Contrato',
+  'reuniao_agendada': 'Reunião Agendada',
+  'novo_colaborador': 'Novo Colaborador',
+  'projeto_atrasado': 'Projeto Atrasado',
+};
+
+const RULE_TYPE_COLORS: Record<string, string> = {
+  'inadimplencia': 'text-red-500',
+  'contrato_vencendo': 'text-yellow-500',
+  'aniversario': 'text-pink-500',
+  'nova_venda': 'text-green-500',
+  'meta_atingida': 'text-blue-500',
+  'onboarding_pendente': 'text-orange-500',
+  'renovacao_contrato': 'text-purple-500',
+  'reuniao_agendada': 'text-cyan-500',
+  'novo_colaborador': 'text-indigo-500',
+  'projeto_atrasado': 'text-amber-500',
 };
 
 function RuleCard({ rule, onUpdate }: { rule: NotificationRule; onUpdate: () => void }) {
@@ -112,20 +141,26 @@ function RuleCard({ rule, onUpdate }: { rule: NotificationRule; onUpdate: () => 
   };
 
   const Icon = RULE_TYPE_ICONS[rule.ruleType] || Bell;
+  const iconColor = RULE_TYPE_COLORS[rule.ruleType] || 'text-primary';
   const priorityOption = PRIORITY_OPTIONS.find(p => p.value === config.priority);
 
   return (
-    <Card className="relative" data-testid={`card-rule-${rule.id}`}>
+    <Card className={`relative transition-all ${rule.isEnabled ? 'border-l-4 border-l-primary' : ''}`} data-testid={`card-rule-${rule.id}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${rule.isEnabled ? 'bg-primary/10' : 'bg-muted'}`}>
-              <Icon className={`h-5 w-5 ${rule.isEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
+              <Icon className={`h-5 w-5 ${rule.isEnabled ? iconColor : 'text-muted-foreground'}`} />
             </div>
             <div>
-              <CardTitle className="text-base">{rule.name}</CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base">{rule.name}</CardTitle>
+                <Badge variant="secondary" className="text-xs">
+                  {RULE_TYPE_LABELS[rule.ruleType] || rule.ruleType}
+                </Badge>
+              </div>
               <CardDescription className="text-sm mt-1">
-                {rule.description || RULE_TYPE_LABELS[rule.ruleType] || rule.ruleType}
+                {rule.description || 'Sem descrição'}
               </CardDescription>
             </div>
           </div>
