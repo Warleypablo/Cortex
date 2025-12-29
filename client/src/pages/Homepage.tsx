@@ -494,13 +494,21 @@ function DashboardAdmin() {
     return <LoadingSkeleton />;
   }
 
+  const mrrTotal = visaoGeralData?.mrr || 0;
+  const aquisicaoMrr = visaoGeralData?.aquisicaoMrr || 0;
+  const aquisicaoPontual = visaoGeralData?.aquisicaoPontual || 0;
+  const churn = visaoGeralData?.churn || 0;
+  
+  const aquisicaoPontualPercent = mrrTotal > 0 ? (aquisicaoPontual / mrrTotal) * 100 : 0;
+  const churnPercent = mrrTotal > 0 ? (churn / mrrTotal) * 100 : 0;
+
   const kpiCards: KpiCard[] = [
     {
       title: "MRR Ativo",
-      subtitle: "Receita mensal recorrente",
-      value: formatCurrency(visaoGeralData?.mrr || 0),
+      subtitle: `${homeOverview?.contratosAtivos || 0} contratos ativos`,
+      value: formatCurrency(mrrTotal),
       icon: DollarSign,
-      badge: visaoGeralData?.mrr ? {
+      badge: mrrTotal ? {
         text: "+3.2%",
         isPositive: true,
       } : undefined,
@@ -508,36 +516,36 @@ function DashboardAdmin() {
     },
     {
       title: "Aquisição MRR",
-      subtitle: "Novos contratos no mês",
-      value: formatCurrency(visaoGeralData?.aquisicaoMrr || 0),
+      subtitle: formatCurrency(aquisicaoMrr),
+      value: formatCurrency(aquisicaoMrr),
       icon: TrendingUp,
-      badge: visaoGeralData?.aquisicaoMrr ? {
+      badge: aquisicaoMrr ? {
         text: "+12.5%",
         isPositive: true,
       } : undefined,
       href: "/dashboard/comercial/closers",
     },
     {
-      title: "Inadimplência",
-      subtitle: `${inadimplenciaData?.quantidadeClientes || 0} clientes`,
-      value: formatCurrency(inadimplenciaData?.totalInadimplente || 0),
-      icon: AlertTriangle,
-      badge: inadimplenciaData?.totalInadimplente ? {
-        text: "-5.1%",
+      title: "Aquisição Pontual",
+      subtitle: formatCurrency(aquisicaoPontual),
+      value: formatPercent(aquisicaoPontualPercent),
+      icon: Target,
+      badge: aquisicaoPontual ? {
+        text: "+8.3%",
         isPositive: true,
       } : undefined,
-      href: "/dashboard/inadimplencia",
+      href: "/visao-geral",
     },
     {
-      title: "Negócios Fechados",
-      subtitle: `Taxa: ${formatPercent(closersMetrics?.taxaConversao || 0)}`,
-      value: String(closersMetrics?.negociosGanhos || 0),
-      icon: Handshake,
-      badge: closersMetrics?.negociosGanhos ? {
-        text: `${formatPercent(closersMetrics?.taxaConversao || 0)}`,
-        isPositive: (closersMetrics?.taxaConversao || 0) > 20,
+      title: "Churn",
+      subtitle: formatCurrency(churn),
+      value: formatPercent(churnPercent),
+      icon: TrendingDown,
+      badge: churn ? {
+        text: churnPercent > 3 ? `+${formatPercent(churnPercent)}` : `-${formatPercent(3 - churnPercent)}`,
+        isPositive: churnPercent <= 3,
       } : undefined,
-      href: "/dashboard/comercial/closers",
+      href: "/analise-retencao",
     },
   ];
 
