@@ -35,6 +35,9 @@ import {
   StatisticsCard7,
   CinematicSwitch,
   InteractiveLineChart,
+  StatisticsCard1,
+  StatisticsCard10,
+  LineCharts6,
 } from "@/components/ui/charts";
 
 export default function AdminDesignSystem() {
@@ -638,6 +641,49 @@ export default function AdminDesignSystem() {
                 <div className="bg-muted/50 rounded-lg p-4 mt-2 space-y-1">
                   <code className="text-xs text-muted-foreground block">
                     import {"{"} CinematicSwitch {"}"} from "@/components/ui/charts";
+                  </code>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Cards de Estatísticas em Grid (4 Colunas)</h3>
+                <p className="text-sm text-muted-foreground">Layout de cards com menus dropdown, deltas e comparativo mensal.</p>
+                <StatisticsCard1 />
+                <div className="bg-muted/50 rounded-lg p-4 mt-2 space-y-1">
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} StatisticsCard1 {"}"} from "@/components/ui/charts";
+                  </code>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Card de Receita Detalhado</h3>
+                <p className="text-sm text-muted-foreground">Card único com ícone, valor, delta, e detalhes em linhas.</p>
+                <div className="max-w-md">
+                  <StatisticsCard10 />
+                </div>
+                <div className="bg-muted/50 rounded-lg p-4 mt-2 space-y-1">
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} StatisticsCard10 {"}"} from "@/components/ui/charts";
+                  </code>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground">Gráfico de Linha com Seletor de Métricas (v6)</h3>
+                <p className="text-sm text-muted-foreground">Versão avançada com mais dados e descrição.</p>
+                <div className="max-w-3xl">
+                  <LineCharts6 />
+                </div>
+                <div className="bg-muted/50 rounded-lg p-4 mt-2 space-y-1">
+                  <code className="text-xs text-muted-foreground block">
+                    import {"{"} LineCharts6 {"}"} from "@/components/ui/charts";
                   </code>
                 </div>
               </div>
