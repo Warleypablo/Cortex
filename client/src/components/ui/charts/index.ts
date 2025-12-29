@@ -41,3 +41,12 @@ export type { CinematicSwitchProps } from '../cinematic-switch';
 
 export { default as InteractiveLineChart } from '../line-chart-interactive';
 export type { InteractiveLineChartProps, MetricConfig, DataPoint } from '../line-chart-interactive';
+
+export { default as StatisticsCard1 } from '../statistics-card-1';
+export type { StatisticsCard1Props, StatItem } from '../statistics-card-1';
+
+export { default as StatisticsCard10 } from '../statistics-card-10';
+export type { StatisticsCard10Props, DetailItem } from '../statistics-card-10';
+
+export { default as LineCharts6 } from '../line-charts-6';
+export type { LineCharts6Props, MetricDef, ChartDataPoint } from '../line-charts-6';
