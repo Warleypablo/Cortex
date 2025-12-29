@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { usePageInfo } from "@/contexts/PageContext";
@@ -130,7 +130,9 @@ export default function PesquisasGG() {
   const [filter1x1, setFilter1x1] = useState("all");
   const [searchPdi, setSearchPdi] = useState("");
 
-  setPageInfo("Pesquisas G&G", "Visão consolidada de e-NPS, 1x1 e PDI");
+  useEffect(() => {
+    setPageInfo("Pesquisas G&G", "Visão consolidada de e-NPS, 1x1 e PDI");
+  }, [setPageInfo]);
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/rh/pesquisas/dashboard"],
