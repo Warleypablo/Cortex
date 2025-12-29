@@ -11969,8 +11969,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `);
           
           if (totaisQuery.rows.length > 0) {
-            mrrTotal = parseFloat(totaisQuery.rows[0].mrr_total || '0');
-            contratosAtivos = parseInt(totaisQuery.rows[0].contratos_total || '0');
+            const totaisRow = totaisQuery.rows[0] as any;
+            mrrTotal = parseFloat(totaisRow.mrr_total || '0');
+            contratosAtivos = parseInt(totaisRow.contratos_total || '0');
           }
         }
       }
@@ -11999,6 +12000,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cor: row.cor,
       }));
       
+      // Buscar alertas e pendências
+      const alertasQuery = await db.execute(sql`
+        SELECT 
+          'cobranca_vencida' as tipo,
+          cl.nome as cliente_nome,
+          cl.cnpj,
+          jc.vencimento as data,
+          jc.valor_aberto as valor,
+          jc.dias_atraso as dias
+        FROM juridicocobranca jc
+        INNER JOIN cup_clientes cl ON jc.cnpj = cl.cnpj
+        WHERE jc.status = 'aberto' AND jc.dias_atraso > 0
+        ORDER BY jc.dias_atraso DESC
+        LIMIT 5
+      `);
+      
+      const contratosVencendoQuery = await db.execute(sql`
+        SELECT 
+          'contrato_vencendo' as tipo,
+          c.nome as cliente_nome,
+          c.cnpj,
+          ct.data_encerramento as data,
+          ct.valorr as valor,
+          0 as dias
+        FROM cup_contratos ct
+        INNER JOIN cup_clientes c ON ct.id_task = c.id_task
+        WHERE ct.status = 'ativo'
+          AND ct.data_encerramento IS NOT NULL
+          AND ct.data_encerramento::date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+        ORDER BY ct.data_encerramento ASC
+        LIMIT 3
+      `);
+      
+      // Clientes em risco: contratos com health negativo ou em triagem há muito tempo
+      const clientesRiscoQuery = await db.execute(sql`
+        SELECT DISTINCT
+          'cliente_risco' as tipo,
+          c.nome as cliente_nome,
+          c.cnpj,
+          ct.data_inicio as data,
+          COALESCE(ct.valorr::numeric, 0) as valor,
+          0 as dias
+        FROM cup_contratos ct
+        INNER JOIN cup_clientes c ON ct.id_task = c.id_task
+        WHERE ct.status IN ('triagem', 'ativo')
+          AND (
+            ct.saude_conta IN ('vermelho', 'Vermelho', 'amarelo', 'Amarelo')
+            OR (ct.status = 'triagem' AND ct.data_inicio::date < CURRENT_DATE - INTERVAL '30 days')
+          )
+        ORDER BY ct.valorr DESC NULLS LAST
+        LIMIT 3
+      `);
+      
+      const alertas = [
+        ...alertasQuery.rows.map((row: any) => ({
+          tipo: 'cobranca_vencida',
+          clienteNome: row.cliente_nome,
+          cnpj: row.cnpj,
+          data: row.data,
+          valor: parseFloat(row.valor || '0'),
+          dias: parseInt(row.dias || '0'),
+        })),
+        ...contratosVencendoQuery.rows.map((row: any) => ({
+          tipo: 'contrato_vencendo',
+          clienteNome: row.cliente_nome,
+          cnpj: row.cnpj,
+          data: row.data,
+          valor: parseFloat(row.valor || '0'),
+          dias: 0,
+        })),
+        ...clientesRiscoQuery.rows.map((row: any) => ({
+          tipo: 'cliente_risco',
+          clienteNome: row.cliente_nome,
+          cnpj: row.cnpj,
+          data: row.data,
+          valor: parseFloat(row.valor || '0'),
+          dias: 0,
+        })),
+      ].slice(0, 6);
+      
       res.json({
         hasActiveContracts: meusClientes.length > 0,
         colaboradorNome,
@@ -12006,6 +12087,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contratosAtivos,
         clientes: meusClientes,
         proximosEventos,
+        alertas,
       });
     } catch (error) {
       console.error("[api] Error fetching home overview:", error);
