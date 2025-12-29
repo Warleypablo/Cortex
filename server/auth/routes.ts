@@ -36,6 +36,12 @@ router.get("/auth/google", (req, res, next) => {
   })(req, res, next);
 });
 
+// Teste simples para verificar se a rota está acessível
+router.get("/auth/google/callback-test", (req, res) => {
+  console.log("✅ Callback test route accessed!");
+  res.json({ message: "Callback route is accessible", query: req.query });
+});
+
 router.get("/auth/google/callback",
   (req, res, next) => {
     console.log("📥 Callback do Google recebido - URL:", req.originalUrl);
