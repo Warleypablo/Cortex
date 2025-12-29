@@ -3249,7 +3249,7 @@ function BPFinanceiroTab() {
   };
 
   const keyMetrics = data.metrics.filter(m => 
-    ["receita_liquida", "ebitda", "margem_bruta", "mrr_ativo"].includes(m.metric_key)
+    ["receita_liquida", "margem_bruta", "mrr_ativo"].includes(m.metric_key)
   );
 
   const getMetricIcon = (key: string) => {
@@ -3269,7 +3269,7 @@ function BPFinanceiroTab() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {keyMetrics.map((metric) => {
           const progress = calculateProgress(metric.totals.actual, metric.totals.plan);
           const isOnTrack = progress !== null && progress >= 90;
