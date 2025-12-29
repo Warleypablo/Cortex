@@ -1016,37 +1016,90 @@ function ExecutiveHeader({
   quarter, 
   krs,
   viewMode,
-  monthLabel 
+  monthLabel,
+  onViewModeChange,
+  selectedQuarter,
+  onQuarterChange,
+  selectedMonth,
+  onMonthChange,
+  currentQuarter
 }: { 
   quarter: string; 
   krs: KR[];
   viewMode: "quarter" | "month";
   monthLabel?: string;
+  onViewModeChange: (mode: ViewMode) => void;
+  selectedQuarter: "Q1" | "Q2" | "Q3" | "Q4";
+  onQuarterChange: (q: "Q1" | "Q2" | "Q3" | "Q4") => void;
+  selectedMonth: MonthKey;
+  onMonthChange: (m: MonthKey) => void;
+  currentQuarter: "Q1" | "Q2" | "Q3" | "Q4";
 }) {
   const { status, onTrackPct, details } = useMemo(() => calculateOverallStatus(krs), [krs]);
   
   return (
     <div className="sticky top-0 z-10 -mx-6 px-6 py-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b mb-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight">
             OKR 2026 — Status Executivo
-            <Badge variant="outline" className="text-sm font-normal">
-              {viewMode === "month" ? monthLabel : quarter}
-            </Badge>
           </h1>
           <p className="text-sm text-muted-foreground">
             Bigger & Better · Consolidação, Escala e Padronização
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
-          <div className="text-right text-xs text-muted-foreground hidden sm:block">
-            <div className="flex items-center gap-2">
-              <span className="text-green-500">{details.green} no alvo</span>
-              <span className="text-amber-500">{details.yellow} atenção</span>
-              <span className="text-red-500">{details.red} fora</span>
-            </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <ToggleGroup 
+            type="single" 
+            value={viewMode} 
+            onValueChange={(v) => v && onViewModeChange(v as ViewMode)}
+            className="bg-muted/50 p-0.5 rounded-md border"
+            data-testid="toggle-view-mode"
+          >
+            <ToggleGroupItem value="quarter" className="text-xs px-3 h-7 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+              Trimestre
+            </ToggleGroupItem>
+            <ToggleGroupItem value="month" className="text-xs px-3 h-7 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+              Mês
+            </ToggleGroupItem>
+          </ToggleGroup>
+          
+          {viewMode === "quarter" ? (
+            <Select value={selectedQuarter} onValueChange={(v) => onQuarterChange(v as "Q1" | "Q2" | "Q3" | "Q4")}>
+              <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="filter-dashboard-quarter">
+                <SelectValue placeholder="Trimestre" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
+                <SelectItem value="Q2">Q2 (Abr-Jun)</SelectItem>
+                <SelectItem value="Q3">Q3 (Jul-Set)</SelectItem>
+                <SelectItem value="Q4">Q4 (Out-Dez)</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <Select value={selectedMonth} onValueChange={(v) => onMonthChange(v as MonthKey)}>
+              <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="filter-dashboard-month">
+                <SelectValue placeholder="Mês" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map(m => (
+                  <SelectItem key={m.key} value={m.key}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          
+          {(viewMode === "quarter" ? selectedQuarter === currentQuarter : selectedMonth === getCurrentMonth()) && (
+            <Badge className="bg-primary/10 text-primary border-primary/30 text-[10px]">Atual</Badge>
+          )}
+          
+          <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground border-l pl-3 ml-1">
+            <span className="text-green-500">{details.green} no alvo</span>
+            <span className="text-amber-500">{details.yellow} atenção</span>
+            <span className="text-red-500">{details.red} fora</span>
           </div>
           <OverallStatusBadge status={status} onTrackPct={onTrackPct} />
         </div>
@@ -2003,61 +2056,15 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
         krs={krs} 
         viewMode={viewMode}
         monthLabel={selectedMonthData?.label}
+        onViewModeChange={setViewMode}
+        selectedQuarter={selectedQuarter}
+        onQuarterChange={setSelectedQuarter}
+        selectedMonth={selectedMonth}
+        onMonthChange={setSelectedMonth}
+        currentQuarter={currentQuarter}
       />
-      
-      <div className="flex flex-wrap items-center gap-3 bg-muted/30 p-3 rounded-lg">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Building className="w-4 h-4" />
-          <span>Período:</span>
-        </div>
-        <ToggleGroup 
-          type="single" 
-          value={viewMode} 
-          onValueChange={(v) => v && setViewMode(v as ViewMode)}
-          className="bg-background/80 p-0.5 rounded-md border"
-          data-testid="toggle-view-mode"
-        >
-          <ToggleGroupItem value="quarter" className="text-xs px-3 h-7 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-            Trimestre
-          </ToggleGroupItem>
-          <ToggleGroupItem value="month" className="text-xs px-3 h-7 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-            Mês
-          </ToggleGroupItem>
-        </ToggleGroup>
-        
-        {viewMode === "quarter" ? (
-          <Select value={selectedQuarter} onValueChange={(v) => setSelectedQuarter(v as "Q1" | "Q2" | "Q3" | "Q4")}>
-            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="filter-dashboard-quarter">
-              <SelectValue placeholder="Trimestre" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
-              <SelectItem value="Q2">Q2 (Abr-Jun)</SelectItem>
-              <SelectItem value="Q3">Q3 (Jul-Set)</SelectItem>
-              <SelectItem value="Q4">Q4 (Out-Dez)</SelectItem>
-            </SelectContent>
-          </Select>
-        ) : (
-          <Select value={selectedMonth} onValueChange={(v) => setSelectedMonth(v as MonthKey)}>
-            <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="filter-dashboard-month">
-              <SelectValue placeholder="Mês" />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map(m => (
-                <SelectItem key={m.key} value={m.key}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        
-        {(viewMode === "quarter" ? selectedQuarter === currentQuarter : selectedMonth === getCurrentMonth()) && (
-          <Badge className="bg-primary/10 text-primary border-primary/30 text-[10px]">Atual</Badge>
-        )}
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <HeroCard
           title="MRR Ativo"
           value={viewMode === "month" 
@@ -2070,19 +2077,6 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           tooltip={viewMode === "month"
             ? `${selectedMonthData?.label} (${effectiveQuarter})`
             : `Meta ${selectedQuarter}: ${mrrTarget ? formatCurrency(mrrTarget) : "—"}`}
-        />
-        <HeroCard
-          title="EBITDA"
-          value={viewMode === "month"
-            ? getValueFromSeries(series.ebitda, selectedMonth) ?? metrics.ebitda_ytd
-            : metrics.ebitda_ytd}
-          target={ebitdaTarget}
-          format="currency"
-          direction="higher"
-          icon={Banknote}
-          tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label} (${effectiveQuarter})`
-            : `Meta ${selectedQuarter}: ${ebitdaTarget ? formatCurrency(ebitdaTarget) : "—"}`}
         />
         <HeroCard
           title="Geração Caixa"
