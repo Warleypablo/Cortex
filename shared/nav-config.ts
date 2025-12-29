@@ -71,6 +71,10 @@ export const PERMISSION_KEYS = {
   ADMIN: {
     USUARIOS: 'admin.usuarios',
     OKR_2026: 'admin.okr_2026',
+    NOTIFICACOES: 'admin.notificacoes',
+    DESIGN_SYSTEM: 'admin.design_system',
+    HEALTH: 'admin.health',
+    KPI: 'admin.kpi',
   },
 } as const;
 
@@ -109,7 +113,7 @@ export const ACCESS_PROFILES = {
   LIDER: {
     id: 'lider',
     label: 'Líder',
-    description: 'Tudo exceto Financeiro',
+    description: 'Tudo exceto Financeiro e Administração',
     permissions: [
       ...getCategoryKeys('GENERAL'),
       ...getCategoryKeys('OPS'),
@@ -119,7 +123,6 @@ export const ACCESS_PROFILES = {
       ...getCategoryKeys('GG'),
       ...getCategoryKeys('JUR'),
       ...getCategoryKeys('REPORTS'),
-      ...getCategoryKeys('ADMIN'),
     ],
   },
   CONTROL_TOWER: {
@@ -186,6 +189,10 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/investors-report': PERMISSION_KEYS.REPORTS.INVESTORS,
   // Administração
   '/admin/usuarios': PERMISSION_KEYS.ADMIN.USUARIOS,
+  '/admin/regras-notificacoes': PERMISSION_KEYS.ADMIN.NOTIFICACOES,
+  '/admin/design-system': PERMISSION_KEYS.ADMIN.DESIGN_SYSTEM,
+  '/admin/health': PERMISSION_KEYS.ADMIN.HEALTH,
+  '/admin/kpi': PERMISSION_KEYS.ADMIN.KPI,
 };
 
 // Convert permission keys to routes (for backwards compatibility)
@@ -366,7 +373,10 @@ export const NAV_CONFIG = {
     icon: 'Settings',
     items: [
       { title: 'Usuários', url: '/admin/usuarios', icon: 'Users', permissionKey: PERMISSION_KEYS.ADMIN.USUARIOS },
-      { title: 'Design System', url: '/admin/design-system', icon: 'Palette', permissionKey: PERMISSION_KEYS.ADMIN.USUARIOS },
+      { title: 'Regras de Notificações', url: '/admin/regras-notificacoes', icon: 'Bell', permissionKey: PERMISSION_KEYS.ADMIN.NOTIFICACOES },
+      { title: 'Design System', url: '/admin/design-system', icon: 'Palette', permissionKey: PERMISSION_KEYS.ADMIN.DESIGN_SYSTEM },
+      { title: 'Saúde do Sistema', url: '/admin/health', icon: 'Activity', permissionKey: PERMISSION_KEYS.ADMIN.HEALTH },
+      { title: 'Overrides KPI', url: '/admin/kpi', icon: 'Sliders', permissionKey: PERMISSION_KEYS.ADMIN.KPI },
     ],
   },
 };

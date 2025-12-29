@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Course, InsertCourse } from "@shared/schema";
 import { insertCourseSchema, courseStatusEnum } from "@shared/schema";
@@ -944,9 +944,8 @@ export default function Conhecimentos() {
                 const isPriority = isPriorityCourse(course.nome);
                 
                 return (
-                  <>
-                    <TableRow 
-                      key={course.id}
+                  <Fragment key={course.id}>
+                    <TableRow
                       className={cn(
                         "cursor-pointer hover-elevate",
                         isExpanded && "bg-muted/50",
@@ -1098,7 +1097,7 @@ export default function Conhecimentos() {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </TableBody>
