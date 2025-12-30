@@ -44,6 +44,7 @@ interface HomeOverview {
   colaboradorNome: string | null;
   mrrTotal: number;
   contratosAtivos: number;
+  clientesAtivos: number;
   clientes: Array<{
     id: number;
     nome: string;
@@ -501,17 +502,28 @@ function DashboardAdmin() {
   
   const aquisicaoPontualPercent = mrrTotal > 0 ? (aquisicaoPontual / mrrTotal) * 100 : 0;
   const churnPercent = mrrTotal > 0 ? (churn / mrrTotal) * 100 : 0;
+  
+  // Calcular clientes ativos (do homeOverview ou do tamanho do array de clientes)
+  const clientesAtivos = homeOverview?.clientesAtivos || homeOverview?.clientes?.length || 0;
+  const ticketMedio = clientesAtivos > 0 ? mrrTotal / clientesAtivos : 0;
 
   const kpiCards: KpiCard[] = [
     {
       title: "MRR Ativo",
-      subtitle: `${homeOverview?.contratosAtivos || 0} contratos ativos`,
+      subtitle: `${homeOverview?.contratosAtivos || 0} contratos • ${clientesAtivos} clientes`,
       value: formatCurrency(mrrTotal),
       icon: DollarSign,
       badge: mrrTotal ? {
         text: "+3.2%",
         isPositive: true,
       } : undefined,
+      href: "/visao-geral",
+    },
+    {
+      title: "Ticket Médio",
+      subtitle: `Por cliente ativo`,
+      value: formatCurrency(ticketMedio),
+      icon: Users,
       href: "/visao-geral",
     },
     {
@@ -553,7 +565,7 @@ function DashboardAdmin() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold mb-4">Indicadores Principais</h2>
-        <KpiCardGrid cards={kpiCards} columns={4} />
+        <KpiCardGrid cards={kpiCards} columns={5} />
       </div>
 
       {/* Widgets personalizados */}
