@@ -541,20 +541,12 @@ export default function ChurnDetalhamento() {
     <div className="p-6 space-y-6">
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-muted-foreground" />
-              <CardTitle className="text-base">Período de Análise</CardTitle>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(3)}>3M</Button>
-              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(6)}>6M</Button>
-              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(12)}>12M</Button>
-              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(24)}>24M</Button>
-            </div>
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-base">Período de Análise</CardTitle>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-2">
               <label className="text-sm font-medium">Data Início</label>
@@ -576,9 +568,15 @@ export default function ChurnDetalhamento() {
                 data-testid="input-data-fim"
               />
             </div>
-            <div className="text-sm text-muted-foreground">
-              Mostrando <span className="font-semibold text-foreground">{filteredContratos.length}</span> contratos no período
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(3)}>3M</Button>
+              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(6)}>6M</Button>
+              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(12)}>12M</Button>
+              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(24)}>24M</Button>
             </div>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Mostrando <span className="font-semibold text-foreground">{filteredContratos.length}</span> contratos no período
           </div>
         </CardContent>
       </Card>
