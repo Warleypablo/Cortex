@@ -24,7 +24,8 @@ import {
   Clock,
   BarChart3,
   PieChart,
-  Target
+  Target,
+  CalendarDays
 } from "lucide-react";
 import {
   Table,
@@ -40,8 +41,20 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  Cell,
+  PieChart as RechartsPie,
+  Pie,
+  Legend
+} from "recharts";
 
 interface ChurnContract {
   id: string;
@@ -75,6 +88,11 @@ interface ChurnDetalhamentoData {
   };
 }
 
+const CHART_COLORS = [
+  "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6", 
+  "#3b82f6", "#8b5cf6", "#ec4899", "#6366f1", "#84cc16"
+];
+
 export default function ChurnDetalhamento() {
   usePageTitle("Detalhamento de Churn");
   useSetPageInfo("Detalhamento de Churn", "Análise detalhada de contratos encerrados");
@@ -84,17 +102,16 @@ export default function ChurnDetalhamento() {
   const [filterProdutos, setFilterProdutos] = useState<string[]>([]);
   const [filterResponsaveis, setFilterResponsaveis] = useState<string[]>([]);
   const [filterServicos, setFilterServicos] = useState<string[]>([]);
-  const [filterPeriodo, setFilterPeriodo] = useState<string>("12");
+  const [dataInicio, setDataInicio] = useState<string>(format(subMonths(new Date(), 12), "yyyy-MM-dd"));
+  const [dataFim, setDataFim] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [sortBy, setSortBy] = useState<string>("data_encerramento");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(true);
 
   const { data, isLoading, error } = useQuery<ChurnDetalhamentoData>({
-    queryKey: ["/api/analytics/churn-detalhamento", filterPeriodo],
+    queryKey: ["/api/analytics/churn-detalhamento", "all"],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      params.append("meses", filterPeriodo);
-      const res = await fetch(`/api/analytics/churn-detalhamento?${params.toString()}`);
+      const res = await fetch(`/api/analytics/churn-detalhamento?meses=all`);
       if (!res.ok) throw new Error("Failed to fetch churn data");
       return res.json();
     },
@@ -104,6 +121,17 @@ export default function ChurnDetalhamento() {
     if (!data?.contratos) return [];
     
     let filtered = [...data.contratos];
+    
+    if (dataInicio) {
+      const inicio = new Date(dataInicio);
+      filtered = filtered.filter(c => c.data_encerramento && new Date(c.data_encerramento) >= inicio);
+    }
+    
+    if (dataFim) {
+      const fim = new Date(dataFim);
+      fim.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(c => c.data_encerramento && new Date(c.data_encerramento) <= fim);
+    }
     
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -156,7 +184,7 @@ export default function ChurnDetalhamento() {
     });
     
     return filtered;
-  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, sortBy, sortOrder]);
+  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, dataInicio, dataFim, sortBy, sortOrder]);
 
   const filteredMetricas = useMemo(() => {
     if (filteredContratos.length === 0) {
@@ -191,14 +219,15 @@ export default function ChurnDetalhamento() {
     
     const total = filteredContratos.length;
     return Object.entries(squadCounts)
-      .map(([squad, data]) => ({
-        squad,
+      .map(([name, data]) => ({
+        name: name.length > 15 ? name.substring(0, 15) + "..." : name,
+        fullName: name,
         count: data.count,
         mrr: data.mrr,
         percentual: (data.count / total) * 100
       }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+      .slice(0, 8);
   }, [filteredContratos]);
 
   const distribuicaoPorProduto = useMemo(() => {
@@ -214,32 +243,89 @@ export default function ChurnDetalhamento() {
     
     const total = filteredContratos.length;
     return Object.entries(prodCounts)
-      .map(([produto, data]) => ({
-        produto,
+      .map(([name, data]) => ({
+        name: name.length > 15 ? name.substring(0, 15) + "..." : name,
+        fullName: name,
         count: data.count,
         mrr: data.mrr,
         percentual: (data.count / total) * 100
       }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+      .slice(0, 8);
   }, [filteredContratos]);
 
   const distribuicaoPorLifetime = useMemo(() => {
-    if (filteredContratos.length === 0) return { curto: 0, medio: 0, longo: 0 };
+    if (filteredContratos.length === 0) return [];
     
-    let curto = 0, medio = 0, longo = 0;
+    const ranges = [
+      { name: "< 3m", min: 0, max: 3, count: 0, mrr: 0 },
+      { name: "3-6m", min: 3, max: 6, count: 0, mrr: 0 },
+      { name: "6-12m", min: 6, max: 12, count: 0, mrr: 0 },
+      { name: "12-24m", min: 12, max: 24, count: 0, mrr: 0 },
+      { name: "> 24m", min: 24, max: Infinity, count: 0, mrr: 0 },
+    ];
+    
     filteredContratos.forEach(c => {
-      if (c.lifetime_meses < 6) curto++;
-      else if (c.lifetime_meses < 12) medio++;
-      else longo++;
+      const lt = c.lifetime_meses;
+      for (const range of ranges) {
+        if (lt >= range.min && lt < range.max) {
+          range.count++;
+          range.mrr += c.valorr || 0;
+          break;
+        }
+      }
     });
     
     const total = filteredContratos.length;
-    return {
-      curto: (curto / total) * 100,
-      medio: (medio / total) * 100,
-      longo: (longo / total) * 100
-    };
+    return ranges.map(r => ({
+      ...r,
+      percentual: (r.count / total) * 100
+    }));
+  }, [filteredContratos]);
+
+  const distribuicaoPorResponsavel = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+    
+    const respCounts: Record<string, { count: number; mrr: number }> = {};
+    filteredContratos.forEach(c => {
+      const resp = c.responsavel || "Não especificado";
+      if (!respCounts[resp]) respCounts[resp] = { count: 0, mrr: 0 };
+      respCounts[resp].count++;
+      respCounts[resp].mrr += c.valorr || 0;
+    });
+    
+    const total = filteredContratos.length;
+    return Object.entries(respCounts)
+      .map(([name, data]) => ({
+        name: name.length > 12 ? name.substring(0, 12) + "..." : name,
+        fullName: name,
+        count: data.count,
+        mrr: data.mrr,
+        percentual: (data.count / total) * 100
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+  }, [filteredContratos]);
+
+  const churnPorMes = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+    
+    const meses: Record<string, { count: number; mrr: number }> = {};
+    filteredContratos.forEach(c => {
+      if (!c.data_encerramento) return;
+      const mes = format(parseISO(c.data_encerramento), "MMM/yy", { locale: ptBR });
+      if (!meses[mes]) meses[mes] = { count: 0, mrr: 0 };
+      meses[mes].count++;
+      meses[mes].mrr += c.valorr || 0;
+    });
+    
+    return Object.entries(meses)
+      .map(([mes, data]) => ({
+        mes,
+        count: data.count,
+        mrr: data.mrr
+      }))
+      .slice(-12);
   }, [filteredContratos]);
 
   const handleSort = (column: string) => {
@@ -265,6 +351,11 @@ export default function ChurnDetalhamento() {
     }
   };
 
+  const setQuickPeriod = (months: number) => {
+    setDataFim(format(new Date(), "yyyy-MM-dd"));
+    setDataInicio(format(subMonths(new Date(), months), "yyyy-MM-dd"));
+  };
+
   const colors = {
     danger: "text-red-500",
     warning: "text-amber-500",
@@ -287,6 +378,50 @@ export default function ChurnDetalhamento() {
 
   return (
     <div className="p-6 space-y-6">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-base">Período de Análise</CardTitle>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(3)}>3M</Button>
+              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(6)}>6M</Button>
+              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(12)}>12M</Button>
+              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(24)}>24M</Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data Início</label>
+              <Input
+                type="date"
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+                className="w-40"
+                data-testid="input-data-inicio"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data Fim</label>
+              <Input
+                type="date"
+                value={dataFim}
+                onChange={(e) => setDataFim(e.target.value)}
+                className="w-40"
+                data-testid="input-data-fim"
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Mostrando <span className="font-semibold text-foreground">{filteredContratos.length}</span> contratos no período
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <Card className="bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -395,7 +530,7 @@ export default function ChurnDetalhamento() {
 
         <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">LTV/CAC Médio</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">LTV Médio</CardTitle>
             <Percent className={`h-4 w-4 ${colors.success}`} />
           </CardHeader>
           <CardContent>
@@ -403,13 +538,13 @@ export default function ChurnDetalhamento() {
               <Skeleton className="h-8 w-20" />
             ) : (
               <>
-                <div className="text-3xl font-bold" data-testid="text-ltv-cac">
+                <div className="text-3xl font-bold" data-testid="text-ltv-medio">
                   {filteredMetricas.total_churned > 0 
-                    ? (filteredMetricas.ltv_total / filteredMetricas.total_churned / 1000).toFixed(1) + "x"
-                    : "0x"}
+                    ? formatCurrency(filteredMetricas.ltv_total / filteredMetricas.total_churned)
+                    : "R$ 0"}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  LTV médio / R$1k
+                  por contrato churned
                 </p>
               </>
             )}
@@ -417,127 +552,182 @@ export default function ChurnDetalhamento() {
         </Card>
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">Churn por Mês</CardTitle>
+            </div>
+            <CardDescription>Evolução mensal de contratos encerrados</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-[250px] w-full" />
+            ) : churnPorMes.length === 0 ? (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                Nenhum dado disponível
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={churnPorMes}>
+                  <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip 
+                    formatter={(value: number, name: string) => [
+                      name === "count" ? `${value} contratos` : formatCurrency(value),
+                      name === "count" ? "Quantidade" : "MRR Perdido"
+                    ]}
+                  />
+                  <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]} name="count" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <PieChart className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">Distribuição por Produto</CardTitle>
+            </div>
+            <CardDescription>Percentual de churn por produto</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-[250px] w-full" />
+            ) : distribuicaoPorProduto.length === 0 ? (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                Nenhum dado disponível
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <RechartsPie>
+                  <Pie
+                    data={distribuicaoPorProduto}
+                    dataKey="count"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    label={({ name, percentual }) => `${name} (${percentual.toFixed(0)}%)`}
+                    labelLine={{ stroke: "#888", strokeWidth: 1 }}
+                  >
+                    {distribuicaoPorProduto.map((entry, index) => (
+                      <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => [`${value} contratos`, "Quantidade"]} />
+                </RechartsPie>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">Churn por Squad</CardTitle>
+            </div>
+            <CardDescription>Quantidade por squad</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-[200px] w-full" />
+            ) : distribuicaoPorSquad.length === 0 ? (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                Nenhum dado disponível
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={distribuicaoPorSquad} layout="vertical">
+                  <XAxis type="number" tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={80} />
+                  <Tooltip 
+                    formatter={(value: number) => [`${value} contratos`, "Quantidade"]}
+                    labelFormatter={(label) => distribuicaoPorSquad.find(s => s.name === label)?.fullName || label}
+                  />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                    {distribuicaoPorSquad.map((entry, index) => (
+                      <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <PieChart className="h-4 w-4 text-muted-foreground" />
               <CardTitle className="text-base">Distribuição por Lifetime</CardTitle>
             </div>
-            <CardDescription>Tempo de permanência dos contratos churned</CardDescription>
+            <CardDescription>Tempo de permanência</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-[200px] w-full" />
+            ) : distribuicaoPorLifetime.length === 0 ? (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                Nenhum dado disponível
               </div>
             ) : (
-              <>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-red-500" />
-                      Curto (&lt;6 meses)
-                    </span>
-                    <span className="font-medium">{distribuicaoPorLifetime.curto.toFixed(1)}%</span>
-                  </div>
-                  <Progress value={distribuicaoPorLifetime.curto} className="h-2 bg-red-100 dark:bg-red-900/30" />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-amber-500" />
-                      Médio (6-12 meses)
-                    </span>
-                    <span className="font-medium">{distribuicaoPorLifetime.medio.toFixed(1)}%</span>
-                  </div>
-                  <Progress value={distribuicaoPorLifetime.medio} className="h-2 bg-amber-100 dark:bg-amber-900/30" />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                      Longo (&gt;12 meses)
-                    </span>
-                    <span className="font-medium">{distribuicaoPorLifetime.longo.toFixed(1)}%</span>
-                  </div>
-                  <Progress value={distribuicaoPorLifetime.longo} className="h-2 bg-emerald-100 dark:bg-emerald-900/30" />
-                </div>
-              </>
+              <ResponsiveContainer width="100%" height={200}>
+                <RechartsPie>
+                  <Pie
+                    data={distribuicaoPorLifetime.filter(d => d.count > 0)}
+                    dataKey="count"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={70}
+                    label={({ name, percentual }) => `${name}: ${percentual.toFixed(0)}%`}
+                  >
+                    {distribuicaoPorLifetime.map((entry, index) => (
+                      <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number, name: string) => [`${value} contratos`, name]} />
+                </RechartsPie>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Top 5 Squads com Churn</CardTitle>
+              <CardTitle className="text-base">Churn por Responsável</CardTitle>
             </div>
-            <CardDescription>Distribuição percentual por squad</CardDescription>
+            <CardDescription>Top 6 responsáveis</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent>
             {isLoading ? (
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-8 w-full" />
-                ))}
+              <Skeleton className="h-[200px] w-full" />
+            ) : distribuicaoPorResponsavel.length === 0 ? (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                Nenhum dado disponível
               </div>
-            ) : distribuicaoPorSquad.length === 0 ? (
-              <p className="text-muted-foreground text-sm text-center py-4">Nenhum dado disponível</p>
             ) : (
-              distribuicaoPorSquad.map((item, index) => (
-                <div key={item.squad} className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="truncate max-w-[60%]" title={item.squad}>{item.squad}</span>
-                    <span className="font-medium text-right">
-                      {item.count} ({item.percentual.toFixed(1)}%)
-                    </span>
-                  </div>
-                  <Progress 
-                    value={item.percentual} 
-                    className="h-2" 
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={distribuicaoPorResponsavel} layout="vertical">
+                  <XAxis type="number" tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={70} />
+                  <Tooltip 
+                    formatter={(value: number) => [`${value} contratos`, "Quantidade"]}
+                    labelFormatter={(label) => distribuicaoPorResponsavel.find(s => s.name === label)?.fullName || label}
                   />
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Top 5 Produtos com Churn</CardTitle>
-            </div>
-            <CardDescription>Distribuição percentual por produto</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoading ? (
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-8 w-full" />
-                ))}
-              </div>
-            ) : distribuicaoPorProduto.length === 0 ? (
-              <p className="text-muted-foreground text-sm text-center py-4">Nenhum dado disponível</p>
-            ) : (
-              distribuicaoPorProduto.map((item, index) => (
-                <div key={item.produto} className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="truncate max-w-[60%]" title={item.produto}>{item.produto}</span>
-                    <span className="font-medium text-right">
-                      {item.count} ({item.percentual.toFixed(1)}%)
-                    </span>
-                  </div>
-                  <Progress 
-                    value={item.percentual} 
-                    className="h-2" 
-                  />
-                </div>
-              ))
+                  <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
@@ -571,22 +761,6 @@ export default function ChurnDetalhamento() {
                       data-testid="input-search-churn"
                     />
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Período</label>
-                  <Select value={filterPeriodo} onValueChange={setFilterPeriodo}>
-                    <SelectTrigger data-testid="select-periodo">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="3">Últimos 3 meses</SelectItem>
-                      <SelectItem value="6">Últimos 6 meses</SelectItem>
-                      <SelectItem value="12">Últimos 12 meses</SelectItem>
-                      <SelectItem value="24">Últimos 24 meses</SelectItem>
-                      <SelectItem value="all">Todo o período</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -645,7 +819,7 @@ export default function ChurnDetalhamento() {
                   </Select>
                 </div>
 
-                <div className="flex items-end">
+                <div className="flex items-end col-span-2">
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -654,13 +828,14 @@ export default function ChurnDetalhamento() {
                       setFilterProdutos([]);
                       setFilterResponsaveis([]);
                       setFilterServicos([]);
-                      setFilterPeriodo("12");
+                      setDataInicio(format(subMonths(new Date(), 12), "yyyy-MM-dd"));
+                      setDataFim(format(new Date(), "yyyy-MM-dd"));
                       setSortBy("data_encerramento");
                       setSortOrder("desc");
                     }}
                     data-testid="button-clear-filters"
                   >
-                    Limpar Filtros
+                    Limpar Todos os Filtros
                   </Button>
                 </div>
               </div>
@@ -750,11 +925,10 @@ export default function ChurnDetalhamento() {
                         <SortIcon column="ltv" />
                       </div>
                     </TableHead>
-                    <TableHead>Serviço</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredContratos.map((contrato, index) => (
+                  {filteredContratos.slice(0, 100).map((contrato, index) => (
                     <TableRow 
                       key={`${contrato.id}-${index}`} 
                       data-testid={`row-churn-${contrato.id}`}
@@ -788,19 +962,15 @@ export default function ChurnDetalhamento() {
                       <TableCell className="text-right font-medium">
                         {formatCurrency(contrato.ltv || 0)}
                       </TableCell>
-                      <TableCell>
-                        {contrato.servico ? (
-                          <span className="text-xs text-muted-foreground truncate max-w-[120px] block" title={contrato.servico}>
-                            {contrato.servico}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">-</span>
-                        )}
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+              {filteredContratos.length > 100 && (
+                <div className="p-4 text-center text-muted-foreground text-sm border-t">
+                  Mostrando 100 de {filteredContratos.length} contratos. Use os filtros para refinar a busca.
+                </div>
+              )}
             </div>
           )}
         </CardContent>
