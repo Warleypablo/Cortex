@@ -4415,31 +4415,45 @@ export default function DetailColaborador() {
             </div>
             {colaborador.promocoes && colaborador.promocoes.length > 0 ? (
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {colaborador.promocoes.map((promocao) => (
-                  <div 
-                    key={promocao.id} 
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                    data-testid={`row-promocao-${promocao.id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium">{formatDateFns(promocao.dataPromocao)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {promocao.cargoAnterior || "—"} → {promocao.cargoNovo || "—"}
+                {colaborador.promocoes.map((promocao, index, arr) => {
+                  const nextPromo = arr[index + 1];
+                  let mesesDesdeUltimo: number | null = null;
+                  if (nextPromo && promocao.dataPromocao && nextPromo.dataPromocao) {
+                    const dataAtual = new Date(promocao.dataPromocao);
+                    const dataAnterior = new Date(nextPromo.dataPromocao);
+                    mesesDesdeUltimo = Math.round((dataAtual.getTime() - dataAnterior.getTime()) / (1000 * 60 * 60 * 24 * 30));
+                  }
+                  return (
+                    <div 
+                      key={promocao.id} 
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                      data-testid={`row-promocao-${promocao.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">{formatDateFns(promocao.dataPromocao)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {promocao.cargoAnterior || "—"} → {promocao.cargoNovo || "—"}
+                          </p>
+                          {mesesDesdeUltimo !== null && (
+                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                              {mesesDesdeUltimo} {mesesDesdeUltimo === 1 ? "mês" : "meses"} após última promoção
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-mono font-semibold text-green-600 dark:text-green-400">
+                          {formatCurrency(promocao.salarioNovo)}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          de {formatCurrency(promocao.salarioAnterior)}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-mono font-semibold text-green-600 dark:text-green-400">
-                        {formatCurrency(promocao.salarioNovo)}
-                      </p>
-                      <p className="text-xs text-muted-foreground font-mono">
-                        de {formatCurrency(promocao.salarioAnterior)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8" data-testid="text-no-promocoes">
