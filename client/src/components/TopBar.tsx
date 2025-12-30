@@ -615,7 +615,7 @@ export default function TopBar() {
 
   return (
     <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-1">
         <SidebarTrigger data-testid="button-sidebar-toggle" />
         <Breadcrumbs />
         {title && (
@@ -628,8 +628,11 @@ export default function TopBar() {
         )}
       </div>
       
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-center flex-1">
         <GlobalSearch />
+      </div>
+      
+      <div className="flex items-center justify-end flex-1 gap-2">
       </div>
       
       <AvisosModal 
