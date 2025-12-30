@@ -6,7 +6,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { Pool } from "pg";
-import { initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables } from "./db";
+import { initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
 
@@ -102,6 +102,7 @@ app.use((req, res, next) => {
     initializeTurboEventosTable(),
     initializeRhPagamentosTable(),
     initializeRhPesquisasTables(),
+    initializeRhComentariosTables(),
   ]);
   
   // Phase 2: Depends on catalogs being ready
