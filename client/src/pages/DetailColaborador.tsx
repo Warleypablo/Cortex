@@ -4776,12 +4776,12 @@ export default function DetailColaborador() {
 
           <TabsContent value="desenvolvimento" data-testid="tab-content-desenvolvimento">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <TimelineCard colaboradorId={colaboradorId} />
               <HealthCard colaboradorId={colaboradorId} />
               <EnpsCard colaboradorId={colaboradorId} />
               <PdiCard colaboradorId={colaboradorId} />
               <OneOnOneCard colaboradorId={colaboradorId} />
               <ComentariosCard colaboradorId={colaboradorId} />
+              <TimelineCard colaboradorId={colaboradorId} />
             </div>
           </TabsContent>
 
