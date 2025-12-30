@@ -82,7 +82,7 @@ interface HomeOverview {
 function MiniCalendar({ eventos }: { eventos: HomeOverview['proximosEventos'] }) {
   if (eventos.length === 0) {
     return (
-      <Card data-testid="card-mini-calendar">
+      <Card data-testid="card-mini-calendar" className="h-full flex flex-col">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
@@ -97,8 +97,8 @@ function MiniCalendar({ eventos }: { eventos: HomeOverview['proximosEventos'] })
             </Link>
           </div>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground text-center py-4">
+        <CardContent className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground text-center py-8">
             Nenhum evento nos próximos 14 dias
           </p>
         </CardContent>
@@ -107,7 +107,7 @@ function MiniCalendar({ eventos }: { eventos: HomeOverview['proximosEventos'] })
   }
 
   return (
-    <Card data-testid="card-mini-calendar">
+    <Card data-testid="card-mini-calendar" className="h-full flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
@@ -122,26 +122,26 @@ function MiniCalendar({ eventos }: { eventos: HomeOverview['proximosEventos'] })
           </Link>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 flex-1 overflow-auto">
         {eventos.map((evento) => (
           <div 
             key={evento.id} 
-            className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors"
+            className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
             data-testid={`event-item-${evento.id}`}
           >
             <div 
-              className="w-1 h-full min-h-[40px] rounded-full" 
+              className="w-1 h-full min-h-[48px] rounded-full" 
               style={{ backgroundColor: evento.cor || '#3b82f6' }}
             />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{evento.titulo}</p>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                <Clock className="w-3 h-3" />
+              <p className="font-medium truncate">{evento.titulo}</p>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                <Clock className="w-3.5 h-3.5" />
                 {format(parseISO(evento.dataInicio), "dd MMM, HH:mm", { locale: ptBR })}
               </div>
               {evento.local && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                  <MapPin className="w-3 h-3" />
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                  <MapPin className="w-3.5 h-3.5" />
                   <span className="truncate">{evento.local}</span>
                 </div>
               )}
@@ -330,42 +330,32 @@ function AlertasWidget({ alertas }: { alertas: HomeOverview['alertas'] }) {
 
 function QuickActions() {
   return (
-    <Card data-testid="card-quick-actions">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Ações Rápidas
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-2">
-          <Link href="/clientes">
-            <Button variant="outline" className="w-full justify-start" size="sm" data-testid="action-novo-cliente">
-              <Building2 className="w-4 h-4 mr-2" />
-              Ver Clientes
-            </Button>
-          </Link>
-          <Link href="/dashboard/comercial/closers">
-            <Button variant="outline" className="w-full justify-start" size="sm" data-testid="action-pipeline">
-              <Target className="w-4 h-4 mr-2" />
-              Pipeline
-            </Button>
-          </Link>
-          <Link href="/dashboard/inadimplencia">
-            <Button variant="outline" className="w-full justify-start" size="sm" data-testid="action-cobrancas">
-              <Receipt className="w-4 h-4 mr-2" />
-              Cobranças
-            </Button>
-          </Link>
-          <Link href="/calendario">
-            <Button variant="outline" className="w-full justify-start" size="sm" data-testid="action-calendario">
-              <Calendar className="w-4 h-4 mr-2" />
-              Calendário
-            </Button>
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex items-center gap-2" data-testid="quick-actions">
+      <Link href="/clientes">
+        <Button variant="outline" size="sm" data-testid="action-novo-cliente">
+          <Building2 className="w-4 h-4 mr-2" />
+          Clientes
+        </Button>
+      </Link>
+      <Link href="/dashboard/comercial/closers">
+        <Button variant="outline" size="sm" data-testid="action-pipeline">
+          <Target className="w-4 h-4 mr-2" />
+          Pipeline
+        </Button>
+      </Link>
+      <Link href="/dashboard/inadimplencia">
+        <Button variant="outline" size="sm" data-testid="action-cobrancas">
+          <Receipt className="w-4 h-4 mr-2" />
+          Cobranças
+        </Button>
+      </Link>
+      <Link href="/calendario">
+        <Button variant="outline" size="sm" data-testid="action-calendario">
+          <Calendar className="w-4 h-4 mr-2" />
+          Calendário
+        </Button>
+      </Link>
+    </div>
   );
 }
 
@@ -588,14 +578,14 @@ function DashboardAdmin() {
           contratosAtivos={homeOverview?.contratosAtivos || 0}
         />
         <AlertasWidget alertas={homeOverview?.alertas || []} />
-        <div className="space-y-6">
-          <MiniCalendar eventos={homeOverview?.proximosEventos || []} />
-          <QuickActions />
-        </div>
+        <MiniCalendar eventos={homeOverview?.proximosEventos || []} />
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold mb-4">Acesso Rápido</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Acesso Rápido</h2>
+          <QuickActions />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <QuickLinkCard
             title="Visão Geral"
