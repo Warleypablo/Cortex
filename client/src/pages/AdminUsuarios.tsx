@@ -223,6 +223,22 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
     setSelectedRoutes([]);
   };
 
+  const handleSelectCategory = (categoryPermissions: string[]) => {
+    setSelectedRoutes(prev => {
+      const newSet = new Set(prev);
+      categoryPermissions.forEach(p => newSet.add(p));
+      return Array.from(newSet);
+    });
+  };
+
+  const handleDeselectCategory = (categoryPermissions: string[]) => {
+    setSelectedRoutes(prev => prev.filter(p => !categoryPermissions.includes(p)));
+  };
+
+  const isCategoryFullySelected = (categoryPermissions: string[]) => {
+    return categoryPermissions.every(p => selectedRoutes.includes(p));
+  };
+
   const handleApplyPreset = (presetId: string) => {
     const preset = ROLE_PRESETS.find(p => p.id === presetId);
     if (preset) {
@@ -350,29 +366,44 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
               </div>
 
               <div className="space-y-6">
-                {PERMISSION_CATEGORIES.map((category) => (
-                  <div key={category.key}>
-                    <h4 className="text-sm font-semibold text-muted-foreground mb-3">{category.label}</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      {category.permissions.map((permission) => (
-                        <div key={permission.key} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`route-${permission.key}`}
-                            checked={selectedRoutes.includes(permission.key)}
-                            onCheckedChange={() => handleToggleRoute(permission.key)}
-                            data-testid={`checkbox-${permission.key}`}
-                          />
-                          <Label
-                            htmlFor={`route-${permission.key}`}
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            {PERMISSION_LABELS[permission.key] || permission.label}
-                          </Label>
-                        </div>
-                      ))}
+                {PERMISSION_CATEGORIES.map((category) => {
+                  const categoryPerms = category.permissions.map(p => p.key);
+                  const isFullySelected = isCategoryFullySelected(categoryPerms);
+                  return (
+                    <div key={category.key}>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold text-muted-foreground">{category.label}</h4>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => isFullySelected ? handleDeselectCategory(categoryPerms) : handleSelectCategory(categoryPerms)}
+                          data-testid={`btn-toggle-category-${category.key}`}
+                          className="h-7 text-xs"
+                        >
+                          {isFullySelected ? "Desmarcar tudo" : "Selecionar tudo"}
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        {category.permissions.map((permission) => (
+                          <div key={permission.key} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`route-${permission.key}`}
+                              checked={selectedRoutes.includes(permission.key)}
+                              onCheckedChange={() => handleToggleRoute(permission.key)}
+                              data-testid={`checkbox-${permission.key}`}
+                            />
+                            <Label
+                              htmlFor={`route-${permission.key}`}
+                              className="text-sm font-normal cursor-pointer"
+                            >
+                              {PERMISSION_LABELS[permission.key] || permission.label}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
@@ -467,6 +498,22 @@ function AddUserDialog({ open, onOpenChange }: {
 
   const handleDeselectAll = () => {
     setSelectedRoutes([]);
+  };
+
+  const handleSelectCategory = (categoryPermissions: string[]) => {
+    setSelectedRoutes(prev => {
+      const newSet = new Set(prev);
+      categoryPermissions.forEach(p => newSet.add(p));
+      return Array.from(newSet);
+    });
+  };
+
+  const handleDeselectCategory = (categoryPermissions: string[]) => {
+    setSelectedRoutes(prev => prev.filter(p => !categoryPermissions.includes(p)));
+  };
+
+  const isCategoryFullySelected = (categoryPermissions: string[]) => {
+    return categoryPermissions.every(p => selectedRoutes.includes(p));
   };
 
   const handleApplyPreset = (presetId: string) => {
@@ -627,29 +674,44 @@ function AddUserDialog({ open, onOpenChange }: {
               </div>
 
               <div className="space-y-6">
-                {PERMISSION_CATEGORIES.map((category) => (
-                  <div key={category.key}>
-                    <h4 className="text-sm font-semibold text-muted-foreground mb-3">{category.label}</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      {category.permissions.map((permission) => (
-                        <div key={permission.key} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`add-route-${permission.key}`}
-                            checked={selectedRoutes.includes(permission.key)}
-                            onCheckedChange={() => handleToggleRoute(permission.key)}
-                            data-testid={`add-checkbox-${permission.key}`}
-                          />
-                          <Label
-                            htmlFor={`add-route-${permission.key}`}
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            {PERMISSION_LABELS[permission.key] || permission.label}
-                          </Label>
-                        </div>
-                      ))}
+                {PERMISSION_CATEGORIES.map((category) => {
+                  const categoryPerms = category.permissions.map(p => p.key);
+                  const isFullySelected = isCategoryFullySelected(categoryPerms);
+                  return (
+                    <div key={category.key}>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold text-muted-foreground">{category.label}</h4>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => isFullySelected ? handleDeselectCategory(categoryPerms) : handleSelectCategory(categoryPerms)}
+                          data-testid={`btn-add-toggle-category-${category.key}`}
+                          className="h-7 text-xs"
+                        >
+                          {isFullySelected ? "Desmarcar tudo" : "Selecionar tudo"}
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        {category.permissions.map((permission) => (
+                          <div key={permission.key} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`add-route-${permission.key}`}
+                              checked={selectedRoutes.includes(permission.key)}
+                              onCheckedChange={() => handleToggleRoute(permission.key)}
+                              data-testid={`add-checkbox-${permission.key}`}
+                            />
+                            <Label
+                              htmlFor={`add-route-${permission.key}`}
+                              className="text-sm font-normal cursor-pointer"
+                            >
+                              {PERMISSION_LABELS[permission.key] || permission.label}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
