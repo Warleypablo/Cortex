@@ -13084,6 +13084,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json([]);
       }
       
+      // Primeiro, buscar o id do cliente na tabela caz_clientes pelo CNPJ/PIX
+      let clienteIds: string | null = null;
+      if (pixLimpo || cnpjLimpo) {
+        const clienteResult = await db.execute(sql`
+          SELECT ids FROM caz_clientes 
+          WHERE REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') = ${pixLimpo || cnpjLimpo}
+          LIMIT 1
+        `);
+        if (clienteResult.rows.length > 0) {
+          clienteIds = (clienteResult.rows[0] as any).ids;
+          console.log(`  Cliente encontrado no CAZ: ids = ${clienteIds}`);
+        }
+      }
+      
       // Buscar em caz_parcelas E caz_pagar usando UNION
       const result = await db.execute(sql`
         WITH pagamentos_parcelas AS (
@@ -13100,7 +13114,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           WHERE p.tipo_evento = 'DESPESA'
             AND UPPER(p.status) IN ('PAID', 'PAGO', 'ACQUITTED', 'LIQUIDADO')
             AND (
-              ${cnpjLimpo ? sql`p.descricao ILIKE ${'%' + cnpjLimpo + '%'}` : sql`FALSE`}
+              ${clienteIds ? sql`p.id_cliente = ${clienteIds}` : sql`FALSE`}
+              OR ${cnpjLimpo ? sql`p.descricao ILIKE ${'%' + cnpjLimpo + '%'}` : sql`FALSE`}
               OR ${cnpjRaw ? sql`p.descricao ILIKE ${'%' + cnpjRaw + '%'}` : sql`FALSE`}
               OR ${pixRaw ? sql`p.descricao ILIKE ${'%' + pixRaw + '%'}` : sql`FALSE`}
               OR ${pixLimpo ? sql`p.descricao ILIKE ${'%' + pixLimpo + '%'}` : sql`FALSE`}
@@ -13226,6 +13241,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       results.pagar_bruno = pagar_bruno.rows;
       console.log(`[DEBUG] caz_pagar (Bruno): ${pagar_bruno.rows.length} registros`);
+      
+      // 7. Se encontrou cliente, buscar pelo id_cliente nas parcelas
+      if (clientes.rows.length > 0) {
+        const clienteIds = (clientes.rows[0] as any).ids;
+        console.log(`[DEBUG] Buscando pagamentos pelo id_cliente: ${clienteIds}`);
+        
+        const parcelas_cliente = await db.execute(sql`
+          SELECT id, descricao, valor_pago, valor_bruto, status, tipo_evento, data_quitacao, data_vencimento, categoria_nome
+          FROM caz_parcelas 
+          WHERE id_cliente = ${clienteIds}
+          LIMIT 20
+        `);
+        results.parcelas_por_id_cliente = parcelas_cliente.rows;
+        console.log(`[DEBUG] caz_parcelas (id_cliente): ${parcelas_cliente.rows.length} registros`);
+      }
       
       res.json(results);
     } catch (error) {
