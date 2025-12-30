@@ -91,10 +91,40 @@ interface ChurnDetalhamentoData {
   };
 }
 
-const CHART_COLORS = [
-  "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6", 
-  "#3b82f6", "#8b5cf6", "#ec4899", "#6366f1", "#84cc16"
+const CHART_COLORS = {
+  primary: "hsl(var(--chart-1))",
+  secondary: "hsl(var(--chart-2))",
+  tertiary: "hsl(var(--chart-3))",
+  quaternary: "hsl(var(--chart-4))",
+  quinary: "hsl(var(--chart-5))",
+};
+
+const PALETTE = [
+  "#f87171", "#fb923c", "#fbbf24", "#4ade80", "#2dd4bf",
+  "#60a5fa", "#a78bfa", "#f472b6", "#818cf8", "#a3e635"
 ];
+
+const REFINED_COLORS = [
+  "#ef4444", "#f97316", "#f59e0b", "#84cc16", "#22c55e",
+  "#14b8a6", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899"
+];
+
+const CustomTooltip = ({ active, payload, label, valueFormatter }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-popover border border-border rounded-lg shadow-lg p-3 min-w-[140px]">
+      <p className="text-sm font-medium text-foreground mb-2">{label}</p>
+      {payload.map((entry: any, i: number) => (
+        <div key={i} className="flex items-center justify-between gap-4 text-sm">
+          <span className="text-muted-foreground">{entry.name === "count" ? "Quantidade" : entry.name}</span>
+          <span className="font-semibold text-foreground">
+            {valueFormatter ? valueFormatter(entry.value) : entry.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export default function ChurnDetalhamento() {
   usePageTitle("Detalhamento de Churn");
@@ -505,164 +535,113 @@ export default function ChurnDetalhamento() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <Card className="bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Churned</CardTitle>
-            <TrendingDown className={`h-4 w-4 ${colors.danger}`} />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <>
-                <div className="text-3xl font-bold" data-testid="text-total-churned">
-                  {filteredMetricas.total_churned}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {[
+          { 
+            title: "Total Churned", 
+            value: filteredMetricas.total_churned.toString(),
+            subtitle: "contratos encerrados",
+            icon: TrendingDown,
+            accent: "border-l-red-500"
+          },
+          { 
+            title: "MRR Perdido", 
+            value: formatCurrency(filteredMetricas.mrr_perdido),
+            subtitle: "receita mensal perdida",
+            icon: DollarSign,
+            accent: "border-l-orange-500"
+          },
+          { 
+            title: "LTV Total", 
+            value: formatCurrency(filteredMetricas.ltv_total),
+            subtitle: "valor gerado antes do churn",
+            icon: Target,
+            accent: "border-l-amber-500"
+          },
+          { 
+            title: "Lifetime Médio", 
+            value: `${filteredMetricas.lt_medio.toFixed(1)}m`,
+            subtitle: "meses em média",
+            icon: Clock,
+            accent: "border-l-blue-500"
+          },
+          { 
+            title: "Ticket Médio", 
+            value: formatCurrency(filteredMetricas.ticket_medio),
+            subtitle: "MRR médio por contrato",
+            icon: BarChart3,
+            accent: "border-l-violet-500"
+          },
+          { 
+            title: "LTV Médio", 
+            value: filteredMetricas.total_churned > 0 
+              ? formatCurrency(filteredMetricas.ltv_total / filteredMetricas.total_churned)
+              : "R$ 0",
+            subtitle: "por contrato churned",
+            icon: Percent,
+            accent: "border-l-emerald-500"
+          }
+        ].map((kpi, index) => (
+          <Card key={index} className={`border-l-4 ${kpi.accent} bg-card/50`}>
+            <CardContent className="p-4">
+              {isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-7 w-24" />
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  contratos encerrados
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">MRR Perdido</CardTitle>
-            <DollarSign className={`h-4 w-4 ${colors.danger}`} />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-32" />
-            ) : (
-              <>
-                <div className="text-3xl font-bold" data-testid="text-mrr-perdido">
-                  {formatCurrency(filteredMetricas.mrr_perdido)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  receita mensal perdida
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">LTV Total</CardTitle>
-            <Target className={`h-4 w-4 ${colors.warning}`} />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-32" />
-            ) : (
-              <>
-                <div className="text-3xl font-bold" data-testid="text-ltv-total">
-                  {formatCurrency(filteredMetricas.ltv_total)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  valor gerado antes do churn
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Lifetime Médio</CardTitle>
-            <Clock className={`h-4 w-4 ${colors.info}`} />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <>
-                <div className="text-3xl font-bold" data-testid="text-lt-medio">
-                  {filteredMetricas.lt_medio.toFixed(1)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  meses em média
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Ticket Médio</CardTitle>
-            <DollarSign className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <>
-                <div className="text-3xl font-bold" data-testid="text-ticket-medio">
-                  {formatCurrency(filteredMetricas.ticket_medio)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  MRR médio por contrato
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">LTV Médio</CardTitle>
-            <Percent className={`h-4 w-4 ${colors.success}`} />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <>
-                <div className="text-3xl font-bold" data-testid="text-ltv-medio">
-                  {filteredMetricas.total_churned > 0 
-                    ? formatCurrency(filteredMetricas.ltv_total / filteredMetricas.total_churned)
-                    : "R$ 0"}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  por contrato churned
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {kpi.title}
+                    </span>
+                    <kpi.icon className="h-4 w-4 text-muted-foreground/60" />
+                  </div>
+                  <div className="text-2xl font-bold tracking-tight">{kpi.value}</div>
+                  <p className="text-[10px] text-muted-foreground mt-1">{kpi.subtitle}</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-4">
             <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Churn por Mês</CardTitle>
+              <div className="p-1.5 rounded-md bg-red-500/10">
+                <BarChart3 className="h-4 w-4 text-red-500" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-semibold">Churn por Mês</CardTitle>
+                <CardDescription className="text-xs">Evolução mensal de contratos encerrados</CardDescription>
+              </div>
             </div>
-            <CardDescription>Evolução mensal de contratos encerrados</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <Skeleton className="h-[250px] w-full" />
+              <Skeleton className="h-[220px] w-full" />
             ) : churnPorMes.length === 0 ? (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
                 Nenhum dado disponível
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={churnPorMes}>
-                  <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip 
-                    formatter={(value: number, name: string) => [
-                      name === "count" ? `${value} contratos` : formatCurrency(value),
-                      name === "count" ? "Quantidade" : "MRR Perdido"
-                    ]}
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={churnPorMes} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                  <XAxis 
+                    dataKey="mes" 
+                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} 
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    tickLine={false}
                   />
-                  <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]} name="count" />
+                  <YAxis 
+                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} 
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                  <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]} name="Quantidade" />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -670,40 +649,65 @@ export default function ChurnDetalhamento() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-4">
             <div className="flex items-center gap-2">
-              <PieChart className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Distribuição por Produto</CardTitle>
+              <div className="p-1.5 rounded-md bg-orange-500/10">
+                <PieChart className="h-4 w-4 text-orange-500" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-semibold">Distribuição por Produto</CardTitle>
+                <CardDescription className="text-xs">Percentual de churn por produto</CardDescription>
+              </div>
             </div>
-            <CardDescription>Percentual de churn por produto</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <Skeleton className="h-[250px] w-full" />
+              <Skeleton className="h-[220px] w-full" />
             ) : distribuicaoPorProduto.length === 0 ? (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
                 Nenhum dado disponível
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
-                <RechartsPie>
-                  <Pie
-                    data={distribuicaoPorProduto}
-                    dataKey="count"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label={({ name, percentual }) => `${name} (${percentual.toFixed(0)}%)`}
-                    labelLine={{ stroke: "#888", strokeWidth: 1 }}
-                  >
-                    {distribuicaoPorProduto.map((entry, index) => (
-                      <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => [`${value} contratos`, "Quantidade"]} />
-                </RechartsPie>
-              </ResponsiveContainer>
+              <div className="flex items-center gap-4">
+                <ResponsiveContainer width="55%" height={220}>
+                  <RechartsPie>
+                    <Pie
+                      data={distribuicaoPorProduto}
+                      dataKey="count"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={85}
+                      strokeWidth={2}
+                      stroke="hsl(var(--card))"
+                    >
+                      {distribuicaoPorProduto.map((entry, index) => (
+                        <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                  </RechartsPie>
+                </ResponsiveContainer>
+                <div className="flex-1 space-y-1.5 text-xs">
+                  {distribuicaoPorProduto.slice(0, 5).map((item, i) => (
+                    <div key={item.name} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div 
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
+                        />
+                        <span className="truncate text-muted-foreground">{item.fullName}</span>
+                      </div>
+                      <span className="font-medium tabular-nums">{item.percentual.toFixed(0)}%</span>
+                    </div>
+                  ))}
+                  {distribuicaoPorProduto.length > 5 && (
+                    <p className="text-[10px] text-muted-foreground/60 pt-1">
+                      +{distribuicaoPorProduto.length - 5} outros
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -711,32 +715,45 @@ export default function ChurnDetalhamento() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-4">
             <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Churn por Squad</CardTitle>
+              <div className="p-1.5 rounded-md bg-violet-500/10">
+                <Users className="h-4 w-4 text-violet-500" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-semibold">Churn por Squad</CardTitle>
+                <CardDescription className="text-xs">Quantidade por squad</CardDescription>
+              </div>
             </div>
-            <CardDescription>Quantidade por squad</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-[200px] w-full" />
             ) : distribuicaoPorSquad.length === 0 ? (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
                 Nenhum dado disponível
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={distribuicaoPorSquad} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={80} />
-                  <Tooltip 
-                    formatter={(value: number) => [`${value} contratos`, "Quantidade"]}
-                    labelFormatter={(label) => distribuicaoPorSquad.find(s => s.name === label)?.fullName || label}
+                <BarChart data={distribuicaoPorSquad} layout="vertical" margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
+                  <XAxis 
+                    type="number" 
+                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} 
+                    axisLine={false}
+                    tickLine={false}
                   />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  <YAxis 
+                    type="category" 
+                    dataKey="name" 
+                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} 
+                    width={80}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]} name="Quantidade">
                     {distribuicaoPorSquad.map((entry, index) => (
-                      <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -746,69 +763,103 @@ export default function ChurnDetalhamento() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-4">
             <div className="flex items-center gap-2">
-              <PieChart className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Distribuição por Lifetime</CardTitle>
+              <div className="p-1.5 rounded-md bg-amber-500/10">
+                <Clock className="h-4 w-4 text-amber-500" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-semibold">Distribuição por Lifetime</CardTitle>
+                <CardDescription className="text-xs">Tempo de permanência</CardDescription>
+              </div>
             </div>
-            <CardDescription>Tempo de permanência</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-[200px] w-full" />
             ) : distribuicaoPorLifetime.length === 0 ? (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
                 Nenhum dado disponível
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <RechartsPie>
-                  <Pie
-                    data={distribuicaoPorLifetime.filter(d => d.count > 0)}
-                    dataKey="count"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={70}
-                    label={({ name, percentual }) => `${name}: ${percentual.toFixed(0)}%`}
-                  >
-                    {distribuicaoPorLifetime.map((entry, index) => (
-                      <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number, name: string) => [`${value} contratos`, name]} />
-                </RechartsPie>
-              </ResponsiveContainer>
+              <div className="flex items-center gap-3">
+                <ResponsiveContainer width="55%" height={200}>
+                  <RechartsPie>
+                    <Pie
+                      data={distribuicaoPorLifetime.filter(d => d.count > 0)}
+                      dataKey="count"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={75}
+                      strokeWidth={2}
+                      stroke="hsl(var(--card))"
+                    >
+                      {distribuicaoPorLifetime.map((entry, index) => (
+                        <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                  </RechartsPie>
+                </ResponsiveContainer>
+                <div className="flex-1 space-y-1.5 text-xs">
+                  {distribuicaoPorLifetime.filter(d => d.count > 0).map((item, i) => (
+                    <div key={item.name} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
+                        />
+                        <span className="text-muted-foreground">{item.name}</span>
+                      </div>
+                      <span className="font-medium tabular-nums">{item.percentual.toFixed(0)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-4">
             <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Churn por Responsável</CardTitle>
+              <div className="p-1.5 rounded-md bg-blue-500/10">
+                <Users className="h-4 w-4 text-blue-500" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-semibold">Churn por Responsável</CardTitle>
+                <CardDescription className="text-xs">Top 6 responsáveis</CardDescription>
+              </div>
             </div>
-            <CardDescription>Top 6 responsáveis</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-[200px] w-full" />
             ) : distribuicaoPorResponsavel.length === 0 ? (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
                 Nenhum dado disponível
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={distribuicaoPorResponsavel} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={70} />
-                  <Tooltip 
-                    formatter={(value: number) => [`${value} contratos`, "Quantidade"]}
-                    labelFormatter={(label) => distribuicaoPorResponsavel.find(s => s.name === label)?.fullName || label}
+                <BarChart data={distribuicaoPorResponsavel} layout="vertical" margin={{ top: 0, right: 10, left: -10, bottom: 0 }}>
+                  <XAxis 
+                    type="number" 
+                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                    axisLine={false}
+                    tickLine={false}
                   />
-                  <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                  <YAxis 
+                    type="category" 
+                    dataKey="name" 
+                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} 
+                    width={70}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                  <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Quantidade" />
                 </BarChart>
               </ResponsiveContainer>
             )}
