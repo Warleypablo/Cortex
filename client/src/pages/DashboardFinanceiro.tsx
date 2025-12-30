@@ -391,7 +391,7 @@ export default function DashboardFinanceiro() {
               </div>
             ) : evolucaoData && evolucaoData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={evolucaoData}>
+                <ComposedChart data={evolucaoData}>
                   <defs>
                     <linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
@@ -404,48 +404,26 @@ export default function DashboardFinanceiro() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="mesLabel" tick={{ fill: 'currentColor', fontSize: 11 }} />
-                  <YAxis tick={{ fill: 'currentColor' }} tickFormatter={formatCurrencyCompact} />
+                  <YAxis yAxisId="left" tick={{ fill: 'currentColor' }} tickFormatter={formatCurrencyCompact} />
+                  <YAxis 
+                    yAxisId="right" 
+                    orientation="right" 
+                    tick={{ fill: '#3b82f6', fontSize: 11 }} 
+                    tickFormatter={(v) => `${v.toFixed(0)}%`}
+                    domain={[-50, 50]}
+                  />
                   <RechartsTooltip 
-                    formatter={(value: number) => formatCurrency(value)}
+                    formatter={(value: number, name: string) => {
+                      if (name === 'Margem %') return formatPercent(value);
+                      return formatCurrency(value);
+                    }}
                     contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
                   />
                   <Legend />
-                  <Area type="monotone" dataKey="receita" name="Receita" stroke="#22c55e" fillOpacity={1} fill="url(#colorReceita)" />
-                  <Area type="monotone" dataKey="despesa" name="Despesa" stroke="#ef4444" fillOpacity={1} fill="url(#colorDespesa)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                Sem dados disponíveis
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <LineChartIcon className="w-5 h-5" />
-              Margem Operacional Mensal
-            </CardTitle>
-            <CardDescription>Evolução da margem ao longo do tempo</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingEvolucao ? (
-              <div className="h-[300px] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin" />
-              </div>
-            ) : evolucaoData && evolucaoData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={evolucaoData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="mesLabel" tick={{ fill: 'currentColor', fontSize: 11 }} />
-                  <YAxis tick={{ fill: 'currentColor' }} tickFormatter={(v) => `${v.toFixed(0)}%`} />
-                  <RechartsTooltip 
-                    formatter={(value: number) => formatPercent(value)}
-                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
-                  />
+                  <Area yAxisId="left" type="monotone" dataKey="receita" name="Receita" stroke="#22c55e" fillOpacity={1} fill="url(#colorReceita)" />
+                  <Area yAxisId="left" type="monotone" dataKey="despesa" name="Despesa" stroke="#ef4444" fillOpacity={1} fill="url(#colorDespesa)" />
                   <Line 
+                    yAxisId="right"
                     type="monotone" 
                     dataKey="margemPercentual" 
                     name="Margem %" 
@@ -454,7 +432,7 @@ export default function DashboardFinanceiro() {
                     dot={{ r: 4, fill: '#3b82f6' }}
                     activeDot={{ r: 6 }}
                   />
-                </LineChart>
+                </ComposedChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-[300px] flex items-center justify-center text-muted-foreground">
