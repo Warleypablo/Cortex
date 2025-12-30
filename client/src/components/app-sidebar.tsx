@@ -269,8 +269,13 @@ export function AppSidebar() {
               </div>
             )}
             
-            {/* OKR 2026 - displayed before Setores */}
-            {renderCategorySection(NAV_CONFIG.okr2026)}
+            {/* OKR 2026 - Link direto sem submenu */}
+            {renderNavItem({ 
+              title: 'OKR 2026', 
+              url: '/okr-2026', 
+              icon: 'Target', 
+              permissionKey: 'admin.okr_2026' 
+            })}
             
             {NAV_CONFIG.setores.map(category => renderCategorySection(category))}
             {renderCategorySection(NAV_CONFIG.gg)}
