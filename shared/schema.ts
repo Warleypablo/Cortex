@@ -1856,6 +1856,8 @@ export const oneOnOne = pgTable("rh_one_on_one", {
   transcriptUrl: text("transcript_url"),
   transcriptText: text("transcript_text"),
   uploadedBy: text("uploaded_by"),
+  aiAnalysis: text("ai_analysis"),
+  aiAnalyzedAt: timestamp("ai_analyzed_at"),
 });
 
 export const oneOnOneAcoes = pgTable("rh_one_on_one_acoes", {

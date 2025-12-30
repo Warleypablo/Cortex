@@ -827,6 +827,13 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
         };
       }
       
+      // Save the analysis to the database
+      await db.execute(sql`
+        UPDATE rh_one_on_one 
+        SET ai_analysis = ${JSON.stringify(analysis)}, ai_analyzed_at = NOW()
+        WHERE id = ${id}
+      `);
+      
       res.json({
         success: true,
         meetingId: id,

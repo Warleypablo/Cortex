@@ -1414,6 +1414,14 @@ export async function initializeRhPesquisasTables(): Promise<void> {
       }
     }
     
+    // Migração para adicionar colunas de análise de IA
+    try {
+      await db.execute(sql`ALTER TABLE rh_one_on_one ADD COLUMN IF NOT EXISTS ai_analysis TEXT`);
+      await db.execute(sql`ALTER TABLE rh_one_on_one ADD COLUMN IF NOT EXISTS ai_analyzed_at TIMESTAMP`);
+    } catch (e) {
+      // Colunas já existem, ignorar
+    }
+    
     // Criar tabela de PDI
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS rh_pdi (

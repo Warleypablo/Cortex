@@ -1776,6 +1776,8 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
       if (result.success) {
         setAiAnalysis(result.analise);
         setAiAnalysisDialogOpen(true);
+        // Invalidate cache to refresh the meeting list and show "Ver Análise" button
+        queryClient.invalidateQueries({ queryKey: ['/api/colaboradores', colaboradorId, 'one-on-one'] });
       } else {
         toast({ title: "Erro na análise", description: result.error || "Não foi possível analisar a reunião.", variant: "destructive" });
       }
@@ -1784,6 +1786,19 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
     } finally {
       setIsAnalyzing(false);
       setAnalyzingMeetingId(null);
+    }
+  };
+
+  const handleViewAnalysis = (meeting: any) => {
+    if (meeting.aiAnalysis) {
+      try {
+        const analysis = typeof meeting.aiAnalysis === 'string' ? JSON.parse(meeting.aiAnalysis) : meeting.aiAnalysis;
+        setAiAnalysis(analysis);
+        setAiAnalysisDialogOpen(true);
+      } catch (error) {
+        console.error("Error parsing AI analysis:", error);
+        toast({ title: "Erro", description: "Não foi possível carregar a análise.", variant: "destructive" });
+      }
     }
   };
 
@@ -1964,23 +1979,38 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
                       
                       {/* AI Analysis Button */}
                       <div className="pt-2 border-t">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          className="w-full gap-2 bg-gradient-to-r from-purple-500/10 to-blue-500/10 hover:from-purple-500/20 hover:to-blue-500/20 border-purple-500/30"
-                          onClick={() => handleAnalyzeMeeting(meeting.id)}
-                          disabled={isAnalyzing}
-                          data-testid={`button-analyze-${meeting.id}`}
-                        >
-                          {isAnalyzing && analyzingMeetingId === meeting.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Sparkles className="w-4 h-4 text-purple-500" />
-                          )}
-                          <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent font-medium">
-                            Analisar com IA
-                          </span>
-                        </Button>
+                        {meeting.aiAnalysis ? (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="w-full gap-2 bg-gradient-to-r from-green-500/10 to-emerald-500/10 hover:from-green-500/20 hover:to-emerald-500/20 border-green-500/30"
+                            onClick={() => handleViewAnalysis(meeting)}
+                            data-testid={`button-view-analysis-${meeting.id}`}
+                          >
+                            <Eye className="w-4 h-4 text-green-500" />
+                            <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent font-medium">
+                              Ver Análise
+                            </span>
+                          </Button>
+                        ) : (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="w-full gap-2 bg-gradient-to-r from-purple-500/10 to-blue-500/10 hover:from-purple-500/20 hover:to-blue-500/20 border-purple-500/30"
+                            onClick={() => handleAnalyzeMeeting(meeting.id)}
+                            disabled={isAnalyzing}
+                            data-testid={`button-analyze-${meeting.id}`}
+                          >
+                            {isAnalyzing && analyzingMeetingId === meeting.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Sparkles className="w-4 h-4 text-purple-500" />
+                            )}
+                            <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent font-medium">
+                              Analisar com IA
+                            </span>
+                          </Button>
+                        )}
                       </div>
 
                       <div className="pt-2 border-t">

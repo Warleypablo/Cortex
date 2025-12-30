@@ -8845,7 +8845,8 @@ export class DbStorage implements IStorage {
         criado_em as "criadoEm",
         pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename",
         transcript_url as "transcriptUrl", transcript_text as "transcriptText",
-        uploaded_by as "uploadedBy"
+        uploaded_by as "uploadedBy",
+        ai_analysis as "aiAnalysis", ai_analyzed_at as "aiAnalyzedAt"
       FROM rh_one_on_one 
       WHERE colaborador_id = ${colaboradorId} 
       ORDER BY data DESC
