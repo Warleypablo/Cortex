@@ -2828,34 +2828,55 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
         </div>
       </div>
 
-      {/* Histórico de pagamentos recentes */}
+      {/* Histórico completo de pagamentos */}
       {isLoading ? (
         <div className="flex items-center justify-center py-4">
           <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
-      ) : pagamentosRecentes.length > 0 ? (
+      ) : pagamentos.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground font-medium">Histórico Recente</p>
-          <div className="space-y-1.5 max-h-36 overflow-y-auto">
-            {pagamentosRecentes.map((pagamento) => {
+          <p className="text-xs text-muted-foreground font-medium">Histórico Completo ({pagamentos.length} faturas)</p>
+          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+            {pagamentos
+              .sort((a, b) => {
+                const dateA = a.ano_referencia * 12 + a.mes_referencia;
+                const dateB = b.ano_referencia * 12 + b.mes_referencia;
+                return dateB - dateA;
+              })
+              .map((pagamento) => {
               const temNf = pagamento.nf_status === "nf_anexada";
+              const isPremiacao = pagamento.categoria_nome?.toLowerCase().includes("premia") || 
+                                  pagamento.categoria_nome?.toLowerCase().includes("bonus") || 
+                                  pagamento.categoria_nome?.toLowerCase().includes("bônus");
               return (
                 <div 
                   key={pagamento.id} 
                   className="flex items-center justify-between p-2 rounded-md bg-muted/30"
                   data-testid={`row-pagamento-${pagamento.id}`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     <div className={cn(
                       "w-2 h-2 rounded-full flex-shrink-0",
                       temNf ? "bg-green-500" : "bg-amber-500"
                     )} />
-                    <span className="text-sm">
-                      {MONTH_NAMES_SHORT[pagamento.mes_referencia]}/{pagamento.ano_referencia}
-                    </span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm">
+                        {MONTH_NAMES_SHORT[pagamento.mes_referencia]}/{pagamento.ano_referencia}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {isPremiacao ? (
+                          <span className="text-purple-600 dark:text-purple-400 font-medium">Premiação</span>
+                        ) : (
+                          pagamento.descricao || "Fixo"
+                        )}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-mono font-medium">
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={cn(
+                      "text-sm font-mono font-medium",
+                      isPremiacao && "text-purple-600 dark:text-purple-400"
+                    )}>
                       R$ {parseFloat(pagamento.valor_bruto || "0").toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </span>
                     {temNf ? (
