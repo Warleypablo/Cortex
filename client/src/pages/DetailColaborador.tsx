@@ -2747,6 +2747,14 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
 
   const nfsAnexadas = pagamentos.filter(p => p.nf_status === "nf_anexada").length;
 
+  // Calcular total de premiações e bônus (pagamentos com categoria "Premiações")
+  const totalPremiacoes = pagamentos
+    .filter(p => p.categoria_nome?.toLowerCase().includes("premia") || p.categoria_nome?.toLowerCase().includes("bonus") || p.categoria_nome?.toLowerCase().includes("bônus"))
+    .reduce((sum, p) => sum + parseFloat(p.valor_bruto || "0"), 0);
+
+  // Calcular total geral de todos os pagamentos
+  const totalGeral = pagamentos.reduce((sum, p) => sum + parseFloat(p.valor_bruto || "0"), 0);
+
   return (
     <Card className="p-5 hover-elevate" data-testid="card-financeiro-resumo">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -2804,6 +2812,18 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
           <p className="text-xs text-muted-foreground mb-1">NFs Enviadas</p>
           <p className="text-base font-bold">
             {nfsAnexadas} / {pagamentos.length}
+          </p>
+        </div>
+        <div className="p-3 rounded-lg bg-muted/50">
+          <p className="text-xs text-muted-foreground mb-1">Total Premiações</p>
+          <p className="text-base font-bold text-purple-600 dark:text-purple-400" data-testid="text-total-premiacoes">
+            R$ {totalPremiacoes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+        <div className="p-3 rounded-lg bg-muted/50">
+          <p className="text-xs text-muted-foreground mb-1">Total Recebido</p>
+          <p className="text-base font-bold text-blue-600 dark:text-blue-400" data-testid="text-total-geral">
+            R$ {totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
         </div>
       </div>
