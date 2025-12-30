@@ -13039,6 +13039,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Buscar pagamentos do Conta Azul (caz_parcelas/caz_pagar) pelo PIX/CNPJ do colaborador
+  app.get("/api/rh/colaborador/:colaboradorId/pagamentos-caz", isAuthenticated, async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.colaboradorId);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "ID de colaborador inválido" });
+      }
+      
+      const user = req.user as any;
+      const hasAccess = await canAccessColaboradorRH(user, colaboradorId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Acesso negado aos dados de pagamentos" });
+      }
+      
+      // Buscar dados do colaborador (PIX e CNPJ)
+      const colaboradorResult = await db.execute(sql`
+        SELECT nome, pix, cnpj FROM rh_colaboradores WHERE id = ${colaboradorId}
+      `);
+      
+      if (colaboradorResult.rows.length === 0) {
+        return res.status(404).json({ error: "Colaborador não encontrado" });
+      }
+      
+      const colaborador = colaboradorResult.rows[0] as any;
+      const pix = colaborador.pix?.trim();
+      const cnpj = colaborador.cnpj?.replace(/\D/g, '');
+      const nome = colaborador.nome?.trim();
+      
+      if (!pix && !cnpj) {
+        return res.json([]);
+      }
+      
+      // Buscar pagamentos nas parcelas do Conta Azul onde:
+      // - tipo_evento é DESPESA
+      // - a descrição ou categoria contém o PIX, CNPJ ou nome do colaborador
+      const result = await db.execute(sql`
+        SELECT 
+          p.id,
+          p.descricao,
+          p.valor_pago as valor_bruto,
+          p.data_quitacao as data_pagamento,
+          p.data_vencimento,
+          p.status,
+          p.categoria_nome,
+          EXTRACT(MONTH FROM COALESCE(p.data_quitacao, p.data_vencimento))::int as mes_referencia,
+          EXTRACT(YEAR FROM COALESCE(p.data_quitacao, p.data_vencimento))::int as ano_referencia,
+          CASE 
+            WHEN EXISTS (
+              SELECT 1 FROM staging.rh_notas_fiscais nf 
+              WHERE nf.colaborador_id = ${colaboradorId}
+                AND EXTRACT(MONTH FROM COALESCE(p.data_quitacao, p.data_vencimento)) = nf.mes_referencia
+                AND EXTRACT(YEAR FROM COALESCE(p.data_quitacao, p.data_vencimento)) = nf.ano_referencia
+            ) THEN 'nf_anexada'
+            ELSE 'pendente'
+          END as nf_status
+        FROM caz_parcelas p
+        WHERE p.tipo_evento = 'DESPESA'
+          AND UPPER(p.status) IN ('PAID', 'PAGO', 'ACQUITTED')
+          AND (
+            ${pix ? sql`p.descricao ILIKE ${'%' + pix + '%'}` : sql`FALSE`}
+            OR ${cnpj ? sql`p.descricao ILIKE ${'%' + cnpj + '%'}` : sql`FALSE`}
+            OR ${nome ? sql`p.descricao ILIKE ${'%' + nome + '%'}` : sql`FALSE`}
+          )
+        ORDER BY COALESCE(p.data_quitacao, p.data_vencimento) DESC
+        LIMIT 24
+      `);
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[rh-pagamentos] Error fetching CAZ payments:", error);
+      res.status(500).json({ error: "Erro ao buscar pagamentos do Conta Azul" });
+    }
+  });
+
+  // Registrar nota fiscal diretamente (sem pagamento existente)
+  app.post("/api/rh/colaboradores/:colaboradorId/nf", isAuthenticated, async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.colaboradorId);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "ID de colaborador inválido" });
+      }
+      
+      const user = req.user as any;
+      const hasAccess = await canAccessColaboradorRH(user, colaboradorId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Acesso negado para anexar nota fiscal" });
+      }
+      
+      const { arquivoPath, arquivoNome, mesReferencia, anoReferencia, numeroNf, valorNf, dataEmissao } = req.body;
+      
+      if (!arquivoPath || !mesReferencia || !anoReferencia) {
+        return res.status(400).json({ error: "Arquivo, mês e ano são obrigatórios" });
+      }
+      
+      // Inserir NF diretamente na tabela staging.rh_notas_fiscais
+      const result = await db.execute(sql`
+        INSERT INTO staging.rh_notas_fiscais (
+          colaborador_id, numero_nf, valor_nf, 
+          arquivo_path, arquivo_nome, data_emissao, status, criado_por,
+          mes_referencia, ano_referencia
+        ) VALUES (
+          ${colaboradorId}, ${numeroNf || null}, ${valorNf || null},
+          ${arquivoPath}, ${arquivoNome}, ${dataEmissao || null}, 'anexada', ${user?.email || 'sistema'},
+          ${mesReferencia}, ${anoReferencia}
+        )
+        RETURNING *
+      `);
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[rh-pagamentos] Error saving direct NF:", error);
+      res.status(500).json({ error: "Erro ao salvar nota fiscal" });
+    }
+  });
+
   // Listar notas fiscais de um colaborador
   app.get("/api/rh/colaborador/:colaboradorId/nfs", isAuthenticated, async (req, res) => {
     try {
