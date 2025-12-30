@@ -2074,7 +2074,10 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
                   data-testid="input-1x1-data" 
                 />
               </div>
+            </div>
 
+            {/* Coluna Direita - Anexos e Notas */}
+            <div className="space-y-5">
               {/* Anexos */}
               <div className="p-4 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 space-y-4">
                 <div className="flex items-center gap-2">
@@ -2151,57 +2154,43 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
                   />
                 </div>
               </div>
-            </div>
 
-            {/* Coluna Direita - Transcrição e Notas */}
-            <div className="space-y-5">
-              {/* Transcrição */}
-              <div className="p-4 rounded-xl bg-muted/50 space-y-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-primary" />
-                  <label className="text-sm font-medium">Transcrição da Reunião</label>
+              {/* Pauta e Notas - Colapsável */}
+              <Collapsible>
+                <div className="p-4 rounded-xl border bg-card">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">Pauta e Notas</p>
+                      <Badge variant="outline" className="text-xs">Opcional</Badge>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform data-[state=open]:rotate-180" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-4 space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Pauta</label>
+                      <Textarea 
+                        value={formData.pauta} 
+                        onChange={(e) => setFormData({ ...formData, pauta: e.target.value })} 
+                        placeholder="Tópicos a serem discutidos..." 
+                        rows={3}
+                        className="mt-1 resize-none"
+                        data-testid="input-1x1-pauta" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notas</label>
+                      <Textarea 
+                        value={formData.notas} 
+                        onChange={(e) => setFormData({ ...formData, notas: e.target.value })} 
+                        placeholder="Anotações e observações..." 
+                        rows={3} 
+                        className="mt-1 resize-none" 
+                        data-testid="input-1x1-notas" 
+                      />
+                    </div>
+                  </CollapsibleContent>
                 </div>
-                <Textarea
-                  value={formData.transcricao_texto}
-                  onChange={(e) => setFormData({ ...formData, transcricao_texto: e.target.value })}
-                  placeholder="Cole aqui a transcrição completa da reunião..."
-                  rows={6}
-                  className="resize-none"
-                  data-testid="input-1x1-transcricao-texto"
-                />
-              </div>
-
-              {/* Pauta e Notas - Opcional */}
-              <div className="p-4 rounded-xl border bg-card space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Pauta e Notas</p>
-                  <Badge variant="outline" className="text-xs">Opcional</Badge>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Pauta</label>
-                    <Textarea 
-                      value={formData.pauta} 
-                      onChange={(e) => setFormData({ ...formData, pauta: e.target.value })} 
-                      placeholder="Tópicos a serem discutidos..." 
-                      rows={3}
-                      className="mt-1 resize-none"
-                      data-testid="input-1x1-pauta" 
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notas</label>
-                    <Textarea 
-                      value={formData.notas} 
-                      onChange={(e) => setFormData({ ...formData, notas: e.target.value })} 
-                      placeholder="Anotações e observações..." 
-                      rows={3} 
-                      className="mt-1 resize-none" 
-                      data-testid="input-1x1-notas" 
-                    />
-                  </div>
-                </div>
-              </div>
+              </Collapsible>
             </div>
           </div>
 
