@@ -4373,73 +4373,71 @@ export default function DetailColaborador() {
           </Card>
         </div>
 
-        {/* Layout de 2 colunas para Promoções/Financeiro e Patrimônios/Telefones */}
+        {/* Layout de 2 colunas para cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Coluna Esquerda: Promoções + Financeiro */}
-          <div className="space-y-6">
-            <Card className="p-5 hover-elevate" data-testid="card-promocoes">
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                <h2 className="text-base font-semibold flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-                    <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  Histórico de Promoções
-                </h2>
-                <Button 
-                  size="sm" 
-                  onClick={() => setAddPromocaoDialogOpen(true)}
-                  data-testid="button-add-promocao"
-                >
-                  <Plus className="w-4 h-4 mr-1" />
-                  Adicionar
-                </Button>
-              </div>
-              {colaborador.promocoes && colaborador.promocoes.length > 0 ? (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {colaborador.promocoes.map((promocao) => (
-                    <div 
-                      key={promocao.id} 
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                      data-testid={`row-promocao-${promocao.id}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
-                        <div>
-                          <p className="text-sm font-medium">{formatDateFns(promocao.dataPromocao)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {promocao.cargoAnterior || "—"} → {promocao.cargoNovo || "—"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-mono font-semibold text-green-600 dark:text-green-400">
-                          {formatCurrency(promocao.salarioNovo)}
-                        </p>
-                        <p className="text-xs text-muted-foreground font-mono">
-                          de {formatCurrency(promocao.salarioAnterior)}
+          {/* Histórico de Promoções */}
+          <Card className="p-5 hover-elevate" data-testid="card-promocoes">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h2 className="text-base font-semibold flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                  <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                Histórico de Promoções
+              </h2>
+              <Button 
+                size="sm" 
+                onClick={() => setAddPromocaoDialogOpen(true)}
+                data-testid="button-add-promocao"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Adicionar
+              </Button>
+            </div>
+            {colaborador.promocoes && colaborador.promocoes.length > 0 ? (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {colaborador.promocoes.map((promocao) => (
+                  <div 
+                    key={promocao.id} 
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    data-testid={`row-promocao-${promocao.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">{formatDateFns(promocao.dataPromocao)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {promocao.cargoAnterior || "—"} → {promocao.cargoNovo || "—"}
                         </p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8" data-testid="text-no-promocoes">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-3">
-                    <TrendingUp className="w-6 h-6 text-muted-foreground" />
+                    <div className="text-right">
+                      <p className="text-sm font-mono font-semibold text-green-600 dark:text-green-400">
+                        {formatCurrency(promocao.salarioNovo)}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        de {formatCurrency(promocao.salarioAnterior)}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">Nenhum histórico de promoção</p>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8" data-testid="text-no-promocoes">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-3">
+                  <TrendingUp className="w-6 h-6 text-muted-foreground" />
                 </div>
-              )}
-            </Card>
-
-            {canViewFinanceiro() && (
-              <FinanceiroCard colaboradorId={colaboradorId} colaborador={colaborador} />
+                <p className="text-sm text-muted-foreground">Nenhum histórico de promoção</p>
+              </div>
             )}
-          </div>
+          </Card>
 
-          {/* Coluna Direita: Patrimônios + Telefones */}
-          <div className="space-y-6">
-            <Card className="p-5 hover-elevate" data-testid="card-patrimonios">
+          {/* Financeiro */}
+          {canViewFinanceiro() && (
+            <FinanceiroCard colaboradorId={colaboradorId} colaborador={colaborador} />
+          )}
+
+          {/* Ativos / Patrimônios */}
+          <Card className="p-5 hover-elevate" data-testid="card-patrimonios">
               <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <h2 className="text-base font-semibold flex items-center gap-2">
                   <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30">
@@ -4535,7 +4533,6 @@ export default function DetailColaborador() {
                 </div>
               )}
             </Card>
-          </div>
         </div>
           </TabsContent>
 
