@@ -8836,7 +8836,10 @@ export class DbStorage implements IStorage {
     const result = await db.execute(sql`
       SELECT 
         id, colaborador_id as "colaboradorId", gestor_id as "gestorId",
-        data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor"
+        data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor",
+        pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename",
+        transcript_url as "transcriptUrl", transcript_text as "transcriptText",
+        uploaded_by as "uploadedBy"
       FROM rh_one_on_one 
       WHERE colaborador_id = ${colaboradorId} 
       ORDER BY data DESC
@@ -8849,7 +8852,35 @@ export class DbStorage implements IStorage {
       INSERT INTO rh_one_on_one (colaborador_id, gestor_id, data, pauta, notas, criado_por)
       VALUES (${data.colaboradorId}, ${data.gestorId || null}, ${data.data}, ${data.pauta || null}, ${data.notas || null}, ${data.criadoPor || null})
       RETURNING id, colaborador_id as "colaboradorId", gestor_id as "gestorId",
-        data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor"
+        data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor",
+        pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename",
+        transcript_url as "transcriptUrl", transcript_text as "transcriptText",
+        uploaded_by as "uploadedBy"
+    `);
+    return result.rows[0] as OneOnOne;
+  }
+  
+  async updateOneOnOneAttachments(id: number, data: { 
+    pdfObjectKey?: string | null; 
+    pdfFilename?: string | null; 
+    transcriptUrl?: string | null; 
+    transcriptText?: string | null;
+    uploadedBy?: string | null;
+  }): Promise<OneOnOne> {
+    const result = await db.execute(sql`
+      UPDATE rh_one_on_one 
+      SET 
+        pdf_object_key = COALESCE(${data.pdfObjectKey ?? null}, pdf_object_key),
+        pdf_filename = COALESCE(${data.pdfFilename ?? null}, pdf_filename),
+        transcript_url = COALESCE(${data.transcriptUrl ?? null}, transcript_url),
+        transcript_text = COALESCE(${data.transcriptText ?? null}, transcript_text),
+        uploaded_by = COALESCE(${data.uploadedBy ?? null}, uploaded_by)
+      WHERE id = ${id}
+      RETURNING id, colaborador_id as "colaboradorId", gestor_id as "gestorId",
+        data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor",
+        pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename",
+        transcript_url as "transcriptUrl", transcript_text as "transcriptText",
+        uploaded_by as "uploadedBy"
     `);
     return result.rows[0] as OneOnOne;
   }

@@ -176,6 +176,11 @@ interface OneOnOneItem {
   criadoEm: string | null;
   criadoPor: string | null;
   acoes?: OneOnOneAcao[];
+  pdfObjectKey?: string | null;
+  pdfFilename?: string | null;
+  transcriptUrl?: string | null;
+  transcriptText?: string | null;
+  uploadedBy?: string | null;
 }
 
 interface EnpsItem {
