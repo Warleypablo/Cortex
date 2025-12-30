@@ -2841,12 +2841,12 @@ export class DbStorage implements IStorage {
   async getContasBancos(): Promise<ContaBanco[]> {
     const result = await db.execute(sql`
       SELECT 
-        id,
+        uuid as id,
         nome,
         balance as saldo,
         empresa
       FROM caz_bancos
-      WHERE ativo = 'true' OR ativo = 't' OR ativo IS NULL
+      WHERE ativo = true OR ativo IS NULL
       ORDER BY balance::numeric DESC
     `);
     
