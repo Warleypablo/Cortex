@@ -11983,11 +11983,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE status IN ('ativo', 'onboarding', 'triagem')
       `);
       
-      // Buscar clientes ativos (distintos por id_task com contrato ativo)
+      // Buscar clientes ativos (distintos por task_id com contrato ativo)
       const empresaClientesQuery = await db.execute(sql`
         SELECT COUNT(DISTINCT c.id) as clientes_total
         FROM cup_clientes c
-        INNER JOIN cup_contratos ct ON c.id_task = ct.id_task
+        INNER JOIN cup_contratos ct ON c.task_id = ct.id_task
         WHERE ct.status IN ('ativo', 'onboarding', 'triagem')
       `);
       
