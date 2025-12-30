@@ -5,7 +5,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, UserMinus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, ArrowUpDown, Info, TrendingUp, TrendingDown } from "lucide-react";
+import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, UserMinus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, ArrowUpDown, Info, TrendingUp, TrendingDown, Banknote } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link, useLocation } from "wouter";
 import { useSetPageInfo } from "@/contexts/PageContext";
@@ -2358,7 +2358,10 @@ export default function Colaboradores() {
       demissaoDate.setHours(0, 0, 0, 0);
       return demissaoDate >= thirtyDaysAgo;
     }).length;
-    return { total, ativos, novosUltimos30d, desligadosUltimos30d };
+    const folhaAtivos = colaboradores
+      .filter((c) => c.status === "Ativo")
+      .reduce((acc, c) => acc + (typeof c.salario === 'number' ? c.salario : parseFloat(c.salario || '0') || 0), 0);
+    return { total, ativos, novosUltimos30d, desligadosUltimos30d, folhaAtivos };
   }, [colaboradores]);
 
   const handleRemoveFilter = useCallback((key: keyof FilterState) => {
@@ -2525,20 +2528,22 @@ export default function Colaboradores() {
             <Card className="hover-elevate">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <div className="flex items-center gap-1">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Inativos</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Folha</CardTitle>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Colaboradores não ativos (desligados, férias, afastados)</p>
+                      <p>Soma dos salários de todos os colaboradores ativos</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
-                <Users className="w-4 h-4 text-muted-foreground" />
+                <Banknote className="w-4 h-4 text-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-muted-foreground" data-testid="metric-inativos">{metrics.total - metrics.ativos}</div>
+                <div className="text-2xl font-bold" data-testid="metric-folha">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(metrics.folhaAtivos)}
+                </div>
               </CardContent>
             </Card>
           </div>
