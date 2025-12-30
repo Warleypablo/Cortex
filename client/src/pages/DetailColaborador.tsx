@@ -3360,8 +3360,8 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
       const valorAtual = parseFloat(pag.valor_bruto || "0");
       const chave = `${pag.ano_referencia}-${pag.mes_referencia}`;
       
-      // Se houve aumento em relação ao último valor fixo, é promoção
-      if (ultimoValorFixo !== null && valorAtual > ultimoValorFixo && (valorAtual - ultimoValorFixo) >= 100) {
+      // Se houve aumento em relação ao último valor fixo, é promoção (qualquer aumento > R$1 para evitar ruído)
+      if (ultimoValorFixo !== null && valorAtual > ultimoValorFixo && (valorAtual - ultimoValorFixo) > 1) {
         promocoes.set(chave, { valorAnterior: ultimoValorFixo, valorAtual });
       }
       
