@@ -1,6 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, lazy, Suspense } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
+
+const JuridicoClientes = lazy(() => import("@/pages/JuridicoClientes"));
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,6 +80,7 @@ import {
   CheckCircle2,
   Pause,
   XCircle,
+  Gavel,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -1612,6 +1616,10 @@ export default function DashboardInadimplencia() {
             <Users className="h-4 w-4 mr-2" />
             Clientes ({clientesData?.clientes?.length || 0})
           </TabsTrigger>
+          <TabsTrigger value="juridico" data-testid="tab-juridico">
+            <Gavel className="h-4 w-4 mr-2" />
+            Jurídico
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="visao-geral">
@@ -1620,6 +1628,12 @@ export default function DashboardInadimplencia() {
 
         <TabsContent value="clientes">
           {renderClientes()}
+        </TabsContent>
+
+        <TabsContent value="juridico">
+          <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+            <JuridicoClientes embedded />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>
