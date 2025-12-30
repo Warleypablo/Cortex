@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, FileText, FileCheck, DollarSign, Activity, Edit2, Check, ChevronsUpDown } from "lucide-react";
 import StatsCard from "@/components/StatsCard";
-import { ContractsTableSkeleton } from "@/components/TableSkeleton";
+import { ContractsTableSkeleton } from "@/components/ui/table-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrencyNoDecimals, cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Users, UserCheck, TrendingUp, Clock, DollarSign, Activity } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import StatsCard from "@/components/StatsCard";
-import { ClientsTableSkeleton } from "@/components/TableSkeleton";
+import { ClientsTableSkeleton } from "@/components/ui/table-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,

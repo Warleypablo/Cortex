@@ -85,4 +85,22 @@ export function TableSkeleton({
   );
 }
 
+export function ClientsTableSkeleton() {
+  return (
+    <TableSkeleton
+      columns={6}
+      rows={8}
+    />
+  );
+}
+
+export function ContractsTableSkeleton() {
+  return (
+    <TableSkeleton
+      columns={7}
+      rows={8}
+    />
+  );
+}
+
 export default TableSkeleton;
