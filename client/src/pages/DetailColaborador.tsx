@@ -4971,9 +4971,15 @@ function HealthCard({ colaboradorId }: { colaboradorId: string }) {
     return { icon: Minus, color: "text-yellow-600 dark:text-yellow-400" };
   })();
 
-  const lastOneOnOne = oneOnOnes.length > 0 ? oneOnOnes[0] : null;
-  const daysSinceLastOneOnOne = lastOneOnOne
-    ? Math.floor((new Date().getTime() - new Date(lastOneOnOne.data).getTime()) / (1000 * 60 * 60 * 24))
+  const lastOneOnOne = oneOnOnes.length > 0 
+    ? [...oneOnOnes].sort((a, b) => {
+        const dateA = new Date(a.data || a.criadoEm || 0).getTime();
+        const dateB = new Date(b.data || b.criadoEm || 0).getTime();
+        return dateB - dateA;
+      })[0] 
+    : null;
+  const daysSinceLastOneOnOne = lastOneOnOne && lastOneOnOne.data
+    ? Math.max(0, Math.floor((new Date().getTime() - new Date(lastOneOnOne.data).getTime()) / (1000 * 60 * 60 * 24)))
     : null;
 
   const allAcoes = oneOnOnes.flatMap(m => m.acoes || []);
@@ -5169,78 +5175,6 @@ function HealthCard({ colaboradorId }: { colaboradorId: string }) {
           </div>
         </div>
       </div>
-
-      {!historyLoading && healthHistory.length === 0 && (
-        <div className="mt-6 pt-6 border-t" data-testid="health-no-history">
-          <p className="text-xs text-muted-foreground uppercase font-medium mb-2">Evolução</p>
-          <p className="text-xs text-muted-foreground italic">Sem histórico suficiente para exibir gráfico</p>
-        </div>
-      )}
-
-      {!historyLoading && healthHistory.length > 0 && (
-        <div className="mt-6 pt-6 border-t" data-testid="health-evolution-chart">
-          <p className="text-xs text-muted-foreground uppercase font-medium mb-3">Evolução</p>
-          <div className="h-32">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart 
-                data={healthHistory.map(item => ({
-                  ...item,
-                  label: MONTH_LABELS[item.month.split('-')[1]] || item.month.split('-')[1]
-                }))} 
-                margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
-              >
-                <defs>
-                  <linearGradient id="healthGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#22c55e" stopOpacity={0.8}/>
-                    <stop offset="40%" stopColor="#eab308" stopOpacity={0.5}/>
-                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0.3}/>
-                  </linearGradient>
-                </defs>
-                <ReferenceArea y1={80} y2={100} fill="#22c55e" fillOpacity={0.1} />
-                <ReferenceArea y1={50} y2={80} fill="#eab308" fillOpacity={0.1} />
-                <ReferenceArea y1={0} y2={50} fill="#ef4444" fillOpacity={0.1} />
-                <ReferenceLine y={80} stroke="#22c55e" strokeDasharray="3 3" strokeOpacity={0.5} />
-                <ReferenceLine y={50} stroke="#eab308" strokeDasharray="3 3" strokeOpacity={0.5} />
-                <XAxis 
-                  dataKey="label" 
-                  tick={{ fontSize: 11 }} 
-                  tickLine={false}
-                  axisLine={{ stroke: 'hsl(var(--border))' }}
-                />
-                <YAxis 
-                  domain={[0, 100]} 
-                  ticks={[0, 25, 50, 75, 100]} 
-                  tick={{ fontSize: 11 }} 
-                  tickLine={false}
-                  axisLine={{ stroke: 'hsl(var(--border))' }}
-                />
-                <Tooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const score = payload[0].value as number;
-                      const color = score >= 80 ? "text-green-600" : score >= 50 ? "text-yellow-600" : "text-red-600";
-                      return (
-                        <div className="bg-background border rounded-lg shadow-lg p-2">
-                          <p className={`font-bold ${color}`}>{score}</p>
-                          <p className="text-xs text-muted-foreground">Health Score</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="healthScore" 
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={2}
-                  fill="url(#healthGradient)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
 
       {/* Evolution Dialog */}
       <Dialog open={showEvolutionDialog} onOpenChange={setShowEvolutionDialog}>
