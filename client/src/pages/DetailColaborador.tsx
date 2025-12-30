@@ -4076,210 +4076,199 @@ export default function DetailColaborador() {
           </Card>
         </div>
 
-        <Card className="p-6 mb-8 hover-elevate" data-testid="card-promocoes">
-          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-            <h2 className="text-lg font-semibold flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-                <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+        {/* Layout de 2 colunas para Promoções/Financeiro e Patrimônios/Telefones */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Coluna Esquerda: Promoções + Financeiro */}
+          <div className="space-y-6">
+            <Card className="p-5 hover-elevate" data-testid="card-promocoes">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                    <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  Histórico de Promoções
+                </h2>
+                <Button 
+                  size="sm" 
+                  onClick={() => setAddPromocaoDialogOpen(true)}
+                  data-testid="button-add-promocao"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Adicionar
+                </Button>
               </div>
-              Histórico de Promoções
-            </h2>
-            <Button 
-              size="sm" 
-              onClick={() => setAddPromocaoDialogOpen(true)}
-              data-testid="button-add-promocao"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar Promoção
-            </Button>
-          </div>
-          {colaborador.promocoes && colaborador.promocoes.length > 0 ? (
-            <div className="overflow-x-auto border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="font-semibold">Data</TableHead>
-                    <TableHead className="font-semibold">Salário Anterior</TableHead>
-                    <TableHead className="font-semibold">Salário Novo</TableHead>
-                    <TableHead className="font-semibold">Cargo Anterior</TableHead>
-                    <TableHead className="font-semibold">Cargo Novo</TableHead>
-                    <TableHead className="font-semibold">Nível Anterior</TableHead>
-                    <TableHead className="font-semibold">Nível Novo</TableHead>
-                    <TableHead className="font-semibold">Motivo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {colaborador.promocoes.map((promocao, index) => (
-                    <TableRow key={promocao.id} data-testid={`row-promocao-${promocao.id}`}>
-                      <TableCell data-testid={`text-promocao-data-${promocao.id}`}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                          <span className="font-medium">{formatDateFns(promocao.dataPromocao)}</span>
+              {colaborador.promocoes && colaborador.promocoes.length > 0 ? (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {colaborador.promocoes.map((promocao) => (
+                    <div 
+                      key={promocao.id} 
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                      data-testid={`row-promocao-${promocao.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium">{formatDateFns(promocao.dataPromocao)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {promocao.cargoAnterior || "—"} → {promocao.cargoNovo || "—"}
+                          </p>
                         </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-muted-foreground" data-testid={`text-promocao-salario-anterior-${promocao.id}`}>
-                        {formatCurrency(promocao.salarioAnterior)}
-                      </TableCell>
-                      <TableCell data-testid={`text-promocao-salario-novo-${promocao.id}`}>
-                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-mono font-semibold text-green-600 dark:text-green-400">
                           {formatCurrency(promocao.salarioNovo)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground" data-testid={`text-promocao-cargo-anterior-${promocao.id}`}>
-                        {promocao.cargoAnterior || "-"}
-                      </TableCell>
-                      <TableCell className="font-medium" data-testid={`text-promocao-cargo-novo-${promocao.id}`}>
-                        {promocao.cargoNovo || "-"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground" data-testid={`text-promocao-nivel-anterior-${promocao.id}`}>
-                        {promocao.nivelAnterior || "-"}
-                      </TableCell>
-                      <TableCell className="font-medium" data-testid={`text-promocao-nivel-novo-${promocao.id}`}>
-                        {promocao.nivelNovo || "-"}
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate" title={promocao.observacoes || undefined} data-testid={`text-promocao-observacoes-${promocao.id}`}>
-                        {promocao.observacoes || "-"}
-                      </TableCell>
-                    </TableRow>
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          de {formatCurrency(promocao.salarioAnterior)}
+                        </p>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-12" data-testid="text-no-promocoes">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-                <TrendingUp className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <p className="text-muted-foreground font-medium mb-1">Nenhum histórico de promoção</p>
-              <p className="text-sm text-muted-foreground/80">Clique em "Adicionar Promoção" para registrar uma nova promoção</p>
-            </div>
-          )}
-        </Card>
+                </div>
+              ) : (
+                <div className="text-center py-8" data-testid="text-no-promocoes">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-3">
+                    <TrendingUp className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Nenhum histórico de promoção</p>
+                </div>
+              )}
+            </Card>
 
-        <Card className="p-6 mb-8 hover-elevate" data-testid="card-patrimonios">
-          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-            <h2 className="text-lg font-semibold flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                <Package className="w-5 h-5 text-violet-600 dark:text-violet-400" />
-              </div>
-              Ativos / Patrimônios
-            </h2>
-            <Button 
-              size="sm" 
-              onClick={() => setAssignPatrimonioDialogOpen(true)}
-              data-testid="button-add-patrimonio"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar Patrimônio
-            </Button>
+            {canViewFinanceiro() && (
+              <Card className="p-5 hover-elevate" data-testid="card-financeiro-resumo">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-semibold flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                      <Receipt className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    Financeiro
+                  </h2>
+                  <Badge variant="secondary" className="text-xs">
+                    Tab Financeiro
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <p className="text-xs text-muted-foreground mb-1">Salário Atual</p>
+                    <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                      {colaborador.salario ? `R$ ${parseFloat(colaborador.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <p className="text-xs text-muted-foreground mb-1">Último Aumento</p>
+                    <p className="text-lg font-bold">
+                      {formatDate(colaborador.ultimoAumento)}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3 text-center">
+                  Acesse a aba "Financeiro" para gerenciar notas fiscais
+                </p>
+              </Card>
+            )}
           </div>
-          {colaborador.patrimonios && colaborador.patrimonios.length > 0 ? (
-            <div className="overflow-x-auto border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="font-semibold">ID</TableHead>
-                    <TableHead className="font-semibold">Número Ativo</TableHead>
-                    <TableHead className="font-semibold">Equipamento</TableHead>
-                    <TableHead className="font-semibold">Marca</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
-                    <TableHead className="font-semibold">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+
+          {/* Coluna Direita: Patrimônios + Telefones */}
+          <div className="space-y-6">
+            <Card className="p-5 hover-elevate" data-testid="card-patrimonios">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30">
+                    <Package className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                  </div>
+                  Ativos / Patrimônios
+                </h2>
+                <Button 
+                  size="sm" 
+                  onClick={() => setAssignPatrimonioDialogOpen(true)}
+                  data-testid="button-add-patrimonio"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Adicionar
+                </Button>
+              </div>
+              {colaborador.patrimonios && colaborador.patrimonios.length > 0 ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
                   {colaborador.patrimonios.map((patrimonio) => (
-                    <TableRow key={patrimonio.id} data-testid={`row-patrimonio-${patrimonio.id}`}>
-                      <TableCell className="font-mono text-muted-foreground" data-testid={`text-patrimonio-id-${patrimonio.id}`}>
-                        #{patrimonio.id}
-                      </TableCell>
-                      <TableCell className="font-mono font-medium" data-testid={`text-patrimonio-numero-${patrimonio.id}`}>
-                        {patrimonio.numeroAtivo || "-"}
-                      </TableCell>
-                      <TableCell className="font-medium" data-testid={`text-patrimonio-ativo-${patrimonio.id}`}>
-                        {patrimonio.ativo || patrimonio.descricao || "-"}
-                      </TableCell>
-                      <TableCell data-testid={`text-patrimonio-marca-${patrimonio.id}`}>
-                        {patrimonio.marca || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" data-testid={`badge-patrimonio-status-${patrimonio.id}`}>
-                          {patrimonio.estadoConservacao || "N/A"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Link href={`/patrimonio/${patrimonio.id}`}>
-                          <Button variant="ghost" size="sm" data-testid={`button-view-patrimonio-${patrimonio.id}`}>
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            Ver detalhes
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
+                    <Link 
+                      key={patrimonio.id} 
+                      href={`/patrimonio/${patrimonio.id}`}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                      data-testid={`row-patrimonio-${patrimonio.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-1.5 rounded bg-violet-100 dark:bg-violet-900/30">
+                          <Package className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{patrimonio.ativo || patrimonio.descricao || "—"}</p>
+                          <p className="text-xs text-muted-foreground font-mono">
+                            #{patrimonio.numeroAtivo || patrimonio.id}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {patrimonio.estadoConservacao || "N/A"}
+                      </Badge>
+                    </Link>
                   ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-12" data-testid="text-no-patrimonios">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-                <Package className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <p className="text-muted-foreground font-medium mb-1">Nenhum patrimônio atribuído</p>
-              <p className="text-sm text-muted-foreground/80">Clique em "Adicionar Patrimônio" para atribuir equipamentos a este colaborador</p>
-            </div>
-          )}
-        </Card>
+                </div>
+              ) : (
+                <div className="text-center py-8" data-testid="text-no-patrimonios">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-3">
+                    <Package className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Nenhum patrimônio atribuído</p>
+                </div>
+              )}
+            </Card>
 
-        <Card className="p-6 mb-8 hover-elevate" data-testid="card-telefones">
-          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-            <h2 className="text-lg font-semibold flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/30">
-                <Phone className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+            <Card className="p-5 hover-elevate" data-testid="card-telefones">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-semibold flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/30">
+                    <Phone className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                  </div>
+                  Linhas Telefônicas
+                </h2>
+                <Badge variant="secondary" className="text-xs">
+                  {colaboradorTelefones.length} linha{colaboradorTelefones.length !== 1 ? 's' : ''}
+                </Badge>
               </div>
-              Linhas Telefônicas
-            </h2>
-          </div>
-          {colaboradorTelefones.length > 0 ? (
-            <div className="overflow-x-auto border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="font-semibold">Telefone</TableHead>
-                    <TableHead className="font-semibold">Plano/Operadora</TableHead>
-                    <TableHead className="font-semibold">Setor</TableHead>
-                    <TableHead className="font-semibold">Conta</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              {colaboradorTelefones.length > 0 ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
                   {colaboradorTelefones.map((telefone) => (
-                    <TableRow key={telefone.id} data-testid={`row-telefone-${telefone.id}`}>
-                      <TableCell className="font-medium" data-testid={`text-telefone-numero-${telefone.id}`}>
-                        {telefone.telefone}
-                      </TableCell>
-                      <TableCell data-testid={`text-telefone-plano-${telefone.id}`}>
-                        {telefone.planoOperadora || "-"}
-                      </TableCell>
-                      <TableCell data-testid={`text-telefone-setor-${telefone.id}`}>
-                        {telefone.setor || "-"}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground" data-testid={`text-telefone-conta-${telefone.id}`}>
-                        {telefone.conta || "-"}
-                      </TableCell>
-                    </TableRow>
+                    <div 
+                      key={telefone.id} 
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                      data-testid={`row-telefone-${telefone.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-1.5 rounded bg-teal-100 dark:bg-teal-900/30">
+                          <Phone className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{telefone.telefone}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {telefone.planoOperadora || "—"} • {telefone.setor || "—"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-12" data-testid="text-no-telefones">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-                <Phone className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <p className="text-muted-foreground font-medium mb-1">Nenhuma linha telefônica ativa</p>
-              <p className="text-sm text-muted-foreground/80">Este colaborador não possui linhas telefônicas atribuídas</p>
-            </div>
-          )}
-        </Card>
+                </div>
+              ) : (
+                <div className="text-center py-8" data-testid="text-no-telefones">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-3">
+                    <Phone className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Nenhuma linha telefônica</p>
+                </div>
+              )}
+            </Card>
+          </div>
+        </div>
           </TabsContent>
 
           <TabsContent value="desenvolvimento" data-testid="tab-content-desenvolvimento">
