@@ -3949,9 +3949,29 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
 
   const nfsAnexadas = pagamentos.filter(p => p.nf_status === "nf_anexada").length;
 
-  // Calcular total de premiações e bônus (pagamentos com categoria "Premiações")
+  // Helper para identificar se é premiação/bônus baseado na categoria_nome
+  const isPremiacao = (categoriaNome: string | null | undefined): boolean => {
+    const cat = (categoriaNome || "").toLowerCase();
+    // Premiação: categoria contém "premia", "bonus", "bônus", "comiss", "gratific"
+    // NÃO é premiação: categoria contém "salario", "salário", "folha", "pró-labore", "pro-labore", "fixo"
+    const keywordsPremiacao = ["premia", "bonus", "bônus", "comiss", "gratific"];
+    const keywordsSalario = ["salario", "salário", "folha", "pró-labore", "pro-labore", "fixo"];
+    
+    // Se contém keyword de salário, não é premiação
+    if (keywordsSalario.some(kw => cat.includes(kw))) {
+      return false;
+    }
+    // Se contém keyword de premiação, é premiação
+    if (keywordsPremiacao.some(kw => cat.includes(kw))) {
+      return true;
+    }
+    // Default: assume que é salário (não premiação)
+    return false;
+  };
+
+  // Calcular total de premiações e bônus
   const totalPremiacoes = pagamentos
-    .filter(p => p.categoria_nome?.toLowerCase().includes("premia") || p.categoria_nome?.toLowerCase().includes("bonus") || p.categoria_nome?.toLowerCase().includes("bônus"))
+    .filter(p => isPremiacao(p.categoria_nome))
     .reduce((sum, p) => sum + parseFloat(p.valor_bruto || "0"), 0);
 
   // Calcular total geral de todos os pagamentos
@@ -3959,32 +3979,44 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
 
   // Detectar promoções - comparar salário fixo entre meses consecutivos
   const detectarPromocoes = () => {
-    // Filtrar apenas pagamentos fixos (não premiação/bônus)
-    const pagamentosFixos = pagamentos
-      .filter(p => {
-        const cat = (p.categoria_nome || "").toLowerCase();
-        return !cat.includes("premia") && !cat.includes("bonus") && !cat.includes("bônus");
-      })
-      .sort((a, b) => {
-        // Ordenar cronologicamente (mais antigo primeiro)
-        const dateA = a.ano_referencia * 12 + a.mes_referencia;
-        const dateB = b.ano_referencia * 12 + b.mes_referencia;
-        return dateA - dateB;
-      });
-
-    const promocoes = new Map<string, { valorAnterior: number; valorAtual: number }>();
-    let ultimoValorFixo: number | null = null;
-
-    for (const pag of pagamentosFixos) {
-      const valorAtual = parseFloat(pag.valor_bruto || "0");
+    // Filtrar apenas pagamentos de salário (não premiação/bônus)
+    const pagamentosSalario = pagamentos.filter(p => !isPremiacao(p.categoria_nome));
+    
+    // Agrupar por mês/ano e pegar o maior valor de cada mês (caso haja múltiplos pagamentos)
+    const salarioPorMes = new Map<string, { ano: number; mes: number; valor: number }>();
+    
+    for (const pag of pagamentosSalario) {
       const chave = `${pag.ano_referencia}-${pag.mes_referencia}`;
+      const valorAtual = parseFloat(pag.valor_bruto || "0");
+      const existente = salarioPorMes.get(chave);
       
-      // Se houve aumento em relação ao último valor fixo, é promoção (qualquer aumento > R$1 para evitar ruído)
-      if (ultimoValorFixo !== null && valorAtual > ultimoValorFixo && (valorAtual - ultimoValorFixo) > 1) {
-        promocoes.set(chave, { valorAnterior: ultimoValorFixo, valorAtual });
+      if (!existente || valorAtual > existente.valor) {
+        salarioPorMes.set(chave, {
+          ano: pag.ano_referencia,
+          mes: pag.mes_referencia,
+          valor: valorAtual
+        });
       }
+    }
+    
+    // Converter para array e ordenar cronologicamente
+    const salariosMensais = Array.from(salarioPorMes.values())
+      .sort((a, b) => (a.ano * 12 + a.mes) - (b.ano * 12 + b.mes));
+    
+    const promocoes = new Map<string, { valorAnterior: number; valorAtual: number }>();
+    
+    for (let i = 1; i < salariosMensais.length; i++) {
+      const anterior = salariosMensais[i - 1];
+      const atual = salariosMensais[i];
       
-      ultimoValorFixo = valorAtual;
+      // Considerar promoção se houve aumento > 5% em relação ao mês anterior
+      const aumento = atual.valor - anterior.valor;
+      const percentualAumento = anterior.valor > 0 ? (aumento / anterior.valor) * 100 : 0;
+      
+      if (aumento > 100 && percentualAumento >= 5) {
+        const chave = `${atual.ano}-${atual.mes}`;
+        promocoes.set(chave, { valorAnterior: anterior.valor, valorAtual: atual.valor });
+      }
     }
     
     return promocoes;
@@ -4082,12 +4114,10 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
               })
               .map((pagamento) => {
               const temNf = pagamento.nf_status === "nf_anexada";
-              const isPremiacao = pagamento.categoria_nome?.toLowerCase().includes("premia") || 
-                                  pagamento.categoria_nome?.toLowerCase().includes("bonus") || 
-                                  pagamento.categoria_nome?.toLowerCase().includes("bônus");
+              const isPremiacaoPag = isPremiacao(pagamento.categoria_nome);
               const chavePromocao = `${pagamento.ano_referencia}-${pagamento.mes_referencia}`;
               const promocao = promocoesDetectadas.get(chavePromocao);
-              const isPromocao = !isPremiacao && promocao;
+              const isPromocao = !isPremiacaoPag && promocao;
               return (
                 <div 
                   key={pagamento.id} 
@@ -4115,7 +4145,7 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
                         )}
                       </div>
                       <span className="text-xs text-muted-foreground truncate">
-                        {isPremiacao ? (
+                        {isPremiacaoPag ? (
                           <span className="text-purple-600 dark:text-purple-400 font-medium">Premiação</span>
                         ) : isPromocao ? (
                           <span className="text-green-700 dark:text-green-400 font-medium">
@@ -4130,7 +4160,7 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className={cn(
                       "text-sm font-mono font-medium",
-                      isPremiacao && "text-purple-600 dark:text-purple-400",
+                      isPremiacaoPag && "text-purple-600 dark:text-purple-400",
                       isPromocao && "text-green-700 dark:text-green-400"
                     )}>
                       R$ {parseFloat(pagamento.valor_bruto || "0").toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
