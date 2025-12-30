@@ -1701,6 +1701,20 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
     },
   });
 
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: async ({ meetingId, type }: { meetingId: number; type: "pdf" | "transcript" }) => {
+      const response = await apiRequest("DELETE", `/api/one-on-one/${meetingId}/attachment/${type}`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaboradorId, "one-on-one"] });
+      toast({ title: "Anexo removido", description: "O anexo foi removido com sucesso." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao remover", description: error.message, variant: "destructive" });
+    },
+  });
+
   const updateAttachmentsMutation = useMutation({
     mutationFn: async (data: { pdfObjectKey?: string; pdfFilename?: string; transcriptUrl?: string; transcriptText?: string }) => {
       const response = await apiRequest("PATCH", `/api/one-on-one/${selectedOneOnOneId}/attachments`, data);
@@ -2076,6 +2090,19 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
                                 data-testid={`button-download-pdf-${meeting.id}`}
                               >
                                 <Download className="w-3 h-3" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                onClick={() => {
+                                  if (confirm("Deseja remover este anexo?")) {
+                                    deleteAttachmentMutation.mutate({ meetingId: meeting.id, type: "pdf" });
+                                  }
+                                }}
+                                data-testid={`button-delete-pdf-${meeting.id}`}
+                              >
+                                <Trash2 className="w-3 h-3" />
                               </Button>
                             </div>
                           )}

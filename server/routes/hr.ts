@@ -602,6 +602,41 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // Delete attachment from 1x1 meeting
+  app.delete("/api/one-on-one/:id/attachment/:type", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const type = req.params.type as "pdf" | "transcript";
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid meeting ID" });
+      }
+      
+      if (type !== "pdf" && type !== "transcript") {
+        return res.status(400).json({ error: "Invalid attachment type. Must be 'pdf' or 'transcript'" });
+      }
+      
+      if (type === "pdf") {
+        await db.execute(sql`
+          UPDATE rh_one_on_one 
+          SET pdf_object_key = NULL, pdf_filename = NULL
+          WHERE id = ${id}
+        `);
+      } else {
+        await db.execute(sql`
+          UPDATE rh_one_on_one 
+          SET transcript_url = NULL, transcript_text = NULL
+          WHERE id = ${id}
+        `);
+      }
+      
+      res.json({ success: true, message: "Anexo removido com sucesso" });
+    } catch (error) {
+      console.error("[api] Error deleting 1x1 attachment:", error);
+      res.status(500).json({ error: "Failed to delete attachment" });
+    }
+  });
+
   // Update 1x1 meeting notes (pauta and notas)
   app.patch("/api/one-on-one/:id", async (req, res) => {
     try {
