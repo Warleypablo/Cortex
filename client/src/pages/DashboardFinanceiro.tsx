@@ -361,87 +361,85 @@ export default function DashboardFinanceiro() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5" />
-                  Evolução Receita vs Despesa
-                </CardTitle>
-                <CardDescription>Últimos {periodoMeses} meses</CardDescription>
-              </div>
-              <Select value={periodoMeses.toString()} onValueChange={(v) => setPeriodoMeses(Number(v))}>
-                <SelectTrigger className="w-[140px]" data-testid="select-periodo-evolucao">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="6">6 meses</SelectItem>
-                  <SelectItem value="12">12 meses</SelectItem>
-                  <SelectItem value="24">24 meses</SelectItem>
-                </SelectContent>
-              </Select>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Evolução Receita vs Despesa
+              </CardTitle>
+              <CardDescription>Últimos {periodoMeses} meses • Margem operacional no eixo direito</CardDescription>
             </div>
-          </CardHeader>
-          <CardContent>
-            {isLoadingEvolucao ? (
-              <div className="h-[300px] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin" />
-              </div>
-            ) : evolucaoData && evolucaoData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <ComposedChart data={evolucaoData}>
-                  <defs>
-                    <linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorDespesa" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="mesLabel" tick={{ fill: 'currentColor', fontSize: 11 }} />
-                  <YAxis yAxisId="left" tick={{ fill: 'currentColor' }} tickFormatter={formatCurrencyCompact} />
-                  <YAxis 
-                    yAxisId="right" 
-                    orientation="right" 
-                    tick={{ fill: '#3b82f6', fontSize: 11 }} 
-                    tickFormatter={(v) => `${v.toFixed(0)}%`}
-                    domain={[-50, 50]}
-                  />
-                  <RechartsTooltip 
-                    formatter={(value: number, name: string) => {
-                      if (name === 'Margem %') return formatPercent(value);
-                      return formatCurrency(value);
-                    }}
-                    contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
-                  />
-                  <Legend />
-                  <Area yAxisId="left" type="monotone" dataKey="receita" name="Receita" stroke="#22c55e" fillOpacity={1} fill="url(#colorReceita)" />
-                  <Area yAxisId="left" type="monotone" dataKey="despesa" name="Despesa" stroke="#ef4444" fillOpacity={1} fill="url(#colorDespesa)" />
-                  <Line 
-                    yAxisId="right"
-                    type="monotone" 
-                    dataKey="margemPercentual" 
-                    name="Margem %" 
-                    stroke="#3b82f6" 
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: '#3b82f6' }}
-                    activeDot={{ r: 6 }}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                Sem dados disponíveis
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            <Select value={periodoMeses.toString()} onValueChange={(v) => setPeriodoMeses(Number(v))}>
+              <SelectTrigger className="w-[140px]" data-testid="select-periodo-evolucao">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="6">6 meses</SelectItem>
+                <SelectItem value="12">12 meses</SelectItem>
+                <SelectItem value="24">24 meses</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoadingEvolucao ? (
+            <div className="h-[300px] flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin" />
+            </div>
+          ) : evolucaoData && evolucaoData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <ComposedChart data={evolucaoData}>
+                <defs>
+                  <linearGradient id="colorReceita" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorDespesa" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="mesLabel" tick={{ fill: 'currentColor', fontSize: 11 }} />
+                <YAxis yAxisId="left" tick={{ fill: 'currentColor' }} tickFormatter={formatCurrencyCompact} />
+                <YAxis 
+                  yAxisId="right" 
+                  orientation="right" 
+                  tick={{ fill: '#3b82f6', fontSize: 11 }} 
+                  tickFormatter={(v) => `${v.toFixed(0)}%`}
+                  domain={[-50, 50]}
+                />
+                <RechartsTooltip 
+                  formatter={(value: number, name: string) => {
+                    if (name === 'Margem %') return formatPercent(value);
+                    return formatCurrency(value);
+                  }}
+                  contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: '6px' }}
+                />
+                <Legend />
+                <Area yAxisId="left" type="monotone" dataKey="receita" name="Receita" stroke="#22c55e" fillOpacity={1} fill="url(#colorReceita)" />
+                <Area yAxisId="left" type="monotone" dataKey="despesa" name="Despesa" stroke="#ef4444" fillOpacity={1} fill="url(#colorDespesa)" />
+                <Line 
+                  yAxisId="right"
+                  type="monotone" 
+                  dataKey="margemPercentual" 
+                  name="Margem %" 
+                  stroke="#3b82f6" 
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: '#3b82f6' }}
+                  activeDot={{ r: 6 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+              Sem dados disponíveis
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
