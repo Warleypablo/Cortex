@@ -575,9 +575,6 @@ export default function ChurnDetalhamento() {
               <Button variant="outline" size="sm" onClick={() => setQuickPeriod(24)}>24M</Button>
             </div>
           </div>
-          <div className="text-sm text-muted-foreground">
-            Mostrando <span className="font-semibold text-foreground">{filteredContratos.length}</span> contratos no período
-          </div>
         </CardContent>
       </Card>
 
