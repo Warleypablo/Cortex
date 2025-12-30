@@ -464,33 +464,37 @@ export default function FluxoCaixa() {
                   >
                     <defs>
                       <linearGradient id="gradientEntradas" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
-                        <stop offset="50%" stopColor="#059669" stopOpacity={0.9} />
-                        <stop offset="100%" stopColor="#047857" stopOpacity={0.7} />
+                        <stop offset="0%" stopColor="#34d399" stopOpacity={1} />
+                        <stop offset="20%" stopColor="#10b981" stopOpacity={1} />
+                        <stop offset="80%" stopColor="#059669" stopOpacity={0.95} />
+                        <stop offset="100%" stopColor="#047857" stopOpacity={0.85} />
                       </linearGradient>
                       <linearGradient id="gradientSaidas" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f43f5e" stopOpacity={1} />
-                        <stop offset="50%" stopColor="#e11d48" stopOpacity={0.9} />
-                        <stop offset="100%" stopColor="#be123c" stopOpacity={0.7} />
+                        <stop offset="0%" stopColor="#fb7185" stopOpacity={1} />
+                        <stop offset="20%" stopColor="#f43f5e" stopOpacity={1} />
+                        <stop offset="80%" stopColor="#e11d48" stopOpacity={0.95} />
+                        <stop offset="100%" stopColor="#be123c" stopOpacity={0.85} />
                       </linearGradient>
                       <linearGradient id="gradientSaldo" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.25} />
-                        <stop offset="50%" stopColor="#06b6d4" stopOpacity={0.1} />
+                        <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.3} />
+                        <stop offset="50%" stopColor="#06b6d4" stopOpacity={0.12} />
                         <stop offset="100%" stopColor="#0891b2" stopOpacity={0.02} />
                       </linearGradient>
                       <filter id="glowCyan" x="-50%" y="-50%" width="200%" height="200%">
-                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                        <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
                         <feMerge>
                           <feMergeNode in="coloredBlur"/>
                           <feMergeNode in="SourceGraphic"/>
                         </feMerge>
                       </filter>
                       <filter id="glowGreen" x="-50%" y="-50%" width="200%" height="200%">
-                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-                        <feMerge>
-                          <feMergeNode in="coloredBlur"/>
-                          <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
+                        <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#34d399" floodOpacity="0.5"/>
+                      </filter>
+                      <filter id="glowRed" x="-50%" y="-50%" width="200%" height="200%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#fb7185" floodOpacity="0.4"/>
+                      </filter>
+                      <filter id="barShadow" x="-20%" y="-10%" width="140%" height="130%">
+                        <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="rgba(0,0,0,0.3)" floodOpacity="0.5"/>
                       </filter>
                     </defs>
                     
@@ -587,8 +591,8 @@ export default function FluxoCaixa() {
                       dataKey="entradas" 
                       name="entradas"
                       fill="url(#gradientEntradas)"
-                      radius={[6, 6, 0, 0]}
-                      maxBarSize={16}
+                      radius={[8, 8, 2, 2]}
+                      maxBarSize={14}
                       style={{ filter: 'url(#glowGreen)' }}
                     />
                     
@@ -597,8 +601,9 @@ export default function FluxoCaixa() {
                       dataKey="saidas" 
                       name="saidas"
                       fill="url(#gradientSaidas)"
-                      radius={[6, 6, 0, 0]}
-                      maxBarSize={16}
+                      radius={[8, 8, 2, 2]}
+                      maxBarSize={14}
+                      style={{ filter: 'url(#glowRed)' }}
                     />
                     
                     <Area
