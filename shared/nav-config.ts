@@ -11,6 +11,7 @@ export const PERMISSION_KEYS = {
     BENEFICIOS: 'general.beneficios',
     GPTURBO: 'general.gpturbo',
     TURBO_TOOLS: 'general.turbo_tools',
+    SUGESTOES: 'general.sugestoes',
   },
   // Financeiro
   FIN: {
@@ -144,6 +145,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/beneficios': PERMISSION_KEYS.GENERAL.BENEFICIOS,
   '/cases/chat': PERMISSION_KEYS.GENERAL.GPTURBO,
   '/ferramentas': PERMISSION_KEYS.GENERAL.TURBO_TOOLS,
+  '/sugestoes': PERMISSION_KEYS.GENERAL.SUGESTOES,
   '/okr-2026': PERMISSION_KEYS.ADMIN.OKR_2026,
   // Financeiro
   '/dashboard/financeiro': PERMISSION_KEYS.FIN.VISAO_GERAL,
@@ -258,6 +260,7 @@ export const NAV_CONFIG = {
     { title: 'Clube Benefícios', url: '/beneficios', icon: 'Gift', permissionKey: PERMISSION_KEYS.GENERAL.BENEFICIOS },
     { title: 'GPTurbo', url: '/cases/chat', icon: 'Sparkles', permissionKey: PERMISSION_KEYS.GENERAL.GPTURBO },
     { title: 'Turbo Tools', url: '/ferramentas', icon: 'Wrench', permissionKey: PERMISSION_KEYS.GENERAL.TURBO_TOOLS },
+    { title: 'Sugestões', url: '/sugestoes', icon: 'Lightbulb', permissionKey: PERMISSION_KEYS.GENERAL.SUGESTOES },
   ],
   
   // Geral module

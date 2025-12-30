@@ -9894,6 +9894,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await registerMetasRoutes(app, db, storage);
 
   // ============================================
+  // Sugestões API
+  // ============================================
+  
+  let sugestoesTableInitialized = false;
+  async function ensureSugestoesTable() {
+    if (sugestoesTableInitialized) return;
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS staging.sugestoes (
+          id SERIAL PRIMARY KEY,
+          tipo VARCHAR(50) NOT NULL,
+          titulo VARCHAR(255) NOT NULL,
+          descricao TEXT NOT NULL,
+          prioridade VARCHAR(20) DEFAULT 'media',
+          status VARCHAR(50) DEFAULT 'pendente',
+          autor_id VARCHAR(100) NOT NULL,
+          autor_nome VARCHAR(255) NOT NULL,
+          autor_email VARCHAR(255),
+          modulo VARCHAR(100),
+          anexo_path TEXT,
+          criado_em TIMESTAMP DEFAULT NOW(),
+          atualizado_em TIMESTAMP DEFAULT NOW(),
+          comentario_admin TEXT
+        )
+      `);
+      sugestoesTableInitialized = true;
+      console.log("[api] staging.sugestoes table initialized");
+    } catch (error) {
+      console.error("[api] Error initializing sugestoes table:", error);
+    }
+  }
+
+  // GET all sugestões
+  app.get("/api/sugestoes", isAuthenticated, async (req, res) => {
+    try {
+      await ensureSugestoesTable();
+      
+      const result = await db.execute(sql`
+        SELECT * FROM staging.sugestoes ORDER BY criado_em DESC
+      `);
+      
+      const sugestoes = result.rows.map((row: any) => ({
+        id: row.id,
+        tipo: row.tipo,
+        titulo: row.titulo,
+        descricao: row.descricao,
+        prioridade: row.prioridade,
+        status: row.status,
+        autorId: row.autor_id,
+        autorNome: row.autor_nome,
+        autorEmail: row.autor_email,
+        modulo: row.modulo,
+        anexoPath: row.anexo_path,
+        criadoEm: row.criado_em,
+        atualizadoEm: row.atualizado_em,
+        comentarioAdmin: row.comentario_admin,
+      }));
+      
+      res.json(sugestoes);
+    } catch (error) {
+      console.error("[api] Error fetching sugestoes:", error);
+      res.status(500).json({ error: "Failed to fetch sugestoes" });
+    }
+  });
+
+  // POST create sugestão
+  app.post("/api/sugestoes", isAuthenticated, async (req, res) => {
+    try {
+      await ensureSugestoesTable();
+      
+      const user = (req as any).user;
+      const { tipo, titulo, descricao, prioridade, modulo } = req.body;
+      
+      if (!tipo || !titulo || !descricao) {
+        return res.status(400).json({ error: "Tipo, título e descrição são obrigatórios" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO staging.sugestoes (tipo, titulo, descricao, prioridade, modulo, autor_id, autor_nome, autor_email)
+        VALUES (${tipo}, ${titulo}, ${descricao}, ${prioridade || 'media'}, ${modulo || null}, ${user.id}, ${user.name}, ${user.email})
+        RETURNING *
+      `);
+      
+      const row = result.rows[0] as any;
+      const sugestao = {
+        id: row.id,
+        tipo: row.tipo,
+        titulo: row.titulo,
+        descricao: row.descricao,
+        prioridade: row.prioridade,
+        status: row.status,
+        autorId: row.autor_id,
+        autorNome: row.autor_nome,
+        autorEmail: row.autor_email,
+        modulo: row.modulo,
+        anexoPath: row.anexo_path,
+        criadoEm: row.criado_em,
+        atualizadoEm: row.atualizado_em,
+        comentarioAdmin: row.comentario_admin,
+      };
+      
+      console.log("[api] Sugestão created:", sugestao.id);
+      res.status(201).json(sugestao);
+    } catch (error) {
+      console.error("[api] Error creating sugestao:", error);
+      res.status(500).json({ error: "Failed to create sugestao" });
+    }
+  });
+
+  // PATCH update sugestão status (admin only)
+  app.patch("/api/sugestoes/:id", isAuthenticated, async (req, res) => {
+    try {
+      await ensureSugestoesTable();
+      
+      const { id } = req.params;
+      const { status, comentarioAdmin } = req.body;
+      const user = (req as any).user;
+      
+      // Check if user is admin for status updates
+      if (status && user.role !== 'admin') {
+        return res.status(403).json({ error: "Apenas administradores podem atualizar o status" });
+      }
+      
+      const updates: string[] = [];
+      const values: any[] = [];
+      
+      if (status) {
+        updates.push("status = $1");
+        values.push(status);
+      }
+      
+      if (comentarioAdmin !== undefined) {
+        updates.push(`comentario_admin = $${values.length + 1}`);
+        values.push(comentarioAdmin);
+      }
+      
+      updates.push(`atualizado_em = NOW()`);
+      
+      if (updates.length === 1) {
+        return res.status(400).json({ error: "Nenhum campo para atualizar" });
+      }
+      
+      const result = await db.execute(sql`
+        UPDATE staging.sugestoes 
+        SET status = COALESCE(${status}, status),
+            comentario_admin = COALESCE(${comentarioAdmin}, comentario_admin),
+            atualizado_em = NOW()
+        WHERE id = ${parseInt(id)}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Sugestão não encontrada" });
+      }
+      
+      const row = result.rows[0] as any;
+      const sugestao = {
+        id: row.id,
+        tipo: row.tipo,
+        titulo: row.titulo,
+        descricao: row.descricao,
+        prioridade: row.prioridade,
+        status: row.status,
+        autorId: row.autor_id,
+        autorNome: row.autor_nome,
+        autorEmail: row.autor_email,
+        modulo: row.modulo,
+        anexoPath: row.anexo_path,
+        criadoEm: row.criado_em,
+        atualizadoEm: row.atualizado_em,
+        comentarioAdmin: row.comentario_admin,
+      };
+      
+      console.log("[api] Sugestão updated:", sugestao.id);
+      res.json(sugestao);
+    } catch (error) {
+      console.error("[api] Error updating sugestao:", error);
+      res.status(500).json({ error: "Failed to update sugestao" });
+    }
+  });
+
+  // ============================================
   // Access Logs API
   // ============================================
 

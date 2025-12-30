@@ -2397,3 +2397,26 @@ export type RhPagamento = typeof rhPagamentos.$inferSelect;
 export type InsertRhPagamento = z.infer<typeof insertRhPagamentoSchema>;
 export type RhNotaFiscal = typeof rhNotasFiscais.$inferSelect;
 export type InsertRhNotaFiscal = z.infer<typeof insertRhNotaFiscalSchema>;
+
+// Tabela de sugestões do sistema (staging schema)
+export const stagingSugestoes = pgTable("staging.sugestoes", {
+  id: serial("id").primaryKey(),
+  tipo: varchar("tipo", { length: 50 }).notNull(), // 'feature', 'melhoria', 'bug'
+  titulo: varchar("titulo", { length: 255 }).notNull(),
+  descricao: text("descricao").notNull(),
+  prioridade: varchar("prioridade", { length: 20 }).default("media"), // 'baixa', 'media', 'alta', 'critica'
+  status: varchar("status", { length: 50 }).default("pendente"), // 'pendente', 'em_analise', 'aprovado', 'em_desenvolvimento', 'concluido', 'rejeitado'
+  autorId: varchar("autor_id", { length: 100 }).notNull(),
+  autorNome: varchar("autor_nome", { length: 255 }).notNull(),
+  autorEmail: varchar("autor_email", { length: 255 }),
+  modulo: varchar("modulo", { length: 100 }), // módulo do sistema afetado
+  anexoPath: text("anexo_path"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+  comentarioAdmin: text("comentario_admin"),
+});
+
+export const insertSugestaoSchema = createInsertSchema(stagingSugestoes).omit({ id: true, criadoEm: true, atualizadoEm: true });
+
+export type Sugestao = typeof stagingSugestoes.$inferSelect;
+export type InsertSugestao = z.infer<typeof insertSugestaoSchema>;
