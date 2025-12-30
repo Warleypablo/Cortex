@@ -597,7 +597,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "Invalid meeting ID" });
       }
       
-      // Get meeting to find PDF object key
+      // Get meeting to find document object key
       const meetings = await db.execute(sql`
         SELECT pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename"
         FROM rh_one_on_one 
@@ -611,7 +611,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       const meeting = meetings.rows[0] as { pdfObjectKey: string | null; pdfFilename: string | null };
       
       if (!meeting.pdfObjectKey) {
-        return res.status(404).json({ error: "No PDF attached to this meeting" });
+        return res.status(404).json({ error: "No document attached to this meeting" });
       }
       
       const { ObjectStorageService } = await import("../replit_integrations/object_storage");
@@ -621,15 +621,27 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       const normalizedPath = objectStorage.normalizeObjectEntityPath(meeting.pdfObjectKey);
       const file = await objectStorage.getObjectEntityFile(normalizedPath);
       
+      // Determine content type based on file extension
+      const filename = meeting.pdfFilename || 'document';
+      const ext = filename.toLowerCase().split('.').pop();
+      const contentTypes: Record<string, string> = {
+        'pdf': 'application/pdf',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'csv': 'text/csv',
+      };
+      const contentType = contentTypes[ext || ''] || 'application/octet-stream';
+      
       // Set download headers
       res.set({
-        'Content-Disposition': `attachment; filename="${meeting.pdfFilename || 'document.pdf'}"`,
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Type': contentType,
       });
       
       await objectStorage.downloadObject(file, res);
     } catch (error) {
-      console.error("[api] Error downloading 1x1 PDF:", error);
-      res.status(500).json({ error: "Failed to download PDF" });
+      console.error("[api] Error downloading 1x1 document:", error);
+      res.status(500).json({ error: "Failed to download document" });
     }
   });
 
