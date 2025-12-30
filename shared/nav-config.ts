@@ -358,13 +358,6 @@ export const NAV_CONFIG = {
   // Governança section
   governanca: [
     {
-      title: 'Jurídico',
-      icon: 'Scale',
-      items: [
-        { title: 'Clientes Inadimplentes', url: '/juridico/clientes', icon: 'Gavel', permissionKey: PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES },
-      ],
-    },
-    {
       title: 'Reports',
       icon: 'FileText',
       items: [

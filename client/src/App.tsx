@@ -208,8 +208,11 @@ function ProtectedRouter() {
       <Route path="/growth/criativos">{() => <ProtectedRoute path="/growth/criativos" component={Criativos} />}</Route>
       <Route path="/growth/performance-plataformas">{() => <ProtectedRoute path="/growth/performance-plataformas" component={PerformancePlataformas} />}</Route>
       
-      {/* Jurídico */}
-      <Route path="/juridico/clientes">{() => <ProtectedRoute path="/juridico/clientes" component={JuridicoClientes} />}</Route>
+      {/* Jurídico - redirect to Inadimplência tab */}
+      <Route path="/juridico/clientes">{() => {
+        window.location.href = "/dashboard/inadimplencia";
+        return null;
+      }}</Route>
       
       {/* Investidores */}
       <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
