@@ -11566,28 +11566,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const squadGoalsSeed = [
         // Financeiro
-        { squad: "Commerce", perspective: "Financeiro", metricName: "Meta de Vendas", unit: "BRL", periodicity: "monthly", targetValue: 2500000, actualValue: 1875000, ownerTeam: "Vendas", year: 2026, quarter: "Q1" },
-        { squad: "Commerce", perspective: "Financeiro", metricName: "Receita Recorrente (MRR)", unit: "BRL", periodicity: "monthly", targetValue: 1340000, actualValue: 936800, ownerTeam: "Comercial", year: 2026, quarter: "Q1" },
-        { squad: "TurboOH", perspective: "Financeiro", metricName: "Receita TurboOH", unit: "BRL", periodicity: "monthly", targetValue: 800000, actualValue: 624000, ownerTeam: "TurboOH", year: 2026, quarter: "Q1" },
-        { squad: "Tech", perspective: "Financeiro", metricName: "Economia Operacional", unit: "BRL", periodicity: "monthly", targetValue: 150000, actualValue: 98500, ownerTeam: "Tech", year: 2026, quarter: "Q1" },
+        { squad: "Commerce", perspective: "Financeiro", metricName: "Meta de Vendas", unit: "BRL", periodicity: "monthly", targetValue: 2500000, actualValue: 1875000, ownerTeam: "Vendas", year: 2026, quarter: 1 },
+        { squad: "Commerce", perspective: "Financeiro", metricName: "Receita Recorrente (MRR)", unit: "BRL", periodicity: "monthly", targetValue: 1340000, actualValue: 936800, ownerTeam: "Comercial", year: 2026, quarter: 1 },
+        { squad: "TurboOH", perspective: "Financeiro", metricName: "Receita TurboOH", unit: "BRL", periodicity: "monthly", targetValue: 800000, actualValue: 624000, ownerTeam: "TurboOH", year: 2026, quarter: 1 },
+        { squad: "Tech", perspective: "Financeiro", metricName: "Economia Operacional", unit: "BRL", periodicity: "monthly", targetValue: 150000, actualValue: 98500, ownerTeam: "Tech", year: 2026, quarter: 1 },
         
         // Cliente
-        { squad: "Commerce", perspective: "Cliente", metricName: "NPS", unit: "COUNT", periodicity: "quarterly", targetValue: 70, actualValue: 62, ownerTeam: "CS", year: 2026, quarter: "Q1" },
-        { squad: "Commerce", perspective: "Cliente", metricName: "Churn Rate", unit: "PCT", periodicity: "monthly", targetValue: 0.05, actualValue: 0.068, ownerTeam: "CS", year: 2026, quarter: "Q1" },
-        { squad: "TurboOH", perspective: "Cliente", metricName: "Satisfação Cliente", unit: "PCT", periodicity: "monthly", targetValue: 0.85, actualValue: 0.79, ownerTeam: "TurboOH", year: 2026, quarter: "Q1" },
-        { squad: "G&G", perspective: "Cliente", metricName: "eNPS (Colaboradores)", unit: "COUNT", periodicity: "quarterly", targetValue: 65, actualValue: 58, ownerTeam: "G&G", year: 2026, quarter: "Q1" },
+        { squad: "Commerce", perspective: "Cliente", metricName: "NPS", unit: "COUNT", periodicity: "quarterly", targetValue: 70, actualValue: 62, ownerTeam: "CS", year: 2026, quarter: 1 },
+        { squad: "Commerce", perspective: "Cliente", metricName: "Churn Rate", unit: "PCT", periodicity: "monthly", targetValue: 0.05, actualValue: 0.068, ownerTeam: "CS", year: 2026, quarter: 1 },
+        { squad: "TurboOH", perspective: "Cliente", metricName: "Satisfação Cliente", unit: "PCT", periodicity: "monthly", targetValue: 0.85, actualValue: 0.79, ownerTeam: "TurboOH", year: 2026, quarter: 1 },
+        { squad: "G&G", perspective: "Cliente", metricName: "eNPS (Colaboradores)", unit: "COUNT", periodicity: "quarterly", targetValue: 65, actualValue: 58, ownerTeam: "G&G", year: 2026, quarter: 1 },
         
         // Processo
-        { squad: "Tech", perspective: "Processo", metricName: "Tempo Médio Deploy", unit: "COUNT", periodicity: "weekly", targetValue: 30, actualValue: 25, ownerTeam: "DevOps", year: 2026, quarter: "Q1", notes: "Em minutos" },
-        { squad: "Tech", perspective: "Processo", metricName: "Uptime", unit: "PCT", periodicity: "monthly", targetValue: 0.999, actualValue: 0.9985, ownerTeam: "Infraestrutura", year: 2026, quarter: "Q1" },
-        { squad: "Commerce", perspective: "Processo", metricName: "Ciclo de Vendas", unit: "COUNT", periodicity: "monthly", targetValue: 45, actualValue: 52, ownerTeam: "Vendas", year: 2026, quarter: "Q1", notes: "Em dias" },
-        { squad: "G&G", perspective: "Processo", metricName: "Tempo Onboarding", unit: "COUNT", periodicity: "monthly", targetValue: 14, actualValue: 18, ownerTeam: "RH", year: 2026, quarter: "Q1", notes: "Em dias" },
+        { squad: "Tech", perspective: "Processo", metricName: "Tempo Médio Deploy", unit: "COUNT", periodicity: "weekly", targetValue: 30, actualValue: 25, ownerTeam: "DevOps", year: 2026, quarter: 1, notes: "Em minutos" },
+        { squad: "Tech", perspective: "Processo", metricName: "Uptime", unit: "PCT", periodicity: "monthly", targetValue: 0.999, actualValue: 0.9985, ownerTeam: "Infraestrutura", year: 2026, quarter: 1 },
+        { squad: "Commerce", perspective: "Processo", metricName: "Ciclo de Vendas", unit: "COUNT", periodicity: "monthly", targetValue: 45, actualValue: 52, ownerTeam: "Vendas", year: 2026, quarter: 1, notes: "Em dias" },
+        { squad: "G&G", perspective: "Processo", metricName: "Tempo Onboarding", unit: "COUNT", periodicity: "monthly", targetValue: 14, actualValue: 18, ownerTeam: "RH", year: 2026, quarter: 1, notes: "Em dias" },
         
         // Pessoas
-        { squad: "G&G", perspective: "Pessoas", metricName: "Turnover", unit: "PCT", periodicity: "monthly", targetValue: 0.03, actualValue: 0.042, ownerTeam: "RH", year: 2026, quarter: "Q1" },
-        { squad: "G&G", perspective: "Pessoas", metricName: "Treinamentos Concluídos", unit: "COUNT", periodicity: "quarterly", targetValue: 50, actualValue: 38, ownerTeam: "T&D", year: 2026, quarter: "Q1" },
-        { squad: "Tech", perspective: "Pessoas", metricName: "Certificações", unit: "COUNT", periodicity: "quarterly", targetValue: 10, actualValue: 7, ownerTeam: "Tech", year: 2026, quarter: "Q1" },
-        { squad: "Commerce", perspective: "Pessoas", metricName: "Produtividade Vendedor", unit: "BRL", periodicity: "monthly", targetValue: 250000, actualValue: 187500, ownerTeam: "Comercial", year: 2026, quarter: "Q1" },
+        { squad: "G&G", perspective: "Pessoas", metricName: "Turnover", unit: "PCT", periodicity: "monthly", targetValue: 0.03, actualValue: 0.042, ownerTeam: "RH", year: 2026, quarter: 1 },
+        { squad: "G&G", perspective: "Pessoas", metricName: "Treinamentos Concluídos", unit: "COUNT", periodicity: "quarterly", targetValue: 50, actualValue: 38, ownerTeam: "T&D", year: 2026, quarter: 1 },
+        { squad: "Tech", perspective: "Pessoas", metricName: "Certificações", unit: "COUNT", periodicity: "quarterly", targetValue: 10, actualValue: 7, ownerTeam: "Tech", year: 2026, quarter: 1 },
+        { squad: "Commerce", perspective: "Pessoas", metricName: "Produtividade Vendedor", unit: "BRL", periodicity: "monthly", targetValue: 250000, actualValue: 187500, ownerTeam: "Comercial", year: 2026, quarter: 1 },
       ];
       
       // Batch insert
