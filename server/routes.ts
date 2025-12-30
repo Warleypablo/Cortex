@@ -12899,7 +12899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // Verificar se usuário está vinculado ao colaborador pelo email
     const colaboradorResult = await db.execute(sql`
-      SELECT email_turbo FROM rh_colaboradores WHERE id = ${colaboradorId}
+      SELECT email_turbo FROM rh_pessoal WHERE id = ${colaboradorId}
     `);
     
     if (colaboradorResult.rows.length === 0) return false;
@@ -13056,7 +13056,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Buscar dados do colaborador (PIX e CNPJ)
       const colaboradorResult = await db.execute(sql`
-        SELECT nome, pix, cnpj FROM rh_colaboradores WHERE id = ${colaboradorId}
+        SELECT nome, pix, cnpj FROM rh_pessoal WHERE id = ${colaboradorId}
       `);
       
       if (colaboradorResult.rows.length === 0) {
