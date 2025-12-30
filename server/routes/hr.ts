@@ -665,12 +665,14 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "Invalid meeting ID" });
       }
       
-      // Get meeting data
+      // Get meeting data including pdf_path for attached documents
       const meetings = await db.execute(sql`
         SELECT 
           id, colaborador_id as "colaboradorId", lider_id as "gestorId",
           data, tipo, anotacoes as "pauta", proximos_passos as "notas",
-          transcript_text as "transcriptText"
+          transcript_text as "transcriptText", 
+          pdf_path as "pdfPath", pdf_filename as "pdfFilename",
+          pdf_object_key as "pdfObjectKey"
         FROM rh_one_on_one 
         WHERE id = ${id}
       `);
@@ -692,6 +694,39 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       if (meeting.pauta) contentParts.push(`**Pauta:** ${meeting.pauta}`);
       if (meeting.notas) contentParts.push(`**Notas:** ${meeting.notas}`);
       if (meeting.transcriptText) contentParts.push(`**Transcrição:** ${meeting.transcriptText}`);
+      
+      // Try to extract text from attached document (DOCX, DOC, etc.)
+      // Check pdf_object_key first, then fallback to pdf_path
+      const objectKey = meeting.pdfObjectKey || meeting.pdfPath;
+      if (objectKey && meeting.pdfFilename) {
+        const filename = meeting.pdfFilename.toLowerCase();
+        const ext = filename.split('.').pop();
+        
+        // Extract text from DOCX files using mammoth
+        if (ext === 'docx' || ext === 'doc') {
+          try {
+            console.log("[ai] Extracting text from attached document:", meeting.pdfFilename);
+            const mammoth = await import("mammoth");
+            const objectStorage = new ObjectStorageService();
+            
+            // Normalize the path and get the file
+            const normalizedPath = objectStorage.normalizeObjectEntityPath(objectKey);
+            const file = await objectStorage.getObjectEntityFile(normalizedPath);
+            const [contents] = await file.download();
+            
+            // Extract text using mammoth
+            const result = await mammoth.extractRawText({ buffer: contents });
+            const docText = result.value.trim();
+            
+            if (docText && docText.length > 50) {
+              console.log("[ai] Successfully extracted", docText.length, "characters from document");
+              contentParts.push(`**Documento Anexado (${meeting.pdfFilename}):** ${docText}`);
+            }
+          } catch (docError) {
+            console.error("[ai] Error extracting text from document:", docError);
+          }
+        }
+      }
       
       if (contentParts.length === 0) {
         return res.status(400).json({ error: "Não há conteúdo suficiente para análise. Adicione pauta, notas ou transcrição." });
