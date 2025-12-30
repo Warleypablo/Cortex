@@ -9829,6 +9829,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bug Reports endpoint
+  let bugReportsTableInitialized = false;
+  async function ensureBugReportsTable() {
+    if (bugReportsTableInitialized) return;
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS staging.bug_reports (
+          id SERIAL PRIMARY KEY,
+          titulo TEXT NOT NULL,
+          descricao TEXT NOT NULL,
+          pagina TEXT,
+          user_agent TEXT,
+          user_email TEXT,
+          user_name TEXT,
+          status TEXT DEFAULT 'aberto',
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      bugReportsTableInitialized = true;
+      console.log("[database] Bug reports table initialized");
+    } catch (error) {
+      console.error("[database] Error initializing bug_reports table:", error);
+    }
+  }
+
+  app.post("/api/bug-reports", async (req, res) => {
+    try {
+      await ensureBugReportsTable();
+      
+      const { titulo, descricao, pagina, userAgent } = req.body;
+      const user = (req as any).user;
+      const userEmail = user?.email || null;
+      const userName = user?.name || null;
+      
+      if (!titulo || !descricao) {
+        return res.status(400).json({ error: "Título e descrição são obrigatórios" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO staging.bug_reports (titulo, descricao, pagina, user_agent, user_email, user_name)
+        VALUES (${titulo}, ${descricao}, ${pagina || null}, ${userAgent || null}, ${userEmail}, ${userName})
+        RETURNING *
+      `);
+      
+      console.log("[api] Bug report created:", result.rows[0]);
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating bug report:", error);
+      res.status(500).json({ error: "Failed to create bug report" });
+    }
+  });
+
   // Acessos Module - registered from separate file
   await registerAcessosRoutes(app, db, storage);
 
