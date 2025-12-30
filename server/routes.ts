@@ -13076,7 +13076,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[rh-pagamentos] Buscando pagamentos para colaborador ${colaboradorId}:`);
       console.log(`  Nome: ${nomeCompleto}, Primeiro: ${primeiroNome}, Último: ${ultimoNome}`);
-      console.log(`  PIX: ${pixRaw}, CNPJ: ${cnpjRaw}, CNPJ limpo: ${cnpjLimpo}`);
+      console.log(`  PIX raw: ${pixRaw}, PIX limpo: ${pixLimpo}`);
+      console.log(`  CNPJ raw: ${cnpjRaw}, CNPJ limpo: ${cnpjLimpo}`);
       
       if (!pixRaw && !cnpjRaw && !nomeCompleto) {
         console.log(`[rh-pagamentos] Nenhum dado para buscar`);
