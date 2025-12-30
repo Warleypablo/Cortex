@@ -2027,30 +2027,16 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
               <label className="text-sm font-medium">Data *</label>
               <Input type="date" value={formData.data} onChange={(e) => setFormData({ ...formData, data: e.target.value })} data-testid="input-1x1-data" />
             </div>
-            <div>
-              <label className="text-sm font-medium">Pauta</label>
-              <Textarea 
-                value={formData.pauta} 
-                onChange={(e) => setFormData({ ...formData, pauta: e.target.value })} 
-                placeholder="Tópicos a serem discutidos..." 
-                rows={5}
-                data-testid="input-1x1-pauta" 
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Notas</label>
-              <Textarea value={formData.notas} onChange={(e) => setFormData({ ...formData, notas: e.target.value })} placeholder="Anotações da reunião..." rows={4} data-testid="input-1x1-notas" />
-            </div>
 
-            {/* Campos de Anexo */}
-            <div className="border-t pt-4 mt-2">
-              <p className="text-sm font-medium mb-3 flex items-center gap-2">
+            {/* Campos de Anexo - Seção Principal */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium flex items-center gap-2">
                 <Paperclip className="w-4 h-4" />
-                Anexos (opcional)
+                Anexos
               </p>
               
               {/* Upload de PDF */}
-              <div className="mb-3">
+              <div>
                 <label className="text-sm text-muted-foreground">Documento PDF</label>
                 <div className="flex items-center gap-2 mt-1">
                   <input
@@ -2098,7 +2084,7 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
               </div>
 
               {/* Link da Transcrição */}
-              <div className="mb-3">
+              <div>
                 <label className="text-sm text-muted-foreground">Link da Transcrição (URL externa)</label>
                 <Input
                   value={formData.transcricao_url}
@@ -2120,6 +2106,26 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
                   className="mt-1"
                   data-testid="input-1x1-transcricao-texto"
                 />
+              </div>
+            </div>
+
+            {/* Pauta e Notas - Seção Opcional */}
+            <div className="border-t pt-4 mt-2 space-y-3">
+              <p className="text-sm font-medium text-muted-foreground">Pauta e Notas (opcional)</p>
+              <div>
+                <label className="text-sm text-muted-foreground">Pauta</label>
+                <Textarea 
+                  value={formData.pauta} 
+                  onChange={(e) => setFormData({ ...formData, pauta: e.target.value })} 
+                  placeholder="Tópicos a serem discutidos..." 
+                  rows={3}
+                  className="mt-1"
+                  data-testid="input-1x1-pauta" 
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">Notas</label>
+                <Textarea value={formData.notas} onChange={(e) => setFormData({ ...formData, notas: e.target.value })} placeholder="Anotações da reunião..." rows={3} className="mt-1" data-testid="input-1x1-notas" />
               </div>
             </div>
           </div>
