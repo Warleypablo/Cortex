@@ -500,7 +500,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       }
       
       // Import ObjectStorageService
-      const { ObjectStorageService } = await import("./replit_integrations/object_storage");
+      const { ObjectStorageService } = await import("../replit_integrations/object_storage");
       const objectStorage = new ObjectStorageService();
       
       // Generate presigned upload URL
@@ -574,7 +574,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(404).json({ error: "No PDF attached to this meeting" });
       }
       
-      const { ObjectStorageService } = await import("./replit_integrations/object_storage");
+      const { ObjectStorageService } = await import("../replit_integrations/object_storage");
       const objectStorage = new ObjectStorageService();
       
       // Normalize and get the file

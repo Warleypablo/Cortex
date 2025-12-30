@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { usePageInfo } from "@/contexts/PageContext";
@@ -1518,11 +1518,16 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [addAcaoDialogOpen, setAddAcaoDialogOpen] = useState(false);
+  const [attachmentDialogOpen, setAttachmentDialogOpen] = useState(false);
   const [selectedOneOnOneId, setSelectedOneOnOneId] = useState<number | null>(null);
   const [expandedMeetings, setExpandedMeetings] = useState<Set<number>>(new Set());
+  const [expandedTranscript, setExpandedTranscript] = useState<Set<number>>(new Set());
   const [formData, setFormData] = useState({ data: new Date().toISOString().split("T")[0], pauta: "", notas: "" });
   const [acaoFormData, setAcaoFormData] = useState({ descricao: "", responsavel: "", prazo: "", status: "pendente" });
+  const [attachmentData, setAttachmentData] = useState({ transcriptUrl: "", transcriptText: "" });
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: oneOnOnes = [], isLoading } = useQuery<OneOnOneItem[]>({
     queryKey: ["/api/colaboradores", colaboradorId, "one-on-one"],
@@ -1602,6 +1607,66 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
       toast({ title: "Erro ao atualizar ação", description: error.message, variant: "destructive" });
     },
   });
+
+  const updateAttachmentsMutation = useMutation({
+    mutationFn: async (data: { pdfObjectKey?: string; pdfFilename?: string; transcriptUrl?: string; transcriptText?: string }) => {
+      const response = await apiRequest("PATCH", `/api/one-on-one/${selectedOneOnOneId}/attachments`, data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaboradorId, "one-on-one"] });
+      toast({ title: "Anexos salvos", description: "Os anexos foram atualizados com sucesso." });
+      setAttachmentDialogOpen(false);
+      setAttachmentData({ transcriptUrl: "", transcriptText: "" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao salvar anexos", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handlePdfUpload = async (file: File) => {
+    if (!selectedOneOnOneId || !file) return;
+    
+    setIsUploading(true);
+    try {
+      // Step 1: Get presigned upload URL
+      const urlResponse = await apiRequest("POST", `/api/one-on-one/${selectedOneOnOneId}/upload-url`, {
+        filename: file.name,
+        contentType: file.type
+      });
+      const { uploadURL, objectPath } = await urlResponse.json();
+      
+      // Step 2: Upload file directly to presigned URL
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type }
+      });
+      
+      // Step 3: Save object path to database
+      await apiRequest("PATCH", `/api/one-on-one/${selectedOneOnOneId}/attachments`, {
+        pdfObjectKey: objectPath,
+        pdfFilename: file.name
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaboradorId, "one-on-one"] });
+      toast({ title: "PDF enviado", description: `${file.name} foi anexado com sucesso.` });
+    } catch (error) {
+      toast({ title: "Erro ao enviar PDF", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const toggleTranscript = (id: number) => {
+    setExpandedTranscript(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
+  };
 
   const toggleMeeting = (id: number) => {
     setExpandedMeetings(prev => {
@@ -1800,6 +1865,81 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
                           <p className="text-xs text-muted-foreground">Nenhuma ação registrada</p>
                         )}
                       </div>
+                      
+                      <div className="pt-2 border-t">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs text-muted-foreground uppercase">Anexos & Transcrição</p>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            onClick={() => { 
+                              setSelectedOneOnOneId(meeting.id); 
+                              setAttachmentData({ 
+                                transcriptUrl: meeting.transcriptUrl || "", 
+                                transcriptText: meeting.transcriptText || "" 
+                              });
+                              setAttachmentDialogOpen(true); 
+                            }}
+                            data-testid={`button-add-attachment-${meeting.id}`}
+                          >
+                            <Upload className="w-3 h-3 mr-1" /> Anexar
+                          </Button>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          {meeting.pdfFilename && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <FileText className="w-4 h-4 text-red-500" />
+                              <span className="flex-1 truncate">{meeting.pdfFilename}</span>
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                onClick={() => window.open(`/api/one-on-one/${meeting.id}/download-pdf`, '_blank')}
+                                data-testid={`button-download-pdf-${meeting.id}`}
+                              >
+                                <Download className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          )}
+                          
+                          {meeting.transcriptUrl && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <ExternalLink className="w-4 h-4 text-blue-500" />
+                              <a 
+                                href={meeting.transcriptUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="text-blue-600 dark:text-blue-400 hover:underline truncate flex-1"
+                                data-testid={`link-transcript-${meeting.id}`}
+                              >
+                                Link da Transcrição
+                              </a>
+                            </div>
+                          )}
+                          
+                          {meeting.transcriptText && (
+                            <div className="space-y-1">
+                              <button 
+                                onClick={() => toggleTranscript(meeting.id)}
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                                data-testid={`toggle-transcript-${meeting.id}`}
+                              >
+                                {expandedTranscript.has(meeting.id) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                Transcrição da Reunião
+                              </button>
+                              {expandedTranscript.has(meeting.id) && (
+                                <div className="bg-muted/50 p-3 rounded-lg text-sm whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                  {meeting.transcriptText}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {!meeting.pdfFilename && !meeting.transcriptUrl && !meeting.transcriptText && (
+                            <p className="text-xs text-muted-foreground">Nenhum anexo ou transcrição</p>
+                          )}
+                        </div>
+                      </div>
                     </CollapsibleContent>
                   </div>
                 </Collapsible>
@@ -1899,6 +2039,80 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
             <Button variant="outline" onClick={() => setAddAcaoDialogOpen(false)}>Cancelar</Button>
             <Button onClick={() => addAcaoMutation.mutate(acaoFormData)} disabled={addAcaoMutation.isPending || !acaoFormData.descricao} data-testid="button-save-acao">
               {addAcaoMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Adicionar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={attachmentDialogOpen} onOpenChange={setAttachmentDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Anexos & Transcrição</DialogTitle>
+            <DialogDescription>Adicione PDF, link ou texto de transcrição da reunião</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Upload de PDF</label>
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePdfUpload(file);
+                  }}
+                  className="hidden"
+                  data-testid="input-pdf-upload"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  data-testid="button-select-pdf"
+                >
+                  {isUploading ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
+                  ) : (
+                    <><Upload className="w-4 h-4 mr-2" /> Selecionar PDF</>
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Apenas arquivos PDF são aceitos</p>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium">Link da Transcrição</label>
+              <Input 
+                value={attachmentData.transcriptUrl} 
+                onChange={(e) => setAttachmentData({ ...attachmentData, transcriptUrl: e.target.value })} 
+                placeholder="https://docs.google.com/... ou https://notion.so/..." 
+                data-testid="input-transcript-url" 
+              />
+              <p className="text-xs text-muted-foreground mt-1">Cole um link público para a transcrição (Google Docs, Notion, etc.)</p>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium">Texto da Transcrição</label>
+              <Textarea 
+                value={attachmentData.transcriptText} 
+                onChange={(e) => setAttachmentData({ ...attachmentData, transcriptText: e.target.value })} 
+                placeholder="Cole aqui a transcrição da reunião..." 
+                rows={6}
+                data-testid="input-transcript-text" 
+              />
+              <p className="text-xs text-muted-foreground mt-1">Ou cole diretamente o texto da transcrição da gravação</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAttachmentDialogOpen(false)}>Cancelar</Button>
+            <Button 
+              onClick={() => updateAttachmentsMutation.mutate(attachmentData)} 
+              disabled={updateAttachmentsMutation.isPending}
+              data-testid="button-save-attachments"
+            >
+              {updateAttachmentsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>
