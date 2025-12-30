@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { usePageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { ArrowLeft, Package, User, DollarSign, Info, Mail, Phone, Briefcase, Calendar, Check, ChevronsUpDown, UserPlus, X, Edit, Trash2, History, Lock } from "lucide-react";
+import { ArrowLeft, Package, User, DollarSign, Info, Briefcase, Check, ChevronsUpDown, UserPlus, X, Edit, Trash2, History, Lock, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -612,31 +612,14 @@ export default function PatrimonioDetail() {
                         </Button>
                       </div>
 
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {patrimonio.colaborador.emailTurbo && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Mail className="h-4 w-4 text-muted-foreground" />
-                            <span data-testid="colaborador-email">{patrimonio.colaborador.emailTurbo}</span>
-                          </div>
-                        )}
-                        {patrimonio.colaborador.telefone && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Phone className="h-4 w-4 text-muted-foreground" />
-                            <span data-testid="colaborador-telefone">{patrimonio.colaborador.telefone}</span>
-                          </div>
-                        )}
-                        {patrimonio.colaborador.admissao && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span>Admissão: {formatDate(patrimonio.colaborador.admissao)}</span>
-                          </div>
-                        )}
-                        {patrimonio.colaborador.squad && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Badge variant="secondary">{patrimonio.colaborador.squad}</Badge>
-                          </div>
-                        )}
-                      </div>
+                      {patrimonio.colaborador.squad && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="secondary" className="text-xs">
+                            <BarChart3 className="h-3 w-3 mr-1" />
+                            {patrimonio.colaborador.squad}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
