@@ -1395,9 +1395,24 @@ export async function initializeRhPesquisasTables(): Promise<void> {
         tipo VARCHAR(50) DEFAULT 'regular',
         anotacoes TEXT,
         proximos_passos TEXT,
-        criado_em TIMESTAMP DEFAULT NOW()
+        criado_em TIMESTAMP DEFAULT NOW(),
+        pdf_object_key VARCHAR(500),
+        pdf_filename VARCHAR(300),
+        transcript_url VARCHAR(1000),
+        transcript_text TEXT,
+        uploaded_by VARCHAR(200)
       )
     `);
+    
+    // Migração para adicionar colunas de anexos se tabela já existe
+    const oneOnOneColumns = ['pdf_object_key', 'pdf_filename', 'transcript_url', 'transcript_text', 'uploaded_by'];
+    for (const col of oneOnOneColumns) {
+      try {
+        await db.execute(sql.raw(`ALTER TABLE rh_one_on_one ADD COLUMN IF NOT EXISTS ${col} ${col.includes('text') ? 'TEXT' : 'VARCHAR(1000)'}`));
+      } catch (e) {
+        // Coluna já existe, ignorar
+      }
+    }
     
     // Criar tabela de PDI
     await db.execute(sql`
