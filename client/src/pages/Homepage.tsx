@@ -503,14 +503,15 @@ function DashboardAdmin() {
   const aquisicaoPontualPercent = mrrTotal > 0 ? (aquisicaoPontual / mrrTotal) * 100 : 0;
   const churnPercent = mrrTotal > 0 ? (churn / mrrTotal) * 100 : 0;
   
-  // Calcular clientes ativos (do homeOverview ou do tamanho do array de clientes)
-  const clientesAtivos = homeOverview?.clientesAtivos || homeOverview?.clientes?.length || 0;
-  const ticketMedio = clientesAtivos > 0 ? mrrTotal / clientesAtivos : 0;
+  // Dados globais da empresa (todos os contratos/clientes ativos)
+  const empresaContratosAtivos = homeOverview?.empresaContratosAtivos || 0;
+  const empresaClientesAtivos = homeOverview?.empresaClientesAtivos || 0;
+  const ticketMedio = empresaClientesAtivos > 0 ? mrrTotal / empresaClientesAtivos : 0;
 
   const kpiCards: KpiCard[] = [
     {
       title: "MRR Ativo",
-      subtitle: `${homeOverview?.contratosAtivos || 0} contratos • ${clientesAtivos} clientes`,
+      subtitle: `${empresaContratosAtivos} contratos • ${empresaClientesAtivos} clientes`,
       value: formatCurrency(mrrTotal),
       icon: DollarSign,
       badge: mrrTotal ? {
