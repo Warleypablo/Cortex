@@ -26,7 +26,7 @@ interface KpiCard {
 interface KpiCardGridProps {
   cards: KpiCard[];
   className?: string;
-  columns?: 3 | 4;
+  columns?: 3 | 4 | 5;
 }
 
 function KpiCardItem({ card }: { card: KpiCard }) {
@@ -107,7 +107,11 @@ export default function KpiCardGrid({ cards, className, columns = 4 }: KpiCardGr
     <div className={cn("w-full", className)}>
       <div className={cn(
         "grid bg-background overflow-hidden rounded-xl border border-border",
-        columns === 3 ? "grid-cols-1 lg:grid-cols-3" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
+        columns === 3 
+          ? "grid-cols-1 lg:grid-cols-3" 
+          : columns === 5 
+            ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-5"
+            : "grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
       )}>
         {cards.map((card, i) => (
           <div

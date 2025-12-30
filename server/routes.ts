@@ -11967,6 +11967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let meusClientes: any[] = [];
       let mrrTotal = 0;
       let contratosAtivos = 0;
+      let clientesAtivos = 0;
       
       if (userName) {
         // Tentar encontrar o colaborador pelo nome ou email
@@ -12014,8 +12015,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const totaisQuery = await db.execute(sql`
             SELECT 
               COALESCE(SUM(ct.valorr::numeric), 0) as mrr_total,
-              COUNT(DISTINCT ct.id_task) as contratos_total
+              COUNT(DISTINCT ct.id_task) as contratos_total,
+              COUNT(DISTINCT c.id) as clientes_total
             FROM cup_contratos ct
+            INNER JOIN cup_clientes c ON ct.id_task = c.id_task
             WHERE (ct.responsavel ILIKE ${`%${colaboradorNome}%`} OR ct.cs_responsavel ILIKE ${`%${colaboradorNome}%`})
               AND ct.status IN ('ativo', 'onboarding', 'triagem')
           `);
@@ -12024,6 +12027,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const totaisRow = totaisQuery.rows[0] as any;
             mrrTotal = parseFloat(totaisRow.mrr_total || '0');
             contratosAtivos = parseInt(totaisRow.contratos_total || '0');
+            clientesAtivos = parseInt(totaisRow.clientes_total || '0');
           }
         }
       }
@@ -12137,6 +12141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         colaboradorNome,
         mrrTotal,
         contratosAtivos,
+        clientesAtivos,
         clientes: meusClientes,
         proximosEventos,
         alertas,
