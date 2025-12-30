@@ -144,9 +144,13 @@ const STATUS_JURIDICO = [
   { value: "cancelado", label: "Cancelado", color: "bg-gray-100 text-gray-600 border-gray-200", icon: XCircle },
 ];
 
-export default function JuridicoClientes() {
-  usePageTitle("Jurídico");
-  useSetPageInfo("Cobrança Jurídica", "Gestão de clientes inadimplentes");
+interface JuridicoClientesProps {
+  embedded?: boolean;
+}
+
+export default function JuridicoClientes({ embedded = false }: JuridicoClientesProps) {
+  usePageTitle(embedded ? "" : "Jurídico");
+  useSetPageInfo(embedded ? "" : "Cobrança Jurídica", embedded ? "" : "Gestão de clientes inadimplentes");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
@@ -380,7 +384,7 @@ export default function JuridicoClientes() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6 min-h-screen">
+      <div className={embedded ? "space-y-6" : "p-6 space-y-6 min-h-screen"}>
         <Skeleton className="h-12 w-80" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Skeleton className="h-28" />
@@ -397,24 +401,26 @@ export default function JuridicoClientes() {
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Header Simples */}
-      <div className="bg-card border-b sticky top-0 z-10 shadow-sm">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-primary/10 rounded-xl">
-              <Scale className="w-7 h-7 text-primary" />
-            </div>
-            <div>
-              <p className="text-muted-foreground">
-                {totals.count} cliente{totals.count !== 1 && 's'} • {formatCurrency(totals.total)} em aberto
-              </p>
+    <div className={embedded ? "" : "min-h-screen"}>
+      {/* Header Simples - only show when not embedded */}
+      {!embedded && (
+        <div className="bg-card border-b sticky top-0 z-10 shadow-sm">
+          <div className="max-w-6xl mx-auto px-6 py-4">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary/10 rounded-xl">
+                <Scale className="w-7 h-7 text-primary" />
+              </div>
+              <div>
+                <p className="text-muted-foreground">
+                  {totals.count} cliente{totals.count !== 1 && 's'} • {formatCurrency(totals.total)} em aberto
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
+      <div className={embedded ? "space-y-6" : "max-w-6xl mx-auto px-6 py-6 space-y-6"}>
         
         <Tabs defaultValue="ativos" className="space-y-6">
           <TabsList className="bg-card shadow-sm border p-1 h-auto">
