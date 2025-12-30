@@ -58,19 +58,8 @@ export function AppSidebar() {
   const isCollapsed = state === "collapsed";
   const turboLogo = theme === "dark" ? turboLogoDark : turboLogoLight;
 
-  // Track open categories
-  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
-    'OKR 2026': true,
-    'Financeiro': false,
-    'Operação': true,
-    'Tech': false,
-    'Comercial': false,
-    'Growth': false,
-    'G&G': false,
-    'Jurídico': false,
-    'Reports': false,
-    'Admin': false,
-  });
+  // Track open categories - all closed by default on page load
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
 
   const toggleCategory = (category: string) => {
     setOpenCategories(prev => ({ ...prev, [category]: !prev[category] }));
