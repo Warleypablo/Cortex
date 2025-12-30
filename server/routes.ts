@@ -5858,6 +5858,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Churn Detalhamento - lista de contratos encerrados/churned com detalhes
+  app.get("/api/analytics/churn-detalhamento", async (req, res) => {
+    try {
+      const meses = req.query.meses as string || "12";
+      
+      let dateFilter = sql`TRUE`;
+      if (meses !== "all") {
+        const mesesNum = parseInt(meses) || 12;
+        dateFilter = sql`c.data_encerramento >= NOW() - INTERVAL '${sql.raw(String(mesesNum))} months'`;
+      }
+      
+      // Get churned/encerrados contracts (filter by status containing churn or encerrado)
+      const contratosResult = await db.execute(sql`
+        SELECT 
+          c.id,
+          cl.nome as cliente_nome,
+          cl.cnpj,
+          c.produto,
+          c.squad,
+          c.responsavel,
+          COALESCE(c.valorr, 0) as valorr,
+          c.data_inicio,
+          c.data_encerramento,
+          c.status,
+          c.motivo_churn,
+          CASE 
+            WHEN c.data_inicio IS NOT NULL AND c.data_encerramento IS NOT NULL 
+            THEN GREATEST(0.5, 
+              (c.data_encerramento::date - c.data_inicio::date)::numeric / 30.44
+            )
+            ELSE 0 
+          END as lifetime_meses
+        FROM cup_contratos c
+        LEFT JOIN cup_clientes cl ON c.id_task = cl.task_id
+        WHERE c.data_encerramento IS NOT NULL
+          AND (
+            LOWER(TRIM(c.status)) LIKE '%churn%' 
+            OR LOWER(TRIM(c.status)) LIKE '%encerrad%'
+            OR LOWER(TRIM(c.status)) LIKE '%cancelad%'
+          )
+          AND ${dateFilter}
+        ORDER BY c.data_encerramento DESC
+      `);
+      
+      const contratos = contratosResult.rows.map((row: any) => ({
+        id: row.id,
+        cliente_nome: row.cliente_nome || 'Cliente não identificado',
+        cnpj: row.cnpj || '',
+        produto: row.produto || 'Não especificado',
+        squad: row.squad || 'Não especificado',
+        responsavel: row.responsavel || 'Não especificado',
+        valorr: Number(row.valorr) || 0,
+        data_inicio: row.data_inicio,
+        data_encerramento: row.data_encerramento,
+        status: row.status || 'encerrado',
+        motivo_churn: row.motivo_churn,
+        lifetime_meses: Number(row.lifetime_meses) || 0,
+        ltv: (Number(row.valorr) || 0) * (Number(row.lifetime_meses) || 0),
+      }));
+      
+      // Get unique values for filters
+      const squads = Array.from(new Set(contratos.map((c: any) => c.squad).filter(Boolean))).sort();
+      const produtos = Array.from(new Set(contratos.map((c: any) => c.produto).filter(Boolean))).sort();
+      const responsaveis = Array.from(new Set(contratos.map((c: any) => c.responsavel).filter(Boolean))).sort();
+      const motivos = Array.from(new Set(contratos.map((c: any) => c.motivo_churn).filter(Boolean))).sort();
+      
+      // Calculate metrics
+      const totalChurned = contratos.length;
+      const mrrPerdido = contratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
+      const ltvTotal = contratos.reduce((sum: number, c: any) => sum + c.ltv, 0);
+      const ltMedio = totalChurned > 0 ? contratos.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
+      
+      res.json({
+        contratos,
+        metricas: {
+          total_churned: totalChurned,
+          mrr_perdido: mrrPerdido,
+          ltv_total: ltvTotal,
+          lt_medio: ltMedio,
+        },
+        filtros: {
+          squads,
+          produtos,
+          responsaveis,
+          motivos,
+        },
+      });
+    } catch (error) {
+      console.error("[api] Error fetching churn detalhamento:", error);
+      res.status(500).json({ error: "Failed to fetch churn detalhamento data" });
+    }
+  });
+
   app.get("/api/dfc", async (req, res) => {
     try {
       const dataInicio = req.query.dataInicio as string | undefined;
