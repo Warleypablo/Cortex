@@ -1522,7 +1522,10 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
   const [selectedOneOnOneId, setSelectedOneOnOneId] = useState<number | null>(null);
   const [expandedMeetings, setExpandedMeetings] = useState<Set<number>>(new Set());
   const [expandedTranscript, setExpandedTranscript] = useState<Set<number>>(new Set());
-  const [formData, setFormData] = useState({ data: new Date().toISOString().split("T")[0], pauta: "", notas: "" });
+  const [formData, setFormData] = useState({ data: new Date().toISOString().split("T")[0], pauta: "", notas: "", transcricao_url: "", transcricao_texto: "" });
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+  const createPdfInputRef = useRef<HTMLInputElement>(null);
   const [acaoFormData, setAcaoFormData] = useState({ descricao: "", responsavel: "", prazo: "", status: "pendente" });
   const [attachmentData, setAttachmentData] = useState({ transcriptUrl: "", transcriptText: "" });
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
@@ -1562,7 +1565,7 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
   ];
 
   const addMutation = useMutation({
-    mutationFn: async (data: { data: string; pauta: string; notas: string }) => {
+    mutationFn: async (data: { data: string; pauta: string; notas: string; transcricao_url?: string; transcricao_texto?: string; pdf_object_key?: string; pdf_filename?: string }) => {
       const response = await apiRequest("POST", `/api/colaboradores/${colaboradorId}/one-on-one`, data);
       return await response.json();
     },
@@ -1570,13 +1573,59 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
       queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaboradorId, "one-on-one"] });
       toast({ title: "1x1 registrado", description: "A reunião foi adicionada com sucesso." });
       setDialogOpen(false);
-      setFormData({ data: new Date().toISOString().split("T")[0], pauta: "", notas: "" });
+      setFormData({ data: new Date().toISOString().split("T")[0], pauta: "", notas: "", transcricao_url: "", transcricao_texto: "" });
+      setPdfFile(null);
       setSelectedTemplate("");
     },
     onError: (error: Error) => {
       toast({ title: "Erro ao registrar 1x1", description: error.message, variant: "destructive" });
     },
   });
+
+  // Handler for creating 1x1 with optional PDF upload
+  const handleCreate1x1 = async () => {
+    setIsUploadingPdf(true);
+    try {
+      let pdfData: { pdf_object_key?: string; pdf_filename?: string } = {};
+      
+      // If there's a PDF file, upload it first
+      if (pdfFile) {
+        // Get presigned upload URL (we need a temp endpoint for new 1x1s)
+        const urlResponse = await apiRequest("POST", `/api/colaboradores/${colaboradorId}/one-on-one/upload-url`, {
+          filename: pdfFile.name,
+          contentType: pdfFile.type
+        });
+        const { uploadURL, objectPath } = await urlResponse.json();
+        
+        // Upload file directly to presigned URL
+        await fetch(uploadURL, {
+          method: "PUT",
+          body: pdfFile,
+          headers: { "Content-Type": pdfFile.type }
+        });
+        
+        pdfData = {
+          pdf_object_key: objectPath,
+          pdf_filename: pdfFile.name
+        };
+      }
+      
+      // Create the 1x1 with all data including attachments
+      await addMutation.mutateAsync({
+        data: formData.data,
+        pauta: formData.pauta,
+        notas: formData.notas,
+        transcricao_url: formData.transcricao_url || undefined,
+        transcricao_texto: formData.transcricao_texto || undefined,
+        ...pdfData
+      });
+    } catch (error) {
+      console.error("Error creating 1x1:", error);
+      toast({ title: "Erro ao criar 1x1", description: "Não foi possível criar a reunião.", variant: "destructive" });
+    } finally {
+      setIsUploadingPdf(false);
+    }
+  };
 
   const addAcaoMutation = useMutation({
     mutationFn: async (data: { descricao: string; responsavel: string; prazo: string; status: string }) => {
@@ -1992,11 +2041,92 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
               <label className="text-sm font-medium">Notas</label>
               <Textarea value={formData.notas} onChange={(e) => setFormData({ ...formData, notas: e.target.value })} placeholder="Anotações da reunião..." rows={4} data-testid="input-1x1-notas" />
             </div>
+
+            {/* Campos de Anexo */}
+            <div className="border-t pt-4 mt-2">
+              <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                <Paperclip className="w-4 h-4" />
+                Anexos (opcional)
+              </p>
+              
+              {/* Upload de PDF */}
+              <div className="mb-3">
+                <label className="text-sm text-muted-foreground">Documento PDF</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="file"
+                    ref={createPdfInputRef}
+                    accept=".pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file && file.type === "application/pdf") {
+                        setPdfFile(file);
+                      } else if (file) {
+                        toast({ title: "Arquivo inválido", description: "Apenas PDFs são aceitos.", variant: "destructive" });
+                      }
+                    }}
+                    data-testid="input-1x1-pdf"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => createPdfInputRef.current?.click()}
+                    disabled={isUploadingPdf}
+                    data-testid="button-upload-1x1-pdf"
+                  >
+                    <Upload className="w-4 h-4 mr-1" />
+                    {pdfFile ? "Trocar PDF" : "Anexar PDF"}
+                  </Button>
+                  {pdfFile && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <FileText className="w-4 h-4 text-red-500" />
+                      <span className="truncate max-w-[150px]">{pdfFile.name}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setPdfFile(null)}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Link da Transcrição */}
+              <div className="mb-3">
+                <label className="text-sm text-muted-foreground">Link da Transcrição (URL externa)</label>
+                <Input
+                  value={formData.transcricao_url}
+                  onChange={(e) => setFormData({ ...formData, transcricao_url: e.target.value })}
+                  placeholder="https://..."
+                  className="mt-1"
+                  data-testid="input-1x1-transcricao-url"
+                />
+              </div>
+
+              {/* Texto da Transcrição */}
+              <div>
+                <label className="text-sm text-muted-foreground">Transcrição (texto)</label>
+                <Textarea
+                  value={formData.transcricao_texto}
+                  onChange={(e) => setFormData({ ...formData, transcricao_texto: e.target.value })}
+                  placeholder="Cole aqui a transcrição da reunião..."
+                  rows={3}
+                  className="mt-1"
+                  data-testid="input-1x1-transcricao-texto"
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={() => addMutation.mutate(formData)} disabled={addMutation.isPending || !formData.data} data-testid="button-save-1x1">
-              {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar"}
+            <Button variant="outline" onClick={() => { setDialogOpen(false); setPdfFile(null); }}>Cancelar</Button>
+            <Button onClick={handleCreate1x1} disabled={addMutation.isPending || isUploadingPdf || !formData.data} data-testid="button-save-1x1">
+              {(addMutation.isPending || isUploadingPdf) ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>

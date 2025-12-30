@@ -8848,10 +8848,21 @@ export class DbStorage implements IStorage {
     return result.rows as OneOnOne[];
   }
 
-  async createOneOnOneMeeting(data: InsertOneOnOne): Promise<OneOnOne> {
+  async createOneOnOneMeeting(data: InsertOneOnOne & { pdf_object_key?: string; pdf_filename?: string; transcricao_url?: string; transcricao_texto?: string }): Promise<OneOnOne> {
     const result = await db.execute(sql`
-      INSERT INTO rh_one_on_one (colaborador_id, gestor_id, data, pauta, notas, criado_por)
-      VALUES (${data.colaboradorId}, ${data.gestorId || null}, ${data.data}, ${data.pauta || null}, ${data.notas || null}, ${data.criadoPor || null})
+      INSERT INTO rh_one_on_one (colaborador_id, gestor_id, data, pauta, notas, criado_por, pdf_object_key, pdf_filename, transcript_url, transcript_text)
+      VALUES (
+        ${data.colaboradorId}, 
+        ${data.gestorId || null}, 
+        ${data.data}, 
+        ${data.pauta || null}, 
+        ${data.notas || null}, 
+        ${data.criadoPor || null},
+        ${data.pdf_object_key || null},
+        ${data.pdf_filename || null},
+        ${data.transcricao_url || null},
+        ${data.transcricao_texto || null}
+      )
       RETURNING id, colaborador_id as "colaboradorId", gestor_id as "gestorId",
         data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor",
         pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename",
