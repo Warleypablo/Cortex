@@ -2335,6 +2335,207 @@ function CatalogsContent() {
   );
 }
 
+// ==================== ACCESS PROFILES CONTENT ====================
+function AccessProfilesContent() {
+  const { toast } = useToast();
+  const [editingProfile, setEditingProfile] = useState<string | null>(null);
+  const [editedPermissions, setEditedPermissions] = useState<string[]>([]);
+
+  const profiles = ROLE_PRESETS;
+
+  const handleEditProfile = (profileId: string) => {
+    const profile = profiles.find(p => p.id === profileId);
+    if (profile) {
+      setEditingProfile(profileId);
+      setEditedPermissions([...profile.permissions]);
+    }
+  };
+
+  const handleTogglePermission = (permKey: string) => {
+    setEditedPermissions(prev => 
+      prev.includes(permKey) 
+        ? prev.filter(p => p !== permKey) 
+        : [...prev, permKey]
+    );
+  };
+
+  const handleSelectCategoryEdit = (categoryPermissions: string[]) => {
+    setEditedPermissions(prev => {
+      const newSet = new Set(prev);
+      categoryPermissions.forEach(p => newSet.add(p));
+      return Array.from(newSet);
+    });
+  };
+
+  const handleDeselectCategoryEdit = (categoryPermissions: string[]) => {
+    setEditedPermissions(prev => prev.filter(p => !categoryPermissions.includes(p)));
+  };
+
+  const isCategoryFullySelectedEdit = (categoryPermissions: string[]) => {
+    return categoryPermissions.every(p => editedPermissions.includes(p));
+  };
+
+  const handleSaveProfile = () => {
+    toast({
+      title: "Perfis são configurados no código",
+      description: "Os perfis de acesso estão definidos no arquivo de configuração do sistema. Para alterar permanentemente, entre em contato com a equipe de desenvolvimento.",
+    });
+    setEditingProfile(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProfile(null);
+    setEditedPermissions([]);
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Perfis de Acesso
+          </CardTitle>
+          <CardDescription>
+            Visualize as configurações de permissões de cada perfil de acesso do sistema
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {profiles.map((profile) => (
+              <Card key={profile.id} className="border">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${profile.id === 'control_tower' ? 'bg-primary/10' : 'bg-muted'}`}>
+                        <Shield className={`h-5 w-5 ${profile.id === 'control_tower' ? 'text-primary' : 'text-muted-foreground'}`} />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">{profile.label}</CardTitle>
+                        <CardDescription className="text-sm">{profile.description}</CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">
+                        {profile.permissions.length} permissões
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditProfile(profile.id)}
+                        data-testid={`btn-edit-profile-${profile.id}`}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Visualizar
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                {editingProfile === profile.id && (
+                  <CardContent className="pt-0 border-t">
+                    <div className="space-y-4 pt-4">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditedPermissions([...ALL_PERMISSION_KEYS])}
+                          data-testid="btn-profile-select-all"
+                        >
+                          Selecionar Todas
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditedPermissions([])}
+                          data-testid="btn-profile-deselect-all"
+                        >
+                          Desmarcar Todas
+                        </Button>
+                        <div className="ml-auto text-sm text-muted-foreground">
+                          {editedPermissions.length} de {ALL_PERMISSION_KEYS.length} selecionadas
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        {PERMISSION_CATEGORIES.map((category) => {
+                          const categoryPerms = category.permissions.map(p => p.key);
+                          const isFullySelected = isCategoryFullySelectedEdit(categoryPerms);
+                          return (
+                            <div key={category.key}>
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-sm font-semibold text-muted-foreground">{category.label}</h4>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => isFullySelected ? handleDeselectCategoryEdit(categoryPerms) : handleSelectCategoryEdit(categoryPerms)}
+                                  data-testid={`btn-profile-toggle-category-${category.key}`}
+                                  className="h-7 text-xs"
+                                >
+                                  {isFullySelected ? "Desmarcar tudo" : "Selecionar tudo"}
+                                </Button>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                {category.permissions.map((permission) => (
+                                  <div key={permission.key} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`profile-${profile.id}-${permission.key}`}
+                                      checked={editedPermissions.includes(permission.key)}
+                                      onCheckedChange={() => handleTogglePermission(permission.key)}
+                                      data-testid={`profile-checkbox-${permission.key}`}
+                                    />
+                                    <Label
+                                      htmlFor={`profile-${profile.id}-${permission.key}`}
+                                      className="text-sm font-normal cursor-pointer"
+                                    >
+                                      {PERMISSION_LABELS[permission.key] || permission.label}
+                                    </Label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-4 border-t">
+                        <Button
+                          variant="outline"
+                          onClick={handleCancelEdit}
+                          data-testid="btn-profile-cancel"
+                        >
+                          Fechar
+                        </Button>
+                        <Button
+                          onClick={handleSaveProfile}
+                          data-testid="btn-profile-save"
+                        >
+                          Entendido
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Sobre os Perfis de Acesso</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <p><strong>Base:</strong> Acesso mínimo, apenas módulo Geral (Perfil, Calendário, Acessos, etc.)</p>
+          <p><strong>Time:</strong> Acesso operacional expandido incluindo Operação, Tech, Comercial e Growth.</p>
+          <p><strong>Líder:</strong> Acesso completo exceto Financeiro e Administração.</p>
+          <p><strong>Control Tower:</strong> Acesso total a todas as áreas do sistema.</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ==================== FIELD REGISTRY CONTENT ====================
 interface SystemField {
   id: number;
@@ -2810,6 +3011,10 @@ export default function AdminUsuarios() {
             <FileText className="h-4 w-4 mr-2" />
             Registro de Campos
           </TabsTrigger>
+          <TabsTrigger value="access-profiles" data-testid="tab-access-profiles">
+            <Shield className="h-4 w-4 mr-2" />
+            Perfis de Acesso
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="usuarios" className="space-y-6">
@@ -3039,6 +3244,10 @@ export default function AdminUsuarios() {
 
         <TabsContent value="system-fields">
           <FieldRegistryContent />
+        </TabsContent>
+
+        <TabsContent value="access-profiles">
+          <AccessProfilesContent />
         </TabsContent>
       </Tabs>
     </div>
