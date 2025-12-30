@@ -12248,6 +12248,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let empresaMrrTotal = 0;
       let empresaContratosAtivos = 0;
       let empresaClientesAtivos = 0;
+      let mrrVariacao = 0;
+      let ticketMedioVariacao = 0;
       
       // Buscar totais globais da empresa - contratos e MRR
       const empresaContratosQuery = await db.execute(sql`
@@ -12274,6 +12276,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (empresaClientesQuery.rows.length > 0) {
         empresaClientesAtivos = parseInt((empresaClientesQuery.rows[0] as any).clientes_total || '0');
+      }
+      
+      // Calcular variação MRR comparando com mês anterior (baseado em data_inicio dos contratos)
+      // Usamos contratos que iniciaram no mês passado vs mês atual para calcular aquisição
+      try {
+        const variacaoQuery = await db.execute(sql`
+          WITH mrr_atual AS (
+            SELECT COALESCE(SUM(valorr::numeric), 0) as total
+            FROM cup_contratos
+            WHERE status IN ('ativo', 'onboarding', 'triagem')
+          ),
+          mrr_mes_passado AS (
+            SELECT COALESCE(SUM(valorr::numeric), 0) as total
+            FROM cup_contratos
+            WHERE status IN ('ativo', 'onboarding', 'triagem')
+              AND (data_inicio IS NULL OR data_inicio::date < date_trunc('month', CURRENT_DATE))
+          ),
+          clientes_atual AS (
+            SELECT COUNT(DISTINCT c.id) as total
+            FROM cup_clientes c
+            INNER JOIN cup_contratos ct ON c.task_id = ct.id_task
+            WHERE ct.status IN ('ativo', 'onboarding', 'triagem')
+          ),
+          clientes_mes_passado AS (
+            SELECT COUNT(DISTINCT c.id) as total
+            FROM cup_clientes c
+            INNER JOIN cup_contratos ct ON c.task_id = ct.id_task
+            WHERE ct.status IN ('ativo', 'onboarding', 'triagem')
+              AND (ct.data_inicio IS NULL OR ct.data_inicio::date < date_trunc('month', CURRENT_DATE))
+          )
+          SELECT 
+            (SELECT total FROM mrr_atual) as mrr_atual,
+            (SELECT total FROM mrr_mes_passado) as mrr_anterior,
+            (SELECT total FROM clientes_atual) as clientes_atual,
+            (SELECT total FROM clientes_mes_passado) as clientes_anterior
+        `);
+        
+        if (variacaoQuery.rows.length > 0) {
+          const row = variacaoQuery.rows[0] as any;
+          const mrrAtual = parseFloat(row.mrr_atual || '0');
+          const mrrAnterior = parseFloat(row.mrr_anterior || '0');
+          const clientesAtual = parseInt(row.clientes_atual || '0');
+          const clientesAnterior = parseInt(row.clientes_anterior || '0');
+          
+          // Calcular variação MRR
+          if (mrrAnterior > 0) {
+            mrrVariacao = ((mrrAtual - mrrAnterior) / mrrAnterior) * 100;
+          }
+          
+          // Calcular variação Ticket Médio
+          const ticketAtual = clientesAtual > 0 ? mrrAtual / clientesAtual : 0;
+          const ticketAnterior = clientesAnterior > 0 ? mrrAnterior / clientesAnterior : 0;
+          
+          if (ticketAnterior > 0) {
+            ticketMedioVariacao = ((ticketAtual - ticketAnterior) / ticketAnterior) * 100;
+          }
+        }
+      } catch (e) {
+        // Ignorar erro de cálculo de variação
+        console.error("Error calculating MRR variation:", e);
       }
       
       if (userName) {
@@ -12471,6 +12533,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         empresaMrrTotal,
         empresaContratosAtivos,
         empresaClientesAtivos,
+        mrrVariacao,
+        ticketMedioVariacao,
         clientes: meusClientes,
         proximosEventos,
         alertas,
