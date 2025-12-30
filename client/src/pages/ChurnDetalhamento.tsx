@@ -25,7 +25,9 @@ import {
   BarChart3,
   PieChart,
   Target,
-  CalendarDays
+  CalendarDays,
+  Building2,
+  Users
 } from "lucide-react";
 import {
   Table,
@@ -41,6 +43,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, parseISO, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
@@ -107,6 +110,7 @@ export default function ChurnDetalhamento() {
   const [sortBy, setSortBy] = useState<string>("data_encerramento");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isFiltersOpen, setIsFiltersOpen] = useState(true);
+  const [viewMode, setViewMode] = useState<"contratos" | "clientes">("contratos");
 
   const { data, isLoading, error } = useQuery<ChurnDetalhamentoData>({
     queryKey: ["/api/analytics/churn-detalhamento", "all"],
@@ -327,6 +331,85 @@ export default function ChurnDetalhamento() {
       }))
       .slice(-12);
   }, [filteredContratos]);
+
+  interface ClienteAgrupado {
+    cnpj: string;
+    cliente_nome: string;
+    contratos_count: number;
+    mrr_total: number;
+    ltv_total: number;
+    lifetime_medio: number;
+    ultima_data_encerramento: string;
+    produtos: string[];
+    squads: string[];
+  }
+
+  const clientesAgrupados = useMemo((): ClienteAgrupado[] => {
+    if (filteredContratos.length === 0) return [];
+    
+    const clientesMap: Record<string, {
+      cnpj: string;
+      cliente_nome: string;
+      contratos: ChurnContract[];
+    }> = {};
+    
+    filteredContratos.forEach(c => {
+      const key = c.cnpj || c.cliente_nome || "unknown";
+      if (!clientesMap[key]) {
+        clientesMap[key] = {
+          cnpj: c.cnpj,
+          cliente_nome: c.cliente_nome,
+          contratos: []
+        };
+      }
+      clientesMap[key].contratos.push(c);
+    });
+    
+    return Object.values(clientesMap)
+      .map(cliente => {
+        const contratos = cliente.contratos;
+        const mrrTotal = contratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
+        const ltvTotal = contratos.reduce((sum, c) => sum + (c.ltv || 0), 0);
+        const ltMedio = contratos.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / contratos.length;
+        const ultimaData = contratos.reduce((max, c) => {
+          if (!c.data_encerramento) return max;
+          return !max || new Date(c.data_encerramento) > new Date(max) ? c.data_encerramento : max;
+        }, "" as string);
+        const produtos = Array.from(new Set(contratos.map(c => c.produto).filter(Boolean)));
+        const squads = Array.from(new Set(contratos.map(c => c.squad).filter(Boolean)));
+        
+        return {
+          cnpj: cliente.cnpj,
+          cliente_nome: cliente.cliente_nome,
+          contratos_count: contratos.length,
+          mrr_total: mrrTotal,
+          ltv_total: ltvTotal,
+          lifetime_medio: ltMedio,
+          ultima_data_encerramento: ultimaData,
+          produtos,
+          squads
+        };
+      })
+      .sort((a, b) => {
+        if (sortBy === "mrr_total" || sortBy === "valorr") {
+          return sortOrder === "desc" ? b.mrr_total - a.mrr_total : a.mrr_total - b.mrr_total;
+        }
+        if (sortBy === "ltv" || sortBy === "ltv_total") {
+          return sortOrder === "desc" ? b.ltv_total - a.ltv_total : a.ltv_total - b.ltv_total;
+        }
+        if (sortBy === "lifetime_meses") {
+          return sortOrder === "desc" ? b.lifetime_medio - a.lifetime_medio : a.lifetime_medio - b.lifetime_medio;
+        }
+        if (sortBy === "data_encerramento") {
+          const dateA = a.ultima_data_encerramento ? new Date(a.ultima_data_encerramento).getTime() : 0;
+          const dateB = b.ultima_data_encerramento ? new Date(b.ultima_data_encerramento).getTime() : 0;
+          return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
+        }
+        return sortOrder === "desc" 
+          ? (b.cliente_nome || "").localeCompare(a.cliente_nome || "")
+          : (a.cliente_nome || "").localeCompare(b.cliente_nome || "");
+      });
+  }, [filteredContratos, sortBy, sortOrder]);
 
   const handleSort = (column: string) => {
     if (sortBy === column) {
@@ -845,19 +928,29 @@ export default function ChurnDetalhamento() {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Contratos Encerrados
-            </CardTitle>
-            <CardDescription>
-              Listagem detalhada de todos os contratos churned no período
-            </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "contratos" | "clientes")}>
+              <TabsList>
+                <TabsTrigger value="contratos" className="gap-2" data-testid="tab-contratos">
+                  <FileText className="h-4 w-4" />
+                  Contratos Encerrados
+                </TabsTrigger>
+                <TabsTrigger value="clientes" className="gap-2" data-testid="tab-clientes">
+                  <Building2 className="h-4 w-4" />
+                  Clientes Encerrados
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-          <Badge variant="secondary" className="text-lg px-3 py-1">
-            {filteredContratos.length}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-lg px-3 py-1">
+              {viewMode === "contratos" ? filteredContratos.length : clientesAgrupados.length}
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              {viewMode === "contratos" ? "contratos" : "clientes"}
+            </span>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -866,112 +959,238 @@ export default function ChurnDetalhamento() {
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : filteredContratos.length === 0 ? (
-            <div className="text-center py-12">
-              <TrendingDown className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">Nenhum contrato churned encontrado</p>
-            </div>
-          ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/80"
-                      onClick={() => handleSort("cliente_nome")}
-                    >
-                      <div className="flex items-center gap-1">
-                        Cliente
-                        <SortIcon column="cliente_nome" />
-                      </div>
-                    </TableHead>
-                    <TableHead>Produto</TableHead>
-                    <TableHead>Squad</TableHead>
-                    <TableHead>Responsável</TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/80 text-right"
-                      onClick={() => handleSort("valorr")}
-                    >
-                      <div className="flex items-center justify-end gap-1">
-                        MRR
-                        <SortIcon column="valorr" />
-                      </div>
-                    </TableHead>
-                    <TableHead>Início</TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/80"
-                      onClick={() => handleSort("data_encerramento")}
-                    >
-                      <div className="flex items-center gap-1">
-                        Encerramento
-                        <SortIcon column="data_encerramento" />
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/80 text-right"
-                      onClick={() => handleSort("lifetime_meses")}
-                    >
-                      <div className="flex items-center justify-end gap-1">
-                        Lifetime
-                        <SortIcon column="lifetime_meses" />
-                      </div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/80 text-right"
-                      onClick={() => handleSort("ltv")}
-                    >
-                      <div className="flex items-center justify-end gap-1">
-                        LTV
-                        <SortIcon column="ltv" />
-                      </div>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredContratos.slice(0, 100).map((contrato, index) => (
-                    <TableRow 
-                      key={`${contrato.id}-${index}`} 
-                      data-testid={`row-churn-${contrato.id}`}
-                      className="hover:bg-muted/30"
-                    >
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{contrato.cliente_nome || "-"}</span>
-                          <span className="text-xs text-muted-foreground">{contrato.cnpj || "-"}</span>
+          ) : viewMode === "contratos" ? (
+            filteredContratos.length === 0 ? (
+              <div className="text-center py-12">
+                <TrendingDown className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Nenhum contrato churned encontrado</p>
+              </div>
+            ) : (
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80"
+                        onClick={() => handleSort("cliente_nome")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Cliente
+                          <SortIcon column="cliente_nome" />
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{contrato.produto || "-"}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{contrato.squad || "-"}</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">{contrato.responsavel || "-"}</TableCell>
-                      <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
-                        {formatCurrency(contrato.valorr || 0)}
-                      </TableCell>
-                      <TableCell className="text-sm">{formatDate(contrato.data_inicio)}</TableCell>
-                      <TableCell className="text-sm">{formatDate(contrato.data_encerramento)}</TableCell>
-                      <TableCell className="text-right">
-                        <Badge 
-                          variant={contrato.lifetime_meses < 6 ? "destructive" : contrato.lifetime_meses < 12 ? "secondary" : "default"}
-                        >
-                          {contrato.lifetime_meses.toFixed(1)}m
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(contrato.ltv || 0)}
-                      </TableCell>
+                      </TableHead>
+                      <TableHead>Produto</TableHead>
+                      <TableHead>Squad</TableHead>
+                      <TableHead>Responsável</TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 text-right"
+                        onClick={() => handleSort("valorr")}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          MRR
+                          <SortIcon column="valorr" />
+                        </div>
+                      </TableHead>
+                      <TableHead>Início</TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80"
+                        onClick={() => handleSort("data_encerramento")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Encerramento
+                          <SortIcon column="data_encerramento" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 text-right"
+                        onClick={() => handleSort("lifetime_meses")}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          Lifetime
+                          <SortIcon column="lifetime_meses" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 text-right"
+                        onClick={() => handleSort("ltv")}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          LTV
+                          <SortIcon column="ltv" />
+                        </div>
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {filteredContratos.length > 100 && (
-                <div className="p-4 text-center text-muted-foreground text-sm border-t">
-                  Mostrando 100 de {filteredContratos.length} contratos. Use os filtros para refinar a busca.
-                </div>
-              )}
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredContratos.slice(0, 100).map((contrato, index) => (
+                      <TableRow 
+                        key={`${contrato.id}-${index}`} 
+                        data-testid={`row-churn-${contrato.id}`}
+                        className="hover:bg-muted/30"
+                      >
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{contrato.cliente_nome || "-"}</span>
+                            <span className="text-xs text-muted-foreground">{contrato.cnpj || "-"}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{contrato.produto || "-"}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{contrato.squad || "-"}</Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">{contrato.responsavel || "-"}</TableCell>
+                        <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
+                          {formatCurrency(contrato.valorr || 0)}
+                        </TableCell>
+                        <TableCell className="text-sm">{formatDate(contrato.data_inicio)}</TableCell>
+                        <TableCell className="text-sm">{formatDate(contrato.data_encerramento)}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge 
+                            variant={contrato.lifetime_meses < 6 ? "destructive" : contrato.lifetime_meses < 12 ? "secondary" : "default"}
+                          >
+                            {contrato.lifetime_meses.toFixed(1)}m
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(contrato.ltv || 0)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {filteredContratos.length > 100 && (
+                  <div className="p-4 text-center text-muted-foreground text-sm border-t">
+                    Mostrando 100 de {filteredContratos.length} contratos. Use os filtros para refinar a busca.
+                  </div>
+                )}
+              </div>
+            )
+          ) : (
+            clientesAgrupados.length === 0 ? (
+              <div className="text-center py-12">
+                <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Nenhum cliente churned encontrado</p>
+              </div>
+            ) : (
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80"
+                        onClick={() => handleSort("cliente_nome")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Cliente
+                          <SortIcon column="cliente_nome" />
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center">Contratos</TableHead>
+                      <TableHead>Produtos</TableHead>
+                      <TableHead>Squads</TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 text-right"
+                        onClick={() => handleSort("valorr")}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          MRR Total
+                          <SortIcon column="valorr" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80"
+                        onClick={() => handleSort("data_encerramento")}
+                      >
+                        <div className="flex items-center gap-1">
+                          Último Encerramento
+                          <SortIcon column="data_encerramento" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 text-right"
+                        onClick={() => handleSort("lifetime_meses")}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          LT Médio
+                          <SortIcon column="lifetime_meses" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 text-right"
+                        onClick={() => handleSort("ltv")}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          LTV Total
+                          <SortIcon column="ltv" />
+                        </div>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clientesAgrupados.slice(0, 100).map((cliente, index) => (
+                      <TableRow 
+                        key={`${cliente.cnpj}-${index}`} 
+                        data-testid={`row-cliente-${cliente.cnpj}`}
+                        className="hover:bg-muted/30"
+                      >
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{cliente.cliente_nome || "-"}</span>
+                            <span className="text-xs text-muted-foreground">{cliente.cnpj || "-"}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className="font-semibold">
+                            {cliente.contratos_count}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1 max-w-[150px]">
+                            {cliente.produtos.slice(0, 2).map((p, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">{p}</Badge>
+                            ))}
+                            {cliente.produtos.length > 2 && (
+                              <Badge variant="secondary" className="text-xs">+{cliente.produtos.length - 2}</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1 max-w-[150px]">
+                            {cliente.squads.slice(0, 2).map((s, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs">{s}</Badge>
+                            ))}
+                            {cliente.squads.length > 2 && (
+                              <Badge variant="secondary" className="text-xs">+{cliente.squads.length - 2}</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
+                          {formatCurrency(cliente.mrr_total || 0)}
+                        </TableCell>
+                        <TableCell className="text-sm">{formatDate(cliente.ultima_data_encerramento)}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge 
+                            variant={cliente.lifetime_medio < 6 ? "destructive" : cliente.lifetime_medio < 12 ? "secondary" : "default"}
+                          >
+                            {cliente.lifetime_medio.toFixed(1)}m
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(cliente.ltv_total || 0)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {clientesAgrupados.length > 100 && (
+                  <div className="p-4 text-center text-muted-foreground text-sm border-t">
+                    Mostrando 100 de {clientesAgrupados.length} clientes. Use os filtros para refinar a busca.
+                  </div>
+                )}
+              </div>
+            )
           )}
         </CardContent>
       </Card>
