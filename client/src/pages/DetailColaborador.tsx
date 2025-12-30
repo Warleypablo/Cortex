@@ -2638,6 +2638,20 @@ interface HealthHistoryItem {
 const MONTH_NAMES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const MONTH_NAMES_SHORT = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
+// Interface para pagamentos do Conta Azul
+interface PagamentoCazItem {
+  id: number;
+  descricao: string;
+  valor_bruto: string;
+  data_pagamento: string;
+  data_vencimento: string;
+  status: string;
+  categoria_nome: string;
+  mes_referencia: number;
+  ano_referencia: number;
+  nf_status: string;
+}
+
 // Card compacto de Financeiro para a aba de Informações
 function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string; colaborador: Colaborador }) {
   const { toast } = useToast();
@@ -2646,8 +2660,14 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
-  const { data: pagamentos = [], isLoading } = useQuery<PagamentoItem[]>({
-    queryKey: ["/api/rh/pagamentos", colaboradorId],
+  // Buscar pagamentos do Conta Azul pelo PIX/CNPJ do colaborador
+  const { data: pagamentos = [], isLoading } = useQuery<PagamentoCazItem[]>({
+    queryKey: ["/api/rh/colaborador", colaboradorId, "pagamentos-caz"],
+    queryFn: async () => {
+      const res = await fetch(`/api/rh/colaborador/${colaboradorId}/pagamentos-caz`, { credentials: "include" });
+      if (!res.ok) throw new Error("Erro ao buscar pagamentos");
+      return res.json();
+    },
   });
 
   const handleFileUpload = async (file: File) => {
@@ -2687,7 +2707,7 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
         anoReferencia: selectedYear,
       });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/rh/pagamentos", colaboradorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/colaborador", colaboradorId, "pagamentos-caz"] });
 
       toast({
         title: "Nota fiscal enviada",
@@ -2725,7 +2745,7 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
     })
     .slice(0, 4);
 
-  const nfsAnexadas = pagamentos.filter(p => parseInt(p.total_nfs || "0") > 0 || p.status === "nf_anexada").length;
+  const nfsAnexadas = pagamentos.filter(p => p.nf_status === "nf_anexada").length;
 
   return (
     <Card className="p-5 hover-elevate" data-testid="card-financeiro-resumo">
@@ -2798,7 +2818,7 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
           <p className="text-xs text-muted-foreground font-medium">Histórico Recente</p>
           <div className="space-y-1.5 max-h-36 overflow-y-auto">
             {pagamentosRecentes.map((pagamento) => {
-              const temNf = parseInt(pagamento.total_nfs || "0") > 0 || pagamento.status === "nf_anexada";
+              const temNf = pagamento.nf_status === "nf_anexada";
               return (
                 <div 
                   key={pagamento.id} 
@@ -3009,7 +3029,7 @@ function FinanceiroTab({ colaboradorId }: { colaboradorId: string }) {
         arquivoNome: file.name,
       });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/rh/pagamentos", colaboradorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/colaborador", colaboradorId, "pagamentos-caz"] });
 
       toast({
         title: "Nota fiscal anexada",
