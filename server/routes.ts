@@ -13064,48 +13064,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const colaborador = colaboradorResult.rows[0] as any;
-      const pix = colaborador.pix?.trim();
-      const cnpj = colaborador.cnpj?.replace(/\D/g, '');
-      const nome = colaborador.nome?.trim();
+      const pixRaw = colaborador.pix?.trim() || '';
+      const cnpjRaw = colaborador.cnpj?.trim() || '';
+      const nomeCompleto = colaborador.nome?.trim() || '';
       
-      if (!pix && !cnpj) {
+      // Preparar variações para busca
+      const cnpjLimpo = cnpjRaw.replace(/\D/g, '');
+      const pixLimpo = pixRaw.replace(/\D/g, '');
+      const primeiroNome = nomeCompleto.split(' ')[0] || '';
+      const ultimoNome = nomeCompleto.split(' ').slice(-1)[0] || '';
+      
+      console.log(`[rh-pagamentos] Buscando pagamentos para colaborador ${colaboradorId}:`);
+      console.log(`  Nome: ${nomeCompleto}, Primeiro: ${primeiroNome}, Último: ${ultimoNome}`);
+      console.log(`  PIX: ${pixRaw}, CNPJ: ${cnpjRaw}, CNPJ limpo: ${cnpjLimpo}`);
+      
+      if (!pixRaw && !cnpjRaw && !nomeCompleto) {
+        console.log(`[rh-pagamentos] Nenhum dado para buscar`);
         return res.json([]);
       }
       
-      // Buscar pagamentos nas parcelas do Conta Azul onde:
-      // - tipo_evento é DESPESA
-      // - a descrição ou categoria contém o PIX, CNPJ ou nome do colaborador
+      // Buscar em caz_parcelas E caz_pagar usando UNION
       const result = await db.execute(sql`
+        WITH pagamentos_parcelas AS (
+          SELECT 
+            p.id,
+            p.descricao,
+            COALESCE(p.valor_pago, p.valor_bruto) as valor_bruto,
+            p.data_quitacao as data_pagamento,
+            p.data_vencimento,
+            p.status,
+            p.categoria_nome,
+            'parcelas' as fonte
+          FROM caz_parcelas p
+          WHERE p.tipo_evento = 'DESPESA'
+            AND UPPER(p.status) IN ('PAID', 'PAGO', 'ACQUITTED', 'LIQUIDADO')
+            AND (
+              ${cnpjLimpo ? sql`p.descricao ILIKE ${'%' + cnpjLimpo + '%'}` : sql`FALSE`}
+              OR ${cnpjRaw ? sql`p.descricao ILIKE ${'%' + cnpjRaw + '%'}` : sql`FALSE`}
+              OR ${pixRaw ? sql`p.descricao ILIKE ${'%' + pixRaw + '%'}` : sql`FALSE`}
+              OR ${pixLimpo ? sql`p.descricao ILIKE ${'%' + pixLimpo + '%'}` : sql`FALSE`}
+              OR ${nomeCompleto ? sql`p.descricao ILIKE ${'%' + nomeCompleto + '%'}` : sql`FALSE`}
+              OR (${primeiroNome.length >= 4 ? sql`p.descricao ILIKE ${'%' + primeiroNome + '%'}` : sql`FALSE`}
+                  AND ${ultimoNome.length >= 4 ? sql`p.descricao ILIKE ${'%' + ultimoNome + '%'}` : sql`FALSE`})
+            )
+        ),
+        pagamentos_pagar AS (
+          SELECT 
+            pg.id,
+            pg.descricao,
+            COALESCE(pg.pago, pg.total) as valor_bruto,
+            pg.data_vencimento as data_pagamento,
+            pg.data_vencimento,
+            pg.status,
+            pg.nome as categoria_nome,
+            'pagar' as fonte
+          FROM caz_pagar pg
+          WHERE UPPER(pg.status) IN ('PAID', 'PAGO', 'ACQUITTED', 'LIQUIDADO')
+            AND (
+              ${cnpjLimpo ? sql`(pg.descricao ILIKE ${'%' + cnpjLimpo + '%'} OR pg.fornecedor ILIKE ${'%' + cnpjLimpo + '%'})` : sql`FALSE`}
+              OR ${cnpjRaw ? sql`(pg.descricao ILIKE ${'%' + cnpjRaw + '%'} OR pg.fornecedor ILIKE ${'%' + cnpjRaw + '%'})` : sql`FALSE`}
+              OR ${pixRaw ? sql`(pg.descricao ILIKE ${'%' + pixRaw + '%'} OR pg.fornecedor ILIKE ${'%' + pixRaw + '%'})` : sql`FALSE`}
+              OR ${nomeCompleto ? sql`(pg.descricao ILIKE ${'%' + nomeCompleto + '%'} OR pg.fornecedor ILIKE ${'%' + nomeCompleto + '%'})` : sql`FALSE`}
+              OR (${primeiroNome.length >= 4 ? sql`(pg.descricao ILIKE ${'%' + primeiroNome + '%'} OR pg.fornecedor ILIKE ${'%' + primeiroNome + '%'})` : sql`FALSE`}
+                  AND ${ultimoNome.length >= 4 ? sql`(pg.descricao ILIKE ${'%' + ultimoNome + '%'} OR pg.fornecedor ILIKE ${'%' + ultimoNome + '%'})` : sql`FALSE`})
+            )
+        ),
+        todos_pagamentos AS (
+          SELECT * FROM pagamentos_parcelas
+          UNION ALL
+          SELECT * FROM pagamentos_pagar
+        )
         SELECT 
-          p.id,
-          p.descricao,
-          p.valor_pago as valor_bruto,
-          p.data_quitacao as data_pagamento,
-          p.data_vencimento,
-          p.status,
-          p.categoria_nome,
-          EXTRACT(MONTH FROM COALESCE(p.data_quitacao, p.data_vencimento))::int as mes_referencia,
-          EXTRACT(YEAR FROM COALESCE(p.data_quitacao, p.data_vencimento))::int as ano_referencia,
+          t.*,
+          EXTRACT(MONTH FROM COALESCE(t.data_pagamento, t.data_vencimento))::int as mes_referencia,
+          EXTRACT(YEAR FROM COALESCE(t.data_pagamento, t.data_vencimento))::int as ano_referencia,
           CASE 
             WHEN EXISTS (
               SELECT 1 FROM staging.rh_notas_fiscais nf 
               WHERE nf.colaborador_id = ${colaboradorId}
-                AND EXTRACT(MONTH FROM COALESCE(p.data_quitacao, p.data_vencimento)) = nf.mes_referencia
-                AND EXTRACT(YEAR FROM COALESCE(p.data_quitacao, p.data_vencimento)) = nf.ano_referencia
+                AND EXTRACT(MONTH FROM COALESCE(t.data_pagamento, t.data_vencimento)) = nf.mes_referencia
+                AND EXTRACT(YEAR FROM COALESCE(t.data_pagamento, t.data_vencimento)) = nf.ano_referencia
             ) THEN 'nf_anexada'
             ELSE 'pendente'
           END as nf_status
-        FROM caz_parcelas p
-        WHERE p.tipo_evento = 'DESPESA'
-          AND UPPER(p.status) IN ('PAID', 'PAGO', 'ACQUITTED')
-          AND (
-            ${pix ? sql`p.descricao ILIKE ${'%' + pix + '%'}` : sql`FALSE`}
-            OR ${cnpj ? sql`p.descricao ILIKE ${'%' + cnpj + '%'}` : sql`FALSE`}
-            OR ${nome ? sql`p.descricao ILIKE ${'%' + nome + '%'}` : sql`FALSE`}
-          )
-        ORDER BY COALESCE(p.data_quitacao, p.data_vencimento) DESC
+        FROM todos_pagamentos t
+        ORDER BY COALESCE(t.data_pagamento, t.data_vencimento) DESC
         LIMIT 24
       `);
+      
+      console.log(`[rh-pagamentos] Encontrados ${result.rows.length} pagamentos`);
       
       res.json(result.rows);
     } catch (error) {
