@@ -13154,6 +13154,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEBUG: Buscar CNPJ em todas as tabelas do Conta Azul
+  app.get("/api/debug/buscar-cnpj/:cnpj", isAuthenticated, async (req, res) => {
+    try {
+      const cnpj = req.params.cnpj.replace(/\D/g, '');
+      console.log(`[DEBUG] Buscando CNPJ ${cnpj} em tabelas CAZ...`);
+      
+      const results: any = {};
+      
+      // 1. Buscar em caz_parcelas - descrição
+      const parcelas = await db.execute(sql`
+        SELECT id, descricao, valor_pago, valor_bruto, status, tipo_evento, data_quitacao, data_vencimento, categoria_nome
+        FROM caz_parcelas 
+        WHERE descricao ILIKE ${'%' + cnpj + '%'}
+        LIMIT 10
+      `);
+      results.parcelas_descricao = parcelas.rows;
+      console.log(`[DEBUG] caz_parcelas (descrição): ${parcelas.rows.length} registros`);
+      
+      // 2. Buscar em caz_pagar - descrição
+      const pagar_desc = await db.execute(sql`
+        SELECT id, descricao, fornecedor, pago, total, status, data_vencimento
+        FROM caz_pagar 
+        WHERE descricao ILIKE ${'%' + cnpj + '%'}
+        LIMIT 10
+      `);
+      results.pagar_descricao = pagar_desc.rows;
+      console.log(`[DEBUG] caz_pagar (descrição): ${pagar_desc.rows.length} registros`);
+      
+      // 3. Buscar em caz_pagar - fornecedor
+      const pagar_forn = await db.execute(sql`
+        SELECT id, descricao, fornecedor, pago, total, status, data_vencimento
+        FROM caz_pagar 
+        WHERE fornecedor ILIKE ${'%' + cnpj + '%'}
+        LIMIT 10
+      `);
+      results.pagar_fornecedor = pagar_forn.rows;
+      console.log(`[DEBUG] caz_pagar (fornecedor): ${pagar_forn.rows.length} registros`);
+      
+      // 4. Buscar em caz_clientes - cnpj
+      const clientes = await db.execute(sql`
+        SELECT id, nome, cnpj, ids
+        FROM caz_clientes 
+        WHERE REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') = ${cnpj}
+        LIMIT 10
+      `);
+      results.clientes = clientes.rows;
+      console.log(`[DEBUG] caz_clientes: ${clientes.rows.length} registros`);
+      
+      // 5. Verificar estrutura das tabelas
+      const estrutura_parcelas = await db.execute(sql`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'caz_parcelas' 
+        ORDER BY ordinal_position
+      `);
+      results.colunas_parcelas = estrutura_parcelas.rows.map((r: any) => r.column_name);
+      
+      const estrutura_pagar = await db.execute(sql`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'caz_pagar' 
+        ORDER BY ordinal_position
+      `);
+      results.colunas_pagar = estrutura_pagar.rows.map((r: any) => r.column_name);
+      
+      // 6. Buscar pelo nome "Bruno" em caz_pagar.fornecedor
+      const pagar_bruno = await db.execute(sql`
+        SELECT id, descricao, fornecedor, pago, total, status, data_vencimento
+        FROM caz_pagar 
+        WHERE fornecedor ILIKE '%Bruno%'
+        LIMIT 10
+      `);
+      results.pagar_bruno = pagar_bruno.rows;
+      console.log(`[DEBUG] caz_pagar (Bruno): ${pagar_bruno.rows.length} registros`);
+      
+      res.json(results);
+    } catch (error) {
+      console.error("[DEBUG] Error:", error);
+      res.status(500).json({ error: "Erro na busca debug", details: String(error) });
+    }
+  });
+
   // Registrar nota fiscal diretamente (sem pagamento existente)
   app.post("/api/rh/colaboradores/:colaboradorId/nf", isAuthenticated, async (req, res) => {
     try {
