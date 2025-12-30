@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,7 +35,6 @@ export default function DashboardFinanceiro() {
   usePageTitle("Dashboard Financeiro");
   useSetPageInfo("Dashboard Financeiro", "Análise completa de receitas, despesas e fluxo de caixa");
   
-  const [activeTab, setActiveTab] = useState("visao-geral");
   const [periodoMeses, setPeriodoMeses] = useState(6);
   const [mesSelecionado, setMesSelecionado] = useState<{ ano: number; mes: number; mesAno: string } | null>(null);
   const [diaSelecionado, setDiaSelecionado] = useState<{ ano: number; mes: number; dia: number; diaFormatado: string } | null>(null);
@@ -1026,42 +1024,10 @@ export default function DashboardFinanceiro() {
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-6 max-w-7xl">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
-            <TabsTrigger value="visao-geral" className="gap-2" data-testid="tab-visao-geral">
-              <PieChart className="w-4 h-4" />
-              <span className="hidden sm:inline">Visão Geral</span>
-            </TabsTrigger>
-            <TabsTrigger value="categorias" className="gap-2" data-testid="tab-categorias">
-              <BarChart3 className="w-4 h-4" />
-              <span className="hidden sm:inline">Categorias</span>
-            </TabsTrigger>
-            <TabsTrigger value="clientes" className="gap-2" data-testid="tab-clientes">
-              <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Clientes</span>
-            </TabsTrigger>
-            <TabsTrigger value="fluxo-caixa" className="gap-2" data-testid="tab-fluxo-caixa">
-              <DollarSign className="w-4 h-4" />
-              <span className="hidden sm:inline">Fluxo de Caixa</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="visao-geral" className="mt-6">
-            {renderVisaoGeral()}
-          </TabsContent>
-
-          <TabsContent value="categorias" className="mt-6">
-            {renderCategorias()}
-          </TabsContent>
-
-          <TabsContent value="clientes" className="mt-6">
-            {renderClientes()}
-          </TabsContent>
-
-          <TabsContent value="fluxo-caixa" className="mt-6">
-            {renderFluxoCaixa()}
-          </TabsContent>
-        </Tabs>
+        <div className="space-y-6">
+          {renderVisaoGeral()}
+          {renderCategorias()}
+        </div>
       </div>
     </div>
   );
