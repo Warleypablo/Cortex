@@ -45,6 +45,7 @@
     "@react-three/fiber": "^8.15.19",
     "@replit/database": "^3.0.1",
     "@tanstack/react-query": "^5.60.5",
+    "@tanstack/react-virtual": "^3.13.13",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/passport-google-oauth20": "^2.0.17",
