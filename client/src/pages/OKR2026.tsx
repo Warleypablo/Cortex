@@ -124,10 +124,12 @@ interface Initiative {
   objectiveId: string;
   name?: string;
   title?: string;
+  description?: string;
   ownerRole?: string;
   owner_email?: string;
   owner_name?: string;
   start?: string;
+  startedAt?: string;
   end?: string;
   dueDate?: string;
   quarter?: string;
@@ -136,6 +138,7 @@ interface Initiative {
   krIds?: string[];
   krs?: string[];
   tags?: string[];
+  checklist?: string[];
   successMetricKeys?: string[];
   successKpi?: string;
   notes?: string;
