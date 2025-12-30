@@ -109,6 +109,15 @@ const REFINED_COLORS = [
   "#14b8a6", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899"
 ];
 
+const formatCurrencyNoDecimals = (value: number) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value);
+};
+
 const CustomTooltip = ({ active, payload, label, valueFormatter }: any) => {
   if (!active || !payload?.length) return null;
   return (
@@ -606,7 +615,7 @@ export default function ChurnDetalhamento() {
             />
             <TechKpiCard
               title="LTV Total"
-              value={formatCurrency(filteredMetricas.ltv_total)}
+              value={formatCurrencyNoDecimals(filteredMetricas.ltv_total)}
               subtitle="valor gerado antes do churn"
               icon={Target}
               gradient="bg-gradient-to-r from-amber-500 to-yellow-600"
@@ -622,7 +631,7 @@ export default function ChurnDetalhamento() {
             />
             <TechKpiCard
               title="Ticket Médio"
-              value={formatCurrency(filteredMetricas.ticket_medio)}
+              value={formatCurrencyNoDecimals(filteredMetricas.ticket_medio)}
               subtitle="MRR médio por contrato"
               icon={BarChart3}
               gradient="bg-gradient-to-r from-violet-500 to-purple-600"
@@ -631,7 +640,7 @@ export default function ChurnDetalhamento() {
             <TechKpiCard
               title="LTV Médio"
               value={filteredMetricas.total_churned > 0 
-                ? formatCurrency(filteredMetricas.ltv_total / filteredMetricas.total_churned)
+                ? formatCurrencyNoDecimals(filteredMetricas.ltv_total / filteredMetricas.total_churned)
                 : "R$ 0"}
               subtitle="por contrato churned"
               icon={Percent}
