@@ -1465,23 +1465,38 @@ function getEnpsCategory(score: number): { label: string; color: string; bgColor
 
 const AGENDA_TEMPLATES = [
   { 
-    id: "checkin", 
+    id: "checkin-semanal", 
     nome: "Check-in Semanal", 
+    descricao: "Acompanhamento rápido",
+    icon: "calendar",
     topicos: "- Bem-estar: Como você está?\n- Bloqueios: O que está te impedindo de avançar?\n- Prioridades: Quais são as prioridades da semana?" 
+  },
+  { 
+    id: "checkin-mensal", 
+    nome: "Check-in Mensal", 
+    descricao: "Revisão do mês",
+    icon: "calendar-days",
+    topicos: "- Retrospectiva: Como foi o mês?\n- Conquistas: O que você realizou?\n- Desafios: Quais foram as dificuldades?\n- Próximo mês: O que esperar?" 
   },
   { 
     id: "feedback", 
     nome: "Feedback", 
+    descricao: "Pontos de melhoria",
+    icon: "message-circle",
     topicos: "- Pontos positivos: O que está funcionando bem?\n- Áreas de melhoria: O que pode melhorar?\n- Ações: Quais próximos passos?" 
   },
   { 
     id: "desenvolvimento", 
     nome: "Desenvolvimento", 
+    descricao: "Plano de carreira",
+    icon: "trending-up",
     topicos: "- Metas: Como estão as metas de desenvolvimento?\n- Aprendizado: O que aprendeu recentemente?\n- Carreira: Onde quer chegar?" 
   },
   { 
     id: "livre", 
     nome: "Livre", 
+    descricao: "Pauta aberta",
+    icon: "edit",
     topicos: "" 
   },
 ];
@@ -2008,36 +2023,56 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
             {/* Coluna Esquerda - Configurações e Anexos */}
             <div className="space-y-5">
-              {/* Template e Data */}
-              <div className="p-4 rounded-xl bg-muted/50 space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Template de Pauta</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {AGENDA_TEMPLATES.map((template) => (
-                      <Button
+              {/* Template de Pauta */}
+              <div className="space-y-3">
+                <label className="text-sm font-medium">Tipo de Reunião</label>
+                <div className="grid grid-cols-1 gap-2">
+                  {AGENDA_TEMPLATES.map((template) => {
+                    const isSelected = selectedTemplate === template.id;
+                    return (
+                      <button
                         key={template.id}
                         type="button"
-                        variant={selectedTemplate === template.id ? "default" : "outline"}
-                        size="sm"
                         onClick={() => handleTemplateSelect(template.id)}
-                        className="justify-start h-10"
+                        className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
+                          isSelected 
+                            ? "border-primary bg-primary/10 shadow-sm" 
+                            : "border-border hover:border-primary/50 hover:bg-muted/50"
+                        }`}
                         data-testid={`template-${template.id}`}
                       >
-                        {template.nome}
-                      </Button>
-                    ))}
-                  </div>
+                        <div className={`p-2 rounded-lg ${isSelected ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                          {template.icon === "calendar" && <Calendar className="w-4 h-4" />}
+                          {template.icon === "calendar-days" && <Calendar className="w-4 h-4" />}
+                          {template.icon === "message-circle" && <MessageSquare className="w-4 h-4" />}
+                          {template.icon === "trending-up" && <TrendingUp className="w-4 h-4" />}
+                          {template.icon === "edit" && <FileText className="w-4 h-4" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${isSelected ? "text-primary" : ""}`}>{template.nome}</p>
+                          <p className="text-xs text-muted-foreground truncate">{template.descricao}</p>
+                        </div>
+                        {isSelected && (
+                          <div className="p-1 rounded-full bg-primary text-primary-foreground">
+                            <Check className="w-3 h-3" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Data da Reunião *</label>
-                  <Input 
-                    type="date" 
-                    value={formData.data} 
-                    onChange={(e) => setFormData({ ...formData, data: e.target.value })} 
-                    className="h-11"
-                    data-testid="input-1x1-data" 
-                  />
-                </div>
+              </div>
+
+              {/* Data */}
+              <div className="p-4 rounded-xl bg-muted/50">
+                <label className="text-sm font-medium mb-2 block">Data da Reunião *</label>
+                <Input 
+                  type="date" 
+                  value={formData.data} 
+                  onChange={(e) => setFormData({ ...formData, data: e.target.value })} 
+                  className="h-11"
+                  data-testid="input-1x1-data" 
+                />
               </div>
 
               {/* Anexos */}
