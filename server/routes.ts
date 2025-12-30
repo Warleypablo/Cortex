@@ -13336,6 +13336,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== API de Comentários sobre Colaboradores =====
+  
+  // Listar comentários de um colaborador
+  app.get("/api/rh/colaborador/:colaboradorId/comentarios", isAuthenticated, async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.colaboradorId);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "ID do colaborador inválido" });
+      }
+      
+      const user = req.user as any;
+      const hasAccess = await canAccessColaboradorRH(user, colaboradorId.toString());
+      
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Acesso negado aos comentários" });
+      }
+      
+      const result = await db.execute(sql`
+        SELECT c.*, 
+               a.nome_completo as autor_nome_completo
+        FROM rh_comentarios c
+        LEFT JOIN rh_pessoal a ON a.id = c.autor_id
+        WHERE c.colaborador_id = ${colaboradorId}
+        ORDER BY c.criado_em DESC
+      `);
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[rh-comentarios] Error fetching comments:", error);
+      res.status(500).json({ error: "Erro ao buscar comentários" });
+    }
+  });
+  
+  // Adicionar comentário
+  app.post("/api/rh/colaborador/:colaboradorId/comentarios", isAuthenticated, async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.colaboradorId);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "ID do colaborador inválido" });
+      }
+      
+      const user = req.user as any;
+      const hasAccess = await canAccessColaboradorRH(user, colaboradorId.toString());
+      
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Acesso negado para adicionar comentários" });
+      }
+      
+      const { comentario, tipo = "geral", visibilidade = "lider" } = req.body;
+      
+      if (!comentario || comentario.trim() === "") {
+        return res.status(400).json({ error: "Comentário é obrigatório" });
+      }
+      
+      // Buscar dados do autor (colaborador logado)
+      const autorResult = await db.execute(sql`
+        SELECT id, nome_completo FROM rh_pessoal 
+        WHERE email = ${user.email}
+        LIMIT 1
+      `);
+      
+      const autor = autorResult.rows[0];
+      const autorId = autor ? (autor as any).id : null;
+      const autorNome = autor ? (autor as any).nome_completo : user.name || user.email;
+      
+      const result = await db.execute(sql`
+        INSERT INTO rh_comentarios (colaborador_id, autor_id, autor_nome, autor_email, comentario, tipo, visibilidade)
+        VALUES (${colaboradorId}, ${autorId}, ${autorNome}, ${user.email}, ${comentario.trim()}, ${tipo}, ${visibilidade})
+        RETURNING *
+      `);
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[rh-comentarios] Error adding comment:", error);
+      res.status(500).json({ error: "Erro ao adicionar comentário" });
+    }
+  });
+  
+  // Deletar comentário
+  app.delete("/api/rh/comentarios/:comentarioId", isAuthenticated, async (req, res) => {
+    try {
+      const comentarioId = parseInt(req.params.comentarioId);
+      if (isNaN(comentarioId)) {
+        return res.status(400).json({ error: "ID do comentário inválido" });
+      }
+      
+      const user = req.user as any;
+      
+      // Verificar se o usuário é o autor do comentário ou admin
+      const comentarioResult = await db.execute(sql`
+        SELECT * FROM rh_comentarios WHERE id = ${comentarioId}
+      `);
+      
+      if (comentarioResult.rows.length === 0) {
+        return res.status(404).json({ error: "Comentário não encontrado" });
+      }
+      
+      const comentario = comentarioResult.rows[0] as any;
+      const isAuthor = comentario.autor_email === user.email;
+      const isAdmin = user.role === "admin";
+      
+      if (!isAuthor && !isAdmin) {
+        return res.status(403).json({ error: "Você só pode deletar seus próprios comentários" });
+      }
+      
+      await db.execute(sql`DELETE FROM rh_comentarios WHERE id = ${comentarioId}`);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[rh-comentarios] Error deleting comment:", error);
+      res.status(500).json({ error: "Erro ao deletar comentário" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
