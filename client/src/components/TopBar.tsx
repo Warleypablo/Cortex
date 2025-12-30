@@ -17,7 +17,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, AlertTriangle, CheckCircle, X, Check, Settings, Cake, FileText, ExternalLink, ChevronRight, Calendar, DollarSign, User } from "lucide-react";
+import { Bell, AlertTriangle, CheckCircle, X, Check, Settings, Cake, FileText, ExternalLink, ChevronRight, Calendar, DollarSign, User, HelpCircle, Bug, Send, Loader2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -534,7 +538,11 @@ export default function TopBar() {
   const [avisosOpen, setAvisosOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [bugReportOpen, setBugReportOpen] = useState(false);
+  const [bugReport, setBugReport] = useState({ titulo: "", descricao: "", pagina: "" });
+  const [isSubmittingBug, setIsSubmittingBug] = useState(false);
   const { title, subtitle } = usePageInfo();
+  const { toast } = useToast();
   const hasGeneratedNotifications = useRef(false);
 
   const handleViewDetails = (notification: Notification) => {
@@ -613,6 +621,31 @@ export default function TopBar() {
       .toUpperCase();
   };
 
+  const handleSubmitBugReport = async () => {
+    if (!bugReport.titulo.trim() || !bugReport.descricao.trim()) {
+      toast({ title: "Campos obrigatórios", description: "Preencha o título e a descrição.", variant: "destructive" });
+      return;
+    }
+    
+    setIsSubmittingBug(true);
+    try {
+      await apiRequest("POST", "/api/bug-reports", {
+        titulo: bugReport.titulo,
+        descricao: bugReport.descricao,
+        pagina: bugReport.pagina || window.location.pathname,
+        userAgent: navigator.userAgent,
+      });
+      
+      toast({ title: "Report enviado", description: "Obrigado pelo feedback! Vamos analisar o problema." });
+      setBugReportOpen(false);
+      setBugReport({ titulo: "", descricao: "", pagina: "" });
+    } catch (error) {
+      toast({ title: "Erro ao enviar", description: "Não foi possível enviar o report. Tente novamente.", variant: "destructive" });
+    } finally {
+      setIsSubmittingBug(false);
+    }
+  };
+
   return (
     <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
       <div className="flex items-center gap-4 flex-1">
@@ -633,7 +666,84 @@ export default function TopBar() {
       </div>
       
       <div className="flex items-center justify-end flex-1 gap-2">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setBugReportOpen(true)}
+              data-testid="button-bug-report"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Reportar problema</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
+      
+      {/* Bug Report Dialog */}
+      <Dialog open={bugReportOpen} onOpenChange={setBugReportOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bug className="h-5 w-5 text-orange-500" />
+              Reportar Problema
+            </DialogTitle>
+            <DialogDescription>
+              Encontrou um bug ou tem uma sugestão? Nos conte!
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="bug-titulo">Título *</Label>
+              <Input
+                id="bug-titulo"
+                placeholder="Resumo do problema..."
+                value={bugReport.titulo}
+                onChange={(e) => setBugReport({ ...bugReport, titulo: e.target.value })}
+                data-testid="input-bug-titulo"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bug-descricao">Descrição *</Label>
+              <Textarea
+                id="bug-descricao"
+                placeholder="Descreva o problema em detalhes. O que aconteceu? O que você esperava que acontecesse?"
+                value={bugReport.descricao}
+                onChange={(e) => setBugReport({ ...bugReport, descricao: e.target.value })}
+                rows={4}
+                data-testid="input-bug-descricao"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bug-pagina">Página (opcional)</Label>
+              <Input
+                id="bug-pagina"
+                placeholder={window.location.pathname}
+                value={bugReport.pagina}
+                onChange={(e) => setBugReport({ ...bugReport, pagina: e.target.value })}
+                data-testid="input-bug-pagina"
+              />
+              <p className="text-xs text-muted-foreground">Se deixar vazio, será usada a página atual.</p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setBugReportOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSubmitBugReport} disabled={isSubmittingBug} data-testid="button-submit-bug">
+              {isSubmittingBug ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Send className="h-4 w-4 mr-1" />
+              )}
+              Enviar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       
       <AvisosModal 
         open={avisosOpen} 
