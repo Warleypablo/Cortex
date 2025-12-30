@@ -3870,27 +3870,6 @@ export default function OKR2026() {
   const [selectedBU, setSelectedBU] = useState("all");
   const currentQuarter = getCurrentQuarter();
 
-  const seedBPMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/okr2026/seed-bp");
-      return res.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Seed realizado com sucesso",
-        description: `Processadas ${data.metricsProcessed} métricas e ${data.targetsUpserted} targets.`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/okr2026/summary"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erro no seed",
-        description: error.message || "Falha ao processar o seed do BP 2026.",
-        variant: "destructive",
-      });
-    },
-  });
-
   const { data, isLoading, error } = useQuery<SummaryResponse>({
     queryKey: ["/api/okr2026/summary", { bu: selectedBU }],
   });
@@ -3983,19 +3962,6 @@ export default function OKR2026() {
               <Badge className="text-sm px-4 py-1.5 bg-primary text-primary-foreground shadow-lg shadow-primary/20">
                 2026
               </Badge>
-              {user?.role === 'admin' && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => seedBPMutation.mutate()}
-                  disabled={seedBPMutation.isPending}
-                  className="bg-background/80 backdrop-blur-sm ml-2"
-                  data-testid="button-seed-bp"
-                >
-                  <Rocket className="w-4 h-4 mr-2" />
-                  {seedBPMutation.isPending ? "Processando..." : "Seed BP 2026"}
-                </Button>
-              )}
             </div>
           </div>
         </div>
