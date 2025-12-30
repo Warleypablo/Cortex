@@ -411,6 +411,46 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // Upload URL for new 1x1 meetings (before creating the meeting)
+  app.post("/api/colaboradores/:id/one-on-one/upload-url", async (req, res) => {
+    try {
+      const colaboradorId = parseInt(req.params.id);
+      if (isNaN(colaboradorId)) {
+        return res.status(400).json({ error: "Invalid colaborador ID" });
+      }
+      
+      const { filename, contentType } = req.body;
+      if (!filename) {
+        return res.status(400).json({ error: "Filename is required" });
+      }
+      
+      // Only allow PDF files
+      if (contentType && !contentType.includes('pdf')) {
+        return res.status(400).json({ error: "Only PDF files are allowed" });
+      }
+      
+      // Import ObjectStorageService
+      const { ObjectStorageService } = await import("../replit_integrations/object_storage");
+      const objectStorage = new ObjectStorageService();
+      
+      // Generate presigned upload URL
+      const uploadURL = await objectStorage.getObjectEntityUploadURL();
+      
+      // Extract object path from upload URL for later storage
+      const url = new URL(uploadURL);
+      const objectPath = url.pathname;
+      
+      res.json({ 
+        uploadURL, 
+        objectPath,
+        colaboradorId
+      });
+    } catch (error) {
+      console.error("[api] Error generating upload URL for new 1x1 PDF:", error);
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
   app.put("/api/one-on-one/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
