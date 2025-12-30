@@ -2048,25 +2048,35 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
                   </div>
                   <div>
                     <p className="text-sm font-semibold">Anexos</p>
-                    <p className="text-xs text-muted-foreground">PDF, links e transcrições</p>
+                    <p className="text-xs text-muted-foreground">PDF, DOC, CSV e links</p>
                   </div>
                 </div>
                 
-                {/* Upload de PDF */}
+                {/* Upload de Documento */}
                 <div className="p-3 rounded-lg bg-background border">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Documento PDF</label>
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Documento</label>
+                  <p className="text-xs text-muted-foreground mt-0.5">PDF, DOC, DOCX ou CSV</p>
                   <div className="flex items-center gap-3 mt-2">
                     <input
                       type="file"
                       ref={createPdfInputRef}
-                      accept=".pdf"
+                      accept=".pdf,.doc,.docx,.csv,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file && file.type === "application/pdf") {
+                        const allowedTypes = [
+                          "application/pdf",
+                          "application/msword",
+                          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                          "text/csv",
+                          "application/csv"
+                        ];
+                        const allowedExtensions = [".pdf", ".doc", ".docx", ".csv"];
+                        const fileExtension = file?.name?.toLowerCase().slice(file.name.lastIndexOf("."));
+                        if (file && (allowedTypes.includes(file.type) || allowedExtensions.includes(fileExtension || ""))) {
                           setPdfFile(file);
                         } else if (file) {
-                          toast({ title: "Arquivo inválido", description: "Apenas PDFs são aceitos.", variant: "destructive" });
+                          toast({ title: "Arquivo inválido", description: "Formatos aceitos: PDF, DOC, DOCX, CSV", variant: "destructive" });
                         }
                       }}
                       data-testid="input-1x1-pdf"
@@ -2080,12 +2090,12 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
                       data-testid="button-upload-1x1-pdf"
                     >
                       <Upload className="w-5 h-5 mr-2" />
-                      {pdfFile ? "Trocar PDF" : "Clique para anexar PDF"}
+                      {pdfFile ? "Trocar arquivo" : "Clique para anexar documento"}
                     </Button>
                   </div>
                   {pdfFile && (
                     <div className="flex items-center gap-2 mt-2 p-2 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                      <FileText className="w-5 h-5 text-red-500 flex-shrink-0" />
+                      <FileText className="w-5 h-5 text-primary flex-shrink-0" />
                       <span className="text-sm truncate flex-1">{pdfFile.name}</span>
                       <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPdfFile(null)}>
                         <X className="w-4 h-4" />
