@@ -1999,140 +1999,176 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Nova Reunião 1x1</DialogTitle>
-            <DialogDescription>Registre uma nova reunião one-on-one</DialogDescription>
+            <DialogTitle className="text-xl">Nova Reunião 1x1</DialogTitle>
+            <DialogDescription>Registre uma nova reunião one-on-one com anexos e transcrição</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Template de Pauta</label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {AGENDA_TEMPLATES.map((template) => (
-                  <Button
-                    key={template.id}
-                    type="button"
-                    variant={selectedTemplate === template.id ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleTemplateSelect(template.id)}
-                    className="justify-start"
-                    data-testid={`template-${template.id}`}
-                  >
-                    {template.nome}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Data *</label>
-              <Input type="date" value={formData.data} onChange={(e) => setFormData({ ...formData, data: e.target.value })} data-testid="input-1x1-data" />
-            </div>
-
-            {/* Campos de Anexo - Seção Principal */}
-            <div className="space-y-3">
-              <p className="text-sm font-medium flex items-center gap-2">
-                <Paperclip className="w-4 h-4" />
-                Anexos
-              </p>
-              
-              {/* Upload de PDF */}
-              <div>
-                <label className="text-sm text-muted-foreground">Documento PDF</label>
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="file"
-                    ref={createPdfInputRef}
-                    accept=".pdf"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file && file.type === "application/pdf") {
-                        setPdfFile(file);
-                      } else if (file) {
-                        toast({ title: "Arquivo inválido", description: "Apenas PDFs são aceitos.", variant: "destructive" });
-                      }
-                    }}
-                    data-testid="input-1x1-pdf"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => createPdfInputRef.current?.click()}
-                    disabled={isUploadingPdf}
-                    data-testid="button-upload-1x1-pdf"
-                  >
-                    <Upload className="w-4 h-4 mr-1" />
-                    {pdfFile ? "Trocar PDF" : "Anexar PDF"}
-                  </Button>
-                  {pdfFile && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <FileText className="w-4 h-4 text-red-500" />
-                      <span className="truncate max-w-[150px]">{pdfFile.name}</span>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+            {/* Coluna Esquerda - Configurações e Anexos */}
+            <div className="space-y-5">
+              {/* Template e Data */}
+              <div className="p-4 rounded-xl bg-muted/50 space-y-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Template de Pauta</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {AGENDA_TEMPLATES.map((template) => (
                       <Button
+                        key={template.id}
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => setPdfFile(null)}
+                        variant={selectedTemplate === template.id ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleTemplateSelect(template.id)}
+                        className="justify-start h-10"
+                        data-testid={`template-${template.id}`}
                       >
-                        <X className="w-3 h-3" />
+                        {template.nome}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Data da Reunião *</label>
+                  <Input 
+                    type="date" 
+                    value={formData.data} 
+                    onChange={(e) => setFormData({ ...formData, data: e.target.value })} 
+                    className="h-11"
+                    data-testid="input-1x1-data" 
+                  />
+                </div>
+              </div>
+
+              {/* Anexos */}
+              <div className="p-4 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Paperclip className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Anexos</p>
+                    <p className="text-xs text-muted-foreground">PDF, links e transcrições</p>
+                  </div>
+                </div>
+                
+                {/* Upload de PDF */}
+                <div className="p-3 rounded-lg bg-background border">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Documento PDF</label>
+                  <div className="flex items-center gap-3 mt-2">
+                    <input
+                      type="file"
+                      ref={createPdfInputRef}
+                      accept=".pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file && file.type === "application/pdf") {
+                          setPdfFile(file);
+                        } else if (file) {
+                          toast({ title: "Arquivo inválido", description: "Apenas PDFs são aceitos.", variant: "destructive" });
+                        }
+                      }}
+                      data-testid="input-1x1-pdf"
+                    />
+                    <Button
+                      type="button"
+                      variant={pdfFile ? "secondary" : "outline"}
+                      onClick={() => createPdfInputRef.current?.click()}
+                      disabled={isUploadingPdf}
+                      className="flex-1 h-12"
+                      data-testid="button-upload-1x1-pdf"
+                    >
+                      <Upload className="w-5 h-5 mr-2" />
+                      {pdfFile ? "Trocar PDF" : "Clique para anexar PDF"}
+                    </Button>
+                  </div>
+                  {pdfFile && (
+                    <div className="flex items-center gap-2 mt-2 p-2 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                      <FileText className="w-5 h-5 text-red-500 flex-shrink-0" />
+                      <span className="text-sm truncate flex-1">{pdfFile.name}</span>
+                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPdfFile(null)}>
+                        <X className="w-4 h-4" />
                       </Button>
                     </div>
                   )}
                 </div>
-              </div>
 
-              {/* Link da Transcrição */}
-              <div>
-                <label className="text-sm text-muted-foreground">Link da Transcrição (URL externa)</label>
-                <Input
-                  value={formData.transcricao_url}
-                  onChange={(e) => setFormData({ ...formData, transcricao_url: e.target.value })}
-                  placeholder="https://..."
-                  className="mt-1"
-                  data-testid="input-1x1-transcricao-url"
-                />
+                {/* Link da Transcrição */}
+                <div className="p-3 rounded-lg bg-background border">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Link da Transcrição</label>
+                  <Input
+                    value={formData.transcricao_url}
+                    onChange={(e) => setFormData({ ...formData, transcricao_url: e.target.value })}
+                    placeholder="https://..."
+                    className="mt-2 h-11"
+                    data-testid="input-1x1-transcricao-url"
+                  />
+                </div>
               </div>
+            </div>
 
-              {/* Texto da Transcrição */}
-              <div>
-                <label className="text-sm text-muted-foreground">Transcrição (texto)</label>
+            {/* Coluna Direita - Transcrição e Notas */}
+            <div className="space-y-5">
+              {/* Transcrição */}
+              <div className="p-4 rounded-xl bg-muted/50 space-y-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" />
+                  <label className="text-sm font-medium">Transcrição da Reunião</label>
+                </div>
                 <Textarea
                   value={formData.transcricao_texto}
                   onChange={(e) => setFormData({ ...formData, transcricao_texto: e.target.value })}
-                  placeholder="Cole aqui a transcrição da reunião..."
-                  rows={3}
-                  className="mt-1"
+                  placeholder="Cole aqui a transcrição completa da reunião..."
+                  rows={6}
+                  className="resize-none"
                   data-testid="input-1x1-transcricao-texto"
                 />
               </div>
-            </div>
 
-            {/* Pauta e Notas - Seção Opcional */}
-            <div className="border-t pt-4 mt-2 space-y-3">
-              <p className="text-sm font-medium text-muted-foreground">Pauta e Notas (opcional)</p>
-              <div>
-                <label className="text-sm text-muted-foreground">Pauta</label>
-                <Textarea 
-                  value={formData.pauta} 
-                  onChange={(e) => setFormData({ ...formData, pauta: e.target.value })} 
-                  placeholder="Tópicos a serem discutidos..." 
-                  rows={3}
-                  className="mt-1"
-                  data-testid="input-1x1-pauta" 
-                />
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground">Notas</label>
-                <Textarea value={formData.notas} onChange={(e) => setFormData({ ...formData, notas: e.target.value })} placeholder="Anotações da reunião..." rows={3} className="mt-1" data-testid="input-1x1-notas" />
+              {/* Pauta e Notas - Opcional */}
+              <div className="p-4 rounded-xl border bg-card space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Pauta e Notas</p>
+                  <Badge variant="outline" className="text-xs">Opcional</Badge>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Pauta</label>
+                    <Textarea 
+                      value={formData.pauta} 
+                      onChange={(e) => setFormData({ ...formData, pauta: e.target.value })} 
+                      placeholder="Tópicos a serem discutidos..." 
+                      rows={3}
+                      className="mt-1 resize-none"
+                      data-testid="input-1x1-pauta" 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notas</label>
+                    <Textarea 
+                      value={formData.notas} 
+                      onChange={(e) => setFormData({ ...formData, notas: e.target.value })} 
+                      placeholder="Anotações e observações..." 
+                      rows={3} 
+                      className="mt-1 resize-none" 
+                      data-testid="input-1x1-notas" 
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="mt-6 pt-4 border-t">
             <Button variant="outline" onClick={() => { setDialogOpen(false); setPdfFile(null); }}>Cancelar</Button>
-            <Button onClick={handleCreate1x1} disabled={addMutation.isPending || isUploadingPdf || !formData.data} data-testid="button-save-1x1">
-              {(addMutation.isPending || isUploadingPdf) ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar"}
+            <Button 
+              onClick={handleCreate1x1} 
+              disabled={addMutation.isPending || isUploadingPdf || !formData.data} 
+              className="min-w-[120px]"
+              data-testid="button-save-1x1"
+            >
+              {(addMutation.isPending || isUploadingPdf) ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar Reunião"}
             </Button>
           </DialogFooter>
         </DialogContent>
