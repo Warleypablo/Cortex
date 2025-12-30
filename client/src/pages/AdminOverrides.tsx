@@ -390,24 +390,6 @@ function ActionsTab() {
   const { toast } = useToast();
   const [recomputeResult, setRecomputeResult] = useState<RecomputeResult | null>(null);
 
-  const seedMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/okr2026/seed-bp", { method: "POST" });
-      if (!res.ok) throw new Error("Failed to seed");
-      return res.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Seed BP 2026 concluído",
-        description: `${data.metricsProcessed} métricas, ${data.targetsUpserted} targets`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/health"] });
-    },
-    onError: () => {
-      toast({ title: "Erro no seed", variant: "destructive" });
-    },
-  });
-
   const recomputeMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/kpi/recompute?year=2026", { method: "POST" });
@@ -435,29 +417,6 @@ function ActionsTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Database className="h-5 w-5" />
-              Seed BP 2026
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Popula o registro de métricas e targets mensais com os valores do Business Plan 2026.
-            </p>
-            <Button
-              onClick={() => seedMutation.mutate()}
-              disabled={seedMutation.isPending}
-              className="w-full"
-              data-testid="button-seed-bp"
-            >
-              {seedMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Database className="h-4 w-4 mr-2" />}
-              Executar Seed
-            </Button>
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
