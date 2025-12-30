@@ -602,6 +602,43 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // Update 1x1 meeting notes (pauta and notas)
+  app.patch("/api/one-on-one/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid meeting ID" });
+      }
+      
+      const { pauta, notas } = req.body;
+      
+      await db.execute(sql`
+        UPDATE rh_one_on_one 
+        SET anotacoes = ${pauta || null}, proximos_passos = ${notas || null}
+        WHERE id = ${id}
+      `);
+      
+      // Return updated meeting
+      const result = await db.execute(sql`
+        SELECT 
+          id, colaborador_id as "colaboradorId", lider_id as "gestorId",
+          data, tipo, anotacoes as "pauta", proximos_passos as "notas", 
+          criado_em as "criadoEm",
+          pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename",
+          transcript_url as "transcriptUrl", transcript_text as "transcriptText",
+          uploaded_by as "uploadedBy",
+          ai_analysis as "aiAnalysis", ai_analyzed_at as "aiAnalyzedAt"
+        FROM rh_one_on_one 
+        WHERE id = ${id}
+      `);
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error updating 1x1 meeting notes:", error);
+      res.status(500).json({ error: "Failed to update meeting notes" });
+    }
+  });
+
   app.get("/api/one-on-one/:id/download-pdf", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
