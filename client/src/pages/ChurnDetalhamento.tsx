@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,22 +9,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { formatCurrency, formatPercent } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { 
   TrendingDown, 
   DollarSign, 
   Calendar, 
-  Users, 
   Search,
   AlertTriangle,
-  Building2,
-  User,
   FileText,
   Filter,
-  Download,
   ChevronDown,
   ChevronUp,
-  ExternalLink
+  Percent,
+  Clock,
+  BarChart3,
+  PieChart,
+  Target
 } from "lucide-react";
 import {
   Table,
@@ -39,11 +39,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { format, parseISO, differenceInMonths } from "date-fns";
+import { Progress } from "@/components/ui/progress";
+import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface ChurnContract {
-  id: number;
+  id: string;
   cliente_nome: string;
   cnpj: string;
   produto: string;
@@ -86,7 +87,7 @@ export default function ChurnDetalhamento() {
   const [filterPeriodo, setFilterPeriodo] = useState<string>("12");
   const [sortBy, setSortBy] = useState<string>("data_encerramento");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [isFiltersOpen, setIsFiltersOpen] = useState(true);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery<ChurnDetalhamentoData>({
     queryKey: ["/api/analytics/churn-detalhamento", filterPeriodo],
@@ -159,19 +160,85 @@ export default function ChurnDetalhamento() {
 
   const filteredMetricas = useMemo(() => {
     if (filteredContratos.length === 0) {
-      return { total_churned: 0, mrr_perdido: 0, ltv_total: 0, lt_medio: 0 };
+      return { total_churned: 0, mrr_perdido: 0, ltv_total: 0, lt_medio: 0, ticket_medio: 0 };
     }
     
     const total = filteredContratos.length;
     const mrrPerdido = filteredContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
     const ltvTotal = filteredContratos.reduce((sum, c) => sum + (c.ltv || 0), 0);
     const ltMedio = filteredContratos.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / total;
+    const ticketMedio = mrrPerdido / total;
     
     return {
       total_churned: total,
       mrr_perdido: mrrPerdido,
       ltv_total: ltvTotal,
-      lt_medio: ltMedio
+      lt_medio: ltMedio,
+      ticket_medio: ticketMedio
+    };
+  }, [filteredContratos]);
+
+  const distribuicaoPorSquad = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+    
+    const squadCounts: Record<string, { count: number; mrr: number }> = {};
+    filteredContratos.forEach(c => {
+      const squad = c.squad || "Não especificado";
+      if (!squadCounts[squad]) squadCounts[squad] = { count: 0, mrr: 0 };
+      squadCounts[squad].count++;
+      squadCounts[squad].mrr += c.valorr || 0;
+    });
+    
+    const total = filteredContratos.length;
+    return Object.entries(squadCounts)
+      .map(([squad, data]) => ({
+        squad,
+        count: data.count,
+        mrr: data.mrr,
+        percentual: (data.count / total) * 100
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [filteredContratos]);
+
+  const distribuicaoPorProduto = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+    
+    const prodCounts: Record<string, { count: number; mrr: number }> = {};
+    filteredContratos.forEach(c => {
+      const produto = c.produto || "Não especificado";
+      if (!prodCounts[produto]) prodCounts[produto] = { count: 0, mrr: 0 };
+      prodCounts[produto].count++;
+      prodCounts[produto].mrr += c.valorr || 0;
+    });
+    
+    const total = filteredContratos.length;
+    return Object.entries(prodCounts)
+      .map(([produto, data]) => ({
+        produto,
+        count: data.count,
+        mrr: data.mrr,
+        percentual: (data.count / total) * 100
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [filteredContratos]);
+
+  const distribuicaoPorLifetime = useMemo(() => {
+    if (filteredContratos.length === 0) return { curto: 0, medio: 0, longo: 0 };
+    
+    let curto = 0, medio = 0, longo = 0;
+    filteredContratos.forEach(c => {
+      if (c.lifetime_meses < 6) curto++;
+      else if (c.lifetime_meses < 12) medio++;
+      else longo++;
+    });
+    
+    const total = filteredContratos.length;
+    return {
+      curto: (curto / total) * 100,
+      medio: (medio / total) * 100,
+      longo: (longo / total) * 100
     };
   }, [filteredContratos]);
 
@@ -198,6 +265,13 @@ export default function ChurnDetalhamento() {
     }
   };
 
+  const colors = {
+    danger: "text-red-500",
+    warning: "text-amber-500",
+    success: "text-emerald-500",
+    info: "text-blue-500",
+  };
+
   if (error) {
     return (
       <div className="p-6">
@@ -213,21 +287,21 @@ export default function ChurnDetalhamento() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <Card className="bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Churned</CardTitle>
-            <TrendingDown className="h-4 w-4 text-destructive" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Churned</CardTitle>
+            <TrendingDown className={`h-4 w-4 ${colors.danger}`} />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
               <>
-                <div className="text-2xl font-bold" data-testid="text-total-churned">
+                <div className="text-3xl font-bold" data-testid="text-total-churned">
                   {filteredMetricas.total_churned}
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground mt-1">
                   contratos encerrados
                 </p>
               </>
@@ -235,65 +309,235 @@ export default function ChurnDetalhamento() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">MRR Perdido</CardTitle>
-            <DollarSign className="h-4 w-4 text-destructive" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">MRR Perdido</CardTitle>
+            <DollarSign className={`h-4 w-4 ${colors.danger}`} />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-32" />
             ) : (
               <>
-                <div className="text-2xl font-bold" data-testid="text-mrr-perdido">
+                <div className="text-3xl font-bold" data-testid="text-mrr-perdido">
                   {formatCurrency(filteredMetricas.mrr_perdido)}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  receita recorrente perdida
+                <p className="text-xs text-muted-foreground mt-1">
+                  receita mensal perdida
                 </p>
               </>
             )}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">LTV Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-amber-500" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">LTV Total</CardTitle>
+            <Target className={`h-4 w-4 ${colors.warning}`} />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-32" />
             ) : (
               <>
-                <div className="text-2xl font-bold" data-testid="text-ltv-total">
+                <div className="text-3xl font-bold" data-testid="text-ltv-total">
                   {formatCurrency(filteredMetricas.ltv_total)}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  valor total gerado
+                <p className="text-xs text-muted-foreground mt-1">
+                  valor gerado antes do churn
                 </p>
               </>
             )}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Lifetime Médio</CardTitle>
-            <Calendar className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Lifetime Médio</CardTitle>
+            <Clock className={`h-4 w-4 ${colors.info}`} />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
               <>
-                <div className="text-2xl font-bold" data-testid="text-lt-medio">
-                  {filteredMetricas.lt_medio.toFixed(1)} meses
+                <div className="text-3xl font-bold" data-testid="text-lt-medio">
+                  {filteredMetricas.lt_medio.toFixed(1)}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  tempo médio de contrato
+                <p className="text-xs text-muted-foreground mt-1">
+                  meses em média
                 </p>
               </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Ticket Médio</CardTitle>
+            <DollarSign className="h-4 w-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-3xl font-bold" data-testid="text-ticket-medio">
+                  {formatCurrency(filteredMetricas.ticket_medio)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  MRR médio por contrato
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">LTV/CAC Médio</CardTitle>
+            <Percent className={`h-4 w-4 ${colors.success}`} />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : (
+              <>
+                <div className="text-3xl font-bold" data-testid="text-ltv-cac">
+                  {filteredMetricas.total_churned > 0 
+                    ? (filteredMetricas.ltv_total / filteredMetricas.total_churned / 1000).toFixed(1) + "x"
+                    : "0x"}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  LTV médio / R$1k
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <PieChart className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">Distribuição por Lifetime</CardTitle>
+            </div>
+            <CardDescription>Tempo de permanência dos contratos churned</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-red-500" />
+                      Curto (&lt;6 meses)
+                    </span>
+                    <span className="font-medium">{distribuicaoPorLifetime.curto.toFixed(1)}%</span>
+                  </div>
+                  <Progress value={distribuicaoPorLifetime.curto} className="h-2 bg-red-100 dark:bg-red-900/30" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-amber-500" />
+                      Médio (6-12 meses)
+                    </span>
+                    <span className="font-medium">{distribuicaoPorLifetime.medio.toFixed(1)}%</span>
+                  </div>
+                  <Progress value={distribuicaoPorLifetime.medio} className="h-2 bg-amber-100 dark:bg-amber-900/30" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                      Longo (&gt;12 meses)
+                    </span>
+                    <span className="font-medium">{distribuicaoPorLifetime.longo.toFixed(1)}%</span>
+                  </div>
+                  <Progress value={distribuicaoPorLifetime.longo} className="h-2 bg-emerald-100 dark:bg-emerald-900/30" />
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">Top 5 Squads com Churn</CardTitle>
+            </div>
+            <CardDescription>Distribuição percentual por squad</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {isLoading ? (
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-8 w-full" />
+                ))}
+              </div>
+            ) : distribuicaoPorSquad.length === 0 ? (
+              <p className="text-muted-foreground text-sm text-center py-4">Nenhum dado disponível</p>
+            ) : (
+              distribuicaoPorSquad.map((item, index) => (
+                <div key={item.squad} className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="truncate max-w-[60%]" title={item.squad}>{item.squad}</span>
+                    <span className="font-medium text-right">
+                      {item.count} ({item.percentual.toFixed(1)}%)
+                    </span>
+                  </div>
+                  <Progress 
+                    value={item.percentual} 
+                    className="h-2" 
+                  />
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">Top 5 Produtos com Churn</CardTitle>
+            </div>
+            <CardDescription>Distribuição percentual por produto</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {isLoading ? (
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-8 w-full" />
+                ))}
+              </div>
+            ) : distribuicaoPorProduto.length === 0 ? (
+              <p className="text-muted-foreground text-sm text-center py-4">Nenhum dado disponível</p>
+            ) : (
+              distribuicaoPorProduto.map((item, index) => (
+                <div key={item.produto} className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="truncate max-w-[60%]" title={item.produto}>{item.produto}</span>
+                    <span className="font-medium text-right">
+                      {item.count} ({item.percentual.toFixed(1)}%)
+                    </span>
+                  </div>
+                  <Progress 
+                    value={item.percentual} 
+                    className="h-2" 
+                  />
+                </div>
+              ))
             )}
           </CardContent>
         </Card>
@@ -306,7 +550,7 @@ export default function ChurnDetalhamento() {
               <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent">
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4" />
-                  <CardTitle className="text-base">Filtros</CardTitle>
+                  <CardTitle className="text-base">Filtros Avançados</CardTitle>
                 </div>
                 {isFiltersOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </Button>
@@ -426,12 +670,19 @@ export default function ChurnDetalhamento() {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Contratos Encerrados
-            <Badge variant="secondary">{filteredContratos.length}</Badge>
-          </CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Contratos Encerrados
+            </CardTitle>
+            <CardDescription>
+              Listagem detalhada de todos os contratos churned no período
+            </CardDescription>
+          </div>
+          <Badge variant="secondary" className="text-lg px-3 py-1">
+            {filteredContratos.length}
+          </Badge>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -449,9 +700,9 @@ export default function ChurnDetalhamento() {
             <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-muted/50">
                     <TableHead 
-                      className="cursor-pointer hover:bg-muted/50"
+                      className="cursor-pointer hover:bg-muted/80"
                       onClick={() => handleSort("cliente_nome")}
                     >
                       <div className="flex items-center gap-1">
@@ -463,7 +714,7 @@ export default function ChurnDetalhamento() {
                     <TableHead>Squad</TableHead>
                     <TableHead>Responsável</TableHead>
                     <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 text-right"
+                      className="cursor-pointer hover:bg-muted/80 text-right"
                       onClick={() => handleSort("valorr")}
                     >
                       <div className="flex items-center justify-end gap-1">
@@ -473,7 +724,7 @@ export default function ChurnDetalhamento() {
                     </TableHead>
                     <TableHead>Início</TableHead>
                     <TableHead 
-                      className="cursor-pointer hover:bg-muted/50"
+                      className="cursor-pointer hover:bg-muted/80"
                       onClick={() => handleSort("data_encerramento")}
                     >
                       <div className="flex items-center gap-1">
@@ -482,7 +733,7 @@ export default function ChurnDetalhamento() {
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 text-right"
+                      className="cursor-pointer hover:bg-muted/80 text-right"
                       onClick={() => handleSort("lifetime_meses")}
                     >
                       <div className="flex items-center justify-end gap-1">
@@ -491,7 +742,7 @@ export default function ChurnDetalhamento() {
                       </div>
                     </TableHead>
                     <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 text-right"
+                      className="cursor-pointer hover:bg-muted/80 text-right"
                       onClick={() => handleSort("ltv")}
                     >
                       <div className="flex items-center justify-end gap-1">
@@ -503,8 +754,12 @@ export default function ChurnDetalhamento() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredContratos.map((contrato) => (
-                    <TableRow key={contrato.id} data-testid={`row-churn-${contrato.id}`}>
+                  {filteredContratos.map((contrato, index) => (
+                    <TableRow 
+                      key={`${contrato.id}-${index}`} 
+                      data-testid={`row-churn-${contrato.id}`}
+                      className="hover:bg-muted/30"
+                    >
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="font-medium">{contrato.cliente_nome || "-"}</span>
@@ -517,17 +772,17 @@ export default function ChurnDetalhamento() {
                       <TableCell>
                         <Badge variant="secondary">{contrato.squad || "-"}</Badge>
                       </TableCell>
-                      <TableCell>{contrato.responsavel || "-"}</TableCell>
-                      <TableCell className="text-right font-medium">
+                      <TableCell className="text-sm">{contrato.responsavel || "-"}</TableCell>
+                      <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
                         {formatCurrency(contrato.valorr || 0)}
                       </TableCell>
-                      <TableCell>{formatDate(contrato.data_inicio)}</TableCell>
-                      <TableCell>{formatDate(contrato.data_encerramento)}</TableCell>
+                      <TableCell className="text-sm">{formatDate(contrato.data_inicio)}</TableCell>
+                      <TableCell className="text-sm">{formatDate(contrato.data_encerramento)}</TableCell>
                       <TableCell className="text-right">
                         <Badge 
                           variant={contrato.lifetime_meses < 6 ? "destructive" : contrato.lifetime_meses < 12 ? "secondary" : "default"}
                         >
-                          {contrato.lifetime_meses.toFixed(1)} meses
+                          {contrato.lifetime_meses.toFixed(1)}m
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium">
@@ -535,9 +790,9 @@ export default function ChurnDetalhamento() {
                       </TableCell>
                       <TableCell>
                         {contrato.servico ? (
-                          <Badge variant="outline" className="text-xs">
+                          <span className="text-xs text-muted-foreground truncate max-w-[120px] block" title={contrato.servico}>
                             {contrato.servico}
-                          </Badge>
+                          </span>
                         ) : (
                           <span className="text-muted-foreground text-xs">-</span>
                         )}
