@@ -11969,6 +11969,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let contratosAtivos = 0;
       let clientesAtivos = 0;
       
+      // Totais globais da empresa (todos os contratos ativos)
+      let empresaMrrTotal = 0;
+      let empresaContratosAtivos = 0;
+      let empresaClientesAtivos = 0;
+      
+      // Buscar totais globais da empresa
+      const empresaTotaisQuery = await db.execute(sql`
+        SELECT 
+          COALESCE(SUM(ct.valorr::numeric), 0) as mrr_total,
+          COUNT(DISTINCT ct.id_task) as contratos_total,
+          COUNT(DISTINCT c.id) as clientes_total
+        FROM cup_contratos ct
+        INNER JOIN cup_clientes c ON ct.id_task = c.id_task
+        WHERE ct.status IN ('ativo', 'onboarding', 'triagem')
+      `);
+      
+      if (empresaTotaisQuery.rows.length > 0) {
+        const row = empresaTotaisQuery.rows[0] as any;
+        empresaMrrTotal = parseFloat(row.mrr_total || '0');
+        empresaContratosAtivos = parseInt(row.contratos_total || '0');
+        empresaClientesAtivos = parseInt(row.clientes_total || '0');
+      }
+      
       if (userName) {
         // Tentar encontrar o colaborador pelo nome ou email
         const colaboradorQuery = await db.execute(sql`
@@ -12142,6 +12165,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mrrTotal,
         contratosAtivos,
         clientesAtivos,
+        empresaMrrTotal,
+        empresaContratosAtivos,
+        empresaClientesAtivos,
         clientes: meusClientes,
         proximosEventos,
         alertas,
