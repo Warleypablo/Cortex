@@ -481,6 +481,118 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // ============ 1x1 Attachments (PDF Upload & Transcript) ============
+  app.post("/api/one-on-one/:id/upload-url", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid meeting ID" });
+      }
+      
+      const { filename, contentType } = req.body;
+      if (!filename) {
+        return res.status(400).json({ error: "Filename is required" });
+      }
+      
+      // Only allow PDF files
+      if (contentType && !contentType.includes('pdf')) {
+        return res.status(400).json({ error: "Only PDF files are allowed" });
+      }
+      
+      // Import ObjectStorageService
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage");
+      const objectStorage = new ObjectStorageService();
+      
+      // Generate presigned upload URL
+      const uploadURL = await objectStorage.getObjectEntityUploadURL();
+      
+      // Extract object path from upload URL for later storage
+      const url = new URL(uploadURL);
+      const objectPath = url.pathname;
+      
+      res.json({ 
+        uploadURL, 
+        objectPath,
+        meetingId: id
+      });
+    } catch (error) {
+      console.error("[api] Error generating upload URL for 1x1 PDF:", error);
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
+  app.patch("/api/one-on-one/:id/attachments", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid meeting ID" });
+      }
+      
+      const { pdfObjectKey, pdfFilename, transcriptUrl, transcriptText, uploadedBy } = req.body;
+      
+      // Validate transcript URL if provided
+      if (transcriptUrl && !transcriptUrl.startsWith('http')) {
+        return res.status(400).json({ error: "Invalid transcript URL format" });
+      }
+      
+      const meeting = await storage.updateOneOnOneAttachments(id, {
+        pdfObjectKey: pdfObjectKey || null,
+        pdfFilename: pdfFilename || null,
+        transcriptUrl: transcriptUrl || null,
+        transcriptText: transcriptText || null,
+        uploadedBy: uploadedBy || null
+      });
+      
+      res.json(meeting);
+    } catch (error) {
+      console.error("[api] Error updating 1x1 attachments:", error);
+      res.status(500).json({ error: "Failed to update attachments" });
+    }
+  });
+
+  app.get("/api/one-on-one/:id/download-pdf", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid meeting ID" });
+      }
+      
+      // Get meeting to find PDF object key
+      const meetings = await db.execute(sql`
+        SELECT pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename"
+        FROM rh_one_on_one 
+        WHERE id = ${id}
+      `);
+      
+      if (meetings.rows.length === 0) {
+        return res.status(404).json({ error: "Meeting not found" });
+      }
+      
+      const meeting = meetings.rows[0] as { pdfObjectKey: string | null; pdfFilename: string | null };
+      
+      if (!meeting.pdfObjectKey) {
+        return res.status(404).json({ error: "No PDF attached to this meeting" });
+      }
+      
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage");
+      const objectStorage = new ObjectStorageService();
+      
+      // Normalize and get the file
+      const normalizedPath = objectStorage.normalizeObjectEntityPath(meeting.pdfObjectKey);
+      const file = await objectStorage.getObjectEntityFile(normalizedPath);
+      
+      // Set download headers
+      res.set({
+        'Content-Disposition': `attachment; filename="${meeting.pdfFilename || 'document.pdf'}"`,
+      });
+      
+      await objectStorage.downloadObject(file, res);
+    } catch (error) {
+      console.error("[api] Error downloading 1x1 PDF:", error);
+      res.status(500).json({ error: "Failed to download PDF" });
+    }
+  });
+
   // ============ E-NPS Endpoints ============
   app.get("/api/colaboradores/:id/enps", async (req, res) => {
     try {
