@@ -13054,9 +13054,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Acesso negado aos dados de pagamentos" });
       }
       
-      // Buscar dados do colaborador (PIX e CNPJ)
+      // Buscar dados do colaborador (PIX, CNPJ, CPF, Email)
       const colaboradorResult = await db.execute(sql`
-        SELECT nome, pix, cnpj FROM rh_pessoal WHERE id = ${colaboradorId}
+        SELECT nome, pix, cnpj, cpf, email_turbo, email_pessoal FROM rh_pessoal WHERE id = ${colaboradorId}
       `);
       
       if (colaboradorResult.rows.length === 0) {
@@ -13066,11 +13066,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const colaborador = colaboradorResult.rows[0] as any;
       const pixRaw = colaborador.pix?.trim() || '';
       const cnpjRaw = colaborador.cnpj?.trim() || '';
+      const cpfRaw = colaborador.cpf?.trim() || '';
+      const emailTurbo = colaborador.email_turbo?.trim() || '';
+      const emailPessoal = colaborador.email_pessoal?.trim() || '';
       const nomeCompleto = colaborador.nome?.trim() || '';
       
       // Preparar variações para busca
       const cnpjLimpo = cnpjRaw.replace(/\D/g, '');
       const pixLimpo = pixRaw.replace(/\D/g, '');
+      const cpfLimpo = cpfRaw.replace(/\D/g, '');
       const primeiroNome = nomeCompleto.split(' ')[0] || '';
       const ultimoNome = nomeCompleto.split(' ').slice(-1)[0] || '';
       
@@ -13078,27 +13082,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`  Nome: ${nomeCompleto}, Primeiro: ${primeiroNome}, Último: ${ultimoNome}`);
       console.log(`  PIX raw: ${pixRaw}, PIX limpo: ${pixLimpo}`);
       console.log(`  CNPJ raw: ${cnpjRaw}, CNPJ limpo: ${cnpjLimpo}`);
+      console.log(`  CPF raw: ${cpfRaw}, CPF limpo: ${cpfLimpo}`);
+      console.log(`  Emails: ${emailTurbo}, ${emailPessoal}`);
       
-      if (!pixRaw && !cnpjRaw && !nomeCompleto) {
+      if (!pixRaw && !cnpjRaw && !cpfRaw && !nomeCompleto && !emailTurbo && !emailPessoal) {
         console.log(`[rh-pagamentos] Nenhum dado para buscar`);
         return res.json([]);
       }
       
-      // Primeiro, buscar o id do cliente na tabela caz_clientes pelo CNPJ/PIX
-      let clienteIds: string | null = null;
-      if (pixLimpo || cnpjLimpo) {
+      // Primeiro, buscar o id do cliente na tabela caz_clientes pelo CNPJ/PIX/CPF/Email
+      let clienteIds: string[] = [];
+      const identifiers = [pixLimpo, cnpjLimpo, cpfLimpo].filter(id => id.length >= 8);
+      const emails = [emailTurbo, emailPessoal].filter(e => e.includes('@'));
+      
+      for (const identifier of identifiers) {
         const clienteResult = await db.execute(sql`
           SELECT ids FROM caz_clientes 
-          WHERE REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') = ${pixLimpo || cnpjLimpo}
-          LIMIT 1
+          WHERE REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') = ${identifier}
+          LIMIT 5
         `);
-        if (clienteResult.rows.length > 0) {
-          clienteIds = (clienteResult.rows[0] as any).ids;
-          console.log(`  Cliente encontrado no CAZ: ids = ${clienteIds}`);
+        for (const row of clienteResult.rows) {
+          const id = (row as any).ids;
+          if (id && !clienteIds.includes(id)) clienteIds.push(id);
         }
       }
       
-      // Buscar em caz_parcelas E caz_pagar usando UNION
+      // Buscar também por email em caz_clientes
+      for (const email of emails) {
+        const clienteResult = await db.execute(sql`
+          SELECT ids FROM caz_clientes 
+          WHERE LOWER(email) = LOWER(${email})
+          LIMIT 5
+        `);
+        for (const row of clienteResult.rows) {
+          const id = (row as any).ids;
+          if (id && !clienteIds.includes(id)) clienteIds.push(id);
+        }
+      }
+      
+      console.log(`  Clientes encontrados no CAZ: ${clienteIds.length} ids = ${clienteIds.join(', ')}`);
+      const hasClienteIds = clienteIds.length > 0;
+      
+      // Construir condição de id_cliente para múltiplos IDs
+      const clienteIdsCondition = hasClienteIds 
+        ? sql.join(clienteIds.map(id => sql`p.id_cliente = ${id}`), sql` OR `)
+        : sql`FALSE`;
+      
+      // Buscar em caz_parcelas E caz_pagar usando UNION - SEM limite para mostrar todos
       const result = await db.execute(sql`
         WITH pagamentos_parcelas AS (
           SELECT 
@@ -13114,11 +13144,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           WHERE p.tipo_evento = 'DESPESA'
             AND UPPER(p.status) IN ('PAID', 'PAGO', 'ACQUITTED', 'LIQUIDADO', 'QUITADO')
             AND (
-              ${clienteIds ? sql`p.id_cliente = ${clienteIds}` : sql`FALSE`}
+              (${clienteIdsCondition})
               OR ${cnpjLimpo ? sql`p.descricao ILIKE ${'%' + cnpjLimpo + '%'}` : sql`FALSE`}
               OR ${cnpjRaw ? sql`p.descricao ILIKE ${'%' + cnpjRaw + '%'}` : sql`FALSE`}
               OR ${pixRaw ? sql`p.descricao ILIKE ${'%' + pixRaw + '%'}` : sql`FALSE`}
               OR ${pixLimpo ? sql`p.descricao ILIKE ${'%' + pixLimpo + '%'}` : sql`FALSE`}
+              OR ${cpfRaw ? sql`p.descricao ILIKE ${'%' + cpfRaw + '%'}` : sql`FALSE`}
+              OR ${cpfLimpo ? sql`p.descricao ILIKE ${'%' + cpfLimpo + '%'}` : sql`FALSE`}
+              OR ${emailTurbo ? sql`p.descricao ILIKE ${'%' + emailTurbo + '%'}` : sql`FALSE`}
+              OR ${emailPessoal ? sql`p.descricao ILIKE ${'%' + emailPessoal + '%'}` : sql`FALSE`}
               OR ${nomeCompleto ? sql`p.descricao ILIKE ${'%' + nomeCompleto + '%'}` : sql`FALSE`}
               OR (${primeiroNome.length >= 4 ? sql`p.descricao ILIKE ${'%' + primeiroNome + '%'}` : sql`FALSE`}
                   AND ${ultimoNome.length >= 4 ? sql`p.descricao ILIKE ${'%' + ultimoNome + '%'}` : sql`FALSE`})
@@ -13140,6 +13174,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ${cnpjLimpo ? sql`(pg.descricao ILIKE ${'%' + cnpjLimpo + '%'} OR pg.fornecedor ILIKE ${'%' + cnpjLimpo + '%'})` : sql`FALSE`}
               OR ${cnpjRaw ? sql`(pg.descricao ILIKE ${'%' + cnpjRaw + '%'} OR pg.fornecedor ILIKE ${'%' + cnpjRaw + '%'})` : sql`FALSE`}
               OR ${pixRaw ? sql`(pg.descricao ILIKE ${'%' + pixRaw + '%'} OR pg.fornecedor ILIKE ${'%' + pixRaw + '%'})` : sql`FALSE`}
+              OR ${cpfRaw ? sql`(pg.descricao ILIKE ${'%' + cpfRaw + '%'} OR pg.fornecedor ILIKE ${'%' + cpfRaw + '%'})` : sql`FALSE`}
+              OR ${cpfLimpo ? sql`(pg.descricao ILIKE ${'%' + cpfLimpo + '%'} OR pg.fornecedor ILIKE ${'%' + cpfLimpo + '%'})` : sql`FALSE`}
+              OR ${emailTurbo ? sql`(pg.descricao ILIKE ${'%' + emailTurbo + '%'} OR pg.fornecedor ILIKE ${'%' + emailTurbo + '%'})` : sql`FALSE`}
+              OR ${emailPessoal ? sql`(pg.descricao ILIKE ${'%' + emailPessoal + '%'} OR pg.fornecedor ILIKE ${'%' + emailPessoal + '%'})` : sql`FALSE`}
               OR ${nomeCompleto ? sql`(pg.descricao ILIKE ${'%' + nomeCompleto + '%'} OR pg.fornecedor ILIKE ${'%' + nomeCompleto + '%'})` : sql`FALSE`}
               OR (${primeiroNome.length >= 4 ? sql`(pg.descricao ILIKE ${'%' + primeiroNome + '%'} OR pg.fornecedor ILIKE ${'%' + primeiroNome + '%'})` : sql`FALSE`}
                   AND ${ultimoNome.length >= 4 ? sql`(pg.descricao ILIKE ${'%' + ultimoNome + '%'} OR pg.fornecedor ILIKE ${'%' + ultimoNome + '%'})` : sql`FALSE`})
@@ -13157,7 +13195,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'pendente' as nf_status
         FROM todos_pagamentos t
         ORDER BY COALESCE(t.data_pagamento, t.data_vencimento) DESC
-        LIMIT 24
       `);
       
       console.log(`[rh-pagamentos] Encontrados ${result.rows.length} pagamentos`);
