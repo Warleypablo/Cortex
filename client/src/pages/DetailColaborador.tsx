@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { usePageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useAuth } from "@/contexts/AuthContext";
-import { formatDecimal } from "@/lib/utils";
+import { formatDecimal, cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SelectWithAdd } from "@/components/ui/select-with-add";
-import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, TrendingDown, Minus, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp, Hash, Clock, CheckCircle2, AlertTriangle, Upload, Receipt, Download, Eye } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, TrendingDown, Minus, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp, Hash, Clock, CheckCircle2, AlertTriangle, AlertCircle, Upload, Receipt, Download, Eye, LayoutGrid, List } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceArea, ReferenceLine, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -2643,6 +2643,8 @@ function FinanceiroTab({ colaboradorId }: { colaboradorId: string }) {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [viewingNf, setViewingNf] = useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const { data: pagamentos = [], isLoading } = useQuery<PagamentoItem[]>({
     queryKey: ["/api/rh/pagamentos", colaboradorId],
@@ -2664,20 +2666,6 @@ function FinanceiroTab({ colaboradorId }: { colaboradorId: string }) {
       toast({ title: "Erro", description: "Não foi possível visualizar a nota fiscal.", variant: "destructive" });
     } finally {
       setViewingNf(null);
-    }
-  };
-
-  const getStatusBadge = (status: string, hasNf: boolean) => {
-    if (hasNf || status === "nf_anexada") {
-      return <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">NF Anexada</Badge>;
-    }
-    switch (status) {
-      case "pendente":
-        return <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Pendente</Badge>;
-      case "pago":
-        return <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Pago</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -2770,164 +2758,380 @@ function FinanceiroTab({ colaboradorId }: { colaboradorId: string }) {
     );
   }
 
-  const totalBruto = pagamentos.reduce((sum, p) => sum + parseFloat(p.valor_bruto || "0"), 0);
-  const ultimoAno = pagamentos.length > 0 ? pagamentos[0].ano_referencia : new Date().getFullYear();
-  const pagamentosAnoAtual = pagamentos.filter(p => p.ano_referencia === ultimoAno);
-  const totalAnoAtual = pagamentosAnoAtual.reduce((sum, p) => sum + parseFloat(p.valor_bruto || "0"), 0);
-  const nfsAnexadas = pagamentos.filter(p => parseInt(p.total_nfs || "0") > 0 || p.status === "nf_anexada").length;
+  const availableYears = [...new Set(pagamentos.map(p => p.ano_referencia))].sort((a, b) => b - a);
+  const pagamentosAnoSelecionado = pagamentos.filter(p => p.ano_referencia === selectedYear);
+  const totalAnoSelecionado = pagamentosAnoSelecionado.reduce((sum, p) => sum + parseFloat(p.valor_bruto || "0"), 0);
+  const nfsAnexadasAno = pagamentosAnoSelecionado.filter(p => parseInt(p.total_nfs || "0") > 0 || p.status === "nf_anexada").length;
+  const nfsPendentes = pagamentosAnoSelecionado.length - nfsAnexadasAno;
+  
+  const pagamentosPorMes = new Map<number, PagamentoItem>();
+  pagamentosAnoSelecionado.forEach(p => {
+    pagamentosPorMes.set(p.mes_referencia, p);
+  });
+
+  const currentMonth = new Date().getMonth() + 1;
+  const currentYear = new Date().getFullYear();
 
   return (
     <div className="space-y-6" data-testid="tab-content-financeiro">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="p-5 hover-elevate" data-testid="card-total-ano">
+      {/* Header com seletor de ano */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-xl bg-primary/10">
+            <Receipt className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold">Notas Fiscais</h2>
+            <p className="text-sm text-muted-foreground">Histórico de pagamentos e envio de NFs</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+            <SelectTrigger className="w-32" data-testid="select-year">
+              <Calendar className="w-4 h-4 mr-2" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableYears.map(year => (
+                <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <div className="flex border rounded-lg overflow-hidden">
+            <Button 
+              variant={viewMode === "grid" ? "secondary" : "ghost"} 
+              size="sm" 
+              className="rounded-none px-3"
+              onClick={() => setViewMode("grid")}
+              data-testid="button-view-grid"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant={viewMode === "list" ? "secondary" : "ghost"} 
+              size="sm" 
+              className="rounded-none px-3"
+              onClick={() => setViewMode("list")}
+              data-testid="button-view-list"
+            >
+              <List className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="p-4 hover-elevate" data-testid="card-total-ano">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-              <DollarSign className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            <div className="p-2.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+              <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Total {ultimoAno}</p>
-              <p className="text-xl font-bold">R$ {totalAnoAtual.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+              <p className="text-xs text-muted-foreground">Total {selectedYear}</p>
+              <p className="text-lg font-bold">R$ {totalAnoSelecionado.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 hover-elevate" data-testid="card-pagamentos-count">
+        <Card className="p-4 hover-elevate" data-testid="card-pagamentos-count">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-              <Receipt className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <div className="p-2.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+              <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Pagamentos</p>
-              <p className="text-xl font-bold">{pagamentos.length} registros</p>
+              <p className="text-xs text-muted-foreground">Pagamentos</p>
+              <p className="text-lg font-bold">{pagamentosAnoSelecionado.length} meses</p>
             </div>
           </div>
         </Card>
-        <Card className="p-5 hover-elevate" data-testid="card-nfs-count">
+        <Card className="p-4 hover-elevate" data-testid="card-nfs-anexadas">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-              <FileText className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+            <div className="p-2.5 rounded-lg bg-green-100 dark:bg-green-900/30">
+              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">NFs Anexadas</p>
-              <p className="text-xl font-bold">{nfsAnexadas} / {pagamentos.length}</p>
+              <p className="text-xs text-muted-foreground">NFs Anexadas</p>
+              <p className="text-lg font-bold">{nfsAnexadasAno} / {pagamentosAnoSelecionado.length}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4 hover-elevate" data-testid="card-nfs-pendentes">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Pendentes</p>
+              <p className="text-lg font-bold">{nfsPendentes}</p>
             </div>
           </div>
         </Card>
       </div>
 
-      <Card className="p-6" data-testid="card-pagamentos-lista">
-        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Receipt className="w-5 h-5" />
-            Histórico de Pagamentos
-          </h3>
-        </div>
+      {/* Progress bar */}
+      {pagamentosAnoSelecionado.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Progresso de envio de NFs</span>
+            <span className="text-sm text-muted-foreground">
+              {Math.round((nfsAnexadasAno / pagamentosAnoSelecionado.length) * 100)}%
+            </span>
+          </div>
+          <Progress value={(nfsAnexadasAno / pagamentosAnoSelecionado.length) * 100} className="h-2" />
+        </Card>
+      )}
 
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Referência</TableHead>
-                <TableHead>Valor Bruto</TableHead>
-                <TableHead>Valor Líquido</TableHead>
-                <TableHead>Data Pagamento</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pagamentos.map((pagamento) => {
-                const hasNf = parseInt(pagamento.total_nfs || "0") > 0;
-                return (
-                  <TableRow key={pagamento.id} data-testid={`row-pagamento-${pagamento.id}`}>
-                    <TableCell className="font-medium">
-                      {MONTH_NAMES[pagamento.mes_referencia]}/{pagamento.ano_referencia}
-                    </TableCell>
-                    <TableCell className="font-mono">
-                      R$ {parseFloat(pagamento.valor_bruto).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell className="font-mono text-muted-foreground">
-                      {pagamento.valor_liquido 
-                        ? `R$ ${parseFloat(pagamento.valor_liquido).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
-                        : "-"
-                      }
-                    </TableCell>
-                    <TableCell>
-                      {pagamento.data_pagamento 
-                        ? format(new Date(pagamento.data_pagamento), "dd/MM/yyyy")
-                        : "-"
-                      }
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(pagamento.status, hasNf)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+      {/* Grid View - Mês a Mês */}
+      {viewMode === "grid" ? (
+        <Card className="p-6" data-testid="card-nf-grid">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
+            Notas Fiscais por Mês - {selectedYear}
+          </h3>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {Array.from({ length: 12 }, (_, i) => i + 1).map(mes => {
+              const pagamento = pagamentosPorMes.get(mes);
+              const hasNf = pagamento && (parseInt(pagamento.total_nfs || "0") > 0 || pagamento.status === "nf_anexada");
+              const isFutureMonth = selectedYear === currentYear && mes > currentMonth;
+              const isPastMonthWithoutPayment = !pagamento && !isFutureMonth;
+              
+              return (
+                <Card 
+                  key={mes}
+                  className={cn(
+                    "p-4 relative transition-all cursor-pointer",
+                    hasNf 
+                      ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:border-green-400" 
+                      : pagamento 
+                        ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 hover:border-amber-400"
+                        : isFutureMonth
+                          ? "bg-muted/30 border-dashed opacity-50"
+                          : "bg-muted/50 border-dashed",
+                    "hover-elevate"
+                  )}
+                  onClick={() => {
+                    if (pagamento && !hasNf) {
+                      setSelectedPagamento(pagamento);
+                      setUploadDialogOpen(true);
+                    } else if (hasNf && pagamento) {
+                      handleViewNf(pagamento.id);
+                    }
+                  }}
+                  data-testid={`card-month-${mes}`}
+                >
+                  {hasNf && (
+                    <div className="absolute -top-1.5 -right-1.5">
+                      <div className="bg-green-500 rounded-full p-1">
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                      {MONTH_NAMES_SHORT[mes]}
+                    </p>
+                    <p className="font-bold text-lg">
+                      {mes.toString().padStart(2, '0')}
+                    </p>
+                    
+                    {pagamento ? (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          R$ {parseFloat(pagamento.valor_bruto).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                        </p>
                         {hasNf ? (
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="gap-1"
-                            onClick={() => handleViewNf(pagamento.id)}
-                            disabled={viewingNf === pagamento.id}
-                            data-testid={`button-view-nf-${pagamento.id}`}
-                          >
-                            {viewingNf === pagamento.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Eye className="w-4 h-4" />
-                            )}
+                          <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            <Eye className="w-3 h-3 mr-1" />
                             Ver NF
-                          </Button>
+                          </Badge>
                         ) : (
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="gap-1"
-                            onClick={() => {
-                              setSelectedPagamento(pagamento);
-                              setUploadDialogOpen(true);
-                            }}
-                            data-testid={`button-upload-nf-${pagamento.id}`}
-                          >
-                            <Upload className="w-4 h-4" />
-                            Anexar NF
-                          </Button>
+                          <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                            <Upload className="w-3 h-3 mr-1" />
+                            Anexar
+                          </Badge>
                         )}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {isFutureMonth ? "Futuro" : "—"}
+                      </p>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </Card>
+      ) : (
+        /* List View */
+        <Card className="p-6" data-testid="card-pagamentos-lista">
+          <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Receipt className="w-5 h-5" />
+              Histórico de Pagamentos - {selectedYear}
+            </h3>
+          </div>
 
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Mês</TableHead>
+                  <TableHead>Valor Bruto</TableHead>
+                  <TableHead>Valor Líquido</TableHead>
+                  <TableHead>Data Pagamento</TableHead>
+                  <TableHead>Status NF</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pagamentosAnoSelecionado
+                  .sort((a, b) => b.mes_referencia - a.mes_referencia)
+                  .map((pagamento) => {
+                    const hasNf = parseInt(pagamento.total_nfs || "0") > 0 || pagamento.status === "nf_anexada";
+                    return (
+                      <TableRow key={pagamento.id} data-testid={`row-pagamento-${pagamento.id}`}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "w-2 h-2 rounded-full",
+                              hasNf ? "bg-green-500" : "bg-amber-500"
+                            )} />
+                            {MONTH_NAMES[pagamento.mes_referencia]}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono font-medium">
+                          R$ {parseFloat(pagamento.valor_bruto).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="font-mono text-muted-foreground">
+                          {pagamento.valor_liquido 
+                            ? `R$ ${parseFloat(pagamento.valor_liquido).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                            : "-"
+                          }
+                        </TableCell>
+                        <TableCell>
+                          {pagamento.data_pagamento 
+                            ? format(new Date(pagamento.data_pagamento), "dd/MM/yyyy")
+                            : "-"
+                          }
+                        </TableCell>
+                        <TableCell>
+                          {hasNf ? (
+                            <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Anexada
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              Pendente
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {hasNf ? (
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="gap-1"
+                                onClick={() => handleViewNf(pagamento.id)}
+                                disabled={viewingNf === pagamento.id}
+                                data-testid={`button-view-nf-${pagamento.id}`}
+                              >
+                                {viewingNf === pagamento.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Eye className="w-4 h-4" />
+                                )}
+                                Ver NF
+                              </Button>
+                            ) : (
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="gap-1"
+                                onClick={() => {
+                                  setSelectedPagamento(pagamento);
+                                  setUploadDialogOpen(true);
+                                }}
+                                data-testid={`button-upload-nf-${pagamento.id}`}
+                              >
+                                <Upload className="w-4 h-4" />
+                                Anexar NF
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
+
+      {/* Dialog de Upload */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Anexar Nota Fiscal</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Anexar Nota Fiscal
+            </DialogTitle>
             <DialogDescription>
               {selectedPagamento && (
-                <>Referência: {MONTH_NAMES[selectedPagamento.mes_referencia]}/{selectedPagamento.ano_referencia}</>
+                <div className="mt-2 p-3 bg-muted rounded-lg">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Referência:</span>
+                      <p className="font-medium">{MONTH_NAMES[selectedPagamento.mes_referencia]}/{selectedPagamento.ano_referencia}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Valor:</span>
+                      <p className="font-medium">R$ {parseFloat(selectedPagamento.valor_bruto).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  </div>
+                </div>
               )}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <label 
               htmlFor="nf-upload"
-              className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+              className={cn(
+                "flex flex-col items-center justify-center w-full h-44 border-2 border-dashed rounded-xl cursor-pointer transition-all",
+                uploading 
+                  ? "bg-primary/5 border-primary/30" 
+                  : "hover:bg-muted/50 hover:border-primary/50"
+              )}
             >
               {uploading ? (
                 <div className="flex flex-col items-center">
-                  <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
-                  <p className="text-sm text-muted-foreground">Enviando arquivo...</p>
+                  <div className="relative">
+                    <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                  </div>
+                  <p className="text-sm font-medium mt-4">Enviando arquivo...</p>
+                  <p className="text-xs text-muted-foreground mt-1">Aguarde enquanto processamos</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center">
-                  <Upload className="w-10 h-10 text-muted-foreground mb-3" />
+                  <div className="p-4 rounded-full bg-primary/10 mb-3">
+                    <Upload className="w-8 h-8 text-primary" />
+                  </div>
                   <p className="text-sm font-medium">Clique para selecionar o arquivo</p>
-                  <p className="text-xs text-muted-foreground mt-1">PDF, PNG, JPG (máx. 10MB)</p>
+                  <p className="text-xs text-muted-foreground mt-1">ou arraste e solte aqui</p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <Badge variant="outline" className="text-xs">PDF</Badge>
+                    <Badge variant="outline" className="text-xs">PNG</Badge>
+                    <Badge variant="outline" className="text-xs">JPG</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">Tamanho máximo: 10MB</p>
                 </div>
               )}
               <input 
