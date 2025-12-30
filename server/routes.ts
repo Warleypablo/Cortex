@@ -13112,7 +13112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'parcelas' as fonte
           FROM caz_parcelas p
           WHERE p.tipo_evento = 'DESPESA'
-            AND UPPER(p.status) IN ('PAID', 'PAGO', 'ACQUITTED', 'LIQUIDADO')
+            AND UPPER(p.status) IN ('PAID', 'PAGO', 'ACQUITTED', 'LIQUIDADO', 'QUITADO')
             AND (
               ${clienteIds ? sql`p.id_cliente = ${clienteIds}` : sql`FALSE`}
               OR ${cnpjLimpo ? sql`p.descricao ILIKE ${'%' + cnpjLimpo + '%'}` : sql`FALSE`}
@@ -13135,7 +13135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             pg.nome as categoria_nome,
             'pagar' as fonte
           FROM caz_pagar pg
-          WHERE UPPER(pg.status) IN ('PAID', 'PAGO', 'ACQUITTED', 'LIQUIDADO')
+          WHERE UPPER(pg.status) IN ('PAID', 'PAGO', 'ACQUITTED', 'LIQUIDADO', 'QUITADO')
             AND (
               ${cnpjLimpo ? sql`(pg.descricao ILIKE ${'%' + cnpjLimpo + '%'} OR pg.fornecedor ILIKE ${'%' + cnpjLimpo + '%'})` : sql`FALSE`}
               OR ${cnpjRaw ? sql`(pg.descricao ILIKE ${'%' + cnpjRaw + '%'} OR pg.fornecedor ILIKE ${'%' + cnpjRaw + '%'})` : sql`FALSE`}
