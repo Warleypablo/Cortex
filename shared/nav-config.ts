@@ -339,7 +339,6 @@ export const NAV_CONFIG = {
         { title: 'Meta Ads', url: '/dashboard/meta-ads', icon: 'Target', permissionKey: PERMISSION_KEYS.GROWTH.META_ADS },
         { title: 'Por Plataforma', url: '/growth/performance-plataformas', icon: 'Layers', permissionKey: PERMISSION_KEYS.GROWTH.PLATAFORMA },
         { title: 'Criativos', url: '/growth/criativos', icon: 'Image', permissionKey: PERMISSION_KEYS.GROWTH.CRIATIVOS },
-        { title: 'TurboDash', url: '/growth/turbodash', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GROWTH.TURBODASH },
       ],
     },
   ],
