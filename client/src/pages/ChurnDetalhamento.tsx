@@ -112,12 +112,12 @@ const REFINED_COLORS = [
 const CustomTooltip = ({ active, payload, label, valueFormatter }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white/95 backdrop-blur-xl border border-gray-200 rounded-lg shadow-xl p-3 min-w-[160px]">
-      <p className="text-xs font-medium text-gray-600 mb-2 uppercase tracking-wider">{label}</p>
+    <div className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-gray-200 dark:border-zinc-700/50 rounded-lg shadow-xl p-3 min-w-[160px]">
+      <p className="text-xs font-medium text-gray-600 dark:text-zinc-300 mb-2 uppercase tracking-wider">{label}</p>
       {payload.map((entry: any, i: number) => (
         <div key={i} className="flex items-center justify-between gap-4 text-sm">
-          <span className="text-gray-500">{entry.name === "count" ? "Quantidade" : entry.name}</span>
-          <span className="font-bold text-gray-900">
+          <span className="text-gray-500 dark:text-zinc-400">{entry.name === "count" ? "Quantidade" : entry.name}</span>
+          <span className="font-bold text-gray-900 dark:text-white">
             {valueFormatter ? valueFormatter(entry.value) : entry.value}
           </span>
         </div>
@@ -135,17 +135,17 @@ const TechKpiCard = ({ title, value, subtitle, icon: Icon, gradient, shadowColor
   shadowColor: string;
 }) => (
   <div className={`relative group overflow-visible rounded-xl ${gradient} p-[1px] shadow-lg hover:shadow-xl transition-all duration-300`} style={{ boxShadow: `0 4px 20px -4px ${shadowColor}` }}>
-    <div className="relative bg-white rounded-xl p-4 h-full">
+    <div className="relative bg-white dark:bg-zinc-950/90 backdrop-blur-xl rounded-xl p-4 h-full">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
+        <span className="text-[10px] font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-widest">
           {title}
         </span>
         <div className={`p-1.5 rounded-lg ${gradient}`}>
           <Icon className="h-3.5 w-3.5 text-white" />
         </div>
       </div>
-      <div className="text-2xl font-bold text-gray-900 tracking-tight mb-1">{value}</div>
-      <p className="text-[10px] text-gray-500">{subtitle}</p>
+      <div className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mb-1">{value}</div>
+      <p className="text-[10px] text-gray-500 dark:text-zinc-500">{subtitle}</p>
     </div>
   </div>
 );
@@ -157,16 +157,16 @@ const TechChartCard = ({ title, subtitle, icon: Icon, iconBg, children }: {
   iconBg: string;
   children: React.ReactNode;
 }) => (
-  <div className="relative rounded-xl bg-white border border-gray-100 shadow-lg overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 via-transparent to-transparent" />
+  <div className="relative rounded-xl bg-white dark:bg-gradient-to-b dark:from-zinc-800/50 dark:to-zinc-900/50 border border-gray-100 dark:border-zinc-800/50 shadow-lg overflow-hidden">
+    <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 via-transparent to-transparent dark:from-zinc-800/20" />
     <div className="relative p-5">
       <div className="flex items-center gap-3 mb-4">
         <div className={`p-2 rounded-lg ${iconBg} shadow-md`}>
           <Icon className="h-4 w-4 text-white" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-          <p className="text-xs text-gray-500">{subtitle}</p>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-zinc-100">{title}</h3>
+          <p className="text-xs text-gray-500 dark:text-zinc-500">{subtitle}</p>
         </div>
       </div>
       {children}
@@ -586,7 +586,7 @@ export default function ChurnDetalhamento() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {isLoading ? (
           Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="rounded-xl bg-white border border-gray-100 p-4 shadow">
+            <div key={i} className="rounded-xl bg-white dark:bg-zinc-900/50 border border-gray-100 dark:border-zinc-800/50 p-4 shadow">
               <Skeleton className="h-4 w-20 mb-3" />
               <Skeleton className="h-7 w-24" />
             </div>
@@ -657,7 +657,7 @@ export default function ChurnDetalhamento() {
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
           ) : churnPorMes.length === 0 ? (
-            <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">
+            <div className="h-[200px] flex items-center justify-center text-gray-400 dark:text-zinc-500 text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -696,7 +696,7 @@ export default function ChurnDetalhamento() {
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
           ) : distribuicaoPorProduto.length === 0 ? (
-            <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">
+            <div className="h-[200px] flex items-center justify-center text-gray-400 dark:text-zinc-500 text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -728,13 +728,13 @@ export default function ChurnDetalhamento() {
                         className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
                         style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
                       />
-                      <span className="truncate text-gray-600">{item.fullName}</span>
+                      <span className="truncate text-gray-600 dark:text-zinc-400">{item.fullName}</span>
                     </div>
-                    <span className="font-semibold text-gray-900 tabular-nums">{item.percentual.toFixed(0)}%</span>
+                    <span className="font-semibold text-gray-900 dark:text-zinc-200 tabular-nums">{item.percentual.toFixed(0)}%</span>
                   </div>
                 ))}
                 {distribuicaoPorProduto.length > 5 && (
-                  <p className="text-[10px] text-gray-400 pt-1">
+                  <p className="text-[10px] text-gray-400 dark:text-zinc-600 pt-1">
                     +{distribuicaoPorProduto.length - 5} outros
                   </p>
                 )}
@@ -754,7 +754,7 @@ export default function ChurnDetalhamento() {
           {isLoading ? (
             <Skeleton className="h-[180px] w-full" />
           ) : distribuicaoPorSquad.length === 0 ? (
-            <div className="h-[180px] flex items-center justify-center text-gray-400 text-sm">
+            <div className="h-[180px] flex items-center justify-center text-gray-400 dark:text-zinc-500 text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -794,7 +794,7 @@ export default function ChurnDetalhamento() {
           {isLoading ? (
             <Skeleton className="h-[180px] w-full" />
           ) : distribuicaoPorLifetime.length === 0 ? (
-            <div className="h-[180px] flex items-center justify-center text-gray-400 text-sm">
+            <div className="h-[180px] flex items-center justify-center text-gray-400 dark:text-zinc-500 text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -827,9 +827,9 @@ export default function ChurnDetalhamento() {
                         className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
                         style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
                       />
-                      <span className="text-gray-600">{item.name}</span>
+                      <span className="text-gray-600 dark:text-zinc-400">{item.name}</span>
                     </div>
-                    <span className="font-semibold text-gray-900 tabular-nums">{item.percentual.toFixed(0)}%</span>
+                    <span className="font-semibold text-gray-900 dark:text-zinc-200 tabular-nums">{item.percentual.toFixed(0)}%</span>
                   </div>
                 ))}
               </div>
@@ -846,7 +846,7 @@ export default function ChurnDetalhamento() {
           {isLoading ? (
             <Skeleton className="h-[180px] w-full" />
           ) : distribuicaoPorResponsavel.length === 0 ? (
-            <div className="h-[180px] flex items-center justify-center text-gray-400 text-sm">
+            <div className="h-[180px] flex items-center justify-center text-gray-400 dark:text-zinc-500 text-sm">
               Nenhum dado disponível
             </div>
           ) : (
