@@ -53,7 +53,7 @@ interface ChurnContract {
   data_inicio: string;
   data_encerramento: string;
   status: string;
-  motivo_churn: string | null;
+  servico: string;
   lifetime_meses: number;
   ltv: number;
 }
@@ -70,7 +70,7 @@ interface ChurnDetalhamentoData {
     squads: string[];
     produtos: string[];
     responsaveis: string[];
-    motivos: string[];
+    servicos: string[];
   };
 }
 
@@ -82,7 +82,7 @@ export default function ChurnDetalhamento() {
   const [filterSquads, setFilterSquads] = useState<string[]>([]);
   const [filterProdutos, setFilterProdutos] = useState<string[]>([]);
   const [filterResponsaveis, setFilterResponsaveis] = useState<string[]>([]);
-  const [filterMotivos, setFilterMotivos] = useState<string[]>([]);
+  const [filterServicos, setFilterServicos] = useState<string[]>([]);
   const [filterPeriodo, setFilterPeriodo] = useState<string>("12");
   const [sortBy, setSortBy] = useState<string>("data_encerramento");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -126,8 +126,8 @@ export default function ChurnDetalhamento() {
       filtered = filtered.filter(c => filterResponsaveis.includes(c.responsavel));
     }
     
-    if (filterMotivos.length > 0) {
-      filtered = filtered.filter(c => c.motivo_churn && filterMotivos.includes(c.motivo_churn));
+    if (filterServicos.length > 0) {
+      filtered = filtered.filter(c => c.servico && filterServicos.includes(c.servico));
     }
     
     filtered.sort((a, b) => {
@@ -155,7 +155,7 @@ export default function ChurnDetalhamento() {
     });
     
     return filtered;
-  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterMotivos, sortBy, sortOrder]);
+  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, sortBy, sortOrder]);
 
   const filteredMetricas = useMemo(() => {
     if (filteredContratos.length === 0) {
@@ -376,12 +376,12 @@ export default function ChurnDetalhamento() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Motivo do Churn</label>
+                  <label className="text-sm font-medium">Serviço</label>
                   <MultiSelect
-                    options={data?.filtros?.motivos || []}
-                    selected={filterMotivos}
-                    onChange={setFilterMotivos}
-                    placeholder="Todos os motivos"
+                    options={data?.filtros?.servicos || []}
+                    selected={filterServicos}
+                    onChange={setFilterServicos}
+                    placeholder="Todos os serviços"
                   />
                 </div>
 
@@ -409,7 +409,7 @@ export default function ChurnDetalhamento() {
                       setFilterSquads([]);
                       setFilterProdutos([]);
                       setFilterResponsaveis([]);
-                      setFilterMotivos([]);
+                      setFilterServicos([]);
                       setFilterPeriodo("12");
                       setSortBy("data_encerramento");
                       setSortOrder("desc");
@@ -499,7 +499,7 @@ export default function ChurnDetalhamento() {
                         <SortIcon column="ltv" />
                       </div>
                     </TableHead>
-                    <TableHead>Motivo</TableHead>
+                    <TableHead>Serviço</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -527,16 +527,16 @@ export default function ChurnDetalhamento() {
                         <Badge 
                           variant={contrato.lifetime_meses < 6 ? "destructive" : contrato.lifetime_meses < 12 ? "secondary" : "default"}
                         >
-                          {contrato.lifetime_meses} meses
+                          {contrato.lifetime_meses.toFixed(1)} meses
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(contrato.ltv || 0)}
                       </TableCell>
                       <TableCell>
-                        {contrato.motivo_churn ? (
+                        {contrato.servico ? (
                           <Badge variant="outline" className="text-xs">
-                            {contrato.motivo_churn}
+                            {contrato.servico}
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground text-xs">-</span>

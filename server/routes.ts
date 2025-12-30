@@ -5882,7 +5882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           c.data_inicio,
           c.data_encerramento,
           c.status,
-          c.motivo_churn,
+          c.servico,
           CASE 
             WHEN c.data_inicio IS NOT NULL AND c.data_encerramento IS NOT NULL 
             THEN GREATEST(0.5, 
@@ -5913,7 +5913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data_inicio: row.data_inicio,
         data_encerramento: row.data_encerramento,
         status: row.status || 'encerrado',
-        motivo_churn: row.motivo_churn,
+        servico: row.servico || 'Não especificado',
         lifetime_meses: Number(row.lifetime_meses) || 0,
         ltv: (Number(row.valorr) || 0) * (Number(row.lifetime_meses) || 0),
       }));
@@ -5922,7 +5922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const squads = Array.from(new Set(contratos.map((c: any) => c.squad).filter(Boolean))).sort();
       const produtos = Array.from(new Set(contratos.map((c: any) => c.produto).filter(Boolean))).sort();
       const responsaveis = Array.from(new Set(contratos.map((c: any) => c.responsavel).filter(Boolean))).sort();
-      const motivos = Array.from(new Set(contratos.map((c: any) => c.motivo_churn).filter(Boolean))).sort();
+      const servicos = Array.from(new Set(contratos.map((c: any) => c.servico).filter(Boolean))).sort();
       
       // Calculate metrics
       const totalChurned = contratos.length;
@@ -5942,7 +5942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           squads,
           produtos,
           responsaveis,
-          motivos,
+          servicos,
         },
       });
     } catch (error) {
