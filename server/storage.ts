@@ -8164,12 +8164,16 @@ export class DbStorage implements IStorage {
     const searchTerm = `%${query.replace(/'/g, "''")}%`;
     const results: import("@shared/schema").SearchResult[] = [];
 
-    // Search clientes
+    // Search clientes - exclude names that match colaboradores to avoid duplicates
     try {
       const clientesResult = await db.execute(sql`
-        SELECT id::text, nome, cnpj
-        FROM caz_clientes
-        WHERE nome ILIKE ${searchTerm} OR cnpj ILIKE ${searchTerm}
+        SELECT c.id::text, c.nome, c.cnpj
+        FROM caz_clientes c
+        WHERE (c.nome ILIKE ${searchTerm} OR c.cnpj ILIKE ${searchTerm})
+          AND NOT EXISTS (
+            SELECT 1 FROM rh_pessoal p 
+            WHERE LOWER(TRIM(REGEXP_REPLACE(p.nome, '\s+', ' ', 'g'))) = LOWER(TRIM(REGEXP_REPLACE(c.nome, '\s+', ' ', 'g')))
+          )
         LIMIT 20
       `);
       for (const row of clientesResult.rows) {
