@@ -707,12 +707,12 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
           try {
             console.log("[ai] Attempting to extract text from DOCX document");
             const mammoth = await import("mammoth");
-            const { ObjectStorageService, objectStorageClient } = await import("../replit_integrations/object_storage");
-            const objectStorage = new ObjectStorageService();
+            const { objectStorageClient } = await import("../replit_integrations/object_storage");
             
             let fileContents: Buffer;
             
-            // Try multiple methods to get the file
+            // Parse the object key to get bucket and object name
+            // The key format is: /bucket-name/.private/uploads/uuid
             if (objectKey.startsWith("https://storage.googleapis.com/")) {
               // Direct GCS URL - parse bucket and object name
               console.log("[ai] Detected GCS URL, parsing directly");
@@ -729,20 +729,29 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
               } else {
                 throw new Error("Invalid GCS URL path");
               }
-            } else if (objectKey.startsWith("/objects/")) {
-              // Standard object entity path
-              console.log("[ai] Using standard object entity path");
-              const file = await objectStorage.getObjectEntityFile(objectKey);
-              const [contents] = await file.download();
-              fileContents = contents;
+            } else if (objectKey.startsWith("/")) {
+              // Path format: /bucket-name/path/to/file
+              console.log("[ai] Parsing direct path format");
+              const pathParts = objectKey.split('/').filter(Boolean);
+              if (pathParts.length >= 2) {
+                const bucketName = pathParts[0];
+                const objectName = pathParts.slice(1).join('/');
+                console.log("[ai] Bucket:", bucketName, "Object:", objectName);
+                const bucket = objectStorageClient.bucket(bucketName);
+                const file = bucket.file(objectName);
+                const [exists] = await file.exists();
+                console.log("[ai] File exists:", exists);
+                if (exists) {
+                  const [contents] = await file.download();
+                  fileContents = contents;
+                } else {
+                  throw new Error("File does not exist in bucket");
+                }
+              } else {
+                throw new Error("Invalid path format");
+              }
             } else {
-              // Try normalizing the path
-              console.log("[ai] Normalizing path and attempting download");
-              const normalizedPath = objectStorage.normalizeObjectEntityPath(objectKey);
-              console.log("[ai] Normalized path:", normalizedPath);
-              const file = await objectStorage.getObjectEntityFile(normalizedPath);
-              const [contents] = await file.download();
-              fileContents = contents;
+              throw new Error("Unknown path format: " + objectKey);
             }
             
             // Extract text using mammoth
