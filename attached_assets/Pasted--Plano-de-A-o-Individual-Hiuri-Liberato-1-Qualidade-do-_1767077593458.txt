@@ -1,0 +1,31 @@
+🛠️ Plano de Ação Individual – Hiuri Liberato
+1. Qualidade do Trabalho
+
+Objetivo: Consolidar a entrega de projetos com padrão elevado, minimizando retrabalho e alinhando expectativas desde o início.
+
+Ação	Prazo	Resultado Esperado
+Documentar retrospectiva de 3 projetos: MAD, Pouppa, Casa do Torresmo, com análise de causas e soluções	Até 20/01	Diagnóstico claro dos erros para ações corretivas
+Contribuir com feedback para apresentação de kick-off e entrega de design	Até 15/01	Padronização que eleve a qualidade e previsibilidade
+Sugerir checklist de qualidade para etapas-chave (design, setup, entrega)	Até 30/01	Criação de processo repetível para novos projetos
+2. Produtividade
+
+Objetivo: Otimizar tempo e recursos, garantindo fluidez no trabalho e ganho de escala no dia a dia.
+
+Ação	Prazo	Resultado Esperado
+Apoiar a criação de playbooks com base nas dúvidas recorrentes	Até 15/02	Redução de dependência direta e agilidade na integração de novos membros
+Mapear e compartilhar boas práticas de finalização técnica (frete, tributos, SEO, etc.)	Até 31/01	Melhoria na consistência das entregas finais
+3. Colaboração e Liderança Técnica
+
+Objetivo: Assumir papel de referência na equipe, influenciando positivamente colegas e fortalecendo o time.
+
+Ação	Prazo	Resultado Esperado
+Acompanhar e apoiar Bibiana nos projetos em finalização	Contínuo	Desenvolvimento conjunto da equipe
+Propor melhorias formais nos processos junto aos POs (ex: incluir decisores no kickoff)	Até 10/01	Redução de retrabalho e aumento da assertividade
+Atuar como reviewer de pelo menos 2 projetos de colegas para padronizar a entrega	Até 31/01	Melhoria da média de qualidade geral
+4. Profissionalismo e Desenvolvimento Pessoal
+
+Objetivo: Manter uma postura equilibrada, com foco em crescimento sustentável e cuidado com a saúde mental.
+
+Ação	Prazo	Resultado Esperado
+Manter rotina de pausas e cuidados com saúde (ex: atividade física regular)	Contínuo	Redução de estresse e maior foco
+Compartilhar aprendizados técnicos ou de processo com a equipe (mensalmente)	A partir de janeiro	Estímulo ao conhecimento coletivo e fortalecimento da cultura
