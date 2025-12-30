@@ -89,19 +89,26 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  await initializeNotificationsTable();
-  await initializeSystemFieldOptionsTable();
-  await initializeNotificationRulesTable();
-  await initializeOnboardingTables();
-  await initializeCatalogTables();
-  await initializeSystemFieldsTable();
+  // Parallel Phase 1: Independent table initializations
+  await Promise.all([
+    initializeNotificationsTable(),
+    initializeSystemFieldOptionsTable(),
+    initializeNotificationRulesTable(),
+    initializeOnboardingTables(),
+    initializeCatalogTables(),
+    initializeSystemFieldsTable(),
+    initializeDashboardTables(),
+    initTurbodashTable(),
+    initializeTurboEventosTable(),
+    initializeRhPagamentosTable(),
+    initializeRhPesquisasTables(),
+  ]);
+  
+  // Phase 2: Depends on catalogs being ready
   await initializeSysSchema();
-  await initializeDashboardTables();
+  
+  // Phase 3: Seeding (depends on tables existing)
   await seedDefaultDashboardViews();
-  await initTurbodashTable();
-  await initializeTurboEventosTable();
-  await initializeRhPagamentosTable();
-  await initializeRhPesquisasTables();
   
   // Register Object Storage routes
   registerObjectStorageRoutes(app);
