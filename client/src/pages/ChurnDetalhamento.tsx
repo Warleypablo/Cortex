@@ -348,44 +348,40 @@ export default function ChurnDetalhamento() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Squads</label>
                   <MultiSelect
-                    options={(data?.filtros?.squads || []).map(s => ({ value: s, label: s }))}
+                    options={data?.filtros?.squads || []}
                     selected={filterSquads}
                     onChange={setFilterSquads}
                     placeholder="Todos os squads"
-                    data-testid="select-squads"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Produtos</label>
                   <MultiSelect
-                    options={(data?.filtros?.produtos || []).map(p => ({ value: p, label: p }))}
+                    options={data?.filtros?.produtos || []}
                     selected={filterProdutos}
                     onChange={setFilterProdutos}
                     placeholder="Todos os produtos"
-                    data-testid="select-produtos"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Responsáveis</label>
                   <MultiSelect
-                    options={(data?.filtros?.responsaveis || []).map(r => ({ value: r, label: r }))}
+                    options={data?.filtros?.responsaveis || []}
                     selected={filterResponsaveis}
                     onChange={setFilterResponsaveis}
                     placeholder="Todos os responsáveis"
-                    data-testid="select-responsaveis"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Motivo do Churn</label>
                   <MultiSelect
-                    options={(data?.filtros?.motivos || []).map(m => ({ value: m, label: m }))}
+                    options={data?.filtros?.motivos || []}
                     selected={filterMotivos}
                     onChange={setFilterMotivos}
                     placeholder="Todos os motivos"
-                    data-testid="select-motivos"
                   />
                 </div>
 

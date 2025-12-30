@@ -489,6 +489,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.OPS.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.OPS.RETENCAO]: 'Análise de Retenção',
   [PERMISSION_KEYS.OPS.COHORT]: 'Cohort de Retenção',
+  [PERMISSION_KEYS.OPS.CHURN_DETALHAMENTO]: 'Detalhamento de Churn',
   [PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS]: 'Clientes & Contratos',
   [PERMISSION_KEYS.TECH.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.TECH.PROJETOS]: 'Projetos',
