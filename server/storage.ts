@@ -2839,21 +2839,27 @@ export class DbStorage implements IStorage {
   }
 
   async getContasBancos(): Promise<ContaBanco[]> {
+    // First, get column names to debug
+    const columnsResult = await db.execute(sql`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'caz_bancos' 
+      ORDER BY ordinal_position
+    `);
+    console.log("[Debug] caz_bancos columns:", columnsResult.rows);
+    
     const result = await db.execute(sql`
-      SELECT 
-        uuid as id,
-        nome,
-        balance as saldo,
-        empresa
+      SELECT *
       FROM caz_bancos
       WHERE ativo = true OR ativo IS NULL
       ORDER BY balance::numeric DESC
     `);
     
+    console.log("[Debug] caz_bancos sample row:", result.rows[0]);
+    
     return (result.rows as any[]).map((row: any) => ({
-      id: String(row.id || ''),
-      nome: row.nome || 'Conta Desconhecida',
-      saldo: parseFloat(row.saldo || '0'),
+      id: String(row.uuid || row.id || ''),
+      nome: row.nome || row.conta || row.name || 'Conta Desconhecida',
+      saldo: parseFloat(row.balance || row.saldo || '0'),
       empresa: row.empresa || '',
     }));
   }
