@@ -2065,32 +2065,129 @@ function ComentariosCard({ colaboradorId }: { colaboradorId: string }) {
   );
 }
 
+// Opções para pergunta de motivo de permanência
+const MOTIVOS_PERMANENCIA = [
+  "O fato dela me proporcionar equilíbrio entre minha vida pessoal e profissional",
+  "A remuneração e benefícios oferecidos pela empresa",
+  "A oportunidade que tenho de crescer e me desenvolver",
+  "O alinhamento dos meus valores com os valores da empresa",
+  "Outro"
+];
+
+// Interface para pesquisa completa
+interface PesquisaEnpsData {
+  motivoPermanencia: string;
+  score: number;
+  comentarioEmpresa: string;
+  scoreLider: number;
+  comentarioLider: string;
+  scoreProdutos: number;
+  comentarioProdutos: string;
+  feedbackGeral: string;
+}
+
 function EnpsCard({ colaboradorId }: { colaboradorId: string }) {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedScore, setSelectedScore] = useState<number | null>(null);
-  const [comentario, setComentario] = useState("");
+  const [step, setStep] = useState(1);
+  const totalSteps = 8;
+  
+  // Estado do formulário
+  const [formData, setFormData] = useState<Partial<PesquisaEnpsData>>({});
 
   const { data: enpsResponses = [], isLoading } = useQuery<EnpsItem[]>({
     queryKey: ["/api/colaboradores", colaboradorId, "enps"],
   });
 
   const addMutation = useMutation({
-    mutationFn: async (data: { score: number; comentario: string; data: string }) => {
-      const response = await apiRequest("POST", `/api/colaboradores/${colaboradorId}/enps`, data);
+    mutationFn: async (data: PesquisaEnpsData) => {
+      const payload = {
+        score: data.score,
+        comentario: data.comentarioEmpresa,
+        motivoPermanencia: data.motivoPermanencia,
+        comentarioEmpresa: data.comentarioEmpresa,
+        scoreLider: data.scoreLider,
+        comentarioLider: data.comentarioLider,
+        scoreProdutos: data.scoreProdutos,
+        comentarioProdutos: data.comentarioProdutos,
+        feedbackGeral: data.feedbackGeral,
+        data: new Date().toISOString().split("T")[0]
+      };
+      const response = await apiRequest("POST", `/api/colaboradores/${colaboradorId}/enps`, payload);
       return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaboradorId, "enps"] });
-      toast({ title: "e-NPS registrado", description: "A resposta foi adicionada com sucesso." });
+      toast({ title: "Pesquisa registrada", description: "Suas respostas foram salvas com sucesso." });
       setDialogOpen(false);
-      setSelectedScore(null);
-      setComentario("");
+      setStep(1);
+      setFormData({});
     },
     onError: (error: Error) => {
-      toast({ title: "Erro ao registrar e-NPS", description: error.message, variant: "destructive" });
+      toast({ title: "Erro ao registrar pesquisa", description: error.message, variant: "destructive" });
     },
   });
+  
+  const resetAndCloseDialog = () => {
+    setDialogOpen(false);
+    setStep(1);
+    setFormData({});
+  };
+  
+  const canProceed = () => {
+    switch(step) {
+      case 1: return !!formData.motivoPermanencia;
+      case 2: return formData.score !== undefined;
+      case 3: return true; // comentário opcional
+      case 4: return formData.scoreLider !== undefined;
+      case 5: return true; // comentário opcional
+      case 6: return formData.scoreProdutos !== undefined;
+      case 7: return true; // comentário opcional
+      case 8: return true; // feedback opcional
+      default: return false;
+    }
+  };
+  
+  const handleNext = () => {
+    if (step < totalSteps) {
+      setStep(step + 1);
+    } else {
+      // Submeter pesquisa
+      addMutation.mutate(formData as PesquisaEnpsData);
+    }
+  };
+  
+  const handleBack = () => {
+    if (step > 1) setStep(step - 1);
+  };
+  
+  // Componente para escala 0-10
+  const ScaleSelector = ({ value, onChange, label }: { value?: number; onChange: (v: number) => void; label: string }) => (
+    <div className="space-y-4">
+      <p className="text-sm font-medium text-center">{label}</p>
+      <div className="flex flex-wrap gap-2 justify-center">
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => {
+          const cat = getEnpsCategory(score);
+          return (
+            <button
+              key={score}
+              type="button"
+              onClick={() => onChange(score)}
+              className={`w-10 h-10 rounded-lg font-bold transition-all ${value === score ? `${cat.bgColor} ${cat.color} ring-2 ring-offset-2` : "bg-muted hover:bg-muted/80"}`}
+              data-testid={`button-score-${score}`}
+            >
+              {score}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex justify-between text-xs text-muted-foreground px-2">
+        <span className="text-red-500">0-6 Detrator</span>
+        <span className="text-yellow-500">7-8 Neutro</span>
+        <span className="text-green-500">9-10 Promotor</span>
+      </div>
+    </div>
+  );
 
   const lastResponse = enpsResponses.length > 0 ? enpsResponses[0] : null;
   const category = lastResponse ? getEnpsCategory(lastResponse.score) : null;
@@ -2289,55 +2386,159 @@ function EnpsCard({ colaboradorId }: { colaboradorId: string }) {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+      <Dialog open={dialogOpen} onOpenChange={resetAndCloseDialog}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nova Resposta e-NPS</DialogTitle>
-            <DialogDescription>Em uma escala de 0 a 10, quanto você recomendaria a Turbo como lugar para trabalhar?</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart2 className="w-5 h-5 text-blue-600" />
+              Pesquisa e-NPS
+            </DialogTitle>
+            <DialogDescription>
+              Pergunta {step} de {totalSteps}
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2 justify-center">
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => {
-                const cat = getEnpsCategory(score);
-                return (
-                  <button
-                    key={score}
-                    onClick={() => setSelectedScore(score)}
-                    className={`w-10 h-10 rounded-lg font-bold transition-all ${selectedScore === score ? `${cat.bgColor} ${cat.color} ring-2 ring-offset-2` : "bg-muted hover:bg-muted/80"}`}
-                    data-testid={`button-score-${score}`}
-                  >
-                    {score}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="text-center">
-              <div className="flex justify-between text-xs text-muted-foreground px-2">
-                <span className="text-red-500">0-6 Detrator</span>
-                <span className="text-yellow-500">7-8 Neutro</span>
-                <span className="text-green-500">9-10 Promotor</span>
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Comentário (opcional)</label>
-              <Textarea 
-                value={comentario} 
-                onChange={(e) => setComentario(e.target.value)} 
-                placeholder="Conte-nos mais sobre sua experiência..." 
-                rows={3}
-                data-testid="input-enps-comentario" 
-              />
-            </div>
+          
+          {/* Progress bar */}
+          <div className="w-full bg-muted rounded-full h-2">
+            <div 
+              className="bg-primary h-2 rounded-full transition-all" 
+              style={{ width: `${(step / totalSteps) * 100}%` }}
+            />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button 
-              onClick={() => addMutation.mutate({ score: selectedScore!, comentario, data: new Date().toISOString().split("T")[0] })} 
-              disabled={addMutation.isPending || selectedScore === null} 
-              data-testid="button-save-enps"
-            >
-              {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar"}
-            </Button>
+          
+          <div className="py-4 min-h-[200px]">
+            {/* Step 1: Motivo de permanência */}
+            {step === 1 && (
+              <div className="space-y-4">
+                <p className="text-sm font-medium">O principal motivo que me faz permanecer na empresa é:</p>
+                <div className="space-y-2">
+                  {MOTIVOS_PERMANENCIA.map((motivo, idx) => (
+                    <label 
+                      key={idx}
+                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formData.motivoPermanencia === motivo ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/50'}`}
+                    >
+                      <input 
+                        type="radio" 
+                        name="motivoPermanencia"
+                        checked={formData.motivoPermanencia === motivo}
+                        onChange={() => setFormData({...formData, motivoPermanencia: motivo})}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">{motivo}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Step 2: Score empresa (0-10) */}
+            {step === 2 && (
+              <ScaleSelector 
+                value={formData.score}
+                onChange={(v) => setFormData({...formData, score: v})}
+                label="Em uma escala de 0 a 10, o quanto você avalia a Turbo Partners? (Sendo 0 não indicaria de jeito nenhum e 10 indicaria para todos)"
+              />
+            )}
+            
+            {/* Step 3: Comentário empresa */}
+            {step === 3 && (
+              <div className="space-y-4">
+                <p className="text-sm font-medium">O que precisamos fazer para sermos ou mantermos um 10?</p>
+                <Textarea 
+                  value={formData.comentarioEmpresa || ''} 
+                  onChange={(e) => setFormData({...formData, comentarioEmpresa: e.target.value})}
+                  placeholder="Compartilhe suas sugestões..."
+                  rows={5}
+                  data-testid="textarea-comentario-empresa"
+                />
+              </div>
+            )}
+            
+            {/* Step 4: Score líder (0-10) */}
+            {step === 4 && (
+              <ScaleSelector 
+                value={formData.scoreLider}
+                onChange={(v) => setFormData({...formData, scoreLider: v})}
+                label="Em uma escala de 0 a 10, o quanto você avalia o seu líder de equipe como uma boa pessoa para se trabalhar?"
+              />
+            )}
+            
+            {/* Step 5: Comentário líder */}
+            {step === 5 && (
+              <div className="space-y-4">
+                <p className="text-sm font-medium">O que o seu líder precisa fazer ou manter para receber um 10?</p>
+                <Textarea 
+                  value={formData.comentarioLider || ''} 
+                  onChange={(e) => setFormData({...formData, comentarioLider: e.target.value})}
+                  placeholder="Compartilhe seu feedback sobre a liderança..."
+                  rows={5}
+                  data-testid="textarea-comentario-lider"
+                />
+              </div>
+            )}
+            
+            {/* Step 6: Score produtos (0-10) */}
+            {step === 6 && (
+              <ScaleSelector 
+                value={formData.scoreProdutos}
+                onChange={(v) => setFormData({...formData, scoreProdutos: v})}
+                label="Em uma escala de 0 a 10, o quanto você avalia os produtos da nossa empresa?"
+              />
+            )}
+            
+            {/* Step 7: Comentário produtos */}
+            {step === 7 && (
+              <div className="space-y-4">
+                <p className="text-sm font-medium">O que podemos fazer para recebermos ou mantermos um 10?</p>
+                <Textarea 
+                  value={formData.comentarioProdutos || ''} 
+                  onChange={(e) => setFormData({...formData, comentarioProdutos: e.target.value})}
+                  placeholder="Compartilhe suas sugestões sobre os produtos..."
+                  rows={5}
+                  data-testid="textarea-comentario-produtos"
+                />
+              </div>
+            )}
+            
+            {/* Step 8: Feedback geral */}
+            {step === 8 && (
+              <div className="space-y-4">
+                <p className="text-sm font-medium">Espaço para feedbacks, críticas construtivas e opiniões:</p>
+                <Textarea 
+                  value={formData.feedbackGeral || ''} 
+                  onChange={(e) => setFormData({...formData, feedbackGeral: e.target.value})}
+                  placeholder="Fique à vontade para compartilhar qualquer feedback adicional..."
+                  rows={5}
+                  data-testid="textarea-feedback-geral"
+                />
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="flex justify-between gap-2">
+            <div>
+              {step > 1 && (
+                <Button variant="outline" onClick={handleBack} data-testid="button-back">
+                  Voltar
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={resetAndCloseDialog}>Cancelar</Button>
+              <Button 
+                onClick={handleNext} 
+                disabled={!canProceed() || addMutation.isPending}
+                data-testid="button-next"
+              >
+                {addMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : step === totalSteps ? (
+                  "Enviar Pesquisa"
+                ) : (
+                  "Próximo"
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
