@@ -71,6 +71,7 @@ const MeuPerfil = lazy(() => import("@/pages/MeuPerfil"));
 const Avisos = lazy(() => import("@/pages/Avisos"));
 const AdminHealth = lazy(() => import("@/pages/AdminHealth"));
 const AdminOverrides = lazy(() => import("@/pages/AdminOverrides"));
+const Sugestoes = lazy(() => import("@/pages/Sugestoes"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -166,6 +167,7 @@ function ProtectedRouter() {
       <Route path="/acessos">{() => <ProtectedRoute path="/acessos" component={Acessos} />}</Route>
       <Route path="/conhecimentos">{() => <ProtectedRoute path="/conhecimentos" component={Conhecimentos} />}</Route>
       <Route path="/beneficios">{() => <ProtectedRoute path="/beneficios" component={Beneficios} />}</Route>
+      <Route path="/sugestoes">{() => <ProtectedRoute path="/sugestoes" component={Sugestoes} />}</Route>
       <Route path="/cases/chat">{() => <ProtectedRoute path="/cases/chat" component={CasesChat} />}</Route>
       
       {/* Operação */}
