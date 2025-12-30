@@ -11974,21 +11974,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let empresaContratosAtivos = 0;
       let empresaClientesAtivos = 0;
       
-      // Buscar totais globais da empresa
-      const empresaTotaisQuery = await db.execute(sql`
+      // Buscar totais globais da empresa - contratos e MRR
+      const empresaContratosQuery = await db.execute(sql`
         SELECT 
-          COALESCE(SUM(ct.valorr::numeric), 0) as mrr_total,
-          COUNT(DISTINCT ct.id_task) as contratos_total,
-          COUNT(DISTINCT ct.cnpj) as clientes_total
-        FROM cup_contratos ct
+          COALESCE(SUM(valorr::numeric), 0) as mrr_total,
+          COUNT(*) as contratos_total
+        FROM cup_contratos
+        WHERE status IN ('ativo', 'onboarding', 'triagem')
+      `);
+      
+      // Buscar clientes ativos (distintos por id_task com contrato ativo)
+      const empresaClientesQuery = await db.execute(sql`
+        SELECT COUNT(DISTINCT c.id) as clientes_total
+        FROM cup_clientes c
+        INNER JOIN cup_contratos ct ON c.id_task = ct.id_task
         WHERE ct.status IN ('ativo', 'onboarding', 'triagem')
       `);
       
-      if (empresaTotaisQuery.rows.length > 0) {
-        const row = empresaTotaisQuery.rows[0] as any;
+      if (empresaContratosQuery.rows.length > 0) {
+        const row = empresaContratosQuery.rows[0] as any;
         empresaMrrTotal = parseFloat(row.mrr_total || '0');
         empresaContratosAtivos = parseInt(row.contratos_total || '0');
-        empresaClientesAtivos = parseInt(row.clientes_total || '0');
+      }
+      
+      if (empresaClientesQuery.rows.length > 0) {
+        empresaClientesAtivos = parseInt((empresaClientesQuery.rows[0] as any).clientes_total || '0');
       }
       
       if (userName) {
