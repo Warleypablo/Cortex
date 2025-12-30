@@ -13138,15 +13138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           t.*,
           EXTRACT(MONTH FROM COALESCE(t.data_pagamento, t.data_vencimento))::int as mes_referencia,
           EXTRACT(YEAR FROM COALESCE(t.data_pagamento, t.data_vencimento))::int as ano_referencia,
-          CASE 
-            WHEN EXISTS (
-              SELECT 1 FROM staging.rh_notas_fiscais nf 
-              WHERE nf.colaborador_id = ${colaboradorId}
-                AND EXTRACT(MONTH FROM COALESCE(t.data_pagamento, t.data_vencimento)) = nf.mes_referencia
-                AND EXTRACT(YEAR FROM COALESCE(t.data_pagamento, t.data_vencimento)) = nf.ano_referencia
-            ) THEN 'nf_anexada'
-            ELSE 'pendente'
-          END as nf_status
+          'pendente' as nf_status
         FROM todos_pagamentos t
         ORDER BY COALESCE(t.data_pagamento, t.data_vencimento) DESC
         LIMIT 24
