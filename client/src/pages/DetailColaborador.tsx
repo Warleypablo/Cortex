@@ -2262,42 +2262,121 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
       </Dialog>
 
       <Dialog open={addAcaoDialogOpen} onOpenChange={setAddAcaoDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Nova Ação</DialogTitle>
-            <DialogDescription>Adicione uma ação para esta reunião</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+                <ListChecks className="w-4 h-4 text-white" />
+              </div>
+              Nova Ação
+            </DialogTitle>
+            <DialogDescription>Defina uma ação a ser realizada após esta reunião</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Descrição *</label>
-              <Input value={acaoFormData.descricao} onChange={(e) => setAcaoFormData({ ...acaoFormData, descricao: e.target.value })} placeholder="O que precisa ser feito..." data-testid="input-acao-descricao" />
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                Descrição <span className="text-red-500">*</span>
+              </label>
+              <Textarea 
+                value={acaoFormData.descricao} 
+                onChange={(e) => setAcaoFormData({ ...acaoFormData, descricao: e.target.value })} 
+                placeholder="Descreva o que precisa ser feito de forma clara e objetiva..." 
+                rows={3}
+                className="resize-none"
+                data-testid="input-acao-descricao" 
+              />
             </div>
-            <div>
-              <label className="text-sm font-medium">Responsável</label>
-              <Input value={acaoFormData.responsavel} onChange={(e) => setAcaoFormData({ ...acaoFormData, responsavel: e.target.value })} placeholder="Quem é responsável..." data-testid="input-acao-responsavel" />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-muted-foreground" />
+                  Responsável
+                </label>
+                <Input 
+                  value={acaoFormData.responsavel} 
+                  onChange={(e) => setAcaoFormData({ ...acaoFormData, responsavel: e.target.value })} 
+                  placeholder="Nome do responsável" 
+                  data-testid="input-acao-responsavel" 
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  <CalendarDays className="w-3.5 h-3.5 text-muted-foreground" />
+                  Prazo
+                </label>
+                <Input 
+                  type="date" 
+                  value={acaoFormData.prazo} 
+                  onChange={(e) => setAcaoFormData({ ...acaoFormData, prazo: e.target.value })} 
+                  data-testid="input-acao-prazo" 
+                />
+              </div>
             </div>
-            <div>
-              <label className="text-sm font-medium">Prazo</label>
-              <Input type="date" value={acaoFormData.prazo} onChange={(e) => setAcaoFormData({ ...acaoFormData, prazo: e.target.value })} data-testid="input-acao-prazo" />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Status</label>
-              <Select value={acaoFormData.status} onValueChange={(v) => setAcaoFormData({ ...acaoFormData, status: v })}>
-                <SelectTrigger data-testid="select-acao-status">
-                  <SelectValue placeholder="Selecione o status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pendente">Pendente</SelectItem>
-                  <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                  <SelectItem value="concluida">Concluído</SelectItem>
-                </SelectContent>
-              </Select>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                Status
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAcaoFormData({ ...acaoFormData, status: "pendente" })}
+                  className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
+                    acaoFormData.status === "pendente" 
+                      ? "bg-yellow-100 border-yellow-300 text-yellow-700 dark:bg-yellow-900/30 dark:border-yellow-700 dark:text-yellow-400" 
+                      : "hover:bg-muted"
+                  }`}
+                  data-testid="button-status-pendente"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  Pendente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAcaoFormData({ ...acaoFormData, status: "em_andamento" })}
+                  className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
+                    acaoFormData.status === "em_andamento" 
+                      ? "bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-400" 
+                      : "hover:bg-muted"
+                  }`}
+                  data-testid="button-status-em-andamento"
+                >
+                  <Loader2 className="w-3.5 h-3.5" />
+                  Andamento
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAcaoFormData({ ...acaoFormData, status: "concluida" })}
+                  className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
+                    acaoFormData.status === "concluida" 
+                      ? "bg-green-100 border-green-300 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400" 
+                      : "hover:bg-muted"
+                  }`}
+                  data-testid="button-status-concluida"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Concluído
+                </button>
+              </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-4 pt-4 border-t">
             <Button variant="outline" onClick={() => setAddAcaoDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={() => addAcaoMutation.mutate(acaoFormData)} disabled={addAcaoMutation.isPending || !acaoFormData.descricao} data-testid="button-save-acao">
-              {addAcaoMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Adicionar"}
+            <Button 
+              onClick={() => addAcaoMutation.mutate(acaoFormData)} 
+              disabled={addAcaoMutation.isPending || !acaoFormData.descricao}
+              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white" 
+              data-testid="button-save-acao"
+            >
+              {addAcaoMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                <>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Adicionar Ação
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

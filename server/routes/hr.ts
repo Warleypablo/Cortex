@@ -700,30 +700,69 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
         const filename = meeting.pdfFilename.toLowerCase();
         const ext = filename.split('.').pop();
         
+        console.log("[ai] Document attached:", meeting.pdfFilename, "extension:", ext, "key:", objectKey);
+        
         // Extract text from DOCX files using mammoth
         if (ext === 'docx' || ext === 'doc') {
           try {
-            console.log("[ai] Extracting text from attached document:", meeting.pdfFilename);
+            console.log("[ai] Attempting to extract text from DOCX document");
             const mammoth = await import("mammoth");
-            const { ObjectStorageService } = await import("../replit_integrations/object_storage");
+            const { ObjectStorageService, objectStorageClient } = await import("../replit_integrations/object_storage");
             const objectStorage = new ObjectStorageService();
             
-            // Normalize the path and get the file
-            const normalizedPath = objectStorage.normalizeObjectEntityPath(objectKey);
-            const file = await objectStorage.getObjectEntityFile(normalizedPath);
-            const [contents] = await file.download();
+            let fileContents: Buffer;
+            
+            // Try multiple methods to get the file
+            if (objectKey.startsWith("https://storage.googleapis.com/")) {
+              // Direct GCS URL - parse bucket and object name
+              console.log("[ai] Detected GCS URL, parsing directly");
+              const url = new URL(objectKey);
+              const pathParts = url.pathname.split('/').filter(Boolean);
+              if (pathParts.length >= 2) {
+                const bucketName = pathParts[0];
+                const objectName = pathParts.slice(1).join('/');
+                console.log("[ai] Bucket:", bucketName, "Object:", objectName);
+                const bucket = objectStorageClient.bucket(bucketName);
+                const file = bucket.file(objectName);
+                const [contents] = await file.download();
+                fileContents = contents;
+              } else {
+                throw new Error("Invalid GCS URL path");
+              }
+            } else if (objectKey.startsWith("/objects/")) {
+              // Standard object entity path
+              console.log("[ai] Using standard object entity path");
+              const file = await objectStorage.getObjectEntityFile(objectKey);
+              const [contents] = await file.download();
+              fileContents = contents;
+            } else {
+              // Try normalizing the path
+              console.log("[ai] Normalizing path and attempting download");
+              const normalizedPath = objectStorage.normalizeObjectEntityPath(objectKey);
+              console.log("[ai] Normalized path:", normalizedPath);
+              const file = await objectStorage.getObjectEntityFile(normalizedPath);
+              const [contents] = await file.download();
+              fileContents = contents;
+            }
             
             // Extract text using mammoth
-            const result = await mammoth.extractRawText({ buffer: contents });
+            console.log("[ai] File downloaded, extracting text with mammoth...");
+            const result = await mammoth.extractRawText({ buffer: fileContents });
             const docText = result.value.trim();
             
-            if (docText && docText.length > 50) {
+            console.log("[ai] Extracted text length:", docText.length);
+            
+            if (docText && docText.length > 10) {
               console.log("[ai] Successfully extracted", docText.length, "characters from document");
               contentParts.push(`**Documento Anexado (${meeting.pdfFilename}):** ${docText}`);
+            } else {
+              console.log("[ai] Document appears to be empty or has minimal text");
             }
           } catch (docError) {
             console.error("[ai] Error extracting text from document:", docError);
           }
+        } else {
+          console.log("[ai] Document is not a DOCX/DOC file, skipping text extraction");
         }
       }
       
