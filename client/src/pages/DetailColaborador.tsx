@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SelectWithAdd } from "@/components/ui/select-with-add";
-import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, TrendingDown, Minus, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp, Hash, Clock, CheckCircle2, AlertTriangle, AlertCircle, Upload, Receipt, Download, Eye, LayoutGrid, List, Info, HelpCircle } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, TrendingDown, Minus, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp, Hash, Clock, CheckCircle2, AlertTriangle, AlertCircle, Upload, Receipt, Download, Eye, LayoutGrid, List, Info, HelpCircle, Paperclip, X, Trash2 } from "lucide-react";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceArea, ReferenceLine, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { Progress } from "@/components/ui/progress";
@@ -3889,7 +3889,7 @@ function FinanceiroTab({ colaboradorId }: { colaboradorId: string }) {
     );
   }
 
-  const availableYears = [...new Set(pagamentos.map(p => p.ano_referencia))].sort((a, b) => b - a);
+  const availableYears = Array.from(new Set(pagamentos.map(p => p.ano_referencia))).sort((a, b) => b - a);
   const pagamentosAnoSelecionado = pagamentos.filter(p => p.ano_referencia === selectedYear);
   const totalAnoSelecionado = pagamentosAnoSelecionado.reduce((sum, p) => sum + parseFloat(p.valor_bruto || "0"), 0);
   const nfsAnexadasAno = pagamentosAnoSelecionado.filter(p => parseInt(p.total_nfs || "0") > 0 || p.status === "nf_anexada").length;
