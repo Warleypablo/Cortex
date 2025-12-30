@@ -112,12 +112,12 @@ const REFINED_COLORS = [
 const CustomTooltip = ({ active, payload, label, valueFormatter }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-popover border border-border rounded-lg shadow-lg p-3 min-w-[140px]">
-      <p className="text-sm font-medium text-foreground mb-2">{label}</p>
+    <div className="bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-lg shadow-2xl p-3 min-w-[160px]">
+      <p className="text-xs font-medium text-zinc-300 mb-2 uppercase tracking-wider">{label}</p>
       {payload.map((entry: any, i: number) => (
         <div key={i} className="flex items-center justify-between gap-4 text-sm">
-          <span className="text-muted-foreground">{entry.name === "count" ? "Quantidade" : entry.name}</span>
-          <span className="font-semibold text-foreground">
+          <span className="text-zinc-400">{entry.name === "count" ? "Quantidade" : entry.name}</span>
+          <span className="font-bold text-white">
             {valueFormatter ? valueFormatter(entry.value) : entry.value}
           </span>
         </div>
@@ -125,6 +125,55 @@ const CustomTooltip = ({ active, payload, label, valueFormatter }: any) => {
     </div>
   );
 };
+
+const TechKpiCard = ({ title, value, subtitle, icon: Icon, gradient, glow }: {
+  title: string;
+  value: string;
+  subtitle: string;
+  icon: any;
+  gradient: string;
+  glow: string;
+}) => (
+  <div className={`relative group overflow-visible rounded-xl ${gradient} p-[1px]`}>
+    <div className={`absolute inset-0 rounded-xl ${glow} opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500`} />
+    <div className="relative bg-zinc-950/90 backdrop-blur-xl rounded-xl p-4 h-full">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">
+          {title}
+        </span>
+        <div className={`p-1.5 rounded-lg ${gradient}`}>
+          <Icon className="h-3.5 w-3.5 text-white" />
+        </div>
+      </div>
+      <div className="text-2xl font-bold text-white tracking-tight mb-1">{value}</div>
+      <p className="text-[10px] text-zinc-500">{subtitle}</p>
+    </div>
+  </div>
+);
+
+const TechChartCard = ({ title, subtitle, icon: Icon, iconBg, children }: {
+  title: string;
+  subtitle: string;
+  icon: any;
+  iconBg: string;
+  children: React.ReactNode;
+}) => (
+  <div className="relative rounded-xl bg-gradient-to-b from-zinc-800/50 to-zinc-900/50 border border-zinc-800/50 overflow-hidden">
+    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-800/20 via-transparent to-transparent" />
+    <div className="relative p-5">
+      <div className="flex items-center gap-3 mb-4">
+        <div className={`p-2 rounded-lg ${iconBg}`}>
+          <Icon className="h-4 w-4 text-white" />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-100">{title}</h3>
+          <p className="text-xs text-zinc-500">{subtitle}</p>
+        </div>
+      </div>
+      {children}
+    </div>
+  </div>
+);
 
 export default function ChurnDetalhamento() {
   usePageTitle("Detalhamento de Churn");
@@ -536,335 +585,300 @@ export default function ChurnDetalhamento() {
       </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {[
-          { 
-            title: "Total Churned", 
-            value: filteredMetricas.total_churned.toString(),
-            subtitle: "contratos encerrados",
-            icon: TrendingDown,
-            accent: "border-l-red-500"
-          },
-          { 
-            title: "MRR Perdido", 
-            value: formatCurrency(filteredMetricas.mrr_perdido),
-            subtitle: "receita mensal perdida",
-            icon: DollarSign,
-            accent: "border-l-orange-500"
-          },
-          { 
-            title: "LTV Total", 
-            value: formatCurrency(filteredMetricas.ltv_total),
-            subtitle: "valor gerado antes do churn",
-            icon: Target,
-            accent: "border-l-amber-500"
-          },
-          { 
-            title: "Lifetime Médio", 
-            value: `${filteredMetricas.lt_medio.toFixed(1)}m`,
-            subtitle: "meses em média",
-            icon: Clock,
-            accent: "border-l-blue-500"
-          },
-          { 
-            title: "Ticket Médio", 
-            value: formatCurrency(filteredMetricas.ticket_medio),
-            subtitle: "MRR médio por contrato",
-            icon: BarChart3,
-            accent: "border-l-violet-500"
-          },
-          { 
-            title: "LTV Médio", 
-            value: filteredMetricas.total_churned > 0 
-              ? formatCurrency(filteredMetricas.ltv_total / filteredMetricas.total_churned)
-              : "R$ 0",
-            subtitle: "por contrato churned",
-            icon: Percent,
-            accent: "border-l-emerald-500"
-          }
-        ].map((kpi, index) => (
-          <Card key={index} className={`border-l-4 ${kpi.accent} bg-card/50`}>
-            <CardContent className="p-4">
-              {isLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-7 w-24" />
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      {kpi.title}
-                    </span>
-                    <kpi.icon className="h-4 w-4 text-muted-foreground/60" />
-                  </div>
-                  <div className="text-2xl font-bold tracking-tight">{kpi.value}</div>
-                  <p className="text-[10px] text-muted-foreground mt-1">{kpi.subtitle}</p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+        {isLoading ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl bg-zinc-900/50 border border-zinc-800/50 p-4">
+              <Skeleton className="h-4 w-20 mb-3 bg-zinc-800" />
+              <Skeleton className="h-7 w-24 bg-zinc-800" />
+            </div>
+          ))
+        ) : (
+          <>
+            <TechKpiCard
+              title="Total Churned"
+              value={filteredMetricas.total_churned.toString()}
+              subtitle="contratos encerrados"
+              icon={TrendingDown}
+              gradient="bg-gradient-to-r from-red-500 to-rose-600"
+              glow="bg-red-500/30"
+            />
+            <TechKpiCard
+              title="MRR Perdido"
+              value={formatCurrency(filteredMetricas.mrr_perdido)}
+              subtitle="receita mensal perdida"
+              icon={DollarSign}
+              gradient="bg-gradient-to-r from-orange-500 to-amber-600"
+              glow="bg-orange-500/30"
+            />
+            <TechKpiCard
+              title="LTV Total"
+              value={formatCurrency(filteredMetricas.ltv_total)}
+              subtitle="valor gerado antes do churn"
+              icon={Target}
+              gradient="bg-gradient-to-r from-amber-500 to-yellow-600"
+              glow="bg-amber-500/30"
+            />
+            <TechKpiCard
+              title="Lifetime Médio"
+              value={`${filteredMetricas.lt_medio.toFixed(1)}m`}
+              subtitle="meses em média"
+              icon={Clock}
+              gradient="bg-gradient-to-r from-blue-500 to-cyan-600"
+              glow="bg-blue-500/30"
+            />
+            <TechKpiCard
+              title="Ticket Médio"
+              value={formatCurrency(filteredMetricas.ticket_medio)}
+              subtitle="MRR médio por contrato"
+              icon={BarChart3}
+              gradient="bg-gradient-to-r from-violet-500 to-purple-600"
+              glow="bg-violet-500/30"
+            />
+            <TechKpiCard
+              title="LTV Médio"
+              value={filteredMetricas.total_churned > 0 
+                ? formatCurrency(filteredMetricas.ltv_total / filteredMetricas.total_churned)
+                : "R$ 0"}
+              subtitle="por contrato churned"
+              icon={Percent}
+              gradient="bg-gradient-to-r from-emerald-500 to-teal-600"
+              glow="bg-emerald-500/30"
+            />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-red-500/10">
-                <BarChart3 className="h-4 w-4 text-red-500" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-semibold">Churn por Mês</CardTitle>
-                <CardDescription className="text-xs">Evolução mensal de contratos encerrados</CardDescription>
-              </div>
+        <TechChartCard
+          title="Churn por Mês"
+          subtitle="Evolução mensal de contratos encerrados"
+          icon={BarChart3}
+          iconBg="bg-gradient-to-r from-red-500 to-rose-600"
+        >
+          {isLoading ? (
+            <Skeleton className="h-[200px] w-full bg-zinc-800" />
+          ) : churnPorMes.length === 0 ? (
+            <div className="h-[200px] flex items-center justify-center text-zinc-500 text-sm">
+              Nenhum dado disponível
             </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[220px] w-full" />
-            ) : churnPorMes.length === 0 ? (
-              <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
-                Nenhum dado disponível
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={churnPorMes} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                  <XAxis 
-                    dataKey="mes" 
-                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} 
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={false}
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} 
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
-                  <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]} name="Quantidade" />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={churnPorMes} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ef4444" stopOpacity={1}/>
+                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0.6}/>
+                  </linearGradient>
+                </defs>
+                <XAxis 
+                  dataKey="mes" 
+                  tick={{ fontSize: 10, fill: '#71717a' }} 
+                  axisLine={{ stroke: '#3f3f46' }}
+                  tickLine={false}
+                />
+                <YAxis 
+                  tick={{ fontSize: 10, fill: '#71717a' }} 
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                <Bar dataKey="count" fill="url(#barGradient)" radius={[4, 4, 0, 0]} name="Quantidade" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </TechChartCard>
 
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-orange-500/10">
-                <PieChart className="h-4 w-4 text-orange-500" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-semibold">Distribuição por Produto</CardTitle>
-                <CardDescription className="text-xs">Percentual de churn por produto</CardDescription>
+        <TechChartCard
+          title="Distribuição por Produto"
+          subtitle="Percentual de churn por produto"
+          icon={PieChart}
+          iconBg="bg-gradient-to-r from-orange-500 to-amber-600"
+        >
+          {isLoading ? (
+            <Skeleton className="h-[200px] w-full bg-zinc-800" />
+          ) : distribuicaoPorProduto.length === 0 ? (
+            <div className="h-[200px] flex items-center justify-center text-zinc-500 text-sm">
+              Nenhum dado disponível
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <ResponsiveContainer width="55%" height={200}>
+                <RechartsPie>
+                  <Pie
+                    data={distribuicaoPorProduto}
+                    dataKey="count"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={75}
+                    strokeWidth={2}
+                    stroke="#18181b"
+                  >
+                    {distribuicaoPorProduto.map((entry, index) => (
+                      <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                </RechartsPie>
+              </ResponsiveContainer>
+              <div className="flex-1 space-y-2 text-xs">
+                {distribuicaoPorProduto.slice(0, 5).map((item, i) => (
+                  <div key={item.name} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div 
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-2 ring-zinc-800" 
+                        style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
+                      />
+                      <span className="truncate text-zinc-400">{item.fullName}</span>
+                    </div>
+                    <span className="font-semibold text-zinc-200 tabular-nums">{item.percentual.toFixed(0)}%</span>
+                  </div>
+                ))}
+                {distribuicaoPorProduto.length > 5 && (
+                  <p className="text-[10px] text-zinc-600 pt-1">
+                    +{distribuicaoPorProduto.length - 5} outros
+                  </p>
+                )}
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[220px] w-full" />
-            ) : distribuicaoPorProduto.length === 0 ? (
-              <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
-                Nenhum dado disponível
-              </div>
-            ) : (
-              <div className="flex items-center gap-4">
-                <ResponsiveContainer width="55%" height={220}>
-                  <RechartsPie>
-                    <Pie
-                      data={distribuicaoPorProduto}
-                      dataKey="count"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={85}
-                      strokeWidth={2}
-                      stroke="hsl(var(--card))"
-                    >
-                      {distribuicaoPorProduto.map((entry, index) => (
-                        <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
-                  </RechartsPie>
-                </ResponsiveContainer>
-                <div className="flex-1 space-y-1.5 text-xs">
-                  {distribuicaoPorProduto.slice(0, 5).map((item, i) => (
-                    <div key={item.name} className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div 
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
-                          style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
-                        />
-                        <span className="truncate text-muted-foreground">{item.fullName}</span>
-                      </div>
-                      <span className="font-medium tabular-nums">{item.percentual.toFixed(0)}%</span>
-                    </div>
-                  ))}
-                  {distribuicaoPorProduto.length > 5 && (
-                    <p className="text-[10px] text-muted-foreground/60 pt-1">
-                      +{distribuicaoPorProduto.length - 5} outros
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          )}
+        </TechChartCard>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-violet-500/10">
-                <Users className="h-4 w-4 text-violet-500" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-semibold">Churn por Squad</CardTitle>
-                <CardDescription className="text-xs">Quantidade por squad</CardDescription>
-              </div>
+        <TechChartCard
+          title="Churn por Squad"
+          subtitle="Quantidade por squad"
+          icon={Users}
+          iconBg="bg-gradient-to-r from-violet-500 to-purple-600"
+        >
+          {isLoading ? (
+            <Skeleton className="h-[180px] w-full bg-zinc-800" />
+          ) : distribuicaoPorSquad.length === 0 ? (
+            <div className="h-[180px] flex items-center justify-center text-zinc-500 text-sm">
+              Nenhum dado disponível
             </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[200px] w-full" />
-            ) : distribuicaoPorSquad.length === 0 ? (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
-                Nenhum dado disponível
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={distribuicaoPorSquad} layout="vertical" margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
-                  <XAxis 
-                    type="number" 
-                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} 
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis 
-                    type="category" 
-                    dataKey="name" 
-                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} 
-                    width={80}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]} name="Quantidade">
-                    {distribuicaoPorSquad.map((entry, index) => (
+          ) : (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={distribuicaoPorSquad} layout="vertical" margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
+                <XAxis 
+                  type="number" 
+                  tick={{ fontSize: 10, fill: '#71717a' }} 
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis 
+                  type="category" 
+                  dataKey="name" 
+                  tick={{ fontSize: 10, fill: '#71717a' }} 
+                  width={80}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]} name="Quantidade">
+                  {distribuicaoPorSquad.map((entry, index) => (
+                    <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </TechChartCard>
+
+        <TechChartCard
+          title="Distribuição por Lifetime"
+          subtitle="Tempo de permanência"
+          icon={Clock}
+          iconBg="bg-gradient-to-r from-amber-500 to-yellow-600"
+        >
+          {isLoading ? (
+            <Skeleton className="h-[180px] w-full bg-zinc-800" />
+          ) : distribuicaoPorLifetime.length === 0 ? (
+            <div className="h-[180px] flex items-center justify-center text-zinc-500 text-sm">
+              Nenhum dado disponível
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <ResponsiveContainer width="55%" height={180}>
+                <RechartsPie>
+                  <Pie
+                    data={distribuicaoPorLifetime.filter(d => d.count > 0)}
+                    dataKey="count"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={65}
+                    strokeWidth={2}
+                    stroke="#18181b"
+                  >
+                    {distribuicaoPorLifetime.map((entry, index) => (
                       <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
                     ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-amber-500/10">
-                <Clock className="h-4 w-4 text-amber-500" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-semibold">Distribuição por Lifetime</CardTitle>
-                <CardDescription className="text-xs">Tempo de permanência</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[200px] w-full" />
-            ) : distribuicaoPorLifetime.length === 0 ? (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
-                Nenhum dado disponível
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <ResponsiveContainer width="55%" height={200}>
-                  <RechartsPie>
-                    <Pie
-                      data={distribuicaoPorLifetime.filter(d => d.count > 0)}
-                      dataKey="count"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={45}
-                      outerRadius={75}
-                      strokeWidth={2}
-                      stroke="hsl(var(--card))"
-                    >
-                      {distribuicaoPorLifetime.map((entry, index) => (
-                        <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
-                  </RechartsPie>
-                </ResponsiveContainer>
-                <div className="flex-1 space-y-1.5 text-xs">
-                  {distribuicaoPorLifetime.filter(d => d.count > 0).map((item, i) => (
-                    <div key={item.name} className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
-                          style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
-                        />
-                        <span className="text-muted-foreground">{item.name}</span>
-                      </div>
-                      <span className="font-medium tabular-nums">{item.percentual.toFixed(0)}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-blue-500/10">
-                <Users className="h-4 w-4 text-blue-500" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-semibold">Churn por Responsável</CardTitle>
-                <CardDescription className="text-xs">Top 6 responsáveis</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[200px] w-full" />
-            ) : distribuicaoPorResponsavel.length === 0 ? (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
-                Nenhum dado disponível
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={distribuicaoPorResponsavel} layout="vertical" margin={{ top: 0, right: 10, left: -10, bottom: 0 }}>
-                  <XAxis 
-                    type="number" 
-                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis 
-                    type="category" 
-                    dataKey="name" 
-                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} 
-                    width={70}
-                    axisLine={false}
-                    tickLine={false}
-                  />
+                  </Pie>
                   <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
-                  <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Quantidade" />
-                </BarChart>
+                </RechartsPie>
               </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+              <div className="flex-1 space-y-2 text-xs">
+                {distribuicaoPorLifetime.filter(d => d.count > 0).map((item, i) => (
+                  <div key={item.name} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-2 ring-zinc-800" 
+                        style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
+                      />
+                      <span className="text-zinc-400">{item.name}</span>
+                    </div>
+                    <span className="font-semibold text-zinc-200 tabular-nums">{item.percentual.toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </TechChartCard>
+
+        <TechChartCard
+          title="Churn por Responsável"
+          subtitle="Top 6 responsáveis"
+          icon={Users}
+          iconBg="bg-gradient-to-r from-blue-500 to-cyan-600"
+        >
+          {isLoading ? (
+            <Skeleton className="h-[180px] w-full bg-zinc-800" />
+          ) : distribuicaoPorResponsavel.length === 0 ? (
+            <div className="h-[180px] flex items-center justify-center text-zinc-500 text-sm">
+              Nenhum dado disponível
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={distribuicaoPorResponsavel} layout="vertical" margin={{ top: 0, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="blueBarGradient" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={1}/>
+                  </linearGradient>
+                </defs>
+                <XAxis 
+                  type="number" 
+                  tick={{ fontSize: 10, fill: '#71717a' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis 
+                  type="category" 
+                  dataKey="name" 
+                  tick={{ fontSize: 10, fill: '#71717a' }} 
+                  width={70}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                <Bar dataKey="count" fill="url(#blueBarGradient)" radius={[0, 4, 4, 0]} name="Quantidade" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </TechChartCard>
       </div>
 
       <Card>
