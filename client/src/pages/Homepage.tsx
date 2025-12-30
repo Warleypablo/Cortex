@@ -45,6 +45,11 @@ interface HomeOverview {
   mrrTotal: number;
   contratosAtivos: number;
   clientesAtivos: number;
+  empresaMrrTotal?: number;
+  empresaContratosAtivos?: number;
+  empresaClientesAtivos?: number;
+  mrrVariacao?: number;
+  ticketMedioVariacao?: number;
   clientes: Array<{
     id: number;
     nome: string;
@@ -507,6 +512,8 @@ function DashboardAdmin() {
   const empresaContratosAtivos = homeOverview?.empresaContratosAtivos || 0;
   const empresaClientesAtivos = homeOverview?.empresaClientesAtivos || 0;
   const ticketMedio = empresaClientesAtivos > 0 ? mrrTotal / empresaClientesAtivos : 0;
+  const mrrVariacao = homeOverview?.mrrVariacao || 0;
+  const ticketMedioVariacao = homeOverview?.ticketMedioVariacao || 0;
 
   const kpiCards: KpiCard[] = [
     {
@@ -514,9 +521,9 @@ function DashboardAdmin() {
       subtitle: `${empresaContratosAtivos} contratos • ${empresaClientesAtivos} clientes`,
       value: formatCurrency(mrrTotal),
       icon: DollarSign,
-      badge: mrrTotal ? {
-        text: "+3.2%",
-        isPositive: true,
+      badge: mrrTotal && mrrVariacao !== 0 ? {
+        text: `${mrrVariacao >= 0 ? '+' : ''}${mrrVariacao.toFixed(1)}%`,
+        isPositive: mrrVariacao >= 0,
       } : undefined,
       href: "/visao-geral",
     },
@@ -525,6 +532,10 @@ function DashboardAdmin() {
       subtitle: `Por cliente ativo`,
       value: formatCurrency(ticketMedio),
       icon: Users,
+      badge: ticketMedio && ticketMedioVariacao !== 0 ? {
+        text: `${ticketMedioVariacao >= 0 ? '+' : ''}${ticketMedioVariacao.toFixed(1)}%`,
+        isPositive: ticketMedioVariacao >= 0,
+      } : undefined,
       href: "/visao-geral",
     },
     {
