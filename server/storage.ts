@@ -298,6 +298,7 @@ export interface IStorage {
   getOneOnOneMeetings(colaboradorId: number): Promise<OneOnOne[]>;
   createOneOnOneMeeting(data: InsertOneOnOne): Promise<OneOnOne>;
   updateOneOnOneMeeting(id: number, data: Partial<InsertOneOnOne>): Promise<OneOnOne>;
+  updateOneOnOneAttachments(id: number, data: { pdfObjectKey?: string | null; pdfFilename?: string | null; transcriptUrl?: string | null; transcriptText?: string | null; uploadedBy?: string | null }): Promise<OneOnOne>;
   deleteOneOnOneMeeting(id: number): Promise<void>;
   getOneOnOneAcoes(oneOnOneId: number): Promise<OneOnOneAcao[]>;
   createOneOnOneAcao(data: InsertOneOnOneAcao): Promise<OneOnOneAcao>;
