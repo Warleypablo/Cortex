@@ -39,8 +39,8 @@ export const objectives: ObjectiveDef[] = [
   },
   {
     id: "O3",
-    title: "Saúde da Receita (Hugz)",
-    subtitle: "Retenção e qualidade - reduzir inadimplência e churn do ecossistema"
+    title: "Hugz Ventures",
+    subtitle: "DNVB de petiscos Pet em parceria com Cofril - tirar a nova empresa do papel"
   },
   {
     id: "O4",
@@ -163,7 +163,7 @@ export const krs: KRDef[] = [
     targets: { Q1: 23, Q2: 23, Q3: 23, Q4: 23 }
   },
 
-  // O3 - Saúde da Receita / Hugz (4 KRs)
+  // O3 - Hugz Ventures / DNVB Pet (4 KRs)
   {
     id: "O3_KR1",
     objectiveId: "O3",
