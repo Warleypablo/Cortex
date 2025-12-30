@@ -1846,10 +1846,16 @@ export const oneOnOne = pgTable("rh_one_on_one", {
   colaboradorId: integer("colaborador_id").notNull(),
   gestorId: integer("gestor_id"),
   data: date("data").notNull(),
+  tipo: text("tipo").default("regular"),
   pauta: text("pauta"),
   notas: text("notas"),
   criadoEm: timestamp("criado_em").defaultNow(),
   criadoPor: text("criado_por"),
+  pdfObjectKey: text("pdf_object_key"),
+  pdfFilename: text("pdf_filename"),
+  transcriptUrl: text("transcript_url"),
+  transcriptText: text("transcript_text"),
+  uploadedBy: text("uploaded_by"),
 });
 
 export const oneOnOneAcoes = pgTable("rh_one_on_one_acoes", {

@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SelectWithAdd } from "@/components/ui/select-with-add";
-import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, TrendingDown, Minus, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp, Hash, Clock, CheckCircle2, AlertTriangle, AlertCircle, Upload, Receipt, Download, Eye, LayoutGrid, List, Info, HelpCircle, Paperclip, X, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, TrendingDown, Minus, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp, Hash, Clock, CheckCircle2, AlertTriangle, AlertCircle, Upload, Receipt, Download, Eye, LayoutGrid, List, Info, HelpCircle, Paperclip, X, Trash2, Sparkles, ThumbsUp, ThumbsDown, Lightbulb, AlertOctagon, ArrowRight } from "lucide-react";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceArea, ReferenceLine, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { Progress } from "@/components/ui/progress";
@@ -1546,6 +1546,18 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [aiAnalysisDialogOpen, setAiAnalysisDialogOpen] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<{
+    resumo: string;
+    sentimento: "positivo" | "neutro" | "preocupante";
+    pontosFortes: string[];
+    areasAtencao: string[];
+    sugestoesAcao: string[];
+    sinaisAlerta: string[];
+    proximosPassos: string[];
+  } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzingMeetingId, setAnalyzingMeetingId] = useState<number | null>(null);
 
   const { data: oneOnOnes = [], isLoading } = useQuery<OneOnOneItem[]>({
     queryKey: ["/api/colaboradores", colaboradorId, "one-on-one"],
@@ -1755,6 +1767,26 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
     return "pendente";
   };
 
+  const handleAnalyzeMeeting = async (meetingId: number) => {
+    setIsAnalyzing(true);
+    setAnalyzingMeetingId(meetingId);
+    try {
+      const response = await apiRequest("POST", `/api/one-on-one/${meetingId}/analyze`);
+      const result = await response.json();
+      if (result.success) {
+        setAiAnalysis(result.analise);
+        setAiAnalysisDialogOpen(true);
+      } else {
+        toast({ title: "Erro na análise", description: result.error || "Não foi possível analisar a reunião.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Erro na análise", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setIsAnalyzing(false);
+      setAnalyzingMeetingId(null);
+    }
+  };
+
   return (
     <Card className="p-6" data-testid="card-1x1">
       <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
@@ -1930,6 +1962,27 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
                         )}
                       </div>
                       
+                      {/* AI Analysis Button */}
+                      <div className="pt-2 border-t">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="w-full gap-2 bg-gradient-to-r from-purple-500/10 to-blue-500/10 hover:from-purple-500/20 hover:to-blue-500/20 border-purple-500/30"
+                          onClick={() => handleAnalyzeMeeting(meeting.id)}
+                          disabled={isAnalyzing}
+                          data-testid={`button-analyze-${meeting.id}`}
+                        >
+                          {isAnalyzing && analyzingMeetingId === meeting.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-4 h-4 text-purple-500" />
+                          )}
+                          <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent font-medium">
+                            Analisar com IA
+                          </span>
+                        </Button>
+                      </div>
+
                       <div className="pt-2 border-t">
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-xs text-muted-foreground uppercase">Anexos & Transcrição</p>
@@ -2320,6 +2373,145 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
             >
               {updateAttachmentsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Analysis Modal */}
+      <Dialog open={aiAnalysisDialogOpen} onOpenChange={setAiAnalysisDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-500" />
+              <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                Análise Inteligente da Reunião
+              </span>
+            </DialogTitle>
+            <DialogDescription>Insights gerados automaticamente com IA</DialogDescription>
+          </DialogHeader>
+          
+          {aiAnalysis && (
+            <div className="space-y-4 mt-4">
+              {/* Resumo e Sentimento */}
+              <div className={`p-4 rounded-xl border-2 ${
+                aiAnalysis.sentimento === "positivo" 
+                  ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                  : aiAnalysis.sentimento === "preocupante"
+                  ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+                  : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+              }`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {aiAnalysis.sentimento === "positivo" && <ThumbsUp className="w-5 h-5 text-green-600" />}
+                  {aiAnalysis.sentimento === "preocupante" && <ThumbsDown className="w-5 h-5 text-red-600" />}
+                  {aiAnalysis.sentimento === "neutro" && <Minus className="w-5 h-5 text-blue-600" />}
+                  <span className={`font-semibold ${
+                    aiAnalysis.sentimento === "positivo" ? "text-green-700 dark:text-green-400"
+                    : aiAnalysis.sentimento === "preocupante" ? "text-red-700 dark:text-red-400"
+                    : "text-blue-700 dark:text-blue-400"
+                  }`}>
+                    Sentimento: {aiAnalysis.sentimento.charAt(0).toUpperCase() + aiAnalysis.sentimento.slice(1)}
+                  </span>
+                </div>
+                <p className="text-sm">{aiAnalysis.resumo}</p>
+              </div>
+
+              {/* Grid de insights */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Pontos Fortes */}
+                {aiAnalysis.pontosFortes.length > 0 && (
+                  <div className="p-4 rounded-xl bg-green-50/50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/50">
+                    <div className="flex items-center gap-2 mb-3">
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                      <p className="font-medium text-green-700 dark:text-green-400">Pontos Fortes</p>
+                    </div>
+                    <ul className="space-y-2">
+                      {aiAnalysis.pontosFortes.map((ponto, i) => (
+                        <li key={i} className="text-sm flex items-start gap-2">
+                          <span className="text-green-500 mt-1">•</span>
+                          <span>{ponto}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Áreas de Atenção */}
+                {aiAnalysis.areasAtencao.length > 0 && (
+                  <div className="p-4 rounded-xl bg-yellow-50/50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/50">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                      <p className="font-medium text-yellow-700 dark:text-yellow-400">Áreas de Atenção</p>
+                    </div>
+                    <ul className="space-y-2">
+                      {aiAnalysis.areasAtencao.map((area, i) => (
+                        <li key={i} className="text-sm flex items-start gap-2">
+                          <span className="text-yellow-500 mt-1">•</span>
+                          <span>{area}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Sugestões de Ação */}
+              {aiAnalysis.sugestoesAcao.length > 0 && (
+                <div className="p-4 rounded-xl bg-purple-50/50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800/50">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Lightbulb className="w-4 h-4 text-purple-600" />
+                    <p className="font-medium text-purple-700 dark:text-purple-400">Sugestões de Ação</p>
+                  </div>
+                  <ul className="space-y-2">
+                    {aiAnalysis.sugestoesAcao.map((sugestao, i) => (
+                      <li key={i} className="text-sm flex items-start gap-2">
+                        <ArrowRight className="w-3 h-3 text-purple-500 mt-1 flex-shrink-0" />
+                        <span>{sugestao}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Sinais de Alerta */}
+              {aiAnalysis.sinaisAlerta.length > 0 && (
+                <div className="p-4 rounded-xl bg-red-50/50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertOctagon className="w-4 h-4 text-red-600" />
+                    <p className="font-medium text-red-700 dark:text-red-400">Sinais de Alerta</p>
+                  </div>
+                  <ul className="space-y-2">
+                    {aiAnalysis.sinaisAlerta.map((sinal, i) => (
+                      <li key={i} className="text-sm flex items-start gap-2">
+                        <span className="text-red-500 mt-1">!</span>
+                        <span>{sinal}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Próximos Passos */}
+              {aiAnalysis.proximosPassos.length > 0 && (
+                <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/50">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Target className="w-4 h-4 text-blue-600" />
+                    <p className="font-medium text-blue-700 dark:text-blue-400">Próximos Passos Recomendados</p>
+                  </div>
+                  <ul className="space-y-2">
+                    {aiAnalysis.proximosPassos.map((passo, i) => (
+                      <li key={i} className="text-sm flex items-start gap-2">
+                        <span className="text-blue-500 mt-1 font-medium">{i + 1}.</span>
+                        <span>{passo}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setAiAnalysisDialogOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

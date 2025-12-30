@@ -8840,8 +8840,9 @@ export class DbStorage implements IStorage {
   async getOneOnOneMeetings(colaboradorId: number): Promise<OneOnOne[]> {
     const result = await db.execute(sql`
       SELECT 
-        id, colaborador_id as "colaboradorId", gestor_id as "gestorId",
-        data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor",
+        id, colaborador_id as "colaboradorId", lider_id as "gestorId",
+        data, tipo, anotacoes as "pauta", proximos_passos as "notas", 
+        criado_em as "criadoEm",
         pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename",
         transcript_url as "transcriptUrl", transcript_text as "transcriptText",
         uploaded_by as "uploadedBy"
@@ -8854,21 +8855,22 @@ export class DbStorage implements IStorage {
 
   async createOneOnOneMeeting(data: InsertOneOnOne & { pdf_object_key?: string; pdf_filename?: string; transcricao_url?: string; transcricao_texto?: string }): Promise<OneOnOne> {
     const result = await db.execute(sql`
-      INSERT INTO rh_one_on_one (colaborador_id, gestor_id, data, pauta, notas, criado_por, pdf_object_key, pdf_filename, transcript_url, transcript_text)
+      INSERT INTO rh_one_on_one (colaborador_id, lider_id, data, tipo, anotacoes, proximos_passos, pdf_object_key, pdf_filename, transcript_url, transcript_text)
       VALUES (
         ${data.colaboradorId}, 
         ${data.gestorId || null}, 
         ${data.data}, 
+        ${data.tipo || 'regular'},
         ${data.pauta || null}, 
         ${data.notas || null}, 
-        ${data.criadoPor || null},
         ${data.pdf_object_key || null},
         ${data.pdf_filename || null},
         ${data.transcricao_url || null},
         ${data.transcricao_texto || null}
       )
-      RETURNING id, colaborador_id as "colaboradorId", gestor_id as "gestorId",
-        data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor",
+      RETURNING id, colaborador_id as "colaboradorId", lider_id as "gestorId",
+        data, tipo, anotacoes as "pauta", proximos_passos as "notas", 
+        criado_em as "criadoEm",
         pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename",
         transcript_url as "transcriptUrl", transcript_text as "transcriptText",
         uploaded_by as "uploadedBy"
@@ -8892,8 +8894,9 @@ export class DbStorage implements IStorage {
         transcript_text = COALESCE(${data.transcriptText ?? null}, transcript_text),
         uploaded_by = COALESCE(${data.uploadedBy ?? null}, uploaded_by)
       WHERE id = ${id}
-      RETURNING id, colaborador_id as "colaboradorId", gestor_id as "gestorId",
-        data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor",
+      RETURNING id, colaborador_id as "colaboradorId", lider_id as "gestorId",
+        data, tipo, anotacoes as "pauta", proximos_passos as "notas", 
+        criado_em as "criadoEm",
         pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename",
         transcript_url as "transcriptUrl", transcript_text as "transcriptText",
         uploaded_by as "uploadedBy"
@@ -8902,24 +8905,21 @@ export class DbStorage implements IStorage {
   }
 
   async updateOneOnOneMeeting(id: number, data: Partial<InsertOneOnOne>): Promise<OneOnOne> {
-    const setClauses: string[] = [];
-    const values: any[] = [];
-    
-    if (data.gestorId !== undefined) { setClauses.push('gestor_id'); values.push(data.gestorId); }
-    if (data.data !== undefined) { setClauses.push('data'); values.push(data.data); }
-    if (data.pauta !== undefined) { setClauses.push('pauta'); values.push(data.pauta); }
-    if (data.notas !== undefined) { setClauses.push('notas'); values.push(data.notas); }
-    
     const result = await db.execute(sql`
       UPDATE rh_one_on_one 
       SET 
-        gestor_id = COALESCE(${data.gestorId ?? null}, gestor_id),
+        lider_id = COALESCE(${data.gestorId ?? null}, lider_id),
         data = COALESCE(${data.data ?? null}, data),
-        pauta = COALESCE(${data.pauta ?? null}, pauta),
-        notas = COALESCE(${data.notas ?? null}, notas)
+        tipo = COALESCE(${data.tipo ?? null}, tipo),
+        anotacoes = COALESCE(${data.pauta ?? null}, anotacoes),
+        proximos_passos = COALESCE(${data.notas ?? null}, proximos_passos)
       WHERE id = ${id}
-      RETURNING id, colaborador_id as "colaboradorId", gestor_id as "gestorId",
-        data, pauta, notas, criado_em as "criadoEm", criado_por as "criadoPor"
+      RETURNING id, colaborador_id as "colaboradorId", lider_id as "gestorId",
+        data, tipo, anotacoes as "pauta", proximos_passos as "notas", 
+        criado_em as "criadoEm",
+        pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename",
+        transcript_url as "transcriptUrl", transcript_text as "transcriptText",
+        uploaded_by as "uploadedBy"
     `);
     return result.rows[0] as OneOnOne;
   }

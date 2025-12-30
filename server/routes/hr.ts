@@ -424,9 +424,15 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "Filename is required" });
       }
       
-      // Only allow PDF files
-      if (contentType && !contentType.includes('pdf')) {
-        return res.status(400).json({ error: "Only PDF files are allowed" });
+      // Allow PDF, DOC, DOCX, CSV files
+      const allowedTypes = ['pdf', 'msword', 'wordprocessingml', 'csv', 'text/csv'];
+      const allowedExtensions = ['.pdf', '.doc', '.docx', '.csv'];
+      const fileExtension = filename?.toLowerCase().slice(filename.lastIndexOf('.'));
+      const isValidType = contentType && allowedTypes.some(t => contentType.includes(t));
+      const isValidExtension = allowedExtensions.includes(fileExtension || '');
+      
+      if (!isValidType && !isValidExtension) {
+        return res.status(400).json({ error: "Formatos aceitos: PDF, DOC, DOCX, CSV" });
       }
       
       // Import ObjectStorageService
@@ -534,9 +540,15 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "Filename is required" });
       }
       
-      // Only allow PDF files
-      if (contentType && !contentType.includes('pdf')) {
-        return res.status(400).json({ error: "Only PDF files are allowed" });
+      // Allow PDF, DOC, DOCX, CSV files
+      const allowedTypes = ['pdf', 'msword', 'wordprocessingml', 'csv', 'text/csv'];
+      const allowedExtensions = ['.pdf', '.doc', '.docx', '.csv'];
+      const fileExtension = filename?.toLowerCase().slice(filename.lastIndexOf('.'));
+      const isValidType = contentType && allowedTypes.some(t => contentType.includes(t));
+      const isValidExtension = allowedExtensions.includes(fileExtension || '');
+      
+      if (!isValidType && !isValidExtension) {
+        return res.status(400).json({ error: "Formatos aceitos: PDF, DOC, DOCX, CSV" });
       }
       
       // Import ObjectStorageService
@@ -642,6 +654,106 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     } catch (error) {
       console.error("[api] Error downloading 1x1 document:", error);
       res.status(500).json({ error: "Failed to download document" });
+    }
+  });
+
+  // ============ 1x1 AI Analysis ============
+  app.post("/api/one-on-one/:id/analyze", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid meeting ID" });
+      }
+      
+      // Get meeting data
+      const meetings = await db.execute(sql`
+        SELECT 
+          id, colaborador_id as "colaboradorId", lider_id as "gestorId",
+          data, tipo, anotacoes as "pauta", proximos_passos as "notas",
+          transcript_text as "transcriptText"
+        FROM rh_one_on_one 
+        WHERE id = ${id}
+      `);
+      
+      if (meetings.rows.length === 0) {
+        return res.status(404).json({ error: "Meeting not found" });
+      }
+      
+      const meeting = meetings.rows[0] as any;
+      
+      // Get colaborador name
+      const colaboradorResult = await db.execute(sql`
+        SELECT nome FROM rh_pessoal WHERE id = ${meeting.colaboradorId}
+      `);
+      const colaboradorNome = colaboradorResult.rows[0]?.nome || "Colaborador";
+      
+      // Prepare content for analysis
+      const contentParts: string[] = [];
+      if (meeting.pauta) contentParts.push(`**Pauta:** ${meeting.pauta}`);
+      if (meeting.notas) contentParts.push(`**Notas:** ${meeting.notas}`);
+      if (meeting.transcriptText) contentParts.push(`**Transcrição:** ${meeting.transcriptText}`);
+      
+      if (contentParts.length === 0) {
+        return res.status(400).json({ error: "Não há conteúdo suficiente para análise. Adicione pauta, notas ou transcrição." });
+      }
+      
+      const content = contentParts.join("\n\n");
+      
+      // Call OpenAI
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      
+      const prompt = `Você é um especialista em gestão de pessoas e desenvolvimento de equipes. Analise esta reunião 1x1 entre um líder e ${colaboradorNome}.
+
+Conteúdo da reunião:
+${content}
+
+Forneça uma análise estruturada em JSON com os seguintes campos:
+- resumo: Um resumo executivo de 2-3 frases
+- sentimento: "positivo", "neutro" ou "preocupante"
+- pontosFortes: Array de 2-3 pontos fortes identificados
+- areasAtencao: Array de 0-3 áreas que precisam atenção
+- sugestoesAcao: Array de 2-4 sugestões de ações práticas
+- sinaisAlerta: Array de 0-2 sinais de alerta (se houver)
+- proximosPassos: Array de 2-3 recomendações para próximas reuniões
+
+Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+      
+      const responseText = completion.choices[0]?.message?.content || "{}";
+      
+      // Parse the JSON response
+      let analysis;
+      try {
+        analysis = JSON.parse(responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
+      } catch (parseError) {
+        console.error("[ai] Error parsing OpenAI response:", parseError);
+        analysis = {
+          resumo: "Não foi possível processar a análise completa.",
+          sentimento: "neutro",
+          pontosFortes: [],
+          areasAtencao: [],
+          sugestoesAcao: [],
+          sinaisAlerta: [],
+          proximosPassos: []
+        };
+      }
+      
+      res.json({
+        success: true,
+        meetingId: id,
+        colaboradorNome,
+        analise: analysis
+      });
+    } catch (error) {
+      console.error("[api] Error analyzing 1x1 meeting:", error);
+      res.status(500).json({ error: "Failed to analyze meeting" });
     }
   });
 
