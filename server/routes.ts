@@ -5872,7 +5872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get churned/encerrados contracts (filter by status containing churn or encerrado)
       const contratosResult = await db.execute(sql`
         SELECT 
-          c.id,
+          c.id_task as id,
           cl.nome as cliente_nome,
           cl.cnpj,
           c.produto,
