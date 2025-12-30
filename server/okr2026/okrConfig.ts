@@ -15,11 +15,11 @@ export const OKR_CONFIG = {
       title: "Aumentar eficiência e geração de caixa",
       description: "Crescer sem quebrar - eficiência operacional e disciplina financeira"
     },
-    O3_HUGZ_RETENTION: {
+    O3_HUGZ_VENTURES: {
       id: "O3",
-      code: "O3_HUGZ_RETENTION",
-      title: "Higiene de receita: inadimplência e churn sob controle (Programa Hugz)",
-      description: "Retenção e qualidade - reduzir inadimplência e churn do ecossistema"
+      code: "O3_HUGZ_VENTURES",
+      title: "Hugz Ventures - DNVB Pet com Cofril",
+      description: "Tirar a nova empresa do papel - DNVB de petiscos Pet em parceria com Cofril"
     },
     O4_TURBOOH_SCALE: {
       id: "O4",
@@ -150,10 +150,10 @@ export const OKR_CONFIG = {
       owner: "Operações"
     },
 
-    // O3 - Hugz Retention
+    // O3 - Hugz Ventures (DNVB Pet)
     KR1_INADIMPLENCIA_MAX: {
       id: "O3-KR1",
-      objectiveId: "O3_HUGZ_RETENTION",
+      objectiveId: "O3_HUGZ_VENTURES",
       title: "Inadimplência % (mensal)",
       metric_key: "inadimplencia_pct",
       target_type: "monthly",
@@ -164,7 +164,7 @@ export const OKR_CONFIG = {
     },
     KR2_GROSS_CHURN_MAX: {
       id: "O3-KR2",
-      objectiveId: "O3_HUGZ_RETENTION",
+      objectiveId: "O3_HUGZ_VENTURES",
       title: "Gross MRR Churn % (mensal)",
       metric_key: "gross_mrr_churn_pct",
       target_type: "monthly",
@@ -175,7 +175,7 @@ export const OKR_CONFIG = {
     },
     KR3_NET_CHURN_READY: {
       id: "O3-KR3",
-      objectiveId: "O3_HUGZ_RETENTION",
+      objectiveId: "O3_HUGZ_VENTURES",
       title: "Net Churn disponível no Cortex",
       metric_key: "net_mrr_churn_pct",
       target_type: "milestone",
@@ -187,7 +187,7 @@ export const OKR_CONFIG = {
     },
     KR4_LOGO_CHURN_READY: {
       id: "O3-KR4",
-      objectiveId: "O3_HUGZ_RETENTION",
+      objectiveId: "O3_HUGZ_VENTURES",
       title: "Logo Churn % disponível no Cortex",
       metric_key: "logo_churn_pct",
       target_type: "milestone",
