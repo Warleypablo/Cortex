@@ -1558,6 +1558,8 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
   } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzingMeetingId, setAnalyzingMeetingId] = useState<number | null>(null);
+  const [editNotesDialogOpen, setEditNotesDialogOpen] = useState(false);
+  const [editNotesData, setEditNotesData] = useState({ pauta: "", notas: "" });
 
   const { data: oneOnOnes = [], isLoading } = useQuery<OneOnOneItem[]>({
     queryKey: ["/api/colaboradores", colaboradorId, "one-on-one"],
@@ -1681,6 +1683,21 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
     },
     onError: (error: Error) => {
       toast({ title: "Erro ao atualizar ação", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateNotesMutation = useMutation({
+    mutationFn: async ({ meetingId, pauta, notas }: { meetingId: number; pauta: string; notas: string }) => {
+      const response = await apiRequest("PATCH", `/api/one-on-one/${meetingId}`, { pauta, notas });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/colaboradores", colaboradorId, "one-on-one"] });
+      toast({ title: "Anotações atualizadas", description: "As anotações foram salvas." });
+      setEditNotesDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1918,14 +1935,28 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
                       <div className="pt-2 border-t">
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-xs text-muted-foreground uppercase">Ações</p>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            onClick={() => { setSelectedOneOnOneId(meeting.id); setAddAcaoDialogOpen(true); }}
-                            data-testid={`button-add-acao-${meeting.id}`}
-                          >
-                            <Plus className="w-3 h-3 mr-1" /> Ação
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => { 
+                                setSelectedOneOnOneId(meeting.id); 
+                                setEditNotesData({ pauta: meeting.pauta || "", notas: meeting.notas || "" });
+                                setEditNotesDialogOpen(true); 
+                              }}
+                              data-testid={`button-edit-notes-${meeting.id}`}
+                            >
+                              <Pencil className="w-3 h-3 mr-1" /> Anotação
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => { setSelectedOneOnOneId(meeting.id); setAddAcaoDialogOpen(true); }}
+                              data-testid={`button-add-acao-${meeting.id}`}
+                            >
+                              <Plus className="w-3 h-3 mr-1" /> Ação
+                            </Button>
+                          </div>
                         </div>
                         {meeting.acoes && meeting.acoes.length > 0 ? (
                           <div className="space-y-2">
@@ -2621,6 +2652,60 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
           
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setAiAnalysisDialogOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Notes Dialog */}
+      <Dialog open={editNotesDialogOpen} onOpenChange={setEditNotesDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-orange-500" />
+              Editar Anotações
+            </DialogTitle>
+            <DialogDescription>Edite a pauta e as notas da reunião 1x1</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium block mb-2">Pauta da Reunião</label>
+              <Textarea 
+                placeholder="Tópicos discutidos na reunião..."
+                value={editNotesData.pauta}
+                onChange={(e) => setEditNotesData(prev => ({ ...prev, pauta: e.target.value }))}
+                className="min-h-[120px]"
+                data-testid="input-edit-pauta"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-2">Notas e Observações</label>
+              <Textarea 
+                placeholder="Observações, decisões tomadas, próximos passos..."
+                value={editNotesData.notas}
+                onChange={(e) => setEditNotesData(prev => ({ ...prev, notas: e.target.value }))}
+                className="min-h-[120px]"
+                data-testid="input-edit-notas"
+              />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setEditNotesDialogOpen(false)}>Cancelar</Button>
+            <Button 
+              onClick={() => {
+                if (selectedOneOnOneId) {
+                  updateNotesMutation.mutate({ 
+                    meetingId: selectedOneOnOneId, 
+                    pauta: editNotesData.pauta, 
+                    notas: editNotesData.notas 
+                  });
+                }
+              }}
+              disabled={updateNotesMutation.isPending}
+              data-testid="button-save-notes"
+            >
+              {updateNotesMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Salvar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
