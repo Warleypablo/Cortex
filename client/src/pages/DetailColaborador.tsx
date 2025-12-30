@@ -3338,6 +3338,41 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
   // Calcular total geral de todos os pagamentos
   const totalGeral = pagamentos.reduce((sum, p) => sum + parseFloat(p.valor_bruto || "0"), 0);
 
+  // Detectar promoções - comparar salário fixo entre meses consecutivos
+  const detectarPromocoes = () => {
+    // Filtrar apenas pagamentos fixos (não premiação/bônus)
+    const pagamentosFixos = pagamentos
+      .filter(p => {
+        const cat = (p.categoria_nome || "").toLowerCase();
+        return !cat.includes("premia") && !cat.includes("bonus") && !cat.includes("bônus");
+      })
+      .sort((a, b) => {
+        // Ordenar cronologicamente (mais antigo primeiro)
+        const dateA = a.ano_referencia * 12 + a.mes_referencia;
+        const dateB = b.ano_referencia * 12 + b.mes_referencia;
+        return dateA - dateB;
+      });
+
+    const promocoes = new Map<string, { valorAnterior: number; valorAtual: number }>();
+    let ultimoValorFixo: number | null = null;
+
+    for (const pag of pagamentosFixos) {
+      const valorAtual = parseFloat(pag.valor_bruto || "0");
+      const chave = `${pag.ano_referencia}-${pag.mes_referencia}`;
+      
+      // Se houve aumento em relação ao último valor fixo, é promoção
+      if (ultimoValorFixo !== null && valorAtual > ultimoValorFixo && (valorAtual - ultimoValorFixo) >= 100) {
+        promocoes.set(chave, { valorAnterior: ultimoValorFixo, valorAtual });
+      }
+      
+      ultimoValorFixo = valorAtual;
+    }
+    
+    return promocoes;
+  };
+
+  const promocoesDetectadas = detectarPromocoes();
+
   return (
     <Card className="p-5 hover-elevate" data-testid="card-financeiro-resumo">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -3431,26 +3466,44 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
               const isPremiacao = pagamento.categoria_nome?.toLowerCase().includes("premia") || 
                                   pagamento.categoria_nome?.toLowerCase().includes("bonus") || 
                                   pagamento.categoria_nome?.toLowerCase().includes("bônus");
+              const chavePromocao = `${pagamento.ano_referencia}-${pagamento.mes_referencia}`;
+              const promocao = promocoesDetectadas.get(chavePromocao);
+              const isPromocao = !isPremiacao && promocao;
               return (
                 <div 
                   key={pagamento.id} 
-                  className="flex items-center justify-between p-2 rounded-md bg-muted/30"
+                  className={cn(
+                    "flex items-center justify-between p-2 rounded-md",
+                    isPromocao ? "bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700" : "bg-muted/30"
+                  )}
                   data-testid={`row-pagamento-${pagamento.id}`}
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <div className={cn(
                       "w-2 h-2 rounded-full flex-shrink-0",
-                      temNf ? "bg-green-500" : "bg-amber-500"
+                      isPromocao ? "bg-green-600" : temNf ? "bg-green-500" : "bg-amber-500"
                     )} />
                     <div className="flex flex-col min-w-0">
-                      <span className="text-sm">
-                        {MONTH_NAMES_SHORT[pagamento.mes_referencia]}/{pagamento.ano_referencia}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm">
+                          {MONTH_NAMES_SHORT[pagamento.mes_referencia]}/{pagamento.ano_referencia}
+                        </span>
+                        {isPromocao && (
+                          <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-600 hover:bg-green-600 text-white" data-testid={`badge-promocao-${pagamento.id}`}>
+                            <TrendingUp className="w-2.5 h-2.5 mr-0.5" />
+                            Promoção
+                          </Badge>
+                        )}
+                      </div>
                       <span className="text-xs text-muted-foreground truncate">
                         {isPremiacao ? (
                           <span className="text-purple-600 dark:text-purple-400 font-medium">Premiação</span>
+                        ) : isPromocao ? (
+                          <span className="text-green-700 dark:text-green-400 font-medium">
+                            +R$ {((promocao.valorAtual - promocao.valorAnterior)).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} de aumento
+                          </span>
                         ) : (
-                          pagamento.descricao || "Fixo"
+                          "Fixo"
                         )}
                       </span>
                     </div>
@@ -3458,7 +3511,8 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className={cn(
                       "text-sm font-mono font-medium",
-                      isPremiacao && "text-purple-600 dark:text-purple-400"
+                      isPremiacao && "text-purple-600 dark:text-purple-400",
+                      isPromocao && "text-green-700 dark:text-green-400"
                     )}>
                       R$ {parseFloat(pagamento.valor_bruto || "0").toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </span>
