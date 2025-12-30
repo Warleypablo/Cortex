@@ -13,7 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SelectWithAdd } from "@/components/ui/select-with-add";
-import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, TrendingDown, Minus, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp, Hash, Clock, CheckCircle2, AlertTriangle, AlertCircle, Upload, Receipt, Download, Eye, LayoutGrid, List } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, TrendingDown, Minus, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp, Hash, Clock, CheckCircle2, AlertTriangle, AlertCircle, Upload, Receipt, Download, Eye, LayoutGrid, List, Info, HelpCircle } from "lucide-react";
+import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceArea, ReferenceLine, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -2637,6 +2638,308 @@ interface HealthHistoryItem {
 const MONTH_NAMES = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const MONTH_NAMES_SHORT = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
+// Card compacto de Financeiro para a aba de Informações
+function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string; colaborador: Colaborador }) {
+  const { toast } = useToast();
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+  const { data: pagamentos = [], isLoading } = useQuery<PagamentoItem[]>({
+    queryKey: ["/api/rh/pagamentos", colaboradorId],
+  });
+
+  const handleFileUpload = async (file: File) => {
+    try {
+      setUploading(true);
+      
+      const requestRes = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type || "application/pdf",
+        }),
+      });
+
+      if (!requestRes.ok) {
+        throw new Error("Falha ao solicitar URL de upload");
+      }
+
+      const { uploadURL, objectPath } = await requestRes.json();
+
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/pdf" },
+        body: file,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Falha ao fazer upload do arquivo");
+      }
+
+      await apiRequest("POST", `/api/rh/colaboradores/${colaboradorId}/nf`, {
+        arquivoPath: objectPath,
+        arquivoNome: file.name,
+        mesReferencia: selectedMonth,
+        anoReferencia: selectedYear,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/pagamentos", colaboradorId] });
+
+      toast({
+        title: "Nota fiscal enviada",
+        description: `A NF foi enviada com sucesso para ${MONTH_NAMES[selectedMonth]}/${selectedYear}`,
+      });
+
+      setUploadDialogOpen(false);
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Erro no upload",
+        description: "Não foi possível anexar a nota fiscal. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  };
+
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear, currentYear - 1, currentYear - 2];
+  
+  const pagamentosRecentes = pagamentos
+    .sort((a, b) => {
+      const dateA = a.ano_referencia * 12 + a.mes_referencia;
+      const dateB = b.ano_referencia * 12 + b.mes_referencia;
+      return dateB - dateA;
+    })
+    .slice(0, 4);
+
+  const nfsAnexadas = pagamentos.filter(p => parseInt(p.total_nfs || "0") > 0 || p.status === "nf_anexada").length;
+
+  return (
+    <Card className="p-5 hover-elevate" data-testid="card-financeiro-resumo">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+              <Receipt className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            Financeiro
+          </h2>
+          <UITooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6">
+                <HelpCircle className="w-4 h-4 text-muted-foreground" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-xs p-4">
+              <div className="space-y-2 text-sm">
+                <p className="font-semibold">Instruções para emissão de NF:</p>
+                <div className="space-y-1.5">
+                  <p><span className="font-medium">Nome do Tomador:</span> Turbo Partners LTDA</p>
+                  <p><span className="font-medium">CNPJ:</span> 42.100.292/0001-84</p>
+                  <p><span className="font-medium">Código Serviço:</span> —</p>
+                  <p><span className="font-medium">Descrição:</span> —</p>
+                </div>
+                <p className="text-muted-foreground pt-2 border-t">
+                  Dúvidas? Envie email para{" "}
+                  <a href="mailto:financeiro@turbopartners.com.br" className="text-primary hover:underline">
+                    financeiro@turbopartners.com.br
+                  </a>
+                </p>
+              </div>
+            </TooltipContent>
+          </UITooltip>
+        </div>
+        <Button 
+          size="sm" 
+          onClick={() => setUploadDialogOpen(true)}
+          data-testid="button-add-nf"
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          Nota Fiscal
+        </Button>
+      </div>
+
+      {/* Resumo financeiro */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="p-3 rounded-lg bg-muted/50">
+          <p className="text-xs text-muted-foreground mb-1">Salário Atual</p>
+          <p className="text-base font-bold text-green-600 dark:text-green-400">
+            {colaborador.salario ? `R$ ${parseFloat(colaborador.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
+          </p>
+        </div>
+        <div className="p-3 rounded-lg bg-muted/50">
+          <p className="text-xs text-muted-foreground mb-1">NFs Enviadas</p>
+          <p className="text-base font-bold">
+            {nfsAnexadas} / {pagamentos.length}
+          </p>
+        </div>
+      </div>
+
+      {/* Histórico de pagamentos recentes */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : pagamentosRecentes.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground font-medium">Histórico Recente</p>
+          <div className="space-y-1.5 max-h-36 overflow-y-auto">
+            {pagamentosRecentes.map((pagamento) => {
+              const temNf = parseInt(pagamento.total_nfs || "0") > 0 || pagamento.status === "nf_anexada";
+              return (
+                <div 
+                  key={pagamento.id} 
+                  className="flex items-center justify-between p-2 rounded-md bg-muted/30"
+                  data-testid={`row-pagamento-${pagamento.id}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "w-2 h-2 rounded-full flex-shrink-0",
+                      temNf ? "bg-green-500" : "bg-amber-500"
+                    )} />
+                    <span className="text-sm">
+                      {MONTH_NAMES_SHORT[pagamento.mes_referencia]}/{pagamento.ano_referencia}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-mono font-medium">
+                      R$ {parseFloat(pagamento.valor_bruto || "0").toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </span>
+                    {temNf ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                    ) : (
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-4" data-testid="text-no-pagamentos">
+          <p className="text-sm text-muted-foreground">Nenhum pagamento registrado</p>
+        </div>
+      )}
+
+      {/* Dialog para upload de NF */}
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-primary" />
+              Enviar Nota Fiscal
+            </DialogTitle>
+            <DialogDescription>
+              Selecione o mês/ano de referência e anexe o arquivo da NF.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Informações do Tomador */}
+            <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-3">
+                <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="space-y-1.5 text-sm">
+                  <p className="font-semibold text-blue-900 dark:text-blue-100">Dados do Tomador:</p>
+                  <p><span className="font-medium">Nome:</span> Turbo Partners LTDA</p>
+                  <p><span className="font-medium">CNPJ:</span> 42.100.292/0001-84</p>
+                  <p className="text-xs text-muted-foreground pt-1">
+                    Dúvidas? <a href="mailto:financeiro@turbopartners.com.br" className="text-primary hover:underline">financeiro@turbopartners.com.br</a>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Seletor de Mês/Ano */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Mês</label>
+                <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
+                  <SelectTrigger data-testid="select-month">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTH_NAMES.slice(1).map((month, index) => (
+                      <SelectItem key={index + 1} value={(index + 1).toString()}>{month}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Ano</label>
+                <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+                  <SelectTrigger data-testid="select-year">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.map(year => (
+                      <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Upload de arquivo */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Arquivo da NF</label>
+              <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="nf-upload"
+                  disabled={uploading}
+                  data-testid="input-nf-file"
+                />
+                <label htmlFor="nf-upload" className="cursor-pointer">
+                  {uploading ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                      <p className="text-sm text-muted-foreground">Enviando...</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="w-8 h-8 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        Clique para selecionar ou arraste o arquivo
+                      </p>
+                      <p className="text-xs text-muted-foreground/70">
+                        PDF, PNG ou JPG (máx. 10MB)
+                      </p>
+                    </div>
+                  )}
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadDialogOpen(false)} disabled={uploading}>
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 function FinanceiroTab({ colaboradorId }: { colaboradorId: string }) {
   const { toast } = useToast();
   const [selectedPagamento, setSelectedPagamento] = useState<PagamentoItem | null>(null);
@@ -3837,12 +4140,6 @@ export default function DetailColaborador() {
               <TrendingUp className="w-4 h-4" />
               Desenvolvimento
             </TabsTrigger>
-            {canViewFinanceiro() && (
-              <TabsTrigger value="financeiro" className="gap-2" data-testid="tab-financeiro">
-                <Receipt className="w-4 h-4" />
-                Financeiro
-              </TabsTrigger>
-            )}
           </TabsList>
 
           <TabsContent value="informacoes" data-testid="tab-content-informacoes">
@@ -4136,36 +4433,7 @@ export default function DetailColaborador() {
             </Card>
 
             {canViewFinanceiro() && (
-              <Card className="p-5 hover-elevate" data-testid="card-financeiro-resumo">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-semibold flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                      <Receipt className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    Financeiro
-                  </h2>
-                  <Badge variant="secondary" className="text-xs">
-                    Tab Financeiro
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-xs text-muted-foreground mb-1">Salário Atual</p>
-                    <p className="text-lg font-bold text-green-600 dark:text-green-400">
-                      {colaborador.salario ? `R$ ${parseFloat(colaborador.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-xs text-muted-foreground mb-1">Último Aumento</p>
-                    <p className="text-lg font-bold">
-                      {formatDate(colaborador.ultimoAumento)}
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground mt-3 text-center">
-                  Acesse a aba "Financeiro" para gerenciar notas fiscais
-                </p>
-              </Card>
+              <FinanceiroCard colaboradorId={colaboradorId} colaborador={colaborador} />
             )}
           </div>
 
@@ -4297,11 +4565,6 @@ export default function DetailColaborador() {
             </div>
           </TabsContent>
 
-          {canViewFinanceiro() && (
-            <TabsContent value="financeiro">
-              <FinanceiroTab colaboradorId={colaboradorId} />
-            </TabsContent>
-          )}
         </Tabs>
 
         <EditColaboradorDialog 
