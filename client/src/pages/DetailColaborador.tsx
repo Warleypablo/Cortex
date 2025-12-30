@@ -1902,6 +1902,169 @@ function OneOnOneCard({ colaboradorId }: { colaboradorId: string }) {
   );
 }
 
+// Interface para comentários
+interface ComentarioItem {
+  id: number;
+  colaborador_id: number;
+  autor_id: number | null;
+  autor_nome: string;
+  autor_email: string;
+  comentario: string;
+  tipo: string;
+  visibilidade: string;
+  criado_em: string;
+  autor_nome_completo?: string;
+}
+
+function ComentariosCard({ colaboradorId }: { colaboradorId: string }) {
+  const { toast } = useToast();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [novoComentario, setNovoComentario] = useState("");
+
+  const { data: comentarios = [], isLoading } = useQuery<ComentarioItem[]>({
+    queryKey: ["/api/rh/colaborador", colaboradorId, "comentarios"],
+    queryFn: async () => {
+      const res = await fetch(`/api/rh/colaborador/${colaboradorId}/comentarios`, { credentials: "include" });
+      if (!res.ok) throw new Error("Erro ao buscar comentários");
+      return res.json();
+    },
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (data: { comentario: string }) => {
+      const response = await apiRequest("POST", `/api/rh/colaborador/${colaboradorId}/comentarios`, data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/colaborador", colaboradorId, "comentarios"] });
+      toast({ title: "Comentário adicionado", description: "A anotação foi salva com sucesso." });
+      setDialogOpen(false);
+      setNovoComentario("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao adicionar comentário", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (comentarioId: number) => {
+      const response = await apiRequest("DELETE", `/api/rh/comentarios/${comentarioId}`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/colaborador", colaboradorId, "comentarios"] });
+      toast({ title: "Comentário removido", description: "A anotação foi excluída." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao remover comentário", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const formatDate = (dateStr: string) => {
+    try {
+      return format(new Date(dateStr), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  return (
+    <Card className="p-6" data-testid="card-comentarios">
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+            <FileText className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+          </div>
+          <h3 className="text-lg font-semibold">Comentários</h3>
+        </div>
+        <Button size="sm" onClick={() => setDialogOpen(true)} data-testid="button-add-comentario">
+          <Plus className="w-4 h-4 mr-1" /> Novo
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : comentarios.length > 0 ? (
+        <div className="space-y-3 max-h-80 overflow-y-auto">
+          {comentarios.map((c) => (
+            <div 
+              key={c.id} 
+              className="p-3 rounded-lg bg-muted/50 border border-border/50"
+              data-testid={`comentario-${c.id}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="text-sm font-medium">{c.autor_nome_completo || c.autor_nome}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatDate(c.criado_em)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{c.comentario}</p>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => deleteMutation.mutate(c.id)}
+                  disabled={deleteMutation.isPending}
+                  data-testid={`button-delete-comentario-${c.id}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-8" data-testid="text-no-comentarios">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-3">
+            <FileText className="w-6 h-6 text-muted-foreground" />
+          </div>
+          <p className="text-sm text-muted-foreground font-medium mb-1">Sem comentários</p>
+          <p className="text-xs text-muted-foreground">Adicione notas e observações sobre este colaborador</p>
+        </div>
+      )}
+
+      {/* Dialog para adicionar comentário */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-amber-600" />
+              Novo Comentário
+            </DialogTitle>
+            <DialogDescription>
+              Adicione uma nota ou observação sobre este colaborador.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Textarea
+              placeholder="Escreva seu comentário aqui..."
+              value={novoComentario}
+              onChange={(e) => setNovoComentario(e.target.value)}
+              rows={4}
+              data-testid="textarea-novo-comentario"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button 
+              onClick={() => addMutation.mutate({ comentario: novoComentario })} 
+              disabled={addMutation.isPending || !novoComentario.trim()}
+              data-testid="button-save-comentario"
+            >
+              {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Adicionar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 function EnpsCard({ colaboradorId }: { colaboradorId: string }) {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -4618,22 +4781,7 @@ export default function DetailColaborador() {
               <EnpsCard colaboradorId={colaboradorId} />
               <PdiCard colaboradorId={colaboradorId} />
               <OneOnOneCard colaboradorId={colaboradorId} />
-              <Card className="p-6 opacity-70" data-testid="card-comentarios">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                    <FileText className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-lg font-semibold">Comentários</h3>
-                      <Badge variant="secondary" className="text-xs">Em breve</Badge>
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                      Em breve - Notas e observações sobre o colaborador
-                    </p>
-                  </div>
-                </div>
-              </Card>
+              <ComentariosCard colaboradorId={colaboradorId} />
             </div>
           </TabsContent>
 
