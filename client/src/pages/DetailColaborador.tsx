@@ -4714,6 +4714,8 @@ function TimelineCard({ colaboradorId }: { colaboradorId: string }) {
 }
 
 function HealthCard({ colaboradorId }: { colaboradorId: string }) {
+  const [showEvolutionDialog, setShowEvolutionDialog] = useState(false);
+  
   const { data: enpsResponses = [], isLoading: enpsLoading } = useQuery<EnpsItem[]>({
     queryKey: ["/api/colaboradores", colaboradorId, "enps"],
   });
@@ -4847,7 +4849,12 @@ function HealthCard({ colaboradorId }: { colaboradorId: string }) {
 
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="flex flex-col items-center justify-center lg:border-r lg:pr-6">
-          <div className="relative w-28 h-28">
+          <button 
+            className="relative w-28 h-28 cursor-pointer hover:scale-105 transition-transform group"
+            onClick={() => setShowEvolutionDialog(true)}
+            title="Clique para ver evolução"
+            data-testid="button-show-evolution"
+          >
             <svg className="w-28 h-28 transform -rotate-90" viewBox="0 0 100 100">
               <circle
                 cx="50"
@@ -4875,10 +4882,12 @@ function HealthCard({ colaboradorId }: { colaboradorId: string }) {
               <span className={`text-2xl font-bold ${healthColor.bg}`} data-testid="text-health-score">{healthScore}</span>
               <span className="text-[10px] text-muted-foreground uppercase">Score</span>
             </div>
-          </div>
+            <div className="absolute inset-0 rounded-full bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </button>
           <Badge className={`mt-2 ${healthScore >= 80 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : healthScore >= 50 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`} data-testid="badge-health-status">
             {healthColor.label}
           </Badge>
+          <p className="text-[10px] text-muted-foreground mt-1">Clique para ver evolução</p>
         </div>
 
         <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -5011,6 +5020,129 @@ function HealthCard({ colaboradorId }: { colaboradorId: string }) {
           </div>
         </div>
       )}
+
+      {/* Evolution Dialog */}
+      <Dialog open={showEvolutionDialog} onOpenChange={setShowEvolutionDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart2 className="w-5 h-5 text-primary" />
+              Evolução do Health Score
+            </DialogTitle>
+            <DialogDescription>
+              Histórico mensal do score de saúde do colaborador
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="mt-4 space-y-6">
+            {/* Current Score Summary */}
+            <div className="flex items-center justify-center gap-8 p-4 rounded-xl bg-muted/50">
+              <div className="text-center">
+                <div className={`text-5xl font-bold ${healthColor.bg}`}>{healthScore}</div>
+                <div className="text-sm text-muted-foreground mt-1">Score Atual</div>
+              </div>
+              <div className="h-16 w-px bg-border" />
+              <div className="text-center">
+                <Badge className={`text-lg px-4 py-1 ${healthScore >= 80 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : healthScore >= 50 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`}>
+                  {healthColor.label}
+                </Badge>
+                <div className="text-sm text-muted-foreground mt-2">Status</div>
+              </div>
+            </div>
+
+            {/* Evolution Chart */}
+            {healthHistory.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart 
+                    data={healthHistory.map(item => ({
+                      ...item,
+                      label: MONTH_LABELS[item.month.split('-')[1]] || item.month.split('-')[1]
+                    }))} 
+                    margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
+                  >
+                    <defs>
+                      <linearGradient id="healthGradientDialog" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#22c55e" stopOpacity={0.8}/>
+                        <stop offset="40%" stopColor="#eab308" stopOpacity={0.5}/>
+                        <stop offset="100%" stopColor="#ef4444" stopOpacity={0.3}/>
+                      </linearGradient>
+                    </defs>
+                    <ReferenceArea y1={80} y2={100} fill="#22c55e" fillOpacity={0.1} />
+                    <ReferenceArea y1={50} y2={80} fill="#eab308" fillOpacity={0.1} />
+                    <ReferenceArea y1={0} y2={50} fill="#ef4444" fillOpacity={0.1} />
+                    <ReferenceLine y={80} stroke="#22c55e" strokeDasharray="3 3" strokeOpacity={0.5} />
+                    <ReferenceLine y={50} stroke="#eab308" strokeDasharray="3 3" strokeOpacity={0.5} />
+                    <XAxis 
+                      dataKey="label" 
+                      tick={{ fontSize: 12 }} 
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <YAxis 
+                      domain={[0, 100]} 
+                      ticks={[0, 25, 50, 75, 100]} 
+                      tick={{ fontSize: 12 }} 
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      width={40}
+                    />
+                    <Tooltip 
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const score = payload[0].value as number;
+                          const color = score >= 80 ? "text-green-600" : score >= 50 ? "text-yellow-600" : "text-red-600";
+                          const status = score >= 80 ? "Excelente" : score >= 50 ? "Atenção" : "Crítico";
+                          return (
+                            <div className="bg-background border rounded-lg shadow-lg p-3">
+                              <p className="text-sm font-medium mb-1">{label}</p>
+                              <p className={`text-2xl font-bold ${color}`}>{score}</p>
+                              <p className="text-xs text-muted-foreground">{status}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="healthScore" 
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth={3}
+                      fill="url(#healthGradientDialog)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <BarChart2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Sem histórico suficiente para exibir gráfico</p>
+              </div>
+            )}
+
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-green-500" />
+                <span>Excelente (80-100)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                <span>Atenção (50-79)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500" />
+                <span>Crítico (0-49)</span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowEvolutionDialog(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
