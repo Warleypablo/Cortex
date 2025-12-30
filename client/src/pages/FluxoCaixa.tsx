@@ -433,13 +433,13 @@ export default function FluxoCaixa() {
                 <p className="text-muted-foreground">Nenhum dado para o período selecionado</p>
               </div>
             ) : (
-              <div className="h-[400px] relative">
+              <div className="h-[400px] relative rounded-xl overflow-hidden" style={{ background: 'linear-gradient(180deg, rgba(6, 182, 212, 0.02) 0%, rgba(15, 23, 42, 0.4) 100%)' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart 
                     data={chartData} 
-                    margin={{ top: 20, right: 80, left: 20, bottom: 50 }}
-                    barGap={2}
-                    barCategoryGap="15%"
+                    margin={{ top: 30, right: 85, left: 25, bottom: 55 }}
+                    barGap={4}
+                    barCategoryGap="20%"
                     onClick={(chartEvent) => {
                       if (chartEvent) {
                         let targetData: string | null = null;
@@ -464,101 +464,117 @@ export default function FluxoCaixa() {
                   >
                     <defs>
                       <linearGradient id="gradientEntradas" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#22c55e" stopOpacity={1} />
-                        <stop offset="100%" stopColor="#16a34a" stopOpacity={0.8} />
+                        <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
+                        <stop offset="50%" stopColor="#059669" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#047857" stopOpacity={0.7} />
                       </linearGradient>
                       <linearGradient id="gradientSaidas" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#ef4444" stopOpacity={1} />
-                        <stop offset="100%" stopColor="#dc2626" stopOpacity={0.8} />
+                        <stop offset="0%" stopColor="#f43f5e" stopOpacity={1} />
+                        <stop offset="50%" stopColor="#e11d48" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#be123c" stopOpacity={0.7} />
                       </linearGradient>
                       <linearGradient id="gradientSaldo" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.02} />
+                        <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.25} />
+                        <stop offset="50%" stopColor="#06b6d4" stopOpacity={0.1} />
+                        <stop offset="100%" stopColor="#0891b2" stopOpacity={0.02} />
                       </linearGradient>
+                      <filter id="glowCyan" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                        <feMerge>
+                          <feMergeNode in="coloredBlur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
+                      <filter id="glowGreen" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                        <feMerge>
+                          <feMergeNode in="coloredBlur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
                     </defs>
                     
                     <CartesianGrid 
-                      strokeDasharray="3 3" 
-                      stroke="hsl(var(--border))" 
+                      strokeDasharray="1 6" 
+                      stroke="rgba(148, 163, 184, 0.15)" 
                       vertical={false} 
-                      opacity={0.5}
                     />
                     
                     <XAxis 
                       dataKey="dataFormatada" 
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
+                      tick={{ fill: 'rgba(148, 163, 184, 0.8)', fontSize: 10, fontWeight: 500 }}
                       tickLine={false}
-                      axisLine={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
+                      axisLine={{ stroke: 'rgba(148, 163, 184, 0.2)', strokeWidth: 1 }}
                       angle={-45}
                       textAnchor="end"
-                      height={50}
-                      interval={chartData.length > 20 ? Math.floor(chartData.length / 12) : chartData.length > 10 ? 1 : 0}
-                      dy={10}
+                      height={55}
+                      interval={chartData.length > 20 ? Math.floor(chartData.length / 10) : chartData.length > 10 ? 1 : 0}
+                      dy={12}
                     />
                     
                     <YAxis 
                       yAxisId="bars"
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11, fontWeight: 500 }}
+                      tick={{ fill: 'rgba(148, 163, 184, 0.8)', fontSize: 10, fontWeight: 500 }}
                       tickFormatter={(value) => formatCurrencyCompact(value)}
                       tickLine={false}
                       axisLine={false}
-                      width={75}
+                      width={70}
                       domain={[0, chartDomains.barsMax]}
                     />
                     
                     <YAxis 
                       yAxisId="line"
                       orientation="right"
-                      tick={{ fill: '#06b6d4', fontSize: 11, fontWeight: 600 }}
+                      tick={{ fill: '#22d3ee', fontSize: 10, fontWeight: 600 }}
                       tickFormatter={(value) => formatCurrencyCompact(value)}
                       tickLine={false}
                       axisLine={false}
-                      width={80}
+                      width={75}
                       domain={[chartDomains.lineMin, chartDomains.lineMax]}
                     />
                     
                     <Tooltip
-                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3, radius: 4 }}
+                      cursor={{ fill: 'rgba(34, 211, 238, 0.08)', radius: 6 }}
                       content={({ active, payload, label }) => {
                         if (!active || !payload?.length) return null;
                         const data = payload[0]?.payload as typeof chartData[0];
                         const saldo = (data?.entradas || 0) - (data?.saidas || 0);
                         return (
-                          <div className="bg-background/95 backdrop-blur-sm border rounded-xl shadow-xl p-4 min-w-[200px]">
-                            <div className="flex items-center gap-2 mb-3 pb-2 border-b">
-                              <CalendarDays className="w-4 h-4 text-muted-foreground" />
-                              <p className="font-semibold">{label}</p>
+                          <div className="bg-slate-900/95 backdrop-blur-md border border-cyan-500/30 rounded-xl shadow-2xl p-4 min-w-[220px]" style={{ boxShadow: '0 0 20px rgba(34, 211, 238, 0.15)' }}>
+                            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-700">
+                              <CalendarDays className="w-4 h-4 text-cyan-400" />
+                              <p className="font-semibold text-white">{label}</p>
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-2.5">
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
-                                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                                  <span className="text-sm text-muted-foreground">Entradas</span>
+                                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 6px rgba(52, 211, 153, 0.6)' }} />
+                                  <span className="text-sm text-slate-400">Entradas</span>
                                 </div>
-                                <span className="text-sm font-semibold text-green-600">{formatCurrency(data?.entradas || 0)}</span>
+                                <span className="text-sm font-semibold text-emerald-400">{formatCurrency(data?.entradas || 0)}</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
-                                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                                  <span className="text-sm text-muted-foreground">Saídas</span>
+                                  <div className="w-2.5 h-2.5 rounded-full bg-rose-400" style={{ boxShadow: '0 0 6px rgba(251, 113, 133, 0.6)' }} />
+                                  <span className="text-sm text-slate-400">Saídas</span>
                                 </div>
-                                <span className="text-sm font-semibold text-red-600">{formatCurrency(data?.saidas || 0)}</span>
+                                <span className="text-sm font-semibold text-rose-400">{formatCurrency(data?.saidas || 0)}</span>
                               </div>
-                              <div className="flex justify-between items-center pt-2 border-t mt-2">
-                                <span className="text-sm font-medium">Saldo do Dia</span>
-                                <span className={`text-sm font-bold ${saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              <div className="flex justify-between items-center pt-2 border-t border-slate-700 mt-2">
+                                <span className="text-sm font-medium text-slate-300">Saldo do Dia</span>
+                                <span className={`text-sm font-bold ${saldo >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                   {formatCurrency(saldo)}
                                 </span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
-                                  <div className="w-3 h-3 rounded-full bg-cyan-500" />
-                                  <span className="text-sm text-muted-foreground">Acumulado</span>
+                                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" style={{ boxShadow: '0 0 6px rgba(34, 211, 238, 0.6)' }} />
+                                  <span className="text-sm text-slate-400">Acumulado</span>
                                 </div>
-                                <span className="text-sm font-semibold text-cyan-600">{formatCurrency(data?.saldoAcumulado || 0)}</span>
+                                <span className="text-sm font-semibold text-cyan-400">{formatCurrency(data?.saldoAcumulado || 0)}</span>
                               </div>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-3 pt-2 border-t text-center">
+                            <p className="text-xs text-slate-500 mt-3 pt-2 border-t border-slate-700 text-center">
                               Clique para ver detalhes
                             </p>
                           </div>
@@ -571,8 +587,9 @@ export default function FluxoCaixa() {
                       dataKey="entradas" 
                       name="entradas"
                       fill="url(#gradientEntradas)"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={20}
+                      radius={[6, 6, 0, 0]}
+                      maxBarSize={16}
+                      style={{ filter: 'url(#glowGreen)' }}
                     />
                     
                     <Bar 
@@ -580,8 +597,8 @@ export default function FluxoCaixa() {
                       dataKey="saidas" 
                       name="saidas"
                       fill="url(#gradientSaidas)"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={20}
+                      radius={[6, 6, 0, 0]}
+                      maxBarSize={16}
                     />
                     
                     <Area
@@ -597,10 +614,11 @@ export default function FluxoCaixa() {
                       type="monotone" 
                       dataKey="saldoAcumulado" 
                       name="saldoAcumulado"
-                      stroke="#06b6d4" 
-                      strokeWidth={3}
+                      stroke="#22d3ee" 
+                      strokeWidth={2.5}
                       dot={false}
-                      activeDot={{ r: 6, fill: '#06b6d4', stroke: '#fff', strokeWidth: 2 }}
+                      activeDot={{ r: 7, fill: '#22d3ee', stroke: '#0f172a', strokeWidth: 3, style: { filter: 'drop-shadow(0 0 8px rgba(34, 211, 238, 0.8))' } }}
+                      style={{ filter: 'url(#glowCyan)' }}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
