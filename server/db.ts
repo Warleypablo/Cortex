@@ -1350,7 +1350,7 @@ export async function initializeRhPagamentosTable(): Promise<void> {
 
 export async function initializeRhPesquisasTables(): Promise<void> {
   try {
-    // Criar tabela de e-NPS
+    // Criar tabela de e-NPS (pesquisa completa)
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS rh_enps (
         id SERIAL PRIMARY KEY,
@@ -1358,9 +1358,32 @@ export async function initializeRhPesquisasTables(): Promise<void> {
         score INTEGER NOT NULL CHECK (score >= 0 AND score <= 10),
         comentario TEXT,
         data DATE DEFAULT CURRENT_DATE,
-        criado_em TIMESTAMP DEFAULT NOW()
+        criado_em TIMESTAMP DEFAULT NOW(),
+        criado_por VARCHAR(200),
+        motivo_permanencia VARCHAR(200),
+        comentario_empresa TEXT,
+        score_lider INTEGER CHECK (score_lider >= 0 AND score_lider <= 10),
+        comentario_lider TEXT,
+        score_produtos INTEGER CHECK (score_produtos >= 0 AND score_produtos <= 10),
+        comentario_produtos TEXT,
+        feedback_geral TEXT
       )
     `);
+    
+    // Adicionar colunas novas se tabela já existe (migração)
+    const columns = ['criado_por', 'motivo_permanencia', 'comentario_empresa', 'score_lider', 
+                     'comentario_lider', 'score_produtos', 'comentario_produtos', 'feedback_geral'];
+    for (const col of columns) {
+      try {
+        if (col.startsWith('score_')) {
+          await db.execute(sql.raw(`ALTER TABLE rh_enps ADD COLUMN IF NOT EXISTS ${col} INTEGER`));
+        } else {
+          await db.execute(sql.raw(`ALTER TABLE rh_enps ADD COLUMN IF NOT EXISTS ${col} TEXT`));
+        }
+      } catch (e) {
+        // Coluna já existe, ignorar
+      }
+    }
     
     // Criar tabela de 1x1
     await db.execute(sql`

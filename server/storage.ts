@@ -8919,7 +8919,14 @@ export class DbStorage implements IStorage {
     const result = await db.execute(sql`
       SELECT 
         id, colaborador_id as "colaboradorId", score, comentario, data, 
-        criado_em as "criadoEm", criado_por as "criadoPor"
+        criado_em as "criadoEm", criado_por as "criadoPor",
+        motivo_permanencia as "motivoPermanencia",
+        comentario_empresa as "comentarioEmpresa",
+        score_lider as "scoreLider",
+        comentario_lider as "comentarioLider",
+        score_produtos as "scoreProdutos",
+        comentario_produtos as "comentarioProdutos",
+        feedback_geral as "feedbackGeral"
       FROM rh_enps 
       WHERE colaborador_id = ${colaboradorId}
       ORDER BY data DESC
@@ -8929,10 +8936,27 @@ export class DbStorage implements IStorage {
 
   async createEnpsResponse(data: InsertEnps): Promise<EnpsResponse> {
     const result = await db.execute(sql`
-      INSERT INTO rh_enps (colaborador_id, score, comentario, data, criado_por)
-      VALUES (${data.colaboradorId}, ${data.score}, ${data.comentario || null}, ${data.data}, ${data.criadoPor || null})
+      INSERT INTO rh_enps (
+        colaborador_id, score, comentario, data, criado_por,
+        motivo_permanencia, comentario_empresa, score_lider, comentario_lider,
+        score_produtos, comentario_produtos, feedback_geral
+      )
+      VALUES (
+        ${data.colaboradorId}, ${data.score}, ${data.comentario || null}, ${data.data}, ${data.criadoPor || null},
+        ${(data as any).motivoPermanencia || null}, ${(data as any).comentarioEmpresa || null}, 
+        ${(data as any).scoreLider || null}, ${(data as any).comentarioLider || null},
+        ${(data as any).scoreProdutos || null}, ${(data as any).comentarioProdutos || null}, 
+        ${(data as any).feedbackGeral || null}
+      )
       RETURNING id, colaborador_id as "colaboradorId", score, comentario, data, 
-        criado_em as "criadoEm", criado_por as "criadoPor"
+        criado_em as "criadoEm", criado_por as "criadoPor",
+        motivo_permanencia as "motivoPermanencia",
+        comentario_empresa as "comentarioEmpresa",
+        score_lider as "scoreLider",
+        comentario_lider as "comentarioLider",
+        score_produtos as "scoreProdutos",
+        comentario_produtos as "comentarioProdutos",
+        feedback_geral as "feedbackGeral"
     `);
     return result.rows[0] as EnpsResponse;
   }
