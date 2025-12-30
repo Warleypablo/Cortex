@@ -705,6 +705,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
           try {
             console.log("[ai] Extracting text from attached document:", meeting.pdfFilename);
             const mammoth = await import("mammoth");
+            const { ObjectStorageService } = await import("../replit_integrations/object_storage");
             const objectStorage = new ObjectStorageService();
             
             // Normalize the path and get the file
