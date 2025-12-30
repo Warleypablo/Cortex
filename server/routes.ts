@@ -11979,9 +11979,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           COALESCE(SUM(ct.valorr::numeric), 0) as mrr_total,
           COUNT(DISTINCT ct.id_task) as contratos_total,
-          COUNT(DISTINCT c.id) as clientes_total
+          COUNT(DISTINCT ct.cnpj) as clientes_total
         FROM cup_contratos ct
-        INNER JOIN cup_clientes c ON ct.id_task = c.id_task
         WHERE ct.status IN ('ativo', 'onboarding', 'triagem')
       `);
       
