@@ -112,12 +112,12 @@ const REFINED_COLORS = [
 const CustomTooltip = ({ active, payload, label, valueFormatter }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-lg shadow-2xl p-3 min-w-[160px]">
-      <p className="text-xs font-medium text-zinc-300 mb-2 uppercase tracking-wider">{label}</p>
+    <div className="bg-white/95 backdrop-blur-xl border border-gray-200 rounded-lg shadow-xl p-3 min-w-[160px]">
+      <p className="text-xs font-medium text-gray-600 mb-2 uppercase tracking-wider">{label}</p>
       {payload.map((entry: any, i: number) => (
         <div key={i} className="flex items-center justify-between gap-4 text-sm">
-          <span className="text-zinc-400">{entry.name === "count" ? "Quantidade" : entry.name}</span>
-          <span className="font-bold text-white">
+          <span className="text-gray-500">{entry.name === "count" ? "Quantidade" : entry.name}</span>
+          <span className="font-bold text-gray-900">
             {valueFormatter ? valueFormatter(entry.value) : entry.value}
           </span>
         </div>
@@ -126,27 +126,26 @@ const CustomTooltip = ({ active, payload, label, valueFormatter }: any) => {
   );
 };
 
-const TechKpiCard = ({ title, value, subtitle, icon: Icon, gradient, glow }: {
+const TechKpiCard = ({ title, value, subtitle, icon: Icon, gradient, shadowColor }: {
   title: string;
   value: string;
   subtitle: string;
   icon: any;
   gradient: string;
-  glow: string;
+  shadowColor: string;
 }) => (
-  <div className={`relative group overflow-visible rounded-xl ${gradient} p-[1px]`}>
-    <div className={`absolute inset-0 rounded-xl ${glow} opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500`} />
-    <div className="relative bg-zinc-950/90 backdrop-blur-xl rounded-xl p-4 h-full">
+  <div className={`relative group overflow-visible rounded-xl ${gradient} p-[1px] shadow-lg hover:shadow-xl transition-all duration-300`} style={{ boxShadow: `0 4px 20px -4px ${shadowColor}` }}>
+    <div className="relative bg-white rounded-xl p-4 h-full">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">
+        <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
           {title}
         </span>
         <div className={`p-1.5 rounded-lg ${gradient}`}>
           <Icon className="h-3.5 w-3.5 text-white" />
         </div>
       </div>
-      <div className="text-2xl font-bold text-white tracking-tight mb-1">{value}</div>
-      <p className="text-[10px] text-zinc-500">{subtitle}</p>
+      <div className="text-2xl font-bold text-gray-900 tracking-tight mb-1">{value}</div>
+      <p className="text-[10px] text-gray-500">{subtitle}</p>
     </div>
   </div>
 );
@@ -158,16 +157,16 @@ const TechChartCard = ({ title, subtitle, icon: Icon, iconBg, children }: {
   iconBg: string;
   children: React.ReactNode;
 }) => (
-  <div className="relative rounded-xl bg-gradient-to-b from-zinc-800/50 to-zinc-900/50 border border-zinc-800/50 overflow-hidden">
-    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-800/20 via-transparent to-transparent" />
+  <div className="relative rounded-xl bg-white border border-gray-100 shadow-lg overflow-hidden">
+    <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 via-transparent to-transparent" />
     <div className="relative p-5">
       <div className="flex items-center gap-3 mb-4">
-        <div className={`p-2 rounded-lg ${iconBg}`}>
+        <div className={`p-2 rounded-lg ${iconBg} shadow-md`}>
           <Icon className="h-4 w-4 text-white" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-zinc-100">{title}</h3>
-          <p className="text-xs text-zinc-500">{subtitle}</p>
+          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+          <p className="text-xs text-gray-500">{subtitle}</p>
         </div>
       </div>
       {children}
@@ -587,9 +586,9 @@ export default function ChurnDetalhamento() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {isLoading ? (
           Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="rounded-xl bg-zinc-900/50 border border-zinc-800/50 p-4">
-              <Skeleton className="h-4 w-20 mb-3 bg-zinc-800" />
-              <Skeleton className="h-7 w-24 bg-zinc-800" />
+            <div key={i} className="rounded-xl bg-white border border-gray-100 p-4 shadow">
+              <Skeleton className="h-4 w-20 mb-3" />
+              <Skeleton className="h-7 w-24" />
             </div>
           ))
         ) : (
@@ -600,7 +599,7 @@ export default function ChurnDetalhamento() {
               subtitle="contratos encerrados"
               icon={TrendingDown}
               gradient="bg-gradient-to-r from-red-500 to-rose-600"
-              glow="bg-red-500/30"
+              shadowColor="rgba(239,68,68,0.25)"
             />
             <TechKpiCard
               title="MRR Perdido"
@@ -608,7 +607,7 @@ export default function ChurnDetalhamento() {
               subtitle="receita mensal perdida"
               icon={DollarSign}
               gradient="bg-gradient-to-r from-orange-500 to-amber-600"
-              glow="bg-orange-500/30"
+              shadowColor="rgba(249,115,22,0.25)"
             />
             <TechKpiCard
               title="LTV Total"
@@ -616,7 +615,7 @@ export default function ChurnDetalhamento() {
               subtitle="valor gerado antes do churn"
               icon={Target}
               gradient="bg-gradient-to-r from-amber-500 to-yellow-600"
-              glow="bg-amber-500/30"
+              shadowColor="rgba(245,158,11,0.25)"
             />
             <TechKpiCard
               title="Lifetime Médio"
@@ -624,7 +623,7 @@ export default function ChurnDetalhamento() {
               subtitle="meses em média"
               icon={Clock}
               gradient="bg-gradient-to-r from-blue-500 to-cyan-600"
-              glow="bg-blue-500/30"
+              shadowColor="rgba(59,130,246,0.25)"
             />
             <TechKpiCard
               title="Ticket Médio"
@@ -632,7 +631,7 @@ export default function ChurnDetalhamento() {
               subtitle="MRR médio por contrato"
               icon={BarChart3}
               gradient="bg-gradient-to-r from-violet-500 to-purple-600"
-              glow="bg-violet-500/30"
+              shadowColor="rgba(139,92,246,0.25)"
             />
             <TechKpiCard
               title="LTV Médio"
@@ -642,7 +641,7 @@ export default function ChurnDetalhamento() {
               subtitle="por contrato churned"
               icon={Percent}
               gradient="bg-gradient-to-r from-emerald-500 to-teal-600"
-              glow="bg-emerald-500/30"
+              shadowColor="rgba(16,185,129,0.25)"
             />
           </>
         )}
@@ -656,9 +655,9 @@ export default function ChurnDetalhamento() {
           iconBg="bg-gradient-to-r from-red-500 to-rose-600"
         >
           {isLoading ? (
-            <Skeleton className="h-[200px] w-full bg-zinc-800" />
+            <Skeleton className="h-[200px] w-full" />
           ) : churnPorMes.length === 0 ? (
-            <div className="h-[200px] flex items-center justify-center text-zinc-500 text-sm">
+            <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -667,17 +666,17 @@ export default function ChurnDetalhamento() {
                 <defs>
                   <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#ef4444" stopOpacity={1}/>
-                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0.6}/>
+                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0.7}/>
                   </linearGradient>
                 </defs>
                 <XAxis 
                   dataKey="mes" 
-                  tick={{ fontSize: 10, fill: '#71717a' }} 
-                  axisLine={{ stroke: '#3f3f46' }}
+                  tick={{ fontSize: 10, fill: '#6b7280' }} 
+                  axisLine={{ stroke: '#e5e7eb' }}
                   tickLine={false}
                 />
                 <YAxis 
-                  tick={{ fontSize: 10, fill: '#71717a' }} 
+                  tick={{ fontSize: 10, fill: '#6b7280' }} 
                   axisLine={false}
                   tickLine={false}
                 />
@@ -695,9 +694,9 @@ export default function ChurnDetalhamento() {
           iconBg="bg-gradient-to-r from-orange-500 to-amber-600"
         >
           {isLoading ? (
-            <Skeleton className="h-[200px] w-full bg-zinc-800" />
+            <Skeleton className="h-[200px] w-full" />
           ) : distribuicaoPorProduto.length === 0 ? (
-            <div className="h-[200px] flex items-center justify-center text-zinc-500 text-sm">
+            <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -712,7 +711,7 @@ export default function ChurnDetalhamento() {
                     cy="50%"
                     outerRadius={75}
                     strokeWidth={2}
-                    stroke="#18181b"
+                    stroke="#ffffff"
                   >
                     {distribuicaoPorProduto.map((entry, index) => (
                       <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
@@ -726,16 +725,16 @@ export default function ChurnDetalhamento() {
                   <div key={item.name} className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <div 
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-2 ring-zinc-800" 
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
                         style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
                       />
-                      <span className="truncate text-zinc-400">{item.fullName}</span>
+                      <span className="truncate text-gray-600">{item.fullName}</span>
                     </div>
-                    <span className="font-semibold text-zinc-200 tabular-nums">{item.percentual.toFixed(0)}%</span>
+                    <span className="font-semibold text-gray-900 tabular-nums">{item.percentual.toFixed(0)}%</span>
                   </div>
                 ))}
                 {distribuicaoPorProduto.length > 5 && (
-                  <p className="text-[10px] text-zinc-600 pt-1">
+                  <p className="text-[10px] text-gray-400 pt-1">
                     +{distribuicaoPorProduto.length - 5} outros
                   </p>
                 )}
@@ -753,9 +752,9 @@ export default function ChurnDetalhamento() {
           iconBg="bg-gradient-to-r from-violet-500 to-purple-600"
         >
           {isLoading ? (
-            <Skeleton className="h-[180px] w-full bg-zinc-800" />
+            <Skeleton className="h-[180px] w-full" />
           ) : distribuicaoPorSquad.length === 0 ? (
-            <div className="h-[180px] flex items-center justify-center text-zinc-500 text-sm">
+            <div className="h-[180px] flex items-center justify-center text-gray-400 text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -763,14 +762,14 @@ export default function ChurnDetalhamento() {
               <BarChart data={distribuicaoPorSquad} layout="vertical" margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
                 <XAxis 
                   type="number" 
-                  tick={{ fontSize: 10, fill: '#71717a' }} 
+                  tick={{ fontSize: 10, fill: '#6b7280' }} 
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis 
                   type="category" 
                   dataKey="name" 
-                  tick={{ fontSize: 10, fill: '#71717a' }} 
+                  tick={{ fontSize: 10, fill: '#6b7280' }} 
                   width={80}
                   axisLine={false}
                   tickLine={false}
@@ -793,9 +792,9 @@ export default function ChurnDetalhamento() {
           iconBg="bg-gradient-to-r from-amber-500 to-yellow-600"
         >
           {isLoading ? (
-            <Skeleton className="h-[180px] w-full bg-zinc-800" />
+            <Skeleton className="h-[180px] w-full" />
           ) : distribuicaoPorLifetime.length === 0 ? (
-            <div className="h-[180px] flex items-center justify-center text-zinc-500 text-sm">
+            <div className="h-[180px] flex items-center justify-center text-gray-400 text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -811,7 +810,7 @@ export default function ChurnDetalhamento() {
                     innerRadius={40}
                     outerRadius={65}
                     strokeWidth={2}
-                    stroke="#18181b"
+                    stroke="#ffffff"
                   >
                     {distribuicaoPorLifetime.map((entry, index) => (
                       <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
@@ -825,12 +824,12 @@ export default function ChurnDetalhamento() {
                   <div key={item.name} className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <div 
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-2 ring-zinc-800" 
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
                         style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
                       />
-                      <span className="text-zinc-400">{item.name}</span>
+                      <span className="text-gray-600">{item.name}</span>
                     </div>
-                    <span className="font-semibold text-zinc-200 tabular-nums">{item.percentual.toFixed(0)}%</span>
+                    <span className="font-semibold text-gray-900 tabular-nums">{item.percentual.toFixed(0)}%</span>
                   </div>
                 ))}
               </div>
@@ -845,9 +844,9 @@ export default function ChurnDetalhamento() {
           iconBg="bg-gradient-to-r from-blue-500 to-cyan-600"
         >
           {isLoading ? (
-            <Skeleton className="h-[180px] w-full bg-zinc-800" />
+            <Skeleton className="h-[180px] w-full" />
           ) : distribuicaoPorResponsavel.length === 0 ? (
-            <div className="h-[180px] flex items-center justify-center text-zinc-500 text-sm">
+            <div className="h-[180px] flex items-center justify-center text-gray-400 text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -861,14 +860,14 @@ export default function ChurnDetalhamento() {
                 </defs>
                 <XAxis 
                   type="number" 
-                  tick={{ fontSize: 10, fill: '#71717a' }}
+                  tick={{ fontSize: 10, fill: '#6b7280' }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis 
                   type="category" 
                   dataKey="name" 
-                  tick={{ fontSize: 10, fill: '#71717a' }} 
+                  tick={{ fontSize: 10, fill: '#6b7280' }} 
                   width={70}
                   axisLine={false}
                   tickLine={false}
