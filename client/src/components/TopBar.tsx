@@ -27,7 +27,6 @@ import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import ThemeToggle from "@/components/ThemeToggle";
 import GlobalSearch from "@/components/GlobalSearch";
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { usePageInfo } from "@/contexts/PageContext";
 
 interface Notification {
@@ -650,14 +649,19 @@ export default function TopBar() {
     <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card">
       <div className="flex items-center gap-4 flex-1">
         <SidebarTrigger data-testid="button-sidebar-toggle" />
-        <Breadcrumbs />
         {title && (
-          <div className="flex flex-col">
+          subtitle ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <h1 className="text-lg font-semibold leading-tight cursor-help" data-testid="header-title">{title}</h1>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p data-testid="header-subtitle">{subtitle}</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
             <h1 className="text-lg font-semibold leading-tight" data-testid="header-title">{title}</h1>
-            {subtitle && (
-              <p className="text-xs text-muted-foreground" data-testid="header-subtitle">{subtitle}</p>
-            )}
-          </div>
+          )
         )}
       </div>
       
