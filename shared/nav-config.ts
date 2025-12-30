@@ -28,6 +28,7 @@ export const PERMISSION_KEYS = {
     RETENCAO: 'ops.retencao',
     COHORT: 'ops.cohort',
     CLIENTES_CONTRATOS: 'ops.clientes_contratos',
+    CHURN_DETALHAMENTO: 'ops.churn_detalhamento',
   },
   // Tech
   TECH: {
@@ -158,6 +159,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/visao-geral': PERMISSION_KEYS.OPS.VISAO_GERAL,
   '/dashboard/retencao': PERMISSION_KEYS.OPS.RETENCAO,
   '/dashboard/cohort': PERMISSION_KEYS.OPS.COHORT,
+  '/dashboard/churn-detalhamento': PERMISSION_KEYS.OPS.CHURN_DETALHAMENTO,
   '/clientes': PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS,
   '/contratos': PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS,
   // Tech
@@ -310,6 +312,7 @@ export const NAV_CONFIG = {
         { title: 'Clientes & Contratos', url: '/clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS },
         { title: 'Análise de Retenção', url: '/dashboard/retencao', icon: 'UserCheck', permissionKey: PERMISSION_KEYS.OPS.RETENCAO },
         { title: 'Cohort de Retenção', url: '/dashboard/cohort', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.OPS.COHORT },
+        { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.OPS.CHURN_DETALHAMENTO },
       ],
     },
     {
