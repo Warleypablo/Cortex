@@ -148,13 +148,31 @@ export async function initializeOnboardingTables(): Promise<void> {
       CREATE TABLE IF NOT EXISTS onboarding_etapas (
         id SERIAL PRIMARY KEY,
         template_id INTEGER NOT NULL,
-        nome VARCHAR(100) NOT NULL,
+        titulo VARCHAR(100),
         ordem INTEGER NOT NULL,
         descricao TEXT,
         responsavel_padrao VARCHAR(100),
         prazo_dias INTEGER
       )
     `);
+    
+    await db.execute(sql`
+      ALTER TABLE onboarding_etapas 
+      ADD COLUMN IF NOT EXISTS titulo VARCHAR(100)
+    `);
+    
+    const hasNomeColumn = await db.execute(sql`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'onboarding_etapas' AND column_name = 'nome'
+    `);
+    
+    if (hasNomeColumn.rows.length > 0) {
+      await db.execute(sql`
+        UPDATE onboarding_etapas 
+        SET titulo = nome 
+        WHERE (titulo IS NULL OR titulo = '') AND nome IS NOT NULL
+      `);
+    }
     
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS onboarding_colaborador (
