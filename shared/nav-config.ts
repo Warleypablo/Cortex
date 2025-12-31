@@ -22,13 +22,19 @@ export const PERMISSION_KEYS = {
     INADIMPLENCIA: 'fin.inadimplencia',
     AUDITORIA: 'fin.auditoria',
   },
-  // Operação
+  // Gestão (antigo Operação)
+  GESTAO: {
+    VISAO_GERAL: 'gestao.visao_geral',
+    RETENCAO: 'gestao.retencao',
+    COHORT: 'gestao.cohort',
+    CLIENTES_CONTRATOS: 'gestao.clientes_contratos',
+    CHURN_DETALHAMENTO: 'gestao.churn_detalhamento',
+  },
+  // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
-    VISAO_GERAL: 'ops.visao_geral',
-    RETENCAO: 'ops.retencao',
-    COHORT: 'ops.cohort',
-    CLIENTES_CONTRATOS: 'ops.clientes_contratos',
-    CHURN_DETALHAMENTO: 'ops.churn_detalhamento',
+    PROJETOS_PONTUAIS: 'ops.projetos_pontuais',
+    TASKS_CLIENTES: 'ops.tasks_clientes',
+    ONBOARDINGS: 'ops.onboardings',
   },
   // Tech
   TECH: {
@@ -105,6 +111,7 @@ export const ACCESS_PROFILES = {
     description: 'Operação do negócio (sem áreas sensíveis)',
     permissions: [
       ...getCategoryKeys('GENERAL'),
+      ...getCategoryKeys('GESTAO'),
       ...getCategoryKeys('OPS'),
       ...getCategoryKeys('TECH'),
       ...getCategoryKeys('COM'),
@@ -117,6 +124,7 @@ export const ACCESS_PROFILES = {
     description: 'Tudo exceto Financeiro e Administração',
     permissions: [
       ...getCategoryKeys('GENERAL'),
+      ...getCategoryKeys('GESTAO'),
       ...getCategoryKeys('OPS'),
       ...getCategoryKeys('TECH'),
       ...getCategoryKeys('COM'),
@@ -155,13 +163,17 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/revenue-goals': PERMISSION_KEYS.FIN.REVENUE_GOALS,
   '/dashboard/inadimplencia': PERMISSION_KEYS.FIN.INADIMPLENCIA,
   '/dashboard/auditoria-sistemas': PERMISSION_KEYS.FIN.AUDITORIA,
+  // Gestão
+  '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
+  '/dashboard/retencao': PERMISSION_KEYS.GESTAO.RETENCAO,
+  '/dashboard/cohort': PERMISSION_KEYS.GESTAO.COHORT,
+  '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
+  '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
+  '/contratos': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   // Operação
-  '/visao-geral': PERMISSION_KEYS.OPS.VISAO_GERAL,
-  '/dashboard/retencao': PERMISSION_KEYS.OPS.RETENCAO,
-  '/dashboard/cohort': PERMISSION_KEYS.OPS.COHORT,
-  '/dashboard/churn-detalhamento': PERMISSION_KEYS.OPS.CHURN_DETALHAMENTO,
-  '/clientes': PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS,
-  '/contratos': PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS,
+  '/operacao/projetos': PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS,
+  '/operacao/tasks': PERMISSION_KEYS.OPS.TASKS_CLIENTES,
+  '/operacao/onboardings': PERMISSION_KEYS.OPS.ONBOARDINGS,
   // Tech
   '/dashboard/tech': PERMISSION_KEYS.TECH.VISAO_GERAL,
   '/tech/projetos': PERMISSION_KEYS.TECH.PROJETOS,
@@ -305,14 +317,23 @@ export const NAV_CONFIG = {
       ],
     },
     {
-      title: 'Operação',
+      title: 'Gestão',
       icon: 'Briefcase',
       items: [
-        { title: 'Visão Geral', url: '/visao-geral', icon: 'Eye', permissionKey: PERMISSION_KEYS.OPS.VISAO_GERAL },
-        { title: 'Clientes & Contratos', url: '/clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS },
-        { title: 'Análise de Retenção', url: '/dashboard/retencao', icon: 'UserCheck', permissionKey: PERMISSION_KEYS.OPS.RETENCAO },
-        { title: 'Cohort de Retenção', url: '/dashboard/cohort', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.OPS.COHORT },
-        { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.OPS.CHURN_DETALHAMENTO },
+        { title: 'Visão Geral', url: '/visao-geral', icon: 'Eye', permissionKey: PERMISSION_KEYS.GESTAO.VISAO_GERAL },
+        { title: 'Clientes & Contratos', url: '/clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS },
+        { title: 'Análise de Retenção', url: '/dashboard/retencao', icon: 'UserCheck', permissionKey: PERMISSION_KEYS.GESTAO.RETENCAO },
+        { title: 'Cohort de Retenção', url: '/dashboard/cohort', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GESTAO.COHORT },
+        { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO },
+      ],
+    },
+    {
+      title: 'Operação',
+      icon: 'ListTodo',
+      items: [
+        { title: 'Projetos Pontuais', url: '/operacao/projetos', icon: 'Folder', permissionKey: PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS },
+        { title: 'Tasks de Clientes', url: '/operacao/tasks', icon: 'CheckSquare', permissionKey: PERMISSION_KEYS.OPS.TASKS_CLIENTES },
+        { title: 'Onboardings', url: '/operacao/onboardings', icon: 'UserPlus', permissionKey: PERMISSION_KEYS.OPS.ONBOARDINGS },
       ],
     },
     {
@@ -405,6 +426,14 @@ export const PERMISSION_CATEGORIES = [
     })),
   },
   { 
+    key: 'GESTAO', 
+    label: 'Gestão',
+    permissions: Object.entries(PERMISSION_KEYS.GESTAO).map(([key, value]) => ({
+      key: value,
+      label: key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+    })),
+  },
+  { 
     key: 'OPS', 
     label: 'Operação',
     permissions: Object.entries(PERMISSION_KEYS.OPS).map(([key, value]) => ({
@@ -486,11 +515,14 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.FIN.REVENUE_GOALS]: 'Revenue Goals',
   [PERMISSION_KEYS.FIN.INADIMPLENCIA]: 'Inadimplência',
   [PERMISSION_KEYS.FIN.AUDITORIA]: 'Auditoria de Sistemas',
-  [PERMISSION_KEYS.OPS.VISAO_GERAL]: 'Visão Geral',
-  [PERMISSION_KEYS.OPS.RETENCAO]: 'Análise de Retenção',
-  [PERMISSION_KEYS.OPS.COHORT]: 'Cohort de Retenção',
-  [PERMISSION_KEYS.OPS.CHURN_DETALHAMENTO]: 'Detalhamento de Churn',
-  [PERMISSION_KEYS.OPS.CLIENTES_CONTRATOS]: 'Clientes & Contratos',
+  [PERMISSION_KEYS.GESTAO.VISAO_GERAL]: 'Visão Geral',
+  [PERMISSION_KEYS.GESTAO.RETENCAO]: 'Análise de Retenção',
+  [PERMISSION_KEYS.GESTAO.COHORT]: 'Cohort de Retenção',
+  [PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO]: 'Detalhamento de Churn',
+  [PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS]: 'Clientes & Contratos',
+  [PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS]: 'Projetos Pontuais',
+  [PERMISSION_KEYS.OPS.TASKS_CLIENTES]: 'Tasks de Clientes',
+  [PERMISSION_KEYS.OPS.ONBOARDINGS]: 'Onboardings',
   [PERMISSION_KEYS.TECH.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.TECH.PROJETOS]: 'Projetos',
   [PERMISSION_KEYS.COM.CLOSERS]: 'Closers',
