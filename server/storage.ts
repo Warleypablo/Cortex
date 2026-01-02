@@ -184,7 +184,7 @@ export interface IStorage {
   getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]>;
   getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]>;
   getContasBancos(): Promise<ContaBanco[]>;
-  getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<FluxoCaixaDiarioCompleto[]>;
+  getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaDiarioCompletoResponse>;
   getFluxoDiaDetalhe(data: string): Promise<{ entradas: any[]; saidas: any[]; totalEntradas: number; totalSaidas: number; saldo: number }>;
   getDfcSnapshot(mesAno: string): Promise<import("@shared/schema").DfcSnapshot | null>;
   createDfcSnapshot(mesAno: string): Promise<import("@shared/schema").DfcSnapshot>;
@@ -586,7 +586,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<FluxoCaixaDiarioCompleto[]> {
+  async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaDiarioCompletoResponse> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -2868,14 +2868,16 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<FluxoCaixaDiarioCompleto[]> {
+  async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaDiarioCompletoResponse> {
     const saldoAtual = await this.getSaldoAtualBancos();
     
     const mesAno = dataInicio.substring(0, 7);
     const snapshot = await this.getDfcSnapshot(mesAno);
     
     const snapshotMap = new Map<string, { entradas: number; saidas: number }>();
-    if (snapshot) {
+    const hasSnapshot = snapshot && snapshot.dadosDiarios && snapshot.dadosDiarios.length > 0;
+    
+    if (hasSnapshot) {
       for (const dia of snapshot.dadosDiarios) {
         snapshotMap.set(dia.data, { entradas: dia.entradas, saidas: dia.saidas });
       }
@@ -2909,24 +2911,29 @@ export class DbStorage implements IStorage {
       ORDER BY d.data
     `);
     
-    let saldoAcumulado = saldoAtual.saldoTotal;
-    let saldoEsperado = snapshot ? snapshot.saldoInicial : saldoAtual.saldoTotal;
+    const saldoInicial = hasSnapshot ? snapshot.saldoInicial : saldoAtual.saldoTotal;
+    let saldoAcumulado = saldoInicial;
+    let saldoEsperado = saldoInicial;
     
-    return (result.rows as any[]).map((row: any) => {
+    const dados = (result.rows as any[]).map((row: any) => {
       const entradasPrevistas = parseFloat(row.entradas_previstas || '0');
       const saidasPrevistas = parseFloat(row.saidas_previstas || '0');
       
       const snapshotDia = snapshotMap.get(row.data);
-      const entradasEsperadas = snapshotDia ? snapshotDia.entradas : entradasPrevistas;
-      const saidasEsperadas = snapshotDia ? snapshotDia.saidas : saidasPrevistas;
+      const entradasEsperadas = hasSnapshot && snapshotDia ? snapshotDia.entradas : 0;
+      const saidasEsperadas = hasSnapshot && snapshotDia ? snapshotDia.saidas : 0;
       
       const entradas = entradasPrevistas;
       const saidas = saidasPrevistas;
       const saldoDia = entradas - saidas;
       saldoAcumulado += saldoDia;
       
-      const saldoDiaEsperado = entradasEsperadas - saidasEsperadas;
-      saldoEsperado += saldoDiaEsperado;
+      if (hasSnapshot) {
+        const saldoDiaEsperado = entradasEsperadas - saidasEsperadas;
+        saldoEsperado += saldoDiaEsperado;
+      } else {
+        saldoEsperado = 0;
+      }
       
       return {
         data: row.data,
@@ -2943,6 +2950,12 @@ export class DbStorage implements IStorage {
         saidasEsperadas,
       };
     });
+    
+    return {
+      hasSnapshot: !!hasSnapshot,
+      snapshotDate: snapshot ? snapshot.dataSnapshot.toISOString().split('T')[0] : null,
+      dados,
+    };
   }
 
   async getFluxoDiaDetalhe(data: string): Promise<{ entradas: any[]; saidas: any[]; totalEntradas: number; totalSaidas: number; saldo: number }> {
