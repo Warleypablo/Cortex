@@ -2,7 +2,6 @@ import type { Express } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { isAuthenticated } from "../auth/middleware";
-import { stagingEntidades, stagingContratos, stagingContratoServicos, insertEntidadeSchema, insertContratoDocSchema, insertContratoServicoSchema } from "@shared/schema";
 
 let tablesInitialized = false;
 
@@ -10,66 +9,405 @@ async function ensureContratosTablesExist() {
   if (tablesInitialized) return;
   
   try {
+    // Migrate entidades table structure if needed
+    try {
+      const result = await db.execute(sql`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_schema = 'staging' AND table_name = 'entidades' AND column_name = 'eh_cliente'
+      `);
+      
+      if (result.rows.length === 0) {
+        // Need to migrate old structure to new structure
+        console.log("[contratos] Migrating entidades table structure...");
+        
+        // Add new columns if they don't exist
+        await db.execute(sql`
+          ALTER TABLE staging.entidades 
+          ADD COLUMN IF NOT EXISTS nome VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS nome_socio VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS cpf_socio VARCHAR(20),
+          ADD COLUMN IF NOT EXISTS eh_cliente BOOLEAN DEFAULT true,
+          ADD COLUMN IF NOT EXISTS eh_fornecedor BOOLEAN DEFAULT false,
+          ADD COLUMN IF NOT EXISTS endereco VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          ADD COLUMN IF NOT EXISTS data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          ADD COLUMN IF NOT EXISTS telefone VARCHAR(50),
+          ADD COLUMN IF NOT EXISTS email VARCHAR(255)
+        `);
+        
+        // Migrate data from old columns to new columns
+        await db.execute(sql`
+          UPDATE staging.entidades 
+          SET 
+            nome = COALESCE(nome, nome_razao_social),
+            eh_cliente = CASE WHEN tipo_entidade = 'cliente' OR tipo_entidade = 'ambos' THEN true ELSE false END,
+            eh_fornecedor = CASE WHEN tipo_entidade = 'fornecedor' OR tipo_entidade = 'ambos' THEN true ELSE false END,
+            endereco = COALESCE(endereco, logradouro),
+            email = COALESCE(email, email_principal),
+            telefone = COALESCE(telefone, telefone_principal)
+          WHERE nome IS NULL OR eh_cliente IS NULL
+        `);
+        
+        console.log("[contratos] Entidades table migration completed");
+      }
+    } catch (migrationError) {
+      console.log("[contratos] Entidades migration skipped or table doesn't exist:", migrationError);
+    }
+
+    // Serviços - catálogo de serviços oferecidos
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.servicos (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        descricao TEXT,
+        ativo BOOLEAN DEFAULT true,
+        data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Planos de Serviços - variações e preços de cada serviço
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.planos_servicos (
+        id SERIAL PRIMARY KEY,
+        servico_id INTEGER REFERENCES staging.servicos(id) ON DELETE CASCADE,
+        nome VARCHAR(255) NOT NULL,
+        escopo TEXT,
+        diretrizes TEXT,
+        valor DECIMAL(12, 2) DEFAULT 0,
+        periodicidade VARCHAR(50),
+        ativo BOOLEAN DEFAULT true,
+        data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Entidades - clientes e fornecedores
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS staging.entidades (
         id SERIAL PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
         tipo_pessoa VARCHAR(20) NOT NULL DEFAULT 'juridica',
-        cpf_cnpj VARCHAR(20) NOT NULL UNIQUE,
-        nome_razao_social VARCHAR(255) NOT NULL,
-        email_principal VARCHAR(255),
+        cpf_cnpj VARCHAR(20) UNIQUE,
+        nome_socio VARCHAR(255),
+        cpf_socio VARCHAR(20),
+        email VARCHAR(255),
+        telefone VARCHAR(50),
         email_cobranca VARCHAR(255),
-        telefone_principal VARCHAR(20),
-        telefone_cobranca VARCHAR(20),
-        cep VARCHAR(10),
+        telefone_cobranca VARCHAR(50),
+        endereco VARCHAR(255),
         numero VARCHAR(20),
-        logradouro VARCHAR(255),
-        bairro VARCHAR(100),
         complemento VARCHAR(100),
+        bairro VARCHAR(100),
         cidade VARCHAR(100),
         estado VARCHAR(2),
-        tipo_entidade VARCHAR(20) NOT NULL DEFAULT 'cliente',
+        cep VARCHAR(15),
+        eh_cliente BOOLEAN DEFAULT true,
+        eh_fornecedor BOOLEAN DEFAULT false,
         observacoes TEXT,
-        ativo BOOLEAN DEFAULT true,
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    
+
+    // Configurações de faturamento por cliente
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.clientes_faturamento (
+        id SERIAL PRIMARY KEY,
+        cliente_id INTEGER REFERENCES staging.entidades(id) ON DELETE CASCADE,
+        ciclo_faturamento VARCHAR(50),
+        dia_vencimento INTEGER,
+        dias_antecedencia_cobranca INTEGER DEFAULT 5,
+        dias_lembrete_apos_vencimento INTEGER DEFAULT 3,
+        email_cobranca VARCHAR(255),
+        telefone_whatsapp VARCHAR(50),
+        observacoes_fatura TEXT,
+        ativo BOOLEAN DEFAULT true,
+        modalidade_recorrente VARCHAR(50),
+        modalidade_pontual VARCHAR(50),
+        data_inicio_cobranca_recorrente DATE,
+        data_inicio_cobranca_pontual DATE,
+        data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Contratos principais
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS staging.contratos (
         id SERIAL PRIMARY KEY,
+        data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         numero_contrato VARCHAR(50) NOT NULL UNIQUE,
-        entidade_id INTEGER REFERENCES staging.entidades(id),
-        comercial_responsavel VARCHAR(255),
-        comercial_responsavel_email VARCHAR(255),
-        id_crm_bitrix VARCHAR(50),
-        status VARCHAR(30) DEFAULT 'rascunho',
-        data_inicio DATE,
-        data_fim DATE,
+        id_crm VARCHAR(50),
+        cliente_id INTEGER REFERENCES staging.entidades(id),
+        fornecedor_id INTEGER REFERENCES staging.entidades(id),
+        descricao TEXT,
+        valor_total DECIMAL(12, 2),
+        data_inicio_recorrentes DATE,
+        data_inicio_cobranca_recorrentes DATE,
+        data_inicio_pontuais DATE,
+        data_inicio_cobranca_pontuais DATE,
+        status VARCHAR(50) DEFAULT 'rascunho',
+        hash_documento VARCHAR(255),
+        url_assinatura TEXT,
+        documento_assinado BOOLEAN DEFAULT false,
         observacoes TEXT,
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        usuario_criacao INTEGER,
+        usuario_atualizacao INTEGER,
+        valor_original DECIMAL(12, 2) DEFAULT 0,
+        valor_negociado DECIMAL(12, 2) DEFAULT 0,
+        economia DECIMAL(12, 2) DEFAULT 0,
+        desconto_percentual DECIMAL(5, 2) DEFAULT 0,
+        signature_provider VARCHAR(50),
+        signature_external_id VARCHAR(255),
+        assinafy_document_id VARCHAR(255),
+        assinafy_status VARCHAR(50),
+        assinafy_upload_url TEXT,
+        assinafy_signing_url TEXT,
+        assinafy_signed_document_url TEXT,
+        assinafy_last_sync TIMESTAMP,
+        signature_sent_at TIMESTAMP,
+        signature_completed_at TIMESTAMP,
+        usuario_responsavel_id INTEGER,
+        comercial_nome VARCHAR(255),
+        comercial_email VARCHAR(255),
+        comercial_telefone VARCHAR(50),
+        comercial_cargo VARCHAR(100),
+        comercial_empresa VARCHAR(255),
+        status_faturamento VARCHAR(50) DEFAULT 'pendente',
+        data_ultima_fatura DATE,
+        usuario_fatura INTEGER,
+        met_cob_recorrente VARCHAR(50),
+        met_cob_pontual VARCHAR(50),
+        data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    
+
+    // Itens de contratos (serviços contratados)
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS staging.contrato_servicos (
+      CREATE TABLE IF NOT EXISTS staging.contratos_itens (
         id SERIAL PRIMARY KEY,
         contrato_id INTEGER REFERENCES staging.contratos(id) ON DELETE CASCADE,
-        servico_nome VARCHAR(255) NOT NULL,
-        plano VARCHAR(100),
+        plano_servico_id INTEGER REFERENCES staging.planos_servicos(id),
+        quantidade INTEGER DEFAULT 1,
+        valor_unitario DECIMAL(12, 2) DEFAULT 0,
+        valor_total DECIMAL(12, 2) DEFAULT 0,
+        modalidade VARCHAR(50),
         valor_original DECIMAL(12, 2) DEFAULT 0,
         valor_negociado DECIMAL(12, 2) DEFAULT 0,
         desconto_percentual DECIMAL(5, 2) DEFAULT 0,
+        tipo_desconto VARCHAR(20),
+        valor_desconto DECIMAL(12, 2) DEFAULT 0,
         valor_final DECIMAL(12, 2) DEFAULT 0,
         economia DECIMAL(12, 2) DEFAULT 0,
+        vigencia_desconto DATE,
+        periodo_desconto VARCHAR(50),
+        apos_periodo VARCHAR(50),
+        forma_pagamento VARCHAR(50),
+        num_parcelas INTEGER,
+        valor_parcela DECIMAL(12, 2),
+        observacoes TEXT
+      )
+    `);
+
+    // Aditivos de contratos
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.aditivos (
+        id SERIAL PRIMARY KEY,
+        contrato_id INTEGER REFERENCES staging.contratos(id) ON DELETE CASCADE,
+        numero_aditivo VARCHAR(20),
+        tipo_aditivo VARCHAR(50),
+        descricao TEXT,
+        valor_anterior DECIMAL(12, 2),
+        valor_novo DECIMAL(12, 2),
+        data_inicio_vigencia DATE,
+        status VARCHAR(30) DEFAULT 'rascunho',
+        url_assinatura TEXT,
+        documento_assinado BOOLEAN DEFAULT false,
+        observacoes TEXT,
+        data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Serviços dos aditivos
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.aditivo_servicos (
+        id SERIAL PRIMARY KEY,
+        aditivo_id INTEGER REFERENCES staging.aditivos(id) ON DELETE CASCADE,
+        plano_servico_id INTEGER REFERENCES staging.planos_servicos(id),
+        tipo_operacao VARCHAR(50),
+        quantidade INTEGER DEFAULT 1,
+        valor_unitario DECIMAL(12, 2) DEFAULT 0,
+        valor_total DECIMAL(12, 2) DEFAULT 0,
+        observacoes TEXT
+      )
+    `);
+
+    // Faturas
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.faturas (
+        id SERIAL PRIMARY KEY,
+        numero_fatura VARCHAR(50) NOT NULL,
+        cliente_id INTEGER REFERENCES staging.entidades(id),
+        contrato_id INTEGER REFERENCES staging.contratos(id),
+        valor_total DECIMAL(12, 2) DEFAULT 0,
+        valor_desconto DECIMAL(12, 2) DEFAULT 0,
+        valor_liquido DECIMAL(12, 2) DEFAULT 0,
+        data_emissao DATE,
+        data_vencimento DATE,
+        data_pagamento DATE,
+        status VARCHAR(30) DEFAULT 'pendente',
+        forma_pagamento VARCHAR(50),
+        observacoes TEXT,
+        conta_azul_id VARCHAR(100),
+        conta_azul_status VARCHAR(50),
+        conta_azul_sync_date TIMESTAMP,
+        url_boleto TEXT,
+        url_pix TEXT,
+        usuario_criacao INTEGER,
         modalidade VARCHAR(50),
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        status_geracao VARCHAR(50),
+        proximo_vencimento DATE,
+        data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Itens de faturas
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.faturas_itens (
+        id SERIAL PRIMARY KEY,
+        fatura_id INTEGER REFERENCES staging.faturas(id) ON DELETE CASCADE,
+        contrato_item_id INTEGER REFERENCES staging.contratos_itens(id),
+        descricao TEXT,
+        quantidade INTEGER DEFAULT 1,
+        valor_unitario DECIMAL(12, 2) DEFAULT 0,
+        valor_total DECIMAL(12, 2) DEFAULT 0,
+        periodo_inicio DATE,
+        periodo_fim DATE,
+        modalidade_servico VARCHAR(50)
+      )
+    `);
+
+    // Histórico de status de contratos
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.contract_status_history (
+        id SERIAL PRIMARY KEY,
+        contract_id INTEGER REFERENCES staging.contratos(id) ON DELETE CASCADE,
+        status_anterior VARCHAR(50),
+        status_novo VARCHAR(50),
+        user_id INTEGER,
+        changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ip_address VARCHAR(50),
+        user_agent TEXT,
+        observacoes TEXT
+      )
+    `);
+
+    // Anexos de contratos
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.contract_attachments (
+        id SERIAL PRIMARY KEY,
+        contract_id INTEGER REFERENCES staging.contratos(id) ON DELETE CASCADE,
+        filename VARCHAR(255),
+        file_path TEXT,
+        file_size INTEGER,
+        file_type VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // PDFs de contratos
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.pdfs_contratos (
+        id SERIAL PRIMARY KEY,
+        contrato_id INTEGER REFERENCES staging.contratos(id) ON DELETE CASCADE,
+        filename VARCHAR(255),
+        original_filename VARCHAR(255),
+        file_path TEXT,
+        file_size INTEGER,
+        file_hash VARCHAR(255),
+        download_url TEXT,
+        is_signed BOOLEAN DEFAULT false,
+        signature_metadata JSONB,
+        download_count INTEGER DEFAULT 0,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Assinaturas de contratos
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.contract_signatures (
+        id SERIAL PRIMARY KEY,
+        contract_id INTEGER REFERENCES staging.contratos(id) ON DELETE CASCADE,
+        external_id VARCHAR(255),
+        provider VARCHAR(50),
+        signature_url TEXT,
+        status VARCHAR(50),
+        signer_name VARCHAR(255),
+        signer_email VARCHAR(255),
+        signer_role VARCHAR(100),
+        signed_at TIMESTAMP,
+        expires_at TIMESTAMP,
+        error_message TEXT,
+        webhook_data JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Configuração Assinafy
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.assinafy_config (
+        id SERIAL PRIMARY KEY,
+        account_id VARCHAR(255),
+        api_key VARCHAR(255),
+        api_url VARCHAR(255),
+        webhook_url VARCHAR(255),
+        webhook_secret VARCHAR(255),
+        ativo BOOLEAN DEFAULT true,
+        data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Log de mudança de status de documentos
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.document_status_changes (
+        id SERIAL PRIMARY KEY,
+        contrato_id INTEGER REFERENCES staging.contratos(id) ON DELETE CASCADE,
+        document_id VARCHAR(255),
+        status_anterior VARCHAR(50),
+        status_novo VARCHAR(50),
+        webhook_data JSONB,
+        data_mudanca TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Audit log
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.audit_log (
+        id SERIAL PRIMARY KEY,
+        usuario_id INTEGER,
+        modulo VARCHAR(100),
+        acao VARCHAR(100),
+        tabela_afetada VARCHAR(100),
+        registro_id INTEGER,
+        dados_anteriores JSONB,
+        dados_novos JSONB,
+        ip_address VARCHAR(50),
+        user_agent TEXT,
+        data_acao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     
     tablesInitialized = true;
-    console.log("[contratos] Tables initialized successfully");
+    console.log("[contratos] All tables initialized successfully");
   } catch (error) {
     console.error("[contratos] Error initializing tables:", error);
   }
@@ -82,71 +420,41 @@ export function registerContratosRoutes(app: Express) {
   // ENTIDADES ROUTES
   // ============================================================================
 
+  // Entidades - List all
   app.get("/api/contratos/entidades", isAuthenticated, async (req, res) => {
     try {
-      const { tipo, search, ativo } = req.query;
+      const { tipo, search } = req.query;
       
-      let query = sql`
-        SELECT * FROM staging.entidades 
-        WHERE 1=1
-      `;
+      let query = sql`SELECT * FROM staging.entidades WHERE 1=1`;
       
-      if (tipo && tipo !== 'todos') {
-        query = sql`${query} AND tipo_entidade = ${tipo}`;
-      }
-      
-      if (ativo === 'true') {
-        query = sql`${query} AND ativo = true`;
-      } else if (ativo === 'false') {
-        query = sql`${query} AND ativo = false`;
+      if (tipo === 'cliente') {
+        query = sql`${query} AND eh_cliente = true`;
+      } else if (tipo === 'fornecedor') {
+        query = sql`${query} AND eh_fornecedor = true`;
       }
       
       if (search) {
         query = sql`${query} AND (
-          nome_razao_social ILIKE ${'%' + search + '%'} OR 
+          nome ILIKE ${'%' + search + '%'} OR 
           cpf_cnpj ILIKE ${'%' + search + '%'} OR
-          email_principal ILIKE ${'%' + search + '%'}
+          email ILIKE ${'%' + search + '%'}
         )`;
       }
       
-      query = sql`${query} ORDER BY nome_razao_social ASC`;
-      
+      query = sql`${query} ORDER BY nome ASC`;
       const result = await db.execute(query);
       
-      const entidades = result.rows.map((row: any) => ({
-        id: row.id,
-        tipoPessoa: row.tipo_pessoa,
-        cpfCnpj: row.cpf_cnpj,
-        nomeRazaoSocial: row.nome_razao_social,
-        emailPrincipal: row.email_principal,
-        emailCobranca: row.email_cobranca,
-        telefonePrincipal: row.telefone_principal,
-        telefoneCobranca: row.telefone_cobranca,
-        cep: row.cep,
-        numero: row.numero,
-        logradouro: row.logradouro,
-        bairro: row.bairro,
-        complemento: row.complemento,
-        cidade: row.cidade,
-        estado: row.estado,
-        tipoEntidade: row.tipo_entidade,
-        observacoes: row.observacoes,
-        ativo: row.ativo,
-        criadoEm: row.criado_em,
-        atualizadoEm: row.atualizado_em,
-      }));
-      
-      res.json({ entidades });
+      res.json({ entidades: result.rows });
     } catch (error) {
       console.error("Error fetching entidades:", error);
       res.status(500).json({ error: "Failed to fetch entidades" });
     }
   });
 
+  // Entidades - Get by ID
   app.get("/api/contratos/entidades/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      
       const result = await db.execute(sql`
         SELECT * FROM staging.entidades WHERE id = ${parseInt(id)}
       `);
@@ -155,57 +463,35 @@ export function registerContratosRoutes(app: Express) {
         return res.status(404).json({ error: "Entidade não encontrada" });
       }
       
-      const row = result.rows[0] as any;
-      const entidade = {
-        id: row.id,
-        tipoPessoa: row.tipo_pessoa,
-        cpfCnpj: row.cpf_cnpj,
-        nomeRazaoSocial: row.nome_razao_social,
-        emailPrincipal: row.email_principal,
-        emailCobranca: row.email_cobranca,
-        telefonePrincipal: row.telefone_principal,
-        telefoneCobranca: row.telefone_cobranca,
-        cep: row.cep,
-        numero: row.numero,
-        logradouro: row.logradouro,
-        bairro: row.bairro,
-        complemento: row.complemento,
-        cidade: row.cidade,
-        estado: row.estado,
-        tipoEntidade: row.tipo_entidade,
-        observacoes: row.observacoes,
-        ativo: row.ativo,
-        criadoEm: row.criado_em,
-        atualizadoEm: row.atualizado_em,
-      };
-      
-      res.json(entidade);
+      res.json(result.rows[0]);
     } catch (error) {
       console.error("Error fetching entidade:", error);
       res.status(500).json({ error: "Failed to fetch entidade" });
     }
   });
 
+  // Entidades - Create
   app.post("/api/contratos/entidades", isAuthenticated, async (req, res) => {
     try {
-      const parsed = insertEntidadeSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Dados inválidos", details: parsed.error.errors });
-      }
+      const data = req.body;
       
-      const data = parsed.data;
+      if (!data.nome) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
       
       const result = await db.execute(sql`
         INSERT INTO staging.entidades (
-          tipo_pessoa, cpf_cnpj, nome_razao_social, email_principal, email_cobranca,
-          telefone_principal, telefone_cobranca, cep, numero, logradouro, bairro,
-          complemento, cidade, estado, tipo_entidade, observacoes, ativo
+          nome, tipo_pessoa, cpf_cnpj, nome_socio, cpf_socio, email, telefone,
+          email_cobranca, telefone_cobranca, endereco, numero, complemento,
+          bairro, cidade, estado, cep, eh_cliente, eh_fornecedor, observacoes
         ) VALUES (
-          ${data.tipoPessoa}, ${data.cpfCnpj}, ${data.nomeRazaoSocial}, ${data.emailPrincipal || null},
-          ${data.emailCobranca || null}, ${data.telefonePrincipal || null}, ${data.telefoneCobranca || null},
-          ${data.cep || null}, ${data.numero || null}, ${data.logradouro || null}, ${data.bairro || null},
-          ${data.complemento || null}, ${data.cidade || null}, ${data.estado || null},
-          ${data.tipoEntidade}, ${data.observacoes || null}, ${data.ativo ?? true}
+          ${data.nome}, ${data.tipo_pessoa || 'juridica'}, ${data.cpf_cnpj || null},
+          ${data.nome_socio || null}, ${data.cpf_socio || null}, ${data.email || null},
+          ${data.telefone || null}, ${data.email_cobranca || null}, ${data.telefone_cobranca || null},
+          ${data.endereco || null}, ${data.numero || null}, ${data.complemento || null},
+          ${data.bairro || null}, ${data.cidade || null}, ${data.estado || null},
+          ${data.cep || null}, ${data.eh_cliente ?? true}, ${data.eh_fornecedor ?? false},
+          ${data.observacoes || null}
         ) RETURNING id
       `);
       
@@ -220,6 +506,7 @@ export function registerContratosRoutes(app: Express) {
     }
   });
 
+  // Entidades - Update
   app.put("/api/contratos/entidades/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
@@ -227,24 +514,26 @@ export function registerContratosRoutes(app: Express) {
       
       await db.execute(sql`
         UPDATE staging.entidades SET
-          tipo_pessoa = ${data.tipoPessoa},
-          cpf_cnpj = ${data.cpfCnpj},
-          nome_razao_social = ${data.nomeRazaoSocial},
-          email_principal = ${data.emailPrincipal || null},
-          email_cobranca = ${data.emailCobranca || null},
-          telefone_principal = ${data.telefonePrincipal || null},
-          telefone_cobranca = ${data.telefoneCobranca || null},
-          cep = ${data.cep || null},
+          nome = ${data.nome},
+          tipo_pessoa = ${data.tipo_pessoa || 'juridica'},
+          cpf_cnpj = ${data.cpf_cnpj || null},
+          nome_socio = ${data.nome_socio || null},
+          cpf_socio = ${data.cpf_socio || null},
+          email = ${data.email || null},
+          telefone = ${data.telefone || null},
+          email_cobranca = ${data.email_cobranca || null},
+          telefone_cobranca = ${data.telefone_cobranca || null},
+          endereco = ${data.endereco || null},
           numero = ${data.numero || null},
-          logradouro = ${data.logradouro || null},
-          bairro = ${data.bairro || null},
           complemento = ${data.complemento || null},
+          bairro = ${data.bairro || null},
           cidade = ${data.cidade || null},
           estado = ${data.estado || null},
-          tipo_entidade = ${data.tipoEntidade},
+          cep = ${data.cep || null},
+          eh_cliente = ${data.eh_cliente ?? true},
+          eh_fornecedor = ${data.eh_fornecedor ?? false},
           observacoes = ${data.observacoes || null},
-          ativo = ${data.ativo ?? true},
-          atualizado_em = CURRENT_TIMESTAMP
+          data_atualizacao = CURRENT_TIMESTAMP
         WHERE id = ${parseInt(id)}
       `);
       
@@ -258,16 +547,16 @@ export function registerContratosRoutes(app: Express) {
     }
   });
 
+  // Entidades - Delete (soft delete)
   app.delete("/api/contratos/entidades/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       
       await db.execute(sql`
-        UPDATE staging.entidades SET ativo = false, atualizado_em = CURRENT_TIMESTAMP
-        WHERE id = ${parseInt(id)}
+        DELETE FROM staging.entidades WHERE id = ${parseInt(id)}
       `);
       
-      res.json({ message: "Entidade desativada com sucesso" });
+      res.json({ message: "Entidade removida com sucesso" });
     } catch (error) {
       console.error("Error deleting entidade:", error);
       res.status(500).json({ error: "Failed to delete entidade" });
@@ -275,17 +564,91 @@ export function registerContratosRoutes(app: Express) {
   });
 
   // ============================================================================
+  // SERVIÇOS ROUTES
+  // ============================================================================
+
+  // Serviços - List all
+  app.get("/api/contratos/servicos", isAuthenticated, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM staging.servicos WHERE ativo = true ORDER BY nome ASC
+      `);
+      res.json({ servicos: result.rows });
+    } catch (error) {
+      console.error("Error fetching servicos:", error);
+      res.status(500).json({ error: "Failed to fetch servicos" });
+    }
+  });
+
+  // Serviços - Create
+  app.post("/api/contratos/servicos", isAuthenticated, async (req, res) => {
+    try {
+      const { nome, descricao } = req.body;
+      const result = await db.execute(sql`
+        INSERT INTO staging.servicos (nome, descricao) VALUES (${nome}, ${descricao || null})
+        RETURNING id
+      `);
+      res.status(201).json({ id: (result.rows[0] as any).id });
+    } catch (error) {
+      console.error("Error creating servico:", error);
+      res.status(500).json({ error: "Failed to create servico" });
+    }
+  });
+
+  // Planos de Serviços - List by servico
+  app.get("/api/contratos/planos-servicos", isAuthenticated, async (req, res) => {
+    try {
+      const { servico_id } = req.query;
+      let query = sql`
+        SELECT ps.*, s.nome as servico_nome
+        FROM staging.planos_servicos ps
+        LEFT JOIN staging.servicos s ON ps.servico_id = s.id
+        WHERE ps.ativo = true
+      `;
+      if (servico_id) {
+        query = sql`${query} AND ps.servico_id = ${parseInt(servico_id as string)}`;
+      }
+      query = sql`${query} ORDER BY s.nome, ps.nome`;
+      const result = await db.execute(query);
+      res.json({ planos: result.rows });
+    } catch (error) {
+      console.error("Error fetching planos:", error);
+      res.status(500).json({ error: "Failed to fetch planos" });
+    }
+  });
+
+  // Planos de Serviços - Create
+  app.post("/api/contratos/planos-servicos", isAuthenticated, async (req, res) => {
+    try {
+      const data = req.body;
+      const result = await db.execute(sql`
+        INSERT INTO staging.planos_servicos (
+          servico_id, nome, escopo, diretrizes, valor, periodicidade
+        ) VALUES (
+          ${data.servico_id}, ${data.nome}, ${data.escopo || null},
+          ${data.diretrizes || null}, ${data.valor || 0}, ${data.periodicidade || null}
+        ) RETURNING id
+      `);
+      res.status(201).json({ id: (result.rows[0] as any).id });
+    } catch (error) {
+      console.error("Error creating plano:", error);
+      res.status(500).json({ error: "Failed to create plano" });
+    }
+  });
+
+  // ============================================================================
   // CONTRATOS ROUTES
   // ============================================================================
 
+  // Contratos - List all
   app.get("/api/contratos/contratos", isAuthenticated, async (req, res) => {
     try {
       const { status, search } = req.query;
       
       let query = sql`
-        SELECT c.*, e.nome_razao_social as entidade_nome, e.cpf_cnpj as entidade_cpf_cnpj
+        SELECT c.*, e.nome as cliente_nome, e.cpf_cnpj as cliente_cpf_cnpj
         FROM staging.contratos c
-        LEFT JOIN staging.entidades e ON c.entidade_id = e.id
+        LEFT JOIN staging.entidades e ON c.cliente_id = e.id
         WHERE 1=1
       `;
       
@@ -296,47 +659,30 @@ export function registerContratosRoutes(app: Express) {
       if (search) {
         query = sql`${query} AND (
           c.numero_contrato ILIKE ${'%' + search + '%'} OR 
-          e.nome_razao_social ILIKE ${'%' + search + '%'} OR
-          c.comercial_responsavel ILIKE ${'%' + search + '%'}
+          e.nome ILIKE ${'%' + search + '%'} OR
+          c.comercial_nome ILIKE ${'%' + search + '%'}
         )`;
       }
       
-      query = sql`${query} ORDER BY c.criado_em DESC`;
-      
+      query = sql`${query} ORDER BY c.data_cadastro DESC`;
       const result = await db.execute(query);
       
-      const contratos = result.rows.map((row: any) => ({
-        id: row.id,
-        numeroContrato: row.numero_contrato,
-        entidadeId: row.entidade_id,
-        entidadeNome: row.entidade_nome,
-        entidadeCpfCnpj: row.entidade_cpf_cnpj,
-        comercialResponsavel: row.comercial_responsavel,
-        comercialResponsavelEmail: row.comercial_responsavel_email,
-        idCrmBitrix: row.id_crm_bitrix,
-        status: row.status,
-        dataInicio: row.data_inicio,
-        dataFim: row.data_fim,
-        observacoes: row.observacoes,
-        criadoEm: row.criado_em,
-        atualizadoEm: row.atualizado_em,
-      }));
-      
-      res.json({ contratos });
+      res.json({ contratos: result.rows });
     } catch (error) {
       console.error("Error fetching contratos:", error);
       res.status(500).json({ error: "Failed to fetch contratos" });
     }
   });
 
+  // Contratos - Get by ID with items
   app.get("/api/contratos/contratos/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       
       const contratoResult = await db.execute(sql`
-        SELECT c.*, e.nome_razao_social as entidade_nome, e.cpf_cnpj as entidade_cpf_cnpj
+        SELECT c.*, e.nome as cliente_nome, e.cpf_cnpj as cliente_cpf_cnpj
         FROM staging.contratos c
-        LEFT JOIN staging.entidades e ON c.entidade_id = e.id
+        LEFT JOIN staging.entidades e ON c.cliente_id = e.id
         WHERE c.id = ${parseInt(id)}
       `);
       
@@ -344,49 +690,25 @@ export function registerContratosRoutes(app: Express) {
         return res.status(404).json({ error: "Contrato não encontrado" });
       }
       
-      const row = contratoResult.rows[0] as any;
-      
-      const servicosResult = await db.execute(sql`
-        SELECT * FROM staging.contrato_servicos WHERE contrato_id = ${parseInt(id)}
+      const itensResult = await db.execute(sql`
+        SELECT ci.*, ps.nome as plano_nome, s.nome as servico_nome
+        FROM staging.contratos_itens ci
+        LEFT JOIN staging.planos_servicos ps ON ci.plano_servico_id = ps.id
+        LEFT JOIN staging.servicos s ON ps.servico_id = s.id
+        WHERE ci.contrato_id = ${parseInt(id)}
       `);
       
-      const contrato = {
-        id: row.id,
-        numeroContrato: row.numero_contrato,
-        entidadeId: row.entidade_id,
-        entidadeNome: row.entidade_nome,
-        entidadeCpfCnpj: row.entidade_cpf_cnpj,
-        comercialResponsavel: row.comercial_responsavel,
-        comercialResponsavelEmail: row.comercial_responsavel_email,
-        idCrmBitrix: row.id_crm_bitrix,
-        status: row.status,
-        dataInicio: row.data_inicio,
-        dataFim: row.data_fim,
-        observacoes: row.observacoes,
-        criadoEm: row.criado_em,
-        atualizadoEm: row.atualizado_em,
-        servicos: servicosResult.rows.map((s: any) => ({
-          id: s.id,
-          contratoId: s.contrato_id,
-          servicoNome: s.servico_nome,
-          plano: s.plano,
-          valorOriginal: parseFloat(s.valor_original) || 0,
-          valorNegociado: parseFloat(s.valor_negociado) || 0,
-          descontoPercentual: parseFloat(s.desconto_percentual) || 0,
-          valorFinal: parseFloat(s.valor_final) || 0,
-          economia: parseFloat(s.economia) || 0,
-          modalidade: s.modalidade,
-          criadoEm: s.criado_em,
-        })),
-      };
-      
-      res.json(contrato);
+      res.json({
+        contrato: contratoResult.rows[0],
+        itens: itensResult.rows
+      });
     } catch (error) {
       console.error("Error fetching contrato:", error);
       res.status(500).json({ error: "Failed to fetch contrato" });
     }
   });
 
+  // Próximo número de contrato
   app.get("/api/contratos/proximo-numero", isAuthenticated, async (req, res) => {
     try {
       const result = await db.execute(sql`
@@ -410,35 +732,50 @@ export function registerContratosRoutes(app: Express) {
     }
   });
 
+  // Contratos - Create
   app.post("/api/contratos/contratos", isAuthenticated, async (req, res) => {
     try {
-      const { contrato, servicos } = req.body;
+      const data = req.body;
       
-      const contratoResult = await db.execute(sql`
+      const result = await db.execute(sql`
         INSERT INTO staging.contratos (
-          numero_contrato, entidade_id, comercial_responsavel, comercial_responsavel_email,
-          id_crm_bitrix, status, data_inicio, data_fim, observacoes
+          numero_contrato, id_crm, cliente_id, fornecedor_id, descricao,
+          data_inicio_recorrentes, data_inicio_cobranca_recorrentes,
+          data_inicio_pontuais, data_inicio_cobranca_pontuais, status,
+          observacoes, usuario_criacao, valor_original, valor_negociado,
+          economia, desconto_percentual, comercial_nome, comercial_email,
+          comercial_telefone, comercial_cargo, comercial_empresa
         ) VALUES (
-          ${contrato.numeroContrato}, ${contrato.entidadeId}, ${contrato.comercialResponsavel || null},
-          ${contrato.comercialResponsavelEmail || null}, ${contrato.idCrmBitrix || null},
-          ${contrato.status || 'rascunho'}, ${contrato.dataInicio || null}, ${contrato.dataFim || null},
-          ${contrato.observacoes || null}
+          ${data.numero_contrato}, ${data.id_crm || null}, ${data.cliente_id || null},
+          ${data.fornecedor_id || null}, ${data.descricao || null},
+          ${data.data_inicio_recorrentes || null}, ${data.data_inicio_cobranca_recorrentes || null},
+          ${data.data_inicio_pontuais || null}, ${data.data_inicio_cobranca_pontuais || null},
+          ${data.status || 'rascunho'}, ${data.observacoes || null},
+          ${data.usuario_criacao || null}, ${data.valor_original || 0},
+          ${data.valor_negociado || 0}, ${data.economia || 0},
+          ${data.desconto_percentual || 0}, ${data.comercial_nome || null},
+          ${data.comercial_email || null}, ${data.comercial_telefone || null},
+          ${data.comercial_cargo || null}, ${data.comercial_empresa || null}
         ) RETURNING id
       `);
       
-      const contratoId = (contratoResult.rows[0] as any).id;
+      const contratoId = (result.rows[0] as any).id;
       
-      if (servicos && servicos.length > 0) {
-        for (const servico of servicos) {
+      // Insert itens if provided
+      if (data.itens && data.itens.length > 0) {
+        for (const item of data.itens) {
           await db.execute(sql`
-            INSERT INTO staging.contrato_servicos (
-              contrato_id, servico_nome, plano, valor_original, valor_negociado,
-              desconto_percentual, valor_final, economia, modalidade
+            INSERT INTO staging.contratos_itens (
+              contrato_id, plano_servico_id, quantidade, valor_unitario, valor_total,
+              modalidade, valor_original, valor_negociado, desconto_percentual,
+              tipo_desconto, valor_desconto, valor_final, economia, observacoes
             ) VALUES (
-              ${contratoId}, ${servico.servicoNome}, ${servico.plano || null},
-              ${servico.valorOriginal || 0}, ${servico.valorNegociado || 0},
-              ${servico.descontoPercentual || 0}, ${servico.valorFinal || 0},
-              ${servico.economia || 0}, ${servico.modalidade || null}
+              ${contratoId}, ${item.plano_servico_id || null}, ${item.quantidade || 1},
+              ${item.valor_unitario || 0}, ${item.valor_total || 0},
+              ${item.modalidade || null}, ${item.valor_original || 0},
+              ${item.valor_negociado || 0}, ${item.desconto_percentual || 0},
+              ${item.tipo_desconto || null}, ${item.valor_desconto || 0},
+              ${item.valor_final || 0}, ${item.economia || 0}, ${item.observacoes || null}
             )
           `);
         }
@@ -454,39 +791,56 @@ export function registerContratosRoutes(app: Express) {
     }
   });
 
+  // Contratos - Update
   app.put("/api/contratos/contratos/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { contrato, servicos } = req.body;
+      const data = req.body;
       
       await db.execute(sql`
         UPDATE staging.contratos SET
-          numero_contrato = ${contrato.numeroContrato},
-          entidade_id = ${contrato.entidadeId},
-          comercial_responsavel = ${contrato.comercialResponsavel || null},
-          comercial_responsavel_email = ${contrato.comercialResponsavelEmail || null},
-          id_crm_bitrix = ${contrato.idCrmBitrix || null},
-          status = ${contrato.status || 'rascunho'},
-          data_inicio = ${contrato.dataInicio || null},
-          data_fim = ${contrato.dataFim || null},
-          observacoes = ${contrato.observacoes || null},
-          atualizado_em = CURRENT_TIMESTAMP
+          numero_contrato = ${data.numero_contrato},
+          id_crm = ${data.id_crm || null},
+          cliente_id = ${data.cliente_id || null},
+          fornecedor_id = ${data.fornecedor_id || null},
+          descricao = ${data.descricao || null},
+          data_inicio_recorrentes = ${data.data_inicio_recorrentes || null},
+          data_inicio_cobranca_recorrentes = ${data.data_inicio_cobranca_recorrentes || null},
+          data_inicio_pontuais = ${data.data_inicio_pontuais || null},
+          data_inicio_cobranca_pontuais = ${data.data_inicio_cobranca_pontuais || null},
+          status = ${data.status || 'rascunho'},
+          observacoes = ${data.observacoes || null},
+          usuario_atualizacao = ${data.usuario_atualizacao || null},
+          valor_original = ${data.valor_original || 0},
+          valor_negociado = ${data.valor_negociado || 0},
+          economia = ${data.economia || 0},
+          desconto_percentual = ${data.desconto_percentual || 0},
+          comercial_nome = ${data.comercial_nome || null},
+          comercial_email = ${data.comercial_email || null},
+          comercial_telefone = ${data.comercial_telefone || null},
+          comercial_cargo = ${data.comercial_cargo || null},
+          comercial_empresa = ${data.comercial_empresa || null},
+          data_atualizacao = CURRENT_TIMESTAMP
         WHERE id = ${parseInt(id)}
       `);
       
-      await db.execute(sql`DELETE FROM staging.contrato_servicos WHERE contrato_id = ${parseInt(id)}`);
-      
-      if (servicos && servicos.length > 0) {
-        for (const servico of servicos) {
+      // Update itens if provided
+      if (data.itens) {
+        await db.execute(sql`DELETE FROM staging.contratos_itens WHERE contrato_id = ${parseInt(id)}`);
+        
+        for (const item of data.itens) {
           await db.execute(sql`
-            INSERT INTO staging.contrato_servicos (
-              contrato_id, servico_nome, plano, valor_original, valor_negociado,
-              desconto_percentual, valor_final, economia, modalidade
+            INSERT INTO staging.contratos_itens (
+              contrato_id, plano_servico_id, quantidade, valor_unitario, valor_total,
+              modalidade, valor_original, valor_negociado, desconto_percentual,
+              tipo_desconto, valor_desconto, valor_final, economia, observacoes
             ) VALUES (
-              ${parseInt(id)}, ${servico.servicoNome}, ${servico.plano || null},
-              ${servico.valorOriginal || 0}, ${servico.valorNegociado || 0},
-              ${servico.descontoPercentual || 0}, ${servico.valorFinal || 0},
-              ${servico.economia || 0}, ${servico.modalidade || null}
+              ${parseInt(id)}, ${item.plano_servico_id || null}, ${item.quantidade || 1},
+              ${item.valor_unitario || 0}, ${item.valor_total || 0},
+              ${item.modalidade || null}, ${item.valor_original || 0},
+              ${item.valor_negociado || 0}, ${item.desconto_percentual || 0},
+              ${item.tipo_desconto || null}, ${item.valor_desconto || 0},
+              ${item.valor_final || 0}, ${item.economia || 0}, ${item.observacoes || null}
             )
           `);
         }
@@ -502,11 +856,12 @@ export function registerContratosRoutes(app: Express) {
     }
   });
 
+  // Contratos - Delete
   app.delete("/api/contratos/contratos/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       
-      await db.execute(sql`DELETE FROM staging.contrato_servicos WHERE contrato_id = ${parseInt(id)}`);
+      await db.execute(sql`DELETE FROM staging.contratos_itens WHERE contrato_id = ${parseInt(id)}`);
       await db.execute(sql`DELETE FROM staging.contratos WHERE id = ${parseInt(id)}`);
       
       res.json({ message: "Contrato excluído com sucesso" });
@@ -524,10 +879,10 @@ export function registerContratosRoutes(app: Express) {
     try {
       const entidadesResult = await db.execute(sql`
         SELECT 
-          COUNT(*) FILTER (WHERE ativo = true) as total_ativas,
-          COUNT(*) FILTER (WHERE tipo_entidade = 'cliente') as clientes,
-          COUNT(*) FILTER (WHERE tipo_entidade = 'fornecedor') as fornecedores,
-          COUNT(*) FILTER (WHERE tipo_entidade = 'ambos') as ambos
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE eh_cliente = true) as clientes,
+          COUNT(*) FILTER (WHERE eh_fornecedor = true) as fornecedores,
+          COUNT(*) FILTER (WHERE eh_cliente = true AND eh_fornecedor = true) as ambos
         FROM staging.entidades
       `);
       
@@ -535,27 +890,36 @@ export function registerContratosRoutes(app: Express) {
         SELECT 
           COUNT(*) as total,
           COUNT(*) FILTER (WHERE status = 'rascunho') as rascunhos,
-          COUNT(*) FILTER (WHERE status = 'ativo') as ativos,
-          COUNT(*) FILTER (WHERE status = 'pausado') as pausados,
+          COUNT(*) FILTER (WHERE status = 'assinado' OR status = 'ativo') as ativos,
+          COUNT(*) FILTER (WHERE status = 'enviado_para_assinatura') as aguardando,
           COUNT(*) FILTER (WHERE status = 'cancelado') as cancelados,
-          COUNT(*) FILTER (WHERE status = 'encerrado') as encerrados
+          COUNT(*) FILTER (WHERE status = 'encerrado') as encerrados,
+          COUNT(*) FILTER (WHERE status_faturamento = 'faturado') as faturados,
+          COUNT(*) FILTER (WHERE status_faturamento = 'pendente') as pendentes_faturamento
         FROM staging.contratos
       `);
       
       const valorResult = await db.execute(sql`
-        SELECT COALESCE(SUM(cs.valor_final), 0) as valor_total
-        FROM staging.contrato_servicos cs
-        JOIN staging.contratos c ON cs.contrato_id = c.id
-        WHERE c.status = 'ativo'
+        SELECT 
+          COALESCE(SUM(ci.valor_final), 0) as valor_total,
+          COALESCE(SUM(ci.economia), 0) as economia_total
+        FROM staging.contratos_itens ci
+        JOIN staging.contratos c ON ci.contrato_id = c.id
+        WHERE c.status IN ('assinado', 'ativo')
+      `);
+
+      const servicosResult = await db.execute(sql`
+        SELECT COUNT(*) as total FROM staging.servicos WHERE ativo = true
       `);
       
       const entidadeStats = entidadesResult.rows[0] as any;
       const contratoStats = contratosResult.rows[0] as any;
-      const valorTotal = parseFloat((valorResult.rows[0] as any).valor_total) || 0;
+      const valorStats = valorResult.rows[0] as any;
+      const servicosStats = servicosResult.rows[0] as any;
       
       res.json({
         entidades: {
-          totalAtivas: parseInt(entidadeStats.total_ativas) || 0,
+          total: parseInt(entidadeStats.total) || 0,
           clientes: parseInt(entidadeStats.clientes) || 0,
           fornecedores: parseInt(entidadeStats.fornecedores) || 0,
           ambos: parseInt(entidadeStats.ambos) || 0,
@@ -564,11 +928,17 @@ export function registerContratosRoutes(app: Express) {
           total: parseInt(contratoStats.total) || 0,
           rascunhos: parseInt(contratoStats.rascunhos) || 0,
           ativos: parseInt(contratoStats.ativos) || 0,
-          pausados: parseInt(contratoStats.pausados) || 0,
+          aguardando: parseInt(contratoStats.aguardando) || 0,
           cancelados: parseInt(contratoStats.cancelados) || 0,
           encerrados: parseInt(contratoStats.encerrados) || 0,
+          faturados: parseInt(contratoStats.faturados) || 0,
+          pendentesFaturamento: parseInt(contratoStats.pendentes_faturamento) || 0,
         },
-        valorTotalAtivos: valorTotal,
+        servicos: {
+          total: parseInt(servicosStats.total) || 0,
+        },
+        valorTotalAtivos: parseFloat(valorStats.valor_total) || 0,
+        economiaTotal: parseFloat(valorStats.economia_total) || 0,
       });
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
