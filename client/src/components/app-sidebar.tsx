@@ -268,6 +268,7 @@ export function AppSidebar() {
             
             {NAV_CONFIG.setores.map(category => renderCategorySection(category))}
             {renderCategorySection(NAV_CONFIG.gg)}
+            {renderCategorySection(NAV_CONFIG.juridico)}
             {NAV_CONFIG.governanca.map(category => renderCategorySection(category))}
             {user?.role === 'admin' && renderCategorySection(NAV_CONFIG.admin)}
             
