@@ -1327,16 +1327,17 @@ export function registerContratosRoutes(app: Express) {
 
       const itens = itensResult.rows as any[];
 
-      // Criar documento PDF
+      // Criar documento PDF com margens similares ao mPDF
       const doc = new PDFDocument({
         size: 'A4',
-        margins: { top: 80, bottom: 100, left: 50, right: 50 },
+        margins: { top: 100, bottom: 60, left: 30, right: 30 },
         bufferPages: true
       });
 
       // Configurar resposta
+      const nomeArquivo = (contrato.cliente_nome || 'Cliente').replace(/[^a-zA-Z0-9]/g, '_');
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="Turbo_-_${contrato.numero_contrato}_${(contrato.cliente_nome || 'Cliente').replace(/\s+/g, '_')}.pdf"`);
+      res.setHeader('Content-Disposition', `inline; filename="Contrato_${contrato.numero_contrato}_${nomeArquivo}.pdf"`);
 
       // Tratamento de erros para abort do cliente
       let aborted = false;
@@ -1367,271 +1368,305 @@ export function registerContratosRoutes(app: Express) {
         cnpj: "42.100.292/0001-84",
         socio: "RODRIGO QUEIROZ SANTOS",
         cpf_socio: "141.802.967-05",
-        endereco: "R. Maria de Lourdes García, 228 - Ilha de Santa Maria, Vitória - ES, 29053-310",
-        telefone: "(27) 9979-69628",
+        endereco: "Av. Joao Baptista Parra, 633 - Ed. Enseada Office - Sala 1301 - Enseada do Suá, Vitória/ES - CEP 29052-123",
+        telefone: "(27) 99687-7563",
         email: "contato@turbopartners.com.br",
         site: "www.turbopartners.com.br"
       };
 
       // Formatadores
-      const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+      const formatCurrency = (value: number) => 'R$ ' + (value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const formatDate = (date: string | Date | null) => {
-        if (!date) return '___/___/______';
+        if (!date) return 'A definir';
         return new Date(date).toLocaleDateString('pt-BR');
       };
       const hoje = formatDate(new Date());
       const numeroContrato = contrato.numero_contrato || `CT-${String(contratoId).padStart(6, '0')}`;
+      
+      // Separar itens por modalidade
+      const itensRecorrentes = itens.filter((i: any) => (i.modalidade || 'recorrente').toLowerCase() === 'recorrente');
+      const itensPontuais = itens.filter((i: any) => (i.modalidade || '').toLowerCase() === 'pontual');
+      
+      // Calcular totais
+      const valorRecorrente = itensRecorrentes.reduce((sum: number, i: any) => sum + (parseFloat(i.valor_negociado) || 0), 0);
+      const valorPontual = itensPontuais.reduce((sum: number, i: any) => sum + (parseFloat(i.valor_negociado) || 0), 0);
 
-      // Cores
-      const corPrimaria = '#1a365d';
-      const corSecundaria = '#2d5282';
+      // Cores do template (escuro como no PHP)
+      const corHeader = '#2d3748';
+      const corAzul = '#4299e1';
+      const corTexto = '#2d3748';
+      const corMuted = '#4a5568';
 
-      // Função para adicionar header em cada página
-      const addHeader = () => {
-        const savedY = doc.y;
-        doc.save();
+      // Dimensões da página
+      const pageWidth = 595;
+      const pageHeight = 842;
+      const marginLeft = 30;
+      const marginRight = 30;
+      const contentWidth = pageWidth - marginLeft - marginRight;
+
+      // Função para desenhar header escuro (estilo PHP)
+      const drawHeader = (pageDoc: typeof doc) => {
+        pageDoc.save();
+        // Fundo escuro arredondado
+        pageDoc.roundedRect(marginLeft, 20, contentWidth, 70, 7).fill(corHeader);
         
-        // Título principal
-        doc.fontSize(14).font('Helvetica-Bold').fillColor(corPrimaria)
-          .text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', 50, 25, { align: 'center', width: 495 });
+        // Título central
+        pageDoc.fontSize(14).font('Helvetica-Bold').fillColor('#ffffff')
+          .text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', marginLeft, 38, { width: contentWidth, align: 'center' });
         
-        // Número do contrato e data
-        doc.fontSize(9).font('Helvetica').fillColor('#333')
-          .text(`Contrato Nº ${numeroContrato}`, 350, 45, { width: 195, align: 'right' })
-          .text(hoje, 350, 57, { width: 195, align: 'right' })
-          .text(turbo.email, 350, 69, { width: 195, align: 'right' });
+        // Subtítulo: número do contrato
+        pageDoc.fontSize(10).fillColor('#bfc5cc')
+          .text(`Contrato Nº ${String(numeroContrato).padStart(6, '0')}`, marginLeft, 56, { width: contentWidth, align: 'center' });
         
-        doc.restore();
-        doc.y = savedY;
+        // Data e email (canto direito)
+        pageDoc.fontSize(9).fillColor('#ffffff')
+          .text(hoje, pageWidth - marginRight - 150, 55, { width: 140, align: 'right' })
+          .text(turbo.email, pageWidth - marginRight - 150, 67, { width: 140, align: 'right' });
+        
+        pageDoc.restore();
       };
 
-      // Função para adicionar footer em cada página
-      const addFooter = (pageNum: number, totalPages: number) => {
-        doc.save();
-        const footerY = 750;
+      // Função para desenhar footer
+      const drawFooter = (pageDoc: typeof doc, pageNum: number, totalPages: number) => {
+        pageDoc.save();
+        const footerY = pageHeight - 50;
         
         // Linha separadora
-        doc.moveTo(50, footerY - 10).lineTo(545, footerY - 10).strokeColor('#ccc').stroke();
+        pageDoc.moveTo(marginLeft, footerY - 5).lineTo(pageWidth - marginRight, footerY - 5).strokeColor('#ccc').stroke();
         
-        // Info esquerda
-        doc.fontSize(8).font('Helvetica-Bold').fillColor('#333')
-          .text(turbo.nome, 50, footerY)
-          .font('Helvetica').text(`CNPJ: ${turbo.cnpj}`, 50, footerY + 10);
+        // Esquerda: Nome e CNPJ
+        pageDoc.fontSize(7).font('Helvetica-Bold').fillColor('#333')
+          .text(turbo.nome, marginLeft, footerY);
+        pageDoc.font('Helvetica').text(`CNPJ: ${turbo.cnpj}`, marginLeft, footerY + 9);
         
-        // Centro
-        doc.font('Helvetica-Bold').text('DOCUMENTO OFICIAL', 230, footerY, { width: 135, align: 'center' })
-          .font('Helvetica').text(`Gerado em ${hoje}`, 230, footerY + 10, { width: 135, align: 'center' });
+        // Centro: Documento oficial
+        pageDoc.font('Helvetica-Bold').text('DOCUMENTO OFICIAL', 220, footerY, { width: 150, align: 'center' });
+        pageDoc.font('Helvetica').text(`Gerado em ${hoje}`, 220, footerY + 9, { width: 150, align: 'center' });
         
-        // Direita
-        doc.text(turbo.site, 380, footerY, { width: 165, align: 'right' })
-          .text(`Página ${pageNum} de ${totalPages}`, 380, footerY + 10, { width: 165, align: 'right' });
+        // Direita: Site e página
+        pageDoc.text(turbo.site, 400, footerY, { width: 165, align: 'right' });
+        pageDoc.text(`Página ${pageNum} de ${totalPages}`, 400, footerY + 9, { width: 165, align: 'right' });
         
-        // Email e telefone na base
-        doc.text(turbo.email, 50, footerY + 25)
-          .text('(27) 99687-7563', 380, footerY + 25, { width: 165, align: 'right' });
-        
+        pageDoc.restore();
+      };
+
+      // Função para título de seção (estilo PHP com border-left azul)
+      const drawSectionTitle = (title: string, y: number) => {
+        doc.save();
+        doc.rect(marginLeft, y, contentWidth, 28).fill('#f7fafc');
+        doc.rect(marginLeft, y, 4, 28).fill(corAzul);
+        doc.fontSize(12).font('Helvetica-Bold').fillColor(corTexto)
+          .text(title, marginLeft + 16, y + 8);
         doc.restore();
+        return y + 40;
       };
 
       // ======= PÁGINA 1: PARTES CONTRATANTES =======
-      doc.y = 90;
-
-      // Seção: PARTES CONTRATANTES com box de fundo
-      doc.rect(45, doc.y - 5, 505, 20).fillAndStroke('#f0f4f8', '#ddd');
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(corPrimaria)
-        .text('PARTES CONTRATANTES', 55, doc.y);
-      doc.y += 25;
-
-      // Layout duas colunas lado a lado com posicionamento absoluto
-      const colLeftX = 50;
-      const colRightX = 305;
-      const colW = 235;
-      const lh = 11; // line height
-      const startYParties = doc.y;
-
-      // ---- Preparar conteúdo da coluna esquerda ----
-      const leftLines: Array<{bold: boolean, text: string}> = [
-        { bold: true, text: 'CONTRATADO:' },
-        { bold: true, text: turbo.nome },
-        { bold: false, text: `CNPJ: ${turbo.cnpj}` },
-        { bold: false, text: `Sócio: ${turbo.socio}, CPF: ${turbo.cpf_socio}` },
-        { bold: false, text: `Endereço: ${turbo.endereco}` },
-        { bold: false, text: `Telefone: ${turbo.telefone}` },
-        { bold: false, text: `E-mail: rodrigo.queiroz@turbopartners.com.br` },
-      ];
-
-      // ---- Preparar conteúdo da coluna direita ----
-      const enderecoCliente = [contrato.endereco, contrato.numero, contrato.complemento, contrato.bairro, contrato.cidade, contrato.estado].filter(Boolean).join(', ');
-      const rightLines: Array<{bold: boolean, text: string}> = [
-        { bold: true, text: 'CONTRATANTE:' },
-        { bold: true, text: contrato.cliente_nome || '________________________' },
-        { bold: false, text: `${contrato.tipo_pessoa === 'juridica' ? 'CNPJ' : 'CPF'}: ${contrato.cpf_cnpj || '________________________'}` },
-      ];
-      if (contrato.tipo_pessoa === 'juridica' && contrato.nome_socio) {
-        rightLines.push({ bold: false, text: `Representante Legal: ${contrato.nome_socio}, CPF: ${contrato.cpf_socio || '___________'}` });
-      }
-      rightLines.push(
-        { bold: false, text: `Endereço: ${enderecoCliente || '________________________'}` },
-        { bold: false, text: `Telefone: ${contrato.telefone || '________________________'}` },
-        { bold: false, text: `E-mail: ${contrato.email || '________________________'}` }
-      );
-
-      // ---- Renderizar ambas colunas linha a linha ----
-      const maxLines = Math.max(leftLines.length, rightLines.length);
-      let yPos = startYParties;
+      let currentY = 100;
       
-      for (let i = 0; i < maxLines; i++) {
-        const leftItem = leftLines[i];
-        const rightItem = rightLines[i];
-        
-        if (leftItem) {
-          doc.fontSize(9).font(leftItem.bold ? 'Helvetica-Bold' : 'Helvetica').fillColor('#333')
-            .text(leftItem.text, colLeftX, yPos, { width: colW, lineBreak: false });
-        }
-        if (rightItem) {
-          doc.fontSize(9).font(rightItem.bold ? 'Helvetica-Bold' : 'Helvetica').fillColor('#333')
-            .text(rightItem.text, colRightX, yPos, { width: colW, lineBreak: false });
-        }
-        yPos += lh + 2;
-      }
+      // Título: PARTES CONTRATANTES
+      currentY = drawSectionTitle('PARTES CONTRATANTES', currentY);
 
-      doc.y = yPos + 25;
+      // Layout duas colunas (50%/50% como no PHP)
+      const colLeft = marginLeft + 15;
+      const colRight = marginLeft + contentWidth / 2 + 10;
+      const colW = contentWidth / 2 - 25;
+      const lineH = 13;
+
+      // Dados do endereço do cliente
+      const enderecoCliente = [contrato.endereco, contrato.numero, contrato.complemento, contrato.bairro, contrato.cidade, contrato.estado, contrato.cep ? `CEP: ${contrato.cep}` : ''].filter(Boolean).join(', ');
+
+      // Coluna esquerda: CONTRATADO
+      let leftY = currentY;
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(corMuted).text('CONTRATADO:', colLeft, leftY);
+      leftY += lineH + 5;
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(corTexto).text(turbo.nome.toUpperCase(), colLeft, leftY, { width: colW });
+      leftY += lineH;
+      doc.font('Helvetica').text(`CNPJ: ${turbo.cnpj}`, colLeft, leftY, { width: colW });
+      leftY += lineH;
+      doc.text(`Sócio: ${turbo.socio}, CPF: ${turbo.cpf_socio}`, colLeft, leftY, { width: colW });
+      leftY += lineH;
+      doc.text(`Endereço: ${turbo.endereco}`, colLeft, leftY, { width: colW });
+      leftY += lineH;
+      doc.text(`Telefone: ${turbo.telefone}`, colLeft, leftY, { width: colW });
+      leftY += lineH;
+      doc.text(`E-mail: ${turbo.email}`, colLeft, leftY, { width: colW });
+      leftY += lineH;
+
+      // Coluna direita: CONTRATANTE (em paralelo à esquerda)
+      let rightY = currentY;
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(corMuted).text('CONTRATANTE:', colRight, rightY);
+      rightY += lineH + 5;
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(corTexto).text((contrato.cliente_nome || 'Cliente').toUpperCase(), colRight, rightY, { width: colW });
+      rightY += lineH;
+      doc.font('Helvetica').text(`${contrato.tipo_pessoa === 'juridica' ? 'CNPJ' : 'CPF'}: ${contrato.cpf_cnpj || '_____________'}`, colRight, rightY, { width: colW });
+      rightY += lineH;
+      if (contrato.tipo_pessoa === 'juridica' && contrato.nome_socio) {
+        doc.text(`Sócio: ${contrato.nome_socio}, CPF: ${contrato.cpf_socio || '_____________'}`, colRight, rightY, { width: colW });
+        rightY += lineH;
+      }
+      doc.text(`Endereço: ${enderecoCliente || '_____________'}`, colRight, rightY, { width: colW });
+      rightY += lineH;
+      doc.text(`Telefone: ${contrato.telefone || '_____________'}`, colRight, rightY, { width: colW });
+      rightY += lineH;
+      doc.text(`E-mail: ${contrato.email || '_____________'}`, colRight, rightY, { width: colW });
+      rightY += lineH;
+
+      currentY = Math.max(leftY, rightY) + 30;
 
       if (checkAborted()) return;
 
       // ======= SEÇÃO: SERVIÇOS CONTRATADOS =======
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(corPrimaria)
-        .text('SERVIÇOS CONTRATADOS', 50, doc.y);
-      doc.moveTo(50, doc.y + 15).lineTo(200, doc.y + 15).strokeColor(corPrimaria).lineWidth(2).stroke();
-      doc.y += 25;
+      currentY = drawSectionTitle('SERVIÇOS CONTRATADOS', currentY);
 
-      // Modalidade e datas
-      const modalidade = contrato.modalidade || 'RECORRENTE';
-      doc.fontSize(10).font('Helvetica-Bold').fillColor('#333')
-        .text(`MODALIDADE ${modalidade.toUpperCase()}`, 50, doc.y);
-      doc.font('Helvetica').fontSize(9)
-        .text(`Início do Serviço: ${formatDate(contrato.data_inicio_recorrentes)} | Primeiro Vencimento: ${formatDate(contrato.data_inicio_cobranca_recorrentes || contrato.data_inicio_recorrentes)} | Método de Pagamento: ${contrato.met_cob_recorrente || 'Boleto'}`, 50, doc.y + 15);
-      doc.y += 40;
-
-      // Tabela de serviços
-      if (itens.length > 0) {
-        const tableX = 50;
-        const tableWidth = 495;
+      // Função para desenhar tabela de serviços (estilo PHP) com paginação
+      const drawServiceTable = (items: any[], modalidade: string, dataInicio: string, dataCobranca: string, valorTotal: number) => {
+        if (items.length === 0) return currentY;
         
-        // Header da tabela
-        doc.rect(tableX, doc.y, tableWidth, 22).fillAndStroke('#f5f5f5', '#ddd');
-        doc.fillColor('#333').font('Helvetica-Bold').fontSize(9);
-        doc.text('Serviço/Plano', tableX + 10, doc.y + 6, { width: 200 });
-        doc.text('Valor Negociado', tableX + 220, doc.y + 6, { width: 120, align: 'center' });
-        doc.text('Detalhes', tableX + 350, doc.y + 6, { width: 135, align: 'center' });
-        doc.y += 22;
-
-        let totalContrato = 0;
-
-        for (const item of itens) {
-          if (checkAborted()) return;
-          
+        const tableX = marginLeft;
+        const tableW = contentWidth;
+        const maxY = 720; // Limite antes do footer
+        
+        // Verificar espaço para header da modalidade
+        if (currentY + 100 > maxY) {
+          doc.addPage();
+          currentY = 100;
+        }
+        
+        // Header escuro da modalidade (estilo PHP)
+        doc.roundedRect(tableX, currentY, tableW, 35, 4).fill(corHeader);
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#ffffff')
+          .text(`MODALIDADE ${modalidade.toUpperCase()}`, tableX + 16, currentY + 8);
+        doc.fontSize(8).fillColor('#e2e8f1')
+          .text(`Início do Serviço: ${dataInicio} | Primeiro Vencimento: ${dataCobranca}`, tableX + 16, currentY + 22);
+        currentY += 40;
+        
+        // Função para desenhar header da tabela
+        const drawTableHeader = () => {
+          doc.rect(tableX, currentY, tableW, 22).fill('#e9eff3');
+          doc.fontSize(9).font('Helvetica-Bold').fillColor('#333');
+          doc.text('Serviço/Plano', tableX + 10, currentY + 6, { width: 200 });
+          doc.text('Valor Negociado', tableX + 220, currentY + 6, { width: 120, align: 'center' });
+          doc.text('Detalhes', tableX + 350, currentY + 6, { width: tableW - 360, align: 'center' });
+          currentY += 22;
+        };
+        
+        // Header inicial da tabela
+        drawTableHeader();
+        
+        // Linhas de serviços com paginação
+        for (const item of items) {
+          const servicoNome = item.servico_nome || 'Serviço';
+          const planoNome = item.plano_nome || item.descricao || 'Personalizado';
           const valorItem = parseFloat(item.valor_negociado) || parseFloat(item.valor_original) || 0;
-          totalContrato += valorItem;
           
-          const servicoNome = `${item.servico_nome || ''} - ${item.plano_nome || item.descricao || 'Personalizado'}`;
-          const detalhes = item.observacoes || '';
-          
-          // Calcular altura da linha
-          const rowHeight = Math.max(25, doc.heightOfString(servicoNome, { width: 200 }) + 10);
+          const rowH = 28;
           
           // Verificar se precisa nova página
-          if (doc.y + rowHeight > 700) {
+          if (currentY + rowH > maxY) {
             doc.addPage();
-            addHeader();
-            doc.y = 90;
+            currentY = 100;
+            // Redesenhar header da tabela na nova página
+            drawTableHeader();
           }
-
-          doc.rect(tableX, doc.y, tableWidth, rowHeight).stroke('#ddd');
-          doc.fillColor('#333').font('Helvetica').fontSize(9);
-          doc.text(servicoNome, tableX + 10, doc.y + 6, { width: 200 });
-          doc.text(formatCurrency(valorItem), tableX + 220, doc.y + 6, { width: 120, align: 'center' });
-          doc.text(detalhes, tableX + 350, doc.y + 6, { width: 135, align: 'center' });
           
-          doc.y += rowHeight;
+          doc.rect(tableX, currentY, tableW, rowH).stroke('#E6EAF6');
+          doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
+            .text(servicoNome, tableX + 10, currentY + 5, { width: 200 });
+          doc.font('Helvetica').fontSize(8).fillColor('#666')
+            .text(planoNome, tableX + 10, currentY + 16, { width: 200 });
+          doc.fontSize(9).font('Helvetica-Bold').fillColor('#28a745')
+            .text(formatCurrency(valorItem), tableX + 220, currentY + 10, { width: 120, align: 'center' });
+          
+          currentY += rowH;
         }
+        
+        // Verificar espaço para resumo
+        if (currentY + 30 > maxY) {
+          doc.addPage();
+          currentY = 100;
+        }
+        
+        // Resumo do valor
+        doc.rect(tableX, currentY, tableW, 25).fill('#f7fafc');
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#333')
+          .text(`VALOR ${modalidade.toUpperCase()}: ${formatCurrency(valorTotal)}`, tableX, currentY + 7, { width: tableW, align: 'center' });
+        currentY += 35;
+        
+        return currentY;
+      };
 
-        // Total
-        doc.rect(tableX, doc.y, tableWidth, 25).fillAndStroke('#e8f4f8', '#ddd');
-        doc.fillColor(corPrimaria).font('Helvetica-Bold').fontSize(10);
-        doc.text(`VALOR TOTAL: ${formatCurrency(totalContrato)}`, tableX + 10, doc.y + 7, { width: tableWidth - 20, align: 'center' });
-        doc.y += 35;
+      // Renderizar serviços recorrentes
+      if (itensRecorrentes.length > 0) {
+        const dataInicioRec = formatDate(contrato.data_inicio_recorrentes);
+        const dataCobrancaRec = formatDate(contrato.data_inicio_cobranca_recorrentes || contrato.data_inicio_recorrentes);
+        currentY = drawServiceTable(itensRecorrentes, 'RECORRENTE', dataInicioRec, dataCobrancaRec, valorRecorrente);
+      }
+
+      // Renderizar serviços pontuais
+      if (itensPontuais.length > 0) {
+        const dataInicioPont = formatDate(contrato.data_inicio_pontuais);
+        const dataCobrancaPont = formatDate(contrato.data_inicio_cobranca_pontuais || contrato.data_inicio_pontuais);
+        currentY = drawServiceTable(itensPontuais, 'PONTUAL', dataInicioPont, dataCobrancaPont, valorPontual);
       }
 
       if (checkAborted()) return;
 
-      // ======= SEÇÃO: CONSIDERAÇÕES =======
+      // ======= SEÇÃO: OBSERVAÇÕES =======
       if (contrato.observacoes) {
-        if (doc.y > 600) {
+        if (currentY > 650) {
           doc.addPage();
-          addHeader();
-          doc.y = 90;
+          currentY = 100;
         }
-
-        doc.fontSize(11).font('Helvetica-Bold').fillColor(corPrimaria)
-          .text('Considerações:', 50, doc.y);
-        doc.y += 15;
-
-        doc.fontSize(9).font('Helvetica').fillColor('#333')
-          .text(contrato.observacoes, 50, doc.y, { width: 495, align: 'justify' });
-        doc.y += 30;
+        currentY = drawSectionTitle('OBSERVAÇÕES', currentY);
+        doc.rect(marginLeft, currentY, 4, 40).fill(corAzul);
+        doc.fontSize(9).font('Helvetica').fillColor(corMuted)
+          .text(contrato.observacoes, marginLeft + 16, currentY, { width: contentWidth - 20, align: 'justify' });
+        currentY += 50;
       }
 
       if (checkAborted()) return;
 
       // ======= NOVA PÁGINA: ESCOPO E DIRETRIZES =======
-      const itensComEscopo = itens.filter(i => i.plano_escopo || i.plano_diretrizes || i.escopo);
+      const itensComEscopo = itens.filter((i: any) => i.plano_escopo || i.plano_diretrizes || i.escopo);
       if (itensComEscopo.length > 0) {
         doc.addPage();
-        addHeader();
-        doc.y = 90;
+        currentY = 100;
 
-        doc.fontSize(11).font('Helvetica-Bold').fillColor(corPrimaria)
-          .text('ESCOPO E DIRETRIZES DOS SERVIÇOS', 50, doc.y);
-        doc.moveTo(50, doc.y + 15).lineTo(260, doc.y + 15).strokeColor(corPrimaria).lineWidth(2).stroke();
-        doc.y += 30;
+        currentY = drawSectionTitle('ESCOPO E DIRETRIZES DOS SERVIÇOS', currentY);
 
         for (const item of itensComEscopo) {
           if (checkAborted()) return;
 
-          // Verificar espaço
-          if (doc.y > 650) {
+          if (currentY > 680) {
             doc.addPage();
-            addHeader();
-            doc.y = 90;
+            currentY = 100;
           }
 
-          // Box do serviço
-          doc.rect(50, doc.y, 495, 25).fillAndStroke('#f8f9fa', '#e0e0e0');
-          doc.fontSize(10).font('Helvetica-Bold').fillColor(corPrimaria)
-            .text(`Serviço:`, 60, doc.y + 7)
-            .font('Helvetica').fillColor('#333')
-            .text(`${item.servico_nome || ''} - ${item.plano_nome || 'Personalizado'}`, 110, doc.y + 7);
-          doc.y += 30;
+          // Nome do serviço/plano
+          doc.rect(marginLeft, currentY, 4, 20).fill(corAzul);
+          doc.fontSize(10).font('Helvetica-Bold').fillColor(corTexto)
+            .text(`Serviço: ${item.servico_nome || ''} - ${item.plano_nome || 'Personalizado'}`, marginLeft + 16, currentY + 3, { width: contentWidth - 20 });
+          currentY += 25;
 
           // Escopo
           const escopo = item.escopo || item.plano_escopo;
           if (escopo) {
-            doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text('Escopo:', 50, doc.y);
-            doc.y += 12;
-            doc.fontSize(9).font('Helvetica').text(escopo, 50, doc.y, { width: 495, align: 'justify' });
-            doc.y += 15;
+            doc.fontSize(9).font('Helvetica-Bold').fillColor('#333').text('Escopo:', marginLeft + 16, currentY);
+            currentY += 12;
+            doc.font('Helvetica').fillColor(corMuted).text(escopo, marginLeft + 16, currentY, { width: contentWidth - 30, align: 'justify' });
+            currentY = doc.y + 10;
           }
 
           // Diretrizes
           if (item.plano_diretrizes) {
-            doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text('Diretrizes:', 50, doc.y);
-            doc.y += 12;
-            doc.fontSize(9).font('Helvetica').text(item.plano_diretrizes, 50, doc.y, { width: 495, align: 'justify' });
-            doc.y += 15;
+            doc.fontSize(9).font('Helvetica-Bold').fillColor('#333').text('Diretrizes:', marginLeft + 16, currentY);
+            currentY += 12;
+            doc.font('Helvetica').fillColor(corMuted).text(item.plano_diretrizes, marginLeft + 16, currentY, { width: contentWidth - 30, align: 'justify' });
+            currentY = doc.y + 10;
           }
 
-          doc.y += 20;
+          currentY += 20;
         }
       }
 
@@ -1639,19 +1674,17 @@ export function registerContratosRoutes(app: Express) {
 
       // ======= NOVA PÁGINA: TURBO MASTER AGREEMENT (TMA) =======
       doc.addPage();
-      addHeader();
-      doc.y = 90;
+      currentY = 100;
 
-      // Título TMA
-      doc.fontSize(14).font('Helvetica-Bold').fillColor(corPrimaria)
-        .text('TURBO MASTER AGREEMENT (TMA)', 50, doc.y, { align: 'center', width: 495 });
-      doc.y += 30;
+      // Título TMA (estilo PHP com fundo cinza e border-left azul)
+      currentY = drawSectionTitle('TURBO MASTER AGREEMENT (TMA)', currentY);
 
-      // Índice
-      doc.fontSize(11).font('Helvetica-Bold').fillColor('#333').text('ÍNDICE', 50, doc.y, { align: 'center', width: 495 });
-      doc.y += 20;
+      // Subtítulo: ÍNDICE
+      doc.fontSize(12).font('Helvetica-Bold').fillColor('#333')
+        .text('ÍNDICE', marginLeft, currentY, { width: contentWidth, align: 'center' });
+      currentY += 25;
 
-      const clausulas = [
+      const clausulasIndex = [
         '1. PRELIMINARES DA PARCERIA',
         '2. ADEQUAÇÃO DO ESCOPO DA PRESTAÇÃO DE SERVIÇO',
         '3. FASE DE IMPLEMENTAÇÃO',
@@ -1667,34 +1700,30 @@ export function registerContratosRoutes(app: Express) {
         '13. DAS DISPOSIÇÕES GERAIS'
       ];
 
-      for (const clausula of clausulas) {
-        doc.fontSize(10).font('Helvetica').fillColor('#333').text(clausula, 150, doc.y);
-        doc.y += 15;
+      for (const clausula of clausulasIndex) {
+        doc.fontSize(11).font('Helvetica').fillColor('#333').text(clausula, marginLeft + 100, currentY);
+        currentY += 20;
       }
 
       if (checkAborted()) return;
 
       // ======= NOVA PÁGINA: CLÁUSULAS CONTRATUAIS =======
       doc.addPage();
-      addHeader();
-      doc.y = 90;
+      currentY = 100;
 
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(corPrimaria)
-        .text('CLÁUSULAS CONTRATUAIS', 50, doc.y);
-      doc.moveTo(50, doc.y + 15).lineTo(195, doc.y + 15).strokeColor(corPrimaria).lineWidth(2).stroke();
-      doc.y += 30;
+      currentY = drawSectionTitle('CLÁUSULAS CONTRATUAIS', currentY);
 
-      // Cláusula 1: PRELIMINARES DA PARCERIA
+      // Função para adicionar cláusula (estilo PHP)
       const addClausula = (titulo: string, texto: string) => {
-        if (doc.y > 650) {
+        if (currentY > 680) {
           doc.addPage();
-          addHeader();
-          doc.y = 90;
+          currentY = 100;
         }
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text(titulo, 50, doc.y);
-        doc.y += 15;
-        doc.fontSize(9).font('Helvetica').text(texto, 70, doc.y, { width: 475, align: 'justify' });
-        doc.y += 20;
+        doc.rect(marginLeft, currentY, 3, 15).fill(corAzul);
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text(titulo.toUpperCase(), marginLeft + 12, currentY);
+        currentY += 20;
+        doc.fontSize(9).font('Helvetica').fillColor(corMuted).text(texto, marginLeft + 12, currentY, { width: contentWidth - 20, align: 'justify' });
+        currentY = doc.y + 15;
       };
 
       addClausula('PRELIMINARES DA PARCERIA', 
@@ -1734,41 +1763,34 @@ export function registerContratosRoutes(app: Express) {
 
       // ======= PÁGINA FINAL: ASSINATURAS =======
       doc.addPage();
-      addHeader();
-      doc.y = 200;
+      currentY = 250;
 
-      doc.fontSize(10).font('Helvetica').fillColor('#333')
-        .text(`Vitória/ES, ${hoje}`, 50, doc.y, { align: 'center', width: 495 });
-      doc.y += 60;
+      doc.fontSize(11).font('Helvetica').fillColor('#333')
+        .text(`Vitória/ES, ${hoje}`, marginLeft, currentY, { align: 'center', width: contentWidth });
+      currentY += 80;
 
       // Linhas de assinatura
-      doc.moveTo(70, doc.y).lineTo(250, doc.y).stroke();
-      doc.moveTo(310, doc.y).lineTo(490, doc.y).stroke();
-      doc.y += 10;
+      doc.strokeColor('#333').lineWidth(0.5);
+      doc.moveTo(marginLeft + 50, currentY).lineTo(marginLeft + 200, currentY).stroke();
+      doc.moveTo(pageWidth - marginRight - 200, currentY).lineTo(pageWidth - marginRight - 50, currentY).stroke();
+      currentY += 10;
 
-      doc.fontSize(9).font('Helvetica-Bold')
-        .text('CONTRATADA', 70, doc.y, { width: 180, align: 'center' })
-        .text('CONTRATANTE', 310, doc.y, { width: 180, align: 'center' });
-      doc.y += 12;
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
+        .text('CONTRATADA', marginLeft + 50, currentY, { width: 150, align: 'center' })
+        .text('CONTRATANTE', pageWidth - marginRight - 200, currentY, { width: 150, align: 'center' });
+      currentY += 12;
       doc.font('Helvetica')
-        .text(turbo.nome, 70, doc.y, { width: 180, align: 'center' })
-        .text(contrato.cliente_nome || '________________________', 310, doc.y, { width: 180, align: 'center' });
+        .text(turbo.nome, marginLeft + 50, currentY, { width: 150, align: 'center' })
+        .text(contrato.cliente_nome || '________________________', pageWidth - marginRight - 200, currentY, { width: 150, align: 'center' });
 
       // Adicionar headers e footers em todas as páginas usando bufferPages
       const range = doc.bufferedPageRange();
       for (let i = range.start; i < range.start + range.count; i++) {
         doc.switchToPage(i);
-        // Adicionar header
-        doc.save();
-        doc.fontSize(14).font('Helvetica-Bold').fillColor(corPrimaria)
-          .text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', 50, 25, { align: 'center', width: 495 });
-        doc.fontSize(9).font('Helvetica').fillColor('#333')
-          .text(`Contrato Nº ${numeroContrato}`, 350, 45, { width: 195, align: 'right' })
-          .text(hoje, 350, 57, { width: 195, align: 'right' })
-          .text(turbo.email, 350, 69, { width: 195, align: 'right' });
-        doc.restore();
+        // Adicionar header escuro (estilo PHP)
+        drawHeader(doc);
         // Adicionar footer
-        addFooter(i + 1, range.count);
+        drawFooter(doc, i + 1, range.count);
       }
 
       if (!checkAborted()) {
