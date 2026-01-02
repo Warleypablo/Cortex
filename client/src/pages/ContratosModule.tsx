@@ -1240,39 +1240,52 @@ function ContratosTab() {
           ))}
         </div>
       ) : (
-        <Card>
+        <Card className="overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Número</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Responsável</TableHead>
-                <TableHead>Data Início</TableHead>
-                <TableHead className="w-28">Ações</TableHead>
+              <TableRow className="bg-muted/50">
+                <TableHead className="font-semibold">Número</TableHead>
+                <TableHead className="font-semibold">Cliente</TableHead>
+                <TableHead className="font-semibold">Status</TableHead>
+                <TableHead className="font-semibold text-right">Valor Negociado</TableHead>
+                <TableHead className="font-semibold">Responsável</TableHead>
+                <TableHead className="font-semibold">Data Início</TableHead>
+                <TableHead className="w-28 font-semibold">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {(!data?.contratos || data.contratos.length === 0) ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    Nenhum contrato encontrado
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                    <p className="text-lg font-medium">Nenhum contrato encontrado</p>
+                    <p className="text-sm">Tente ajustar os filtros ou criar um novo contrato</p>
                   </TableCell>
                 </TableRow>
               ) : (
                 data.contratos.map((contrato) => (
-                  <TableRow key={contrato.id} data-testid={`row-contrato-${contrato.id}`}>
-                    <TableCell className="font-medium font-mono">
+                  <TableRow 
+                    key={contrato.id} 
+                    data-testid={`row-contrato-${contrato.id}`}
+                    className="hover-elevate cursor-pointer transition-colors"
+                    onClick={() => handleView(contrato)}
+                  >
+                    <TableCell className="font-mono text-sm font-semibold">
                       {contrato.numero_contrato}
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <p className="font-medium">{contrato.cliente_nome || '-'}</p>
-                        {contrato.cliente_cpf_cnpj && (
-                          <p className="text-xs text-muted-foreground">
-                            {formatCpfCnpj(contrato.cliente_cpf_cnpj)}
-                          </p>
-                        )}
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Building2 className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{contrato.cliente_nome || '-'}</p>
+                          {contrato.cliente_cpf_cnpj && (
+                            <p className="text-xs text-muted-foreground">
+                              {formatCpfCnpj(contrato.cliente_cpf_cnpj)}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -1280,17 +1293,28 @@ function ContratosTab() {
                         {statusLabels[contrato.status] || contrato.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>{contrato.comercial_nome || '-'}</TableCell>
+                    <TableCell className="text-right">
+                      <span className="font-semibold text-green-600">
+                        {formatCurrency(Number(contrato.valor_negociado) || 0)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span>{contrato.comercial_nome || '-'}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       {contrato.data_inicio_recorrentes ? new Date(contrato.data_inicio_recorrentes).toLocaleDateString('pt-BR') : '-'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => handleView(contrato)}
                           data-testid={`button-view-contrato-${contrato.id}`}
+                          title="Ver detalhes"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -1299,6 +1323,7 @@ function ContratosTab() {
                           variant="ghost"
                           onClick={() => handleEdit(contrato)}
                           data-testid={`button-edit-contrato-${contrato.id}`}
+                          title="Editar"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -1307,6 +1332,8 @@ function ContratosTab() {
                           variant="ghost"
                           onClick={() => deleteMutation.mutate(contrato.id)}
                           data-testid={`button-delete-contrato-${contrato.id}`}
+                          title="Excluir"
+                          className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -1328,142 +1355,243 @@ function ContratosTab() {
       />
 
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Detalhes do Contrato</DialogTitle>
-          </DialogHeader>
-
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
           {contratoDetail && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">Número do Contrato</Label>
-                  <p className="font-mono font-medium">{contratoDetail.numero_contrato}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Status</Label>
-                  <div className="mt-1">
-                    <Badge variant="outline" className={statusColors[contratoDetail.status] || 'bg-gray-500/10'}>
-                      {statusLabels[contratoDetail.status] || contratoDetail.status}
-                    </Badge>
+            <>
+              {/* Header com gradiente */}
+              <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 border-b">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="h-14 w-14 rounded-xl bg-primary/20 flex items-center justify-center">
+                      <FileCheck className="h-7 w-7 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Contrato</p>
+                      <h2 className="text-2xl font-bold font-mono">{contratoDetail.numero_contrato}</h2>
+                      {contratoDetail.id_crm && (
+                        <p className="text-sm text-muted-foreground">CRM: {contratoDetail.id_crm}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">Cliente</Label>
-                  <p className="font-medium">{contratoDetail.cliente_nome || '-'}</p>
-                  {contratoDetail.cliente_cpf_cnpj && (
-                    <p className="text-sm text-muted-foreground">
-                      {formatCpfCnpj(contratoDetail.cliente_cpf_cnpj)}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Comercial Responsável</Label>
-                  <p>{contratoDetail.comercial_nome || '-'}</p>
-                  {contratoDetail.comercial_email && (
-                    <p className="text-sm text-muted-foreground">{contratoDetail.comercial_email}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">ID CRM</Label>
-                  <p>{contratoDetail.id_crm || '-'}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Valor Original</Label>
-                  <p className="font-medium">{formatCurrency(Number(contratoDetail.valor_original) || 0)}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Valor Negociado</Label>
-                  <p className="font-medium text-green-500">{formatCurrency(Number(contratoDetail.valor_negociado) || 0)}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">Data Início Recorrentes</Label>
-                  <p>{contratoDetail.data_inicio_recorrentes ? new Date(contratoDetail.data_inicio_recorrentes).toLocaleDateString('pt-BR') : '-'}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Data Cobrança Recorrentes</Label>
-                  <p>{contratoDetail.data_inicio_cobranca_recorrentes ? new Date(contratoDetail.data_inicio_cobranca_recorrentes).toLocaleDateString('pt-BR') : '-'}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Data Início Pontuais</Label>
-                  <p>{contratoDetail.data_inicio_pontuais ? new Date(contratoDetail.data_inicio_pontuais).toLocaleDateString('pt-BR') : '-'}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Data Cobrança Pontuais</Label>
-                  <p>{contratoDetail.data_inicio_cobranca_pontuais ? new Date(contratoDetail.data_inicio_cobranca_pontuais).toLocaleDateString('pt-BR') : '-'}</p>
-                </div>
-              </div>
-
-              {contratoDetail.assinafy_document_id && (
-                <div>
-                  <Label className="text-muted-foreground">Documento Assinado</Label>
-                  <a 
-                    href={`/api/contratos/assinafy/download/${contratoDetail.assinafy_document_id}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline flex items-center gap-1 mt-1"
+                  <Badge 
+                    variant="outline" 
+                    className={`${statusColors[contratoDetail.status] || 'bg-gray-500/10'} text-base px-4 py-1`}
                   >
-                    <ExternalLink className="h-4 w-4" />
-                    Ver documento assinado
-                  </a>
+                    {statusLabels[contratoDetail.status] || contratoDetail.status}
+                  </Badge>
                 </div>
-              )}
+              </div>
 
-              {contratoDetail.itens && contratoDetail.itens.length > 0 && (
-                <div>
-                  <Label className="text-muted-foreground mb-2 block">Itens do Contrato</Label>
-                  <Card>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Descrição</TableHead>
-                          <TableHead>Qtd</TableHead>
-                          <TableHead className="text-right">Valor Tabela</TableHead>
-                          <TableHead className="text-right">Valor Negociado</TableHead>
-                          <TableHead className="text-right">Desconto</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {contratoDetail.itens.map((item, index) => (
-                          <TableRow key={index}>
-                            <TableCell>{item.descricao || '-'}</TableCell>
-                            <TableCell>{item.quantidade}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(item.valor_tabela || 0)}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(item.valor_negociado)}</TableCell>
-                            <TableCell className="text-right text-green-500">
-                              {(Number(item.desconto_percentual) || 0).toFixed(1)}%
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        <TableRow className="bg-muted/50">
-                          <TableCell colSpan={3} className="font-medium">Total</TableCell>
-                          <TableCell className="text-right font-bold">
-                            {formatCurrency(contratoDetail.itens.reduce((acc, i) => acc + (i.valor_negociado * i.quantidade), 0))}
-                          </TableCell>
-                          <TableCell></TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
+              <div className="p-6 space-y-6">
+                {/* Cards de Valores */}
+                <div className="grid grid-cols-3 gap-4">
+                  <Card className="p-4 bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                        <DollarSign className="h-5 w-5 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Valor Original</p>
+                        <p className="text-lg font-bold">{formatCurrency(Number(contratoDetail.valor_original) || 0)}</p>
+                      </div>
+                    </div>
+                  </Card>
+                  <Card className="p-4 bg-green-500/5 border-green-500/20">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                        <DollarSign className="h-5 w-5 text-green-500" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Valor Negociado</p>
+                        <p className="text-lg font-bold text-green-600">{formatCurrency(Number(contratoDetail.valor_negociado) || 0)}</p>
+                      </div>
+                    </div>
+                  </Card>
+                  <Card className="p-4 bg-muted/30">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                        <DollarSign className="h-5 w-5 text-orange-500" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Economia</p>
+                        <p className="text-lg font-bold text-orange-600">
+                          {formatCurrency(Number(contratoDetail.economia) || 0)}
+                        </p>
+                      </div>
+                    </div>
                   </Card>
                 </div>
-              )}
 
-              {contratoDetail.observacoes && (
-                <div>
-                  <Label className="text-muted-foreground">Observações</Label>
-                  <p className="mt-1 text-sm whitespace-pre-wrap">{contratoDetail.observacoes}</p>
+                {/* Informações principais em duas colunas */}
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Cliente */}
+                  <Card className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <Label className="text-sm font-semibold">Cliente</Label>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="font-medium text-lg">{contratoDetail.cliente_nome || '-'}</p>
+                      {contratoDetail.cliente_cpf_cnpj && (
+                        <p className="text-sm text-muted-foreground font-mono">
+                          {formatCpfCnpj(contratoDetail.cliente_cpf_cnpj)}
+                        </p>
+                      )}
+                    </div>
+                  </Card>
+
+                  {/* Comercial */}
+                  <Card className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <Label className="text-sm font-semibold">Comercial Responsável</Label>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="font-medium text-lg">{contratoDetail.comercial_nome || '-'}</p>
+                      {contratoDetail.comercial_email && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Mail className="h-3 w-3" />
+                          {contratoDetail.comercial_email}
+                        </div>
+                      )}
+                      {contratoDetail.comercial_telefone && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Phone className="h-3 w-3" />
+                          {contratoDetail.comercial_telefone}
+                        </div>
+                      )}
+                    </div>
+                  </Card>
                 </div>
-              )}
-            </div>
+
+                {/* Datas */}
+                <Card className="p-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm font-semibold">Datas do Contrato</Label>
+                  </div>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground mb-1">Início Recorrentes</p>
+                      <p className="font-medium">
+                        {contratoDetail.data_inicio_recorrentes 
+                          ? new Date(contratoDetail.data_inicio_recorrentes).toLocaleDateString('pt-BR') 
+                          : '-'}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground mb-1">Cobrança Recorrentes</p>
+                      <p className="font-medium">
+                        {contratoDetail.data_inicio_cobranca_recorrentes 
+                          ? new Date(contratoDetail.data_inicio_cobranca_recorrentes).toLocaleDateString('pt-BR') 
+                          : '-'}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground mb-1">Início Pontuais</p>
+                      <p className="font-medium">
+                        {contratoDetail.data_inicio_pontuais 
+                          ? new Date(contratoDetail.data_inicio_pontuais).toLocaleDateString('pt-BR') 
+                          : '-'}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground mb-1">Cobrança Pontuais</p>
+                      <p className="font-medium">
+                        {contratoDetail.data_inicio_cobranca_pontuais 
+                          ? new Date(contratoDetail.data_inicio_cobranca_pontuais).toLocaleDateString('pt-BR') 
+                          : '-'}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Documento Assinado */}
+                {contratoDetail.assinafy_document_id && (
+                  <Card className="p-4 border-primary/20 bg-primary/5">
+                    <a 
+                      href={`/api/contratos/assinafy/download/${contratoDetail.assinafy_document_id}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between hover:opacity-80 transition-opacity"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                          <FileCheck className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Documento Assinado</p>
+                          <p className="text-sm text-muted-foreground">Clique para visualizar o PDF</p>
+                        </div>
+                      </div>
+                      <ExternalLink className="h-5 w-5 text-primary" />
+                    </a>
+                  </Card>
+                )}
+
+                {/* Itens do Contrato */}
+                {contratoDetail.itens && contratoDetail.itens.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Briefcase className="h-4 w-4 text-muted-foreground" />
+                      <Label className="text-sm font-semibold">Itens do Contrato ({contratoDetail.itens.length})</Label>
+                    </div>
+                    <Card className="overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="font-semibold">Descrição</TableHead>
+                            <TableHead className="font-semibold text-center">Qtd</TableHead>
+                            <TableHead className="font-semibold text-right">Valor Tabela</TableHead>
+                            <TableHead className="font-semibold text-right">Valor Negociado</TableHead>
+                            <TableHead className="font-semibold text-right">Desconto</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {contratoDetail.itens.map((item, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="font-medium">{item.descricao || '-'}</TableCell>
+                              <TableCell className="text-center">{item.quantidade}</TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {formatCurrency(item.valor_tabela || 0)}
+                              </TableCell>
+                              <TableCell className="text-right font-semibold">
+                                {formatCurrency(item.valor_negociado)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                                  -{(Number(item.desconto_percentual) || 0).toFixed(1)}%
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="bg-muted/50 border-t-2">
+                            <TableCell colSpan={3} className="font-bold text-base">Total do Contrato</TableCell>
+                            <TableCell className="text-right font-bold text-lg">
+                              {formatCurrency(contratoDetail.itens.reduce((acc, i) => acc + (i.valor_negociado * i.quantidade), 0))}
+                            </TableCell>
+                            <TableCell></TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Observações */}
+                {contratoDetail.observacoes && (
+                  <Card className="p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <Label className="text-sm font-semibold">Observações</Label>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap text-muted-foreground leading-relaxed">
+                      {contratoDetail.observacoes}
+                    </p>
+                  </Card>
+                )}
+              </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
