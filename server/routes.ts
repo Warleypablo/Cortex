@@ -5931,7 +5931,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM cup_contratos c
         LEFT JOIN cup_clientes cl ON c.id_task = cl.task_id
         WHERE c.data_pausa IS NOT NULL
-          AND LOWER(TRIM(c.status)) = 'pausado'
           AND ${pausaDateFilter}
       `);
       
