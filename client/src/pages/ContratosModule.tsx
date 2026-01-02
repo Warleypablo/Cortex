@@ -87,9 +87,11 @@ interface ContratoItem {
   plano_servico_id: number | null;
   plano_nome?: string;
   servico_nome?: string;
+  descricao?: string;
   quantidade: number;
   valor_unitario: number;
   valor_total: number;
+  valor_tabela?: number;
   modalidade: string | null;
   valor_original: number;
   valor_negociado: number;
@@ -214,7 +216,7 @@ function DashboardTab() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Entidades Ativas</p>
-                <p className="text-3xl font-bold">{stats.entidades.totalAtivas}</p>
+                <p className="text-3xl font-bold">{stats.entidades.total}</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center">
                 <Users className="h-6 w-6 text-blue-500" />
@@ -700,14 +702,14 @@ function EntidadesTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data?.entidades.length === 0 ? (
+              {(!data?.entidades || data.entidades.length === 0) ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     Nenhuma entidade encontrada
                   </TableCell>
                 </TableRow>
               ) : (
-                data?.entidades.map((entidade) => (
+                data.entidades.map((entidade) => (
                   <TableRow key={entidade.id} data-testid={`row-entidade-${entidade.id}`}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
@@ -892,10 +894,16 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
       plano_servico_id: null,
       descricao: '',
       valor_tabela: 0,
+      valor_unitario: 0,
+      valor_total: 0,
+      valor_original: 0,
       valor_negociado: 0,
+      valor_final: 0,
+      economia: 0,
       desconto_percentual: 0,
       quantidade: 1,
       modalidade: null,
+      observacoes: null,
     }]);
   };
 
@@ -1079,7 +1087,7 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                       Desconto: {(item.desconto_percentual || 0).toFixed(1)}%
                     </span>
                     <span className="text-green-500 font-medium">
-                      Economia: {formatCurrency((item.valor_tabela - item.valor_negociado) * item.quantidade)}
+                      Economia: {formatCurrency(((item.valor_tabela || 0) - item.valor_negociado) * item.quantidade)}
                     </span>
                   </div>
                   <Button
@@ -1240,14 +1248,14 @@ function ContratosTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data?.contratos.length === 0 ? (
+              {(!data?.contratos || data.contratos.length === 0) ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     Nenhum contrato encontrado
                   </TableCell>
                 </TableRow>
               ) : (
-                data?.contratos.map((contrato) => (
+                data.contratos.map((contrato) => (
                   <TableRow key={contrato.id} data-testid={`row-contrato-${contrato.id}`}>
                     <TableCell className="font-medium font-mono">
                       {contrato.numero_contrato}
@@ -1386,7 +1394,7 @@ function ContratosTab() {
                           <TableRow key={index}>
                             <TableCell>{item.descricao || '-'}</TableCell>
                             <TableCell>{item.quantidade}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(item.valor_tabela)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.valor_tabela || 0)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(item.valor_negociado)}</TableCell>
                             <TableCell className="text-right text-green-500">
                               {(item.desconto_percentual || 0).toFixed(1)}%
