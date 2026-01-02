@@ -27,7 +27,8 @@ import {
   Target,
   CalendarDays,
   Building2,
-  Users
+  Users,
+  Pause
 } from "lucide-react";
 import {
   Table,
@@ -68,9 +69,11 @@ interface ChurnContract {
   responsavel: string;
   valorr: number;
   data_inicio: string;
-  data_encerramento: string;
+  data_encerramento: string | null;
+  data_pausa: string | null;
   status: string;
   servico: string;
+  tipo: 'churn' | 'pausado';
   lifetime_meses: number;
   ltv: number;
 }
@@ -79,7 +82,9 @@ interface ChurnDetalhamentoData {
   contratos: ChurnContract[];
   metricas: {
     total_churned: number;
+    total_pausados: number;
     mrr_perdido: number;
+    mrr_pausado: number;
     ltv_total: number;
     lt_medio: number;
   };
@@ -254,7 +259,9 @@ export default function ChurnDetalhamento() {
       let comparison = 0;
       switch (sortBy) {
         case "data_encerramento":
-          comparison = new Date(a.data_encerramento).getTime() - new Date(b.data_encerramento).getTime();
+          const dateA = a.data_encerramento || a.data_pausa || '';
+          const dateB = b.data_encerramento || b.data_pausa || '';
+          comparison = new Date(dateA).getTime() - new Date(dateB).getTime();
           break;
         case "valorr":
           comparison = a.valorr - b.valorr;
@@ -279,18 +286,25 @@ export default function ChurnDetalhamento() {
 
   const filteredMetricas = useMemo(() => {
     if (filteredContratos.length === 0) {
-      return { total_churned: 0, mrr_perdido: 0, ltv_total: 0, lt_medio: 0, ticket_medio: 0 };
+      return { total_churned: 0, total_pausados: 0, mrr_perdido: 0, mrr_pausado: 0, ltv_total: 0, lt_medio: 0, ticket_medio: 0 };
     }
     
-    const total = filteredContratos.length;
-    const mrrPerdido = filteredContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
-    const ltvTotal = filteredContratos.reduce((sum, c) => sum + (c.ltv || 0), 0);
-    const ltMedio = filteredContratos.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / total;
-    const ticketMedio = mrrPerdido / total;
+    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn');
+    const pausadoContratos = filteredContratos.filter(c => c.tipo === 'pausado');
+    
+    const totalChurned = churnContratos.length;
+    const totalPausados = pausadoContratos.length;
+    const mrrPerdido = churnContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
+    const mrrPausado = pausadoContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
+    const ltvTotal = churnContratos.reduce((sum, c) => sum + (c.ltv || 0), 0);
+    const ltMedio = totalChurned > 0 ? churnContratos.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / totalChurned : 0;
+    const ticketMedio = totalChurned > 0 ? mrrPerdido / totalChurned : 0;
     
     return {
-      total_churned: total,
+      total_churned: totalChurned,
+      total_pausados: totalPausados,
       mrr_perdido: mrrPerdido,
+      mrr_pausado: mrrPausado,
       ltv_total: ltvTotal,
       lt_medio: ltMedio,
       ticket_medio: ticketMedio
@@ -587,9 +601,9 @@ export default function ChurnDetalhamento() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
         {isLoading ? (
-          Array.from({ length: 6 }).map((_, i) => (
+          Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="rounded-xl bg-white dark:bg-zinc-900/50 border border-gray-100 dark:border-zinc-800/50 p-4 shadow">
               <Skeleton className="h-4 w-20 mb-3" />
               <Skeleton className="h-7 w-24" />
@@ -612,6 +626,22 @@ export default function ChurnDetalhamento() {
               icon={DollarSign}
               gradient="bg-gradient-to-r from-orange-500 to-amber-600"
               shadowColor="rgba(249,115,22,0.25)"
+            />
+            <TechKpiCard
+              title="Total Pausados"
+              value={filteredMetricas.total_pausados.toString()}
+              subtitle="contratos pausados"
+              icon={Pause}
+              gradient="bg-gradient-to-r from-yellow-500 to-amber-500"
+              shadowColor="rgba(234,179,8,0.25)"
+            />
+            <TechKpiCard
+              title="MRR Pausado"
+              value={formatCurrency(filteredMetricas.mrr_pausado)}
+              subtitle="receita mensal pausada"
+              icon={Pause}
+              gradient="bg-gradient-to-r from-yellow-600 to-orange-500"
+              shadowColor="rgba(202,138,4,0.25)"
             />
             <TechKpiCard
               title="LTV Total"
@@ -1002,7 +1032,7 @@ export default function ChurnDetalhamento() {
               <TabsList>
                 <TabsTrigger value="contratos" className="gap-2" data-testid="tab-contratos">
                   <FileText className="h-4 w-4" />
-                  Contratos Encerrados
+                  Contratos (Churn + Pausados)
                 </TabsTrigger>
                 <TabsTrigger value="clientes" className="gap-2" data-testid="tab-clientes">
                   <Building2 className="h-4 w-4" />
@@ -1047,6 +1077,7 @@ export default function ChurnDetalhamento() {
                           <SortIcon column="cliente_nome" />
                         </div>
                       </TableHead>
+                      <TableHead>Tipo</TableHead>
                       <TableHead>Produto</TableHead>
                       <TableHead>Squad</TableHead>
                       <TableHead>Responsável</TableHead>
@@ -1065,7 +1096,7 @@ export default function ChurnDetalhamento() {
                         onClick={() => handleSort("data_encerramento")}
                       >
                         <div className="flex items-center gap-1">
-                          Encerramento
+                          Data Evento
                           <SortIcon column="data_encerramento" />
                         </div>
                       </TableHead>
@@ -1103,17 +1134,25 @@ export default function ChurnDetalhamento() {
                           </div>
                         </TableCell>
                         <TableCell>
+                          <Badge 
+                            variant={contrato.tipo === 'pausado' ? 'secondary' : 'destructive'}
+                            className={contrato.tipo === 'pausado' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' : ''}
+                          >
+                            {contrato.tipo === 'pausado' ? 'Pausado' : 'Churn'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           <Badge variant="outline">{contrato.produto || "-"}</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary">{contrato.squad || "-"}</Badge>
                         </TableCell>
                         <TableCell className="text-sm">{contrato.responsavel || "-"}</TableCell>
-                        <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
+                        <TableCell className={`text-right font-semibold ${contrato.tipo === 'pausado' ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
                           {formatCurrency(contrato.valorr || 0)}
                         </TableCell>
                         <TableCell className="text-sm">{formatDate(contrato.data_inicio)}</TableCell>
-                        <TableCell className="text-sm">{formatDate(contrato.data_encerramento)}</TableCell>
+                        <TableCell className="text-sm">{formatDate(contrato.data_encerramento || contrato.data_pausa)}</TableCell>
                         <TableCell className="text-right">
                           <Badge 
                             variant={contrato.lifetime_meses < 6 ? "destructive" : contrato.lifetime_meses < 12 ? "secondary" : "default"}
