@@ -789,39 +789,99 @@ function EntidadesTab() {
     setDialogOpen(true);
   }, []);
 
+  // Stats
+  const entidades = data?.entidades || [];
+  const totalClientes = entidades.filter(e => e.eh_cliente).length;
+  const totalFornecedores = entidades.filter(e => e.eh_fornecedor).length;
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              data-testid="input-search-entidades"
-              placeholder="Buscar por nome, CPF/CNPJ ou e-mail..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-9 w-72"
-            />
-          </div>
-
-          <Select value={tipoFilter} onValueChange={setTipoFilter}>
-            <SelectTrigger className="w-40" data-testid="select-tipo-filter">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="cliente">Clientes</SelectItem>
-              <SelectItem value="fornecedor">Fornecedores</SelectItem>
-              <SelectItem value="ambos">Ambos</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button onClick={handleNew} data-testid="button-nova-entidade">
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Entidade
-        </Button>
+    <div className="space-y-6">
+      {/* Header com estatísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+              <Users className="h-6 w-6 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{entidades.length}</p>
+              <p className="text-xs text-muted-foreground">Total de Entidades</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+              <Building2 className="h-6 w-6 text-green-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-green-600">{totalClientes}</p>
+              <p className="text-xs text-muted-foreground">Clientes</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
+              <Briefcase className="h-6 w-6 text-purple-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-purple-600">{totalFornecedores}</p>
+              <p className="text-xs text-muted-foreground">Fornecedores</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-dashed border-2">
+          <CardContent className="p-0 h-full">
+            <Button 
+              variant="ghost" 
+              className="w-full h-full flex items-center justify-center gap-3 min-h-[80px] rounded-lg"
+              onClick={handleNew}
+              data-testid="button-nova-entidade-card"
+            >
+              <Plus className="h-6 w-6 text-muted-foreground" />
+              <span className="font-medium">Nova Entidade</span>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Barra de pesquisa e filtros */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  data-testid="input-search-entidades"
+                  placeholder="Buscar por nome, CPF/CNPJ ou e-mail..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="pl-9 w-80"
+                />
+              </div>
+
+              <Select value={tipoFilter} onValueChange={setTipoFilter}>
+                <SelectTrigger className="w-44" data-testid="select-tipo-filter">
+                  <SelectValue placeholder="Filtrar por tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os tipos</SelectItem>
+                  <SelectItem value="cliente">Apenas Clientes</SelectItem>
+                  <SelectItem value="fornecedor">Apenas Fornecedores</SelectItem>
+                  <SelectItem value="ambos">Cliente e Fornecedor</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button onClick={handleNew} data-testid="button-nova-entidade">
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Entidade
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {isLoading ? (
         <div className="space-y-2">
@@ -1478,41 +1538,100 @@ function ContratosTab() {
     setDialogOpen(true);
   }, []);
 
+  // Stats
+  const contratos = data?.contratos || [];
+  const totalAtivos = contratos.filter(c => c.status === 'ativo').length;
+  const totalRascunhos = contratos.filter(c => c.status === 'rascunho').length;
+  const totalValor = contratos.filter(c => c.status === 'ativo').reduce((sum, c) => sum + (Number(c.valor_negociado) || 0), 0);
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              data-testid="input-search-contratos"
-              placeholder="Buscar por número, cliente ou responsável..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-9 w-72"
-            />
-          </div>
-
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40" data-testid="select-status-filter">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="rascunho">Rascunho</SelectItem>
-              <SelectItem value="ativo">Ativo</SelectItem>
-              <SelectItem value="pausado">Pausado</SelectItem>
-              <SelectItem value="cancelado">Cancelado</SelectItem>
-              <SelectItem value="encerrado">Encerrado</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button onClick={handleNew} data-testid="button-novo-contrato">
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Contrato
-        </Button>
+    <div className="space-y-6">
+      {/* Cards estatísticos */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center">
+              <FileCheck className="h-6 w-6 text-green-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-green-600">{totalAtivos}</p>
+              <p className="text-xs text-muted-foreground">Contratos Ativos</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border-yellow-500/20">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-yellow-500/20 flex items-center justify-center">
+              <FileText className="h-6 w-6 text-yellow-500" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-yellow-600">{totalRascunhos}</p>
+              <p className="text-xs text-muted-foreground">Rascunhos</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+              <DollarSign className="h-6 w-6 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-blue-600">{formatCurrency(totalValor)}</p>
+              <p className="text-xs text-muted-foreground">Receita Ativa (mensal)</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
+              <Briefcase className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{contratos.length}</p>
+              <p className="text-xs text-muted-foreground">Total de Contratos</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Barra de pesquisa e filtros */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  data-testid="input-search-contratos"
+                  placeholder="Buscar por número, cliente ou responsável..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="pl-9 w-80"
+                />
+              </div>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-44" data-testid="select-status-filter">
+                  <SelectValue placeholder="Filtrar status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os status</SelectItem>
+                  <SelectItem value="rascunho">Rascunho</SelectItem>
+                  <SelectItem value="ativo">Ativo</SelectItem>
+                  <SelectItem value="pausado">Pausado</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                  <SelectItem value="encerrado">Encerrado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button onClick={handleNew} data-testid="button-novo-contrato">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Contrato
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {isLoading ? (
         <div className="space-y-2">
@@ -1893,6 +2012,439 @@ function ContratosTab() {
   );
 }
 
+function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    numero_contrato: '',
+    cliente_id: null as number | null,
+    comercial_nome: '',
+    comercial_email: '',
+    id_crm: '',
+    status: 'rascunho',
+    data_inicio_recorrentes: '',
+    data_inicio_cobranca_recorrentes: '',
+    data_inicio_pontuais: '',
+    data_inicio_cobranca_pontuais: '',
+    observacoes: '',
+  });
+
+  const [itens, setItens] = useState<ContratoItem[]>([]);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [selectedServicoId, setSelectedServicoId] = useState<number | null>(null);
+
+  const { data: proximoNumero } = useQuery<{ proximoNumero: string }>({
+    queryKey: ['/api/contratos/proximo-numero'],
+  });
+
+  const { data: entidadesData } = useQuery<{ entidades: Entidade[] }>({
+    queryKey: ['/api/contratos/entidades'],
+    queryFn: async () => {
+      const res = await fetch('/api/contratos/entidades?ativo=true&tipo=cliente');
+      return res.json();
+    },
+  });
+
+  const { data: servicosData } = useQuery<{ servicos: Servico[] }>({
+    queryKey: ['/api/contratos/servicos'],
+  });
+
+  const { data: planosData } = useQuery<{ planos: PlanoServico[] }>({
+    queryKey: ['/api/contratos/planos-servicos', selectedServicoId],
+    queryFn: async () => {
+      const params = selectedServicoId ? `?servico_id=${selectedServicoId}` : '';
+      const res = await fetch(`/api/contratos/planos-servicos${params}`);
+      return res.json();
+    },
+    enabled: !!selectedServicoId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const data = {
+        ...formData,
+        numero_contrato: formData.numero_contrato || proximoNumero?.proximoNumero,
+      };
+      const res = await apiRequest('POST', '/api/contratos/contratos', { contrato: data, itens });
+      return res;
+    },
+    onSuccess: () => {
+      toast({ title: "Contrato criado com sucesso!" });
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/contratos'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/proximo-numero'] });
+      onSuccess();
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao criar contrato", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addItem = () => {
+    setShowAddItem(true);
+    setItens([...itens, {
+      plano_servico_id: null,
+      servico_id: null,
+      descricao: '',
+      escopo: '',
+      valor_tabela: 0,
+      valor_unitario: 0,
+      valor_total: 0,
+      valor_original: 0,
+      valor_negociado: 0,
+      valor_final: 0,
+      economia: 0,
+      desconto_percentual: 0,
+      quantidade: 1,
+      modalidade: 'recorrente',
+      observacoes: null,
+      is_personalizado: false,
+    }]);
+  };
+
+  const handleServicoChange = (index: number, servicoId: number) => {
+    const servico = servicosData?.servicos.find(s => s.id === servicoId);
+    const updated = [...itens];
+    updated[index] = {
+      ...updated[index],
+      servico_id: servicoId,
+      servico_nome: servico?.nome,
+      plano_servico_id: null,
+      escopo: '',
+      valor_tabela: 0,
+      valor_negociado: 0,
+      is_personalizado: false,
+    };
+    setItens(updated);
+    setSelectedServicoId(servicoId);
+  };
+
+  const handlePlanoChange = (index: number, planoId: string) => {
+    const updated = [...itens];
+    if (planoId === 'personalizado') {
+      updated[index] = {
+        ...updated[index],
+        plano_servico_id: null,
+        is_personalizado: true,
+        descricao: 'Plano Personalizado',
+        plano_nome: 'Personalizado',
+        escopo: '',
+        valor_tabela: 0,
+        valor_negociado: 0,
+      };
+    } else {
+      const plano = planosData?.planos.find(p => p.id === parseInt(planoId));
+      if (plano) {
+        updated[index] = {
+          ...updated[index],
+          plano_servico_id: plano.id,
+          is_personalizado: false,
+          descricao: plano.nome,
+          plano_nome: plano.nome,
+          escopo: plano.escopo || '',
+          valor_tabela: plano.valor,
+          valor_negociado: plano.valor,
+        };
+      }
+    }
+    setItens(updated);
+  };
+
+  const updateItem = (index: number, field: keyof ContratoItem, value: any) => {
+    const updated = [...itens];
+    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'valor_tabela' || field === 'valor_negociado') {
+      const original = updated[index].valor_tabela || 0;
+      const negociado = updated[index].valor_negociado || 0;
+      const desconto = original > 0 ? ((original - negociado) / original) * 100 : 0;
+      updated[index].desconto_percentual = desconto;
+    }
+    setItens(updated);
+  };
+
+  const removeItem = (index: number) => {
+    setItens(itens.filter((_, i) => i !== index));
+  };
+
+  const totalRecorrente = itens.filter(i => i.modalidade === 'recorrente').reduce((sum, i) => sum + (i.valor_negociado || 0), 0);
+  const totalPontual = itens.filter(i => i.modalidade === 'pontual').reduce((sum, i) => sum + (i.valor_negociado || 0), 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <Card className="border-orange-500/20 bg-gradient-to-r from-orange-500/5 to-transparent">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-orange-500/10 flex items-center justify-center">
+              <Plus className="h-7 w-7 text-orange-500" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold">Novo Contrato</h2>
+              <p className="text-muted-foreground">Preencha os dados para criar um novo contrato</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Formulário */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Coluna Principal */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Dados Básicos */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="h-5 w-5 text-orange-500" />
+                Dados do Contrato
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Número do Contrato</Label>
+                  <Input
+                    data-testid="input-numero-novo"
+                    value={formData.numero_contrato || proximoNumero?.proximoNumero || ''}
+                    onChange={(e) => setFormData({ ...formData, numero_contrato: e.target.value })}
+                    placeholder="AUTO"
+                    className="font-mono"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>ID CRM</Label>
+                  <Input
+                    data-testid="input-crm-novo"
+                    value={formData.id_crm}
+                    onChange={(e) => setFormData({ ...formData, id_crm: e.target.value })}
+                    placeholder="ID do deal no CRM"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Cliente *</Label>
+                <Select value={formData.cliente_id?.toString() || ''} onValueChange={(v) => setFormData({ ...formData, cliente_id: parseInt(v) })}>
+                  <SelectTrigger data-testid="select-cliente-novo">
+                    <SelectValue placeholder="Selecione o cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {entidadesData?.entidades.map((e) => (
+                      <SelectItem key={e.id} value={e.id.toString()}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4" />
+                          {e.nome}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Comercial Responsável</Label>
+                  <Input
+                    data-testid="input-comercial-novo"
+                    value={formData.comercial_nome}
+                    onChange={(e) => setFormData({ ...formData, comercial_nome: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>E-mail do Comercial</Label>
+                  <Input
+                    data-testid="input-email-comercial-novo"
+                    type="email"
+                    value={formData.comercial_email}
+                    onChange={(e) => setFormData({ ...formData, comercial_email: e.target.value })}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Datas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileCheck className="h-5 w-5 text-blue-500" />
+                Datas e Vigência
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4 p-4 rounded-xl bg-green-500/5 border border-green-500/10">
+                  <p className="font-medium text-green-600 flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-green-500" />
+                    Serviços Recorrentes
+                  </p>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Início do Serviço</Label>
+                    <Input type="date" value={formData.data_inicio_recorrentes} onChange={(e) => setFormData({ ...formData, data_inicio_recorrentes: e.target.value })} data-testid="input-data-inicio-rec" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Início da Cobrança</Label>
+                    <Input type="date" value={formData.data_inicio_cobranca_recorrentes} onChange={(e) => setFormData({ ...formData, data_inicio_cobranca_recorrentes: e.target.value })} data-testid="input-data-cobranca-rec" />
+                  </div>
+                </div>
+                <div className="space-y-4 p-4 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                  <p className="font-medium text-purple-600 flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-purple-500" />
+                    Serviços Pontuais
+                  </p>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Início do Serviço</Label>
+                    <Input type="date" value={formData.data_inicio_pontuais} onChange={(e) => setFormData({ ...formData, data_inicio_pontuais: e.target.value })} data-testid="input-data-inicio-pont" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Início da Cobrança</Label>
+                    <Input type="date" value={formData.data_inicio_cobranca_pontuais} onChange={(e) => setFormData({ ...formData, data_inicio_cobranca_pontuais: e.target.value })} data-testid="input-data-cobranca-pont" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Serviços */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-purple-500" />
+                Serviços Contratados
+              </CardTitle>
+              <Button onClick={addItem} size="sm" data-testid="button-add-item">
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Serviço
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {itens.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhum serviço adicionado</p>
+                  <p className="text-sm">Clique em "Adicionar Serviço" para começar</p>
+                </div>
+              ) : (
+                itens.map((item, index) => (
+                  <Card key={index} className="p-4 bg-muted/30">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline">{item.modalidade === 'recorrente' ? 'Recorrente' : 'Pontual'}</Badge>
+                        <Button size="icon" variant="ghost" onClick={() => removeItem(index)} data-testid={`button-remove-item-${index}`}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Modalidade</Label>
+                          <Select value={item.modalidade || 'recorrente'} onValueChange={(v) => updateItem(index, 'modalidade', v)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="recorrente">Recorrente</SelectItem>
+                              <SelectItem value="pontual">Pontual</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Serviço</Label>
+                          <Select value={item.servico_id?.toString() || ''} onValueChange={(v) => handleServicoChange(index, parseInt(v))}>
+                            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                            <SelectContent>
+                              {servicosData?.servicos.filter(s => s.ativo).map((s) => (
+                                <SelectItem key={s.id} value={s.id.toString()}>{s.nome}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Plano</Label>
+                          <Select value={item.is_personalizado ? 'personalizado' : item.plano_servico_id?.toString() || ''} onValueChange={(v) => handlePlanoChange(index, v)} disabled={!item.servico_id}>
+                            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="personalizado">Personalizado</SelectItem>
+                              {planosData?.planos.filter(p => p.ativo && p.servico_id === item.servico_id).map((p) => (
+                                <SelectItem key={p.id} value={p.id.toString()}>{p.nome} - {formatCurrency(p.valor)}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      {item.is_personalizado && (
+                        <div className="space-y-2">
+                          <Label className="text-xs">Escopo do Serviço</Label>
+                          <Textarea value={item.escopo || ''} onChange={(e) => updateItem(index, 'escopo', e.target.value)} rows={3} placeholder="Descreva o escopo do serviço personalizado..." />
+                        </div>
+                      )}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Valor Tabela</Label>
+                          <Input type="number" value={item.valor_tabela || ''} onChange={(e) => updateItem(index, 'valor_tabela', parseFloat(e.target.value) || 0)} disabled={!item.is_personalizado} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Valor Negociado</Label>
+                          <Input type="number" value={item.valor_negociado || ''} onChange={(e) => updateItem(index, 'valor_negociado', parseFloat(e.target.value) || 0)} className="border-green-500/50 focus:border-green-500" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Desconto</Label>
+                          <div className="flex items-center h-9 px-3 rounded-md bg-muted">
+                            <span className="text-green-600 font-medium">{(item.desconto_percentual || 0).toFixed(1)}%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Observações */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Observações</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea value={formData.observacoes} onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })} rows={4} placeholder="Observações adicionais sobre o contrato..." data-testid="textarea-obs-novo" />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar - Resumo */}
+        <div className="space-y-6">
+          <Card className="sticky top-6">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-green-500" />
+                Resumo do Contrato
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/10">
+                <p className="text-xs text-muted-foreground mb-1">Recorrente (mensal)</p>
+                <p className="text-2xl font-bold text-green-600">{formatCurrency(totalRecorrente)}</p>
+              </div>
+              <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                <p className="text-xs text-muted-foreground mb-1">Pontual (único)</p>
+                <p className="text-2xl font-bold text-purple-600">{formatCurrency(totalPontual)}</p>
+              </div>
+              <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                <p className="text-xs text-muted-foreground mb-1">Total Geral</p>
+                <p className="text-3xl font-bold text-orange-600">{formatCurrency(totalRecorrente + totalPontual)}</p>
+              </div>
+
+              <div className="pt-4 space-y-2">
+                <p className="text-sm text-muted-foreground">{itens.length} serviço(s) adicionado(s)</p>
+                <Button className="w-full" size="lg" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !formData.cliente_id} data-testid="button-criar-contrato">
+                  {createMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileCheck className="h-4 w-4 mr-2" />}
+                  Criar Contrato
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ContratosModule() {
   usePageTitle("Contratos");
   useSetPageInfo("Contratos", "Gestão de entidades e contratos");
@@ -1902,31 +2454,67 @@ export default function ContratosModule() {
   return (
     <div className="p-6 space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3 w-fit" data-testid="tabs-contratos">
-          <TabsTrigger value="dashboard" data-testid="tab-dashboard">
-            <FileText className="mr-2 h-4 w-4" />
-            Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="entidades" data-testid="tab-entidades">
-            <Users className="mr-2 h-4 w-4" />
-            Entidades
-          </TabsTrigger>
-          <TabsTrigger value="contratos" data-testid="tab-contratos">
-            <Briefcase className="mr-2 h-4 w-4" />
-            Contratos
-          </TabsTrigger>
-        </TabsList>
+        <Card className="mb-6 bg-gradient-to-r from-background via-muted/30 to-background border-muted/50">
+          <CardContent className="p-2">
+            <TabsList className="w-full grid grid-cols-4 gap-2 bg-transparent h-auto p-0" data-testid="tabs-contratos">
+              <TabsTrigger 
+                value="dashboard" 
+                data-testid="tab-dashboard"
+                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200"
+              >
+                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <span className="font-medium text-sm">Dashboard</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="entidades" 
+                data-testid="tab-entidades"
+                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200"
+              >
+                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
+                  <Users className="h-5 w-5" />
+                </div>
+                <span className="font-medium text-sm">Entidades</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="contratos" 
+                data-testid="tab-contratos"
+                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200"
+              >
+                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
+                  <Briefcase className="h-5 w-5" />
+                </div>
+                <span className="font-medium text-sm">Contratos</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="novo" 
+                data-testid="tab-novo-contrato"
+                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200"
+              >
+                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
+                  <Plus className="h-5 w-5" />
+                </div>
+                <span className="font-medium text-sm">Novo Contrato</span>
+              </TabsTrigger>
+            </TabsList>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="dashboard" className="mt-6">
+        <TabsContent value="dashboard" className="mt-0">
           <DashboardTab />
         </TabsContent>
 
-        <TabsContent value="entidades" className="mt-6">
+        <TabsContent value="entidades" className="mt-0">
           <EntidadesTab />
         </TabsContent>
 
-        <TabsContent value="contratos" className="mt-6">
+        <TabsContent value="contratos" className="mt-0">
           <ContratosTab />
+        </TabsContent>
+
+        <TabsContent value="novo" className="mt-0">
+          <NovoContratoTab onSuccess={() => setActiveTab("contratos")} />
         </TabsContent>
       </Tabs>
     </div>
