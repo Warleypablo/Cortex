@@ -53,6 +53,7 @@ import {
   Eye,
   X,
   ExternalLink,
+  Download,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1653,12 +1654,25 @@ function ContratosTab() {
                       )}
                     </div>
                   </div>
-                  <Badge 
-                    variant="outline" 
-                    className={`${statusColors[contratoDetail.status] || 'bg-gray-500/10'} text-base px-4 py-1`}
-                  >
-                    {statusLabels[contratoDetail.status] || contratoDetail.status}
-                  </Badge>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        window.open(`/api/contratos/${contratoDetail.id}/gerar-pdf`, '_blank');
+                      }}
+                      data-testid="button-gerar-pdf"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Gerar PDF
+                    </Button>
+                    <Badge 
+                      variant="outline" 
+                      className={`${statusColors[contratoDetail.status] || 'bg-gray-500/10'} text-base px-4 py-1`}
+                    >
+                      {statusLabels[contratoDetail.status] || contratoDetail.status}
+                    </Badge>
+                  </div>
                 </div>
               </div>
 
