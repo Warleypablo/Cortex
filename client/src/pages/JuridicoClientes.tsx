@@ -62,6 +62,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { SiWhatsapp } from "react-icons/si";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -127,6 +128,18 @@ const formatDate = (date: string | null) => {
   } catch {
     return "-";
   }
+};
+
+const formatPhoneForWhatsApp = (phone: string | null): string | null => {
+  if (!phone) return null;
+  let cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('0')) {
+    cleaned = cleaned.substring(1);
+  }
+  if (cleaned.length >= 10 && !cleaned.startsWith('55')) {
+    cleaned = '55' + cleaned;
+  }
+  return cleaned.length >= 12 ? cleaned : null;
 };
 
 const PROCEDIMENTOS = [
@@ -814,6 +827,24 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                             {status.label}
                           </Badge>
                         )}
+                        
+                        {(() => {
+                          const whatsappNumber = formatPhoneForWhatsApp(item.cliente.telefone);
+                          if (whatsappNumber) {
+                            return (
+                              <Button 
+                                size="lg"
+                                className="bg-green-600 hover:bg-green-700 text-white font-medium"
+                                onClick={() => window.open(`https://wa.me/${whatsappNumber}`, '_blank')}
+                                data-testid={`button-whatsapp-${index}`}
+                              >
+                                <SiWhatsapp className="h-4 w-4 mr-2" />
+                                WhatsApp
+                              </Button>
+                            );
+                          }
+                          return null;
+                        })()}
                         
                         <Button 
                           size="lg"
