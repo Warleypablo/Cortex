@@ -287,6 +287,69 @@ export default function FluxoCaixa() {
           </div>
         )}
 
+        {/* Provisão Mensal */}
+        <Card className="mb-6 border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-purple-500/10" data-testid="card-provisao-mensal">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-purple-500" />
+              <CardTitle className="text-base">Provisão Mensal - {periodoLabel}</CardTitle>
+            </div>
+            <CardDescription>Projeção de geração de caixa considerando inadimplência de 6%</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingInsights ? (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-20" />)}
+              </div>
+            ) : (() => {
+              const entradasPrevistas = insightsPeriodo?.entradasPeriodo || 0;
+              const saidasPrevistas = insightsPeriodo?.saidasPeriodo || 0;
+              const inadimplenciaPrevista = entradasPrevistas * 0.06;
+              const geracaoCaixaPrevista = entradasPrevistas - saidasPrevistas - inadimplenciaPrevista;
+              const margemPrevista = entradasPrevistas > 0 ? (geracaoCaixaPrevista / entradasPrevistas) * 100 : 0;
+              
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Entradas Previstas</p>
+                    <p className="text-lg font-bold text-green-600" data-testid="text-entradas-previstas">
+                      {formatCurrency(entradasPrevistas)}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Saídas Previstas</p>
+                    <p className="text-lg font-bold text-red-600" data-testid="text-saidas-previstas">
+                      {formatCurrency(saidasPrevistas)}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Inadimplência (6%)</p>
+                    <p className="text-lg font-bold text-amber-600" data-testid="text-inadimplencia-prevista">
+                      -{formatCurrency(inadimplenciaPrevista)}
+                    </p>
+                  </div>
+                  
+                  <div className={`p-4 rounded-lg border ${geracaoCaixaPrevista >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Geração de Caixa</p>
+                    <p className={`text-lg font-bold ${geracaoCaixaPrevista >= 0 ? 'text-emerald-600' : 'text-red-600'}`} data-testid="text-geracao-caixa">
+                      {formatCurrency(geracaoCaixaPrevista)}
+                    </p>
+                  </div>
+                  
+                  <div className={`p-4 rounded-lg border ${margemPrevista >= 0 ? 'bg-purple-500/10 border-purple-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Margem Prevista</p>
+                    <p className={`text-lg font-bold ${margemPrevista >= 0 ? 'text-purple-600' : 'text-red-600'}`} data-testid="text-margem-prevista">
+                      {margemPrevista.toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+
         {/* Contas Bancárias */}
         <Card className="mb-6" data-testid="card-contas-bancos">
           <CardHeader className="pb-3">
