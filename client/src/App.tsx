@@ -73,6 +73,7 @@ const Avisos = lazy(() => import("@/pages/Avisos"));
 const AdminHealth = lazy(() => import("@/pages/AdminHealth"));
 const AdminOverrides = lazy(() => import("@/pages/AdminOverrides"));
 const Sugestoes = lazy(() => import("@/pages/Sugestoes"));
+const ContratosModule = lazy(() => import("@/pages/ContratosModule"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -185,6 +186,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/revenue-goals">{() => <ProtectedRoute path="/dashboard/revenue-goals" component={RevenueGoals} />}</Route>
       <Route path="/dashboard/inadimplencia">{() => <ProtectedRoute path="/dashboard/inadimplencia" component={DashboardInadimplencia} />}</Route>
       <Route path="/dashboard/auditoria-sistemas">{() => <ProtectedRoute path="/dashboard/auditoria-sistemas" component={AuditoriaSistemas} />}</Route>
+      <Route path="/contratos-module">{() => <ProtectedRoute path="/contratos-module" component={ContratosModule} />}</Route>
       
       {/* G&G */}
       <Route path="/dashboard/geg">{() => <ProtectedRoute path="/dashboard/geg" component={DashboardGeG} />}</Route>
