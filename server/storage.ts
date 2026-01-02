@@ -186,6 +186,8 @@ export interface IStorage {
   getContasBancos(): Promise<ContaBanco[]>;
   getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<FluxoCaixaDiarioCompleto[]>;
   getFluxoDiaDetalhe(data: string): Promise<{ entradas: any[]; saidas: any[]; totalEntradas: number; totalSaidas: number; saldo: number }>;
+  getDfcSnapshot(mesAno: string): Promise<import("@shared/schema").DfcSnapshot | null>;
+  createDfcSnapshot(mesAno: string): Promise<import("@shared/schema").DfcSnapshot>;
   getFluxoCaixaInsights(): Promise<FluxoCaixaInsights>;
   getFluxoCaixaInsightsPeriodo(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaInsightsPeriodo>;
   getCohortRetention(filters?: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<CohortRetentionData>;
@@ -589,6 +591,14 @@ export class MemStorage implements IStorage {
   }
 
   async getFluxoDiaDetalhe(data: string): Promise<{ entradas: any[]; saidas: any[]; totalEntradas: number; totalSaidas: number; saldo: number }> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getDfcSnapshot(mesAno: string): Promise<import("@shared/schema").DfcSnapshot | null> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async createDfcSnapshot(mesAno: string): Promise<import("@shared/schema").DfcSnapshot> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -2969,6 +2979,82 @@ export class DbStorage implements IStorage {
       totalEntradas,
       totalSaidas,
       saldo: totalEntradas - totalSaidas,
+    };
+  }
+
+  async getDfcSnapshot(mesAno: string): Promise<import("@shared/schema").DfcSnapshot | null> {
+    const result = await db.execute(sql`
+      SELECT mes_ano, data_snapshot, saldo_inicial, dados_diarios
+      FROM staging.dfc_snapshots
+      WHERE mes_ano = ${mesAno}
+    `);
+    
+    if (result.rows.length === 0) return null;
+    
+    const row = result.rows[0] as any;
+    return {
+      mesAno: row.mes_ano,
+      dataSnapshot: new Date(row.data_snapshot),
+      saldoInicial: parseFloat(row.saldo_inicial || '0'),
+      dadosDiarios: row.dados_diarios || [],
+    };
+  }
+
+  async createDfcSnapshot(mesAno: string): Promise<import("@shared/schema").DfcSnapshot> {
+    const [ano, mes] = mesAno.split('-').map(Number);
+    const dataInicio = new Date(ano, mes - 1, 1).toISOString().split('T')[0];
+    const dataFim = new Date(ano, mes, 0).toISOString().split('T')[0];
+    
+    const saldoAtual = await this.getSaldoAtualBancos();
+    
+    const result = await db.execute(sql`
+      WITH dates AS (
+        SELECT generate_series(
+          ${dataInicio}::date,
+          ${dataFim}::date,
+          '1 day'::interval
+        )::date as data
+      ),
+      daily_transactions AS (
+        SELECT 
+          data_vencimento::date as data,
+          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas
+        FROM caz_parcelas
+        WHERE tipo_evento IN ('RECEITA', 'DESPESA')
+          AND status NOT IN ('QUITADO', 'PERDIDO')
+          AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+        GROUP BY data_vencimento::date
+      )
+      SELECT 
+        TO_CHAR(d.data, 'YYYY-MM-DD') as data,
+        COALESCE(dt.entradas, 0) as entradas,
+        COALESCE(dt.saidas, 0) as saidas
+      FROM dates d
+      LEFT JOIN daily_transactions dt ON d.data = dt.data
+      ORDER BY d.data
+    `);
+    
+    const dadosDiarios = (result.rows as any[]).map((row: any) => ({
+      data: row.data,
+      entradas: parseFloat(row.entradas || '0'),
+      saidas: parseFloat(row.saidas || '0'),
+    }));
+    
+    await db.execute(sql`
+      INSERT INTO staging.dfc_snapshots (mes_ano, saldo_inicial, dados_diarios)
+      VALUES (${mesAno}, ${saldoAtual.saldoTotal}, ${JSON.stringify(dadosDiarios)}::jsonb)
+      ON CONFLICT (mes_ano) DO UPDATE SET
+        saldo_inicial = ${saldoAtual.saldoTotal},
+        dados_diarios = ${JSON.stringify(dadosDiarios)}::jsonb,
+        data_snapshot = NOW()
+    `);
+    
+    return {
+      mesAno,
+      dataSnapshot: new Date(),
+      saldoInicial: saldoAtual.saldoTotal,
+      dadosDiarios,
     };
   }
 
