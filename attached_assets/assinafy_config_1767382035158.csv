@@ -1,0 +1,2 @@
+"id","account_id","api_key","api_url","webhook_url","webhook_secret","ativo","data_cadastro","data_atualizacao"
+"1","ffaee2469fa51a647e2f2796e4a","Uo3ew1It7z-GyxjXftmqp8XEy0cgGV243R8YfBIvNhv4zR1Q5odhx2hhXP7roOxs","https://api.assinafy.com.br/v1","https://contratos.turbopartners.com.br/api/assinafy_webhook.php",NULL,"1","2025-09-25 15:36:43","2025-09-25 23:04:34"
