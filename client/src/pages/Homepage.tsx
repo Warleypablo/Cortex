@@ -452,6 +452,8 @@ function DashboardAdmin() {
     mrr: number;
     aquisicaoMrr: number;
     aquisicaoPontual: number;
+    aquisicaoPontualCommerce: number;
+    aquisicaoPontualTech: number;
     churn: number;
     pausados: number;
   }>({
@@ -493,9 +495,10 @@ function DashboardAdmin() {
   const mrrTotal = visaoGeralData?.mrr || 0;
   const aquisicaoMrr = visaoGeralData?.aquisicaoMrr || 0;
   const aquisicaoPontual = visaoGeralData?.aquisicaoPontual || 0;
+  const aquisicaoPontualCommerce = visaoGeralData?.aquisicaoPontualCommerce || 0;
+  const aquisicaoPontualTech = visaoGeralData?.aquisicaoPontualTech || 0;
   const churn = visaoGeralData?.churn || 0;
   
-  const aquisicaoPontualPercent = mrrTotal > 0 ? (aquisicaoPontual / mrrTotal) * 100 : 0;
   const churnPercent = mrrTotal > 0 ? (churn / mrrTotal) * 100 : 0;
   
   // Dados globais da empresa (todos os contratos/clientes ativos)
@@ -540,14 +543,19 @@ function DashboardAdmin() {
       href: "/dashboard/comercial/closers",
     },
     {
-      title: "Aquisição Pontual",
-      subtitle: "Vendas pontuais no mês",
-      value: formatCurrency(aquisicaoPontual),
+      title: "Pontual Commerce",
+      subtitle: "Vendas pontuais E-commerce",
+      value: formatCurrency(aquisicaoPontualCommerce),
       icon: Target,
-      badge: aquisicaoPontual ? {
-        text: "+8.3%",
-        isPositive: true,
-      } : undefined,
+      badge: undefined,
+      href: "/visao-geral",
+    },
+    {
+      title: "Pontual Tech",
+      subtitle: "Vendas pontuais Tech",
+      value: formatCurrency(aquisicaoPontualTech),
+      icon: Target,
+      badge: undefined,
       href: "/visao-geral",
     },
     {
@@ -567,7 +575,7 @@ function DashboardAdmin() {
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold mb-4">Indicadores Principais</h2>
-        <KpiCardGrid cards={kpiCards} columns={5} />
+        <KpiCardGrid cards={kpiCards} columns={3} />
       </div>
 
       {/* Widgets personalizados */}
