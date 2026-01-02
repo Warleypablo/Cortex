@@ -1190,22 +1190,66 @@ export function registerContratosRoutes(app: Express) {
       const config = configResult.rows[0] as { api_key: string; api_url: string };
       const downloadUrl = `${config.api_url}/documents/${documentId}/download/certificated`;
       
-      // Fazer requisição autenticada ao Assinafy
-      const response = await fetch(downloadUrl, {
+      console.log("[assinafy] Attempting download from:", downloadUrl);
+      
+      // Tentar diferentes métodos de autenticação
+      // Método 1: API Key como query parameter
+      const urlWithKey = `${downloadUrl}?api_key=${config.api_key}`;
+      
+      let response = await fetch(urlWithKey, {
         headers: {
-          'Authorization': `Bearer ${config.api_key}`,
-          'Accept': 'application/pdf'
+          'Accept': '*/*'
         }
       });
       
+      // Se falhar, tentar com header X-API-Key
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("[assinafy] Download error:", response.status, errorText);
-        return res.status(response.status).json({ error: "Erro ao baixar documento", details: errorText });
+        console.log("[assinafy] Query param auth failed, trying X-API-Key header");
+        response = await fetch(downloadUrl, {
+          headers: {
+            'X-API-Key': config.api_key,
+            'Accept': '*/*'
+          }
+        });
       }
       
-      // Definir headers para download do PDF
-      res.setHeader('Content-Type', 'application/pdf');
+      // Se ainda falhar, tentar com Authorization Bearer
+      if (!response.ok) {
+        console.log("[assinafy] X-API-Key header failed, trying Bearer token");
+        response = await fetch(downloadUrl, {
+          headers: {
+            'Authorization': `Bearer ${config.api_key}`,
+            'Accept': '*/*'
+          }
+        });
+      }
+      
+      // Se ainda falhar, tentar com Authorization sem Bearer
+      if (!response.ok) {
+        console.log("[assinafy] Bearer failed, trying simple Authorization");
+        response = await fetch(downloadUrl, {
+          headers: {
+            'Authorization': config.api_key,
+            'Accept': '*/*'
+          }
+        });
+      }
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[assinafy] All auth methods failed. Status:", response.status, "Response:", errorText);
+        return res.status(response.status).json({ 
+          error: "Erro ao baixar documento", 
+          details: errorText,
+          hint: "A API do Assinafy pode requerer um método de autenticação diferente. Verifique a documentação."
+        });
+      }
+      
+      // Obter o content-type da resposta original
+      const contentType = response.headers.get('content-type') || 'application/pdf';
+      
+      // Definir headers para download
+      res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Disposition', `inline; filename="contrato-${documentId}.pdf"`);
       
       // Stream do PDF para o cliente
@@ -1214,7 +1258,7 @@ export function registerContratosRoutes(app: Express) {
       
     } catch (error: any) {
       console.error("[assinafy] Download error:", error);
-      res.status(500).json({ error: "Erro ao baixar documento" });
+      res.status(500).json({ error: "Erro ao baixar documento", details: error.message });
     }
   });
 }
