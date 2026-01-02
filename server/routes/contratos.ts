@@ -1293,7 +1293,7 @@ export function registerContratosRoutes(app: Express) {
     }
   });
 
-  // Endpoint para gerar PDF do contrato
+  // Endpoint para gerar PDF do contrato - Modelo Profissional Turbo Partners
   app.get("/api/contratos/:id/gerar-pdf", isAuthenticated, async (req, res) => {
     try {
       const contratoId = parseInt(req.params.id);
@@ -1314,9 +1314,10 @@ export function registerContratosRoutes(app: Express) {
 
       const contrato = contratoResult.rows[0] as any;
 
-      // Buscar itens do contrato
+      // Buscar itens do contrato com escopo e diretrizes
       const itensResult = await db.execute(sql`
-        SELECT ci.*, ps.nome as plano_nome, ps.escopo as plano_escopo, s.nome as servico_nome
+        SELECT ci.*, ps.nome as plano_nome, ps.escopo as plano_escopo, ps.diretrizes as plano_diretrizes,
+               s.nome as servico_nome
         FROM staging.contratos_itens ci
         LEFT JOIN staging.planos_servicos ps ON ci.plano_servico_id = ps.id
         LEFT JOIN staging.servicos s ON ps.servico_id = s.id
@@ -1329,29 +1330,22 @@ export function registerContratosRoutes(app: Express) {
       // Criar documento PDF
       const doc = new PDFDocument({
         size: 'A4',
-        margins: { top: 50, bottom: 50, left: 50, right: 50 }
+        margins: { top: 80, bottom: 100, left: 50, right: 50 },
+        bufferPages: true
       });
 
       // Configurar resposta
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="contrato-${contrato.numero_contrato || contratoId}.pdf"`);
+      res.setHeader('Content-Disposition', `inline; filename="Turbo_-_${contrato.numero_contrato}_${(contrato.cliente_nome || 'Cliente').replace(/\s+/g, '_')}.pdf"`);
 
       // Tratamento de erros para abort do cliente
       let aborted = false;
-      
-      const checkAborted = (): boolean => {
-        if (aborted) return true;
-        return false;
-      };
+      const checkAborted = (): boolean => aborted;
 
       res.on('close', () => {
         if (!res.writableEnded) {
           aborted = true;
-          try {
-            (doc as any).destroy?.();
-          } catch (e) {
-            // Ignore destroy errors
-          }
+          try { (doc as any).destroy?.(); } catch (e) {}
         }
       });
 
@@ -1365,208 +1359,417 @@ export function registerContratosRoutes(app: Express) {
       });
 
       doc.pipe(res);
-
-      // Verificar abort antes de continuar
       if (checkAborted()) return;
 
       // Dados fixos da Turbo Partners
-      const turboPartners = {
-        nome: "TURBO PARTNERS ASSESSORIA DE MARKETING LTDA",
-        cnpj: "35.176.040/0001-26",
-        endereco: "Avenida Euclides da Cunha, 1475, Sala 1011",
-        bairro: "Graça",
-        cidade: "Salvador",
-        estado: "BA",
-        cep: "40150-121",
+      const turbo = {
+        nome: "TURBO PARTNERS LTDA",
+        cnpj: "42.100.292/0001-84",
+        socio: "RODRIGO QUEIROZ SANTOS",
+        cpf_socio: "141.802.967-05",
+        endereco: "R. Maria de Lourdes García, 228 - Ilha de Santa Maria, Vitória - ES, 29053-310",
+        telefone: "(27) 9979-69628",
         email: "contato@turbopartners.com.br",
         site: "www.turbopartners.com.br"
       };
 
       // Formatadores
-      const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
-      };
-
+      const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
       const formatDate = (date: string | Date | null) => {
         if (!date) return '___/___/______';
-        const d = new Date(date);
-        return d.toLocaleDateString('pt-BR');
+        return new Date(date).toLocaleDateString('pt-BR');
+      };
+      const hoje = formatDate(new Date());
+      const numeroContrato = contrato.numero_contrato || `CT-${String(contratoId).padStart(6, '0')}`;
+
+      // Cores
+      const corPrimaria = '#1a365d';
+      const corSecundaria = '#2d5282';
+
+      // Função para adicionar header em cada página
+      const addHeader = () => {
+        const savedY = doc.y;
+        doc.save();
+        
+        // Título principal
+        doc.fontSize(14).font('Helvetica-Bold').fillColor(corPrimaria)
+          .text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', 50, 25, { align: 'center', width: 495 });
+        
+        // Número do contrato e data
+        doc.fontSize(9).font('Helvetica').fillColor('#333')
+          .text(`Contrato Nº ${numeroContrato}`, 350, 45, { width: 195, align: 'right' })
+          .text(hoje, 350, 57, { width: 195, align: 'right' })
+          .text(turbo.email, 350, 69, { width: 195, align: 'right' });
+        
+        doc.restore();
+        doc.y = savedY;
       };
 
-      // Cabeçalho
-      doc.fontSize(18).font('Helvetica-Bold').text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
-      doc.moveDown(0.5);
-      doc.fontSize(12).font('Helvetica').text(`Contrato N° ${contrato.numero_contrato || `CT-${String(contratoId).padStart(6, '0')}`}`, { align: 'center' });
-      doc.moveDown(2);
+      // Função para adicionar footer em cada página
+      const addFooter = (pageNum: number, totalPages: number) => {
+        doc.save();
+        const footerY = 750;
+        
+        // Linha separadora
+        doc.moveTo(50, footerY - 10).lineTo(545, footerY - 10).strokeColor('#ccc').stroke();
+        
+        // Info esquerda
+        doc.fontSize(8).font('Helvetica-Bold').fillColor('#333')
+          .text(turbo.nome, 50, footerY)
+          .font('Helvetica').text(`CNPJ: ${turbo.cnpj}`, 50, footerY + 10);
+        
+        // Centro
+        doc.font('Helvetica-Bold').text('DOCUMENTO OFICIAL', 230, footerY, { width: 135, align: 'center' })
+          .font('Helvetica').text(`Gerado em ${hoje}`, 230, footerY + 10, { width: 135, align: 'center' });
+        
+        // Direita
+        doc.text(turbo.site, 380, footerY, { width: 165, align: 'right' })
+          .text(`Página ${pageNum} de ${totalPages}`, 380, footerY + 10, { width: 165, align: 'right' });
+        
+        // Email e telefone na base
+        doc.text(turbo.email, 50, footerY + 25)
+          .text('(27) 99687-7563', 380, footerY + 25, { width: 165, align: 'right' });
+        
+        doc.restore();
+      };
 
-      // Seção 1 - Identificação das Partes
-      doc.fontSize(12).font('Helvetica-Bold').text('1. IDENTIFICAÇÃO DAS PARTES', { underline: true });
-      doc.moveDown(0.5);
+      // ======= PÁGINA 1: PARTES CONTRATANTES =======
+      doc.y = 90;
 
-      doc.fontSize(10).font('Helvetica-Bold').text('CONTRATADA:');
+      // Seção: PARTES CONTRATANTES com box
+      doc.rect(45, doc.y - 5, 505, 20).fillAndStroke('#f0f4f8', '#ddd');
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(corPrimaria)
+        .text('PARTES CONTRATANTES', 55, doc.y);
+      doc.y += 25;
+
+      // Layout duas colunas lado a lado
+      const colLeft = 50;
+      const colRight = 300;
+      const colWidth = 240;
+      const lineHeight = 12;
+      let currentY = doc.y;
+
+      // Desenhar ambas as colunas simultaneamente
+      // Coluna esquerda: CONTRATADO
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
+        .text('CONTRATADO:', colLeft, currentY);
+      currentY += lineHeight + 5;
+      
+      const contratadoStartY = currentY;
+      doc.font('Helvetica-Bold').text(turbo.nome, colLeft, currentY, { width: colWidth - 10 });
+      currentY = doc.y;
       doc.font('Helvetica')
-        .text(`Razão Social: ${turboPartners.nome}`)
-        .text(`CNPJ: ${turboPartners.cnpj}`)
-        .text(`Endereço: ${turboPartners.endereco}, ${turboPartners.bairro}`)
-        .text(`Cidade: ${turboPartners.cidade}/${turboPartners.estado} - CEP: ${turboPartners.cep}`)
-        .text(`E-mail: ${turboPartners.email}`);
-      doc.moveDown();
+        .text(`CNPJ: ${turbo.cnpj}`, colLeft, currentY, { width: colWidth - 10 });
+      currentY = doc.y;
+      doc.text(`Sócio: ${turbo.socio}, CPF: ${turbo.cpf_socio}`, colLeft, currentY, { width: colWidth - 10 });
+      currentY = doc.y;
+      doc.text(`Endereço: ${turbo.endereco}`, colLeft, currentY, { width: colWidth - 10 });
+      currentY = doc.y;
+      doc.text(`Telefone: ${turbo.telefone}`, colLeft, currentY, { width: colWidth - 10 });
+      currentY = doc.y;
+      doc.text(`E-mail: rodrigo.queiroz@turbopartners.com.br`, colLeft, currentY, { width: colWidth - 10 });
+      const leftEndY = doc.y;
 
-      doc.font('Helvetica-Bold').text('CONTRATANTE:');
-      const clienteEndereco = [contrato.endereco, contrato.numero, contrato.complemento].filter(Boolean).join(', ');
+      // Coluna direita: CONTRATANTE (resetar Y para o início)
+      currentY = doc.y = contratadoStartY - lineHeight - 5;
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
+        .text('CONTRATANTE:', colRight, currentY);
+      currentY += lineHeight + 5;
+      
+      doc.font('Helvetica-Bold').text(contrato.cliente_nome || '________________________', colRight, currentY, { width: colWidth - 10 });
+      currentY = doc.y;
       doc.font('Helvetica')
-        .text(`${contrato.tipo_pessoa === 'juridica' ? 'Razão Social' : 'Nome'}: ${contrato.cliente_nome || '___________________'}`)
-        .text(`${contrato.tipo_pessoa === 'juridica' ? 'CNPJ' : 'CPF'}: ${contrato.cpf_cnpj || '___________________'}`)
-        .text(`Endereço: ${clienteEndereco || '___________________'}, ${contrato.bairro || '___________________'}`)
-        .text(`Cidade: ${contrato.cidade || '___________________'}/${contrato.estado || '__'} - CEP: ${contrato.cep || '___________________'}`)
-        .text(`E-mail: ${contrato.email || '___________________'}`)
-        .text(`Telefone: ${contrato.telefone || '___________________'}`);
+        .text(`${contrato.tipo_pessoa === 'juridica' ? 'CNPJ' : 'CPF'}: ${contrato.cpf_cnpj || '________________________'}`, colRight, currentY, { width: colWidth - 10 });
+      currentY = doc.y;
       
       if (contrato.tipo_pessoa === 'juridica' && contrato.nome_socio) {
-        doc.text(`Representante Legal: ${contrato.nome_socio}`)
-           .text(`CPF do Representante: ${contrato.cpf_socio || '___________________'}`);
+        doc.text(`Representante Legal: ${contrato.nome_socio}, CPF: ${contrato.cpf_socio || '___________'}`, colRight, currentY, { width: colWidth - 10 });
+        currentY = doc.y;
       }
-      doc.moveDown(1.5);
+      
+      const enderecoCliente = [contrato.endereco, contrato.numero, contrato.complemento, contrato.bairro, contrato.cidade, contrato.estado].filter(Boolean).join(', ');
+      doc.text(`Endereço: ${enderecoCliente || '________________________'}`, colRight, currentY, { width: colWidth - 10 });
+      currentY = doc.y;
+      doc.text(`Telefone: ${contrato.telefone || '________________________'}`, colRight, currentY, { width: colWidth - 10 });
+      currentY = doc.y;
+      doc.text(`E-mail: ${contrato.email || '________________________'}`, colRight, currentY, { width: colWidth - 10 });
+      const rightEndY = doc.y;
+
+      doc.y = Math.max(leftEndY, rightEndY) + 30;
 
       if (checkAborted()) return;
 
-      // Seção 2 - Objeto do Contrato
-      doc.fontSize(12).font('Helvetica-Bold').text('2. OBJETO DO CONTRATO', { underline: true });
-      doc.moveDown(0.5);
-      doc.fontSize(10).font('Helvetica')
-        .text('O presente contrato tem por objeto a prestação de serviços de marketing digital e assessoria pela CONTRATADA à CONTRATANTE, conforme especificações abaixo:', { align: 'justify' });
-      doc.moveDown();
+      // ======= SEÇÃO: SERVIÇOS CONTRATADOS =======
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(corPrimaria)
+        .text('SERVIÇOS CONTRATADOS', 50, doc.y);
+      doc.moveTo(50, doc.y + 15).lineTo(200, doc.y + 15).strokeColor(corPrimaria).lineWidth(2).stroke();
+      doc.y += 25;
 
-      // Tabela de serviços com suporte a paginação
+      // Modalidade e datas
+      const modalidade = contrato.modalidade || 'RECORRENTE';
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#333')
+        .text(`MODALIDADE ${modalidade.toUpperCase()}`, 50, doc.y);
+      doc.font('Helvetica').fontSize(9)
+        .text(`Início do Serviço: ${formatDate(contrato.data_inicio_recorrentes)} | Primeiro Vencimento: ${formatDate(contrato.data_inicio_cobranca_recorrentes || contrato.data_inicio_recorrentes)} | Método de Pagamento: ${contrato.met_cob_recorrente || 'Boleto'}`, 50, doc.y + 15);
+      doc.y += 40;
+
+      // Tabela de serviços
       if (itens.length > 0) {
-        const colWidths = [150, 180, 80, 80];
-        const startX = 50;
-        const rowHeight = 20;
-        const pageHeight = 792;
-        const marginBottom = 50;
-        const maxY = pageHeight - marginBottom - 30;
+        const tableX = 50;
+        const tableWidth = 495;
+        
+        // Header da tabela
+        doc.rect(tableX, doc.y, tableWidth, 22).fillAndStroke('#f5f5f5', '#ddd');
+        doc.fillColor('#333').font('Helvetica-Bold').fontSize(9);
+        doc.text('Serviço/Plano', tableX + 10, doc.y + 6, { width: 200 });
+        doc.text('Valor Negociado', tableX + 220, doc.y + 6, { width: 120, align: 'center' });
+        doc.text('Detalhes', tableX + 350, doc.y + 6, { width: 135, align: 'center' });
+        doc.y += 22;
 
-        const drawTableHeader = () => {
-          doc.font('Helvetica-Bold').fontSize(9);
-          doc.rect(startX, doc.y, 490, 20).fillAndStroke('#f0f0f0', '#333');
-          doc.fillColor('#000');
-          const headerY = doc.y + 5;
-          doc.text('Serviço', startX + 5, headerY, { width: colWidths[0] });
-          doc.text('Plano/Descrição', startX + colWidths[0] + 5, headerY, { width: colWidths[1] });
-          doc.text('Qtd', startX + colWidths[0] + colWidths[1] + 5, headerY, { width: colWidths[2], align: 'center' });
-          doc.text('Valor', startX + colWidths[0] + colWidths[1] + colWidths[2] + 5, headerY, { width: colWidths[3], align: 'right' });
-          doc.y += 20;
-        };
-
-        drawTableHeader();
-        doc.font('Helvetica').fontSize(9);
         let totalContrato = 0;
 
         for (const item of itens) {
           if (checkAborted()) return;
           
-          if (doc.y + rowHeight > maxY) {
+          const valorItem = parseFloat(item.valor_negociado) || parseFloat(item.valor_original) || 0;
+          totalContrato += valorItem;
+          
+          const servicoNome = `${item.servico_nome || ''} - ${item.plano_nome || item.descricao || 'Personalizado'}`;
+          const detalhes = item.observacoes || '';
+          
+          // Calcular altura da linha
+          const rowHeight = Math.max(25, doc.heightOfString(servicoNome, { width: 200 }) + 10);
+          
+          // Verificar se precisa nova página
+          if (doc.y + rowHeight > 700) {
             doc.addPage();
-            drawTableHeader();
-            doc.font('Helvetica').fontSize(9);
+            addHeader();
+            doc.y = 90;
           }
 
-          const rowY = doc.y;
-          doc.rect(startX, rowY, 490, rowHeight).stroke('#ccc');
+          doc.rect(tableX, doc.y, tableWidth, rowHeight).stroke('#ddd');
+          doc.fillColor('#333').font('Helvetica').fontSize(9);
+          doc.text(servicoNome, tableX + 10, doc.y + 6, { width: 200 });
+          doc.text(formatCurrency(valorItem), tableX + 220, doc.y + 6, { width: 120, align: 'center' });
+          doc.text(detalhes, tableX + 350, doc.y + 6, { width: 135, align: 'center' });
           
-          doc.text(item.servico_nome || '-', startX + 5, rowY + 5, { width: colWidths[0] });
-          doc.text(item.plano_nome || item.descricao || '-', startX + colWidths[0] + 5, rowY + 5, { width: colWidths[1] });
-          doc.text(String(item.quantidade || 1), startX + colWidths[0] + colWidths[1] + 5, rowY + 5, { width: colWidths[2], align: 'center' });
-          
-          const valorItem = (parseFloat(item.valor_negociado) || parseFloat(item.valor_unitario) || 0) * (item.quantidade || 1);
-          totalContrato += valorItem;
-          doc.text(formatCurrency(valorItem), startX + colWidths[0] + colWidths[1] + colWidths[2] + 5, rowY + 5, { width: colWidths[3], align: 'right' });
-          
-          doc.y = rowY + rowHeight;
+          doc.y += rowHeight;
         }
 
-        if (doc.y + 30 > maxY) {
-          doc.addPage();
-        }
-
-        const totalY = doc.y;
-        doc.rect(startX, totalY, 490, 25).fillAndStroke('#e8e8e8', '#333');
-        doc.fillColor('#000').font('Helvetica-Bold');
-        doc.text('VALOR TOTAL MENSAL:', startX + 5, totalY + 7, { width: 400 });
-        doc.text(formatCurrency(totalContrato), startX + colWidths[0] + colWidths[1] + colWidths[2] + 5, totalY + 7, { width: colWidths[3], align: 'right' });
-        
-        doc.y = totalY + 35;
+        // Total
+        doc.rect(tableX, doc.y, tableWidth, 25).fillAndStroke('#e8f4f8', '#ddd');
+        doc.fillColor(corPrimaria).font('Helvetica-Bold').fontSize(10);
+        doc.text(`VALOR TOTAL: ${formatCurrency(totalContrato)}`, tableX + 10, doc.y + 7, { width: tableWidth - 20, align: 'center' });
+        doc.y += 35;
       }
 
       if (checkAborted()) return;
 
-      // Seção 3 - Escopo detalhado (se houver)
-      const escopos = itens.filter(i => i.plano_escopo || i.escopo_personalizado);
-      if (escopos.length > 0) {
-        doc.addPage();
-        doc.fontSize(12).font('Helvetica-Bold').text('3. ESCOPO DOS SERVIÇOS', { underline: true });
-        doc.moveDown(0.5);
-
-        for (const item of escopos) {
-          if (checkAborted()) return;
-          doc.fontSize(10).font('Helvetica-Bold').text(`${item.servico_nome || ''} - ${item.plano_nome || item.descricao || 'Plano Personalizado'}:`);
-          doc.font('Helvetica').text(item.plano_escopo || item.escopo_personalizado || '', { align: 'justify' });
-          doc.moveDown();
-        }
-      }
-
-      if (checkAborted()) return;
-
-      // Seção de Condições
-      const nextSection = escopos.length > 0 ? 4 : 3;
-      doc.moveDown();
-      doc.fontSize(12).font('Helvetica-Bold').text(`${nextSection}. CONDIÇÕES GERAIS`, { underline: true });
-      doc.moveDown(0.5);
-      doc.fontSize(10).font('Helvetica')
-        .text(`${nextSection}.1. Vigência: O presente contrato entrará em vigor na data de sua assinatura e terá duração de 12 (doze) meses.`, { align: 'justify' })
-        .moveDown(0.3)
-        .text(`${nextSection}.2. Pagamento: O pagamento deverá ser realizado até o dia 10 (dez) de cada mês, mediante boleto bancário ou transferência.`, { align: 'justify' })
-        .moveDown(0.3)
-        .text(`${nextSection}.3. Data de início da prestação: ${formatDate(contrato.data_inicio_recorrentes)}`, { align: 'justify' });
-
-      // Observações
+      // ======= SEÇÃO: CONSIDERAÇÕES =======
       if (contrato.observacoes) {
-        doc.moveDown();
-        doc.fontSize(12).font('Helvetica-Bold').text(`${nextSection + 1}. OBSERVAÇÕES`, { underline: true });
-        doc.moveDown(0.5);
-        doc.fontSize(10).font('Helvetica').text(contrato.observacoes, { align: 'justify' });
+        if (doc.y > 600) {
+          doc.addPage();
+          addHeader();
+          doc.y = 90;
+        }
+
+        doc.fontSize(11).font('Helvetica-Bold').fillColor(corPrimaria)
+          .text('Considerações:', 50, doc.y);
+        doc.y += 15;
+
+        doc.fontSize(9).font('Helvetica').fillColor('#333')
+          .text(contrato.observacoes, 50, doc.y, { width: 495, align: 'justify' });
+        doc.y += 30;
       }
 
       if (checkAborted()) return;
 
-      // Seção de Assinaturas
-      doc.moveDown(2);
-      const sigSection = contrato.observacoes ? nextSection + 2 : nextSection + 1;
-      doc.fontSize(12).font('Helvetica-Bold').text(`${sigSection}. ASSINATURAS`, { underline: true });
-      doc.moveDown();
+      // ======= NOVA PÁGINA: ESCOPO E DIRETRIZES =======
+      const itensComEscopo = itens.filter(i => i.plano_escopo || i.plano_diretrizes || i.escopo);
+      if (itensComEscopo.length > 0) {
+        doc.addPage();
+        addHeader();
+        doc.y = 90;
 
-      doc.fontSize(10).font('Helvetica')
-        .text(`Salvador/BA, ${formatDate(new Date())}`, { align: 'center' });
-      doc.moveDown(2);
+        doc.fontSize(11).font('Helvetica-Bold').fillColor(corPrimaria)
+          .text('ESCOPO E DIRETRIZES DOS SERVIÇOS', 50, doc.y);
+        doc.moveTo(50, doc.y + 15).lineTo(260, doc.y + 15).strokeColor(corPrimaria).lineWidth(2).stroke();
+        doc.y += 30;
+
+        for (const item of itensComEscopo) {
+          if (checkAborted()) return;
+
+          // Verificar espaço
+          if (doc.y > 650) {
+            doc.addPage();
+            addHeader();
+            doc.y = 90;
+          }
+
+          // Box do serviço
+          doc.rect(50, doc.y, 495, 25).fillAndStroke('#f8f9fa', '#e0e0e0');
+          doc.fontSize(10).font('Helvetica-Bold').fillColor(corPrimaria)
+            .text(`Serviço:`, 60, doc.y + 7)
+            .font('Helvetica').fillColor('#333')
+            .text(`${item.servico_nome || ''} - ${item.plano_nome || 'Personalizado'}`, 110, doc.y + 7);
+          doc.y += 30;
+
+          // Escopo
+          const escopo = item.escopo || item.plano_escopo;
+          if (escopo) {
+            doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text('Escopo:', 50, doc.y);
+            doc.y += 12;
+            doc.fontSize(9).font('Helvetica').text(escopo, 50, doc.y, { width: 495, align: 'justify' });
+            doc.y += 15;
+          }
+
+          // Diretrizes
+          if (item.plano_diretrizes) {
+            doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text('Diretrizes:', 50, doc.y);
+            doc.y += 12;
+            doc.fontSize(9).font('Helvetica').text(item.plano_diretrizes, 50, doc.y, { width: 495, align: 'justify' });
+            doc.y += 15;
+          }
+
+          doc.y += 20;
+        }
+      }
+
+      if (checkAborted()) return;
+
+      // ======= NOVA PÁGINA: TURBO MASTER AGREEMENT (TMA) =======
+      doc.addPage();
+      addHeader();
+      doc.y = 90;
+
+      // Título TMA
+      doc.fontSize(14).font('Helvetica-Bold').fillColor(corPrimaria)
+        .text('TURBO MASTER AGREEMENT (TMA)', 50, doc.y, { align: 'center', width: 495 });
+      doc.y += 30;
+
+      // Índice
+      doc.fontSize(11).font('Helvetica-Bold').fillColor('#333').text('ÍNDICE', 50, doc.y, { align: 'center', width: 495 });
+      doc.y += 20;
+
+      const clausulas = [
+        '1. PRELIMINARES DA PARCERIA',
+        '2. ADEQUAÇÃO DO ESCOPO DA PRESTAÇÃO DE SERVIÇO',
+        '3. FASE DE IMPLEMENTAÇÃO',
+        '4. FASE DE EXECUÇÃO',
+        '5. FORMA DE PAGAMENTO',
+        '6. OBRIGAÇÕES DA CONTRATADA',
+        '7. OBRIGAÇÕES DA CONTRATANTE',
+        '8. SIGILO E CONFIDENCIALIDADE',
+        '9. INDEPENDÊNCIA ENTRE OS CONTRATANTES',
+        '10. PROTEÇÃO DE DADOS',
+        '11. COMPLIANCE',
+        '12. CANCELAMENTO DA ASSINATURA',
+        '13. DAS DISPOSIÇÕES GERAIS'
+      ];
+
+      for (const clausula of clausulas) {
+        doc.fontSize(10).font('Helvetica').fillColor('#333').text(clausula, 150, doc.y);
+        doc.y += 15;
+      }
+
+      if (checkAborted()) return;
+
+      // ======= NOVA PÁGINA: CLÁUSULAS CONTRATUAIS =======
+      doc.addPage();
+      addHeader();
+      doc.y = 90;
+
+      doc.fontSize(11).font('Helvetica-Bold').fillColor(corPrimaria)
+        .text('CLÁUSULAS CONTRATUAIS', 50, doc.y);
+      doc.moveTo(50, doc.y + 15).lineTo(195, doc.y + 15).strokeColor(corPrimaria).lineWidth(2).stroke();
+      doc.y += 30;
+
+      // Cláusula 1: PRELIMINARES DA PARCERIA
+      const addClausula = (titulo: string, texto: string) => {
+        if (doc.y > 650) {
+          doc.addPage();
+          addHeader();
+          doc.y = 90;
+        }
+        doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text(titulo, 50, doc.y);
+        doc.y += 15;
+        doc.fontSize(9).font('Helvetica').text(texto, 70, doc.y, { width: 475, align: 'justify' });
+        doc.y += 20;
+      };
+
+      addClausula('PRELIMINARES DA PARCERIA', 
+        '1.1 O presente Termos & Condições tem por objeto a prestação de serviços de marketing digital realizados pela CONTRATADA, nos termos e limites deste instrumento e conforme detalhamento contido no escopo selecionado.\n\n1.2 A metodologia adequada para o CONTRATANTE será indicada pelo Especialista responsável pelo planejamento e estruturação, sempre com a concordância do CONTRATANTE.\n\n1.3 O Método TURBO aplicado na prestação de serviços depende de diversas variáveis para obter sucesso, entre elas, o emprego das melhores técnicas pela CONTRATADA, a participação ativa da CONTRATANTE e a disposição do mercado, não havendo garantia ou promessa integral de êxito sem o envolvimento desses fatores.');
+
+      addClausula('ADEQUAÇÃO DO ESCOPO DA PRESTAÇÃO DE SERVIÇO',
+        '2.1 Considerando que o CONTRATANTE poderá apresentar diferentes necessidades durante o processo de estruturação e expansão no mercado digital, a TURBO conta com diversos planos de atendimento.\n\n2.1.1 A indicação e definição do escopo adequado dependerá da maturidade do CONTRATANTE no mercado digital, das suas necessidades e da adequação do escopo de cada plano.');
+
+      addClausula('FASE DE IMPLEMENTAÇÃO',
+        '3.1 O planejamento e o cronograma de entrega serão definidos em comum acordo entre a CONTRATADA e a CONTRATANTE, na fase de implementação.\n\n3.2 A Fase de Implementação seguirá as etapas: Recolhimento de informações, Reunião de Onboarding e Reunião de Kickoff.');
+
+      addClausula('FASE DE EXECUÇÃO',
+        '4.1 Após o cumprimento das etapas de implementação, o projeto seguirá para a fase de execução, operada pelas entregas acordadas no módulo de cada serviço.\n\nParágrafo Único: A CONTRATADA se declara disponível diariamente, em horário comercial, para esclarecimento de dúvidas através de canal de comunicação de resposta rápida.');
+
+      addClausula('FORMA DE PAGAMENTO',
+        '5.1 O CONTRATANTE deverá pagar à CONTRATADA o valor conforme proposta comercial, de acordo com a periodicidade e forma de pagamento definidas.\n\n5.2 A inadimplência ensejará a suspensão imediata de todas as atividades em curso.\n\n5.3 O valor mensal poderá ser reajustado anualmente com base no IPCA.');
+
+      addClausula('OBRIGAÇÕES DA CONTRATADA',
+        '6.1 Constituem obrigações da CONTRATADA:\na) Estruturar e planejar o plano de ação conforme as necessidades da CONTRATANTE.\nb) Prestar os serviços conforme planejados e aprovados.\nc) Empregar ferramentas de trabalho próprias.\nd) Manter sigilo das informações da CONTRATANTE.');
+
+      addClausula('OBRIGAÇÕES DA CONTRATANTE',
+        '7.1 Constituem obrigações da CONTRATANTE:\na) Fornecer todas as informações relativas ao negócio necessárias à prestação dos serviços.\nb) Participar ativamente do processo de planejamento e execução.\nc) Efetuar os pagamentos devidos na forma e prazo especificados.\nd) Responsabilizar-se pela veracidade e licitude de todo o conteúdo fornecido.');
+
+      addClausula('SIGILO E CONFIDENCIALIDADE',
+        '8.1 Todas as informações e dados de natureza técnica e comercial tornados de conhecimento a qualquer das PARTES constituem matéria sigilosa, obrigando-se a guardar integral e absoluto segredo.');
+
+      addClausula('PROTEÇÃO DE DADOS',
+        '10.1 As PARTES se comprometem a cumprir a Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018), garantindo a proteção dos dados pessoais tratados em razão deste contrato.');
+
+      addClausula('CANCELAMENTO DA ASSINATURA',
+        '12.1 O cancelamento poderá ser solicitado por qualquer das partes com aviso prévio de 30 (trinta) dias.\n\n12.2 Em caso de cancelamento antecipado pela CONTRATANTE, será devida multa rescisória equivalente a 2 (dois) meses do valor contratado.');
+
+      addClausula('DAS DISPOSIÇÕES GERAIS',
+        '13.1 Este contrato obriga as partes e seus sucessores a qualquer título.\n\n13.2 As partes elegem o Foro da Comarca de Vitória/ES para dirimir quaisquer questões oriundas deste instrumento.\n\n13.3 Este contrato é celebrado por prazo indeterminado, podendo ser rescindido conforme cláusula 12.');
+
+      if (checkAborted()) return;
+
+      // ======= PÁGINA FINAL: ASSINATURAS =======
+      doc.addPage();
+      addHeader();
+      doc.y = 200;
+
+      doc.fontSize(10).font('Helvetica').fillColor('#333')
+        .text(`Vitória/ES, ${hoje}`, 50, doc.y, { align: 'center', width: 495 });
+      doc.y += 60;
 
       // Linhas de assinatura
-      const centerX = 297;
-      doc.moveTo(centerX - 150, doc.y).lineTo(centerX - 10, doc.y).stroke();
-      doc.moveTo(centerX + 10, doc.y).lineTo(centerX + 150, doc.y).stroke();
-      doc.moveDown(0.3);
-      
-      doc.fontSize(9);
-      doc.text('CONTRATADA', centerX - 150, doc.y, { width: 140, align: 'center' });
-      doc.text('CONTRATANTE', centerX + 10, doc.y - 11, { width: 140, align: 'center' });
-      doc.moveDown(0.3);
-      doc.text(turboPartners.nome, centerX - 150, doc.y, { width: 140, align: 'center' });
-      doc.text(contrato.cliente_nome || '___________________', centerX + 10, doc.y - 11, { width: 140, align: 'center' });
+      doc.moveTo(70, doc.y).lineTo(250, doc.y).stroke();
+      doc.moveTo(310, doc.y).lineTo(490, doc.y).stroke();
+      doc.y += 10;
 
-      // Rodapé
-      doc.moveDown(2);
-      doc.fontSize(8).fillColor('#666')
-        .text('Este documento foi gerado pelo sistema Turbo Cortex.', { align: 'center' })
-        .text(`${turboPartners.site} | ${turboPartners.email}`, { align: 'center' });
+      doc.fontSize(9).font('Helvetica-Bold')
+        .text('CONTRATADA', 70, doc.y, { width: 180, align: 'center' })
+        .text('CONTRATANTE', 310, doc.y, { width: 180, align: 'center' });
+      doc.y += 12;
+      doc.font('Helvetica')
+        .text(turbo.nome, 70, doc.y, { width: 180, align: 'center' })
+        .text(contrato.cliente_nome || '________________________', 310, doc.y, { width: 180, align: 'center' });
+
+      // Adicionar headers e footers em todas as páginas usando bufferPages
+      const range = doc.bufferedPageRange();
+      for (let i = range.start; i < range.start + range.count; i++) {
+        doc.switchToPage(i);
+        // Adicionar header
+        doc.save();
+        doc.fontSize(14).font('Helvetica-Bold').fillColor(corPrimaria)
+          .text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', 50, 25, { align: 'center', width: 495 });
+        doc.fontSize(9).font('Helvetica').fillColor('#333')
+          .text(`Contrato Nº ${numeroContrato}`, 350, 45, { width: 195, align: 'right' })
+          .text(hoje, 350, 57, { width: 195, align: 'right' })
+          .text(turbo.email, 350, 69, { width: 195, align: 'right' });
+        doc.restore();
+        // Adicionar footer
+        addFooter(i + 1, range.count);
+      }
 
       if (!checkAborted()) {
         try {
@@ -1581,11 +1784,7 @@ export function registerContratosRoutes(app: Express) {
       if (!res.headersSent) {
         res.status(500).json({ error: "Erro ao gerar PDF", details: error.message });
       } else {
-        try {
-          res.destroy();
-        } catch (destroyError) {
-          // Ignore destroy errors
-        }
+        try { res.destroy(); } catch (e) {}
       }
     }
   });
