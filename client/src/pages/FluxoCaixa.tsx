@@ -108,7 +108,7 @@ export default function FluxoCaixa() {
     queryKey: ['/api/fluxo-caixa/contas-bancos'],
   });
 
-  const { data: fluxoDiario, isLoading: isLoadingFluxo } = useQuery<FluxoCaixaDiarioCompleto[]>({
+  const { data: fluxoDiarioResponse, isLoading: isLoadingFluxo } = useQuery<{ hasSnapshot: boolean; snapshotDate: string | null; dados: FluxoCaixaDiarioCompleto[] }>({
     queryKey: ['/api/fluxo-caixa/diario-completo', { dataInicio, dataFim }],
     queryFn: async () => {
       const params = new URLSearchParams({ dataInicio, dataFim });
@@ -118,6 +118,9 @@ export default function FluxoCaixa() {
     },
     enabled: !!dataInicio && !!dataFim,
   });
+  
+  const fluxoDiario = fluxoDiarioResponse?.dados;
+  const hasSnapshot = fluxoDiarioResponse?.hasSnapshot ?? false;
 
   const { data: diaDetalhe, isLoading: isLoadingDiaDetalhe } = useQuery<FluxoDiaDetalhe>({
     queryKey: ['/api/fluxo-caixa/dia-detalhe', diaSelecionado],
@@ -147,7 +150,7 @@ export default function FluxoCaixa() {
     const barsMax = Math.max(maxEntrada, maxSaida) * 1.1 || 100000;
     
     const saldosReal = chartData.map(d => d.saldoAcumulado || 0);
-    const saldosEsperado = chartData.map(d => d.saldoEsperado || 0);
+    const saldosEsperado = hasSnapshot ? chartData.map(d => d.saldoEsperado || 0) : [];
     const allSaldos = [...saldosReal, ...saldosEsperado];
     const lineMin = Math.min(...allSaldos);
     const lineMax = Math.max(...allSaldos);
@@ -158,7 +161,7 @@ export default function FluxoCaixa() {
       lineMin: Math.floor((lineMin - linePadding) / 100000) * 100000,
       lineMax: Math.ceil((lineMax + linePadding) / 100000) * 100000,
     };
-  }, [chartData]);
+  }, [chartData, hasSnapshot]);
 
   const totais = useMemo(() => {
     if (!fluxoDiario || fluxoDiario.length === 0) {
@@ -500,17 +503,19 @@ export default function FluxoCaixa() {
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
                                   <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" style={{ boxShadow: '0 0 6px rgba(34, 211, 238, 0.6)' }} />
-                                  <span className="text-sm text-slate-400">Saldo Real</span>
+                                  <span className="text-sm text-slate-400">{hasSnapshot ? 'Saldo Real' : 'Saldo Acumulado'}</span>
                                 </div>
                                 <span className="text-sm font-semibold text-cyan-400">{formatCurrency(data?.saldoAcumulado || 0)}</span>
                               </div>
-                              <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2.5 h-2.5 rounded-full bg-amber-400" style={{ boxShadow: '0 0 6px rgba(251, 191, 36, 0.6)' }} />
-                                  <span className="text-sm text-slate-400">Saldo Esperado</span>
+                              {hasSnapshot && (
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400" style={{ boxShadow: '0 0 6px rgba(251, 191, 36, 0.6)' }} />
+                                    <span className="text-sm text-slate-400">Saldo Esperado</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-amber-400">{formatCurrency(data?.saldoEsperado || 0)}</span>
                                 </div>
-                                <span className="text-sm font-semibold text-amber-400">{formatCurrency(data?.saldoEsperado || 0)}</span>
-                              </div>
+                              )}
                             </div>
                             <p className="text-xs text-slate-500 mt-3 pt-2 border-t border-slate-700 text-center">
                               Clique para ver detalhes
@@ -552,7 +557,7 @@ export default function FluxoCaixa() {
                       yAxisId="line"
                       type="monotone" 
                       dataKey="saldoAcumulado" 
-                      name="Saldo Real"
+                      name={hasSnapshot ? "Saldo Real" : "Saldo Acumulado"}
                       stroke="#22d3ee" 
                       strokeWidth={2.5}
                       dot={false}
@@ -560,17 +565,19 @@ export default function FluxoCaixa() {
                       style={{ filter: 'url(#glowCyan)' }}
                     />
                     
-                    <Line 
-                      yAxisId="line"
-                      type="monotone" 
-                      dataKey="saldoEsperado" 
-                      name="Saldo Esperado"
-                      stroke="#fbbf24" 
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      dot={false}
-                      activeDot={{ r: 5, fill: '#fbbf24', stroke: '#0f172a', strokeWidth: 2 }}
-                    />
+                    {hasSnapshot && (
+                      <Line 
+                        yAxisId="line"
+                        type="monotone" 
+                        dataKey="saldoEsperado" 
+                        name="Saldo Esperado"
+                        stroke="#fbbf24" 
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        dot={false}
+                        activeDot={{ r: 5, fill: '#fbbf24', stroke: '#0f172a', strokeWidth: 2 }}
+                      />
+                    )}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
