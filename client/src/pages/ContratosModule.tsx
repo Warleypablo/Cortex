@@ -1163,7 +1163,9 @@ function ContratosTab() {
     queryKey: ['/api/contratos/contratos', selectedContrato?.id],
     queryFn: async () => {
       const res = await fetch(`/api/contratos/contratos/${selectedContrato?.id}`);
-      return res.json();
+      const data = await res.json();
+      // Backend returns { contrato, itens }, merge them
+      return { ...data.contrato, itens: data.itens };
     },
     enabled: !!selectedContrato && viewDialogOpen,
   });
