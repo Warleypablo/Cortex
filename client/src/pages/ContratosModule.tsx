@@ -58,60 +58,81 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Entidade {
   id: number;
-  tipoPessoa: 'fisica' | 'juridica';
-  cpfCnpj: string;
-  nomeRazaoSocial: string;
-  emailPrincipal: string | null;
-  emailCobranca: string | null;
-  telefonePrincipal: string | null;
-  telefoneCobranca: string | null;
-  cep: string | null;
+  nome: string;
+  tipo_pessoa: 'fisica' | 'juridica';
+  cpf_cnpj: string | null;
+  nome_socio: string | null;
+  cpf_socio: string | null;
+  email: string | null;
+  telefone: string | null;
+  email_cobranca: string | null;
+  telefone_cobranca: string | null;
+  endereco: string | null;
   numero: string | null;
-  logradouro: string | null;
-  bairro: string | null;
   complemento: string | null;
+  bairro: string | null;
   cidade: string | null;
   estado: string | null;
-  tipoEntidade: 'cliente' | 'fornecedor' | 'ambos';
+  cep: string | null;
+  eh_cliente: boolean;
+  eh_fornecedor: boolean;
   observacoes: string | null;
-  ativo: boolean;
-  criadoEm: string;
-  atualizadoEm: string;
+  data_cadastro: string;
+  data_atualizacao: string;
 }
 
-interface ContratoServico {
+interface ContratoItem {
   id?: number;
-  servicoNome: string;
-  plano: string | null;
-  valorOriginal: number;
-  valorNegociado: number;
-  descontoPercentual: number;
-  valorFinal: number;
-  economia: number;
+  contrato_id?: number;
+  plano_servico_id: number | null;
+  plano_nome?: string;
+  servico_nome?: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
   modalidade: string | null;
+  valor_original: number;
+  valor_negociado: number;
+  desconto_percentual: number;
+  valor_final: number;
+  economia: number;
+  observacoes: string | null;
 }
 
 interface ContratoDoc {
   id: number;
-  numeroContrato: string;
-  entidadeId: number;
-  entidadeNome: string;
-  entidadeCpfCnpj: string;
-  comercialResponsavel: string | null;
-  comercialResponsavelEmail: string | null;
-  idCrmBitrix: string | null;
-  status: 'rascunho' | 'ativo' | 'pausado' | 'cancelado' | 'encerrado';
-  dataInicio: string | null;
-  dataFim: string | null;
+  numero_contrato: string;
+  id_crm: string | null;
+  cliente_id: number | null;
+  cliente_nome?: string;
+  cliente_cpf_cnpj?: string;
+  fornecedor_id: number | null;
+  descricao: string | null;
+  valor_total: number | null;
+  data_inicio_recorrentes: string | null;
+  data_inicio_cobranca_recorrentes: string | null;
+  data_inicio_pontuais: string | null;
+  data_inicio_cobranca_pontuais: string | null;
+  status: string;
   observacoes: string | null;
-  servicos?: ContratoServico[];
-  criadoEm: string;
-  atualizadoEm: string;
+  valor_original: number;
+  valor_negociado: number;
+  economia: number;
+  desconto_percentual: number;
+  comercial_nome: string | null;
+  comercial_email: string | null;
+  comercial_telefone: string | null;
+  comercial_cargo: string | null;
+  comercial_empresa: string | null;
+  status_faturamento: string | null;
+  itens?: ContratoItem[];
+  data_cadastro: string;
+  data_atualizacao: string;
 }
 
 interface DashboardStats {
   entidades: {
-    totalAtivas: number;
+    total: number;
     clientes: number;
     fornecedores: number;
     ambos: number;
@@ -120,9 +141,11 @@ interface DashboardStats {
     total: number;
     rascunhos: number;
     ativos: number;
-    pausados: number;
+    aguardando: number;
     cancelados: number;
     encerrados: number;
+    faturados: number;
+    pendentesFaturamento: number;
   };
   valorTotalAtivos: number;
 }
@@ -328,9 +351,9 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
 }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState<Partial<Entidade>>({
-    tipoPessoa: 'juridica',
-    tipoEntidade: 'cliente',
-    ativo: true,
+    tipo_pessoa: 'juridica',
+    eh_cliente: true,
+    eh_fornecedor: false,
     ...entidade,
   });
 
@@ -394,8 +417,8 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
             <div className="space-y-2">
               <Label>Tipo de Pessoa</Label>
               <Select
-                value={formData.tipoPessoa}
-                onValueChange={(v) => setFormData({ ...formData, tipoPessoa: v as 'fisica' | 'juridica' })}
+                value={formData.tipo_pessoa}
+                onValueChange={(v) => setFormData({ ...formData, tipo_pessoa: v as 'fisica' | 'juridica' })}
               >
                 <SelectTrigger data-testid="select-tipo-pessoa">
                   <SelectValue />
@@ -409,40 +432,44 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
 
             <div className="space-y-2">
               <Label>Tipo de Entidade</Label>
-              <Select
-                value={formData.tipoEntidade}
-                onValueChange={(v) => setFormData({ ...formData, tipoEntidade: v as 'cliente' | 'fornecedor' | 'ambos' })}
-              >
-                <SelectTrigger data-testid="select-tipo-entidade">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cliente">Cliente</SelectItem>
-                  <SelectItem value="fornecedor">Fornecedor</SelectItem>
-                  <SelectItem value="ambos">Ambos</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex gap-4 pt-2">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.eh_cliente || false}
+                    onChange={(e) => setFormData({ ...formData, eh_cliente: e.target.checked })}
+                  />
+                  Cliente
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.eh_fornecedor || false}
+                    onChange={(e) => setFormData({ ...formData, eh_fornecedor: e.target.checked })}
+                  />
+                  Fornecedor
+                </label>
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>{formData.tipoPessoa === 'fisica' ? 'CPF' : 'CNPJ'}</Label>
+              <Label>{formData.tipo_pessoa === 'fisica' ? 'CPF' : 'CNPJ'}</Label>
               <Input
                 data-testid="input-cpf-cnpj"
-                value={formData.cpfCnpj || ''}
-                onChange={(e) => setFormData({ ...formData, cpfCnpj: e.target.value.replace(/\D/g, '') })}
-                placeholder={formData.tipoPessoa === 'fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
-                required
+                value={formData.cpf_cnpj || ''}
+                onChange={(e) => setFormData({ ...formData, cpf_cnpj: e.target.value.replace(/\D/g, '') })}
+                placeholder={formData.tipo_pessoa === 'fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
               />
             </div>
 
             <div className="space-y-2">
-              <Label>{formData.tipoPessoa === 'fisica' ? 'Nome Completo' : 'Razão Social'}</Label>
+              <Label>{formData.tipo_pessoa === 'fisica' ? 'Nome Completo' : 'Razão Social'}</Label>
               <Input
                 data-testid="input-nome-razao"
-                value={formData.nomeRazaoSocial || ''}
-                onChange={(e) => setFormData({ ...formData, nomeRazaoSocial: e.target.value })}
+                value={formData.nome || ''}
+                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                 required
               />
             </div>
@@ -450,12 +477,12 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>E-mail Principal</Label>
+              <Label>E-mail</Label>
               <Input
-                data-testid="input-email-principal"
+                data-testid="input-email"
                 type="email"
-                value={formData.emailPrincipal || ''}
-                onChange={(e) => setFormData({ ...formData, emailPrincipal: e.target.value })}
+                value={formData.email || ''}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
             </div>
 
@@ -464,19 +491,19 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
               <Input
                 data-testid="input-email-cobranca"
                 type="email"
-                value={formData.emailCobranca || ''}
-                onChange={(e) => setFormData({ ...formData, emailCobranca: e.target.value })}
+                value={formData.email_cobranca || ''}
+                onChange={(e) => setFormData({ ...formData, email_cobranca: e.target.value })}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Telefone Principal</Label>
+              <Label>Telefone</Label>
               <Input
-                data-testid="input-telefone-principal"
-                value={formData.telefonePrincipal || ''}
-                onChange={(e) => setFormData({ ...formData, telefonePrincipal: e.target.value.replace(/\D/g, '') })}
+                data-testid="input-telefone"
+                value={formData.telefone || ''}
+                onChange={(e) => setFormData({ ...formData, telefone: e.target.value.replace(/\D/g, '') })}
                 placeholder="(00) 00000-0000"
               />
             </div>
@@ -485,8 +512,8 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
               <Label>Telefone de Cobrança</Label>
               <Input
                 data-testid="input-telefone-cobranca"
-                value={formData.telefoneCobranca || ''}
-                onChange={(e) => setFormData({ ...formData, telefoneCobranca: e.target.value.replace(/\D/g, '') })}
+                value={formData.telefone_cobranca || ''}
+                onChange={(e) => setFormData({ ...formData, telefone_cobranca: e.target.value.replace(/\D/g, '') })}
                 placeholder="(00) 00000-0000"
               />
             </div>
@@ -504,11 +531,11 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
             </div>
 
             <div className="space-y-2 col-span-2">
-              <Label>Logradouro</Label>
+              <Label>Endereço</Label>
               <Input
-                data-testid="input-logradouro"
-                value={formData.logradouro || ''}
-                onChange={(e) => setFormData({ ...formData, logradouro: e.target.value })}
+                data-testid="input-endereco"
+                value={formData.endereco || ''}
+                onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
               />
             </div>
 
@@ -684,38 +711,42 @@ function EntidadesTab() {
                   <TableRow key={entidade.id} data-testid={`row-entidade-${entidade.id}`}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        {entidade.tipoPessoa === 'juridica' ? (
+                        {entidade.tipo_pessoa === 'juridica' ? (
                           <Building2 className="h-4 w-4 text-muted-foreground" />
                         ) : (
                           <User className="h-4 w-4 text-muted-foreground" />
                         )}
-                        {entidade.nomeRazaoSocial}
+                        {entidade.nome}
                       </div>
                     </TableCell>
-                    <TableCell>{formatCpfCnpj(entidade.cpfCnpj)}</TableCell>
+                    <TableCell>{entidade.cpf_cnpj ? formatCpfCnpj(entidade.cpf_cnpj) : '-'}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={
-                        entidade.tipoEntidade === 'cliente' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                        entidade.tipoEntidade === 'fornecedor' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
-                        'bg-orange-500/10 text-orange-500 border-orange-500/20'
-                      }>
-                        {entidade.tipoEntidade === 'cliente' ? 'Cliente' :
-                         entidade.tipoEntidade === 'fornecedor' ? 'Fornecedor' : 'Ambos'}
-                      </Badge>
+                      <div className="flex gap-1">
+                        {entidade.eh_cliente && (
+                          <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">
+                            Cliente
+                          </Badge>
+                        )}
+                        {entidade.eh_fornecedor && (
+                          <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20">
+                            Fornecedor
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
-                      {entidade.emailPrincipal && (
+                      {entidade.email && (
                         <div className="flex items-center gap-1">
                           <Mail className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-sm">{entidade.emailPrincipal}</span>
+                          <span className="text-sm">{entidade.email}</span>
                         </div>
                       )}
                     </TableCell>
                     <TableCell>
-                      {entidade.telefonePrincipal && (
+                      {entidade.telefone && (
                         <div className="flex items-center gap-1">
                           <Phone className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-sm">{formatPhone(entidade.telefonePrincipal)}</span>
+                          <span className="text-sm">{formatPhone(entidade.telefone)}</span>
                         </div>
                       )}
                     </TableCell>
@@ -770,28 +801,26 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
 }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState<{
-    numeroContrato: string;
-    entidadeId: number | null;
-    comercialResponsavel: string;
-    comercialResponsavelEmail: string;
-    idCrmBitrix: string;
+    numero_contrato: string;
+    cliente_id: number | null;
+    comercial_nome: string;
+    comercial_email: string;
+    id_crm: string;
     status: string;
-    dataInicio: string;
-    dataFim: string;
+    data_inicio_recorrentes: string;
     observacoes: string;
   }>({
-    numeroContrato: contrato?.numeroContrato || '',
-    entidadeId: contrato?.entidadeId || null,
-    comercialResponsavel: contrato?.comercialResponsavel || '',
-    comercialResponsavelEmail: contrato?.comercialResponsavelEmail || '',
-    idCrmBitrix: contrato?.idCrmBitrix || '',
+    numero_contrato: contrato?.numero_contrato || '',
+    cliente_id: contrato?.cliente_id || null,
+    comercial_nome: contrato?.comercial_nome || '',
+    comercial_email: contrato?.comercial_email || '',
+    id_crm: contrato?.id_crm || '',
     status: contrato?.status || 'rascunho',
-    dataInicio: contrato?.dataInicio ? contrato.dataInicio.split('T')[0] : '',
-    dataFim: contrato?.dataFim ? contrato.dataFim.split('T')[0] : '',
+    data_inicio_recorrentes: contrato?.data_inicio_recorrentes ? contrato.data_inicio_recorrentes.split('T')[0] : '',
     observacoes: contrato?.observacoes || '',
   });
 
-  const [servicos, setServicos] = useState<ContratoServico[]>(contrato?.servicos || []);
+  const [itens, setItens] = useState<ContratoItem[]>(contrato?.itens || []);
 
   const { data: proximoNumero } = useQuery<{ proximoNumero: string }>({
     queryKey: ['/api/contratos/proximo-numero'],
@@ -808,13 +837,13 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
 
   useState(() => {
     if (!contrato && proximoNumero) {
-      setFormData(prev => ({ ...prev, numeroContrato: proximoNumero.proximoNumero }));
+      setFormData(prev => ({ ...prev, numero_contrato: proximoNumero.proximoNumero }));
     }
   });
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/contratos/contratos', { contrato: formData, servicos });
+      const res = await apiRequest('POST', '/api/contratos/contratos', { contrato: formData, itens });
       return res;
     },
     onSuccess: () => {
@@ -832,7 +861,7 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('PUT', `/api/contratos/contratos/${contrato?.id}`, { contrato: formData, servicos });
+      const res = await apiRequest('PUT', `/api/contratos/contratos/${contrato?.id}`, { contrato: formData, itens });
       return res;
     },
     onSuccess: () => {
@@ -856,37 +885,36 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
     }
   };
 
-  const addServico = () => {
-    setServicos([...servicos, {
-      servicoNome: '',
-      plano: null,
-      valorOriginal: 0,
-      valorNegociado: 0,
-      descontoPercentual: 0,
-      valorFinal: 0,
-      economia: 0,
+  const addItem = () => {
+    setItens([...itens, {
+      id: 0,
+      contrato_id: contrato?.id || 0,
+      plano_servico_id: null,
+      descricao: '',
+      valor_tabela: 0,
+      valor_negociado: 0,
+      desconto_percentual: 0,
+      quantidade: 1,
       modalidade: null,
     }]);
   };
 
-  const updateServico = (index: number, field: keyof ContratoServico, value: any) => {
-    const updated = [...servicos];
+  const updateItem = (index: number, field: keyof ContratoItem, value: any) => {
+    const updated = [...itens];
     updated[index] = { ...updated[index], [field]: value };
 
-    if (field === 'valorOriginal' || field === 'valorNegociado') {
-      const original = field === 'valorOriginal' ? value : updated[index].valorOriginal;
-      const negociado = field === 'valorNegociado' ? value : updated[index].valorNegociado;
+    if (field === 'valor_tabela' || field === 'valor_negociado') {
+      const original = field === 'valor_tabela' ? value : updated[index].valor_tabela;
+      const negociado = field === 'valor_negociado' ? value : updated[index].valor_negociado;
       const desconto = original > 0 ? ((original - negociado) / original) * 100 : 0;
-      updated[index].descontoPercentual = desconto;
-      updated[index].valorFinal = negociado;
-      updated[index].economia = original - negociado;
+      updated[index].desconto_percentual = desconto;
     }
 
-    setServicos(updated);
+    setItens(updated);
   };
 
-  const removeServico = (index: number) => {
-    setServicos(servicos.filter((_, i) => i !== index));
+  const removeItem = (index: number) => {
+    setItens(itens.filter((_, i) => i !== index));
   };
 
   const isPending = createMutation.isPending || updateMutation.isPending;
@@ -907,8 +935,8 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
               <Label>Número do Contrato</Label>
               <Input
                 data-testid="input-numero-contrato"
-                value={formData.numeroContrato || proximoNumero?.proximoNumero || ''}
-                onChange={(e) => setFormData({ ...formData, numeroContrato: e.target.value })}
+                value={formData.numero_contrato || proximoNumero?.proximoNumero || ''}
+                onChange={(e) => setFormData({ ...formData, numero_contrato: e.target.value })}
                 required
               />
             </div>
@@ -935,8 +963,8 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
             <div className="space-y-2">
               <Label>Cliente/Entidade</Label>
               <Select
-                value={formData.entidadeId?.toString() || ''}
-                onValueChange={(v) => setFormData({ ...formData, entidadeId: parseInt(v) })}
+                value={formData.cliente_id?.toString() || ''}
+                onValueChange={(v) => setFormData({ ...formData, cliente_id: parseInt(v) })}
               >
                 <SelectTrigger data-testid="select-entidade-contrato">
                   <SelectValue placeholder="Selecione uma entidade" />
@@ -944,7 +972,7 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                 <SelectContent>
                   {entidadesData?.entidades.map((ent) => (
                     <SelectItem key={ent.id} value={ent.id.toString()}>
-                      {ent.nomeRazaoSocial}
+                      {ent.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -957,8 +985,8 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
               <Label>Comercial Responsável</Label>
               <Input
                 data-testid="input-comercial-responsavel"
-                value={formData.comercialResponsavel}
-                onChange={(e) => setFormData({ ...formData, comercialResponsavel: e.target.value })}
+                value={formData.comercial_nome}
+                onChange={(e) => setFormData({ ...formData, comercial_nome: e.target.value })}
               />
             </div>
 
@@ -967,109 +995,99 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
               <Input
                 data-testid="input-comercial-email"
                 type="email"
-                value={formData.comercialResponsavelEmail}
-                onChange={(e) => setFormData({ ...formData, comercialResponsavelEmail: e.target.value })}
+                value={formData.comercial_email}
+                onChange={(e) => setFormData({ ...formData, comercial_email: e.target.value })}
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>ID CRM Bitrix</Label>
+              <Label>ID CRM</Label>
               <Input
                 data-testid="input-crm-bitrix"
-                value={formData.idCrmBitrix}
-                onChange={(e) => setFormData({ ...formData, idCrmBitrix: e.target.value })}
+                value={formData.id_crm}
+                onChange={(e) => setFormData({ ...formData, id_crm: e.target.value })}
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Data de Início</Label>
+              <Label>Data de Início Recorrentes</Label>
               <Input
                 data-testid="input-data-inicio"
                 type="date"
-                value={formData.dataInicio}
-                onChange={(e) => setFormData({ ...formData, dataInicio: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Data de Fim</Label>
-              <Input
-                data-testid="input-data-fim"
-                type="date"
-                value={formData.dataFim}
-                onChange={(e) => setFormData({ ...formData, dataFim: e.target.value })}
+                value={formData.data_inicio_recorrentes}
+                onChange={(e) => setFormData({ ...formData, data_inicio_recorrentes: e.target.value })}
               />
             </div>
           </div>
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label className="text-base font-semibold">Serviços do Contrato</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addServico} data-testid="button-add-servico">
+              <Label className="text-base font-semibold">Itens do Contrato</Label>
+              <Button type="button" variant="outline" size="sm" onClick={addItem} data-testid="button-add-item">
                 <Plus className="mr-2 h-4 w-4" />
-                Adicionar Serviço
+                Adicionar Item
               </Button>
             </div>
 
-            {servicos.map((servico, index) => (
+            {itens.map((item, index) => (
               <Card key={index} className="p-4">
                 <div className="flex items-start gap-4">
                   <div className="flex-1 grid grid-cols-4 gap-3">
                     <div className="space-y-1">
-                      <Label className="text-xs">Serviço</Label>
+                      <Label className="text-xs">Descrição</Label>
                       <Input
-                        data-testid={`input-servico-nome-${index}`}
-                        value={servico.servicoNome}
-                        onChange={(e) => updateServico(index, 'servicoNome', e.target.value)}
-                        placeholder="Nome do serviço"
+                        data-testid={`input-item-descricao-${index}`}
+                        value={item.descricao || ''}
+                        onChange={(e) => updateItem(index, 'descricao', e.target.value)}
+                        placeholder="Descrição do item"
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Plano</Label>
+                      <Label className="text-xs">Quantidade</Label>
                       <Input
-                        data-testid={`input-servico-plano-${index}`}
-                        value={servico.plano || ''}
-                        onChange={(e) => updateServico(index, 'plano', e.target.value)}
-                        placeholder="Plano/tier"
+                        data-testid={`input-item-quantidade-${index}`}
+                        type="number"
+                        value={item.quantidade}
+                        onChange={(e) => updateItem(index, 'quantidade', parseInt(e.target.value) || 1)}
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Valor Original</Label>
+                      <Label className="text-xs">Valor Tabela</Label>
                       <Input
-                        data-testid={`input-servico-original-${index}`}
+                        data-testid={`input-item-tabela-${index}`}
                         type="number"
                         step="0.01"
-                        value={servico.valorOriginal}
-                        onChange={(e) => updateServico(index, 'valorOriginal', parseFloat(e.target.value) || 0)}
+                        value={item.valor_tabela}
+                        onChange={(e) => updateItem(index, 'valor_tabela', parseFloat(e.target.value) || 0)}
                       />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Valor Negociado</Label>
                       <Input
-                        data-testid={`input-servico-negociado-${index}`}
+                        data-testid={`input-item-negociado-${index}`}
                         type="number"
                         step="0.01"
-                        value={servico.valorNegociado}
-                        onChange={(e) => updateServico(index, 'valorNegociado', parseFloat(e.target.value) || 0)}
+                        value={item.valor_negociado}
+                        onChange={(e) => updateItem(index, 'valor_negociado', parseFloat(e.target.value) || 0)}
                       />
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 text-sm">
                     <span className="text-muted-foreground">
-                      Desconto: {servico.descontoPercentual.toFixed(1)}%
+                      Desconto: {(item.desconto_percentual || 0).toFixed(1)}%
                     </span>
                     <span className="text-green-500 font-medium">
-                      Economia: {formatCurrency(servico.economia)}
+                      Economia: {formatCurrency((item.valor_tabela - item.valor_negociado) * item.quantidade)}
                     </span>
                   </div>
                   <Button
                     type="button"
                     size="icon"
                     variant="ghost"
-                    onClick={() => removeServico(index)}
-                    data-testid={`button-remove-servico-${index}`}
+                    onClick={() => removeItem(index)}
+                    data-testid={`button-remove-item-${index}`}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -1077,10 +1095,10 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
               </Card>
             ))}
 
-            {servicos.length > 0 && (
+            {itens.length > 0 && (
               <div className="flex justify-end text-sm">
                 <span className="font-medium">
-                  Total: {formatCurrency(servicos.reduce((acc, s) => acc + s.valorFinal, 0))}
+                  Total: {formatCurrency(itens.reduce((acc, i) => acc + (i.valor_negociado * i.quantidade), 0))}
                 </span>
               </div>
             )}
@@ -1232,26 +1250,26 @@ function ContratosTab() {
                 data?.contratos.map((contrato) => (
                   <TableRow key={contrato.id} data-testid={`row-contrato-${contrato.id}`}>
                     <TableCell className="font-medium font-mono">
-                      {contrato.numeroContrato}
+                      {contrato.numero_contrato}
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{contrato.entidadeNome}</p>
-                        {contrato.entidadeCpfCnpj && (
+                        <p className="font-medium">{contrato.cliente_nome || '-'}</p>
+                        {contrato.cliente_cpf_cnpj && (
                           <p className="text-xs text-muted-foreground">
-                            {formatCpfCnpj(contrato.entidadeCpfCnpj)}
+                            {formatCpfCnpj(contrato.cliente_cpf_cnpj)}
                           </p>
                         )}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={statusColors[contrato.status]}>
-                        {statusLabels[contrato.status]}
+                      <Badge variant="outline" className={statusColors[contrato.status] || 'bg-gray-500/10'}>
+                        {statusLabels[contrato.status] || contrato.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>{contrato.comercialResponsavel || '-'}</TableCell>
+                    <TableCell>{contrato.comercial_nome || '-'}</TableCell>
                     <TableCell>
-                      {contrato.dataInicio ? new Date(contrato.dataInicio).toLocaleDateString('pt-BR') : '-'}
+                      {contrato.data_inicio_recorrentes ? new Date(contrato.data_inicio_recorrentes).toLocaleDateString('pt-BR') : '-'}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -1307,13 +1325,13 @@ function ContratosTab() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-muted-foreground">Número do Contrato</Label>
-                  <p className="font-mono font-medium">{contratoDetail.numeroContrato}</p>
+                  <p className="font-mono font-medium">{contratoDetail.numero_contrato}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Status</Label>
                   <div className="mt-1">
-                    <Badge variant="outline" className={statusColors[contratoDetail.status]}>
-                      {statusLabels[contratoDetail.status]}
+                    <Badge variant="outline" className={statusColors[contratoDetail.status] || 'bg-gray-500/10'}>
+                      {statusLabels[contratoDetail.status] || contratoDetail.status}
                     </Badge>
                   </div>
                 </div>
@@ -1322,67 +1340,63 @@ function ContratosTab() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-muted-foreground">Cliente</Label>
-                  <p className="font-medium">{contratoDetail.entidadeNome}</p>
-                  {contratoDetail.entidadeCpfCnpj && (
+                  <p className="font-medium">{contratoDetail.cliente_nome || '-'}</p>
+                  {contratoDetail.cliente_cpf_cnpj && (
                     <p className="text-sm text-muted-foreground">
-                      {formatCpfCnpj(contratoDetail.entidadeCpfCnpj)}
+                      {formatCpfCnpj(contratoDetail.cliente_cpf_cnpj)}
                     </p>
                   )}
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Comercial Responsável</Label>
-                  <p>{contratoDetail.comercialResponsavel || '-'}</p>
-                  {contratoDetail.comercialResponsavelEmail && (
-                    <p className="text-sm text-muted-foreground">{contratoDetail.comercialResponsavelEmail}</p>
+                  <p>{contratoDetail.comercial_nome || '-'}</p>
+                  {contratoDetail.comercial_email && (
+                    <p className="text-sm text-muted-foreground">{contratoDetail.comercial_email}</p>
                   )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-muted-foreground">Data de Início</Label>
-                  <p>{contratoDetail.dataInicio ? new Date(contratoDetail.dataInicio).toLocaleDateString('pt-BR') : '-'}</p>
+                  <Label className="text-muted-foreground">Data de Início Recorrentes</Label>
+                  <p>{contratoDetail.data_inicio_recorrentes ? new Date(contratoDetail.data_inicio_recorrentes).toLocaleDateString('pt-BR') : '-'}</p>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">Data de Fim</Label>
-                  <p>{contratoDetail.dataFim ? new Date(contratoDetail.dataFim).toLocaleDateString('pt-BR') : '-'}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">ID CRM Bitrix</Label>
-                  <p>{contratoDetail.idCrmBitrix || '-'}</p>
+                  <Label className="text-muted-foreground">ID CRM</Label>
+                  <p>{contratoDetail.id_crm || '-'}</p>
                 </div>
               </div>
 
-              {contratoDetail.servicos && contratoDetail.servicos.length > 0 && (
+              {contratoDetail.itens && contratoDetail.itens.length > 0 && (
                 <div>
-                  <Label className="text-muted-foreground mb-2 block">Serviços</Label>
+                  <Label className="text-muted-foreground mb-2 block">Itens do Contrato</Label>
                   <Card>
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Serviço</TableHead>
-                          <TableHead>Plano</TableHead>
-                          <TableHead className="text-right">Valor Original</TableHead>
-                          <TableHead className="text-right">Valor Final</TableHead>
+                          <TableHead>Descrição</TableHead>
+                          <TableHead>Qtd</TableHead>
+                          <TableHead className="text-right">Valor Tabela</TableHead>
+                          <TableHead className="text-right">Valor Negociado</TableHead>
                           <TableHead className="text-right">Desconto</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {contratoDetail.servicos.map((servico, index) => (
+                        {contratoDetail.itens.map((item, index) => (
                           <TableRow key={index}>
-                            <TableCell>{servico.servicoNome}</TableCell>
-                            <TableCell>{servico.plano || '-'}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(servico.valorOriginal)}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(servico.valorFinal)}</TableCell>
+                            <TableCell>{item.descricao || '-'}</TableCell>
+                            <TableCell>{item.quantidade}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.valor_tabela)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(item.valor_negociado)}</TableCell>
                             <TableCell className="text-right text-green-500">
-                              {servico.descontoPercentual.toFixed(1)}%
+                              {(item.desconto_percentual || 0).toFixed(1)}%
                             </TableCell>
                           </TableRow>
                         ))}
                         <TableRow className="bg-muted/50">
                           <TableCell colSpan={3} className="font-medium">Total</TableCell>
                           <TableCell className="text-right font-bold">
-                            {formatCurrency(contratoDetail.servicos.reduce((acc, s) => acc + s.valorFinal, 0))}
+                            {formatCurrency(contratoDetail.itens.reduce((acc, i) => acc + (i.valor_negociado * i.quantidade), 0))}
                           </TableCell>
                           <TableCell></TableCell>
                         </TableRow>
