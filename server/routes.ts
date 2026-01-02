@@ -5905,29 +5905,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND ${churnDateFilter}
       `);
       
-      // Get paused contracts
+      // Get paused contracts - simply all contracts where data_pausa is not null
       const pausaResult = await db.execute(sql`
         SELECT 
-          c.id_task as id,
+          c.*,
           cl.nome as cliente_nome,
-          cl.cnpj,
-          c.produto,
-          c.squad,
-          c.responsavel,
-          COALESCE(c.valorr, 0) as valorr,
-          c.data_inicio,
-          NULL::timestamp as data_encerramento,
-          c.data_pausa,
-          c.status,
-          c.servico,
-          'pausado' as tipo,
-          CASE 
-            WHEN c.data_inicio IS NOT NULL AND c.data_pausa IS NOT NULL 
-            THEN GREATEST(0.5, 
-              (c.data_pausa::date - c.data_inicio::date)::numeric / 30.44
-            )
-            ELSE 0 
-          END as lifetime_meses
+          cl.cnpj
         FROM cup_contratos c
         LEFT JOIN cup_clientes cl ON c.id_task = cl.task_id
         WHERE c.data_pausa IS NOT NULL
@@ -5953,23 +5936,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lifetime_meses: Number(row.lifetime_meses) || 0,
           ltv: (Number(row.valorr) || 0) * (Number(row.lifetime_meses) || 0),
         })),
-        ...pausaResult.rows.map((row: any) => ({
-          id: row.id,
-          cliente_nome: row.cliente_nome || 'Cliente não identificado',
-          cnpj: row.cnpj || '',
-          produto: row.produto || 'Não especificado',
-          squad: row.squad || 'Não especificado',
-          responsavel: row.responsavel || 'Não especificado',
-          valorr: Number(row.valorr) || 0,
-          data_inicio: row.data_inicio,
-          data_encerramento: null,
-          data_pausa: row.data_pausa,
-          status: row.status || 'pausado',
-          servico: row.servico || 'Não especificado',
-          tipo: 'pausado',
-          lifetime_meses: Number(row.lifetime_meses) || 0,
-          ltv: (Number(row.valorr) || 0) * (Number(row.lifetime_meses) || 0),
-        })),
+        ...pausaResult.rows.map((row: any) => {
+          const lifetimeMeses = row.data_inicio && row.data_pausa 
+            ? Math.max(0.5, (new Date(row.data_pausa).getTime() - new Date(row.data_inicio).getTime()) / (1000 * 60 * 60 * 24 * 30.44))
+            : 0;
+          return {
+            id: row.id_task,
+            cliente_nome: row.cliente_nome || 'Cliente não identificado',
+            cnpj: row.cnpj || '',
+            produto: row.produto || 'Não especificado',
+            squad: row.squad || 'Não especificado',
+            responsavel: row.responsavel || 'Não especificado',
+            valorr: Number(row.valorr) || 0,
+            data_inicio: row.data_inicio,
+            data_encerramento: null,
+            data_pausa: row.data_pausa,
+            status: row.status || 'pausado',
+            servico: row.servico || 'Não especificado',
+            tipo: 'pausado',
+            lifetime_meses: lifetimeMeses,
+            ltv: (Number(row.valorr) || 0) * lifetimeMeses,
+          };
+        }),
       ].sort((a, b) => {
         const dateA = a.data_encerramento || a.data_pausa;
         const dateB = b.data_encerramento || b.data_pausa;
