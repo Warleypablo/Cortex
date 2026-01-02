@@ -20,6 +20,7 @@ import { registerAcessosRoutes } from "./routes/acessos";
 import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
 import { registerMetasRoutes } from "./routes/metas";
+import { registerContratosRoutes } from "./routes/contratos";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== 'admin') {
@@ -10077,6 +10078,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Metas & Notifications Module - registered from separate file
   await registerMetasRoutes(app, db, storage);
+
+  // Contratos Module - registered from separate file
+  registerContratosRoutes(app);
 
   // ============================================
   // Sugestões API
