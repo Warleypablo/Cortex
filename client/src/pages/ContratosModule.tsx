@@ -100,6 +100,28 @@ interface ContratoItem {
   valor_final: number;
   economia: number;
   observacoes: string | null;
+  servico_id?: number | null;
+  escopo?: string;
+  is_personalizado?: boolean;
+}
+
+interface Servico {
+  id: number;
+  nome: string;
+  descricao: string | null;
+  ativo: boolean;
+}
+
+interface PlanoServico {
+  id: number;
+  servico_id: number;
+  nome: string;
+  escopo: string | null;
+  diretrizes: string | null;
+  valor: number;
+  periodicidade: string | null;
+  ativo: boolean;
+  servico_nome?: string;
 }
 
 interface ContratoDoc {
@@ -955,6 +977,22 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
     },
   });
 
+  const { data: servicosData } = useQuery<{ servicos: Servico[] }>({
+    queryKey: ['/api/contratos/servicos'],
+  });
+
+  const [selectedServicoId, setSelectedServicoId] = useState<number | null>(null);
+
+  const { data: planosData } = useQuery<{ planos: PlanoServico[] }>({
+    queryKey: ['/api/contratos/planos-servicos', selectedServicoId],
+    queryFn: async () => {
+      const params = selectedServicoId ? `?servico_id=${selectedServicoId}` : '';
+      const res = await fetch(`/api/contratos/planos-servicos${params}`);
+      return res.json();
+    },
+    enabled: !!selectedServicoId,
+  });
+
   useState(() => {
     if (!contrato && proximoNumero) {
       setFormData(prev => ({ ...prev, numero_contrato: proximoNumero.proximoNumero }));
@@ -1010,7 +1048,9 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
       id: 0,
       contrato_id: contrato?.id || 0,
       plano_servico_id: null,
+      servico_id: null,
       descricao: '',
+      escopo: '',
       valor_tabela: 0,
       valor_unitario: 0,
       valor_total: 0,
@@ -1022,18 +1062,71 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
       quantidade: 1,
       modalidade: null,
       observacoes: null,
+      is_personalizado: false,
     }]);
+  };
+
+  const handleServicoChange = (index: number, servicoId: number) => {
+    const updated = [...itens];
+    updated[index] = {
+      ...updated[index],
+      servico_id: servicoId,
+      plano_servico_id: null,
+      escopo: '',
+      valor_tabela: 0,
+      valor_negociado: 0,
+      is_personalizado: false,
+    };
+    setItens(updated);
+    setSelectedServicoId(servicoId);
+  };
+
+  const handlePlanoChange = (index: number, planoId: string) => {
+    const updated = [...itens];
+    
+    if (planoId === 'personalizado') {
+      updated[index] = {
+        ...updated[index],
+        plano_servico_id: null,
+        is_personalizado: true,
+        descricao: 'Plano Personalizado',
+        escopo: '',
+        valor_tabela: 0,
+        valor_negociado: 0,
+      };
+    } else {
+      const plano = planosData?.planos.find(p => p.id === parseInt(planoId));
+      if (plano) {
+        updated[index] = {
+          ...updated[index],
+          plano_servico_id: plano.id,
+          is_personalizado: false,
+          descricao: plano.nome,
+          escopo: plano.escopo || '',
+          valor_tabela: plano.valor,
+          valor_negociado: plano.valor,
+          plano_nome: plano.nome,
+        };
+      }
+    }
+    setItens(updated);
   };
 
   const updateItem = (index: number, field: keyof ContratoItem, value: any) => {
     const updated = [...itens];
     updated[index] = { ...updated[index], [field]: value };
 
-    if (field === 'valor_tabela' || field === 'valor_negociado') {
-      const original = field === 'valor_tabela' ? value : updated[index].valor_tabela;
-      const negociado = field === 'valor_negociado' ? value : updated[index].valor_negociado;
-      const desconto = original > 0 ? ((original - negociado) / original) * 100 : 0;
-      updated[index].desconto_percentual = desconto;
+    if (field === 'valor_tabela' || field === 'valor_negociado' || field === 'desconto_percentual') {
+      const original = updated[index].valor_tabela || 0;
+      let negociado = updated[index].valor_negociado || 0;
+      
+      if (field === 'desconto_percentual') {
+        negociado = original * (1 - (value / 100));
+        updated[index].valor_negociado = negociado;
+      } else {
+        const desconto = original > 0 ? ((original - negociado) / original) * 100 : 0;
+        updated[index].desconto_percentual = desconto;
+      }
     }
 
     setItens(updated);
@@ -1158,55 +1251,49 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
             </div>
 
             {itens.map((item, index) => (
-              <Card key={index} className="p-4">
+              <Card key={index} className="p-4 space-y-4">
                 <div className="flex items-start gap-4">
-                  <div className="flex-1 grid grid-cols-4 gap-3">
+                  <div className="flex-1 grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <Label className="text-xs">Descrição</Label>
-                      <Input
-                        data-testid={`input-item-descricao-${index}`}
-                        value={item.descricao || ''}
-                        onChange={(e) => updateItem(index, 'descricao', e.target.value)}
-                        placeholder="Descrição do item"
-                      />
+                      <Label className="text-xs">Serviço</Label>
+                      <Select
+                        value={item.servico_id?.toString() || ''}
+                        onValueChange={(v) => handleServicoChange(index, parseInt(v))}
+                      >
+                        <SelectTrigger data-testid={`select-item-servico-${index}`}>
+                          <SelectValue placeholder="Selecione um serviço" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {servicosData?.servicos.map((srv) => (
+                            <SelectItem key={srv.id} value={srv.id.toString()}>
+                              {srv.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Quantidade</Label>
-                      <Input
-                        data-testid={`input-item-quantidade-${index}`}
-                        type="number"
-                        value={item.quantidade}
-                        onChange={(e) => updateItem(index, 'quantidade', parseInt(e.target.value) || 1)}
-                      />
+                      <Label className="text-xs">Plano</Label>
+                      <Select
+                        value={item.is_personalizado ? 'personalizado' : (item.plano_servico_id?.toString() || '')}
+                        onValueChange={(v) => handlePlanoChange(index, v)}
+                        disabled={!item.servico_id}
+                      >
+                        <SelectTrigger data-testid={`select-item-plano-${index}`}>
+                          <SelectValue placeholder={item.servico_id ? "Selecione um plano" : "Selecione um serviço primeiro"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {planosData?.planos.filter(p => p.servico_id === item.servico_id).map((plano) => (
+                            <SelectItem key={plano.id} value={plano.id.toString()}>
+                              {plano.nome} - {formatCurrency(plano.valor)}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="personalizado">
+                            Personalizado
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Valor Tabela</Label>
-                      <Input
-                        data-testid={`input-item-tabela-${index}`}
-                        type="number"
-                        step="0.01"
-                        value={item.valor_tabela}
-                        onChange={(e) => updateItem(index, 'valor_tabela', parseFloat(e.target.value) || 0)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Valor Negociado</Label>
-                      <Input
-                        data-testid={`input-item-negociado-${index}`}
-                        type="number"
-                        step="0.01"
-                        value={item.valor_negociado}
-                        onChange={(e) => updateItem(index, 'valor_negociado', parseFloat(e.target.value) || 0)}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 text-sm">
-                    <span className="text-muted-foreground">
-                      Desconto: {(Number(item.desconto_percentual) || 0).toFixed(1)}%
-                    </span>
-                    <span className="text-green-500 font-medium">
-                      Economia: {formatCurrency(((item.valor_tabela || 0) - item.valor_negociado) * item.quantidade)}
-                    </span>
                   </div>
                   <Button
                     type="button"
@@ -1218,6 +1305,84 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
+
+                {(item.plano_servico_id || item.is_personalizado) && (
+                  <div className="space-y-4 pt-2 border-t">
+                    {item.escopo && !item.is_personalizado && (
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <Label className="text-xs text-muted-foreground">Escopo do Plano</Label>
+                        <p className="text-sm mt-1 whitespace-pre-wrap">{item.escopo}</p>
+                      </div>
+                    )}
+
+                    {item.is_personalizado && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Escopo Personalizado</Label>
+                        <Textarea
+                          data-testid={`textarea-item-escopo-${index}`}
+                          value={item.escopo || ''}
+                          onChange={(e) => updateItem(index, 'escopo', e.target.value)}
+                          placeholder="Descreva o escopo do serviço personalizado..."
+                          rows={3}
+                        />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Valor Base</Label>
+                        <Input
+                          data-testid={`input-item-tabela-${index}`}
+                          type="number"
+                          step="0.01"
+                          value={item.valor_tabela || 0}
+                          onChange={(e) => updateItem(index, 'valor_tabela', parseFloat(e.target.value) || 0)}
+                          disabled={!item.is_personalizado}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Desconto (%)</Label>
+                        <Input
+                          data-testid={`input-item-desconto-${index}`}
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          value={(Number(item.desconto_percentual) || 0).toFixed(1)}
+                          onChange={(e) => updateItem(index, 'desconto_percentual', parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Valor Final</Label>
+                        <Input
+                          data-testid={`input-item-negociado-${index}`}
+                          type="number"
+                          step="0.01"
+                          value={item.valor_negociado || 0}
+                          onChange={(e) => updateItem(index, 'valor_negociado', parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Quantidade</Label>
+                        <Input
+                          data-testid={`input-item-quantidade-${index}`}
+                          type="number"
+                          value={item.quantidade}
+                          onChange={(e) => updateItem(index, 'quantidade', parseInt(e.target.value) || 1)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-4 text-sm">
+                      <span className="text-muted-foreground">
+                        Economia: <span className="text-green-500 font-medium">{formatCurrency(((item.valor_tabela || 0) - (item.valor_negociado || 0)) * item.quantidade)}</span>
+                      </span>
+                      <span className="font-medium">
+                        Subtotal: {formatCurrency((item.valor_negociado || 0) * item.quantidade)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </Card>
             ))}
 
