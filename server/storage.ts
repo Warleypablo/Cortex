@@ -2871,6 +2871,16 @@ export class DbStorage implements IStorage {
   async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<FluxoCaixaDiarioCompleto[]> {
     const saldoAtual = await this.getSaldoAtualBancos();
     
+    const mesAno = dataInicio.substring(0, 7);
+    const snapshot = await this.getDfcSnapshot(mesAno);
+    
+    const snapshotMap = new Map<string, { entradas: number; saidas: number }>();
+    if (snapshot) {
+      for (const dia of snapshot.dadosDiarios) {
+        snapshotMap.set(dia.data, { entradas: dia.entradas, saidas: dia.saidas });
+      }
+    }
+    
     const result = await db.execute(sql`
       WITH dates AS (
         SELECT generate_series(
@@ -2899,17 +2909,24 @@ export class DbStorage implements IStorage {
       ORDER BY d.data
     `);
     
-    // Saldo inicial = saldo atual dos bancos (R$ 784k)
     let saldoAcumulado = saldoAtual.saldoTotal;
+    let saldoEsperado = snapshot ? snapshot.saldoInicial : saldoAtual.saldoTotal;
     
     return (result.rows as any[]).map((row: any) => {
       const entradasPrevistas = parseFloat(row.entradas_previstas || '0');
       const saidasPrevistas = parseFloat(row.saidas_previstas || '0');
       
+      const snapshotDia = snapshotMap.get(row.data);
+      const entradasEsperadas = snapshotDia ? snapshotDia.entradas : entradasPrevistas;
+      const saidasEsperadas = snapshotDia ? snapshotDia.saidas : saidasPrevistas;
+      
       const entradas = entradasPrevistas;
       const saidas = saidasPrevistas;
       const saldoDia = entradas - saidas;
       saldoAcumulado += saldoDia;
+      
+      const saldoDiaEsperado = entradasEsperadas - saidasEsperadas;
+      saldoEsperado += saldoDiaEsperado;
       
       return {
         data: row.data,
@@ -2917,10 +2934,13 @@ export class DbStorage implements IStorage {
         saidas,
         saldoDia,
         saldoAcumulado,
+        saldoEsperado,
         entradasPagas: 0,
         saidasPagas: 0,
         entradasPrevistas,
         saidasPrevistas,
+        entradasEsperadas,
+        saidasEsperadas,
       };
     });
   }

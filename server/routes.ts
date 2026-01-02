@@ -3604,6 +3604,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/fluxo-caixa/snapshot", async (req, res) => {
+    try {
+      const mesAno = req.query.mesAno as string;
+      
+      if (!mesAno || !/^\d{4}-\d{2}$/.test(mesAno)) {
+        return res.status(400).json({ error: "mesAno is required in format YYYY-MM" });
+      }
+
+      const snapshot = await storage.getDfcSnapshot(mesAno);
+      res.json(snapshot);
+    } catch (error) {
+      console.error("[api] Error fetching DFC snapshot:", error);
+      res.status(500).json({ error: "Failed to fetch DFC snapshot" });
+    }
+  });
+
+  app.post("/api/fluxo-caixa/snapshot", async (req, res) => {
+    try {
+      const { mesAno } = req.body;
+      
+      if (!mesAno || !/^\d{4}-\d{2}$/.test(mesAno)) {
+        return res.status(400).json({ error: "mesAno is required in format YYYY-MM" });
+      }
+
+      const snapshot = await storage.createDfcSnapshot(mesAno);
+      res.json(snapshot);
+    } catch (error) {
+      console.error("[api] Error creating DFC snapshot:", error);
+      res.status(500).json({ error: "Failed to create DFC snapshot" });
+    }
+  });
+
   app.get("/api/financeiro/resumo", async (req, res) => {
     try {
       const mesAno = req.query.mesAno as string | undefined;
