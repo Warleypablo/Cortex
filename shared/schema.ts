@@ -397,10 +397,24 @@ export type FluxoCaixaDiarioCompleto = {
   saidas: number;
   saldoDia: number;
   saldoAcumulado: number;
+  saldoEsperado: number;
   entradasPagas: number;
   saidasPagas: number;
   entradasPrevistas: number;
   saidasPrevistas: number;
+  entradasEsperadas: number;
+  saidasEsperadas: number;
+};
+
+export type DfcSnapshot = {
+  mesAno: string;
+  dataSnapshot: Date;
+  saldoInicial: number;
+  dadosDiarios: {
+    data: string;
+    entradas: number;
+    saidas: number;
+  }[];
 };
 
 export type FluxoCaixaInsights = {
