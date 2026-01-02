@@ -129,6 +129,7 @@ interface ContratoDoc {
   comercial_empresa: string | null;
   status_faturamento: string | null;
   assinafy_signed_document_url: string | null;
+  assinafy_document_id: string | null;
   itens?: ContratoItem[];
   data_cadastro: string;
   data_atualizacao: string;
@@ -1402,11 +1403,11 @@ function ContratosTab() {
                 </div>
               </div>
 
-              {contratoDetail.assinafy_signed_document_url && (
+              {contratoDetail.assinafy_document_id && (
                 <div>
                   <Label className="text-muted-foreground">Documento Assinado</Label>
                   <a 
-                    href={contratoDetail.assinafy_signed_document_url} 
+                    href={`/api/contratos/assinafy/download/${contratoDetail.assinafy_document_id}`} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-primary hover:underline flex items-center gap-1 mt-1"
