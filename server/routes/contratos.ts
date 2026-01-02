@@ -1471,48 +1471,46 @@ export function registerContratosRoutes(app: Express) {
       const colLeft = marginLeft + 15;
       const colRight = marginLeft + contentWidth / 2 + 10;
       const colW = contentWidth / 2 - 25;
-      const lineH = 13;
+      const lineSpacing = 4; // Espaçamento entre linhas
 
       // Dados do endereço do cliente
       const enderecoCliente = [contrato.endereco, contrato.numero, contrato.complemento, contrato.bairro, contrato.cidade, contrato.estado, contrato.cep ? `CEP: ${contrato.cep}` : ''].filter(Boolean).join(', ');
 
+      // Função helper para escrever texto e retornar a altura usada
+      const writeField = (text: string, x: number, y: number, options: { width: number, font?: string, fontSize?: number, color?: string }) => {
+        doc.font(options.font || 'Helvetica')
+           .fontSize(options.fontSize || 10)
+           .fillColor(options.color || corTexto);
+        const textHeight = doc.heightOfString(text, { width: options.width });
+        doc.text(text, x, y, { width: options.width });
+        return textHeight + lineSpacing;
+      };
+
       // Coluna esquerda: CONTRATADO
       let leftY = currentY;
-      doc.fontSize(10).font('Helvetica-Bold').fillColor(corMuted).text('CONTRATADO:', colLeft, leftY);
-      leftY += lineH + 5;
-      doc.fontSize(10).font('Helvetica-Bold').fillColor(corTexto).text(turbo.nome.toUpperCase(), colLeft, leftY, { width: colW });
-      leftY += lineH;
-      doc.font('Helvetica').text(`CNPJ: ${turbo.cnpj}`, colLeft, leftY, { width: colW });
-      leftY += lineH;
-      doc.text(`Sócio: ${turbo.socio}, CPF: ${turbo.cpf_socio}`, colLeft, leftY, { width: colW });
-      leftY += lineH;
-      doc.text(`Endereço: ${turbo.endereco}`, colLeft, leftY, { width: colW });
-      leftY += lineH;
-      doc.text(`Telefone: ${turbo.telefone}`, colLeft, leftY, { width: colW });
-      leftY += lineH;
-      doc.text(`E-mail: ${turbo.email}`, colLeft, leftY, { width: colW });
-      leftY += lineH;
+      leftY += writeField('CONTRATADO:', colLeft, leftY, { width: colW, font: 'Helvetica-Bold', color: corMuted });
+      leftY += 2;
+      leftY += writeField(turbo.nome.toUpperCase(), colLeft, leftY, { width: colW, font: 'Helvetica-Bold' });
+      leftY += writeField(`CNPJ: ${turbo.cnpj}`, colLeft, leftY, { width: colW });
+      leftY += writeField(`Sócio: ${turbo.socio}, CPF: ${turbo.cpf_socio}`, colLeft, leftY, { width: colW });
+      leftY += writeField(`Endereço: ${turbo.endereco}`, colLeft, leftY, { width: colW });
+      leftY += writeField(`Telefone: ${turbo.telefone}`, colLeft, leftY, { width: colW });
+      leftY += writeField(`E-mail: ${turbo.email}`, colLeft, leftY, { width: colW });
 
       // Coluna direita: CONTRATANTE (em paralelo à esquerda)
       let rightY = currentY;
-      doc.fontSize(10).font('Helvetica-Bold').fillColor(corMuted).text('CONTRATANTE:', colRight, rightY);
-      rightY += lineH + 5;
-      doc.fontSize(10).font('Helvetica-Bold').fillColor(corTexto).text((contrato.cliente_nome || 'Cliente').toUpperCase(), colRight, rightY, { width: colW });
-      rightY += lineH;
-      doc.font('Helvetica').text(`${contrato.tipo_pessoa === 'juridica' ? 'CNPJ' : 'CPF'}: ${contrato.cpf_cnpj || '_____________'}`, colRight, rightY, { width: colW });
-      rightY += lineH;
+      rightY += writeField('CONTRATANTE:', colRight, rightY, { width: colW, font: 'Helvetica-Bold', color: corMuted });
+      rightY += 2;
+      rightY += writeField((contrato.cliente_nome || 'Cliente').toUpperCase(), colRight, rightY, { width: colW, font: 'Helvetica-Bold' });
+      rightY += writeField(`${contrato.tipo_pessoa === 'juridica' ? 'CNPJ' : 'CPF'}: ${contrato.cpf_cnpj || '_____________'}`, colRight, rightY, { width: colW });
       if (contrato.tipo_pessoa === 'juridica' && contrato.nome_socio) {
-        doc.text(`Sócio: ${contrato.nome_socio}, CPF: ${contrato.cpf_socio || '_____________'}`, colRight, rightY, { width: colW });
-        rightY += lineH;
+        rightY += writeField(`Sócio: ${contrato.nome_socio}, CPF: ${contrato.cpf_socio || '_____________'}`, colRight, rightY, { width: colW });
       }
-      doc.text(`Endereço: ${enderecoCliente || '_____________'}`, colRight, rightY, { width: colW });
-      rightY += lineH;
-      doc.text(`Telefone: ${contrato.telefone || '_____________'}`, colRight, rightY, { width: colW });
-      rightY += lineH;
-      doc.text(`E-mail: ${contrato.email || '_____________'}`, colRight, rightY, { width: colW });
-      rightY += lineH;
+      rightY += writeField(`Endereço: ${enderecoCliente || '_____________'}`, colRight, rightY, { width: colW });
+      rightY += writeField(`Telefone: ${contrato.telefone || '_____________'}`, colRight, rightY, { width: colW });
+      rightY += writeField(`E-mail: ${contrato.email || '_____________'}`, colRight, rightY, { width: colW });
 
-      currentY = Math.max(leftY, rightY) + 30;
+      currentY = Math.max(leftY, rightY) + 20;
 
       if (checkAborted()) return;
 
