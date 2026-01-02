@@ -218,15 +218,24 @@ export default function ChurnDetalhamento() {
     
     let filtered = [...data.contratos];
     
+    // Filter by date using the correct date column for each type:
+    // - Churn: uses data_encerramento
+    // - Pausado: uses data_pausa
     if (dataInicio) {
       const inicio = new Date(dataInicio);
-      filtered = filtered.filter(c => c.data_encerramento && new Date(c.data_encerramento) >= inicio);
+      filtered = filtered.filter(c => {
+        const refDate = c.tipo === 'pausado' ? c.data_pausa : c.data_encerramento;
+        return refDate && new Date(refDate) >= inicio;
+      });
     }
     
     if (dataFim) {
       const fim = new Date(dataFim);
       fim.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(c => c.data_encerramento && new Date(c.data_encerramento) <= fim);
+      filtered = filtered.filter(c => {
+        const refDate = c.tipo === 'pausado' ? c.data_pausa : c.data_encerramento;
+        return refDate && new Date(refDate) <= fim;
+      });
     }
     
     if (searchTerm) {

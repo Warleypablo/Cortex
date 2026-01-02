@@ -5862,10 +5862,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/analytics/churn-detalhamento", async (req, res) => {
     try {
       const meses = req.query.meses as string || "12";
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
       
       let churnDateFilter = sql`TRUE`;
       let pausaDateFilter = sql`TRUE`;
-      if (meses !== "all") {
+      
+      // If explicit date range provided, use it for each type with its respective date column
+      if (startDate && endDate) {
+        churnDateFilter = sql`c.data_encerramento >= ${startDate}::date AND c.data_encerramento <= ${endDate}::date`;
+        pausaDateFilter = sql`c.data_pausa >= ${startDate}::date AND c.data_pausa <= ${endDate}::date`;
+      } else if (meses !== "all") {
         const mesesNum = parseInt(meses) || 12;
         churnDateFilter = sql`c.data_encerramento >= NOW() - INTERVAL '${sql.raw(String(mesesNum))} months'`;
         pausaDateFilter = sql`c.data_pausa >= NOW() - INTERVAL '${sql.raw(String(mesesNum))} months'`;
