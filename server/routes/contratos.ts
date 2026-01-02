@@ -4,7 +4,80 @@ import { sql } from "drizzle-orm";
 import { isAuthenticated } from "../auth/middleware";
 import { stagingEntidades, stagingContratos, stagingContratoServicos, insertEntidadeSchema, insertContratoDocSchema, insertContratoServicoSchema } from "@shared/schema";
 
+let tablesInitialized = false;
+
+async function ensureContratosTablesExist() {
+  if (tablesInitialized) return;
+  
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.entidades (
+        id SERIAL PRIMARY KEY,
+        tipo_pessoa VARCHAR(20) NOT NULL DEFAULT 'juridica',
+        cpf_cnpj VARCHAR(20) NOT NULL UNIQUE,
+        nome_razao_social VARCHAR(255) NOT NULL,
+        email_principal VARCHAR(255),
+        email_cobranca VARCHAR(255),
+        telefone_principal VARCHAR(20),
+        telefone_cobranca VARCHAR(20),
+        cep VARCHAR(10),
+        numero VARCHAR(20),
+        logradouro VARCHAR(255),
+        bairro VARCHAR(100),
+        complemento VARCHAR(100),
+        cidade VARCHAR(100),
+        estado VARCHAR(2),
+        tipo_entidade VARCHAR(20) NOT NULL DEFAULT 'cliente',
+        observacoes TEXT,
+        ativo BOOLEAN DEFAULT true,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.contratos (
+        id SERIAL PRIMARY KEY,
+        numero_contrato VARCHAR(50) NOT NULL UNIQUE,
+        entidade_id INTEGER REFERENCES staging.entidades(id),
+        comercial_responsavel VARCHAR(255),
+        comercial_responsavel_email VARCHAR(255),
+        id_crm_bitrix VARCHAR(50),
+        status VARCHAR(30) DEFAULT 'rascunho',
+        data_inicio DATE,
+        data_fim DATE,
+        observacoes TEXT,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.contrato_servicos (
+        id SERIAL PRIMARY KEY,
+        contrato_id INTEGER REFERENCES staging.contratos(id) ON DELETE CASCADE,
+        servico_nome VARCHAR(255) NOT NULL,
+        plano VARCHAR(100),
+        valor_original DECIMAL(12, 2) DEFAULT 0,
+        valor_negociado DECIMAL(12, 2) DEFAULT 0,
+        desconto_percentual DECIMAL(5, 2) DEFAULT 0,
+        valor_final DECIMAL(12, 2) DEFAULT 0,
+        economia DECIMAL(12, 2) DEFAULT 0,
+        modalidade VARCHAR(50),
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    tablesInitialized = true;
+    console.log("[contratos] Tables initialized successfully");
+  } catch (error) {
+    console.error("[contratos] Error initializing tables:", error);
+  }
+}
+
 export function registerContratosRoutes(app: Express) {
+  ensureContratosTablesExist();
+  
   // ============================================================================
   // ENTIDADES ROUTES
   // ============================================================================

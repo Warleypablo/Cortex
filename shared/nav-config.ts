@@ -69,6 +69,7 @@ export const PERMISSION_KEYS = {
   // Jurídico
   JUR: {
     CLIENTES_INADIMPLENTES: 'jur.clientes_inadimplentes',
+    CONTRATOS_MODULE: 'jur.contratos_module',
   },
   // Reports
   REPORTS: {
@@ -199,6 +200,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/patrimonio': PERMISSION_KEYS.GG.PATRIMONIO,
   // Jurídico
   '/juridico/clientes': PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES,
+  '/contratos-module': PERMISSION_KEYS.JUR.CONTRATOS_MODULE,
   // Reports
   '/investors-report': PERMISSION_KEYS.REPORTS.INVESTORS,
   // Administração
@@ -381,6 +383,16 @@ export const NAV_CONFIG = {
       { title: 'Patrimônio', url: '/patrimonio', icon: 'Building2', permissionKey: PERMISSION_KEYS.GG.PATRIMONIO },
     ],
   },
+
+  // Jurídico section
+  juridico: {
+    title: 'Jurídico',
+    icon: 'Scale',
+    items: [
+      { title: 'Clientes Inadimplentes', url: '/juridico/clientes', icon: 'Gavel', permissionKey: PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES },
+      { title: 'Contratos', url: '/contratos-module', icon: 'FileText', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_MODULE },
+    ],
+  },
   
   // Governança section
   governanca: [
@@ -542,6 +554,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GG.COLABORADORES]: 'Colaboradores',
   [PERMISSION_KEYS.GG.PATRIMONIO]: 'Patrimônio',
   [PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES]: 'Clientes Inadimplentes',
+  [PERMISSION_KEYS.JUR.CONTRATOS_MODULE]: 'Contratos',
   [PERMISSION_KEYS.REPORTS.INVESTORS]: 'Investors Report',
   [PERMISSION_KEYS.ADMIN.USUARIOS]: 'Administração',
 };
