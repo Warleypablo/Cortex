@@ -5858,19 +5858,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Churn Detalhamento - lista de contratos encerrados/churned com detalhes
+  // Churn Detalhamento - lista de contratos encerrados/churned e pausados com detalhes
   app.get("/api/analytics/churn-detalhamento", async (req, res) => {
     try {
       const meses = req.query.meses as string || "12";
       
-      let dateFilter = sql`TRUE`;
+      let churnDateFilter = sql`TRUE`;
+      let pausaDateFilter = sql`TRUE`;
       if (meses !== "all") {
         const mesesNum = parseInt(meses) || 12;
-        dateFilter = sql`c.data_encerramento >= NOW() - INTERVAL '${sql.raw(String(mesesNum))} months'`;
+        churnDateFilter = sql`c.data_encerramento >= NOW() - INTERVAL '${sql.raw(String(mesesNum))} months'`;
+        pausaDateFilter = sql`c.data_pausa >= NOW() - INTERVAL '${sql.raw(String(mesesNum))} months'`;
       }
       
       // Get churned/encerrados contracts (filter by status containing churn or encerrado)
-      const contratosResult = await db.execute(sql`
+      const churnResult = await db.execute(sql`
         SELECT 
           c.id_task as id,
           cl.nome as cliente_nome,
@@ -5881,8 +5883,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(c.valorr, 0) as valorr,
           c.data_inicio,
           c.data_encerramento,
+          NULL::timestamp as data_pausa,
           c.status,
           c.servico,
+          'churn' as tipo,
           CASE 
             WHEN c.data_inicio IS NOT NULL AND c.data_encerramento IS NOT NULL 
             THEN GREATEST(0.5, 
@@ -5898,43 +5902,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
             OR LOWER(TRIM(c.status)) LIKE '%encerrad%'
             OR LOWER(TRIM(c.status)) LIKE '%cancelad%'
           )
-          AND ${dateFilter}
-        ORDER BY c.data_encerramento DESC
+          AND ${churnDateFilter}
       `);
       
-      const contratos = contratosResult.rows.map((row: any) => ({
-        id: row.id,
-        cliente_nome: row.cliente_nome || 'Cliente não identificado',
-        cnpj: row.cnpj || '',
-        produto: row.produto || 'Não especificado',
-        squad: row.squad || 'Não especificado',
-        responsavel: row.responsavel || 'Não especificado',
-        valorr: Number(row.valorr) || 0,
-        data_inicio: row.data_inicio,
-        data_encerramento: row.data_encerramento,
-        status: row.status || 'encerrado',
-        servico: row.servico || 'Não especificado',
-        lifetime_meses: Number(row.lifetime_meses) || 0,
-        ltv: (Number(row.valorr) || 0) * (Number(row.lifetime_meses) || 0),
-      }));
+      // Get paused contracts
+      const pausaResult = await db.execute(sql`
+        SELECT 
+          c.id_task as id,
+          cl.nome as cliente_nome,
+          cl.cnpj,
+          c.produto,
+          c.squad,
+          c.responsavel,
+          COALESCE(c.valorr, 0) as valorr,
+          c.data_inicio,
+          NULL::timestamp as data_encerramento,
+          c.data_pausa,
+          c.status,
+          c.servico,
+          'pausado' as tipo,
+          CASE 
+            WHEN c.data_inicio IS NOT NULL AND c.data_pausa IS NOT NULL 
+            THEN GREATEST(0.5, 
+              (c.data_pausa::date - c.data_inicio::date)::numeric / 30.44
+            )
+            ELSE 0 
+          END as lifetime_meses
+        FROM cup_contratos c
+        LEFT JOIN cup_clientes cl ON c.id_task = cl.task_id
+        WHERE c.data_pausa IS NOT NULL
+          AND LOWER(TRIM(c.status)) = 'pausado'
+          AND ${pausaDateFilter}
+      `);
+      
+      // Combine and sort by date (encerramento or pausa)
+      const allContratos = [
+        ...churnResult.rows.map((row: any) => ({
+          id: row.id,
+          cliente_nome: row.cliente_nome || 'Cliente não identificado',
+          cnpj: row.cnpj || '',
+          produto: row.produto || 'Não especificado',
+          squad: row.squad || 'Não especificado',
+          responsavel: row.responsavel || 'Não especificado',
+          valorr: Number(row.valorr) || 0,
+          data_inicio: row.data_inicio,
+          data_encerramento: row.data_encerramento,
+          data_pausa: null,
+          status: row.status || 'encerrado',
+          servico: row.servico || 'Não especificado',
+          tipo: 'churn',
+          lifetime_meses: Number(row.lifetime_meses) || 0,
+          ltv: (Number(row.valorr) || 0) * (Number(row.lifetime_meses) || 0),
+        })),
+        ...pausaResult.rows.map((row: any) => ({
+          id: row.id,
+          cliente_nome: row.cliente_nome || 'Cliente não identificado',
+          cnpj: row.cnpj || '',
+          produto: row.produto || 'Não especificado',
+          squad: row.squad || 'Não especificado',
+          responsavel: row.responsavel || 'Não especificado',
+          valorr: Number(row.valorr) || 0,
+          data_inicio: row.data_inicio,
+          data_encerramento: null,
+          data_pausa: row.data_pausa,
+          status: row.status || 'pausado',
+          servico: row.servico || 'Não especificado',
+          tipo: 'pausado',
+          lifetime_meses: Number(row.lifetime_meses) || 0,
+          ltv: (Number(row.valorr) || 0) * (Number(row.lifetime_meses) || 0),
+        })),
+      ].sort((a, b) => {
+        const dateA = a.data_encerramento || a.data_pausa;
+        const dateB = b.data_encerramento || b.data_pausa;
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      });
       
       // Get unique values for filters
-      const squads = Array.from(new Set(contratos.map((c: any) => c.squad).filter(Boolean))).sort();
-      const produtos = Array.from(new Set(contratos.map((c: any) => c.produto).filter(Boolean))).sort();
-      const responsaveis = Array.from(new Set(contratos.map((c: any) => c.responsavel).filter(Boolean))).sort();
-      const servicos = Array.from(new Set(contratos.map((c: any) => c.servico).filter(Boolean))).sort();
+      const squads = Array.from(new Set(allContratos.map((c: any) => c.squad).filter(Boolean))).sort();
+      const produtos = Array.from(new Set(allContratos.map((c: any) => c.produto).filter(Boolean))).sort();
+      const responsaveis = Array.from(new Set(allContratos.map((c: any) => c.responsavel).filter(Boolean))).sort();
+      const servicos = Array.from(new Set(allContratos.map((c: any) => c.servico).filter(Boolean))).sort();
       
-      // Calculate metrics
-      const totalChurned = contratos.length;
-      const mrrPerdido = contratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
-      const ltvTotal = contratos.reduce((sum: number, c: any) => sum + c.ltv, 0);
-      const ltMedio = totalChurned > 0 ? contratos.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
+      // Calculate metrics separately for churn and pausado
+      const churnContratos = allContratos.filter(c => c.tipo === 'churn');
+      const pausadoContratos = allContratos.filter(c => c.tipo === 'pausado');
+      
+      const totalChurned = churnContratos.length;
+      const totalPausados = pausadoContratos.length;
+      const mrrPerdidoChurn = churnContratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
+      const mrrPerdidoPausado = pausadoContratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
+      const ltvTotal = churnContratos.reduce((sum: number, c: any) => sum + c.ltv, 0);
+      const ltMedio = totalChurned > 0 ? churnContratos.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
       
       res.json({
-        contratos,
+        contratos: allContratos,
         metricas: {
           total_churned: totalChurned,
-          mrr_perdido: mrrPerdido,
+          total_pausados: totalPausados,
+          mrr_perdido: mrrPerdidoChurn,
+          mrr_pausado: mrrPerdidoPausado,
           ltv_total: ltvTotal,
           lt_medio: ltMedio,
         },
