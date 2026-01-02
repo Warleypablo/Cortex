@@ -3494,14 +3494,24 @@ export class DbStorage implements IStorage {
     const fimMes = new Date(ano, mes, 0, 23, 59, 59);
 
     // Buscar último snapshot do mês filtrado
-    const ultimoSnapshotQuery = await db.execute(sql`
+    let ultimoSnapshotQuery = await db.execute(sql`
       SELECT MAX(data_snapshot) as data_ultimo_snapshot
       FROM ${schema.cupDataHist}
       WHERE data_snapshot >= ${inicioMes}::timestamp
         AND data_snapshot <= ${fimMes}::timestamp
     `);
 
-    const dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
+    let dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
+
+    // Se não houver snapshot no mês selecionado, buscar o último snapshot disponível até a data de fim do mês
+    if (!dataUltimoSnapshot) {
+      const fallbackSnapshotQuery = await db.execute(sql`
+        SELECT MAX(data_snapshot) as data_ultimo_snapshot
+        FROM ${schema.cupDataHist}
+        WHERE data_snapshot <= ${fimMes}::timestamp
+      `);
+      dataUltimoSnapshot = (fallbackSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
+    }
 
     if (!dataUltimoSnapshot) {
       return {
