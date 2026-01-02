@@ -433,6 +433,20 @@ async function ensureContratosTablesExist() {
     
     tablesInitialized = true;
     console.log("[contratos] All tables initialized successfully");
+    
+    // Import data from CSV file using batch import
+    try {
+      const { runImport } = await import('../scripts/importContratos');
+      runImport().then(results => {
+        if (results.length > 0) {
+          console.log("[import] Batch import results:", results.map(r => `${r.table}: ${r.imported} imported`).join(', '));
+        }
+      }).catch(err => {
+        console.log("[import] Batch import failed:", err.message);
+      });
+    } catch (importError: any) {
+      console.log("[contratos] Import skipped or failed:", importError.message);
+    }
   } catch (error) {
     console.error("[contratos] Error initializing tables:", error);
   }
@@ -968,6 +982,141 @@ export function registerContratosRoutes(app: Express) {
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
       res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  // Import CSV data endpoint
+  app.post("/api/contratos/import-csv", isAuthenticated, async (req, res) => {
+    const parseCSVLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          result.push(current);
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current);
+      
+      return result;
+    };
+
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      const csvPath = path.join(process.cwd(), 'attached_assets', 'turbop58_contratos_(2)_1767374833084.csv');
+      
+      if (!fs.existsSync(csvPath)) {
+        return res.status(404).json({ error: "CSV file not found" });
+      }
+      
+      const content = fs.readFileSync(csvPath, 'utf-8');
+      const allLines = content.split('\n');
+      
+      console.log(`[import] Loaded CSV with ${allLines.length} lines`);
+      
+      interface CSVSection {
+        startLine: number;
+        endLine: number;
+        tableName: string;
+        headers: string[];
+      }
+      
+      const sections: CSVSection[] = [
+        { startLine: 6862, endLine: 6888, tableName: 'servicos', headers: [] },
+        { startLine: 4903, endLine: 5171, tableName: 'entidades', headers: [] },
+        { startLine: 5722, endLine: 6861, tableName: 'planos_servicos', headers: [] },
+        { startLine: 3353, endLine: 4475, tableName: 'contratos', headers: [] },
+        { startLine: 4476, endLine: 4902, tableName: 'contratos_itens', headers: [] },
+      ];
+      
+      const results: Record<string, { imported: number; skipped: number; errors: string[] }> = {};
+      
+      for (const section of sections) {
+        const headerLine = allLines[section.startLine - 1];
+        section.headers = parseCSVLine(headerLine);
+        
+        const dataLines = allLines.slice(section.startLine, section.endLine);
+        
+        let imported = 0;
+        let skipped = 0;
+        const errors: string[] = [];
+        
+        for (const line of dataLines) {
+          if (!line.trim()) {
+            skipped++;
+            continue;
+          }
+          
+          const values = parseCSVLine(line);
+          if (values.length !== section.headers.length) {
+            skipped++;
+            continue;
+          }
+          
+          const record: Record<string, any> = {};
+          for (let i = 0; i < section.headers.length; i++) {
+            let value = values[i];
+            
+            if (value === '' || value === 'NULL' || value === undefined) {
+              record[section.headers[i]] = null;
+            } else if (value === '0' || value === '1') {
+              if (section.headers[i].startsWith('eh_') || section.headers[i] === 'ativo') {
+                record[section.headers[i]] = value === '1';
+              } else {
+                record[section.headers[i]] = value;
+              }
+            } else {
+              record[section.headers[i]] = value;
+            }
+          }
+          
+          try {
+            const columns = Object.keys(record);
+            const valuesStr = columns.map(c => {
+              const v = record[c];
+              if (v === null) return 'NULL';
+              if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+              return `'${String(v).replace(/'/g, "''")}'`;
+            }).join(', ');
+            const columnsStr = columns.map(c => `"${c}"`).join(', ');
+            
+            await db.execute(sql.raw(`
+              INSERT INTO staging.${section.tableName} (${columnsStr})
+              VALUES (${valuesStr})
+              ON CONFLICT (id) DO NOTHING
+            `));
+            imported++;
+          } catch (err: any) {
+            if (errors.length < 5) {
+              errors.push(err.message);
+            }
+            skipped++;
+          }
+        }
+        
+        results[section.tableName] = { imported, skipped, errors };
+        console.log(`[import] ${section.tableName}: ${imported} imported, ${skipped} skipped`);
+      }
+      
+      res.json({ success: true, results });
+    } catch (error: any) {
+      console.error("[import] Error:", error);
+      res.status(500).json({ error: error.message || "Import failed" });
     }
   });
 }
