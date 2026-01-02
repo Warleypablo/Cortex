@@ -54,6 +54,36 @@ async function ensureContratosTablesExist() {
       console.log("[contratos] Entidades migration skipped or table doesn't exist:", migrationError);
     }
 
+    // Migrate contratos table structure if needed
+    try {
+      const result = await db.execute(sql`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_schema = 'staging' AND table_name = 'contratos' AND column_name = 'cliente_id'
+      `);
+      
+      if (result.rows.length === 0) {
+        console.log("[contratos] Migrating contratos table structure...");
+        
+        await db.execute(sql`
+          ALTER TABLE staging.contratos 
+          ADD COLUMN IF NOT EXISTS cliente_id INTEGER,
+          ADD COLUMN IF NOT EXISTS fornecedor_id INTEGER,
+          ADD COLUMN IF NOT EXISTS status_faturamento VARCHAR(50) DEFAULT 'pendente',
+          ADD COLUMN IF NOT EXISTS data_ultima_fatura DATE,
+          ADD COLUMN IF NOT EXISTS usuario_fatura INTEGER,
+          ADD COLUMN IF NOT EXISTS comercial_nome VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS comercial_email VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS comercial_telefone VARCHAR(50),
+          ADD COLUMN IF NOT EXISTS comercial_cargo VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS comercial_empresa VARCHAR(255)
+        `);
+        
+        console.log("[contratos] Contratos table migration completed");
+      }
+    } catch (migrationError) {
+      console.log("[contratos] Contratos migration skipped or table doesn't exist:", migrationError);
+    }
+
     // Serviços - catálogo de serviços oferecidos
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS staging.servicos (
