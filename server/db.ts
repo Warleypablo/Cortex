@@ -1499,3 +1499,28 @@ export async function initializeRhComentariosTables(): Promise<void> {
     console.error('[database] Error initializing RH Comentarios table:', error);
   }
 }
+
+export async function initializeDfcSnapshotsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.dfc_snapshots (
+        id SERIAL PRIMARY KEY,
+        mes_ano VARCHAR(7) NOT NULL,
+        data_snapshot TIMESTAMP NOT NULL DEFAULT NOW(),
+        saldo_inicial NUMERIC(15,2) NOT NULL,
+        dados_diarios JSONB NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE(mes_ano)
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_dfc_snapshots_mes_ano 
+      ON staging.dfc_snapshots(mes_ano)
+    `);
+    
+    console.log('[database] DFC Snapshots table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing DFC Snapshots table:', error);
+  }
+}
