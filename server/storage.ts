@@ -128,6 +128,8 @@ export interface VisaoGeralMetricas {
   mrr: number;
   aquisicaoMrr: number;
   aquisicaoPontual: number;
+  aquisicaoPontualCommerce: number;
+  aquisicaoPontualTech: number;
   receitaPontualEntregue: number;
   churn: number;
   pausados: number;
@@ -3638,6 +3640,8 @@ export class DbStorage implements IStorage {
         mrr: 0,
         aquisicaoMrr: 0,
         aquisicaoPontual: 0,
+        aquisicaoPontualCommerce: 0,
+        aquisicaoPontualTech: 0,
         receitaPontualEntregue: 0,
         churn: 0,
         pausados: 0,
@@ -3688,6 +3692,32 @@ export class DbStorage implements IStorage {
           END
         ), 0) as aquisicao_pontual,
         
+        -- Aquisição Pontual Commerce: valor_p dos contratos de Commerce criados no período
+        COALESCE(SUM(
+          CASE 
+            WHEN data_inicio >= ${inicioMes}
+              AND data_inicio <= ${fimMes}
+              AND valorp IS NOT NULL
+              AND valorp > 0
+              AND (LOWER(squad) LIKE '%commerce%' OR LOWER(squad) LIKE '%ecommerce%' OR LOWER(squad) LIKE '%e-commerce%')
+            THEN valorp::numeric
+            ELSE 0 
+          END
+        ), 0) as aquisicao_pontual_commerce,
+        
+        -- Aquisição Pontual Tech: valor_p dos contratos de Tech criados no período
+        COALESCE(SUM(
+          CASE 
+            WHEN data_inicio >= ${inicioMes}
+              AND data_inicio <= ${fimMes}
+              AND valorp IS NOT NULL
+              AND valorp > 0
+              AND (LOWER(squad) LIKE '%tech%' OR LOWER(squad) LIKE '%tecnologia%' OR LOWER(squad) LIKE '%dev%')
+            THEN valorp::numeric
+            ELSE 0 
+          END
+        ), 0) as aquisicao_pontual_tech,
+        
         -- Churn: contratos encerrados no período
         COALESCE(SUM(
           CASE 
@@ -3733,6 +3763,8 @@ export class DbStorage implements IStorage {
     const mrr = parseFloat(mrrRow.mrr || '0');
     const aquisicaoMrr = parseFloat(transRow.aquisicao_mrr || '0');
     const aquisicaoPontual = parseFloat(transRow.aquisicao_pontual || '0');
+    const aquisicaoPontualCommerce = parseFloat(transRow.aquisicao_pontual_commerce || '0');
+    const aquisicaoPontualTech = parseFloat(transRow.aquisicao_pontual_tech || '0');
     const churn = parseFloat(transRow.churn || '0');
     const pausados = parseFloat(transRow.pausados || '0');
     const receitaPontualEntregue = parseFloat(transRow.receita_pontual_entregue || '0');
@@ -3742,6 +3774,8 @@ export class DbStorage implements IStorage {
       mrr,
       aquisicaoMrr,
       aquisicaoPontual,
+      aquisicaoPontualCommerce,
+      aquisicaoPontualTech,
       receitaPontualEntregue,
       churn,
       pausados,
