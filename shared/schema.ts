@@ -2489,9 +2489,9 @@ export const stagingContratos = pgTable("staging.contratos", {
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
 
-export const insertContratoSchema = createInsertSchema(stagingContratos).omit({ id: true, criadoEm: true, atualizadoEm: true });
-export type Contrato = typeof stagingContratos.$inferSelect;
-export type InsertContrato = z.infer<typeof insertContratoSchema>;
+export const insertContratoDocSchema = createInsertSchema(stagingContratos).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type ContratoDoc = typeof stagingContratos.$inferSelect;
+export type InsertContratoDoc = z.infer<typeof insertContratoDocSchema>;
 
 // Tabela de Serviços do Contrato
 export const stagingContratoServicos = pgTable("staging.contrato_servicos", {
