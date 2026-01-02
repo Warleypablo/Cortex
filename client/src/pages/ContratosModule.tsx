@@ -1084,7 +1084,7 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                   </div>
                   <div className="flex flex-col items-end gap-1 text-sm">
                     <span className="text-muted-foreground">
-                      Desconto: {(item.desconto_percentual || 0).toFixed(1)}%
+                      Desconto: {(Number(item.desconto_percentual) || 0).toFixed(1)}%
                     </span>
                     <span className="text-green-500 font-medium">
                       Economia: {formatCurrency(((item.valor_tabela || 0) - item.valor_negociado) * item.quantidade)}
@@ -1397,7 +1397,7 @@ function ContratosTab() {
                             <TableCell className="text-right">{formatCurrency(item.valor_tabela || 0)}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(item.valor_negociado)}</TableCell>
                             <TableCell className="text-right text-green-500">
-                              {(item.desconto_percentual || 0).toFixed(1)}%
+                              {(Number(item.desconto_percentual) || 0).toFixed(1)}%
                             </TableCell>
                           </TableRow>
                         ))}
