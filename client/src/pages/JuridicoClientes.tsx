@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useDeferredValue, useCallback, memo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -166,6 +166,7 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
   useSetPageInfo(embedded ? "" : "Cobrança Jurídica", embedded ? "" : "Gestão de clientes inadimplentes");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<string>("ativos");
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
   const [editingCliente, setEditingCliente] = useState<ClienteJuridico | null>(null);
   const [editForm, setEditForm] = useState({
@@ -175,6 +176,9 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
     valorAcordado: "",
   });
   const { toast } = useToast();
+  
+  const deferredSearchTerm = useDeferredValue(searchTerm);
+  const deferredStatusFilter = useDeferredValue(statusFilter);
 
   const { data, isLoading } = useQuery<{ clientes: ClienteJuridico[] }>({
     queryKey: ["/api/juridico/clientes"],
@@ -202,42 +206,37 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
 
   const clientes = data?.clientes || [];
 
-  const filteredClientes = useMemo(() => {
-    return clientes.filter((item) => {
+  const { sortedClientes, totals } = useMemo(() => {
+    const searchLower = deferredSearchTerm.toLowerCase();
+    
+    const filtered = clientes.filter((item) => {
       const matchesSearch =
-        searchTerm === "" ||
-        item.cliente.nomeCliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.cliente.empresa?.toLowerCase().includes(searchTerm.toLowerCase());
+        deferredSearchTerm === "" ||
+        item.cliente.nomeCliente.toLowerCase().includes(searchLower) ||
+        item.cliente.empresa?.toLowerCase().includes(searchLower);
 
       const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "pendente" && !item.contexto?.procedimentoJuridico) ||
-        item.contexto?.procedimentoJuridico === statusFilter;
+        deferredStatusFilter === "all" ||
+        (deferredStatusFilter === "pendente" && !item.contexto?.procedimentoJuridico) ||
+        item.contexto?.procedimentoJuridico === deferredStatusFilter;
 
       return matchesSearch && matchesStatus;
     });
-  }, [clientes, searchTerm, statusFilter]);
 
-  const sortedClientes = useMemo(() => {
-    return [...filteredClientes].sort((a, b) => b.cliente.diasAtrasoMax - a.cliente.diasAtrasoMax);
-  }, [filteredClientes]);
+    const sorted = filtered.sort((a, b) => b.cliente.diasAtrasoMax - a.cliente.diasAtrasoMax);
 
-  const totals = useMemo(() => {
-    // Single-pass reducer for performance optimization
-    const stats = filteredClientes.reduce((acc, c) => {
+    const stats = filtered.reduce((acc, c) => {
       const dias = c.cliente.diasAtrasoMax;
       const proc = c.contexto?.procedimentoJuridico || 'sem_acao';
       
       acc.total += c.cliente.valorTotal;
       acc.totalDias += dias;
       
-      // Urgency buckets
       if (dias > 90) acc.urgentes++;
       else if (dias > 60) acc.atencao++;
       else if (dias > 30) acc.moderado++;
       else acc.recente++;
       
-      // Procedimento counts
       acc.porProcedimento[proc] = (acc.porProcedimento[proc] || 0) + 1;
       
       return acc;
@@ -251,7 +250,7 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
       porProcedimento: {} as Record<string, number>
     });
     
-    const count = filteredClientes.length;
+    const count = filtered.length;
     const semAcao = stats.porProcedimento['sem_acao'] || 0;
     const ticketMedio = count > 0 ? stats.total / count : 0;
     const diasMedio = count > 0 ? stats.totalDias / count : 0;
@@ -259,7 +258,6 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
     
     const porProcedimento = stats.porProcedimento;
     
-    // Distribuição por urgência para gráfico
     const distribuicaoUrgencia = [
       { name: 'Urgente (+90d)', value: stats.urgentes, color: '#ef4444' },
       { name: 'Atenção (60-90d)', value: stats.atencao, color: '#f97316' },
@@ -267,7 +265,6 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
       { name: 'Recente (-30d)', value: stats.recente, color: '#94a3b8' },
     ].filter(d => d.value > 0);
     
-    // Distribuição por procedimento para gráfico
     const distribuicaoProcedimento = [
       { name: 'Sem Ação', value: porProcedimento['sem_acao'], color: '#d1d5db' },
       { name: 'Notificação', value: porProcedimento['notificacao'], color: '#3b82f6' },
@@ -278,21 +275,24 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
     ].filter(d => d.value > 0);
     
     return { 
-      total: stats.total, 
-      count, 
-      urgentes: stats.urgentes, 
-      atencao: stats.atencao,
-      moderado: stats.moderado,
-      recente: stats.recente,
-      semAcao, 
-      ticketMedio, 
-      diasMedio, 
-      percentUrgente,
-      porProcedimento,
-      distribuicaoUrgencia,
-      distribuicaoProcedimento
+      sortedClientes: sorted,
+      totals: {
+        total: stats.total, 
+        count, 
+        urgentes: stats.urgentes, 
+        atencao: stats.atencao,
+        moderado: stats.moderado,
+        recente: stats.recente,
+        semAcao, 
+        ticketMedio, 
+        diasMedio, 
+        percentUrgente,
+        porProcedimento,
+        distribuicaoUrgencia,
+        distribuicaoProcedimento
+      }
     };
-  }, [filteredClientes]);
+  }, [clientes, deferredSearchTerm, deferredStatusFilter]);
 
   // Clientes pré-negociados (recuperados antes do registro no sistema jurídico)
   const clientesPreNegociados = useMemo(() => [
@@ -311,12 +311,27 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
   ], []);
 
   const recuperadosStats = useMemo(() => {
+    if (activeTab !== 'recuperados') {
+      const recuperadosSistemaCount = clientes.filter(c => 
+        c.contexto?.statusJuridico === 'concluido' && 
+        (c.contexto?.procedimentoJuridico === 'acordo' || c.contexto?.procedimentoJuridico === 'baixa')
+      ).length;
+      return { 
+        clientesRecuperados: recuperadosSistemaCount + clientesPreNegociados.length, 
+        valorNegociado: 0, 
+        valorOriginal: 0, 
+        taxaRecuperacao: 0, 
+        porProcedimento: { acordo: 0, baixa: 0 }, 
+        lista: [] as ClienteJuridico[],
+        listaPreNegociados: clientesPreNegociados
+      };
+    }
+    
     const recuperadosSistema = clientes.filter(c => 
       c.contexto?.statusJuridico === 'concluido' && 
       (c.contexto?.procedimentoJuridico === 'acordo' || c.contexto?.procedimentoJuridico === 'baixa')
     );
     
-    // Combina recuperados do sistema + pré-negociados
     const totalRecuperados = recuperadosSistema.length + clientesPreNegociados.length;
     const valorNegociadoSistema = recuperadosSistema.reduce((acc, c) => acc + (c.contexto?.valorAcordado || 0), 0);
     const valorOriginalSistema = recuperadosSistema.reduce((acc, c) => acc + c.cliente.valorTotal, 0);
@@ -342,7 +357,7 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
       lista: recuperadosSistema,
       listaPreNegociados: clientesPreNegociados
     };
-  }, [clientes, clientesPreNegociados]);
+  }, [clientes, clientesPreNegociados, activeTab]);
 
   const openEditModal = (cliente: ClienteJuridico) => {
     setEditingCliente(cliente);
@@ -435,7 +450,7 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
 
       <div className={embedded ? "space-y-6" : "max-w-6xl mx-auto px-6 py-6 space-y-6"}>
         
-        <Tabs defaultValue="ativos" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-card shadow-sm border p-1 h-auto">
             <TabsTrigger 
               value="ativos" 
