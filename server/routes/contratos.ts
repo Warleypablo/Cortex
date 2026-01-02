@@ -1172,4 +1172,49 @@ export function registerContratosRoutes(app: Express) {
       res.status(500).json({ error: error.message || "Import failed" });
     }
   });
+
+  // Proxy para download de documento assinado do Assinafy
+  app.get("/api/contratos/assinafy/download/:documentId", isAuthenticated, async (req, res) => {
+    try {
+      const { documentId } = req.params;
+      
+      // Buscar configuração do Assinafy
+      const configResult = await db.execute(sql`
+        SELECT api_key, api_url FROM staging.assinafy_config WHERE ativo = true LIMIT 1
+      `);
+      
+      if (configResult.rows.length === 0) {
+        return res.status(500).json({ error: "Configuração Assinafy não encontrada" });
+      }
+      
+      const config = configResult.rows[0] as { api_key: string; api_url: string };
+      const downloadUrl = `${config.api_url}/documents/${documentId}/download/certificated`;
+      
+      // Fazer requisição autenticada ao Assinafy
+      const response = await fetch(downloadUrl, {
+        headers: {
+          'Authorization': `Bearer ${config.api_key}`,
+          'Accept': 'application/pdf'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[assinafy] Download error:", response.status, errorText);
+        return res.status(response.status).json({ error: "Erro ao baixar documento", details: errorText });
+      }
+      
+      // Definir headers para download do PDF
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="contrato-${documentId}.pdf"`);
+      
+      // Stream do PDF para o cliente
+      const buffer = await response.arrayBuffer();
+      res.send(Buffer.from(buffer));
+      
+    } catch (error: any) {
+      console.error("[assinafy] Download error:", error);
+      res.status(500).json({ error: "Erro ao baixar documento" });
+    }
+  });
 }
