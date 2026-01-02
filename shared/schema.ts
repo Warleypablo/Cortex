@@ -2440,3 +2440,74 @@ export const insertSugestaoSchema = createInsertSchema(stagingSugestoes).omit({ 
 
 export type Sugestao = typeof stagingSugestoes.$inferSelect;
 export type InsertSugestao = z.infer<typeof insertSugestaoSchema>;
+
+// ============================================================================
+// MÓDULO DE CONTRATOS - Tabelas para gestão de entidades e contratos
+// ============================================================================
+
+// Tabela de Entidades (Clientes/Fornecedores)
+export const stagingEntidades = pgTable("staging.entidades", {
+  id: serial("id").primaryKey(),
+  tipoPessoa: varchar("tipo_pessoa", { length: 20 }).notNull(), // 'fisica' ou 'juridica'
+  cpfCnpj: varchar("cpf_cnpj", { length: 18 }).notNull().unique(),
+  nomeRazaoSocial: varchar("nome_razao_social", { length: 255 }).notNull(),
+  emailPrincipal: varchar("email_principal", { length: 255 }),
+  emailCobranca: varchar("email_cobranca", { length: 255 }),
+  telefonePrincipal: varchar("telefone_principal", { length: 20 }),
+  telefoneCobranca: varchar("telefone_cobranca", { length: 20 }),
+  cep: varchar("cep", { length: 10 }),
+  numero: varchar("numero", { length: 20 }),
+  logradouro: varchar("logradouro", { length: 255 }),
+  bairro: varchar("bairro", { length: 100 }),
+  complemento: varchar("complemento", { length: 255 }),
+  cidade: varchar("cidade", { length: 100 }),
+  estado: varchar("estado", { length: 2 }),
+  tipoEntidade: varchar("tipo_entidade", { length: 50 }).notNull(), // 'cliente', 'fornecedor', 'ambos'
+  observacoes: text("observacoes"),
+  ativo: boolean("ativo").default(true),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const insertEntidadeSchema = createInsertSchema(stagingEntidades).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type Entidade = typeof stagingEntidades.$inferSelect;
+export type InsertEntidade = z.infer<typeof insertEntidadeSchema>;
+
+// Tabela de Contratos
+export const stagingContratos = pgTable("staging.contratos", {
+  id: serial("id").primaryKey(),
+  numeroContrato: varchar("numero_contrato", { length: 20 }).notNull().unique(),
+  entidadeId: integer("entidade_id").notNull(),
+  comercialResponsavel: varchar("comercial_responsavel", { length: 255 }),
+  comercialResponsavelEmail: varchar("comercial_responsavel_email", { length: 255 }),
+  idCrmBitrix: varchar("id_crm_bitrix", { length: 50 }),
+  status: varchar("status", { length: 50 }).default("rascunho"), // 'rascunho', 'ativo', 'pausado', 'cancelado', 'encerrado'
+  dataInicio: date("data_inicio"),
+  dataFim: date("data_fim"),
+  observacoes: text("observacoes"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const insertContratoSchema = createInsertSchema(stagingContratos).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type Contrato = typeof stagingContratos.$inferSelect;
+export type InsertContrato = z.infer<typeof insertContratoSchema>;
+
+// Tabela de Serviços do Contrato
+export const stagingContratoServicos = pgTable("staging.contrato_servicos", {
+  id: serial("id").primaryKey(),
+  contratoId: integer("contrato_id").notNull(),
+  servicoNome: varchar("servico_nome", { length: 255 }).notNull(),
+  plano: varchar("plano", { length: 100 }),
+  valorOriginal: decimal("valor_original", { precision: 12, scale: 2 }).default("0"),
+  valorNegociado: decimal("valor_negociado", { precision: 12, scale: 2 }).default("0"),
+  descontoPercentual: decimal("desconto_percentual", { precision: 5, scale: 2 }).default("0"),
+  valorFinal: decimal("valor_final", { precision: 12, scale: 2 }).default("0"),
+  economia: decimal("economia", { precision: 12, scale: 2 }).default("0"),
+  modalidade: varchar("modalidade", { length: 100 }),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export const insertContratoServicoSchema = createInsertSchema(stagingContratoServicos).omit({ id: true, criadoEm: true });
+export type ContratoServico = typeof stagingContratoServicos.$inferSelect;
+export type InsertContratoServico = z.infer<typeof insertContratoServicoSchema>;
