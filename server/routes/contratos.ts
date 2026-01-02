@@ -60,8 +60,37 @@ async function ensureContratosTablesExist() {
       
       await db.execute(sql`
         ALTER TABLE staging.contratos 
+        ADD COLUMN IF NOT EXISTS data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS id_crm VARCHAR(50),
         ADD COLUMN IF NOT EXISTS cliente_id INTEGER,
         ADD COLUMN IF NOT EXISTS fornecedor_id INTEGER,
+        ADD COLUMN IF NOT EXISTS descricao TEXT,
+        ADD COLUMN IF NOT EXISTS valor_total DECIMAL(12, 2),
+        ADD COLUMN IF NOT EXISTS data_inicio_recorrentes DATE,
+        ADD COLUMN IF NOT EXISTS data_inicio_cobranca_recorrentes DATE,
+        ADD COLUMN IF NOT EXISTS data_inicio_pontuais DATE,
+        ADD COLUMN IF NOT EXISTS data_inicio_cobranca_pontuais DATE,
+        ADD COLUMN IF NOT EXISTS hash_documento VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS url_assinatura TEXT,
+        ADD COLUMN IF NOT EXISTS documento_assinado BOOLEAN DEFAULT false,
+        ADD COLUMN IF NOT EXISTS observacoes TEXT,
+        ADD COLUMN IF NOT EXISTS usuario_criacao INTEGER,
+        ADD COLUMN IF NOT EXISTS usuario_atualizacao INTEGER,
+        ADD COLUMN IF NOT EXISTS valor_original DECIMAL(12, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS valor_negociado DECIMAL(12, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS economia DECIMAL(12, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS desconto_percentual DECIMAL(5, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS signature_provider VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS signature_external_id VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS assinafy_document_id VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS assinafy_status VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS assinafy_upload_url TEXT,
+        ADD COLUMN IF NOT EXISTS assinafy_signing_url TEXT,
+        ADD COLUMN IF NOT EXISTS assinafy_signed_document_url TEXT,
+        ADD COLUMN IF NOT EXISTS assinafy_last_sync TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS signature_sent_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS signature_completed_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS usuario_responsavel_id INTEGER,
         ADD COLUMN IF NOT EXISTS status_faturamento VARCHAR(50) DEFAULT 'pendente',
         ADD COLUMN IF NOT EXISTS data_ultima_fatura DATE,
         ADD COLUMN IF NOT EXISTS usuario_fatura INTEGER,
@@ -71,12 +100,36 @@ async function ensureContratosTablesExist() {
         ADD COLUMN IF NOT EXISTS comercial_cargo VARCHAR(100),
         ADD COLUMN IF NOT EXISTS comercial_empresa VARCHAR(255),
         ADD COLUMN IF NOT EXISTS data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        ADD COLUMN IF NOT EXISTS data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ADD COLUMN IF NOT EXISTS data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS met_cob_recorrente VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS met_cob_pontual VARCHAR(50)
       `);
       
       console.log("[contratos] Contratos table columns ensured");
     } catch (migrationError) {
       console.log("[contratos] Contratos migration skipped or table doesn't exist:", migrationError);
+    }
+    
+    // Fix contratos_itens - change vigencia_desconto from DATE to TEXT if needed
+    try {
+      await db.execute(sql`
+        ALTER TABLE staging.contratos_itens 
+        ALTER COLUMN vigencia_desconto TYPE TEXT USING vigencia_desconto::text
+      `);
+      console.log("[contratos] contratos_itens.vigencia_desconto changed to TEXT");
+    } catch (e) {
+      // Column might already be TEXT or table doesn't exist
+    }
+    
+    // Fix entidades - allow NULL on nome_razao_social if it exists
+    try {
+      await db.execute(sql`
+        ALTER TABLE staging.entidades 
+        ALTER COLUMN nome_razao_social DROP NOT NULL
+      `);
+      console.log("[contratos] entidades.nome_razao_social constraint removed");
+    } catch (e) {
+      // Column might not exist or already nullable
     }
 
     // Serviços - catálogo de serviços oferecidos
