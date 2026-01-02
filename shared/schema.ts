@@ -417,6 +417,12 @@ export type DfcSnapshot = {
   }[];
 };
 
+export type FluxoCaixaDiarioCompletoResponse = {
+  hasSnapshot: boolean;
+  snapshotDate: string | null;
+  dados: FluxoCaixaDiarioCompleto[];
+};
+
 export type FluxoCaixaInsights = {
   saldoHoje: number;
   saldoFuturo30Dias: number;
