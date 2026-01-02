@@ -11,11 +11,17 @@ interface ImportResult {
   errors: string[];
 }
 
-function escapeSQL(val: any): string {
+function escapeSQL(val: any, colName?: string): string {
   if (val === null || val === undefined || val === '' || val === 'NULL') return 'NULL';
   if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
   if (typeof val === 'number') return val.toString();
-  return "'" + String(val).replace(/'/g, "''").replace(/\r/g, '').replace(/\n/g, ' ') + "'";
+  
+  const strVal = String(val).trim();
+  
+  // Handle invalid dates
+  if (strVal === '0000-00-00' || strVal === '0000-00-00 00:00:00') return 'NULL';
+  
+  return "'" + strVal.replace(/'/g, "''").replace(/\r/g, '').replace(/\n/g, ' ') + "'";
 }
 
 async function importTable(
