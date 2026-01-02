@@ -52,6 +52,7 @@ import {
   DollarSign,
   Eye,
   X,
+  ExternalLink,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -127,6 +128,7 @@ interface ContratoDoc {
   comercial_cargo: string | null;
   comercial_empresa: string | null;
   status_faturamento: string | null;
+  assinafy_signed_document_url: string | null;
   itens?: ContratoItem[];
   data_cadastro: string;
   data_atualizacao: string;
@@ -1366,14 +1368,52 @@ function ContratosTab() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-muted-foreground">Data de Início Recorrentes</Label>
-                  <p>{contratoDetail.data_inicio_recorrentes ? new Date(contratoDetail.data_inicio_recorrentes).toLocaleDateString('pt-BR') : '-'}</p>
-                </div>
-                <div>
                   <Label className="text-muted-foreground">ID CRM</Label>
                   <p>{contratoDetail.id_crm || '-'}</p>
                 </div>
+                <div>
+                  <Label className="text-muted-foreground">Valor Original</Label>
+                  <p className="font-medium">{formatCurrency(Number(contratoDetail.valor_original) || 0)}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Valor Negociado</Label>
+                  <p className="font-medium text-green-500">{formatCurrency(Number(contratoDetail.valor_negociado) || 0)}</p>
+                </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground">Data Início Recorrentes</Label>
+                  <p>{contratoDetail.data_inicio_recorrentes ? new Date(contratoDetail.data_inicio_recorrentes).toLocaleDateString('pt-BR') : '-'}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Data Cobrança Recorrentes</Label>
+                  <p>{contratoDetail.data_inicio_cobranca_recorrentes ? new Date(contratoDetail.data_inicio_cobranca_recorrentes).toLocaleDateString('pt-BR') : '-'}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Data Início Pontuais</Label>
+                  <p>{contratoDetail.data_inicio_pontuais ? new Date(contratoDetail.data_inicio_pontuais).toLocaleDateString('pt-BR') : '-'}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Data Cobrança Pontuais</Label>
+                  <p>{contratoDetail.data_inicio_cobranca_pontuais ? new Date(contratoDetail.data_inicio_cobranca_pontuais).toLocaleDateString('pt-BR') : '-'}</p>
+                </div>
+              </div>
+
+              {contratoDetail.assinafy_signed_document_url && (
+                <div>
+                  <Label className="text-muted-foreground">Documento Assinado</Label>
+                  <a 
+                    href={contratoDetail.assinafy_signed_document_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline flex items-center gap-1 mt-1"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Ver documento assinado
+                  </a>
+                </div>
+              )}
 
               {contratoDetail.itens && contratoDetail.itens.length > 0 && (
                 <div>
