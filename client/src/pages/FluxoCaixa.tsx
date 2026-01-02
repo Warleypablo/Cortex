@@ -146,9 +146,11 @@ export default function FluxoCaixa() {
     const maxSaida = Math.max(...chartData.map(d => d.saidas || 0));
     const barsMax = Math.max(maxEntrada, maxSaida) * 1.1 || 100000;
     
-    const saldos = chartData.map(d => d.saldoAcumulado || 0);
-    const lineMin = Math.min(...saldos);
-    const lineMax = Math.max(...saldos);
+    const saldosReal = chartData.map(d => d.saldoAcumulado || 0);
+    const saldosEsperado = chartData.map(d => d.saldoEsperado || 0);
+    const allSaldos = [...saldosReal, ...saldosEsperado];
+    const lineMin = Math.min(...allSaldos);
+    const lineMax = Math.max(...allSaldos);
     const linePadding = (lineMax - lineMin) * 0.1 || 100000;
     
     return {
@@ -498,9 +500,16 @@ export default function FluxoCaixa() {
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
                                   <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" style={{ boxShadow: '0 0 6px rgba(34, 211, 238, 0.6)' }} />
-                                  <span className="text-sm text-slate-400">Acumulado</span>
+                                  <span className="text-sm text-slate-400">Saldo Real</span>
                                 </div>
                                 <span className="text-sm font-semibold text-cyan-400">{formatCurrency(data?.saldoAcumulado || 0)}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 rounded-full bg-amber-400" style={{ boxShadow: '0 0 6px rgba(251, 191, 36, 0.6)' }} />
+                                  <span className="text-sm text-slate-400">Saldo Esperado</span>
+                                </div>
+                                <span className="text-sm font-semibold text-amber-400">{formatCurrency(data?.saldoEsperado || 0)}</span>
                               </div>
                             </div>
                             <p className="text-xs text-slate-500 mt-3 pt-2 border-t border-slate-700 text-center">
@@ -543,12 +552,24 @@ export default function FluxoCaixa() {
                       yAxisId="line"
                       type="monotone" 
                       dataKey="saldoAcumulado" 
-                      name="saldoAcumulado"
+                      name="Saldo Real"
                       stroke="#22d3ee" 
                       strokeWidth={2.5}
                       dot={false}
                       activeDot={{ r: 7, fill: '#22d3ee', stroke: '#0f172a', strokeWidth: 3, style: { filter: 'drop-shadow(0 0 8px rgba(34, 211, 238, 0.8))' } }}
                       style={{ filter: 'url(#glowCyan)' }}
+                    />
+                    
+                    <Line 
+                      yAxisId="line"
+                      type="monotone" 
+                      dataKey="saldoEsperado" 
+                      name="Saldo Esperado"
+                      stroke="#fbbf24" 
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      dot={false}
+                      activeDot={{ r: 5, fill: '#fbbf24', stroke: '#0f172a', strokeWidth: 2 }}
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
