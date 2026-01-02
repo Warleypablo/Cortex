@@ -1436,66 +1436,66 @@ export function registerContratosRoutes(app: Express) {
       // ======= PÁGINA 1: PARTES CONTRATANTES =======
       doc.y = 90;
 
-      // Seção: PARTES CONTRATANTES com box
+      // Seção: PARTES CONTRATANTES com box de fundo
       doc.rect(45, doc.y - 5, 505, 20).fillAndStroke('#f0f4f8', '#ddd');
       doc.fontSize(11).font('Helvetica-Bold').fillColor(corPrimaria)
         .text('PARTES CONTRATANTES', 55, doc.y);
       doc.y += 25;
 
-      // Layout duas colunas lado a lado
-      const colLeft = 50;
-      const colRight = 300;
-      const colWidth = 240;
-      const lineHeight = 12;
-      let currentY = doc.y;
+      // Layout duas colunas lado a lado com posicionamento absoluto
+      const colLeftX = 50;
+      const colRightX = 305;
+      const colW = 235;
+      const lh = 11; // line height
+      const startYParties = doc.y;
 
-      // Desenhar ambas as colunas simultaneamente
-      // Coluna esquerda: CONTRATADO
-      doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
-        .text('CONTRATADO:', colLeft, currentY);
-      currentY += lineHeight + 5;
-      
-      const contratadoStartY = currentY;
-      doc.font('Helvetica-Bold').text(turbo.nome, colLeft, currentY, { width: colWidth - 10 });
-      currentY = doc.y;
-      doc.font('Helvetica')
-        .text(`CNPJ: ${turbo.cnpj}`, colLeft, currentY, { width: colWidth - 10 });
-      currentY = doc.y;
-      doc.text(`Sócio: ${turbo.socio}, CPF: ${turbo.cpf_socio}`, colLeft, currentY, { width: colWidth - 10 });
-      currentY = doc.y;
-      doc.text(`Endereço: ${turbo.endereco}`, colLeft, currentY, { width: colWidth - 10 });
-      currentY = doc.y;
-      doc.text(`Telefone: ${turbo.telefone}`, colLeft, currentY, { width: colWidth - 10 });
-      currentY = doc.y;
-      doc.text(`E-mail: rodrigo.queiroz@turbopartners.com.br`, colLeft, currentY, { width: colWidth - 10 });
-      const leftEndY = doc.y;
+      // ---- Preparar conteúdo da coluna esquerda ----
+      const leftLines: Array<{bold: boolean, text: string}> = [
+        { bold: true, text: 'CONTRATADO:' },
+        { bold: true, text: turbo.nome },
+        { bold: false, text: `CNPJ: ${turbo.cnpj}` },
+        { bold: false, text: `Sócio: ${turbo.socio}, CPF: ${turbo.cpf_socio}` },
+        { bold: false, text: `Endereço: ${turbo.endereco}` },
+        { bold: false, text: `Telefone: ${turbo.telefone}` },
+        { bold: false, text: `E-mail: rodrigo.queiroz@turbopartners.com.br` },
+      ];
 
-      // Coluna direita: CONTRATANTE (resetar Y para o início)
-      currentY = doc.y = contratadoStartY - lineHeight - 5;
-      doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
-        .text('CONTRATANTE:', colRight, currentY);
-      currentY += lineHeight + 5;
-      
-      doc.font('Helvetica-Bold').text(contrato.cliente_nome || '________________________', colRight, currentY, { width: colWidth - 10 });
-      currentY = doc.y;
-      doc.font('Helvetica')
-        .text(`${contrato.tipo_pessoa === 'juridica' ? 'CNPJ' : 'CPF'}: ${contrato.cpf_cnpj || '________________________'}`, colRight, currentY, { width: colWidth - 10 });
-      currentY = doc.y;
-      
-      if (contrato.tipo_pessoa === 'juridica' && contrato.nome_socio) {
-        doc.text(`Representante Legal: ${contrato.nome_socio}, CPF: ${contrato.cpf_socio || '___________'}`, colRight, currentY, { width: colWidth - 10 });
-        currentY = doc.y;
-      }
-      
+      // ---- Preparar conteúdo da coluna direita ----
       const enderecoCliente = [contrato.endereco, contrato.numero, contrato.complemento, contrato.bairro, contrato.cidade, contrato.estado].filter(Boolean).join(', ');
-      doc.text(`Endereço: ${enderecoCliente || '________________________'}`, colRight, currentY, { width: colWidth - 10 });
-      currentY = doc.y;
-      doc.text(`Telefone: ${contrato.telefone || '________________________'}`, colRight, currentY, { width: colWidth - 10 });
-      currentY = doc.y;
-      doc.text(`E-mail: ${contrato.email || '________________________'}`, colRight, currentY, { width: colWidth - 10 });
-      const rightEndY = doc.y;
+      const rightLines: Array<{bold: boolean, text: string}> = [
+        { bold: true, text: 'CONTRATANTE:' },
+        { bold: true, text: contrato.cliente_nome || '________________________' },
+        { bold: false, text: `${contrato.tipo_pessoa === 'juridica' ? 'CNPJ' : 'CPF'}: ${contrato.cpf_cnpj || '________________________'}` },
+      ];
+      if (contrato.tipo_pessoa === 'juridica' && contrato.nome_socio) {
+        rightLines.push({ bold: false, text: `Representante Legal: ${contrato.nome_socio}, CPF: ${contrato.cpf_socio || '___________'}` });
+      }
+      rightLines.push(
+        { bold: false, text: `Endereço: ${enderecoCliente || '________________________'}` },
+        { bold: false, text: `Telefone: ${contrato.telefone || '________________________'}` },
+        { bold: false, text: `E-mail: ${contrato.email || '________________________'}` }
+      );
 
-      doc.y = Math.max(leftEndY, rightEndY) + 30;
+      // ---- Renderizar ambas colunas linha a linha ----
+      const maxLines = Math.max(leftLines.length, rightLines.length);
+      let yPos = startYParties;
+      
+      for (let i = 0; i < maxLines; i++) {
+        const leftItem = leftLines[i];
+        const rightItem = rightLines[i];
+        
+        if (leftItem) {
+          doc.fontSize(9).font(leftItem.bold ? 'Helvetica-Bold' : 'Helvetica').fillColor('#333')
+            .text(leftItem.text, colLeftX, yPos, { width: colW, lineBreak: false });
+        }
+        if (rightItem) {
+          doc.fontSize(9).font(rightItem.bold ? 'Helvetica-Bold' : 'Helvetica').fillColor('#333')
+            .text(rightItem.text, colRightX, yPos, { width: colW, lineBreak: false });
+        }
+        yPos += lh + 2;
+      }
+
+      doc.y = yPos + 25;
 
       if (checkAborted()) return;
 
