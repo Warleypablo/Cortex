@@ -122,6 +122,18 @@ async function ensureContratosTablesExist() {
       // Column might already be TEXT or table doesn't exist
     }
     
+    // Add escopo and is_personalizado columns to contratos_itens
+    try {
+      await db.execute(sql`
+        ALTER TABLE staging.contratos_itens 
+        ADD COLUMN IF NOT EXISTS escopo TEXT,
+        ADD COLUMN IF NOT EXISTS is_personalizado BOOLEAN DEFAULT false
+      `);
+      console.log("[contratos] contratos_itens.escopo and is_personalizado columns added");
+    } catch (e) {
+      // Columns might already exist
+    }
+    
     // Fix entidades - allow NULL on nome_razao_social if it exists
     try {
       await db.execute(sql`
@@ -828,7 +840,19 @@ export function registerContratosRoutes(app: Express) {
   // Contratos - Create
   app.post("/api/contratos/contratos", isAuthenticated, async (req, res) => {
     try {
-      const data = req.body;
+      const { contrato: data, itens } = req.body;
+      
+      // Calculate totals from itens
+      let valorOriginal = 0;
+      let valorNegociado = 0;
+      if (itens && itens.length > 0) {
+        for (const item of itens) {
+          valorOriginal += Number(item.valor_tabela) || 0;
+          valorNegociado += Number(item.valor_negociado) || 0;
+        }
+      }
+      const economia = valorOriginal - valorNegociado;
+      const descontoPercentual = valorOriginal > 0 ? ((economia / valorOriginal) * 100) : 0;
       
       const result = await db.execute(sql`
         INSERT INTO staging.contratos (
@@ -844,9 +868,9 @@ export function registerContratosRoutes(app: Express) {
           ${data.data_inicio_recorrentes || null}, ${data.data_inicio_cobranca_recorrentes || null},
           ${data.data_inicio_pontuais || null}, ${data.data_inicio_cobranca_pontuais || null},
           ${data.status || 'rascunho'}, ${data.observacoes || null},
-          ${data.usuario_criacao || null}, ${data.valor_original || 0},
-          ${data.valor_negociado || 0}, ${data.economia || 0},
-          ${data.desconto_percentual || 0}, ${data.comercial_nome || null},
+          ${data.usuario_criacao || null}, ${valorOriginal},
+          ${valorNegociado}, ${economia},
+          ${descontoPercentual}, ${data.comercial_nome || null},
           ${data.comercial_email || null}, ${data.comercial_telefone || null},
           ${data.comercial_cargo || null}, ${data.comercial_empresa || null}
         ) RETURNING id
@@ -855,20 +879,26 @@ export function registerContratosRoutes(app: Express) {
       const contratoId = (result.rows[0] as any).id;
       
       // Insert itens if provided
-      if (data.itens && data.itens.length > 0) {
-        for (const item of data.itens) {
+      if (itens && itens.length > 0) {
+        for (const item of itens) {
+          const itemValorOriginal = Number(item.valor_tabela) || 0;
+          const itemValorNegociado = Number(item.valor_negociado) || 0;
+          const itemEconomia = itemValorOriginal - itemValorNegociado;
+          
           await db.execute(sql`
             INSERT INTO staging.contratos_itens (
               contrato_id, plano_servico_id, quantidade, valor_unitario, valor_total,
               modalidade, valor_original, valor_negociado, desconto_percentual,
-              tipo_desconto, valor_desconto, valor_final, economia, observacoes
+              tipo_desconto, valor_desconto, valor_final, economia, observacoes,
+              escopo, is_personalizado
             ) VALUES (
               ${contratoId}, ${item.plano_servico_id || null}, ${item.quantidade || 1},
-              ${item.valor_unitario || 0}, ${item.valor_total || 0},
-              ${item.modalidade || null}, ${item.valor_original || 0},
-              ${item.valor_negociado || 0}, ${item.desconto_percentual || 0},
-              ${item.tipo_desconto || null}, ${item.valor_desconto || 0},
-              ${item.valor_final || 0}, ${item.economia || 0}, ${item.observacoes || null}
+              ${itemValorNegociado}, ${itemValorNegociado},
+              ${item.modalidade || 'recorrente'}, ${itemValorOriginal},
+              ${itemValorNegociado}, ${Number(item.desconto_percentual) || 0},
+              ${item.tipo_desconto || 'percentual'}, ${itemEconomia},
+              ${itemValorNegociado}, ${itemEconomia}, ${item.observacoes || null},
+              ${item.escopo || null}, ${item.is_personalizado || false}
             )
           `);
         }
@@ -880,7 +910,7 @@ export function registerContratosRoutes(app: Express) {
       if (error.code === '23505') {
         return res.status(400).json({ error: "Número de contrato já existe" });
       }
-      res.status(500).json({ error: "Failed to create contrato" });
+      res.status(500).json({ error: "Failed to create contrato", details: error.message });
     }
   });
 
@@ -1318,7 +1348,7 @@ export function registerContratosRoutes(app: Express) {
         if (!res.writableEnded) {
           aborted = true;
           try {
-            doc.destroy();
+            (doc as any).destroy?.();
           } catch (e) {
             // Ignore destroy errors
           }
