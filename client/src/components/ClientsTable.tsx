@@ -81,7 +81,7 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, contratos
     <div className="rounded-lg border border-border bg-card overflow-auto h-full">
       {/* Sticky Header */}
       <div className="sticky top-0 z-10 bg-background border-b">
-        <div className="grid grid-cols-[minmax(220px,2fr)_minmax(90px,0.7fr)_minmax(100px,0.8fr)_minmax(60px,0.5fr)_minmax(90px,0.7fr)_minmax(80px,0.6fr)_minmax(80px,0.6fr)_minmax(95px,0.75fr)_minmax(95px,0.75fr)_minmax(160px,1.3fr)_minmax(130px,1fr)_minmax(90px,0.7fr)] text-sm font-medium text-muted-foreground">
+        <div className="grid grid-cols-[minmax(220px,2fr)_minmax(150px,1.2fr)_minmax(80px,0.6fr)_minmax(90px,0.7fr)_minmax(100px,0.8fr)_minmax(60px,0.5fr)_minmax(90px,0.7fr)_minmax(80px,0.6fr)_minmax(80px,0.6fr)_minmax(95px,0.75fr)_minmax(95px,0.75fr)_minmax(160px,1.3fr)] text-sm font-medium text-muted-foreground">
           {/* Nome do Cliente */}
           <div className="h-12 flex items-center px-4">
             <Button 
@@ -94,6 +94,23 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, contratos
               Nome do Cliente
               <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
+          </div>
+          {/* CNPJ */}
+          <div className="h-12 flex items-center px-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => onSort("cnpj")}
+              className="hover-elevate -ml-3"
+              data-testid="sort-cnpj"
+            >
+              CNPJ
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+          {/* Contrato */}
+          <div className="h-12 flex items-center px-4">
+            Contrato
           </div>
           {/* Status */}
           <div className="h-12 flex items-center px-4">
@@ -233,23 +250,6 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, contratos
           <div className="h-12 flex items-center px-4">
             Serviços
           </div>
-          {/* CNPJ */}
-          <div className="h-12 flex items-center px-4">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => onSort("cnpj")}
-              className="hover-elevate -ml-3"
-              data-testid="sort-cnpj"
-            >
-              CNPJ
-              <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-          {/* Contrato */}
-          <div className="h-12 flex items-center px-4">
-            Contrato
-          </div>
         </div>
       </div>
 
@@ -264,13 +264,34 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, contratos
           return (
             <div 
               key={`${clientId}-${index}`} 
-              className="grid grid-cols-[minmax(220px,2fr)_minmax(90px,0.7fr)_minmax(100px,0.8fr)_minmax(60px,0.5fr)_minmax(90px,0.7fr)_minmax(80px,0.6fr)_minmax(80px,0.6fr)_minmax(95px,0.75fr)_minmax(95px,0.75fr)_minmax(160px,1.3fr)_minmax(130px,1fr)_minmax(90px,0.7fr)] cursor-pointer hover-elevate"
+              className="grid grid-cols-[minmax(220px,2fr)_minmax(150px,1.2fr)_minmax(80px,0.6fr)_minmax(90px,0.7fr)_minmax(100px,0.8fr)_minmax(60px,0.5fr)_minmax(90px,0.7fr)_minmax(80px,0.6fr)_minmax(80px,0.6fr)_minmax(95px,0.75fr)_minmax(95px,0.75fr)_minmax(160px,1.3fr)] cursor-pointer hover-elevate"
               onClick={() => onClientClick(clientId)}
               data-testid={`client-row-${clientId}`}
             >
               {/* Nome do Cliente */}
               <div className="px-4 py-3 font-medium text-sm" data-testid={`text-client-name-${clientId}`}>
                 {client.nomeClickup || client.nome || "-"}
+              </div>
+              {/* CNPJ */}
+              <div className="px-4 py-3 text-sm text-muted-foreground" data-testid={`text-cnpj-${clientId}`}>
+                {formatCNPJ(client.cnpjCliente || client.cnpj)}
+              </div>
+              {/* Contrato */}
+              <div className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()} data-testid={`text-contrato-${clientId}`}>
+                {contratoInfo ? (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="gap-1.5 text-xs"
+                    onClick={() => window.open(`/api/contratos/${contratoInfo.id}/gerar-pdf`, '_blank')}
+                    data-testid={`button-ver-contrato-${clientId}`}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Ver
+                  </Button>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                )}
               </div>
               {/* Status */}
               <div className="px-4 py-3 text-sm" data-testid={`text-status-${clientId}`}>
@@ -320,27 +341,6 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, contratos
               {/* Serviços */}
               <div className="px-4 py-3 text-sm" data-testid={`text-services-${clientId}`}>
                 <ServiceIcons services={client.servicos} />
-              </div>
-              {/* CNPJ */}
-              <div className="px-4 py-3 text-sm text-muted-foreground" data-testid={`text-cnpj-${clientId}`}>
-                {formatCNPJ(client.cnpjCliente || client.cnpj)}
-              </div>
-              {/* Contrato */}
-              <div className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()} data-testid={`text-contrato-${clientId}`}>
-                {contratoInfo ? (
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="gap-1.5 text-xs"
-                    onClick={() => window.open(`/api/contratos/${contratoInfo.id}/gerar-pdf`, '_blank')}
-                    data-testid={`button-ver-contrato-${clientId}`}
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    Ver
-                  </Button>
-                ) : (
-                  <span className="text-muted-foreground">-</span>
-                )}
               </div>
             </div>
           );
