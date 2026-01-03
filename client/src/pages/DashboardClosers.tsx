@@ -320,7 +320,7 @@ export default function DashboardClosers() {
               </motion.div>
             </motion.div>
             <div>
-              <span className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-white via-violet-200 to-violet-400 bg-clip-text text-transparent">
+              <span className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-violet-700 via-purple-600 to-violet-500 dark:from-white dark:via-violet-200 dark:to-violet-400 bg-clip-text text-transparent">
                 ARENA DOS CLOSERS
               </span>
               <p className="text-muted-foreground text-lg mt-1">
@@ -549,17 +549,17 @@ export default function DashboardClosers() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600/20 to-teal-600/10 border border-emerald-500/30 p-5"
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-50 dark:from-emerald-600/20 dark:to-teal-600/10 border border-emerald-300 dark:border-emerald-500/30 p-5"
             data-testid="card-kpi-0"
           >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl" />
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/20 dark:bg-emerald-500/10 rounded-full blur-2xl" />
             <div className="relative">
               <div className="flex items-center gap-2 mb-2">
-                <Repeat className="w-5 h-5 text-emerald-400" />
-                <span className="text-sm font-medium text-emerald-300">MRR Obtido</span>
+                <Repeat className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">MRR Obtido</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Info className="w-4 h-4 text-emerald-300/70 cursor-help" />
+                    <Info className="w-4 h-4 text-emerald-500/70 dark:text-emerald-300/70 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Receita Mensal Recorrente dos negócios fechados</p>
@@ -585,17 +585,17 @@ export default function DashboardClosers() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/20 to-indigo-600/10 border border-blue-500/30 p-5"
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-50 dark:from-blue-600/20 dark:to-indigo-600/10 border border-blue-300 dark:border-blue-500/30 p-5"
             data-testid="card-kpi-1"
           >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl" />
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/20 dark:bg-blue-500/10 rounded-full blur-2xl" />
             <div className="relative">
               <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-5 h-5 text-blue-400" />
-                <span className="text-sm font-medium text-blue-300">Pontual Obtido</span>
+                <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Pontual Obtido</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Info className="w-4 h-4 text-blue-300/70 cursor-help" />
+                    <Info className="w-4 h-4 text-blue-500/70 dark:text-blue-300/70 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Receita pontual (não recorrente) dos negócios fechados</p>
@@ -621,17 +621,17 @@ export default function DashboardClosers() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600/20 to-purple-600/10 border border-violet-500/30 p-5"
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-100 to-purple-50 dark:from-violet-600/20 dark:to-purple-600/10 border border-violet-300 dark:border-violet-500/30 p-5"
             data-testid="card-kpi-2"
           >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl" />
+            <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/20 dark:bg-violet-500/10 rounded-full blur-2xl" />
             <div className="relative">
               <div className="flex items-center gap-2 mb-2">
-                <Users className="w-5 h-5 text-violet-400" />
-                <span className="text-sm font-medium text-violet-300">Reuniões</span>
+                <Users className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+                <span className="text-sm font-medium text-violet-700 dark:text-violet-300">Reuniões</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Info className="w-4 h-4 text-violet-300/70 cursor-help" />
+                    <Info className="w-4 h-4 text-violet-500/70 dark:text-violet-300/70 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Reuniões realizadas pelos closers</p>
@@ -657,17 +657,17 @@ export default function DashboardClosers() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600/20 to-orange-600/10 border border-amber-500/30 p-5"
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-100 to-orange-50 dark:from-amber-600/20 dark:to-orange-600/10 border border-amber-300 dark:border-amber-500/30 p-5"
             data-testid="card-kpi-3"
           >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl" />
+            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/20 dark:bg-amber-500/10 rounded-full blur-2xl" />
             <div className="relative">
               <div className="flex items-center gap-2 mb-2">
-                <Handshake className="w-5 h-5 text-amber-400" />
-                <span className="text-sm font-medium text-amber-300">Negócios</span>
+                <Handshake className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <span className="text-sm font-medium text-amber-700 dark:text-amber-300">Negócios</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Info className="w-4 h-4 text-amber-300/70 cursor-help" />
+                    <Info className="w-4 h-4 text-amber-500/70 dark:text-amber-300/70 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Quantidade de negócios fechados no período</p>
@@ -693,17 +693,17 @@ export default function DashboardClosers() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-600/20 to-pink-600/10 border border-rose-500/30 p-5"
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-100 to-pink-50 dark:from-rose-600/20 dark:to-pink-600/10 border border-rose-300 dark:border-rose-500/30 p-5"
             data-testid="card-kpi-4"
           >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl" />
+            <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/20 dark:bg-rose-500/10 rounded-full blur-2xl" />
             <div className="relative">
               <div className="flex items-center gap-2 mb-2">
-                <Target className="w-5 h-5 text-rose-400" />
-                <span className="text-sm font-medium text-rose-300">Conversão</span>
+                <Target className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                <span className="text-sm font-medium text-rose-700 dark:text-rose-300">Conversão</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Info className="w-4 h-4 text-rose-300/70 cursor-help" />
+                    <Info className="w-4 h-4 text-rose-500/70 dark:text-rose-300/70 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Negócios ganhos dividido por reuniões (%)</p>
