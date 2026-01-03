@@ -1577,31 +1577,31 @@ export function registerContratosRoutes(app: Express) {
     const marginRight = 30;
     const contentWidth = pageWidth - marginLeft - marginRight;
 
-    // Função para desenhar header escuro (estilo PHP)
+    // Função para desenhar header escuro (estilo PHP) - usando lineBreak: false
     const drawHeader = (pageDoc: typeof doc) => {
       pageDoc.save();
       pageDoc.roundedRect(marginLeft, 20, contentWidth, 70, 7).fill(corHeader);
       pageDoc.fontSize(14).font('Helvetica-Bold').fillColor('#ffffff')
-        .text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', marginLeft, 38, { width: contentWidth, align: 'center' });
+        .text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', marginLeft, 38, { width: contentWidth, align: 'center', lineBreak: false });
       pageDoc.fontSize(10).fillColor('#bfc5cc')
-        .text(`Contrato Nº ${String(numeroContrato).padStart(6, '0')}`, marginLeft, 56, { width: contentWidth, align: 'center' });
+        .text(`Contrato Nº ${String(numeroContrato).padStart(6, '0')}`, marginLeft, 56, { width: contentWidth, align: 'center', lineBreak: false });
       pageDoc.fontSize(9).fillColor('#ffffff')
-        .text(hoje, pageWidth - marginRight - 150, 55, { width: 140, align: 'right' })
-        .text(turbo.email, pageWidth - marginRight - 150, 67, { width: 140, align: 'right' });
+        .text(hoje, pageWidth - marginRight - 150, 55, { width: 140, align: 'right', lineBreak: false })
+        .text(turbo.email, pageWidth - marginRight - 150, 67, { width: 140, align: 'right', lineBreak: false });
       pageDoc.restore();
     };
 
-    // Função para desenhar footer
+    // Função para desenhar footer (usando lineBreak: false para evitar paginação)
     const drawFooter = (pageDoc: typeof doc, pageNum: number, totalPages: number) => {
       pageDoc.save();
       const footerY = pageHeight - 50;
       pageDoc.moveTo(marginLeft, footerY - 5).lineTo(pageWidth - marginRight, footerY - 5).strokeColor('#ccc').stroke();
-      pageDoc.fontSize(7).font('Helvetica-Bold').fillColor('#333').text(turbo.nome, marginLeft, footerY);
-      pageDoc.font('Helvetica').text(`CNPJ: ${turbo.cnpj}`, marginLeft, footerY + 9);
-      pageDoc.font('Helvetica-Bold').text('DOCUMENTO OFICIAL', 220, footerY, { width: 150, align: 'center' });
-      pageDoc.font('Helvetica').text(`Gerado em ${hoje}`, 220, footerY + 9, { width: 150, align: 'center' });
-      pageDoc.text(turbo.site, 400, footerY, { width: 165, align: 'right' });
-      pageDoc.text(`Página ${pageNum} de ${totalPages}`, 400, footerY + 9, { width: 165, align: 'right' });
+      pageDoc.fontSize(7).font('Helvetica-Bold').fillColor('#333').text(turbo.nome, marginLeft, footerY, { lineBreak: false });
+      pageDoc.font('Helvetica').text(`CNPJ: ${turbo.cnpj}`, marginLeft, footerY + 9, { lineBreak: false });
+      pageDoc.font('Helvetica-Bold').text('DOCUMENTO OFICIAL', 220, footerY, { width: 150, align: 'center', lineBreak: false });
+      pageDoc.font('Helvetica').text(`Gerado em ${hoje}`, 220, footerY + 9, { width: 150, align: 'center', lineBreak: false });
+      pageDoc.text(turbo.site, 400, footerY, { width: 165, align: 'right', lineBreak: false });
+      pageDoc.text(`Página ${pageNum} de ${totalPages}`, 400, footerY + 9, { width: 165, align: 'right', lineBreak: false });
       pageDoc.restore();
     };
 
