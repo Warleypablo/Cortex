@@ -822,7 +822,7 @@ export function registerContratosRoutes(app: Express) {
           c.id, c.numero_contrato, c.status, c.valor_negociado
         FROM staging.contratos c
         INNER JOIN staging.entidades e ON c.entidade_id = e.id
-        WHERE e.cpf_cnpj IS NOT NULL AND c.status = 'ativo'
+        WHERE e.cpf_cnpj IS NOT NULL AND c.status = 'assinado'
         ORDER BY c.data_criacao DESC
       `);
       
