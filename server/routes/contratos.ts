@@ -2514,29 +2514,59 @@ export function registerContratosRoutes(app: Express) {
       const docStatus = uploadResult.status || uploadResult.data?.status;
       console.log(`[assinafy] Documento criado: ${documentId}, status: ${docStatus}`);
       
-      // 5. Criar signatário no Assinafy
+      // 5. Buscar ou criar signatário no Assinafy
       const signerUrl = `${config.api_url}/accounts/${config.account_id}/signers`;
-      const signerResponse = await fetch(signerUrl, {
-        method: 'POST',
+      
+      // Primeiro, buscar se o signatário já existe pelo email
+      const searchUrl = `${signerUrl}?search=${encodeURIComponent(emailSignatario)}`;
+      console.log(`[assinafy] Buscando signatário existente: ${emailSignatario}`);
+      
+      const searchResponse = await fetch(searchUrl, {
+        method: 'GET',
         headers: {
-          'X-Api-Key': config.api_key,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          full_name: nomeSignatario,
-          email: emailSignatario
-        })
+          'X-Api-Key': config.api_key
+        }
       });
       
-      const signerResult = await signerResponse.json() as any;
+      const searchResult = await searchResponse.json() as any;
+      let signerId: string | null = null;
       
-      if (signerResult.status !== 200 && !signerResult.data?.id) {
-        console.error('[assinafy] Erro ao criar signatário:', signerResult);
-        return res.status(500).json({ error: "Erro ao criar signatário", details: signerResult.message });
+      // Verificar se encontrou um signatário com o mesmo email
+      if (searchResult.status === 200 && searchResult.data && Array.isArray(searchResult.data)) {
+        const existingSigner = searchResult.data.find((s: any) => 
+          s.email?.toLowerCase() === emailSignatario.toLowerCase()
+        );
+        if (existingSigner) {
+          signerId = existingSigner.id;
+          console.log(`[assinafy] Signatário existente encontrado: ${signerId}`);
+        }
       }
       
-      const signerId = signerResult.data?.id || signerResult.id;
-      console.log(`[assinafy] Signatário criado: ${signerId}`);
+      // Se não encontrou, criar novo signatário
+      if (!signerId) {
+        console.log(`[assinafy] Criando novo signatário: ${nomeSignatario} (${emailSignatario})`);
+        const signerResponse = await fetch(signerUrl, {
+          method: 'POST',
+          headers: {
+            'X-Api-Key': config.api_key,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            full_name: nomeSignatario,
+            email: emailSignatario
+          })
+        });
+        
+        const signerResult = await signerResponse.json() as any;
+        
+        if (signerResult.status !== 200 && !signerResult.data?.id) {
+          console.error('[assinafy] Erro ao criar signatário:', signerResult);
+          return res.status(500).json({ error: "Erro ao criar signatário", details: signerResult.message });
+        }
+        
+        signerId = signerResult.data?.id || signerResult.id;
+        console.log(`[assinafy] Signatário criado: ${signerId}`);
+      }
       
       // 6. Enviar para assinatura
       const assignmentUrl = `${config.api_url}/documents/${documentId}/assignments`;
