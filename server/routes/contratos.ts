@@ -753,7 +753,7 @@ export function registerContratosRoutes(app: Express) {
       let query = sql`
         SELECT c.*, e.nome as cliente_nome, e.cpf_cnpj as cliente_cpf_cnpj
         FROM staging.contratos c
-        LEFT JOIN staging.entidades e ON c.cliente_id = e.id
+        LEFT JOIN staging.entidades e ON c.entidade_id = e.id
         WHERE 1=1
       `;
       
@@ -787,7 +787,7 @@ export function registerContratosRoutes(app: Express) {
       const contratoResult = await db.execute(sql`
         SELECT c.*, e.nome as cliente_nome, e.cpf_cnpj as cliente_cpf_cnpj
         FROM staging.contratos c
-        LEFT JOIN staging.entidades e ON c.cliente_id = e.id
+        LEFT JOIN staging.entidades e ON c.entidade_id = e.id
         WHERE c.id = ${parseInt(id)}
       `);
       
@@ -821,7 +821,7 @@ export function registerContratosRoutes(app: Express) {
           REPLACE(REPLACE(REPLACE(e.cpf_cnpj, '.', ''), '/', ''), '-', '') as cnpj_limpo,
           c.id, c.numero_contrato, c.status, c.valor_negociado
         FROM staging.contratos c
-        INNER JOIN staging.entidades e ON c.cliente_id = e.id
+        INNER JOIN staging.entidades e ON c.entidade_id = e.id
         WHERE e.cpf_cnpj IS NOT NULL AND c.status = 'ativo'
         ORDER BY c.data_criacao DESC
       `);
@@ -861,7 +861,7 @@ export function registerContratosRoutes(app: Express) {
         SELECT c.id, c.numero_contrato, c.status, c.valor_negociado, c.data_criacao,
                e.nome as cliente_nome, e.cpf_cnpj
         FROM staging.contratos c
-        INNER JOIN staging.entidades e ON c.cliente_id = e.id
+        INNER JOIN staging.entidades e ON c.entidade_id = e.id
         WHERE REPLACE(REPLACE(REPLACE(e.cpf_cnpj, '.', ''), '/', ''), '-', '') = ${cnpjLimpo}
         ORDER BY c.data_criacao DESC
       `);
@@ -1364,7 +1364,7 @@ export function registerContratosRoutes(app: Express) {
                e.endereco, e.numero, e.complemento, e.bairro, e.cidade, e.estado, e.cep,
                e.email, e.telefone, e.nome_socio, e.cpf_socio
         FROM staging.contratos c
-        LEFT JOIN staging.entidades e ON c.cliente_id = e.id
+        LEFT JOIN staging.entidades e ON c.entidade_id = e.id
         WHERE c.id = ${contratoId}
       `);
 
