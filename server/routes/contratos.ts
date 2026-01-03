@@ -2721,9 +2721,11 @@ export function registerContratosRoutes(app: Express) {
       const isAssinado = 
         status === 'signed' || 
         status === 'completed' || 
+        status === 'certificated' ||
         eventType === 'document.signed' ||
         eventType === 'assignment.signed' ||
-        eventType === 'document.completed';
+        eventType === 'document.completed' ||
+        eventType === 'document.certificated';
       
       const isRecusado = 
         status === 'declined' || 
@@ -2836,7 +2838,7 @@ export function registerContratosRoutes(app: Express) {
       if (currentStatus && currentStatus !== contrato.assinafy_status) {
         let novoStatus = contrato.status;
         
-        if (currentStatus === 'signed' || currentStatus === 'completed') {
+        if (currentStatus === 'signed' || currentStatus === 'completed' || currentStatus === 'certificated') {
           novoStatus = 'assinado';
           await db.execute(sql`
             UPDATE staging.contratos SET
