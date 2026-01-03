@@ -2003,7 +2003,11 @@ function ContratosTab() {
                         <TableBody>
                           {contratoDetail.itens.map((item, index) => (
                             <TableRow key={index}>
-                              <TableCell className="font-medium">{item.descricao || '-'}</TableCell>
+                              <TableCell className="font-medium">
+                                {item.servico_nome && item.plano_nome 
+                                  ? `${item.servico_nome} - ${item.plano_nome}`
+                                  : item.servico_nome || item.plano_nome || item.descricao || '-'}
+                              </TableCell>
                               <TableCell className="text-center">{item.quantidade}</TableCell>
                               <TableCell className="text-right text-muted-foreground">
                                 {formatCurrency(item.valor_tabela || 0)}
