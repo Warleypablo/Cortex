@@ -2514,8 +2514,9 @@ export function registerContratosRoutes(app: Express) {
       console.log(`[assinafy] Documento criado: ${documentId}`);
       
       // 4.1 Aguardar documento ser processado (polling até status != metadata_processing)
-      const maxAttempts = 10;
-      const delayMs = 2000; // 2 segundos entre tentativas
+      // PDFs maiores (com múltiplas páginas) podem demorar mais para processar
+      const maxAttempts = 30; // Aumentado de 10 para 30
+      const delayMs = 3000; // 3 segundos entre tentativas (total: 90 segundos)
       let documentReady = false;
       
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
