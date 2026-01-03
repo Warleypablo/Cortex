@@ -3,6 +3,7 @@ import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { isAuthenticated } from "../auth/middleware";
 import PDFDocument from "pdfkit";
+import FormData from "form-data";
 
 let tablesInitialized = false;
 
@@ -1993,6 +1994,198 @@ export function registerContratosRoutes(app: Express) {
       } else {
         try { res.destroy(); } catch (e) {}
       }
+    }
+  });
+
+  // =====================================================
+  // ENVIAR CONTRATO PARA ASSINATURA VIA ASSINAFY
+  // =====================================================
+  app.post("/api/contratos/:id/enviar-assinatura", isAuthenticated, async (req, res) => {
+    const contratoId = parseInt(req.params.id);
+    
+    try {
+      console.log(`[assinafy] Iniciando envio para assinatura - Contrato ID: ${contratoId}`);
+      
+      // 1. Buscar configuração do Assinafy
+      const configResult = await db.execute(sql`
+        SELECT account_id, api_key, api_url FROM staging.assinafy_config WHERE ativo = true LIMIT 1
+      `);
+      
+      if (configResult.rows.length === 0) {
+        return res.status(500).json({ error: "Configuração do Assinafy não encontrada" });
+      }
+      
+      const config = configResult.rows[0] as { account_id: string; api_key: string; api_url: string };
+      
+      // 2. Buscar dados do contrato e entidade
+      const contratoResult = await db.execute(sql`
+        SELECT 
+          c.*,
+          e.nome as cliente_nome,
+          e.cpf_cnpj,
+          e.email_cobranca,
+          e.email as email_entidade,
+          e.nome_socio
+        FROM staging.contratos c
+        LEFT JOIN staging.entidades e ON c.entidade_id = e.id
+        WHERE c.id = ${contratoId}
+      `);
+      
+      if (contratoResult.rows.length === 0) {
+        return res.status(404).json({ error: "Contrato não encontrado" });
+      }
+      
+      const contrato = contratoResult.rows[0] as any;
+      
+      // Obter email do signatário (prioridade: email_cobranca > email_entidade)
+      const emailSignatario = contrato.email_cobranca || contrato.email_entidade;
+      if (!emailSignatario) {
+        return res.status(400).json({ error: "Email de cobrança da entidade não encontrado. Cadastre o email antes de enviar para assinatura." });
+      }
+      
+      const nomeSignatario = contrato.nome_socio || contrato.cliente_nome || "Contratante";
+      
+      console.log(`[assinafy] Signatário: ${nomeSignatario} (${emailSignatario})`);
+      
+      // 3. Gerar PDF do contrato em memória
+      const chunks: Buffer[] = [];
+      
+      const pdfDoc = new PDFDocument({ 
+        size: 'A4', 
+        margin: 50,
+        bufferPages: true
+      });
+      
+      pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      
+      const pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
+        pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+        pdfDoc.on('error', reject);
+        
+        // Gerar conteúdo simples do PDF para assinatura
+        pdfDoc.fontSize(18).font('Helvetica-Bold').text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
+        pdfDoc.moveDown(2);
+        pdfDoc.fontSize(12).font('Helvetica').text(`Contrato Nº: ${contrato.numero_contrato || contratoId}`, { align: 'left' });
+        pdfDoc.text(`Cliente: ${contrato.cliente_nome || 'N/A'}`, { align: 'left' });
+        pdfDoc.text(`CNPJ/CPF: ${contrato.cpf_cnpj || 'N/A'}`, { align: 'left' });
+        pdfDoc.text(`Valor: R$ ${parseFloat(contrato.valor_negociado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, { align: 'left' });
+        pdfDoc.moveDown(2);
+        pdfDoc.text('Este documento será assinado eletronicamente via Assinafy.', { align: 'center' });
+        
+        pdfDoc.end();
+      });
+      
+      console.log(`[assinafy] PDF gerado: ${pdfBuffer.length} bytes`);
+      
+      // 4. Upload do PDF para Assinafy
+      const formData = new FormData();
+      formData.append('file', pdfBuffer, {
+        filename: `contrato_${contratoId}.pdf`,
+        contentType: 'application/pdf'
+      });
+      
+      const uploadUrl = `${config.api_url}/accounts/${config.account_id}/documents`;
+      console.log(`[assinafy] Fazendo upload para: ${uploadUrl}`);
+      
+      // Convert FormData to Buffer for fetch compatibility
+      const formBuffer = await new Promise<Buffer>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        formData.on('data', (chunk: Buffer) => chunks.push(chunk));
+        formData.on('end', () => resolve(Buffer.concat(chunks)));
+        formData.on('error', reject);
+        formData.resume();
+      });
+      
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'X-Api-Key': config.api_key,
+          ...formData.getHeaders()
+        },
+        body: formBuffer
+      });
+      
+      const uploadResult = await uploadResponse.json() as any;
+      
+      if (uploadResult.status !== 200 && !uploadResult.id) {
+        console.error('[assinafy] Erro no upload:', uploadResult);
+        return res.status(500).json({ error: "Erro ao fazer upload do documento", details: uploadResult.message });
+      }
+      
+      const documentId = uploadResult.id || uploadResult.data?.id;
+      console.log(`[assinafy] Documento criado: ${documentId}`);
+      
+      // 5. Criar signatário no Assinafy
+      const signerUrl = `${config.api_url}/accounts/${config.account_id}/signers`;
+      const signerResponse = await fetch(signerUrl, {
+        method: 'POST',
+        headers: {
+          'X-Api-Key': config.api_key,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          full_name: nomeSignatario,
+          email: emailSignatario
+        })
+      });
+      
+      const signerResult = await signerResponse.json() as any;
+      
+      if (signerResult.status !== 200 && !signerResult.data?.id) {
+        console.error('[assinafy] Erro ao criar signatário:', signerResult);
+        return res.status(500).json({ error: "Erro ao criar signatário", details: signerResult.message });
+      }
+      
+      const signerId = signerResult.data?.id || signerResult.id;
+      console.log(`[assinafy] Signatário criado: ${signerId}`);
+      
+      // 6. Enviar para assinatura
+      const assignmentUrl = `${config.api_url}/documents/${documentId}/assignments`;
+      const assignmentResponse = await fetch(assignmentUrl, {
+        method: 'POST',
+        headers: {
+          'X-Api-Key': config.api_key,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          method: 'virtual',
+          signerIds: [signerId]
+        })
+      });
+      
+      const assignmentResult = await assignmentResponse.json() as any;
+      
+      if (assignmentResult.status !== 200 && assignmentResult.status !== 201) {
+        console.error('[assinafy] Erro ao enviar para assinatura:', assignmentResult);
+        return res.status(500).json({ error: "Erro ao enviar para assinatura", details: assignmentResult.message });
+      }
+      
+      console.log(`[assinafy] Contrato enviado para assinatura com sucesso`);
+      
+      // 7. Atualizar contrato no banco de dados
+      await db.execute(sql`
+        UPDATE staging.contratos SET
+          status = 'enviado para assinatura',
+          assinafy_document_id = ${documentId},
+          assinafy_status = 'pending',
+          signature_sent_at = NOW(),
+          data_atualizacao = NOW()
+        WHERE id = ${contratoId}
+      `);
+      
+      console.log(`[assinafy] Contrato ${contratoId} atualizado para 'enviado para assinatura'`);
+      
+      res.json({ 
+        success: true, 
+        message: "Contrato enviado para assinatura com sucesso",
+        documentId,
+        signerId,
+        emailEnviado: emailSignatario
+      });
+      
+    } catch (error: any) {
+      console.error("[assinafy] Erro ao enviar para assinatura:", error);
+      res.status(500).json({ error: "Erro ao enviar para assinatura", details: error.message });
     }
   });
 }

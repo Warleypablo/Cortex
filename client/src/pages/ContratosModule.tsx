@@ -54,6 +54,7 @@ import {
   X,
   ExternalLink,
   Download,
+  Send,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -184,6 +185,8 @@ const statusColors: Record<string, string> = {
   pausado: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
   cancelado: "bg-red-500/10 text-red-500 border-red-500/20",
   encerrado: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  "enviado para assinatura": "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  assinado: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
 };
 
 const statusLabels: Record<string, string> = {
@@ -192,6 +195,8 @@ const statusLabels: Record<string, string> = {
   pausado: "Pausado",
   cancelado: "Cancelado",
   encerrado: "Encerrado",
+  "enviado para assinatura": "Enviado para Assinatura",
+  assinado: "Assinado",
 };
 
 const formatCpfCnpj = (value: string) => {
@@ -1523,6 +1528,27 @@ function ContratosTab() {
     },
   });
 
+  const enviarAssinaturaMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest('POST', `/api/contratos/${id}/enviar-assinatura`);
+    },
+    onSuccess: (data: { emailEnviado?: string }) => {
+      toast({ 
+        title: "Contrato enviado para assinatura", 
+        description: data.emailEnviado ? `Email enviado para: ${data.emailEnviado}` : "Contrato enviado com sucesso"
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/contratos'] });
+      setViewDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erro ao enviar para assinatura", 
+        description: error.message || "Verifique se a entidade possui email de cobrança cadastrado",
+        variant: "destructive"
+      });
+    },
+  });
+
   const handleEdit = useCallback((contrato: ContratoDoc) => {
     setSelectedContrato(contrato);
     setDialogOpen(true);
@@ -1784,6 +1810,20 @@ function ContratosTab() {
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Gerar PDF
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => enviarAssinaturaMutation.mutate(contratoDetail.id)}
+                      disabled={enviarAssinaturaMutation.isPending || contratoDetail.status === 'enviado para assinatura' || contratoDetail.status === 'assinado'}
+                      data-testid="button-enviar-assinatura"
+                    >
+                      {enviarAssinaturaMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      Enviar para Assinatura
                     </Button>
                     <Badge 
                       variant="outline" 
