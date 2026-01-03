@@ -2505,14 +2505,18 @@ export function registerContratosRoutes(app: Express) {
       
       const uploadResult = await uploadResponse.json() as any;
       
+      // Log completo da resposta do upload
+      console.log(`[assinafy] Resposta do upload:`, JSON.stringify(uploadResult, null, 2));
+      
       if (uploadResult.status !== 200 && !uploadResult.id) {
         console.error('[assinafy] Erro no upload:', uploadResult);
         return res.status(500).json({ error: "Erro ao fazer upload do documento", details: uploadResult.message });
       }
       
       const documentId = uploadResult.id || uploadResult.data?.id;
-      const docStatus = uploadResult.status || uploadResult.data?.status;
-      console.log(`[assinafy] Documento criado: ${documentId}, status: ${docStatus}`);
+      const initialStatus = uploadResult.data?.status || uploadResult.status;
+      const pages = uploadResult.data?.pages || uploadResult.pages || [];
+      console.log(`[assinafy] Documento criado: ${documentId}, status inicial: ${initialStatus}, páginas: ${pages.length}`);
       
       // 5. Buscar ou criar signatário no Assinafy
       const signerUrl = `${config.api_url}/accounts/${config.account_id}/signers`;
