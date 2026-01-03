@@ -268,7 +268,6 @@ export interface NavSection {
 export const NAV_CONFIG = {
   // Acesso Rápido - shortcuts to Geral pages
   quickAccess: [
-    { title: 'OKR 2026', url: '/okr-2026', icon: 'Target', permissionKey: PERMISSION_KEYS.ADMIN.OKR_2026 },
     { title: 'Meu Perfil', url: '/meu-perfil', icon: 'UserRound', permissionKey: PERMISSION_KEYS.GENERAL.PROFILE },
     { title: 'Calendário', url: '/calendario', icon: 'CalendarDays', permissionKey: PERMISSION_KEYS.GENERAL.CALENDAR },
     { title: 'Acessos', url: '/acessos', icon: 'Key', permissionKey: PERMISSION_KEYS.GENERAL.ACESSOS },
