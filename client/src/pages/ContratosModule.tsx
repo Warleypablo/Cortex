@@ -55,6 +55,7 @@ import {
   ExternalLink,
   Download,
   Send,
+  RefreshCw,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1549,6 +1550,31 @@ function ContratosTab() {
     },
   });
 
+  const verificarStatusMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/contratos/${id}/status-assinatura`);
+      return res.json();
+    },
+    onSuccess: (data: { status?: string; assinafyStatus?: string; mensagem?: string }) => {
+      const statusLabel = data.status === 'assinado' ? 'Assinado' : 
+                         data.status === 'recusado' ? 'Recusado' : 
+                         data.assinafyStatus || 'Aguardando assinatura';
+      toast({ 
+        title: "Status atualizado", 
+        description: `Status atual: ${statusLabel}`
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/contratos'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/contratos', selectedContrato?.id] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erro ao verificar status", 
+        description: error.message,
+        variant: "destructive"
+      });
+    },
+  });
+
   const handleEdit = useCallback((contrato: ContratoDoc) => {
     setSelectedContrato(contrato);
     setDialogOpen(true);
@@ -1825,6 +1851,22 @@ function ContratosTab() {
                       )}
                       Enviar para Assinatura
                     </Button>
+                    {(contratoDetail.status === 'enviado para assinatura' || contratoDetail.assinafy_document_id) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => verificarStatusMutation.mutate(contratoDetail.id)}
+                        disabled={verificarStatusMutation.isPending}
+                        data-testid="button-verificar-status"
+                      >
+                        {verificarStatusMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                        )}
+                        Verificar Status
+                      </Button>
+                    )}
                     <Badge 
                       variant="outline" 
                       className={`${statusColors[contratoDetail.status] || 'bg-gray-500/10'} text-base px-4 py-1`}
