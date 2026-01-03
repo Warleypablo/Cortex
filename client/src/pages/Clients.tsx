@@ -60,6 +60,10 @@ export default function Clients({
     queryKey: ["/api/clientes-ltv"],
   });
 
+  const { data: contratosMapData } = useQuery<{ mapa: Record<string, { id: number; numero_contrato: string; status: string; valor_negociado: number }> }>({
+    queryKey: ["/api/contratos/mapa-cnpj"],
+  });
+
   const filteredClients = useMemo(() => {
     if (!clientes) return [];
     
@@ -360,6 +364,7 @@ export default function Clients({
             clients={paginatedClients}
             onClientClick={(id) => setLocation(`/cliente/${id}`)}
             ltvMap={ltvMap}
+            contratosMap={contratosMapData?.mapa}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
