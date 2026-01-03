@@ -1491,8 +1491,9 @@ export function registerContratosRoutes(app: Express) {
     }
   });
 
-  // Função helper para gerar PDF do contrato e retornar como Buffer
+  // Função helper para gerar PDF COMPLETO do contrato e retornar como Buffer
   // Reutilizada pelo endpoint gerar-pdf e enviar-assinatura
+  // IMPORTANTE: Esta função gera o PDF completo com todas as páginas (partes, serviços, escopo, TMA, assinaturas)
   async function generateContratoPdfBuffer(contratoId: number): Promise<Buffer> {
     // Buscar dados do contrato
     const contratoResult = await db.execute(sql`
@@ -1571,9 +1572,38 @@ export function registerContratosRoutes(app: Express) {
 
     // Dimensões da página
     const pageWidth = 595;
+    const pageHeight = 842;
     const marginLeft = 30;
     const marginRight = 30;
     const contentWidth = pageWidth - marginLeft - marginRight;
+
+    // Função para desenhar header escuro (estilo PHP)
+    const drawHeader = (pageDoc: typeof doc) => {
+      pageDoc.save();
+      pageDoc.roundedRect(marginLeft, 20, contentWidth, 70, 7).fill(corHeader);
+      pageDoc.fontSize(14).font('Helvetica-Bold').fillColor('#ffffff')
+        .text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', marginLeft, 38, { width: contentWidth, align: 'center' });
+      pageDoc.fontSize(10).fillColor('#bfc5cc')
+        .text(`Contrato Nº ${String(numeroContrato).padStart(6, '0')}`, marginLeft, 56, { width: contentWidth, align: 'center' });
+      pageDoc.fontSize(9).fillColor('#ffffff')
+        .text(hoje, pageWidth - marginRight - 150, 55, { width: 140, align: 'right' })
+        .text(turbo.email, pageWidth - marginRight - 150, 67, { width: 140, align: 'right' });
+      pageDoc.restore();
+    };
+
+    // Função para desenhar footer
+    const drawFooter = (pageDoc: typeof doc, pageNum: number, totalPages: number) => {
+      pageDoc.save();
+      const footerY = pageHeight - 50;
+      pageDoc.moveTo(marginLeft, footerY - 5).lineTo(pageWidth - marginRight, footerY - 5).strokeColor('#ccc').stroke();
+      pageDoc.fontSize(7).font('Helvetica-Bold').fillColor('#333').text(turbo.nome, marginLeft, footerY);
+      pageDoc.font('Helvetica').text(`CNPJ: ${turbo.cnpj}`, marginLeft, footerY + 9);
+      pageDoc.font('Helvetica-Bold').text('DOCUMENTO OFICIAL', 220, footerY, { width: 150, align: 'center' });
+      pageDoc.font('Helvetica').text(`Gerado em ${hoje}`, 220, footerY + 9, { width: 150, align: 'center' });
+      pageDoc.text(turbo.site, 400, footerY, { width: 165, align: 'right' });
+      pageDoc.text(`Página ${pageNum} de ${totalPages}`, 400, footerY + 9, { width: 165, align: 'right' });
+      pageDoc.restore();
+    };
 
     // Função para título de seção
     const drawSectionTitle = (title: string, y: number) => {
@@ -1586,22 +1616,8 @@ export function registerContratosRoutes(app: Express) {
       return y + 40;
     };
 
-    // ======= PÁGINA 1: CABEÇALHO E PARTES =======
-    let currentY = 20;
-    
-    // Header escuro
-    doc.save();
-    doc.roundedRect(marginLeft, currentY, contentWidth, 70, 7).fill(corHeader);
-    doc.fontSize(14).font('Helvetica-Bold').fillColor('#ffffff')
-      .text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', marginLeft, currentY + 18, { width: contentWidth, align: 'center' });
-    doc.fontSize(10).fillColor('#bfc5cc')
-      .text(`Contrato Nº ${String(numeroContrato).padStart(6, '0')}`, marginLeft, currentY + 36, { width: contentWidth, align: 'center' });
-    doc.fontSize(9).fillColor('#ffffff')
-      .text(hoje, pageWidth - marginRight - 150, currentY + 35, { width: 140, align: 'right' })
-      .text(turbo.email, pageWidth - marginRight - 150, currentY + 47, { width: 140, align: 'right' });
-    doc.restore();
-    
-    currentY = 110;
+    // ======= PÁGINA 1: PARTES CONTRATANTES =======
+    let currentY = 100;
     currentY = drawSectionTitle('PARTES CONTRATANTES', currentY);
 
     const colLeft = marginLeft + 15;
@@ -1646,83 +1662,245 @@ export function registerContratosRoutes(app: Express) {
     // ======= SEÇÃO: SERVIÇOS CONTRATADOS =======
     currentY = drawSectionTitle('SERVIÇOS CONTRATADOS', currentY);
 
-    // Tabela simplificada de serviços recorrentes
+    // Função para desenhar tabela de serviços com paginação
+    const drawServiceTable = (items: any[], modalidade: string, dataInicio: string, dataCobranca: string, valorTotal: number) => {
+      if (items.length === 0) return currentY;
+      
+      const tableX = marginLeft;
+      const tableW = contentWidth;
+      const maxY = 720;
+      
+      if (currentY + 100 > maxY) {
+        doc.addPage();
+        currentY = 100;
+      }
+      
+      doc.roundedRect(tableX, currentY, tableW, 35, 4).fill(corHeader);
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#ffffff')
+        .text(`MODALIDADE ${modalidade.toUpperCase()}`, tableX + 16, currentY + 8);
+      doc.fontSize(8).fillColor('#e2e8f1')
+        .text(`Início do Serviço: ${dataInicio} | Primeiro Vencimento: ${dataCobranca}`, tableX + 16, currentY + 22);
+      currentY += 40;
+      
+      const drawTableHeader = () => {
+        doc.rect(tableX, currentY, tableW, 22).fill('#e9eff3');
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#333');
+        doc.text('Serviço/Plano', tableX + 10, currentY + 6, { width: 200 });
+        doc.text('Valor Negociado', tableX + 220, currentY + 6, { width: 120, align: 'center' });
+        doc.text('Detalhes', tableX + 350, currentY + 6, { width: tableW - 360, align: 'center' });
+        currentY += 22;
+      };
+      
+      drawTableHeader();
+      
+      for (const item of items) {
+        const servicoNome = item.servico_nome || 'Serviço';
+        const planoNome = item.plano_nome || item.descricao || 'Personalizado';
+        const valorItem = parseFloat(item.valor_negociado) || parseFloat(item.valor_original) || 0;
+        const rowH = 28;
+        
+        if (currentY + rowH > maxY) {
+          doc.addPage();
+          currentY = 100;
+          drawTableHeader();
+        }
+        
+        doc.rect(tableX, currentY, tableW, rowH).stroke('#E6EAF6');
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
+          .text(servicoNome, tableX + 10, currentY + 5, { width: 200 });
+        doc.font('Helvetica').fontSize(8).fillColor('#666')
+          .text(planoNome, tableX + 10, currentY + 16, { width: 200 });
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#28a745')
+          .text(formatCurrency(valorItem), tableX + 220, currentY + 10, { width: 120, align: 'center' });
+        
+        currentY += rowH;
+      }
+      
+      if (currentY + 30 > maxY) {
+        doc.addPage();
+        currentY = 100;
+      }
+      
+      doc.rect(tableX, currentY, tableW, 25).fill('#f7fafc');
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#333')
+        .text(`VALOR ${modalidade.toUpperCase()}: ${formatCurrency(valorTotal)}`, tableX, currentY + 7, { width: tableW, align: 'center' });
+      currentY += 35;
+      
+      return currentY;
+    };
+
+    // Renderizar serviços recorrentes
     if (itensRecorrentes.length > 0) {
-      doc.fontSize(10).font('Helvetica-Bold').fillColor(corTexto)
-        .text('Serviços Recorrentes (Mensais)', marginLeft, currentY);
-      currentY += 20;
-      
-      doc.font('Helvetica').fontSize(9);
-      for (const item of itensRecorrentes) {
-        const servicoNome = item.plano_nome || item.servico_nome || 'Serviço';
-        doc.text(`• ${servicoNome}: ${formatCurrency(parseFloat(item.valor_negociado) || 0)}`, marginLeft + 10, currentY);
-        currentY += 15;
-      }
-      doc.font('Helvetica-Bold').text(`Total Recorrente: ${formatCurrency(valorRecorrente)}`, marginLeft + 10, currentY);
-      currentY += 25;
+      const dataInicioRec = formatDate(contrato.data_inicio_recorrentes);
+      const dataCobrancaRec = formatDate(contrato.data_inicio_cobranca_recorrentes || contrato.data_inicio_recorrentes);
+      currentY = drawServiceTable(itensRecorrentes, 'RECORRENTE', dataInicioRec, dataCobrancaRec, valorRecorrente);
     }
 
-    // Tabela simplificada de serviços pontuais
+    // Renderizar serviços pontuais
     if (itensPontuais.length > 0) {
-      doc.fontSize(10).font('Helvetica-Bold').fillColor(corTexto)
-        .text('Serviços Pontuais (Únicos)', marginLeft, currentY);
-      currentY += 20;
-      
-      doc.font('Helvetica').fontSize(9);
-      for (const item of itensPontuais) {
-        const servicoNome = item.plano_nome || item.servico_nome || 'Serviço';
-        doc.text(`• ${servicoNome}: ${formatCurrency(parseFloat(item.valor_negociado) || 0)}`, marginLeft + 10, currentY);
-        currentY += 15;
+      const dataInicioPont = formatDate(contrato.data_inicio_pontuais);
+      const dataCobrancaPont = formatDate(contrato.data_inicio_cobranca_pontuais || contrato.data_inicio_pontuais);
+      currentY = drawServiceTable(itensPontuais, 'PONTUAL', dataInicioPont, dataCobrancaPont, valorPontual);
+    }
+
+    // ======= SEÇÃO: OBSERVAÇÕES =======
+    if (contrato.observacoes) {
+      if (currentY > 650) {
+        doc.addPage();
+        currentY = 100;
       }
-      doc.font('Helvetica-Bold').text(`Total Pontual: ${formatCurrency(valorPontual)}`, marginLeft + 10, currentY);
-      currentY += 25;
+      currentY = drawSectionTitle('OBSERVAÇÕES', currentY);
+      doc.rect(marginLeft, currentY, 4, 40).fill(corAzul);
+      doc.fontSize(9).font('Helvetica').fillColor(corMuted)
+        .text(contrato.observacoes, marginLeft + 16, currentY, { width: contentWidth - 20, align: 'justify' });
+      currentY += 50;
     }
 
-    // Resumo financeiro
-    currentY = drawSectionTitle('RESUMO FINANCEIRO', currentY);
-    doc.fontSize(11).font('Helvetica')
-      .text(`Valor Recorrente Mensal: ${formatCurrency(valorRecorrente)}`, marginLeft + 15, currentY);
-    currentY += 18;
-    doc.text(`Valor Pontual (Único): ${formatCurrency(valorPontual)}`, marginLeft + 15, currentY);
-    currentY += 18;
-    doc.font('Helvetica-Bold')
-      .text(`Valor Total do Contrato: ${formatCurrency(valorRecorrente + valorPontual)}`, marginLeft + 15, currentY);
-    currentY += 30;
-
-    // Datas
-    currentY = drawSectionTitle('VIGÊNCIA E COBRANÇA', currentY);
-    doc.fontSize(10).font('Helvetica')
-      .text(`Início dos Serviços Recorrentes: ${formatDate(contrato.data_inicio_recorrentes)}`, marginLeft + 15, currentY);
-    currentY += 15;
-    doc.text(`Início da Cobrança Recorrente: ${formatDate(contrato.data_inicio_cobranca_recorrentes)}`, marginLeft + 15, currentY);
-    currentY += 15;
-    if (itensPontuais.length > 0) {
-      doc.text(`Início dos Serviços Pontuais: ${formatDate(contrato.data_inicio_pontuais)}`, marginLeft + 15, currentY);
-      currentY += 15;
-      doc.text(`Início da Cobrança Pontual: ${formatDate(contrato.data_inicio_cobranca_pontuais)}`, marginLeft + 15, currentY);
-      currentY += 15;
-    }
-    currentY += 20;
-
-    // Área de assinaturas
-    if (currentY > 650) {
+    // ======= NOVA PÁGINA: ESCOPO E DIRETRIZES =======
+    const itensComEscopo = itens.filter((i: any) => i.plano_escopo || i.plano_diretrizes || i.escopo);
+    if (itensComEscopo.length > 0) {
       doc.addPage();
       currentY = 100;
+      currentY = drawSectionTitle('ESCOPO E DIRETRIZES DOS SERVIÇOS', currentY);
+
+      for (const item of itensComEscopo) {
+        if (currentY > 680) {
+          doc.addPage();
+          currentY = 100;
+        }
+
+        doc.rect(marginLeft, currentY, 4, 20).fill(corAzul);
+        doc.fontSize(10).font('Helvetica-Bold').fillColor(corTexto)
+          .text(`Serviço: ${item.servico_nome || ''} - ${item.plano_nome || 'Personalizado'}`, marginLeft + 16, currentY + 3, { width: contentWidth - 20 });
+        currentY += 25;
+
+        const escopo = item.escopo || item.plano_escopo;
+        if (escopo) {
+          doc.fontSize(9).font('Helvetica-Bold').fillColor('#333').text('Escopo:', marginLeft + 16, currentY);
+          currentY += 12;
+          doc.font('Helvetica').fillColor(corMuted).text(escopo, marginLeft + 16, currentY, { width: contentWidth - 30, align: 'justify' });
+          currentY = doc.y + 10;
+        }
+
+        if (item.plano_diretrizes) {
+          doc.fontSize(9).font('Helvetica-Bold').fillColor('#333').text('Diretrizes:', marginLeft + 16, currentY);
+          currentY += 12;
+          doc.font('Helvetica').fillColor(corMuted).text(item.plano_diretrizes, marginLeft + 16, currentY, { width: contentWidth - 30, align: 'justify' });
+          currentY = doc.y + 10;
+        }
+
+        currentY += 20;
+      }
     }
-    
-    currentY = drawSectionTitle('ASSINATURAS', currentY);
-    currentY += 40;
-    
-    // Assinatura Contratado
-    doc.moveTo(marginLeft + 20, currentY).lineTo(marginLeft + 230, currentY).stroke();
-    doc.fontSize(9).font('Helvetica')
-      .text(turbo.nome, marginLeft + 20, currentY + 5, { width: 210, align: 'center' })
-      .text('CONTRATADO', marginLeft + 20, currentY + 18, { width: 210, align: 'center' });
-    
-    // Assinatura Contratante
-    doc.moveTo(marginLeft + 280, currentY).lineTo(marginLeft + contentWidth - 20, currentY).stroke();
-    doc.text(contrato.cliente_nome || 'CONTRATANTE', marginLeft + 280, currentY + 5, { width: contentWidth - 300, align: 'center' })
-      .text('CONTRATANTE', marginLeft + 280, currentY + 18, { width: contentWidth - 300, align: 'center' });
+
+    // ======= NOVA PÁGINA: TURBO MASTER AGREEMENT (TMA) =======
+    doc.addPage();
+    currentY = 100;
+    currentY = drawSectionTitle('TURBO MASTER AGREEMENT (TMA)', currentY);
+
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#333')
+      .text('ÍNDICE', marginLeft, currentY, { width: contentWidth, align: 'center' });
+    currentY += 25;
+
+    const clausulasIndex = [
+      '1. PRELIMINARES DA PARCERIA',
+      '2. ADEQUAÇÃO DO ESCOPO DA PRESTAÇÃO DE SERVIÇO',
+      '3. FASE DE IMPLEMENTAÇÃO',
+      '4. FASE DE EXECUÇÃO',
+      '5. FORMA DE PAGAMENTO',
+      '6. OBRIGAÇÕES DA CONTRATADA',
+      '7. OBRIGAÇÕES DA CONTRATANTE',
+      '8. SIGILO E CONFIDENCIALIDADE',
+      '9. INDEPENDÊNCIA ENTRE OS CONTRATANTES',
+      '10. PROTEÇÃO DE DADOS',
+      '11. COMPLIANCE',
+      '12. CANCELAMENTO DA ASSINATURA',
+      '13. DAS DISPOSIÇÕES GERAIS'
+    ];
+
+    for (const clausula of clausulasIndex) {
+      doc.fontSize(11).font('Helvetica').fillColor('#333').text(clausula, marginLeft + 100, currentY);
+      currentY += 20;
+    }
+
+    // ======= NOVA PÁGINA: CLÁUSULAS CONTRATUAIS =======
+    doc.addPage();
+    currentY = 100;
+    currentY = drawSectionTitle('CLÁUSULAS CONTRATUAIS', currentY);
+
+    const addClausula = (titulo: string, texto: string) => {
+      if (currentY > 680) {
+        doc.addPage();
+        currentY = 100;
+      }
+      doc.rect(marginLeft, currentY, 3, 15).fill(corAzul);
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#333').text(titulo.toUpperCase(), marginLeft + 12, currentY);
+      currentY += 20;
+      doc.fontSize(9).font('Helvetica').fillColor(corMuted).text(texto, marginLeft + 12, currentY, { width: contentWidth - 20, align: 'justify' });
+      currentY = doc.y + 15;
+    };
+
+    addClausula('PRELIMINARES DA PARCERIA', 
+      '1.1 O presente Termos & Condições tem por objeto a prestação de serviços de marketing digital realizados pela CONTRATADA, nos termos e limites deste instrumento e conforme detalhamento contido no escopo selecionado.\n\n1.2 A metodologia adequada para o CONTRATANTE será indicada pelo Especialista responsável pelo planejamento e estruturação, sempre com a concordância do CONTRATANTE.\n\n1.3 O Método TURBO aplicado na prestação de serviços depende de diversas variáveis para obter sucesso, entre elas, o emprego das melhores técnicas pela CONTRATADA, a participação ativa da CONTRATANTE e a disposição do mercado, não havendo garantia ou promessa integral de êxito sem o envolvimento desses fatores.');
+
+    addClausula('ADEQUAÇÃO DO ESCOPO DA PRESTAÇÃO DE SERVIÇO',
+      '2.1 Considerando que o CONTRATANTE poderá apresentar diferentes necessidades durante o processo de estruturação e expansão no mercado digital, a TURBO conta com diversos planos de atendimento.\n\n2.1.1 A indicação e definição do escopo adequado dependerá da maturidade do CONTRATANTE no mercado digital, das suas necessidades e da adequação do escopo de cada plano.');
+
+    addClausula('FASE DE IMPLEMENTAÇÃO',
+      '3.1 O planejamento e o cronograma de entrega serão definidos em comum acordo entre a CONTRATADA e a CONTRATANTE, na fase de implementação.\n\n3.2 A Fase de Implementação seguirá as etapas: Recolhimento de informações, Reunião de Onboarding e Reunião de Kickoff.');
+
+    addClausula('FASE DE EXECUÇÃO',
+      '4.1 Após o cumprimento das etapas de implementação, o projeto seguirá para a fase de execução, operada pelas entregas acordadas no módulo de cada serviço.\n\nParágrafo Único: A CONTRATADA se declara disponível diariamente, em horário comercial, para esclarecimento de dúvidas através de canal de comunicação de resposta rápida.');
+
+    addClausula('FORMA DE PAGAMENTO',
+      '5.1 O CONTRATANTE deverá pagar à CONTRATADA o valor conforme proposta comercial, de acordo com a periodicidade e forma de pagamento definidas.\n\n5.2 A inadimplência ensejará a suspensão imediata de todas as atividades em curso.\n\n5.3 O valor mensal poderá ser reajustado anualmente com base no IPCA.');
+
+    addClausula('OBRIGAÇÕES DA CONTRATADA',
+      '6.1 Constituem obrigações da CONTRATADA:\na) Estruturar e planejar o plano de ação conforme as necessidades da CONTRATANTE.\nb) Prestar os serviços conforme planejados e aprovados.\nc) Empregar ferramentas de trabalho próprias.\nd) Manter sigilo das informações da CONTRATANTE.');
+
+    addClausula('OBRIGAÇÕES DA CONTRATANTE',
+      '7.1 Constituem obrigações da CONTRATANTE:\na) Fornecer todas as informações relativas ao negócio necessárias à prestação dos serviços.\nb) Participar ativamente do processo de planejamento e execução.\nc) Efetuar os pagamentos devidos na forma e prazo especificados.\nd) Responsabilizar-se pela veracidade e licitude de todo o conteúdo fornecido.');
+
+    addClausula('SIGILO E CONFIDENCIALIDADE',
+      '8.1 Todas as informações e dados de natureza técnica e comercial tornados de conhecimento a qualquer das PARTES constituem matéria sigilosa, obrigando-se a guardar integral e absoluto segredo.');
+
+    addClausula('PROTEÇÃO DE DADOS',
+      '10.1 As PARTES se comprometem a cumprir a Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018), garantindo a proteção dos dados pessoais tratados em razão deste contrato.');
+
+    addClausula('CANCELAMENTO DA ASSINATURA',
+      '12.1 O cancelamento poderá ser solicitado por qualquer das partes com aviso prévio de 30 (trinta) dias.\n\n12.2 Em caso de cancelamento antecipado pela CONTRATANTE, será devida multa rescisória equivalente a 2 (dois) meses do valor contratado.');
+
+    addClausula('DAS DISPOSIÇÕES GERAIS',
+      '13.1 Este contrato obriga as partes e seus sucessores a qualquer título.\n\n13.2 As partes elegem o Foro da Comarca de Vitória/ES para dirimir quaisquer questões oriundas deste instrumento.\n\n13.3 Este contrato é celebrado por prazo indeterminado, podendo ser rescindido conforme cláusula 12.');
+
+    // ======= PÁGINA FINAL: ASSINATURAS =======
+    doc.addPage();
+    currentY = 250;
+
+    doc.fontSize(11).font('Helvetica').fillColor('#333')
+      .text(`Vitória/ES, ${hoje}`, marginLeft, currentY, { align: 'center', width: contentWidth });
+    currentY += 80;
+
+    doc.strokeColor('#333').lineWidth(0.5);
+    doc.moveTo(marginLeft + 50, currentY).lineTo(marginLeft + 200, currentY).stroke();
+    doc.moveTo(pageWidth - marginRight - 200, currentY).lineTo(pageWidth - marginRight - 50, currentY).stroke();
+    currentY += 10;
+
+    doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
+      .text('CONTRATADA', marginLeft + 50, currentY, { width: 150, align: 'center' })
+      .text('CONTRATANTE', pageWidth - marginRight - 200, currentY, { width: 150, align: 'center' });
+    currentY += 12;
+    doc.font('Helvetica')
+      .text(turbo.nome, marginLeft + 50, currentY, { width: 150, align: 'center' })
+      .text(contrato.cliente_nome || '________________________', pageWidth - marginRight - 200, currentY, { width: 150, align: 'center' });
+
+    // Adicionar headers e footers em todas as páginas usando bufferPages
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      drawHeader(doc);
+      drawFooter(doc, i + 1, range.count);
+    }
 
     // Finalizar documento e retornar buffer
     return new Promise<Buffer>((resolve, reject) => {
