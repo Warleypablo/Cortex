@@ -2511,53 +2511,8 @@ export function registerContratosRoutes(app: Express) {
       }
       
       const documentId = uploadResult.id || uploadResult.data?.id;
-      console.log(`[assinafy] Documento criado: ${documentId}`);
-      
-      // 4.1 Aguardar documento ser processado (polling até status != metadata_processing)
-      // PDFs maiores (com múltiplas páginas) podem demorar mais para processar
-      const maxAttempts = 30; // Aumentado de 10 para 30
-      const delayMs = 3000; // 3 segundos entre tentativas (total: 90 segundos)
-      let documentReady = false;
-      
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        console.log(`[assinafy] Verificando status do documento (tentativa ${attempt}/${maxAttempts})...`);
-        
-        const statusUrl = `${config.api_url}/documents/${documentId}`;
-        const statusResponse = await fetch(statusUrl, {
-          method: 'GET',
-          headers: {
-            'X-Api-Key': config.api_key
-          }
-        });
-        
-        const statusResult = await statusResponse.json() as any;
-        const docStatus = statusResult.data?.status || statusResult.status;
-        console.log(`[assinafy] Status do documento: ${docStatus}`);
-        
-        if (docStatus !== 'metadata_processing' && docStatus !== 'processing') {
-          documentReady = true;
-          break;
-        }
-        
-        // Aguardar antes da próxima tentativa
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      }
-      
-      if (!documentReady) {
-        console.warn('[assinafy] Documento ainda em processamento após todas as tentativas');
-        // Salvar o documento ID mesmo assim para retry manual
-        await db.execute(sql`
-          UPDATE staging.contratos SET
-            assinafy_document_id = ${documentId},
-            assinafy_status = 'processing',
-            data_atualizacao = NOW()
-          WHERE id = ${contratoId}
-        `);
-        return res.status(202).json({ 
-          message: "Documento ainda em processamento. Tente novamente em alguns segundos.",
-          documentId
-        });
-      }
+      const docStatus = uploadResult.status || uploadResult.data?.status;
+      console.log(`[assinafy] Documento criado: ${documentId}, status: ${docStatus}`);
       
       // 5. Criar signatário no Assinafy
       const signerUrl = `${config.api_url}/accounts/${config.account_id}/signers`;
