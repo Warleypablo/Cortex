@@ -2532,59 +2532,67 @@ export function registerContratosRoutes(app: Express) {
       const pages = uploadResult.data?.pages || uploadResult.pages || [];
       console.log(`[assinafy] Documento criado: ${documentId}, status inicial: ${initialStatus}, páginas: ${pages.length}`);
       
-      // 5. Buscar ou criar signatário no Assinafy
+      // 5. Buscar ou criar signatários no Assinafy
+      // Precisamos de dois signatários: cliente + Rodrigo Queiroz (sócio responsável)
       const signerUrl = `${config.api_url}/accounts/${config.account_id}/signers`;
       
-      // Primeiro, buscar se o signatário já existe pelo email
-      const searchUrl = `${signerUrl}?search=${encodeURIComponent(emailSignatario)}`;
-      console.log(`[assinafy] Buscando signatário existente: ${emailSignatario}`);
+      // Dados do sócio responsável (sempre assina todos os contratos)
+      const socioResponsavel = {
+        nome: "Rodrigo Queiroz Santos",
+        email: "rodrigo.queiroz@turbopartners.com.br"
+      };
       
-      const searchResponse = await fetch(searchUrl, {
-        method: 'GET',
-        headers: {
-          'X-Api-Key': config.api_key
+      // Função para buscar ou criar signatário
+      const getOrCreateSigner = async (nome: string, email: string): Promise<string> => {
+        const searchUrl = `${signerUrl}?search=${encodeURIComponent(email)}`;
+        console.log(`[assinafy] Buscando signatário existente: ${email}`);
+        
+        const searchResponse = await fetch(searchUrl, {
+          method: 'GET',
+          headers: { 'X-Api-Key': config.api_key }
+        });
+        
+        const searchResult = await searchResponse.json() as any;
+        
+        // Verificar se encontrou um signatário com o mesmo email
+        if (searchResult.status === 200 && searchResult.data && Array.isArray(searchResult.data)) {
+          const existingSigner = searchResult.data.find((s: any) => 
+            s.email?.toLowerCase() === email.toLowerCase()
+          );
+          if (existingSigner) {
+            console.log(`[assinafy] Signatário existente encontrado: ${existingSigner.id}`);
+            return existingSigner.id;
+          }
         }
-      });
-      
-      const searchResult = await searchResponse.json() as any;
-      let signerId: string | null = null;
-      
-      // Verificar se encontrou um signatário com o mesmo email
-      if (searchResult.status === 200 && searchResult.data && Array.isArray(searchResult.data)) {
-        const existingSigner = searchResult.data.find((s: any) => 
-          s.email?.toLowerCase() === emailSignatario.toLowerCase()
-        );
-        if (existingSigner) {
-          signerId = existingSigner.id;
-          console.log(`[assinafy] Signatário existente encontrado: ${signerId}`);
-        }
-      }
-      
-      // Se não encontrou, criar novo signatário
-      if (!signerId) {
-        console.log(`[assinafy] Criando novo signatário: ${nomeSignatario} (${emailSignatario})`);
+        
+        // Se não encontrou, criar novo signatário
+        console.log(`[assinafy] Criando novo signatário: ${nome} (${email})`);
         const signerResponse = await fetch(signerUrl, {
           method: 'POST',
           headers: {
             'X-Api-Key': config.api_key,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            full_name: nomeSignatario,
-            email: emailSignatario
-          })
+          body: JSON.stringify({ full_name: nome, email: email })
         });
         
         const signerResult = await signerResponse.json() as any;
         
         if (signerResult.status !== 200 && !signerResult.data?.id) {
-          console.error('[assinafy] Erro ao criar signatário:', signerResult);
-          return res.status(500).json({ error: "Erro ao criar signatário", details: signerResult.message });
+          throw new Error(`Erro ao criar signatário: ${signerResult.message}`);
         }
         
-        signerId = signerResult.data?.id || signerResult.id;
-        console.log(`[assinafy] Signatário criado: ${signerId}`);
-      }
+        const newId = signerResult.data?.id || signerResult.id;
+        console.log(`[assinafy] Signatário criado: ${newId}`);
+        return newId;
+      };
+      
+      // Buscar/criar ambos os signatários
+      const clienteSignerId = await getOrCreateSigner(nomeSignatario, emailSignatario);
+      const socioSignerId = await getOrCreateSigner(socioResponsavel.nome, socioResponsavel.email);
+      
+      const signerIds = [clienteSignerId, socioSignerId];
+      console.log(`[assinafy] Signatários para o contrato: Cliente=${clienteSignerId}, Sócio=${socioSignerId}`);
       
       // 6. Aguardar documento estar pronto (polling com timeout de 60s)
       const statusUrl = `${config.api_url}/documents/${documentId}`;
@@ -2620,7 +2628,7 @@ export function registerContratosRoutes(app: Express) {
         });
       }
       
-      // 7. Enviar para assinatura
+      // 7. Enviar para assinatura (ambos signatários)
       const assignmentUrl = `${config.api_url}/documents/${documentId}/assignments`;
       const assignmentResponse = await fetch(assignmentUrl, {
         method: 'POST',
@@ -2630,7 +2638,7 @@ export function registerContratosRoutes(app: Express) {
         },
         body: JSON.stringify({
           method: 'virtual',
-          signerIds: [signerId]
+          signerIds: signerIds // Cliente + Sócio responsável
         })
       });
       
