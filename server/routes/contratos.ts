@@ -2572,20 +2572,26 @@ export function registerContratosRoutes(app: Express) {
         console.log(`[assinafy] Signatário criado: ${signerId}`);
       }
       
-      // 6. Aguardar documento estar pronto (polling com timeout de 30s)
+      // 6. Aguardar documento estar pronto (polling com timeout de 60s)
       const statusUrl = `${config.api_url}/documents/${documentId}`;
       let documentReady = false;
       
-      for (let attempt = 1; attempt <= 15; attempt++) {
+      for (let attempt = 1; attempt <= 30; attempt++) {
         const statusResponse = await fetch(statusUrl, {
           method: 'GET',
           headers: { 'X-Api-Key': config.api_key }
         });
         const statusResult = await statusResponse.json() as any;
         const currentStatus = statusResult.data?.status || statusResult.status;
-        console.log(`[assinafy] Status do documento (tentativa ${attempt}/15): ${currentStatus}`);
+        const pagesCount = statusResult.data?.pages?.length || 0;
+        
+        // Log apenas a cada 5 tentativas para não poluir
+        if (attempt === 1 || attempt % 5 === 0) {
+          console.log(`[assinafy] Status do documento (tentativa ${attempt}/30): ${currentStatus}, páginas: ${pagesCount}`);
+        }
         
         if (currentStatus !== 'metadata_processing' && currentStatus !== 'processing') {
+          console.log(`[assinafy] Documento pronto! Status: ${currentStatus}, páginas: ${pagesCount}`);
           documentReady = true;
           break;
         }
@@ -2593,7 +2599,11 @@ export function registerContratosRoutes(app: Express) {
       }
       
       if (!documentReady) {
-        console.log('[assinafy] Documento ainda em processamento após 30s, tentando criar assignment mesmo assim...');
+        console.error('[assinafy] Documento ainda em processamento após 60s - possível problema com o PDF');
+        return res.status(500).json({ 
+          error: "Documento ainda em processamento no Assinafy. O PDF pode ter um problema de formatação.",
+          documentId
+        });
       }
       
       // 7. Enviar para assinatura
