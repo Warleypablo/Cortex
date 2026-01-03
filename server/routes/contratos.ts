@@ -813,6 +813,33 @@ export function registerContratosRoutes(app: Express) {
     }
   });
 
+  // Buscar contratos por CNPJ (para cruzar com tabela de clientes)
+  app.get("/api/contratos/por-cnpj/:cnpj", isAuthenticated, async (req, res) => {
+    try {
+      const { cnpj } = req.params;
+      // Remove non-numeric characters for comparison
+      const cnpjLimpo = cnpj.replace(/\D/g, '');
+      
+      if (!cnpjLimpo) {
+        return res.status(400).json({ error: "CNPJ inválido" });
+      }
+      
+      const result = await db.execute(sql`
+        SELECT c.id, c.numero_contrato, c.status, c.valor_negociado, c.created_at,
+               e.nome as cliente_nome, e.cpf_cnpj
+        FROM staging.contratos c
+        INNER JOIN staging.entidades e ON c.cliente_id = e.id
+        WHERE REPLACE(REPLACE(REPLACE(e.cpf_cnpj, '.', ''), '/', ''), '-', '') = ${cnpjLimpo}
+        ORDER BY c.created_at DESC
+      `);
+      
+      res.json({ contratos: result.rows });
+    } catch (error) {
+      console.error("Error fetching contratos por CNPJ:", error);
+      res.status(500).json({ error: "Failed to fetch contratos por CNPJ" });
+    }
+  });
+
   // Próximo número de contrato
   app.get("/api/contratos/proximo-numero", isAuthenticated, async (req, res) => {
     try {
