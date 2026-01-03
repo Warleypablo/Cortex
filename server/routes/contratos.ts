@@ -1577,8 +1577,12 @@ export function registerContratosRoutes(app: Express) {
     const marginRight = 30;
     const contentWidth = pageWidth - marginLeft - marginRight;
 
-    // Função para desenhar header escuro (estilo PHP) - usando lineBreak: false
+    // Função para desenhar header escuro (estilo PHP) - zerando margens temporariamente
     const drawHeader = (pageDoc: typeof doc) => {
+      // Salvar margens originais e zerar para evitar auto-paginação
+      const originalMargins = { ...pageDoc.page.margins };
+      pageDoc.page.margins = { top: 0, bottom: 0, left: 0, right: 0 };
+      
       pageDoc.save();
       pageDoc.roundedRect(marginLeft, 20, contentWidth, 70, 7).fill(corHeader);
       pageDoc.fontSize(14).font('Helvetica-Bold').fillColor('#ffffff')
@@ -1589,10 +1593,17 @@ export function registerContratosRoutes(app: Express) {
         .text(hoje, pageWidth - marginRight - 150, 55, { width: 140, align: 'right', lineBreak: false })
         .text(turbo.email, pageWidth - marginRight - 150, 67, { width: 140, align: 'right', lineBreak: false });
       pageDoc.restore();
+      
+      // Restaurar margens originais
+      pageDoc.page.margins = originalMargins;
     };
 
-    // Função para desenhar footer (usando lineBreak: false para evitar paginação)
+    // Função para desenhar footer - zerando margens temporariamente
     const drawFooter = (pageDoc: typeof doc, pageNum: number, totalPages: number) => {
+      // Salvar margens originais e zerar para evitar auto-paginação
+      const originalMargins = { ...pageDoc.page.margins };
+      pageDoc.page.margins = { top: 0, bottom: 0, left: 0, right: 0 };
+      
       pageDoc.save();
       const footerY = pageHeight - 50;
       pageDoc.moveTo(marginLeft, footerY - 5).lineTo(pageWidth - marginRight, footerY - 5).strokeColor('#ccc').stroke();
@@ -1603,6 +1614,9 @@ export function registerContratosRoutes(app: Express) {
       pageDoc.text(turbo.site, 400, footerY, { width: 165, align: 'right', lineBreak: false });
       pageDoc.text(`Página ${pageNum} de ${totalPages}`, 400, footerY + 9, { width: 165, align: 'right', lineBreak: false });
       pageDoc.restore();
+      
+      // Restaurar margens originais
+      pageDoc.page.margins = originalMargins;
     };
 
     // Função para título de seção
