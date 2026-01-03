@@ -2568,27 +2568,28 @@ export function registerContratosRoutes(app: Express) {
         console.log(`[assinafy] Signatário criado: ${signerId}`);
       }
       
-      // 6. Aguardar documento estar pronto (polling rápido)
+      // 6. Aguardar documento estar pronto (polling com timeout de 30s)
       const statusUrl = `${config.api_url}/documents/${documentId}`;
-      for (let attempt = 1; attempt <= 10; attempt++) {
+      let documentReady = false;
+      
+      for (let attempt = 1; attempt <= 15; attempt++) {
         const statusResponse = await fetch(statusUrl, {
           method: 'GET',
           headers: { 'X-Api-Key': config.api_key }
         });
         const statusResult = await statusResponse.json() as any;
-        const docStatus = statusResult.data?.status || statusResult.status;
-        console.log(`[assinafy] Status do documento (tentativa ${attempt}): ${docStatus}`);
+        const currentStatus = statusResult.data?.status || statusResult.status;
+        console.log(`[assinafy] Status do documento (tentativa ${attempt}/15): ${currentStatus}`);
         
-        if (docStatus !== 'metadata_processing' && docStatus !== 'processing') {
+        if (currentStatus !== 'metadata_processing' && currentStatus !== 'processing') {
+          documentReady = true;
           break;
         }
-        if (attempt === 10) {
-          return res.status(202).json({ 
-            message: "Documento ainda em processamento. Tente novamente em alguns segundos.",
-            documentId
-          });
-        }
-        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 segundo entre tentativas
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 segundos entre tentativas
+      }
+      
+      if (!documentReady) {
+        console.log('[assinafy] Documento ainda em processamento após 30s, tentando criar assignment mesmo assim...');
       }
       
       // 7. Enviar para assinatura
