@@ -65,6 +65,7 @@ async function ensureContratosTablesExist() {
         ADD COLUMN IF NOT EXISTS data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         ADD COLUMN IF NOT EXISTS id_crm VARCHAR(50),
         ADD COLUMN IF NOT EXISTS cliente_id INTEGER,
+        ADD COLUMN IF NOT EXISTS entidade_id INTEGER,
         ADD COLUMN IF NOT EXISTS fornecedor_id INTEGER,
         ADD COLUMN IF NOT EXISTS descricao TEXT,
         ADD COLUMN IF NOT EXISTS valor_total DECIMAL(12, 2),
@@ -108,6 +109,14 @@ async function ensureContratosTablesExist() {
       `);
       
       console.log("[contratos] Contratos table columns ensured");
+      
+      // Migrate data from cliente_id to entidade_id where entidade_id is null
+      await db.execute(sql`
+        UPDATE staging.contratos 
+        SET entidade_id = cliente_id 
+        WHERE entidade_id IS NULL AND cliente_id IS NOT NULL
+      `);
+      console.log("[contratos] Migrated cliente_id to entidade_id");
     } catch (migrationError) {
       console.log("[contratos] Contratos migration skipped or table doesn't exist:", migrationError);
     }
@@ -232,6 +241,7 @@ async function ensureContratosTablesExist() {
         numero_contrato VARCHAR(50) NOT NULL UNIQUE,
         id_crm VARCHAR(50),
         cliente_id INTEGER REFERENCES staging.entidades(id),
+        entidade_id INTEGER REFERENCES staging.entidades(id),
         fornecedor_id INTEGER REFERENCES staging.entidades(id),
         descricao TEXT,
         valor_total DECIMAL(12, 2),
@@ -917,7 +927,7 @@ export function registerContratosRoutes(app: Express) {
       
       const result = await db.execute(sql`
         INSERT INTO staging.contratos (
-          numero_contrato, id_crm, cliente_id, fornecedor_id, descricao,
+          numero_contrato, id_crm, entidade_id, fornecedor_id, descricao,
           data_inicio_recorrentes, data_inicio_cobranca_recorrentes,
           data_inicio_pontuais, data_inicio_cobranca_pontuais, status,
           observacoes, usuario_criacao, valor_original, valor_negociado,
