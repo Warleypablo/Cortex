@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { ServiceIcons } from "@/components/ServiceIcons";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
-import { Link } from "wouter";
 import type { ClienteCompleto } from "../../../server/storage";
 
 type SortField = "name" | "cnpj" | "ltv" | "lt" | "aov" | "status" | "startDate" | "cluster" | "financeiro" | "firstPayment";
@@ -329,17 +328,16 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, contratos
               {/* Contrato */}
               <div className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
                 {contratoInfo ? (
-                  <Link href={`/contratos?contrato=${contratoInfo.id}`}>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="gap-1.5 text-xs"
-                      data-testid={`button-ver-contrato-${clientId}`}
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      Ver
-                    </Button>
-                  </Link>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="gap-1.5 text-xs"
+                    onClick={() => window.open(`/api/contratos/${contratoInfo.id}/gerar-pdf`, '_blank')}
+                    data-testid={`button-ver-contrato-${clientId}`}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Ver
+                  </Button>
                 ) : (
                   <span className="text-muted-foreground">-</span>
                 )}
