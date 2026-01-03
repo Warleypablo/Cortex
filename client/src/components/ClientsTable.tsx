@@ -322,11 +322,11 @@ export default function ClientsTable({ clients, onClientClick, ltvMap, contratos
                 <ServiceIcons services={client.servicos} />
               </div>
               {/* CNPJ */}
-              <div className="px-4 py-3 font-mono text-sm text-muted-foreground" data-testid={`text-cnpj-${clientId}`}>
+              <div className="px-4 py-3 text-sm text-muted-foreground" data-testid={`text-cnpj-${clientId}`}>
                 {formatCNPJ(client.cnpjCliente || client.cnpj)}
               </div>
               {/* Contrato */}
-              <div className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
+              <div className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()} data-testid={`text-contrato-${clientId}`}>
                 {contratoInfo ? (
                   <Button 
                     size="sm" 
