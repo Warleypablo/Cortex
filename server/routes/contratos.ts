@@ -1264,6 +1264,133 @@ export function registerContratosRoutes(app: Express) {
     }
   });
 
+  // Migrar coluna entidade_id usando dados de cliente_id do CSV
+  app.post("/api/contratos/migrar-entidade-id", isAuthenticated, async (req, res) => {
+    const parseCSVLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          result.push(current);
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current);
+      
+      return result;
+    };
+
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      // Buscar o arquivo CSV mais recente de contratos
+      const assetsDir = path.join(process.cwd(), 'attached_assets');
+      const files = fs.readdirSync(assetsDir).filter((f: string) => f.startsWith('contratos_') && f.endsWith('.csv'));
+      
+      if (files.length === 0) {
+        return res.status(404).json({ error: "Nenhum arquivo CSV de contratos encontrado" });
+      }
+      
+      // Ordenar por timestamp no nome do arquivo (mais recente primeiro)
+      files.sort((a: string, b: string) => {
+        const timestampA = parseInt(a.match(/_(\d+)\.csv$/)?.[1] || '0');
+        const timestampB = parseInt(b.match(/_(\d+)\.csv$/)?.[1] || '0');
+        return timestampB - timestampA;
+      });
+      
+      const csvPath = path.join(assetsDir, files[0]);
+      console.log(`[migrar-entidade-id] Usando arquivo: ${files[0]}`);
+      
+      const content = fs.readFileSync(csvPath, 'utf-8');
+      const lines = content.split('\n');
+      
+      if (lines.length < 2) {
+        return res.status(400).json({ error: "CSV vazio ou inválido" });
+      }
+      
+      // Parse header para encontrar índices das colunas id e cliente_id
+      const headers = parseCSVLine(lines[0]);
+      const idIndex = headers.findIndex(h => h.toLowerCase() === 'id');
+      const clienteIdIndex = headers.findIndex(h => h.toLowerCase() === 'cliente_id');
+      
+      if (idIndex === -1 || clienteIdIndex === -1) {
+        return res.status(400).json({ 
+          error: "CSV não possui colunas 'id' e 'cliente_id'",
+          headers: headers.slice(0, 10)
+        });
+      }
+      
+      console.log(`[migrar-entidade-id] Colunas encontradas: id=${idIndex}, cliente_id=${clienteIdIndex}`);
+      
+      // Mapear id -> cliente_id
+      const mappings: { id: number; clienteId: number }[] = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const values = parseCSVLine(line);
+        const id = parseInt(values[idIndex]);
+        const clienteId = parseInt(values[clienteIdIndex]);
+        
+        if (!isNaN(id) && !isNaN(clienteId) && clienteId > 0) {
+          mappings.push({ id, clienteId });
+        }
+      }
+      
+      console.log(`[migrar-entidade-id] Total de mapeamentos válidos: ${mappings.length}`);
+      
+      // Executar updates
+      let updated = 0;
+      let errors = 0;
+      const errorDetails: string[] = [];
+      
+      for (const mapping of mappings) {
+        try {
+          await db.execute(sql`
+            UPDATE staging.contratos 
+            SET entidade_id = ${mapping.clienteId}
+            WHERE id = ${mapping.id}
+          `);
+          updated++;
+        } catch (err: any) {
+          errors++;
+          if (errorDetails.length < 5) {
+            errorDetails.push(`ID ${mapping.id}: ${err.message}`);
+          }
+        }
+      }
+      
+      console.log(`[migrar-entidade-id] Concluído: ${updated} atualizados, ${errors} erros`);
+      
+      res.json({
+        success: true,
+        arquivo: files[0],
+        totalMapeamentos: mappings.length,
+        atualizados: updated,
+        erros: errors,
+        detalhesErros: errorDetails
+      });
+    } catch (error: any) {
+      console.error("[migrar-entidade-id] Erro:", error);
+      res.status(500).json({ error: error.message || "Migração falhou" });
+    }
+  });
+
   // Proxy para download de documento assinado do Assinafy
   app.get("/api/contratos/assinafy/download/:documentId", isAuthenticated, async (req, res) => {
     try {
