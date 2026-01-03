@@ -1491,6 +1491,247 @@ export function registerContratosRoutes(app: Express) {
     }
   });
 
+  // Função helper para gerar PDF do contrato e retornar como Buffer
+  // Reutilizada pelo endpoint gerar-pdf e enviar-assinatura
+  async function generateContratoPdfBuffer(contratoId: number): Promise<Buffer> {
+    // Buscar dados do contrato
+    const contratoResult = await db.execute(sql`
+      SELECT c.*, e.nome as cliente_nome, e.cpf_cnpj, e.tipo_pessoa,
+             e.endereco, e.numero, e.complemento, e.bairro, e.cidade, e.estado, e.cep,
+             e.email, e.telefone, e.nome_socio, e.cpf_socio
+      FROM staging.contratos c
+      LEFT JOIN staging.entidades e ON c.entidade_id = e.id
+      WHERE c.id = ${contratoId}
+    `);
+
+    if (contratoResult.rows.length === 0) {
+      throw new Error("Contrato não encontrado");
+    }
+
+    const contrato = contratoResult.rows[0] as any;
+
+    // Buscar itens do contrato com escopo e diretrizes
+    const itensResult = await db.execute(sql`
+      SELECT ci.*, ps.nome as plano_nome, ps.escopo as plano_escopo, ps.diretrizes as plano_diretrizes,
+             s.nome as servico_nome
+      FROM staging.contratos_itens ci
+      LEFT JOIN staging.planos_servicos ps ON ci.plano_servico_id = ps.id
+      LEFT JOIN staging.servicos s ON ps.servico_id = s.id
+      WHERE ci.contrato_id = ${contratoId}
+      ORDER BY ci.id
+    `);
+
+    const itens = itensResult.rows as any[];
+
+    // Criar documento PDF com margens similares ao mPDF
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: 100, bottom: 60, left: 30, right: 30 },
+      bufferPages: true
+    });
+
+    // Coletar chunks em memória
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+
+    // Dados fixos da Turbo Partners
+    const turbo = {
+      nome: "TURBO PARTNERS LTDA",
+      cnpj: "42.100.292/0001-84",
+      socio: "RODRIGO QUEIROZ SANTOS",
+      cpf_socio: "141.802.967-05",
+      endereco: "Av. Joao Baptista Parra, 633 - Ed. Enseada Office - Sala 1301 - Enseada do Suá, Vitória/ES - CEP 29052-123",
+      telefone: "(27) 99687-7563",
+      email: "contato@turbopartners.com.br",
+      site: "www.turbopartners.com.br"
+    };
+
+    // Formatadores
+    const formatCurrency = (value: number) => 'R$ ' + (value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const formatDate = (date: string | Date | null) => {
+      if (!date) return 'A definir';
+      return new Date(date).toLocaleDateString('pt-BR');
+    };
+    const hoje = formatDate(new Date());
+    const numeroContrato = contrato.numero_contrato || `CT-${String(contratoId).padStart(6, '0')}`;
+    
+    // Separar itens por modalidade
+    const itensRecorrentes = itens.filter((i: any) => (i.modalidade || 'recorrente').toLowerCase() === 'recorrente');
+    const itensPontuais = itens.filter((i: any) => (i.modalidade || '').toLowerCase() === 'pontual');
+    
+    // Calcular totais
+    const valorRecorrente = itensRecorrentes.reduce((sum: number, i: any) => sum + (parseFloat(i.valor_negociado) || 0), 0);
+    const valorPontual = itensPontuais.reduce((sum: number, i: any) => sum + (parseFloat(i.valor_negociado) || 0), 0);
+
+    // Cores do template
+    const corHeader = '#2d3748';
+    const corAzul = '#4299e1';
+    const corTexto = '#2d3748';
+    const corMuted = '#4a5568';
+
+    // Dimensões da página
+    const pageWidth = 595;
+    const marginLeft = 30;
+    const marginRight = 30;
+    const contentWidth = pageWidth - marginLeft - marginRight;
+
+    // Função para título de seção
+    const drawSectionTitle = (title: string, y: number) => {
+      doc.save();
+      doc.rect(marginLeft, y, contentWidth, 28).fill('#f7fafc');
+      doc.rect(marginLeft, y, 4, 28).fill(corAzul);
+      doc.fontSize(12).font('Helvetica-Bold').fillColor(corTexto)
+        .text(title, marginLeft + 16, y + 8);
+      doc.restore();
+      return y + 40;
+    };
+
+    // ======= PÁGINA 1: CABEÇALHO E PARTES =======
+    let currentY = 20;
+    
+    // Header escuro
+    doc.save();
+    doc.roundedRect(marginLeft, currentY, contentWidth, 70, 7).fill(corHeader);
+    doc.fontSize(14).font('Helvetica-Bold').fillColor('#ffffff')
+      .text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', marginLeft, currentY + 18, { width: contentWidth, align: 'center' });
+    doc.fontSize(10).fillColor('#bfc5cc')
+      .text(`Contrato Nº ${String(numeroContrato).padStart(6, '0')}`, marginLeft, currentY + 36, { width: contentWidth, align: 'center' });
+    doc.fontSize(9).fillColor('#ffffff')
+      .text(hoje, pageWidth - marginRight - 150, currentY + 35, { width: 140, align: 'right' })
+      .text(turbo.email, pageWidth - marginRight - 150, currentY + 47, { width: 140, align: 'right' });
+    doc.restore();
+    
+    currentY = 110;
+    currentY = drawSectionTitle('PARTES CONTRATANTES', currentY);
+
+    const colLeft = marginLeft + 15;
+    const colRight = marginLeft + contentWidth / 2 + 10;
+    const colW = contentWidth / 2 - 25;
+    const lineSpacing = 4;
+    const enderecoCliente = [contrato.endereco, contrato.numero, contrato.complemento, contrato.bairro, contrato.cidade, contrato.estado, contrato.cep ? `CEP: ${contrato.cep}` : ''].filter(Boolean).join(', ');
+
+    const writeField = (text: string, x: number, y: number, options: { width: number, font?: string, fontSize?: number, color?: string }) => {
+      doc.font(options.font || 'Helvetica').fontSize(options.fontSize || 10).fillColor(options.color || corTexto);
+      const textHeight = doc.heightOfString(text, { width: options.width });
+      doc.text(text, x, y, { width: options.width });
+      return textHeight + lineSpacing;
+    };
+
+    // Coluna esquerda: CONTRATADO
+    let leftY = currentY;
+    leftY += writeField('CONTRATADO:', colLeft, leftY, { width: colW, font: 'Helvetica-Bold', color: corMuted });
+    leftY += 2;
+    leftY += writeField(turbo.nome.toUpperCase(), colLeft, leftY, { width: colW, font: 'Helvetica-Bold' });
+    leftY += writeField(`CNPJ: ${turbo.cnpj}`, colLeft, leftY, { width: colW });
+    leftY += writeField(`Sócio: ${turbo.socio}, CPF: ${turbo.cpf_socio}`, colLeft, leftY, { width: colW });
+    leftY += writeField(`Endereço: ${turbo.endereco}`, colLeft, leftY, { width: colW });
+    leftY += writeField(`Telefone: ${turbo.telefone}`, colLeft, leftY, { width: colW });
+    leftY += writeField(`E-mail: ${turbo.email}`, colLeft, leftY, { width: colW });
+
+    // Coluna direita: CONTRATANTE
+    let rightY = currentY;
+    rightY += writeField('CONTRATANTE:', colRight, rightY, { width: colW, font: 'Helvetica-Bold', color: corMuted });
+    rightY += 2;
+    rightY += writeField((contrato.cliente_nome || 'Cliente').toUpperCase(), colRight, rightY, { width: colW, font: 'Helvetica-Bold' });
+    rightY += writeField(`${contrato.tipo_pessoa === 'juridica' ? 'CNPJ' : 'CPF'}: ${contrato.cpf_cnpj || '_____________'}`, colRight, rightY, { width: colW });
+    if (contrato.tipo_pessoa === 'juridica' && contrato.nome_socio) {
+      rightY += writeField(`Sócio: ${contrato.nome_socio}, CPF: ${contrato.cpf_socio || '_____________'}`, colRight, rightY, { width: colW });
+    }
+    rightY += writeField(`Endereço: ${enderecoCliente || '_____________'}`, colRight, rightY, { width: colW });
+    rightY += writeField(`Telefone: ${contrato.telefone || '_____________'}`, colRight, rightY, { width: colW });
+    rightY += writeField(`E-mail: ${contrato.email || '_____________'}`, colRight, rightY, { width: colW });
+
+    currentY = Math.max(leftY, rightY) + 20;
+
+    // ======= SEÇÃO: SERVIÇOS CONTRATADOS =======
+    currentY = drawSectionTitle('SERVIÇOS CONTRATADOS', currentY);
+
+    // Tabela simplificada de serviços recorrentes
+    if (itensRecorrentes.length > 0) {
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(corTexto)
+        .text('Serviços Recorrentes (Mensais)', marginLeft, currentY);
+      currentY += 20;
+      
+      doc.font('Helvetica').fontSize(9);
+      for (const item of itensRecorrentes) {
+        const servicoNome = item.plano_nome || item.servico_nome || 'Serviço';
+        doc.text(`• ${servicoNome}: ${formatCurrency(parseFloat(item.valor_negociado) || 0)}`, marginLeft + 10, currentY);
+        currentY += 15;
+      }
+      doc.font('Helvetica-Bold').text(`Total Recorrente: ${formatCurrency(valorRecorrente)}`, marginLeft + 10, currentY);
+      currentY += 25;
+    }
+
+    // Tabela simplificada de serviços pontuais
+    if (itensPontuais.length > 0) {
+      doc.fontSize(10).font('Helvetica-Bold').fillColor(corTexto)
+        .text('Serviços Pontuais (Únicos)', marginLeft, currentY);
+      currentY += 20;
+      
+      doc.font('Helvetica').fontSize(9);
+      for (const item of itensPontuais) {
+        const servicoNome = item.plano_nome || item.servico_nome || 'Serviço';
+        doc.text(`• ${servicoNome}: ${formatCurrency(parseFloat(item.valor_negociado) || 0)}`, marginLeft + 10, currentY);
+        currentY += 15;
+      }
+      doc.font('Helvetica-Bold').text(`Total Pontual: ${formatCurrency(valorPontual)}`, marginLeft + 10, currentY);
+      currentY += 25;
+    }
+
+    // Resumo financeiro
+    currentY = drawSectionTitle('RESUMO FINANCEIRO', currentY);
+    doc.fontSize(11).font('Helvetica')
+      .text(`Valor Recorrente Mensal: ${formatCurrency(valorRecorrente)}`, marginLeft + 15, currentY);
+    currentY += 18;
+    doc.text(`Valor Pontual (Único): ${formatCurrency(valorPontual)}`, marginLeft + 15, currentY);
+    currentY += 18;
+    doc.font('Helvetica-Bold')
+      .text(`Valor Total do Contrato: ${formatCurrency(valorRecorrente + valorPontual)}`, marginLeft + 15, currentY);
+    currentY += 30;
+
+    // Datas
+    currentY = drawSectionTitle('VIGÊNCIA E COBRANÇA', currentY);
+    doc.fontSize(10).font('Helvetica')
+      .text(`Início dos Serviços Recorrentes: ${formatDate(contrato.data_inicio_recorrentes)}`, marginLeft + 15, currentY);
+    currentY += 15;
+    doc.text(`Início da Cobrança Recorrente: ${formatDate(contrato.data_inicio_cobranca_recorrentes)}`, marginLeft + 15, currentY);
+    currentY += 15;
+    if (itensPontuais.length > 0) {
+      doc.text(`Início dos Serviços Pontuais: ${formatDate(contrato.data_inicio_pontuais)}`, marginLeft + 15, currentY);
+      currentY += 15;
+      doc.text(`Início da Cobrança Pontual: ${formatDate(contrato.data_inicio_cobranca_pontuais)}`, marginLeft + 15, currentY);
+      currentY += 15;
+    }
+    currentY += 20;
+
+    // Área de assinaturas
+    if (currentY > 650) {
+      doc.addPage();
+      currentY = 100;
+    }
+    
+    currentY = drawSectionTitle('ASSINATURAS', currentY);
+    currentY += 40;
+    
+    // Assinatura Contratado
+    doc.moveTo(marginLeft + 20, currentY).lineTo(marginLeft + 230, currentY).stroke();
+    doc.fontSize(9).font('Helvetica')
+      .text(turbo.nome, marginLeft + 20, currentY + 5, { width: 210, align: 'center' })
+      .text('CONTRATADO', marginLeft + 20, currentY + 18, { width: 210, align: 'center' });
+    
+    // Assinatura Contratante
+    doc.moveTo(marginLeft + 280, currentY).lineTo(marginLeft + contentWidth - 20, currentY).stroke();
+    doc.text(contrato.cliente_nome || 'CONTRATANTE', marginLeft + 280, currentY + 5, { width: contentWidth - 300, align: 'center' })
+      .text('CONTRATANTE', marginLeft + 280, currentY + 18, { width: contentWidth - 300, align: 'center' });
+
+    // Finalizar documento e retornar buffer
+    return new Promise<Buffer>((resolve, reject) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+      doc.end();
+    });
+  }
+
   // Endpoint para gerar PDF do contrato - Modelo Profissional Turbo Partners
   app.get("/api/contratos/:id/gerar-pdf", isAuthenticated, async (req, res) => {
     try {
@@ -2057,33 +2298,8 @@ export function registerContratosRoutes(app: Express) {
       
       console.log(`[assinafy] Signatário: ${nomeSignatario} (${emailSignatario})`);
       
-      // 3. Gerar PDF do contrato em memória
-      const chunks: Buffer[] = [];
-      
-      const pdfDoc = new PDFDocument({ 
-        size: 'A4', 
-        margin: 50,
-        bufferPages: true
-      });
-      
-      pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk));
-      
-      const pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
-        pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-        pdfDoc.on('error', reject);
-        
-        // Gerar conteúdo simples do PDF para assinatura
-        pdfDoc.fontSize(18).font('Helvetica-Bold').text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
-        pdfDoc.moveDown(2);
-        pdfDoc.fontSize(12).font('Helvetica').text(`Contrato Nº: ${contrato.numero_contrato || contratoId}`, { align: 'left' });
-        pdfDoc.text(`Cliente: ${contrato.cliente_nome || 'N/A'}`, { align: 'left' });
-        pdfDoc.text(`CNPJ/CPF: ${contrato.cpf_cnpj || 'N/A'}`, { align: 'left' });
-        pdfDoc.text(`Valor: R$ ${parseFloat(contrato.valor_negociado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, { align: 'left' });
-        pdfDoc.moveDown(2);
-        pdfDoc.text('Este documento será assinado eletronicamente via Assinafy.', { align: 'center' });
-        
-        pdfDoc.end();
-      });
+      // 3. Gerar PDF profissional do contrato usando a mesma lógica do endpoint gerar-pdf
+      const pdfBuffer = await generateContratoPdfBuffer(contratoId);
       
       console.log(`[assinafy] PDF gerado: ${pdfBuffer.length} bytes`);
       
