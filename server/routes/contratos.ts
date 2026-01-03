@@ -813,6 +813,39 @@ export function registerContratosRoutes(app: Express) {
     }
   });
 
+  // Mapa de contratos por CNPJ (para cruzar com tabela de clientes - retorna todos de uma vez)
+  app.get("/api/contratos/mapa-cnpj", isAuthenticated, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          REPLACE(REPLACE(REPLACE(e.cpf_cnpj, '.', ''), '/', ''), '-', '') as cnpj_limpo,
+          c.id, c.numero_contrato, c.status, c.valor_negociado
+        FROM staging.contratos c
+        INNER JOIN staging.entidades e ON c.cliente_id = e.id
+        WHERE e.cpf_cnpj IS NOT NULL AND c.status = 'ativo'
+        ORDER BY c.data_criacao DESC
+      `);
+      
+      // Agrupa por CNPJ (pega o contrato mais recente de cada)
+      const mapa: Record<string, { id: number; numero_contrato: string; status: string; valor_negociado: number }> = {};
+      for (const row of result.rows as any[]) {
+        if (row.cnpj_limpo && !mapa[row.cnpj_limpo]) {
+          mapa[row.cnpj_limpo] = {
+            id: row.id,
+            numero_contrato: row.numero_contrato,
+            status: row.status,
+            valor_negociado: row.valor_negociado
+          };
+        }
+      }
+      
+      res.json({ mapa });
+    } catch (error) {
+      console.error("Error fetching mapa contratos por CNPJ:", error);
+      res.status(500).json({ error: "Failed to fetch mapa contratos" });
+    }
+  });
+
   // Buscar contratos por CNPJ (para cruzar com tabela de clientes)
   app.get("/api/contratos/por-cnpj/:cnpj", isAuthenticated, async (req, res) => {
     try {
@@ -825,12 +858,12 @@ export function registerContratosRoutes(app: Express) {
       }
       
       const result = await db.execute(sql`
-        SELECT c.id, c.numero_contrato, c.status, c.valor_negociado, c.created_at,
+        SELECT c.id, c.numero_contrato, c.status, c.valor_negociado, c.data_criacao,
                e.nome as cliente_nome, e.cpf_cnpj
         FROM staging.contratos c
         INNER JOIN staging.entidades e ON c.cliente_id = e.id
         WHERE REPLACE(REPLACE(REPLACE(e.cpf_cnpj, '.', ''), '/', ''), '-', '') = ${cnpjLimpo}
-        ORDER BY c.created_at DESC
+        ORDER BY c.data_criacao DESC
       `);
       
       res.json({ contratos: result.rows });
