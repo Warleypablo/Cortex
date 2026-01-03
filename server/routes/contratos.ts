@@ -2669,4 +2669,209 @@ export function registerContratosRoutes(app: Express) {
       res.status(500).json({ error: "Erro ao enviar para assinatura", details: error.message });
     }
   });
+
+  // ========== WEBHOOK ASSINAFY ==========
+  // Endpoint público para receber notificações do Assinafy sobre assinaturas
+  // Configurar no painel Assinafy: https://seudominio.com/api/webhooks/assinafy
+  app.post("/api/webhooks/assinafy", async (req, res) => {
+    try {
+      const payload = req.body;
+      
+      console.log('[assinafy-webhook] Recebido:', JSON.stringify(payload, null, 2));
+      
+      // Extrair informações do payload
+      const eventType = payload.type || payload.event || payload.action;
+      const documentId = payload.document_id || payload.data?.document_id || payload.data?.document?.id;
+      const status = payload.status || payload.data?.status || payload.data?.document?.status;
+      
+      console.log(`[assinafy-webhook] Evento: ${eventType}, Document ID: ${documentId}, Status: ${status}`);
+      
+      if (!documentId) {
+        console.warn('[assinafy-webhook] Payload sem document_id');
+        return res.status(200).json({ received: true, warning: 'no document_id' });
+      }
+      
+      // Buscar contrato pelo assinafy_document_id
+      const contratoResult = await db.execute(sql`
+        SELECT id, status, assinafy_status FROM staging.contratos
+        WHERE assinafy_document_id = ${documentId}
+      `);
+      
+      if (contratoResult.rows.length === 0) {
+        console.warn(`[assinafy-webhook] Contrato não encontrado para document_id: ${documentId}`);
+        return res.status(200).json({ received: true, warning: 'contract not found' });
+      }
+      
+      const contrato = contratoResult.rows[0] as any;
+      console.log(`[assinafy-webhook] Contrato encontrado: ${contrato.id}, status atual: ${contrato.status}`);
+      
+      // Mapear status do Assinafy para status do contrato
+      let novoStatus = contrato.status;
+      let novoAssStatus = status;
+      
+      // Verificar se é um evento de assinatura concluída
+      const isAssinado = 
+        status === 'signed' || 
+        status === 'completed' || 
+        eventType === 'document.signed' ||
+        eventType === 'assignment.signed' ||
+        eventType === 'document.completed';
+      
+      const isRecusado = 
+        status === 'declined' || 
+        eventType === 'document.declined' ||
+        eventType === 'assignment.declined';
+      
+      if (isAssinado) {
+        novoStatus = 'assinado';
+        novoAssStatus = 'signed';
+        console.log(`[assinafy-webhook] Contrato ${contrato.id} foi ASSINADO!`);
+        
+        await db.execute(sql`
+          UPDATE staging.contratos SET
+            status = ${novoStatus},
+            assinafy_status = ${novoAssStatus},
+            signature_completed_at = NOW(),
+            data_atualizacao = NOW()
+          WHERE id = ${contrato.id}
+        `);
+        
+        console.log(`[assinafy-webhook] Contrato ${contrato.id} atualizado para '${novoStatus}'`);
+        
+      } else if (isRecusado) {
+        novoStatus = 'recusado';
+        novoAssStatus = 'declined';
+        console.log(`[assinafy-webhook] Contrato ${contrato.id} foi RECUSADO!`);
+        
+        await db.execute(sql`
+          UPDATE staging.contratos SET
+            status = ${novoStatus},
+            assinafy_status = ${novoAssStatus},
+            data_atualizacao = NOW()
+          WHERE id = ${contrato.id}
+        `);
+        
+        console.log(`[assinafy-webhook] Contrato ${contrato.id} atualizado para '${novoStatus}'`);
+        
+      } else {
+        // Apenas atualizar assinafy_status para outros eventos
+        if (status && status !== contrato.assinafy_status) {
+          await db.execute(sql`
+            UPDATE staging.contratos SET
+              assinafy_status = ${status},
+              data_atualizacao = NOW()
+            WHERE id = ${contrato.id}
+          `);
+          console.log(`[assinafy-webhook] Status Assinafy atualizado para: ${status}`);
+        }
+      }
+      
+      res.status(200).json({ 
+        received: true, 
+        contratoId: contrato.id,
+        novoStatus: isAssinado || isRecusado ? novoStatus : 'unchanged'
+      });
+      
+    } catch (error: any) {
+      console.error("[assinafy-webhook] Erro ao processar webhook:", error);
+      // Sempre retornar 200 para webhooks para evitar retentativas
+      res.status(200).json({ received: true, error: error.message });
+    }
+  });
+
+  // Endpoint para consultar status de assinatura manualmente
+  app.get("/api/contratos/:id/status-assinatura", isAuthenticated, async (req, res) => {
+    try {
+      const contratoId = parseInt(req.params.id);
+      
+      // Buscar contrato
+      const contratoResult = await db.execute(sql`
+        SELECT id, status, assinafy_document_id, assinafy_status, signature_sent_at, signature_completed_at
+        FROM staging.contratos
+        WHERE id = ${contratoId}
+      `);
+      
+      if (contratoResult.rows.length === 0) {
+        return res.status(404).json({ error: "Contrato não encontrado" });
+      }
+      
+      const contrato = contratoResult.rows[0] as any;
+      
+      if (!contrato.assinafy_document_id) {
+        return res.json({ 
+          contratoId,
+          status: contrato.status,
+          assinafyStatus: null,
+          mensagem: "Contrato não foi enviado para assinatura"
+        });
+      }
+      
+      // Consultar status atual no Assinafy
+      const configResult = await db.execute(sql`SELECT * FROM staging.assinafy_config LIMIT 1`);
+      if (configResult.rows.length === 0) {
+        return res.status(500).json({ error: "Configuração do Assinafy não encontrada" });
+      }
+      const config = configResult.rows[0] as any;
+      
+      const statusUrl = `${config.api_url}/documents/${contrato.assinafy_document_id}`;
+      const statusResponse = await fetch(statusUrl, {
+        method: 'GET',
+        headers: { 'X-Api-Key': config.api_key }
+      });
+      
+      const statusResult = await statusResponse.json() as any;
+      const currentStatus = statusResult.data?.status || statusResult.status;
+      
+      console.log(`[assinafy] Status do documento ${contrato.assinafy_document_id}: ${currentStatus}`);
+      
+      // Atualizar status se mudou
+      if (currentStatus && currentStatus !== contrato.assinafy_status) {
+        let novoStatus = contrato.status;
+        
+        if (currentStatus === 'signed' || currentStatus === 'completed') {
+          novoStatus = 'assinado';
+          await db.execute(sql`
+            UPDATE staging.contratos SET
+              status = ${novoStatus},
+              assinafy_status = ${currentStatus},
+              signature_completed_at = NOW(),
+              data_atualizacao = NOW()
+            WHERE id = ${contratoId}
+          `);
+        } else if (currentStatus === 'declined') {
+          novoStatus = 'recusado';
+          await db.execute(sql`
+            UPDATE staging.contratos SET
+              status = ${novoStatus},
+              assinafy_status = ${currentStatus},
+              data_atualizacao = NOW()
+            WHERE id = ${contratoId}
+          `);
+        } else {
+          await db.execute(sql`
+            UPDATE staging.contratos SET
+              assinafy_status = ${currentStatus},
+              data_atualizacao = NOW()
+            WHERE id = ${contratoId}
+          `);
+        }
+        
+        contrato.status = novoStatus;
+        contrato.assinafy_status = currentStatus;
+      }
+      
+      res.json({
+        contratoId,
+        status: contrato.status,
+        assinafyDocumentId: contrato.assinafy_document_id,
+        assinafyStatus: currentStatus,
+        enviadoEm: contrato.signature_sent_at,
+        assinadoEm: contrato.signature_completed_at
+      });
+      
+    } catch (error: any) {
+      console.error("[assinafy] Erro ao consultar status:", error);
+      res.status(500).json({ error: "Erro ao consultar status", details: error.message });
+    }
+  });
 }
