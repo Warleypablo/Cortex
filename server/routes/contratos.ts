@@ -2097,14 +2097,8 @@ export function registerContratosRoutes(app: Express) {
       const uploadUrl = `${config.api_url}/accounts/${config.account_id}/documents`;
       console.log(`[assinafy] Fazendo upload para: ${uploadUrl}`);
       
-      // Convert FormData to Buffer for fetch compatibility
-      const formBuffer = await new Promise<Buffer>((resolve, reject) => {
-        const chunks: Buffer[] = [];
-        formData.on('data', (chunk: Buffer) => chunks.push(chunk));
-        formData.on('end', () => resolve(Buffer.concat(chunks)));
-        formData.on('error', reject);
-        formData.resume();
-      });
+      // Use getBuffer() method from form-data package for proper Buffer conversion
+      const formBuffer = formData.getBuffer();
       
       const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
