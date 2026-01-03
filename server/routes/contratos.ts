@@ -2568,7 +2568,30 @@ export function registerContratosRoutes(app: Express) {
         console.log(`[assinafy] Signatário criado: ${signerId}`);
       }
       
-      // 6. Enviar para assinatura
+      // 6. Aguardar documento estar pronto (polling rápido)
+      const statusUrl = `${config.api_url}/documents/${documentId}`;
+      for (let attempt = 1; attempt <= 10; attempt++) {
+        const statusResponse = await fetch(statusUrl, {
+          method: 'GET',
+          headers: { 'X-Api-Key': config.api_key }
+        });
+        const statusResult = await statusResponse.json() as any;
+        const docStatus = statusResult.data?.status || statusResult.status;
+        console.log(`[assinafy] Status do documento (tentativa ${attempt}): ${docStatus}`);
+        
+        if (docStatus !== 'metadata_processing' && docStatus !== 'processing') {
+          break;
+        }
+        if (attempt === 10) {
+          return res.status(202).json({ 
+            message: "Documento ainda em processamento. Tente novamente em alguns segundos.",
+            documentId
+          });
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 segundo entre tentativas
+      }
+      
+      // 7. Enviar para assinatura
       const assignmentUrl = `${config.api_url}/documents/${documentId}/assignments`;
       const assignmentResponse = await fetch(assignmentUrl, {
         method: 'POST',
