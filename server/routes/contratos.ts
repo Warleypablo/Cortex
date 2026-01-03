@@ -2834,21 +2834,28 @@ export function registerContratosRoutes(app: Express) {
       
       console.log(`[assinafy] Status do documento ${contrato.assinafy_document_id}: ${currentStatus}`);
       
-      // Atualizar status se mudou
-      if (currentStatus && currentStatus !== contrato.assinafy_status) {
+      // Atualizar status se mudou ou se o status do contrato não corresponde ao assinafy_status
+      const isAssinadoAssinafy = currentStatus === 'signed' || currentStatus === 'completed' || currentStatus === 'certificated';
+      const isRecusadoAssinafy = currentStatus === 'declined';
+      const contratoNaoAtualizado = (isAssinadoAssinafy && contrato.status !== 'assinado') || 
+                                     (isRecusadoAssinafy && contrato.status !== 'recusado') ||
+                                     (currentStatus && currentStatus !== contrato.assinafy_status);
+      
+      if (contratoNaoAtualizado) {
         let novoStatus = contrato.status;
         
-        if (currentStatus === 'signed' || currentStatus === 'completed' || currentStatus === 'certificated') {
+        if (isAssinadoAssinafy) {
           novoStatus = 'assinado';
           await db.execute(sql`
             UPDATE staging.contratos SET
               status = ${novoStatus},
               assinafy_status = ${currentStatus},
-              signature_completed_at = NOW(),
+              signature_completed_at = COALESCE(signature_completed_at, NOW()),
               data_atualizacao = NOW()
             WHERE id = ${contratoId}
           `);
-        } else if (currentStatus === 'declined') {
+          console.log(`[assinafy] Contrato ${contratoId} atualizado para 'assinado'`);
+        } else if (isRecusadoAssinafy) {
           novoStatus = 'recusado';
           await db.execute(sql`
             UPDATE staging.contratos SET
@@ -2857,6 +2864,7 @@ export function registerContratosRoutes(app: Express) {
               data_atualizacao = NOW()
             WHERE id = ${contratoId}
           `);
+          console.log(`[assinafy] Contrato ${contratoId} atualizado para 'recusado'`);
         } else {
           await db.execute(sql`
             UPDATE staging.contratos SET
