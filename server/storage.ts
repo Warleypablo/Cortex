@@ -131,6 +131,8 @@ export interface VisaoGeralMetricas {
   aquisicaoPontualCommerce: number;
   aquisicaoPontualTech: number;
   receitaPontualEntregue: number;
+  valorEntreguePontual: number;
+  valorAquisicaoPontual: number;
   churn: number;
   pausados: number;
 }
@@ -3643,6 +3645,8 @@ export class DbStorage implements IStorage {
         aquisicaoPontualCommerce: 0,
         aquisicaoPontualTech: 0,
         receitaPontualEntregue: 0,
+        valorEntreguePontual: 0,
+        valorAquisicaoPontual: 0,
         churn: 0,
         pausados: 0,
       };
@@ -3753,7 +3757,31 @@ export class DbStorage implements IStorage {
             THEN valorp::numeric
             ELSE 0 
           END
-        ), 0) as receita_pontual_entregue
+        ), 0) as receita_pontual_entregue,
+        
+        -- Valor Entregue Pontual: soma de valorp de TODOS os contratos com status = 'entregue'
+        COALESCE(SUM(
+          CASE 
+            WHEN LOWER(status) = 'entregue'
+              AND valorp IS NOT NULL
+              AND valorp > 0
+            THEN valorp::numeric
+            ELSE 0 
+          END
+        ), 0) as valor_entregue_pontual,
+        
+        -- Valor Aquisição Pontual: soma de valorp de contratos com status = 'entregue' E data_inicio no mês atual
+        COALESCE(SUM(
+          CASE 
+            WHEN LOWER(status) = 'entregue'
+              AND data_inicio >= ${inicioMes}
+              AND data_inicio <= ${fimMes}
+              AND valorp IS NOT NULL
+              AND valorp > 0
+            THEN valorp::numeric
+            ELSE 0 
+          END
+        ), 0) as valor_aquisicao_pontual
       FROM ${schema.cupContratos}
     `);
 
@@ -3768,6 +3796,8 @@ export class DbStorage implements IStorage {
     const churn = parseFloat(transRow.churn || '0');
     const pausados = parseFloat(transRow.pausados || '0');
     const receitaPontualEntregue = parseFloat(transRow.receita_pontual_entregue || '0');
+    const valorEntreguePontual = parseFloat(transRow.valor_entregue_pontual || '0');
+    const valorAquisicaoPontual = parseFloat(transRow.valor_aquisicao_pontual || '0');
 
     return {
       receitaTotal: mrr + aquisicaoPontual,
@@ -3777,6 +3807,8 @@ export class DbStorage implements IStorage {
       aquisicaoPontualCommerce,
       aquisicaoPontualTech,
       receitaPontualEntregue,
+      valorEntreguePontual,
+      valorAquisicaoPontual,
       churn,
       pausados,
     };
