@@ -4599,6 +4599,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============ OPERAÇÃO ENDPOINTS ============
+
+  // Busca unificada de clientes (Conta Azul + ClickUp)
+  app.get("/api/operacao/clientes-unificados", isAuthenticated, async (req, res) => {
+    try {
+      const search = (req.query.search as string)?.trim() || "";
+      
+      if (search.length < 2) {
+        return res.json([]);
+      }
+
+      // Remove caracteres especiais para busca por CNPJ (sanitizado)
+      const cleanedSearch = search.replace(/[^\w\s]/g, '');
+      
+      // Prepara padrões de busca com concatenação em JavaScript (seguro)
+      const searchPattern = `%${search}%`;
+      const cnpjPattern = `%${cleanedSearch}%`;
+
+      // Busca em caz_clientes (Conta Azul)
+      const cazResult = await db.execute(sql`
+        SELECT 
+          id,
+          nome as name,
+          cnpj,
+          'conta_azul' as fonte
+        FROM caz_clientes
+        WHERE nome IS NOT NULL
+          AND (
+            LOWER(nome) LIKE LOWER(${searchPattern})
+            OR REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') LIKE ${cnpjPattern}
+          )
+        LIMIT 20
+      `);
+
+      // Busca em cup_clientes (ClickUp)
+      const cupResult = await db.execute(sql`
+        SELECT 
+          id,
+          nome as name,
+          cnpj,
+          'clickup' as fonte,
+          status
+        FROM cup_clientes
+        WHERE nome IS NOT NULL
+          AND (
+            LOWER(nome) LIKE LOWER(${searchPattern})
+            OR REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') LIKE ${cnpjPattern}
+          )
+        LIMIT 20
+      `);
+
+      // Combina resultados
+      const clientes = [
+        ...cazResult.rows.map((row: any) => ({
+          id: row.id,
+          nome: row.name,
+          cnpj: row.cnpj,
+          fonte: 'conta_azul',
+          status: null
+        })),
+        ...cupResult.rows.map((row: any) => ({
+          id: row.id,
+          nome: row.name,
+          cnpj: row.cnpj,
+          fonte: 'clickup',
+          status: row.status
+        }))
+      ];
+
+      res.json(clientes);
+    } catch (error: any) {
+      console.error("[operacao] Error fetching unified clients:", error);
+      res.status(500).json({ error: "Failed to fetch clients", details: error.message });
+    }
+  });
+
+  // Onboardings de clientes (placeholder - pode ser expandido depois)
+  app.get("/api/operacao/onboardings-clientes", isAuthenticated, async (req, res) => {
+    try {
+      // Por enquanto retorna array vazio - a tabela pode ser criada quando necessário
+      res.json([]);
+    } catch (error: any) {
+      console.error("[operacao] Error fetching client onboardings:", error);
+      res.status(500).json({ error: "Failed to fetch onboardings", details: error.message });
+    }
+  });
+
   // ============ INVESTORS REPORT ENDPOINTS ============
   
   // Endpoint consolidado com todas as métricas do Investors Report
