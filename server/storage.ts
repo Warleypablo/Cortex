@@ -2902,7 +2902,7 @@ export class DbStorage implements IStorage {
           SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_previstas
         FROM caz_parcelas
         WHERE tipo_evento IN ('RECEITA', 'DESPESA')
-          AND status NOT IN ('QUITADO', 'PERDIDO')
+          AND status NOT IN ('PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
         GROUP BY data_vencimento::date
       )
