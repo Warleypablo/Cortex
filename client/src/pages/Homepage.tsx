@@ -454,6 +454,8 @@ function DashboardAdmin() {
     aquisicaoPontual: number;
     aquisicaoPontualCommerce: number;
     aquisicaoPontualTech: number;
+    valorEntreguePontual: number;
+    valorAquisicaoPontual: number;
     churn: number;
     pausados: number;
   }>({
@@ -497,6 +499,8 @@ function DashboardAdmin() {
   const aquisicaoPontual = visaoGeralData?.aquisicaoPontual || 0;
   const aquisicaoPontualCommerce = visaoGeralData?.aquisicaoPontualCommerce || 0;
   const aquisicaoPontualTech = visaoGeralData?.aquisicaoPontualTech || 0;
+  const valorEntreguePontual = visaoGeralData?.valorEntreguePontual || 0;
+  const valorAquisicaoPontual = visaoGeralData?.valorAquisicaoPontual || 0;
   const churn = visaoGeralData?.churn || 0;
   
   const churnPercent = mrrTotal > 0 ? (churn / mrrTotal) * 100 : 0;
@@ -543,17 +547,17 @@ function DashboardAdmin() {
       href: "/dashboard/comercial/closers",
     },
     {
-      title: "Pontual Commerce",
-      subtitle: "Vendas pontuais E-commerce",
-      value: formatCurrency(aquisicaoPontualCommerce),
+      title: "Valor Entregue Pontual",
+      subtitle: "Projetos pontuais entregues",
+      value: formatCurrency(valorEntreguePontual),
       icon: Target,
       badge: undefined,
       href: "/visao-geral",
     },
     {
-      title: "Pontual Tech",
-      subtitle: "Vendas pontuais Tech",
-      value: formatCurrency(aquisicaoPontualTech),
+      title: "Aquisição Pontual",
+      subtitle: "Novos pontuais entregues no mês",
+      value: formatCurrency(valorAquisicaoPontual),
       icon: Target,
       badge: undefined,
       href: "/visao-geral",
