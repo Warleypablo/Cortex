@@ -192,8 +192,8 @@ export default function FluxoCaixa() {
           />
         </div>
 
-        {/* KPIs Principais - 4 cards em linha */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* KPIs Principais */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20" data-testid="card-saldo-atual">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
@@ -213,7 +213,7 @@ export default function FluxoCaixa() {
           <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-saldo-final">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Saldo Projetado</span>
+                <span className="text-sm font-medium text-muted-foreground">Saldo Projetado (Fim do Mês)</span>
                 <TrendingUp className="w-5 h-5 text-blue-500" />
               </div>
               {isLoadingInsights ? (
@@ -226,41 +226,174 @@ export default function FluxoCaixa() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20" data-testid="card-entradas-vencidas">
+          <Card data-testid="card-entradas-periodo">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Entradas Vencidas</span>
-                <AlertCircle className="w-5 h-5 text-amber-500" />
+                <span className="text-sm font-medium text-muted-foreground">Entradas do Mês</span>
+                <ArrowUpCircle className="w-5 h-5 text-green-500" />
               </div>
               {isLoadingInsights ? (
                 <Skeleton className="h-8 w-32" />
               ) : (
-                <div className="text-2xl font-bold text-amber-600" data-testid="text-entradas-vencidas">
-                  {formatCurrency(insightsPeriodo?.entradasVencidas || 0)}
+                <div className="text-2xl font-bold text-green-600" data-testid="text-entradas-periodo">
+                  {formatCurrency(insightsPeriodo?.entradasPeriodo || 0)}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20" data-testid="card-saidas-vencidas">
+          <Card data-testid="card-saidas-periodo">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Saídas Vencidas</span>
-                <AlertCircle className="w-5 h-5 text-red-500" />
+                <span className="text-sm font-medium text-muted-foreground">Saídas do Mês</span>
+                <ArrowDownCircle className="w-5 h-5 text-red-500" />
               </div>
               {isLoadingInsights ? (
                 <Skeleton className="h-8 w-32" />
               ) : (
-                <div className="text-2xl font-bold text-red-600" data-testid="text-saidas-vencidas">
-                  {formatCurrency(insightsPeriodo?.saidasVencidas || 0)}
+                <div className="text-2xl font-bold text-red-600" data-testid="text-saidas-periodo">
+                  {formatCurrency(insightsPeriodo?.saidasPeriodo || 0)}
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
+        {/* Alertas de Vencidos */}
+        {((insightsPeriodo?.entradasVencidas || 0) > 0 || (insightsPeriodo?.saidasVencidas || 0) > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {(insightsPeriodo?.entradasVencidas || 0) > 0 && (
+              <Card className="border-amber-500/50 bg-amber-500/5" data-testid="card-entradas-vencidas">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-amber-500/20">
+                      <AlertCircle className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Entradas Vencidas</p>
+                      <p className="text-xl font-bold text-amber-600">{formatCurrency(insightsPeriodo?.entradasVencidas || 0)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            {(insightsPeriodo?.saidasVencidas || 0) > 0 && (
+              <Card className="border-red-500/50 bg-red-500/5" data-testid="card-saidas-vencidas">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-red-500/20">
+                      <AlertCircle className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Saídas Vencidas</p>
+                      <p className="text-xl font-bold text-red-600">{formatCurrency(insightsPeriodo?.saidasVencidas || 0)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Provisão Mensal */}
+        <Card className="mb-6 border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-purple-500/10" data-testid="card-provisao-mensal">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-purple-500" />
+              <CardTitle className="text-base">Provisão Mensal - {periodoLabel}</CardTitle>
+            </div>
+            <CardDescription>Projeção de geração de caixa considerando inadimplência de 6%</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingInsights ? (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-20" />)}
+              </div>
+            ) : (() => {
+              const entradasPrevistas = insightsPeriodo?.entradasPeriodo || 0;
+              const saidasPrevistas = insightsPeriodo?.saidasPeriodo || 0;
+              const inadimplenciaPrevista = entradasPrevistas * 0.06;
+              const geracaoCaixaPrevista = entradasPrevistas - saidasPrevistas - inadimplenciaPrevista;
+              const margemPrevista = entradasPrevistas > 0 ? (geracaoCaixaPrevista / entradasPrevistas) * 100 : 0;
+              
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Entradas Previstas</p>
+                    <p className="text-lg font-bold text-green-600" data-testid="text-entradas-previstas">
+                      {formatCurrency(entradasPrevistas)}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Saídas Previstas</p>
+                    <p className="text-lg font-bold text-red-600" data-testid="text-saidas-previstas">
+                      {formatCurrency(saidasPrevistas)}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Inadimplência (6%)</p>
+                    <p className="text-lg font-bold text-amber-600" data-testid="text-inadimplencia-prevista">
+                      -{formatCurrency(inadimplenciaPrevista)}
+                    </p>
+                  </div>
+                  
+                  <div className={`p-4 rounded-lg border ${geracaoCaixaPrevista >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Geração de Caixa</p>
+                    <p className={`text-lg font-bold ${geracaoCaixaPrevista >= 0 ? 'text-emerald-600' : 'text-red-600'}`} data-testid="text-geracao-caixa">
+                      {formatCurrency(geracaoCaixaPrevista)}
+                    </p>
+                  </div>
+                  
+                  <div className={`p-4 rounded-lg border ${margemPrevista >= 0 ? 'bg-purple-500/10 border-purple-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Margem Prevista</p>
+                    <p className={`text-lg font-bold ${margemPrevista >= 0 ? 'text-purple-600' : 'text-red-600'}`} data-testid="text-margem-prevista">
+                      {margemPrevista.toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+
+        {/* Contas Bancárias */}
+        <Card className="mb-6" data-testid="card-contas-bancos">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-muted-foreground" />
+              <CardTitle className="text-base">Contas Bancárias</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingContas ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[1,2,3,4].map(i => <Skeleton key={i} className="h-16" />)}
+              </div>
+            ) : !contasBancos || contasBancos.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma conta bancária encontrada</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {contasBancos.map((conta, index) => (
+                  <div 
+                    key={conta.id || index}
+                    className="p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
+                    data-testid={`card-conta-${index}`}
+                  >
+                    <p className="text-xs font-medium text-muted-foreground truncate">{conta.nome}</p>
+                    <p className={`text-base font-bold ${conta.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(conta.saldo)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Gráfico Principal */}
-        <Card className="mb-6" data-testid="card-fluxo-diario">
+        <Card data-testid="card-fluxo-diario">
           <CardHeader className="pb-4">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
@@ -518,103 +651,6 @@ export default function FluxoCaixa() {
                     )}
                   </ComposedChart>
                 </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Provisão Mensal */}
-        <Card className="mb-6 border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-purple-500/10" data-testid="card-provisao-mensal">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-purple-500" />
-              <CardTitle className="text-base">Provisão Mensal - {periodoLabel}</CardTitle>
-            </div>
-            <CardDescription>Projeção de geração de caixa considerando inadimplência de 6%</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingInsights ? (
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-20" />)}
-              </div>
-            ) : (() => {
-              const entradasPrevistas = insightsPeriodo?.entradasPeriodo || 0;
-              const saidasPrevistas = insightsPeriodo?.saidasPeriodo || 0;
-              const inadimplenciaPrevista = entradasPrevistas * 0.06;
-              const geracaoCaixaPrevista = entradasPrevistas - saidasPrevistas - inadimplenciaPrevista;
-              const margemPrevista = entradasPrevistas > 0 ? (geracaoCaixaPrevista / entradasPrevistas) * 100 : 0;
-              
-              return (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Entradas Previstas</p>
-                    <p className="text-lg font-bold text-green-600" data-testid="text-entradas-previstas">
-                      {formatCurrency(entradasPrevistas)}
-                    </p>
-                  </div>
-                  
-                  <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Saídas Previstas</p>
-                    <p className="text-lg font-bold text-red-600" data-testid="text-saidas-previstas">
-                      {formatCurrency(saidasPrevistas)}
-                    </p>
-                  </div>
-                  
-                  <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Inadimplência (6%)</p>
-                    <p className="text-lg font-bold text-amber-600" data-testid="text-inadimplencia-prevista">
-                      -{formatCurrency(inadimplenciaPrevista)}
-                    </p>
-                  </div>
-                  
-                  <div className={`p-4 rounded-lg border ${geracaoCaixaPrevista >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Geração de Caixa</p>
-                    <p className={`text-lg font-bold ${geracaoCaixaPrevista >= 0 ? 'text-emerald-600' : 'text-red-600'}`} data-testid="text-geracao-caixa">
-                      {formatCurrency(geracaoCaixaPrevista)}
-                    </p>
-                  </div>
-                  
-                  <div className={`p-4 rounded-lg border ${margemPrevista >= 0 ? 'bg-purple-500/10 border-purple-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Margem Prevista</p>
-                    <p className={`text-lg font-bold ${margemPrevista >= 0 ? 'text-purple-600' : 'text-red-600'}`} data-testid="text-margem-prevista">
-                      {margemPrevista.toFixed(1)}%
-                    </p>
-                  </div>
-                </div>
-              );
-            })()}
-          </CardContent>
-        </Card>
-
-        {/* Contas Bancárias */}
-        <Card className="mb-6" data-testid="card-contas-bancos">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-muted-foreground" />
-              <CardTitle className="text-base">Contas Bancárias</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoadingContas ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[1,2,3,4].map(i => <Skeleton key={i} className="h-16" />)}
-              </div>
-            ) : !contasBancos || contasBancos.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma conta bancária encontrada</p>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {contasBancos.map((conta, index) => (
-                  <div 
-                    key={conta.id || index}
-                    className="p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
-                    data-testid={`card-conta-${index}`}
-                  >
-                    <p className="text-xs font-medium text-muted-foreground truncate">{conta.nome}</p>
-                    <p className={`text-base font-bold ${conta.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatCurrency(conta.saldo)}
-                    </p>
-                  </div>
-                ))}
               </div>
             )}
           </CardContent>
