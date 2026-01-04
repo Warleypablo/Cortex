@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useTheme } from "@/components/ThemeProvider";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,17 +76,10 @@ const getMesNome = (mes: number, ano: number) => {
 export default function FluxoCaixa() {
   usePageTitle("Fluxo de Caixa");
   useSetPageInfo("Fluxo de Caixa", "Análise de entradas e saídas do período");
-  const { theme } = useTheme();
   
   const hoje = new Date();
   const [selectedMonth, setSelectedMonth] = useState({ month: hoje.getMonth() + 1, year: hoje.getFullYear() });
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
-  
-  const chartColors = useMemo(() => ({
-    axisLabel: theme === 'dark' ? 'rgba(148, 163, 184, 0.8)' : 'rgba(71, 85, 105, 0.9)',
-    axisLine: theme === 'dark' ? 'rgba(148, 163, 184, 0.2)' : 'rgba(71, 85, 105, 0.3)',
-    gridLine: theme === 'dark' ? 'rgba(148, 163, 184, 0.15)' : 'rgba(71, 85, 105, 0.15)',
-  }), [theme]);
   
   const dataInicio = useMemo(() => {
     return new Date(selectedMonth.year, selectedMonth.month - 1, 1).toISOString().split('T')[0];
@@ -434,7 +426,7 @@ export default function FluxoCaixa() {
                 <p className="text-muted-foreground">Nenhum dado para o período selecionado</p>
               </div>
             ) : (
-              <div className="h-[400px] relative rounded-xl overflow-hidden bg-gradient-to-b from-cyan-500/[0.02] to-slate-200/30 dark:to-slate-900/40">
+              <div className="h-[400px] relative rounded-xl overflow-hidden" style={{ background: 'linear-gradient(180deg, rgba(6, 182, 212, 0.02) 0%, rgba(15, 23, 42, 0.4) 100%)' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart 
                     data={chartData} 
@@ -501,15 +493,15 @@ export default function FluxoCaixa() {
                     
                     <CartesianGrid 
                       strokeDasharray="1 6" 
-                      stroke={chartColors.gridLine} 
+                      stroke="rgba(148, 163, 184, 0.15)" 
                       vertical={false} 
                     />
                     
                     <XAxis 
                       dataKey="dataFormatada" 
-                      tick={{ fill: chartColors.axisLabel, fontSize: 10, fontWeight: 500 }}
+                      tick={{ fill: 'rgba(148, 163, 184, 0.8)', fontSize: 10, fontWeight: 500 }}
                       tickLine={false}
-                      axisLine={{ stroke: chartColors.axisLine, strokeWidth: 1 }}
+                      axisLine={{ stroke: 'rgba(148, 163, 184, 0.2)', strokeWidth: 1 }}
                       angle={-45}
                       textAnchor="end"
                       height={55}
@@ -519,7 +511,7 @@ export default function FluxoCaixa() {
                     
                     <YAxis 
                       yAxisId="bars"
-                      tick={{ fill: chartColors.axisLabel, fontSize: 10, fontWeight: 500 }}
+                      tick={{ fill: 'rgba(148, 163, 184, 0.8)', fontSize: 10, fontWeight: 500 }}
                       tickFormatter={(value) => formatCurrencyCompact(value)}
                       tickLine={false}
                       axisLine={false}
