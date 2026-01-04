@@ -192,8 +192,8 @@ export default function FluxoCaixa() {
           />
         </div>
 
-        {/* KPIs Principais - Saldo Atual e Projetado */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        {/* KPIs Principais - 4 cards em linha */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20" data-testid="card-saldo-atual">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
@@ -213,7 +213,7 @@ export default function FluxoCaixa() {
           <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-saldo-final">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Saldo Projetado (Fim do Mês)</span>
+                <span className="text-sm font-medium text-muted-foreground">Saldo Projetado</span>
                 <TrendingUp className="w-5 h-5 text-blue-500" />
               </div>
               {isLoadingInsights ? (
@@ -221,6 +221,38 @@ export default function FluxoCaixa() {
               ) : (
                 <div className={`text-2xl font-bold ${(insightsPeriodo?.saldoFinalPeriodo || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`} data-testid="text-saldo-final">
                   {formatCurrency(insightsPeriodo?.saldoFinalPeriodo || 0)}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20" data-testid="card-entradas-vencidas">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-muted-foreground">Entradas Vencidas</span>
+                <AlertCircle className="w-5 h-5 text-amber-500" />
+              </div>
+              {isLoadingInsights ? (
+                <Skeleton className="h-8 w-32" />
+              ) : (
+                <div className="text-2xl font-bold text-amber-600" data-testid="text-entradas-vencidas">
+                  {formatCurrency(insightsPeriodo?.entradasVencidas || 0)}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20" data-testid="card-saidas-vencidas">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-muted-foreground">Saídas Vencidas</span>
+                <AlertCircle className="w-5 h-5 text-red-500" />
+              </div>
+              {isLoadingInsights ? (
+                <Skeleton className="h-8 w-32" />
+              ) : (
+                <div className="text-2xl font-bold text-red-600" data-testid="text-saidas-vencidas">
+                  {formatCurrency(insightsPeriodo?.saidasVencidas || 0)}
                 </div>
               )}
             </CardContent>
@@ -490,77 +522,6 @@ export default function FluxoCaixa() {
             )}
           </CardContent>
         </Card>
-
-        {/* KPIs Secundários - Entradas e Saídas */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <Card data-testid="card-entradas-periodo">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Entradas do Mês</span>
-                <ArrowUpCircle className="w-5 h-5 text-green-500" />
-              </div>
-              {isLoadingInsights ? (
-                <Skeleton className="h-8 w-32" />
-              ) : (
-                <div className="text-2xl font-bold text-green-600" data-testid="text-entradas-periodo">
-                  {formatCurrency(insightsPeriodo?.entradasPeriodo || 0)}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-saidas-periodo">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Saídas do Mês</span>
-                <ArrowDownCircle className="w-5 h-5 text-red-500" />
-              </div>
-              {isLoadingInsights ? (
-                <Skeleton className="h-8 w-32" />
-              ) : (
-                <div className="text-2xl font-bold text-red-600" data-testid="text-saidas-periodo">
-                  {formatCurrency(insightsPeriodo?.saidasPeriodo || 0)}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Alertas de Vencidos */}
-        {((insightsPeriodo?.entradasVencidas || 0) > 0 || (insightsPeriodo?.saidasVencidas || 0) > 0) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {(insightsPeriodo?.entradasVencidas || 0) > 0 && (
-              <Card className="border-amber-500/50 bg-amber-500/5" data-testid="card-entradas-vencidas">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-amber-500/20">
-                      <AlertCircle className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Entradas Vencidas</p>
-                      <p className="text-xl font-bold text-amber-600">{formatCurrency(insightsPeriodo?.entradasVencidas || 0)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {(insightsPeriodo?.saidasVencidas || 0) > 0 && (
-              <Card className="border-red-500/50 bg-red-500/5" data-testid="card-saidas-vencidas">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-red-500/20">
-                      <AlertCircle className="w-5 h-5 text-red-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Saídas Vencidas</p>
-                      <p className="text-xl font-bold text-red-600">{formatCurrency(insightsPeriodo?.saidasVencidas || 0)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
 
         {/* Provisão Mensal */}
         <Card className="mb-6 border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-purple-500/10" data-testid="card-provisao-mensal">
