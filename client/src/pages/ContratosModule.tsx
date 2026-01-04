@@ -1485,7 +1485,7 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                 variant="outline"
                 size="sm"
                 onClick={() => revisarIAMutation.mutate(formData.observacoes)}
-                disabled={revisarIAMutation.isPending || !formData.observacoes.trim()}
+                disabled={revisarIAMutation.isPending || !formData.observacoes?.trim()}
                 data-testid="button-revisar-ia-contrato"
               >
                 {revisarIAMutation.isPending ? (
@@ -2538,7 +2538,7 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
                   variant="outline"
                   size="sm"
                   onClick={() => revisarIAMutation.mutate(formData.observacoes)}
-                  disabled={revisarIAMutation.isPending || !formData.observacoes.trim()}
+                  disabled={revisarIAMutation.isPending || !formData.observacoes?.trim()}
                   data-testid="button-revisar-ia-novo"
                 >
                   {revisarIAMutation.isPending ? (
