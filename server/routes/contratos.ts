@@ -4,6 +4,9 @@ import { sql } from "drizzle-orm";
 import { isAuthenticated } from "../auth/middleware";
 import PDFDocument from "pdfkit";
 import FormData from "form-data";
+import OpenAI from "openai";
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 let tablesInitialized = false;
 
@@ -2890,6 +2893,59 @@ export function registerContratosRoutes(app: Express) {
     } catch (error: any) {
       console.error("[assinafy] Erro ao consultar status:", error);
       res.status(500).json({ error: "Erro ao consultar status", details: error.message });
+    }
+  });
+
+  // Endpoint para revisão de IA das observações do contrato
+  app.post("/api/contratos/revisar-observacoes", isAuthenticated, async (req, res) => {
+    try {
+      const { observacoes } = req.body;
+
+      if (!observacoes || typeof observacoes !== 'string' || observacoes.trim().length === 0) {
+        return res.status(400).json({ error: "Observações são obrigatórias" });
+      }
+
+      const systemPrompt = `Você é um advogado especialista em contratos empresariais da Turbo Partners, uma agência de marketing digital.
+
+Sua função é revisar observações/cláusulas de contratos escritas pelo time comercial e reescrevê-las de forma que:
+
+1. MANTENHA a intenção original do comercial
+2. PROTEJA juridicamente a empresa contra interpretações subjetivas
+3. USE linguagem clara, objetiva e juridicamente precisa
+4. ELIMINE ambiguidades e termos vagos como "não gostar", "parecer", "achar"
+5. ADICIONE condições objetivas e mensuráveis quando aplicável
+6. MANTENHA um tom profissional e neutro
+
+REGRAS IMPORTANTES:
+- Nunca remova cláusulas inteiras, apenas reformule
+- Se a cláusula original for muito prejudicial à empresa, mantenha a ideia mas adicione salvaguardas
+- Use termos como "mediante comprovação documental", "após análise técnica da equipe", "conforme métricas definidas em contrato"
+- Substitua critérios subjetivos por critérios objetivos quando possível
+
+Responda APENAS com o texto revisado das observações, sem explicações adicionais.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Revise as seguintes observações de contrato:\n\n${observacoes}` }
+        ],
+        temperature: 0.3,
+        max_tokens: 1500
+      });
+
+      const revisedText = response.choices[0]?.message?.content?.trim();
+
+      if (!revisedText) {
+        return res.status(500).json({ error: "Não foi possível gerar a revisão" });
+      }
+
+      console.log("[contratos] Observações revisadas por IA com sucesso");
+      res.json({ observacoesRevisadas: revisedText });
+
+    } catch (error: any) {
+      console.error("[contratos] Erro ao revisar observações com IA:", error);
+      res.status(500).json({ error: "Erro ao revisar observações", details: error.message });
     }
   });
 }
