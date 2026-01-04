@@ -426,7 +426,7 @@ export default function FluxoCaixa() {
                 <p className="text-muted-foreground">Nenhum dado para o período selecionado</p>
               </div>
             ) : (
-              <div className="h-[400px] relative rounded-xl overflow-hidden" style={{ background: 'linear-gradient(180deg, rgba(6, 182, 212, 0.02) 0%, rgba(15, 23, 42, 0.4) 100%)' }}>
+              <div className="h-[400px] relative rounded-xl overflow-hidden bg-gradient-to-b from-cyan-500/5 to-slate-100/50 dark:from-cyan-500/5 dark:to-slate-900/50">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart 
                     data={chartData} 
