@@ -56,6 +56,7 @@ import {
   Download,
   Send,
   RefreshCw,
+  Sparkles,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1101,6 +1102,20 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
     },
   });
 
+  const revisarIAMutation = useMutation({
+    mutationFn: async (observacoes: string) => {
+      const res = await apiRequest('POST', '/api/contratos/revisar-observacoes', { observacoes });
+      return res as { observacoesRevisadas: string };
+    },
+    onSuccess: (data) => {
+      setFormData(prev => ({ ...prev, observacoes: data.observacoesRevisadas }));
+      toast({ title: "Observações revisadas com sucesso", description: "O texto foi aprimorado para maior proteção jurídica." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao revisar observações", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (contrato) {
@@ -1463,7 +1478,24 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Observações</Label>
+            <div className="flex items-center justify-between">
+              <Label>Observações</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => revisarIAMutation.mutate(formData.observacoes)}
+                disabled={revisarIAMutation.isPending || !formData.observacoes.trim()}
+                data-testid="button-revisar-ia-contrato"
+              >
+                {revisarIAMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-2" />
+                )}
+                Revisão de IA
+              </Button>
+            </div>
             <Textarea
               data-testid="textarea-observacoes-contrato"
               value={formData.observacoes}
