@@ -1105,7 +1105,7 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
   const revisarIAMutation = useMutation({
     mutationFn: async (observacoes: string) => {
       const res = await apiRequest('POST', '/api/contratos/revisar-observacoes', { observacoes });
-      return res as { observacoesRevisadas: string };
+      return res.json() as Promise<{ observacoesRevisadas: string }>;
     },
     onSuccess: (data) => {
       setFormData(prev => ({ ...prev, observacoes: data.observacoesRevisadas }));
@@ -2200,7 +2200,7 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
   const revisarIAMutation = useMutation({
     mutationFn: async (observacoes: string) => {
       const res = await apiRequest('POST', '/api/contratos/revisar-observacoes', { observacoes });
-      return res as { observacoesRevisadas: string };
+      return res.json() as Promise<{ observacoesRevisadas: string }>;
     },
     onSuccess: (data) => {
       setFormData(prev => ({ ...prev, observacoes: data.observacoesRevisadas }));
