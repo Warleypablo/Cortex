@@ -2197,6 +2197,20 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
     },
   });
 
+  const revisarIAMutation = useMutation({
+    mutationFn: async (observacoes: string) => {
+      const res = await apiRequest('POST', '/api/contratos/revisar-observacoes', { observacoes });
+      return res as { observacoesRevisadas: string };
+    },
+    onSuccess: (data) => {
+      setFormData(prev => ({ ...prev, observacoes: data.observacoesRevisadas }));
+      toast({ title: "Observações revisadas com sucesso", description: "O texto foi aprimorado para maior proteção jurídica." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao revisar observações", description: error.message, variant: "destructive" });
+    },
+  });
+
   const addItem = () => {
     setShowAddItem(true);
     setItens([...itens, {
@@ -2517,7 +2531,24 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
           {/* Observações */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Observações</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Observações</CardTitle>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => revisarIAMutation.mutate(formData.observacoes)}
+                  disabled={revisarIAMutation.isPending || !formData.observacoes.trim()}
+                  data-testid="button-revisar-ia-novo"
+                >
+                  {revisarIAMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-2" />
+                  )}
+                  Revisão de IA
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <Textarea value={formData.observacoes} onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })} rows={4} placeholder="Observações adicionais sobre o contrato..." data-testid="textarea-obs-novo" />

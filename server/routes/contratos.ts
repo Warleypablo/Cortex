@@ -6,7 +6,17 @@ import PDFDocument from "pdfkit";
 import FormData from "form-data";
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI | null {
+  if (!process.env.OPENAI_API_KEY) {
+    return null;
+  }
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openaiClient;
+}
 
 let tablesInitialized = false;
 
@@ -2899,6 +2909,11 @@ export function registerContratosRoutes(app: Express) {
   // Endpoint para revisão de IA das observações do contrato
   app.post("/api/contratos/revisar-observacoes", isAuthenticated, async (req, res) => {
     try {
+      const openai = getOpenAIClient();
+      if (!openai) {
+        return res.status(503).json({ error: "Serviço de IA não disponível. Configure a chave OPENAI_API_KEY." });
+      }
+
       const { observacoes } = req.body;
 
       if (!observacoes || typeof observacoes !== 'string' || observacoes.trim().length === 0) {
