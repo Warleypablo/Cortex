@@ -67,6 +67,7 @@ const AdminNotificationRules = lazy(() => import("@/pages/AdminNotificationRules
 const AdminDesignSystem = lazy(() => import("@/pages/AdminDesignSystem"));
 const Calendario = lazy(() => import("@/pages/Calendario"));
 const OnboardingRH = lazy(() => import("@/pages/OnboardingRH"));
+const OnboardingsClientes = lazy(() => import("@/pages/OnboardingsClientes"));
 const PesquisasGG = lazy(() => import("@/pages/PesquisasGG"));
 const MeuPerfil = lazy(() => import("@/pages/MeuPerfil"));
 const Avisos = lazy(() => import("@/pages/Avisos"));
@@ -194,6 +195,9 @@ function ProtectedRouter() {
       <Route path="/dashboard/recrutamento">{() => <ProtectedRoute path="/dashboard/recrutamento" component={DashboardRecrutamento} />}</Route>
       <Route path="/rh/onboarding">{() => <ProtectedRoute path="/rh/onboarding" component={OnboardingRH} />}</Route>
       <Route path="/rh/pesquisas">{() => <ProtectedRoute path="/rh/pesquisas" component={PesquisasGG} />}</Route>
+
+      {/* Operação */}
+      <Route path="/operacao/onboardings">{() => <ProtectedRoute path="/operacao/onboardings" component={OnboardingsClientes} />}</Route>
       
       {/* Tech */}
       <Route path="/dashboard/tech">{() => <ProtectedRoute path="/dashboard/tech" component={DashboardTech} />}</Route>

@@ -1244,7 +1244,35 @@ function CredentialRow({
           {credential.platform}
         </div>
       </TableCell>
-      <TableCell>{credential.username || "-"}</TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <span>{credential.username || "-"}</span>
+          {credential.username && (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => {
+                navigator.clipboard.writeText(credential.username || "");
+                createLog.mutate({
+                  action: "copy_password",
+                  entityType: "credential",
+                  entityId: credential.id,
+                  entityName: `${credential.platform} (usuário)`,
+                  clientId,
+                  clientName,
+                });
+                toast({ 
+                  title: "Copiado!", 
+                  description: "Usuário copiado para a área de transferência" 
+                });
+              }}
+              data-testid={`button-copy-username-${credential.id}`}
+            >
+              <Copy className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <span className="font-mono text-sm">
@@ -1403,7 +1431,27 @@ function TurboToolsSection() {
                     {tool.platform}
                   </div>
                 </TableCell>
-                <TableCell>{tool.username || "-"}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <span>{tool.username || "-"}</span>
+                    {tool.username && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          navigator.clipboard.writeText(tool.username || "");
+                          toast({ 
+                            title: "Copiado!", 
+                            description: "Usuário copiado para a área de transferência" 
+                          });
+                        }}
+                        data-testid={`button-copy-username-turbo-${tool.id}`}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm">
@@ -1421,7 +1469,13 @@ function TurboToolsSection() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => copyToClipboard(tool.password || "")}
+                        onClick={() => {
+                          navigator.clipboard.writeText(tool.password || "");
+                          toast({ 
+                            title: "Copiado!", 
+                            description: "Senha copiada para a área de transferência" 
+                          });
+                        }}
                         data-testid={`button-copy-password-turbo-${tool.id}`}
                       >
                         <Copy className="w-4 h-4" />
