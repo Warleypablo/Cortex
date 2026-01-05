@@ -21,6 +21,7 @@ export const PERMISSION_KEYS = {
     REVENUE_GOALS: 'fin.revenue_goals',
     INADIMPLENCIA: 'fin.inadimplencia',
     AUDITORIA: 'fin.auditoria',
+    CONTRIBUICAO_COLABORADOR: 'fin.contribuicao_colaborador',
   },
   // Gestão (antigo Operação)
   GESTAO: {
@@ -164,6 +165,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/revenue-goals': PERMISSION_KEYS.FIN.REVENUE_GOALS,
   '/dashboard/inadimplencia': PERMISSION_KEYS.FIN.INADIMPLENCIA,
   '/dashboard/auditoria-sistemas': PERMISSION_KEYS.FIN.AUDITORIA,
+  '/dashboard/contribuicao-colaborador': PERMISSION_KEYS.FIN.CONTRIBUICAO_COLABORADOR,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/retencao': PERMISSION_KEYS.GESTAO.RETENCAO,
@@ -315,6 +317,7 @@ export const NAV_CONFIG = {
         { title: 'Revenue Goals', url: '/dashboard/revenue-goals', icon: 'Target', permissionKey: PERMISSION_KEYS.FIN.REVENUE_GOALS },
         { title: 'Inadimplência', url: '/dashboard/inadimplencia', icon: 'AlertTriangle', permissionKey: PERMISSION_KEYS.FIN.INADIMPLENCIA },
         { title: 'Auditoria de Sistemas', url: '/dashboard/auditoria-sistemas', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.FIN.AUDITORIA },
+        { title: 'Contribuição por Colaborador', url: '/dashboard/contribuicao-colaborador', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.FIN.CONTRIBUICAO_COLABORADOR },
       ],
     },
     {
