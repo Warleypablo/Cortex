@@ -21,8 +21,16 @@ interface ContribuicaoDfcData {
     children: string[];
     isLeaf: boolean;
   }[];
+  despesas: {
+    categoriaId: string;
+    categoriaNome: string;
+    valor: number;
+    nivel: number;
+  }[];
   totais: {
     receitaTotal: number;
+    despesaTotal: number;
+    resultado: number;
     quantidadeParcelas: number;
     quantidadeClientes: number;
   };
@@ -113,7 +121,7 @@ export default function ContribuicaoColaborador() {
   });
 
   const hierarchicalData = useMemo(() => {
-    if (!monthlyResults) return { categories: [], monthColumns: [] };
+    if (!monthlyResults) return { categories: [], despesas: [], monthColumns: [] };
     
     const allCategoriesMap = new Map<string, { id: string; nome: string; nivel: number }>();
     
@@ -143,12 +151,21 @@ export default function ContribuicaoColaborador() {
       if (a.nivel !== b.nivel) return a.nivel - b.nivel;
       return a.id.localeCompare(b.id);
     });
+
+    const despesasCategories = [
+      { id: 'DESP.01', nome: 'Salário do Responsável', nivel: 2 },
+      { id: 'DESP.02', nome: 'Salário do Líder', nivel: 2 },
+      { id: 'DESP.03', nome: 'Impostos (16%)', nivel: 2 }
+    ];
     
     const monthColumns = monthlyResults.map(m => ({
       mes: m.mes,
       mesLabel: m.mesLabel,
       valorPorCategoria: new Map<string, number>(),
-      receitaTotal: m.data?.totais?.receitaTotal || 0
+      valorPorDespesa: new Map<string, number>(),
+      receitaTotal: m.data?.totais?.receitaTotal || 0,
+      despesaTotal: m.data?.totais?.despesaTotal || 0,
+      resultado: m.data?.totais?.resultado || 0
     }));
     
     for (let i = 0; i < monthlyResults.length; i++) {
@@ -158,10 +175,16 @@ export default function ContribuicaoColaborador() {
           monthColumns[i].valorPorCategoria.set(receita.categoriaId, receita.valor);
         }
       }
+      if (monthData.data?.despesas) {
+        for (const despesa of monthData.data.despesas) {
+          monthColumns[i].valorPorDespesa.set(despesa.categoriaId, despesa.valor);
+        }
+      }
     }
     
     return {
       categories: categoriesByLevel,
+      despesas: despesasCategories,
       monthColumns
     };
   }, [monthlyResults]);
@@ -403,6 +426,78 @@ export default function ContribuicaoColaborador() {
                     </div>
                   );
                 })}
+
+                <div 
+                  className="grid border-b-2 border-red-500/50 bg-red-500/10 cursor-pointer hover-elevate mt-4"
+                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                  onClick={() => toggleExpand("DESPESAS")}
+                  data-testid="row-despesas-total"
+                >
+                  <div className="p-3 font-bold text-red-500 flex items-center gap-2 sticky left-0 z-10 bg-red-500/10">
+                    {expanded.has("DESPESAS") ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    <CircleMinus className="h-4 w-4" />
+                    Despesas
+                  </div>
+                  {hierarchicalData.monthColumns.map((col) => (
+                    <div key={col.mes} className="p-3 text-right font-bold text-red-500">
+                      {formatCurrencyNoDecimals(col.despesaTotal)}
+                    </div>
+                  ))}
+                </div>
+
+                {expanded.has("DESPESAS") && hierarchicalData.despesas.map((despesa) => (
+                  <div 
+                    key={despesa.id}
+                    className="grid border-b border-border/50 hover-elevate"
+                    style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                    data-testid={`row-despesa-${despesa.id}`}
+                  >
+                    <div 
+                      className="p-3 flex items-center gap-2 sticky left-0 z-10 bg-background"
+                      style={{ paddingLeft: '28px' }}
+                    >
+                      <span className="w-4" />
+                      <span className="text-sm">{despesa.nome}</span>
+                    </div>
+                    {hierarchicalData.monthColumns.map((col) => {
+                      const valor = col.valorPorDespesa.get(despesa.id) || 0;
+                      return (
+                        <div key={col.mes} className="p-3 text-right text-sm text-red-400">
+                          {valor > 0 ? formatCurrencyNoDecimals(valor) : "-"}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+
+                <div 
+                  className="grid border-t-2 border-primary/50 bg-primary/10 mt-4"
+                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                  data-testid="row-resultado"
+                >
+                  <div className="p-3 font-bold text-primary flex items-center gap-2 sticky left-0 z-10 bg-primary/10">
+                    <TrendingUp className="h-4 w-4" />
+                    Resultado
+                  </div>
+                  {hierarchicalData.monthColumns.map((col) => {
+                    const isPositive = col.resultado >= 0;
+                    return (
+                      <div 
+                        key={col.mes} 
+                        className={cn(
+                          "p-3 text-right font-bold",
+                          isPositive ? "text-emerald-500" : "text-red-500"
+                        )}
+                      >
+                        {formatCurrencyNoDecimals(col.resultado)}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
