@@ -351,6 +351,31 @@ export interface IStorage {
     quantidadeClientes: number;
     quantidadeParcelas: number;
   }[]>;
+  
+  // Contribuição por Colaborador - Estilo DFC (hierárquico)
+  getContribuicaoColaboradorDfc(dataInicio: string, dataFim: string, responsavel?: string): Promise<{
+    colaboradores: string[];
+    receitas: {
+      categoriaId: string;
+      categoriaNome: string;
+      valor: number;
+      nivel: number;
+      children: string[];
+      isLeaf: boolean;
+      parcelas?: {
+        id: number;
+        descricao: string;
+        cliente: string;
+        valor: number;
+        dataQuitacao: string;
+      }[];
+    }[];
+    totais: {
+      receitaTotal: number;
+      quantidadeParcelas: number;
+      quantidadeClientes: number;
+    };
+  }>;
 }
 
 // GEG Dashboard Extended Types
