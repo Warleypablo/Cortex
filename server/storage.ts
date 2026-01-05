@@ -337,6 +337,20 @@ export interface IStorage {
   getSystemSetting(key: string): Promise<string | null>;
   setSystemSetting(key: string, value: string, description?: string): Promise<void>;
   getAllSystemSettings(): Promise<SystemSetting[]>;
+  
+  // Contribuição por Colaborador
+  getContribuicaoColaborador(mes: number, ano: number): Promise<{
+    responsavel: string;
+    faturamentoBruto: number;
+    quantidadeClientes: number;
+    quantidadeParcelas: number;
+  }[]>;
+  getContribuicaoColaboradorPeriodo(dataInicio: string, dataFim: string): Promise<{
+    responsavel: string;
+    faturamentoBruto: number;
+    quantidadeClientes: number;
+    quantidadeParcelas: number;
+  }[]>;
 }
 
 // GEG Dashboard Extended Types
@@ -9403,6 +9417,82 @@ export class DbStorage implements IStorage {
       ORDER BY key
     `);
     return result.rows as SystemSetting[];
+  }
+
+  // Contribuição por Colaborador - Faturamento Bruto por Responsável
+  async getContribuicaoColaborador(mes: number, ano: number): Promise<{
+    responsavel: string;
+    faturamentoBruto: number;
+    quantidadeClientes: number;
+    quantidadeParcelas: number;
+  }[]> {
+    // Primeiro e último dia do mês (usando cálculo seguro)
+    const primeiroDia = `${ano}-${String(mes).padStart(2, '0')}-01`;
+    const ultimoDia = new Date(ano, mes, 0).getDate();
+    const ultimoDiaStr = `${ano}-${String(mes).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')} 23:59:59`;
+    
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(NULLIF(TRIM(cc.responsavel), ''), 'Sem Responsável') as responsavel,
+        SUM(COALESCE(p.valor_pago::numeric, 0)) as faturamento_bruto,
+        COUNT(DISTINCT REPLACE(REPLACE(REPLACE(p.cnpj, '.', ''), '-', ''), '/', '')) as quantidade_clientes,
+        COUNT(p.id) as quantidade_parcelas
+      FROM caz_parcelas p
+      LEFT JOIN cup_clientes cc 
+        ON REPLACE(REPLACE(REPLACE(p.cnpj, '.', ''), '-', ''), '/', '') = 
+           REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '')
+      WHERE p.status = 'QUITADO'
+        AND p.tipo_evento = 'RECEITA'
+        AND p.data_quitacao >= ${primeiroDia}::date
+        AND p.data_quitacao <= ${ultimoDiaStr}::timestamp
+        AND p.valor_pago IS NOT NULL
+        AND p.valor_pago::numeric > 0
+      GROUP BY COALESCE(NULLIF(TRIM(cc.responsavel), ''), 'Sem Responsável')
+      ORDER BY faturamento_bruto DESC
+    `);
+    
+    return result.rows.map((row: any) => ({
+      responsavel: row.responsavel,
+      faturamentoBruto: Number(row.faturamento_bruto) || 0,
+      quantidadeClientes: Number(row.quantidade_clientes) || 0,
+      quantidadeParcelas: Number(row.quantidade_parcelas) || 0
+    }));
+  }
+
+  async getContribuicaoColaboradorPeriodo(dataInicio: string, dataFim: string): Promise<{
+    responsavel: string;
+    faturamentoBruto: number;
+    quantidadeClientes: number;
+    quantidadeParcelas: number;
+  }[]> {
+    const dataFimComHora = `${dataFim} 23:59:59`;
+    
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(NULLIF(TRIM(cc.responsavel), ''), 'Sem Responsável') as responsavel,
+        SUM(COALESCE(p.valor_pago::numeric, 0)) as faturamento_bruto,
+        COUNT(DISTINCT REPLACE(REPLACE(REPLACE(p.cnpj, '.', ''), '-', ''), '/', '')) as quantidade_clientes,
+        COUNT(p.id) as quantidade_parcelas
+      FROM caz_parcelas p
+      LEFT JOIN cup_clientes cc 
+        ON REPLACE(REPLACE(REPLACE(p.cnpj, '.', ''), '-', ''), '/', '') = 
+           REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '')
+      WHERE p.status = 'QUITADO'
+        AND p.tipo_evento = 'RECEITA'
+        AND p.data_quitacao >= ${dataInicio}::date
+        AND p.data_quitacao <= ${dataFimComHora}::timestamp
+        AND p.valor_pago IS NOT NULL
+        AND p.valor_pago::numeric > 0
+      GROUP BY COALESCE(NULLIF(TRIM(cc.responsavel), ''), 'Sem Responsável')
+      ORDER BY faturamento_bruto DESC
+    `);
+    
+    return result.rows.map((row: any) => ({
+      responsavel: row.responsavel,
+      faturamentoBruto: Number(row.faturamento_bruto) || 0,
+      quantidadeClientes: Number(row.quantidade_clientes) || 0,
+      quantidadeParcelas: Number(row.quantidade_parcelas) || 0
+    }));
   }
 }
 
