@@ -1103,10 +1103,10 @@ const CATEGORIA_NOMES_PADRAO: Record<string, string> = {
   // Nível 1 - Conforme padrão Conta Azul
   '03': 'Receitas Operacionais',
   '04': 'Receitas Não Operacionais',
-  '05': 'Custos',
+  '05': 'Custos Operacionais',
   '06': 'Despesas Operacionais',
-  '07': 'Despesas Financeiras',
-  '08': 'Outras Despesas',
+  '07': 'Despesas Não Operacionais',
+  '08': 'Tributos Após Resultado',
   
   // Nível 2 - Receitas Operacionais (conforme Conta Azul)
   '03.01': 'Receita Commerce',
@@ -1120,29 +1120,32 @@ const CATEGORIA_NOMES_PADRAO: Record<string, string> = {
   '04.02': 'Recebimento de Empréstimos',
   '04.03': 'Outras Receitas Não Operacionais',
   
-  // Nível 2 - Custos
-  '05.01': 'Custos de Produção',
-  '05.02': 'Custos de Serviços',
-  '05.03': 'Custos de Materiais',
-  '05.04': 'Custos de Pessoal',
-  '05.05': 'Custos Variáveis',
-  '05.06': 'Custos Fixos',
-  '05.07': 'Custos Diretos',
-  '05.08': 'Custos Indiretos',
+  // Nível 2 - Custos Operacionais (conforme Conta Azul)
+  '05.01': 'Mão de Obra Operacional',
+  '05.02': 'Serviços Terceirizados',
+  '05.03': 'Custo Stack Digital',
+  '05.04': 'Outros Custos de Operação',
+  '05.05': 'Impostos Sobre o Faturamento',
   
-  // Nível 2 - Despesas Operacionais
-  '06.01': 'Despesas Administrativas',
-  '06.02': 'Despesas Comerciais',
-  '06.03': 'Despesas com Pessoal',
-  '06.04': 'Despesas Tributárias',
-  '06.05': 'Despesas com Serviços',
-  '06.06': 'Despesas com Marketing',
-  '06.07': 'Despesas com Tecnologia',
-  '06.08': 'Despesas com Infraestrutura',
-  '06.09': 'Despesas com Manutenção',
-  '06.10': 'Despesas com Viagens',
-  '06.11': 'Despesas com Treinamento',
-  '06.12': 'Despesas Diversas',
+  // Nível 2 - Despesas Operacionais (conforme Conta Azul)
+  '06.01': 'Despesas Ventures',
+  '06.02': 'Despesas Ocupacionais',
+  '06.03': 'Despesa Financeira',
+  '06.04': 'Mão de Obra Comercial',
+  '06.05': 'Despesas Comerciais',
+  '06.06': 'Aquisição',
+  '06.07': 'Despesa com Marketing',
+  '06.08': 'Despesa Mão de Obra Administrativa',
+  '06.09': 'Pro-labore',
+  '06.10': 'Despesas Administrativas',
+  '06.11': 'Ativos Imobilizados',
+  '06.12': 'Tributos Sobre Pagamentos',
+  
+  // Nível 2 - Despesas Não Operacionais (conforme Conta Azul)
+  '07.01': 'Retirada dos Sócios',
+  
+  // Nível 2 - Tributos Após Resultado (conforme Conta Azul)
+  '08.01': 'Tributos',
 };
 
 function getCategoriaName(code: string): string {
