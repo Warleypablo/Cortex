@@ -362,16 +362,17 @@ export interface IStorage {
       nivel: number;
       children: string[];
       isLeaf: boolean;
-      parcelas?: {
-        id: number;
-        descricao: string;
-        cliente: string;
-        valor: number;
-        dataQuitacao: string;
-      }[];
+    }[];
+    despesas: {
+      categoriaId: string;
+      categoriaNome: string;
+      valor: number;
+      nivel: number;
     }[];
     totais: {
       receitaTotal: number;
+      despesaTotal: number;
+      resultado: number;
       quantidadeParcelas: number;
       quantidadeClientes: number;
     };
@@ -9662,11 +9663,62 @@ export class DbStorage implements IStorage {
       totalClientes += Number(row.quantidade_clientes) || 0;
     }
     
+    // Calcula despesas
+    let salarioResponsavel = 0;
+    const salarioLider = 7000; // Valor fixo do líder
+    const taxaImposto = 0.16; // 16% de imposto
+    
+    // Buscar salário do responsável se filtrado
+    if (responsavel && responsavel !== 'todos') {
+      const salarioResult = await db.execute(sql`
+        SELECT salario::numeric as salario
+        FROM rh_colaboradores
+        WHERE LOWER(TRIM(nome)) = LOWER(TRIM(${responsavel}))
+          AND salario IS NOT NULL
+          AND salario != ''
+          AND salario ~ '^[0-9]+(\.[0-9]+)?$'
+        LIMIT 1
+      `);
+      
+      if (salarioResult.rows.length > 0) {
+        salarioResponsavel = Number((salarioResult.rows[0] as any).salario) || 0;
+      }
+    }
+    
+    const impostos = receitaTotal * taxaImposto;
+    const despesaTotal = salarioResponsavel + salarioLider + impostos;
+    const resultado = receitaTotal - despesaTotal;
+    
+    // Estrutura de despesas
+    const despesas = [
+      {
+        categoriaId: 'DESP.01',
+        categoriaNome: 'Salário do Responsável',
+        valor: salarioResponsavel,
+        nivel: 2
+      },
+      {
+        categoriaId: 'DESP.02',
+        categoriaNome: 'Salário do Líder',
+        valor: salarioLider,
+        nivel: 2
+      },
+      {
+        categoriaId: 'DESP.03',
+        categoriaNome: 'Impostos (16%)',
+        valor: impostos,
+        nivel: 2
+      }
+    ];
+    
     return {
       colaboradores,
       receitas,
+      despesas,
       totais: {
         receitaTotal,
+        despesaTotal,
+        resultado,
         quantidadeParcelas: totalParcelas,
         quantidadeClientes: totalClientes
       }
