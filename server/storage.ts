@@ -1100,20 +1100,25 @@ function normalizeCode(code: string): string {
 }
 
 const CATEGORIA_NOMES_PADRAO: Record<string, string> = {
-  // Nível 1
-  '03': 'Receitas',
-  '04': 'Outras Receitas',
+  // Nível 1 - Conforme padrão Conta Azul
+  '03': 'Receitas Operacionais',
+  '04': 'Receitas Não Operacionais',
   '05': 'Custos',
   '06': 'Despesas Operacionais',
   '07': 'Despesas Financeiras',
   '08': 'Outras Despesas',
   
-  // Nível 2 - Receitas
-  '03.01': 'Receitas de Serviços',
-  '03.02': 'Receitas de Vendas',
-  '03.03': 'Receitas Recorrentes',
-  '03.04': 'Receitas Não Recorrentes',
-  '03.05': 'Outras Receitas Operacionais',
+  // Nível 2 - Receitas Operacionais (conforme Conta Azul)
+  '03.01': 'Receita Commerce',
+  '03.02': 'Receita Variável',
+  '03.03': 'Receita Stack Digital',
+  '03.04': 'Receita de Curso e Treinamentos',
+  '03.05': 'Receita Ventures',
+  
+  // Nível 2 - Receitas Não Operacionais (conforme Conta Azul)
+  '04.01': 'Receita Financeiras',
+  '04.02': 'Recebimento de Empréstimos',
+  '04.03': 'Outras Receitas Não Operacionais',
   
   // Nível 2 - Custos
   '05.01': 'Custos de Produção',
@@ -1142,6 +1147,21 @@ const CATEGORIA_NOMES_PADRAO: Record<string, string> = {
 
 function getCategoriaName(code: string): string {
   return CATEGORIA_NOMES_PADRAO[code] || code;
+}
+
+/**
+ * Formata o código para exibição seguindo padrão Conta Azul:
+ * - Nível 1: "3", "4", "5", "6" (sem zero à esquerda)
+ * - Nível 2+: "03.01", "04.02", etc. (mantém zeros)
+ */
+function formatDisplayCode(normalizedCode: string): string {
+  const level = determineLevel(normalizedCode);
+  if (level === 1) {
+    // Nível 1: remove zero à esquerda ("03" -> "3")
+    return String(parseInt(normalizedCode, 10));
+  }
+  // Níveis 2+: mantém formato normalizado
+  return normalizedCode;
 }
 
 /**
@@ -1308,8 +1328,9 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
         inferredNames.get(normalizedId) ||
         getCategoriaName(normalizedId);
       
-      // Incluir o código da categoria no nome para facilitar debug
-      const categoriaNome = `${normalizedId} ${baseNome || 'Categoria'}`;
+      // Formatar código para exibição conforme padrão Conta Azul
+      const displayCode = formatDisplayCode(normalizedId);
+      const categoriaNome = `${displayCode} ${baseNome || 'Categoria'}`;
       
       nodeMap.set(normalizedId, {
         categoriaId: normalizedId,
@@ -1363,8 +1384,9 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
           inferredNames.get(parentNormalizedId) || 
           getCategoriaName(parentNormalizedId);
         
-        // Incluir o código da categoria no nome
-        const parentName = `${parentNormalizedId} ${baseParentName || 'Categoria'}`;
+        // Formatar código para exibição conforme padrão Conta Azul
+        const displayCode = formatDisplayCode(parentNormalizedId);
+        const parentName = `${displayCode} ${baseParentName || 'Categoria'}`;
         
         nodeMap.set(parentNormalizedId, {
           categoriaId: parentNormalizedId,
