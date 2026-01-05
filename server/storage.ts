@@ -1229,13 +1229,16 @@ function determineLevel(categoriaId: string): number {
 }
 
 function determineParent(categoriaId: string): string {
-  if (categoriaId.includes('.')) {
-    const parts = categoriaId.split('.');
+  // Primeiro normaliza o código para garantir consistência
+  const normalizedId = normalizeCode(categoriaId);
+  
+  if (normalizedId.includes('.')) {
+    const parts = normalizedId.split('.');
     parts.pop();
-    return normalizeCode(parts.join('.'));
+    return parts.join('.');
   }
   
-  const twoDigitPrefix = categoriaId.substring(0, 2);
+  const twoDigitPrefix = normalizedId.substring(0, 2);
   return (twoDigitPrefix === '03' || twoDigitPrefix === '04') ? 'RECEITAS' : 'DESPESAS';
 }
 
@@ -1262,13 +1265,14 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
     isLeaf: false,
   });
   
-  const categoriasByNormalizedId = new Map<string, { nome: string; items: DfcItem[]; originalKey?: string }>();
+  const categoriasByNormalizedId = new Map<string, { nome: string; items: DfcItem[]; originalKey?: string; originalId?: string }>();
   const realCategoryNames = new Map<string, string>();
   
   // Infere nomes de categorias intermediárias a partir dos filhos
   const inferredNames = inferIntermediateNames(items);
   
   for (const item of items) {
+    // SEMPRE normalizar o código para garantir hierarquia consistente
     const normalizedId = normalizeCode(item.categoriaId);
     
     // Armazena o nome real da categoria vindo do banco
@@ -1280,7 +1284,8 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
       categoriasByNormalizedId.set(normalizedId, {
         nome: item.categoriaNome,
         items: [],
-        originalKey: `${item.categoriaId}|${item.categoriaNome}`
+        originalKey: `${item.categoriaId}|${item.categoriaNome}`,
+        originalId: item.categoriaId
       });
     }
     categoriasByNormalizedId.get(normalizedId)!.items.push(item);
@@ -1297,11 +1302,14 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
       // 3. Nome inferido dos filhos
       // 4. Nome do mapeamento padrão (DEPRECATED - apenas fallback)
       // 5. Código (fallback final)
-      const categoriaNome = 
+      const baseNome = 
         (categoriaNamesMap && categoriaNamesMap.get(normalizedId)) ||
         data.nome ||
         inferredNames.get(normalizedId) ||
         getCategoriaName(normalizedId);
+      
+      // Incluir o código da categoria no nome para facilitar debug
+      const categoriaNome = `${normalizedId} ${baseNome || 'Categoria'}`;
       
       nodeMap.set(normalizedId, {
         categoriaId: normalizedId,
@@ -1329,6 +1337,7 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
     }
   }
   
+  // Criar nós intermediários para completar a hierarquia
   const allNormalizedIds = new Set(categoriasByNormalizedId.keys());
   for (const normalizedId of Array.from(allNormalizedIds)) {
     let currentId = normalizedId;
@@ -1348,11 +1357,14 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
         // 3. Nome inferido dos filhos
         // 4. Nome do mapeamento padrão (DEPRECATED - apenas fallback)
         // 5. Código (fallback final)
-        const parentName = 
+        const baseParentName = 
           (categoriaNamesMap && categoriaNamesMap.get(parentNormalizedId)) ||
           realCategoryNames.get(parentNormalizedId) || 
           inferredNames.get(parentNormalizedId) || 
           getCategoriaName(parentNormalizedId);
+        
+        // Incluir o código da categoria no nome
+        const parentName = `${parentNormalizedId} ${baseParentName || 'Categoria'}`;
         
         nodeMap.set(parentNormalizedId, {
           categoriaId: parentNormalizedId,
@@ -1369,6 +1381,7 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
     }
   }
   
+  // Vincular filhos aos pais
   for (const [id, node] of Array.from(nodeMap.entries())) {
     if (node.parentId && nodeMap.has(node.parentId)) {
       const parent = nodeMap.get(node.parentId)!;
@@ -1378,6 +1391,7 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
     }
   }
   
+  // Ordenar filhos e marcar nós com filhos como não-folha
   for (const node of Array.from(nodeMap.values())) {
     if (node.children.length > 0) {
       node.isLeaf = false;
@@ -1385,6 +1399,7 @@ function buildHierarchy(items: DfcItem[], meses: string[], parcelasByCategory?: 
     }
   }
   
+  // Agregar valores dos filhos para os pais
   function aggregateValues(nodeId: string): void {
     const node = nodeMap.get(nodeId);
     if (!node) return;
@@ -9420,6 +9435,7 @@ export class DbStorage implements IStorage {
   }
 
   // Contribuição por Colaborador - Faturamento Bruto por Responsável
+  // Fluxo: caz_parcelas.id_cliente -> caz_clientes.ids (para obter cnpj) -> cup_clientes.cnpj (para obter responsável)
   async getContribuicaoColaborador(mes: number, ano: number): Promise<{
     responsavel: string;
     faturamentoBruto: number;
@@ -9433,21 +9449,22 @@ export class DbStorage implements IStorage {
     
     const result = await db.execute(sql`
       SELECT 
-        COALESCE(NULLIF(TRIM(cc.responsavel), ''), 'Sem Responsável') as responsavel,
+        COALESCE(NULLIF(TRIM(cup.responsavel), ''), 'Sem Responsável') as responsavel,
         SUM(COALESCE(p.valor_pago::numeric, 0)) as faturamento_bruto,
-        COUNT(DISTINCT REPLACE(REPLACE(REPLACE(p.cnpj, '.', ''), '-', ''), '/', '')) as quantidade_clientes,
+        COUNT(DISTINCT p.id_cliente) as quantidade_clientes,
         COUNT(p.id) as quantidade_parcelas
       FROM caz_parcelas p
-      LEFT JOIN cup_clientes cc 
-        ON REPLACE(REPLACE(REPLACE(p.cnpj, '.', ''), '-', ''), '/', '') = 
-           REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '')
+      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN cup_clientes cup 
+        ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = 
+           REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '')
       WHERE p.status = 'QUITADO'
         AND p.tipo_evento = 'RECEITA'
         AND p.data_quitacao >= ${primeiroDia}::date
         AND p.data_quitacao <= ${ultimoDiaStr}::timestamp
         AND p.valor_pago IS NOT NULL
         AND p.valor_pago::numeric > 0
-      GROUP BY COALESCE(NULLIF(TRIM(cc.responsavel), ''), 'Sem Responsável')
+      GROUP BY COALESCE(NULLIF(TRIM(cup.responsavel), ''), 'Sem Responsável')
       ORDER BY faturamento_bruto DESC
     `);
     
@@ -9469,21 +9486,22 @@ export class DbStorage implements IStorage {
     
     const result = await db.execute(sql`
       SELECT 
-        COALESCE(NULLIF(TRIM(cc.responsavel), ''), 'Sem Responsável') as responsavel,
+        COALESCE(NULLIF(TRIM(cup.responsavel), ''), 'Sem Responsável') as responsavel,
         SUM(COALESCE(p.valor_pago::numeric, 0)) as faturamento_bruto,
-        COUNT(DISTINCT REPLACE(REPLACE(REPLACE(p.cnpj, '.', ''), '-', ''), '/', '')) as quantidade_clientes,
+        COUNT(DISTINCT p.id_cliente) as quantidade_clientes,
         COUNT(p.id) as quantidade_parcelas
       FROM caz_parcelas p
-      LEFT JOIN cup_clientes cc 
-        ON REPLACE(REPLACE(REPLACE(p.cnpj, '.', ''), '-', ''), '/', '') = 
-           REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '')
+      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN cup_clientes cup 
+        ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = 
+           REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '')
       WHERE p.status = 'QUITADO'
         AND p.tipo_evento = 'RECEITA'
         AND p.data_quitacao >= ${dataInicio}::date
         AND p.data_quitacao <= ${dataFimComHora}::timestamp
         AND p.valor_pago IS NOT NULL
         AND p.valor_pago::numeric > 0
-      GROUP BY COALESCE(NULLIF(TRIM(cc.responsavel), ''), 'Sem Responsável')
+      GROUP BY COALESCE(NULLIF(TRIM(cup.responsavel), ''), 'Sem Responsável')
       ORDER BY faturamento_bruto DESC
     `);
     
