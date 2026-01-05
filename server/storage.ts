@@ -9562,6 +9562,116 @@ export class DbStorage implements IStorage {
       quantidadeParcelas: Number(row.quantidade_parcelas) || 0
     }));
   }
+
+  // Contribuição por Colaborador - Estilo DFC com colunas mensais
+  async getContribuicaoColaboradorDfc(dataInicio: string, dataFim: string, responsavel?: string): Promise<{
+    colaboradores: string[];
+    receitas: {
+      categoriaId: string;
+      categoriaNome: string;
+      valor: number;
+      nivel: number;
+      children: string[];
+      isLeaf: boolean;
+      parcelas?: {
+        id: number;
+        descricao: string;
+        cliente: string;
+        valor: number;
+        dataQuitacao: string;
+      }[];
+    }[];
+    totais: {
+      receitaTotal: number;
+      quantidadeParcelas: number;
+      quantidadeClientes: number;
+    };
+  }> {
+    const dataFimComHora = `${dataFim} 23:59:59`;
+    
+    // Primeiro busca lista de colaboradores
+    const colaboradoresResult = await db.execute(sql`
+      SELECT DISTINCT COALESCE(NULLIF(TRIM(cup.responsavel), ''), 'Sem Responsável') as responsavel
+      FROM caz_parcelas p
+      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN cup_clientes cup 
+        ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = 
+           REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '')
+      WHERE p.status = 'QUITADO'
+        AND p.tipo_evento = 'RECEITA'
+        AND p.data_quitacao >= ${dataInicio}::date
+        AND p.data_quitacao <= ${dataFimComHora}::timestamp
+        AND p.valor_pago IS NOT NULL
+        AND p.valor_pago::numeric > 0
+      ORDER BY responsavel
+    `);
+    
+    const colaboradores = colaboradoresResult.rows.map((r: any) => r.responsavel);
+    
+    // Constrói filtro de responsável se especificado
+    const responsavelFilter = responsavel && responsavel !== 'todos' 
+      ? sql`AND COALESCE(NULLIF(TRIM(cup.responsavel), ''), 'Sem Responsável') = ${responsavel}`
+      : sql``;
+    
+    // Busca receitas agrupadas por categoria
+    const receitasResult = await db.execute(sql`
+      SELECT 
+        COALESCE(p.categoria_id, 'SEM_CATEGORIA') as categoria_id,
+        COALESCE(p.categoria_nome, 'Sem Categoria') as categoria_nome,
+        SUM(COALESCE(p.valor_pago::numeric, 0)) as valor_total,
+        COUNT(p.id) as quantidade_parcelas,
+        COUNT(DISTINCT p.id_cliente) as quantidade_clientes
+      FROM caz_parcelas p
+      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN cup_clientes cup 
+        ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = 
+           REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '')
+      WHERE p.status = 'QUITADO'
+        AND p.tipo_evento = 'RECEITA'
+        AND p.data_quitacao >= ${dataInicio}::date
+        AND p.data_quitacao <= ${dataFimComHora}::timestamp
+        AND p.valor_pago IS NOT NULL
+        AND p.valor_pago::numeric > 0
+        ${responsavelFilter}
+      GROUP BY p.categoria_id, p.categoria_nome
+      ORDER BY valor_total DESC
+    `);
+    
+    // Processa receitas em estrutura hierárquica
+    const receitas: any[] = [];
+    let receitaTotal = 0;
+    let totalParcelas = 0;
+    let totalClientes = 0;
+    
+    for (const row of receitasResult.rows as any[]) {
+      const normalizedId = normalizeCode(row.categoria_id);
+      const displayCode = formatDisplayCode(normalizedId);
+      const baseName = CATEGORIA_NOMES_PADRAO[normalizedId] || row.categoria_nome;
+      
+      receitas.push({
+        categoriaId: normalizedId,
+        categoriaNome: `${displayCode} ${baseName}`,
+        valor: Number(row.valor_total) || 0,
+        nivel: determineLevel(normalizedId),
+        children: [],
+        isLeaf: true
+      });
+      
+      receitaTotal += Number(row.valor_total) || 0;
+      totalParcelas += Number(row.quantidade_parcelas) || 0;
+      totalClientes += Number(row.quantidade_clientes) || 0;
+    }
+    
+    return {
+      colaboradores,
+      receitas,
+      totais: {
+        receitaTotal,
+        quantidadeParcelas: totalParcelas,
+        quantidadeClientes: totalClientes
+      }
+    };
+  }
 }
 
 export const storage = new DbStorage();
