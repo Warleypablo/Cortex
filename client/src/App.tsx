@@ -42,6 +42,7 @@ const TechProjetos = lazy(() => import("@/pages/TechProjetos"));
 const FluxoCaixa = lazy(() => import("@/pages/FluxoCaixa"));
 const MetaAds = lazy(() => import("@/pages/MetaAds"));
 const AuditoriaSistemas = lazy(() => import("@/pages/AuditoriaSistemas"));
+const ContribuicaoColaborador = lazy(() => import("@/pages/ContribuicaoColaborador"));
 const AdminUsuarios = lazy(() => import("@/pages/AdminUsuarios"));
 const AccessDenied = lazy(() => import("@/pages/AccessDenied"));
 const Login = lazy(() => import("@/pages/Login"));
@@ -187,6 +188,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/revenue-goals">{() => <ProtectedRoute path="/dashboard/revenue-goals" component={RevenueGoals} />}</Route>
       <Route path="/dashboard/inadimplencia">{() => <ProtectedRoute path="/dashboard/inadimplencia" component={DashboardInadimplencia} />}</Route>
       <Route path="/dashboard/auditoria-sistemas">{() => <ProtectedRoute path="/dashboard/auditoria-sistemas" component={AuditoriaSistemas} />}</Route>
+      <Route path="/dashboard/contribuicao-colaborador">{() => <ProtectedRoute path="/dashboard/contribuicao-colaborador" component={ContribuicaoColaborador} />}</Route>
       <Route path="/contratos-module">{() => <ProtectedRoute path="/contratos-module" component={ContratosModule} />}</Route>
       
       {/* G&G */}

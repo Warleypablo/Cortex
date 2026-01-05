@@ -6213,6 +6213,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================
+  // CONTRIBUIÇÃO POR COLABORADOR API ENDPOINT
+  // ========================================
+  app.get("/api/contribuicao-colaborador", async (req, res) => {
+    try {
+      const mes = parseInt(req.query.mes as string);
+      const ano = parseInt(req.query.ano as string);
+      
+      if (isNaN(mes) || isNaN(ano) || mes < 1 || mes > 12 || ano < 2000 || ano > 2100) {
+        return res.status(400).json({ error: "Parâmetros inválidos. Esperado: mes (1-12), ano (2000-2100)" });
+      }
+      
+      const data = await storage.getContribuicaoColaborador(mes, ano);
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching contribuição por colaborador:", error);
+      res.status(500).json({ error: "Falha ao buscar dados de contribuição" });
+    }
+  });
+
+  app.get("/api/contribuicao-colaborador/periodo", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string;
+      const dataFim = req.query.dataFim as string;
+      
+      if (!dataInicio || !dataFim) {
+        return res.status(400).json({ error: "Parâmetros dataInicio e dataFim são obrigatórios" });
+      }
+      
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dataInicio) || !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+        return res.status(400).json({ error: "Formato inválido. Esperado: YYYY-MM-DD" });
+      }
+      
+      const data = await storage.getContribuicaoColaboradorPeriodo(dataInicio, dataFim);
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching contribuição por colaborador:", error);
+      res.status(500).json({ error: "Falha ao buscar dados de contribuição" });
+    }
+  });
+
+  // ========================================
   // CASES DE SUCESSO CHAT API ENDPOINT
   // ========================================
   app.post("/api/cases/chat", async (req, res) => {
