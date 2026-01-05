@@ -1793,17 +1793,24 @@ function ContratosTab() {
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEdit(contrato)}
-                          data-testid={`button-atualizar-contrato-${contrato.id}`}
-                          title="Atualizar contrato"
-                          className="text-xs"
-                        >
-                          <Edit className="h-3 w-3 mr-1" />
-                          Atualizar
-                        </Button>
+                        {(contrato.status === 'enviado para assinatura' || contrato.assinafy_document_id) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => verificarStatusMutation.mutate(contrato.id)}
+                            disabled={verificarStatusMutation.isPending}
+                            data-testid={`button-atualizar-status-${contrato.id}`}
+                            title="Atualizar status da assinatura"
+                            className="text-xs"
+                          >
+                            {verificarStatusMutation.isPending ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-3 w-3 mr-1" />
+                            )}
+                            Atualizar
+                          </Button>
+                        )}
                         <Button
                           size="icon"
                           variant="ghost"
@@ -1812,6 +1819,15 @@ function ContratosTab() {
                           title="Ver detalhes"
                         >
                           <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleEdit(contrato)}
+                          data-testid={`button-edit-contrato-${contrato.id}`}
+                          title="Editar"
+                        >
+                          <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           size="icon"
