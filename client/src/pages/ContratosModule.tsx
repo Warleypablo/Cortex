@@ -1794,6 +1794,17 @@ function ContratosTab() {
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEdit(contrato)}
+                          data-testid={`button-atualizar-contrato-${contrato.id}`}
+                          title="Atualizar contrato"
+                          className="text-xs"
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          Atualizar
+                        </Button>
+                        <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => handleView(contrato)}
@@ -1801,15 +1812,6 @@ function ContratosTab() {
                           title="Ver detalhes"
                         >
                           <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleEdit(contrato)}
-                          data-testid={`button-edit-contrato-${contrato.id}`}
-                          title="Editar"
-                        >
-                          <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           size="icon"
