@@ -8194,7 +8194,8 @@ export class DbStorage implements IStorage {
     const escapedAtualizadoPor = data.atualizadoPor.replace(/'/g, "''");
     const valorAcordadoSql = data.valorAcordado != null ? data.valorAcordado.toString() : 'NULL';
     
-    const result = await db.execute(sql.raw(`
+    // Primeiro tenta atualizar se já existe
+    let result = await db.execute(sql.raw(`
       UPDATE inadimplencia_contextos SET
         contexto_juridico = NULLIF('${escapedContexto}', ''),
         procedimento_juridico = NULLIF('${escapedProcedimento}', ''),
@@ -8206,8 +8207,37 @@ export class DbStorage implements IStorage {
       RETURNING contexto_juridico, procedimento_juridico, status_juridico, valor_acordado, atualizado_juridico_por, atualizado_juridico_em
     `));
     
+    // Se não existe, insere um novo registro
     if (!result.rows.length) {
-      throw new Error(`Cliente ${data.clienteId} não encontrado em inadimplencia_contextos`);
+      console.log(`[storage] Cliente ${data.clienteId} não existe em inadimplencia_contextos, criando registro...`);
+      result = await db.execute(sql.raw(`
+        INSERT INTO inadimplencia_contextos (
+          cliente_id, 
+          contexto_juridico, 
+          procedimento_juridico, 
+          status_juridico, 
+          valor_acordado, 
+          atualizado_juridico_por, 
+          atualizado_juridico_em
+        )
+        VALUES (
+          '${escapedClienteId}',
+          NULLIF('${escapedContexto}', ''),
+          NULLIF('${escapedProcedimento}', ''),
+          NULLIF('${escapedStatus}', ''),
+          ${valorAcordadoSql},
+          '${escapedAtualizadoPor}',
+          NOW()
+        )
+        ON CONFLICT (cliente_id) DO UPDATE SET
+          contexto_juridico = EXCLUDED.contexto_juridico,
+          procedimento_juridico = EXCLUDED.procedimento_juridico,
+          status_juridico = EXCLUDED.status_juridico,
+          valor_acordado = EXCLUDED.valor_acordado,
+          atualizado_juridico_por = EXCLUDED.atualizado_juridico_por,
+          atualizado_juridico_em = EXCLUDED.atualizado_juridico_em
+        RETURNING contexto_juridico, procedimento_juridico, status_juridico, valor_acordado, atualizado_juridico_por, atualizado_juridico_em
+      `));
     }
     
     const row = result.rows[0] as any;
