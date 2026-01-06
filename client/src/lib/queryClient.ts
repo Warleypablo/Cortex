@@ -1,7 +1,47 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// Maintenance mode event system
+export interface MaintenanceInfo {
+  isInMaintenance: boolean;
+  message: string;
+  windowStart: string;
+  windowEnd: string;
+  resumesAt: string | null;
+  remainingMinutes: number | null;
+}
+
+type MaintenanceListener = (info: MaintenanceInfo) => void;
+const maintenanceListeners: Set<MaintenanceListener> = new Set();
+
+export function onMaintenanceChange(listener: MaintenanceListener) {
+  maintenanceListeners.add(listener);
+  return () => maintenanceListeners.delete(listener);
+}
+
+function notifyMaintenance(info: MaintenanceInfo) {
+  maintenanceListeners.forEach(listener => listener(info));
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    // Check for maintenance mode response (503)
+    if (res.status === 503) {
+      try {
+        const data = await res.clone().json();
+        if (data.error === "maintenance") {
+          notifyMaintenance({
+            isInMaintenance: true,
+            message: data.message,
+            windowStart: data.details?.windowStart || "13:00",
+            windowEnd: data.details?.windowEnd || "14:30",
+            resumesAt: data.details?.resumesAt || null,
+            remainingMinutes: data.details?.remainingMinutes || null,
+          });
+        }
+      } catch (e) {
+        // Ignore JSON parse errors
+      }
+    }
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
