@@ -1983,6 +1983,12 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
   const selectedMonthData = MONTHS.find(m => m.key === selectedMonth);
   const effectiveQuarter = viewMode === "month" && selectedMonthData ? selectedMonthData.quarter : selectedQuarter;
 
+  // Verificar se o mês selecionado é futuro (ainda não tem dados)
+  const currentMonthIndex = new Date().getMonth();
+  const selectedMonthIndex = MONTHS.findIndex(m => m.key === selectedMonth);
+  const isSelectedMonthFuture = selectedMonthIndex > currentMonthIndex;
+  const isSelectedMonthCurrent = selectedMonthIndex === currentMonthIndex;
+
   const getTargetForMetric = (metricKey: string): number | null => {
     const kr = krs?.find(k => k.metricKey === metricKey);
     if (!kr?.targets) return null;
@@ -2105,60 +2111,60 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
         <HeroCard
           title="MRR Ativo"
           value={viewMode === "month" 
-            ? getValueFromSeries(series.mrr || metrics.mrr_serie, selectedMonth) ?? metrics.mrr_ativo
+            ? (isSelectedMonthFuture ? null : (isSelectedMonthCurrent ? metrics.mrr_ativo : getValueFromSeries(series.mrr || metrics.mrr_serie, selectedMonth)))
             : metrics.mrr_ativo}
           target={mrrTarget}
           format="currency"
           direction="higher"
           icon={TrendingUp}
           tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label}: Meta ${formatCurrency(mrrTarget)}`
+            ? `${selectedMonthData?.label}: Meta ${formatCurrency(mrrTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: ${formatCurrency(mrrTarget)}`}
         />
         <HeroCard
           title="Vendas MRR"
-          value={vendasMrrValue}
+          value={viewMode === "month" && isSelectedMonthFuture ? null : vendasMrrValue}
           target={vendasMrrTarget}
           format="currency"
           direction="higher"
           icon={ShoppingCart}
           tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label}: Meta ${formatCurrency(vendasMrrTarget)}`
+            ? `${selectedMonthData?.label}: Meta ${formatCurrency(vendasMrrTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: ${formatCurrency(vendasMrrTarget)}`}
         />
         <HeroCard
           title="Inadimplência"
-          value={inadValue}
+          value={viewMode === "month" && isSelectedMonthFuture ? null : inadValue}
           target={inadTarget}
           format="currency"
           direction="lower"
           icon={CreditCard}
           tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label}: Máx ${formatCurrency(inadTarget)}`
+            ? `${selectedMonthData?.label}: Máx ${formatCurrency(inadTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: Máx ${formatCurrency(inadTarget)}`}
-          status={inadStatus}
+          status={isSelectedMonthFuture ? undefined : inadStatus}
         />
         <HeroCard
           title="Churn"
-          value={churnValue}
+          value={viewMode === "month" && isSelectedMonthFuture ? null : churnValue}
           target={churnTarget}
           format="currency"
           direction="lower"
           icon={TrendingDownIcon}
           tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label}: Máx ${formatCurrency(churnTarget)}`
+            ? `${selectedMonthData?.label}: Máx ${formatCurrency(churnTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: Máx ${formatCurrency(churnTarget)}`}
-          status={churnStatus}
+          status={isSelectedMonthFuture ? undefined : churnStatus}
         />
         <HeroCard
           title="Geração de Caixa"
-          value={metrics.geracao_caixa_ytd}
+          value={viewMode === "month" && isSelectedMonthFuture ? null : metrics.geracao_caixa_ytd}
           target={cashGenTarget}
           format="currency"
           direction="higher"
           icon={PiggyBank}
           tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label}: Meta ${formatCurrency(cashGenTarget)}`
+            ? `${selectedMonthData?.label}: Meta ${formatCurrency(cashGenTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: ${formatCurrency(cashGenTarget)}`}
         />
       </div>
