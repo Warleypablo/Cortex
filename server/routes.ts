@@ -11797,6 +11797,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!actualsByMetric["sales_mrr"]) actualsByMetric["sales_mrr"] = {};
           actualsByMetric["sales_mrr"][currentMonthKey] = vendasMrr;
           
+          const receitaPontualResult = await db.execute(sql`
+            SELECT COALESCE(SUM(valor_pontual::numeric), 0) as receita_pontual
+            FROM crm_deal
+            WHERE stage_name = 'Negócio Ganho'
+              AND data_fechamento >= ${startOfMonth.toISOString().split("T")[0]}
+              AND data_fechamento < ${today.toISOString().split("T")[0]}
+          `);
+          const receitaPontual = parseFloat((receitaPontualResult.rows[0] as any)?.receita_pontual || "0");
+          if (!actualsByMetric["revenue_one_time"]) actualsByMetric["revenue_one_time"] = {};
+          actualsByMetric["revenue_one_time"][currentMonthKey] = receitaPontual;
+          
           const inadResult = await db.execute(sql`
             SELECT COALESCE(SUM(nao_pago::numeric), 0) as inadimplencia
             FROM caz_parcelas
