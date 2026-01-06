@@ -612,6 +612,25 @@ export async function getVendasMrr(): Promise<number> {
   }
 }
 
+export async function getGeracaoCaixa(): Promise<number> {
+  try {
+    // Geração de Caixa = Receitas - Despesas do mês atual (status QUITADO)
+    // Mesma lógica do "Resultado do Mês" em getFinanceiroKPIsCompletos
+    const result = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as geracao_caixa
+      FROM caz_parcelas
+      WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+        AND status = 'QUITADO'
+    `);
+    return parseFloat((result.rows[0] as any)?.geracao_caixa || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Geração de Caixa:", error);
+    return 0;
+  }
+}
+
 export async function getTurboohReceita(): Promise<number | null> {
   try {
     const currentYear = new Date().getFullYear();
@@ -1677,6 +1696,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     expansionMrr,
     vendasPontual,
     vendasMrr,
+    geracaoCaixa,
     turboohReceita,
     turboohCustos,
     turboohResultado,
@@ -1702,6 +1722,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     getExpansionMrr(),
     getVendasPontual(),
     getVendasMrr(),
+    getGeracaoCaixa(),
     getTurboohReceita(),
     getTurboohCustos(),
     getTurboohResultado(),
@@ -1721,7 +1742,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     receita_total_ytd: receitaYTD.total,
     receita_liquida_ytd: receitaYTD.liquida,
     ebitda_ytd: ebitdaYTD,
-    geracao_caixa_ytd: ebitdaYTD * 0.6,
+    geracao_caixa_ytd: geracaoCaixa,
     caixa_atual: caixaAtual,
     inadimplencia_valor: inadimplencia.valor,
     inadimplencia_brl: inadimplencia.valor,
