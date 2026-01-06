@@ -246,8 +246,8 @@ export async function getCaixaAtual(): Promise<number> {
 
 export async function getInadimplenciaValor(): Promise<number> {
   try {
-    // Inadimplência = soma de nao_pago para boletos RECEITA vencidos no mês atual
-    // Usando a mesma lógica do /api/inadimplencia/resumo
+    // Inadimplência = soma de nao_pago para boletos RECEITA com competência do mês atual
+    // e que ainda estão vencidos (data_vencimento < hoje)
     const hoje = new Date().toISOString().split('T')[0];
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(nao_pago::numeric), 0) as valor_inadimplente
@@ -255,7 +255,7 @@ export async function getInadimplenciaValor(): Promise<number> {
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento < ${hoje}::date
         AND nao_pago::numeric > 0
-        AND TO_CHAR(data_vencimento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+        AND TO_CHAR(data_competencia::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
     `);
     return parseFloat((result.rows[0] as any)?.valor_inadimplente || "0");
   } catch (error) {
@@ -266,19 +266,21 @@ export async function getInadimplenciaValor(): Promise<number> {
 
 export async function getInadimplenciaPct(): Promise<number> {
   try {
+    const hoje = new Date().toISOString().split('T')[0];
     const result = await db.execute(sql`
       WITH inadimplente AS (
-        SELECT COALESCE(SUM(nao_pago::numeric + COALESCE(perda::numeric, 0)), 0) as valor_inadimplente
+        SELECT COALESCE(SUM(nao_pago::numeric), 0) as valor_inadimplente
         FROM caz_parcelas
         WHERE tipo_evento = 'RECEITA'
-          AND status NOT IN ('QUITADO', 'PERDIDO')
-          AND data_vencimento < NOW()
+          AND data_vencimento < ${hoje}::date
+          AND nao_pago::numeric > 0
+          AND TO_CHAR(data_competencia::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
       ),
       receita_mes AS (
         SELECT COALESCE(SUM(valor_bruto::numeric), 0) as receita_total
         FROM caz_parcelas
         WHERE tipo_evento = 'RECEITA'
-          AND TO_CHAR(data_vencimento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+          AND TO_CHAR(data_competencia::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
       )
       SELECT 
         CASE WHEN r.receita_total > 0 
