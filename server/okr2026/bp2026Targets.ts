@@ -33,6 +33,21 @@ export const BP_2026_TARGETS: MetricDefinition[] = [
     totals: { sum_months: 20998078, dec: 2337388 }
   },
   {
+    metric_key: "sales_mrr",
+    title: "Vendas MRR",
+    unit: "BRL",
+    period_type: "month_sum",
+    direction: "up",
+    is_derived: false,
+    months: {
+      "2026-01": 215000, "2026-02": 215000, "2026-03": 215000,
+      "2026-04": 240000, "2026-05": 240000, "2026-06": 240000,
+      "2026-07": 270000, "2026-08": 270000, "2026-09": 270000,
+      "2026-10": 300000, "2026-11": 300000, "2026-12": 300000
+    },
+    totals: { sum_months: 2975000 }
+  },
+  {
     metric_key: "revenue_one_time",
     title: "Receita Pontual",
     unit: "BRL",
@@ -614,6 +629,7 @@ export const BP_MONTHS = [
 
 export const BP_METRIC_ORDER = [
   "mrr_active",
+  "sales_mrr",
   "revenue_one_time",
   "revenue_other",
   "revenue_billable_total",

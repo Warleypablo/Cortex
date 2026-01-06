@@ -11761,6 +11761,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("[api] BP financeiro: No actuals available (DB unavailable)");
       }
       
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonthNum = now.getMonth() + 1;
+      const currentMonthKey = `${currentYear}-${String(currentMonthNum).padStart(2, "0")}`;
+      
+      if (currentYear === 2026) {
+        try {
+          const startOfMonth = new Date(currentYear, currentMonthNum - 1, 1);
+          const today = new Date();
+          
+          const mrrResult = await db.execute(sql`
+            WITH ultimo_snapshot AS (
+              SELECT MAX(data_snapshot) as data_ultimo
+              FROM cup_data_hist
+            )
+            SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
+            FROM cup_data_hist h
+            JOIN ultimo_snapshot us ON h.data_snapshot = us.data_ultimo
+            WHERE status IN ('ativo', 'onboarding', 'triagem')
+              AND valorr IS NOT NULL AND valorr > 0
+          `);
+          const mrrAtivo = parseFloat((mrrResult.rows[0] as any)?.mrr || "0");
+          if (!actualsByMetric["mrr_active"]) actualsByMetric["mrr_active"] = {};
+          actualsByMetric["mrr_active"][currentMonthKey] = mrrAtivo;
+          
+          const vendasResult = await db.execute(sql`
+            SELECT COALESCE(SUM(valor_recorrente::numeric), 0) as vendas_mrr
+            FROM crm_deal
+            WHERE stage_name = 'Negócio Ganho'
+              AND data_fechamento >= ${startOfMonth.toISOString().split("T")[0]}
+              AND data_fechamento < ${today.toISOString().split("T")[0]}
+          `);
+          const vendasMrr = parseFloat((vendasResult.rows[0] as any)?.vendas_mrr || "0");
+          if (!actualsByMetric["sales_mrr"]) actualsByMetric["sales_mrr"] = {};
+          actualsByMetric["sales_mrr"][currentMonthKey] = vendasMrr;
+          
+          const inadResult = await db.execute(sql`
+            SELECT COALESCE(SUM(nao_pago::numeric), 0) as inadimplencia
+            FROM caz_parcelas
+            WHERE tipo_evento = 'RECEITA'
+              AND data_vencimento >= ${startOfMonth.toISOString().split("T")[0]}
+              AND data_vencimento < ${today.toISOString().split("T")[0]}
+              AND nao_pago::numeric > 0
+          `);
+          const inadimplencia = parseFloat((inadResult.rows[0] as any)?.inadimplencia || "0");
+          if (!actualsByMetric["bad_debt"]) actualsByMetric["bad_debt"] = {};
+          actualsByMetric["bad_debt"][currentMonthKey] = inadimplencia;
+          
+          const churnResult = await db.execute(sql`
+            SELECT COALESCE(SUM(valorr::numeric), 0) as churn
+            FROM cup_contratos
+            WHERE data_solicitacao_encerramento >= ${startOfMonth.toISOString().split("T")[0]}
+              AND data_solicitacao_encerramento < ${today.toISOString().split("T")[0]}
+          `);
+          const churnMrr = parseFloat((churnResult.rows[0] as any)?.churn || "0");
+          if (!actualsByMetric["churn_mrr_month"]) actualsByMetric["churn_mrr_month"] = {};
+          actualsByMetric["churn_mrr_month"][currentMonthKey] = churnMrr;
+          
+          const receitasResult = await db.execute(sql`
+            SELECT COALESCE(SUM(valor_pago::numeric), 0) as total
+            FROM caz_parcelas
+            WHERE tipo_evento = 'RECEITA'
+              AND status = 'QUITADO'
+              AND data_competencia >= ${startOfMonth.toISOString().split("T")[0]}
+              AND data_competencia < ${today.toISOString().split("T")[0]}
+          `);
+          const receitasQuitadas = parseFloat((receitasResult.rows[0] as any)?.total || "0");
+          
+          const despesasResult = await db.execute(sql`
+            SELECT COALESCE(SUM(valor_pago::numeric), 0) as total
+            FROM caz_parcelas
+            WHERE tipo_evento = 'DESPESA'
+              AND status = 'QUITADO'
+              AND data_competencia >= ${startOfMonth.toISOString().split("T")[0]}
+              AND data_competencia < ${today.toISOString().split("T")[0]}
+          `);
+          const despesasQuitadas = parseFloat((despesasResult.rows[0] as any)?.total || "0");
+          
+          const geracaoCaixa = receitasQuitadas - despesasQuitadas;
+          if (!actualsByMetric["cash_generation"]) actualsByMetric["cash_generation"] = {};
+          actualsByMetric["cash_generation"][currentMonthKey] = geracaoCaixa;
+          
+        } catch (liveError) {
+          console.log("[api] BP financeiro: Could not fetch live metrics for current month", liveError);
+        }
+      }
+      
       const currentDate = new Date();
       const currentMonth = currentDate.getFullYear() === 2026 
         ? `2026-${String(currentDate.getMonth() + 1).padStart(2, "0")}`
