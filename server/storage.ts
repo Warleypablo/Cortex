@@ -9885,32 +9885,28 @@ export class DbStorage implements IStorage {
   }> {
     const dataFimComHora = `${dataFim} 23:59:59`;
     
-    // Usa CTE para garantir apenas um contrato por CNPJ (evita duplicação)
-    // Seleciona o contrato com maior MRR para cada CNPJ único
+    // CTE para deduplicar cup_clientes por CNPJ limpo (um responsável por cliente)
+    // Isso evita multiplicação de parcelas quando um cliente tem múltiplos tasks
     const operadoresResult = await db.execute(sql`
-      WITH contratos_unicos AS (
+      WITH clientes_unicos AS (
         SELECT DISTINCT ON (cnpj_limpo)
           cnpj_limpo,
-          responsavel,
-          produto,
-          id_subtask
+          responsavel
         FROM (
           SELECT 
-            REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
-            cont.responsavel,
-            cont.produto,
-            cont.id_subtask,
-            COALESCE(cont.mrr::numeric, 0) as mrr_valor
-          FROM cup_clientes cup
-          JOIN cup_contratos cont ON cup.task_id = cont.id_task AND LOWER(cont.status) = 'ativo'
-          WHERE cup.cnpj IS NOT NULL AND TRIM(cup.cnpj) != ''
+            REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+            responsavel,
+            task_id
+          FROM cup_clientes
+          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
         ) sub
-        ORDER BY cnpj_limpo, mrr_valor DESC
+        ORDER BY cnpj_limpo, task_id
       )
       SELECT DISTINCT COALESCE(NULLIF(TRIM(cu.responsavel), ''), 'Sem Responsável') as operador
       FROM caz_parcelas p
-      JOIN caz_clientes caz ON p.id_cliente::text = caz.ids::text
-      JOIN contratos_unicos cu ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = cu.cnpj_limpo
+      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN clientes_unicos cu 
+        ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = cu.cnpj_limpo
       WHERE p.status = 'QUITADO'
         AND p.tipo_evento = 'RECEITA'
         AND p.data_quitacao >= ${dataInicio}::date
@@ -9923,41 +9919,38 @@ export class DbStorage implements IStorage {
     
     const operadores = operadoresResult.rows.map((r: any) => r.operador);
     
-    // Constrói filtro de operador se especificado
+    // Constrói filtro de operador se especificado (usando responsável do cliente)
     const operadorFilter = operador && operador !== 'todos' 
       ? sql`AND COALESCE(NULLIF(TRIM(cu.responsavel), ''), 'Sem Responsável') = ${operador}`
       : sql``;
     
-    // Busca receitas agrupadas por produto do contrato (sem duplicação)
-    // Usa CTE para garantir apenas um contrato por CNPJ
+    // CTE para deduplicar cup_clientes por CNPJ limpo
+    // Garante que cada parcela é contada apenas uma vez por cliente
     const receitasResult = await db.execute(sql`
-      WITH contratos_unicos AS (
+      WITH clientes_unicos AS (
         SELECT DISTINCT ON (cnpj_limpo)
           cnpj_limpo,
-          responsavel,
-          produto,
-          id_subtask
+          responsavel
         FROM (
           SELECT 
-            REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
-            cont.responsavel,
-            cont.produto,
-            cont.id_subtask,
-            COALESCE(cont.mrr::numeric, 0) as mrr_valor
-          FROM cup_clientes cup
-          JOIN cup_contratos cont ON cup.task_id = cont.id_task AND LOWER(cont.status) = 'ativo'
-          WHERE cup.cnpj IS NOT NULL AND TRIM(cup.cnpj) != ''
+            REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+            responsavel,
+            task_id
+          FROM cup_clientes
+          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
         ) sub
-        ORDER BY cnpj_limpo, mrr_valor DESC
+        ORDER BY cnpj_limpo, task_id
       )
       SELECT 
-        COALESCE(cu.produto, 'Sem Produto') as produto_nome,
+        COALESCE(p.categoria_id, 'SEM_CATEGORIA') as categoria_id,
+        COALESCE(p.categoria_nome, 'Sem Categoria') as categoria_nome,
         SUM(COALESCE(p.valor_pago::numeric, 0)) as valor_total,
-        COUNT(DISTINCT p.id) as quantidade_parcelas,
-        COUNT(DISTINCT cu.id_subtask) as quantidade_contratos
+        COUNT(p.id) as quantidade_parcelas,
+        COUNT(DISTINCT p.id_cliente) as quantidade_clientes
       FROM caz_parcelas p
-      JOIN caz_clientes caz ON p.id_cliente::text = caz.ids::text
-      JOIN contratos_unicos cu ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = cu.cnpj_limpo
+      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN clientes_unicos cu 
+        ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = cu.cnpj_limpo
       WHERE p.status = 'QUITADO'
         AND p.tipo_evento = 'RECEITA'
         AND p.data_quitacao >= ${dataInicio}::date
@@ -9966,7 +9959,7 @@ export class DbStorage implements IStorage {
         AND p.valor_pago::numeric > 0
         AND p.descricao LIKE 'Venda%'
         ${operadorFilter}
-      GROUP BY COALESCE(cu.produto, 'Sem Produto')
+      GROUP BY p.categoria_id, p.categoria_nome
       ORDER BY valor_total DESC
     `);
     
@@ -9982,19 +9975,19 @@ export class DbStorage implements IStorage {
     let totalContratos = 0;
     
     for (const row of receitasResult.rows as any[]) {
-      const produtoNome = row.produto_nome || 'Sem Produto';
-      const categoriaId = `PROD.${produtoNome.substring(0, 10).toUpperCase().replace(/\s+/g, '_')}`;
+      const categoriaNome = row.categoria_nome || 'Sem Categoria';
+      const categoriaId = row.categoria_id || 'SEM_CATEGORIA';
       
       receitas.push({
         categoriaId,
-        categoriaNome: produtoNome,
+        categoriaNome,
         valor: Number(row.valor_total) || 0,
         nivel: 2
       });
       
       receitaTotal += Number(row.valor_total) || 0;
       totalParcelas += Number(row.quantidade_parcelas) || 0;
-      totalContratos += Number(row.quantidade_contratos) || 0;
+      totalContratos += Number(row.quantidade_clientes) || 0;
     }
     
     // Calcula despesas
