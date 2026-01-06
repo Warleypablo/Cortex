@@ -9738,9 +9738,11 @@ export class DbStorage implements IStorage {
     const taxaImposto = 0.16; // 16% de imposto
     
     // Buscar salário do responsável se filtrado
+    console.log(`[ContribuicaoDfc] Buscando salário para responsavel="${responsavel}"`);
     if (responsavel && responsavel !== 'todos') {
       try {
-        // Busca salário bruto primeiro
+        // Busca salário bruto primeiro (correspondência exata)
+        console.log(`[ContribuicaoDfc] Tentando match exato para "${responsavel}"`);
         let salarioResult = await db.execute(sql`
           SELECT salario as salario_bruto, nome
           FROM rh_pessoal
