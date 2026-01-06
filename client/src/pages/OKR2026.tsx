@@ -62,9 +62,12 @@ interface DashboardMetrics {
   geracao_caixa_ytd: number;
   caixa_atual: number;
   inadimplencia_percentual: number;
+  inadimplencia_brl: number | null;
   gross_mrr_churn_percentual: number;
   net_churn_mrr_percentual: number | null;
+  churn_brl: number | null;
   logo_churn_percentual: number | null;
+  vendas_mrr: number | null;
   clientes_ativos: number;
   headcount: number;
   receita_por_head: number;
@@ -1986,28 +1989,28 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
     return kr.targets[effectiveQuarter] ?? null;
   };
 
-  // Metas mensais baseadas nos OKRs definidos
+  // Metas mensais baseadas nos OKRs definidos (valores corretos passados pelo usuário)
   const monthlyTargets: Record<MonthKey, { mrr: number; vendasMrr: number; inadimplencia: number; churn: number; geracaoCaixa: number }> = {
-    jan: { mrr: 1340000, vendasMrr: 250000, inadimplencia: 80400, churn: 107200, geracaoCaixa: 131630 },
-    fev: { mrr: 1423334, vendasMrr: 250000, inadimplencia: 85400, churn: 113867, geracaoCaixa: 131630 },
-    mar: { mrr: 1510001, vendasMrr: 250000, inadimplencia: 90600, churn: 120800, geracaoCaixa: 131630 },
-    abr: { mrr: 1600001, vendasMrr: 250000, inadimplencia: 96000, churn: 128000, geracaoCaixa: 131630 },
-    mai: { mrr: 1693335, vendasMrr: 250000, inadimplencia: 101600, churn: 135467, geracaoCaixa: 131630 },
-    jun: { mrr: 1790002, vendasMrr: 250000, inadimplencia: 107400, churn: 143200, geracaoCaixa: 131630 },
-    jul: { mrr: 1870002, vendasMrr: 250000, inadimplencia: 112200, churn: 149600, geracaoCaixa: 131630 },
-    ago: { mrr: 1973336, vendasMrr: 250000, inadimplencia: 118400, churn: 157867, geracaoCaixa: 131630 },
-    set: { mrr: 2080003, vendasMrr: 250000, inadimplencia: 124800, churn: 166400, geracaoCaixa: 131630 },
-    out: { mrr: 2170003, vendasMrr: 250000, inadimplencia: 130200, churn: 173600, geracaoCaixa: 131630 },
-    nov: { mrr: 2273337, vendasMrr: 250000, inadimplencia: 136400, churn: 181867, geracaoCaixa: 131630 },
-    dez: { mrr: 2380004, vendasMrr: 250000, inadimplencia: 142800, churn: 190400, geracaoCaixa: 131630 },
+    jan: { mrr: 1156850, vendasMrr: 215000, inadimplencia: 69411, churn: 92548, geracaoCaixa: 42113 },
+    fev: { mrr: 1267734, vendasMrr: 215000, inadimplencia: 76064, churn: 101419, geracaoCaixa: 190284 },
+    mar: { mrr: 1368637, vendasMrr: 215000, inadimplencia: 82118, churn: 109491, geracaoCaixa: 212724 },
+    abr: { mrr: 1485460, vendasMrr: 240000, inadimplencia: 89128, churn: 118837, geracaoCaixa: 255448 },
+    mai: { mrr: 1591769, vendasMrr: 240000, inadimplencia: 95506, churn: 127342, geracaoCaixa: 257036 },
+    jun: { mrr: 1688510, vendasMrr: 240000, inadimplencia: 101311, churn: 135081, geracaoCaixa: 345070 },
+    jul: { mrr: 1806544, vendasMrr: 270000, inadimplencia: 108393, churn: 144524, geracaoCaixa: 325588 },
+    ago: { mrr: 1913955, vendasMrr: 270000, inadimplencia: 114837, churn: 153116, geracaoCaixa: 448395 },
+    set: { mrr: 2011699, vendasMrr: 270000, inadimplencia: 120702, churn: 160936, geracaoCaixa: 485121 },
+    out: { mrr: 2130646, vendasMrr: 300000, inadimplencia: 127839, churn: 170452, geracaoCaixa: 511923 },
+    nov: { mrr: 2238888, vendasMrr: 300000, inadimplencia: 134333, churn: 179111, geracaoCaixa: 576613 },
+    dez: { mrr: 2337388, vendasMrr: 300000, inadimplencia: 140243, churn: 186991, geracaoCaixa: 596171 },
   };
 
-  // Metas trimestrais (soma dos meses)
+  // Metas trimestrais (último mês do trimestre para MRR, soma para vendas/geração, soma para churn/inadimplência)
   const quarterlyTargets: Record<string, { mrr: number; vendasMrr: number; inadimplencia: number; churn: number; geracaoCaixa: number }> = {
-    Q1: { mrr: 1510001, vendasMrr: 750000, inadimplencia: 256400, churn: 341867, geracaoCaixa: 394890 },
-    Q2: { mrr: 1790002, vendasMrr: 750000, inadimplencia: 305000, churn: 406667, geracaoCaixa: 394890 },
-    Q3: { mrr: 2080003, vendasMrr: 750000, inadimplencia: 355400, churn: 473867, geracaoCaixa: 394890 },
-    Q4: { mrr: 2380004, vendasMrr: 750000, inadimplencia: 409400, churn: 545867, geracaoCaixa: 394890 },
+    Q1: { mrr: 1368637, vendasMrr: 645000, inadimplencia: 227593, churn: 303458, geracaoCaixa: 445121 },
+    Q2: { mrr: 1688510, vendasMrr: 720000, inadimplencia: 285945, churn: 381260, geracaoCaixa: 857554 },
+    Q3: { mrr: 2011699, vendasMrr: 810000, inadimplencia: 343932, churn: 458576, geracaoCaixa: 1259104 },
+    Q4: { mrr: 2337388, vendasMrr: 900000, inadimplencia: 402415, churn: 536554, geracaoCaixa: 1684707 },
   };
 
   const getCurrentTargets = () => {
