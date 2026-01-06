@@ -247,15 +247,20 @@ export async function getCaixaAtual(): Promise<number> {
 export async function getInadimplenciaValor(): Promise<number> {
   try {
     // Inadimplência = faturas RECEITA com vencimento do dia 01 do mês até hoje
-    // que não foram pagas (status diferente de QUITADO/BAIXADO/CANCELADO)
+    // que não foram pagas (status = PENDENTE ou EM ATRASO)
+    // Usando valor_bruto para boletos não pagos
     const result = await db.execute(sql`
-      SELECT COALESCE(SUM(nao_pago::numeric), 0) as valor_inadimplente
+      SELECT COALESCE(SUM(
+        CASE 
+          WHEN nao_pago::numeric > 0 THEN nao_pago::numeric
+          ELSE valor_bruto::numeric 
+        END
+      ), 0) as valor_inadimplente
       FROM caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento >= date_trunc('month', CURRENT_DATE)
         AND data_vencimento < CURRENT_DATE
-        AND nao_pago::numeric > 0
-        AND status NOT IN ('QUITADO', 'BAIXADO', 'CANCELADO', 'PERDIDO')
+        AND status IN ('PENDENTE', 'EM ATRASO', 'ABERTO', 'A RECEBER', 'VENCIDO')
     `);
     return parseFloat((result.rows[0] as any)?.valor_inadimplente || "0");
   } catch (error) {
@@ -268,13 +273,17 @@ export async function getInadimplenciaPct(): Promise<number> {
   try {
     const result = await db.execute(sql`
       WITH inadimplente AS (
-        SELECT COALESCE(SUM(nao_pago::numeric), 0) as valor_inadimplente
+        SELECT COALESCE(SUM(
+          CASE 
+            WHEN nao_pago::numeric > 0 THEN nao_pago::numeric
+            ELSE valor_bruto::numeric 
+          END
+        ), 0) as valor_inadimplente
         FROM caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND data_vencimento >= date_trunc('month', CURRENT_DATE)
           AND data_vencimento < CURRENT_DATE
-          AND nao_pago::numeric > 0
-          AND status NOT IN ('QUITADO', 'BAIXADO', 'CANCELADO', 'PERDIDO')
+          AND status IN ('PENDENTE', 'EM ATRASO', 'ABERTO', 'A RECEBER', 'VENCIDO')
       ),
       receita_mes AS (
         SELECT COALESCE(SUM(valor_bruto::numeric), 0) as receita_total
