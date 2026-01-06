@@ -595,15 +595,15 @@ export async function getVendasPontual(): Promise<number> {
 
 export async function getVendasMrr(): Promise<number> {
   try {
-    // Vendas MRR = soma de valorr de deals com stage_name = 'Negócio Ganho' fechados no mês atual
+    // Vendas MRR = soma de valor_recorrente de deals com stage_name = 'Negócio Ganho' fechados no mês atual
     const result = await db.execute(sql`
-      SELECT COALESCE(SUM(valorr::numeric), 0) as vendas_mrr
+      SELECT COALESCE(SUM(valor_recorrente::numeric), 0) as vendas_mrr
       FROM crm_deal
       WHERE stage_name = 'Negócio Ganho'
         AND data_fechamento IS NOT NULL
         AND TO_CHAR(data_fechamento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
-        AND valorr IS NOT NULL
-        AND valorr > 0
+        AND valor_recorrente IS NOT NULL
+        AND valor_recorrente > 0
     `);
     return parseFloat((result.rows[0] as any)?.vendas_mrr || "0");
   } catch (error) {
