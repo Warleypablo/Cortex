@@ -33,7 +33,7 @@ async function throwIfResNotOk(res: Response) {
             isInMaintenance: true,
             message: data.message,
             windowStart: data.details?.windowStart || "13:00",
-            windowEnd: data.details?.windowEnd || "14:30",
+            windowEnd: data.details?.windowEnd || "14:00",
             resumesAt: data.details?.resumesAt || null,
             remainingMinutes: data.details?.remainingMinutes || null,
           });
