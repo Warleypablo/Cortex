@@ -260,7 +260,7 @@ export async function getInadimplenciaValor(): Promise<number> {
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento >= date_trunc('month', CURRENT_DATE)
         AND data_vencimento < CURRENT_DATE
-        AND status IN ('PENDENTE', 'EM ATRASO', 'ABERTO', 'A RECEBER', 'VENCIDO')
+        AND status IN ('EM ATRASO', 'ABERTO', 'VENCIDO')
     `);
     return parseFloat((result.rows[0] as any)?.valor_inadimplente || "0");
   } catch (error) {
@@ -283,7 +283,7 @@ export async function getInadimplenciaPct(): Promise<number> {
         WHERE tipo_evento = 'RECEITA'
           AND data_vencimento >= date_trunc('month', CURRENT_DATE)
           AND data_vencimento < CURRENT_DATE
-          AND status IN ('PENDENTE', 'EM ATRASO', 'ABERTO', 'A RECEBER', 'VENCIDO')
+          AND status IN ('EM ATRASO', 'ABERTO', 'VENCIDO')
       ),
       receita_mes AS (
         SELECT COALESCE(SUM(valor_bruto::numeric), 0) as receita_total
