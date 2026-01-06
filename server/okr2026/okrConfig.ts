@@ -3,6 +3,24 @@ export const OKR_CONFIG = {
   title: "Bigger & Better — Consolidação, Escala e Padronização",
 
   objectives: {
+    O1_BIGGER: {
+      id: "O1",
+      code: "O1_BIGGER",
+      title: "Bigger",
+      description: "Crescimento e escala de receita"
+    },
+    O2_BETTER: {
+      id: "O2",
+      code: "O2_BETTER",
+      title: "Better",
+      description: "Eficiência operacional e qualidade"
+    },
+    O3_BOARD: {
+      id: "O3",
+      code: "O3_BOARD",
+      title: "Board",
+      description: "Métricas estratégicas de acompanhamento"
+    },
     OX_LEGADO: {
       id: "Ox",
       code: "OX_LEGADO",
@@ -12,101 +30,79 @@ export const OKR_CONFIG = {
   },
 
   krs: {
-    // O1 - Ecossistema (Consolidação + Escala)
-    KR1_MRR_EOQ: {
+    // O1 - Bigger
+    KR1_FATURAR_25M: {
       id: "O1_KR1",
-      objectiveId: "OX_LEGADO",
-      title: "MRR Ativo",
-      metric_key: "mrr_active",
-      target_type: "quarterly",
-      targets: { Q1: 1338870, Q2: 1611315, Q3: 1871384, Q4: 2122127 },
-      unit: "currency",
-      direction: "higher",
-      owner: "Comercial"
-    },
-    KR2_RECEITA_TOTAL: {
-      id: "O1_KR2",
-      objectiveId: "OX_LEGADO",
-      title: "Receita Total Faturável",
-      metric_key: "revenue_total",
-      target_type: "quarterly",
-      targets: { Q1: 4573000, Q2: 5502000, Q3: 6461000, Q4: 7370000 },
+      objectiveId: "O1_BIGGER",
+      title: "Faturar 25M Legado",
+      metric_key: "faturamento_legado",
+      target_type: "annual",
+      targets: { Q1: 6250000, Q2: 6250000, Q3: 6250000, Q4: 6250000 },
       unit: "currency",
       direction: "higher",
       owner: "Financeiro"
     },
-    KR3_CLIENTES_ATIVOS: {
+    KR2_VENDER_3M_MRR: {
+      id: "O1_KR2",
+      objectiveId: "O1_BIGGER",
+      title: "Vender 3M MRR",
+      metric_key: "vendas_mrr",
+      target_type: "annual",
+      targets: { Q1: 750000, Q2: 750000, Q3: 750000, Q4: 750000 },
+      unit: "currency",
+      direction: "higher",
+      owner: "Comercial"
+    },
+    KR3_VENDER_4_5M_PONTUAL: {
       id: "O1_KR3",
-      objectiveId: "OX_LEGADO",
-      title: "Clientes ativos",
-      metric_key: "clients_active",
-      target_type: "quarterly",
-      targets: { Q1: 346, Q2: 401, Q3: 456, Q4: 511 },
-      unit: "number",
+      objectiveId: "O1_BIGGER",
+      title: "Vender 4.5M Pontual",
+      metric_key: "vendas_pontual",
+      target_type: "annual",
+      targets: { Q1: 1125000, Q2: 1125000, Q3: 1125000, Q4: 1125000 },
+      unit: "currency",
       direction: "higher",
       owner: "Comercial"
     },
-    KR4_VENDAS_NOVAS_MRR: {
+    KR4_FATURAR_1M_VENTURES: {
       id: "O1_KR4",
-      objectiveId: "OX_LEGADO",
-      title: "Vendas Novas MRR",
-      metric_key: "new_mrr",
-      target_type: "quarterly",
-      targets: { Q1: 600000, Q2: 660000, Q3: 720000, Q4: 780000 },
+      objectiveId: "O1_BIGGER",
+      title: "Faturar 1M em outras receitas VENTURES",
+      metric_key: "faturamento_ventures",
+      target_type: "annual",
+      targets: { Q1: 250000, Q2: 250000, Q3: 250000, Q4: 250000 },
       unit: "currency",
       direction: "higher",
-      owner: "Comercial"
+      owner: "Ventures"
     },
-    KR5_EXPANSAO_MONETIZACAO: {
+    KR5_ENTREGAR_2_4M_TECH: {
       id: "O1_KR5",
-      objectiveId: "OX_LEGADO",
-      title: "Expansão/Monetização (média 20%)",
-      metric_key: "expansion_mrr",
-      target_type: "quarterly",
-      targets: { Q1: 150000, Q2: 180000, Q3: 200000, Q4: 220000 },
+      objectiveId: "O1_BIGGER",
+      title: "Entregar 2.4M em Projetos Tech",
+      metric_key: "projetos_tech",
+      target_type: "annual",
+      targets: { Q1: 600000, Q2: 600000, Q3: 600000, Q4: 600000 },
       unit: "currency",
       direction: "higher",
-      owner: "CS"
+      owner: "Tech"
     },
 
-    // O2 - Eficiência & Sistemas
-    KR1_EBITDA: {
+    // O2 - Better
+    KR1_CHURN: {
       id: "O2_KR1",
-      objectiveId: "OX_LEGADO",
-      title: "EBITDA",
-      metric_key: "ebitda",
-      target_type: "quarterly",
-      targets: { Q1: 746100, Q2: 1150000, Q3: 1400000, Q4: 1970000 },
-      unit: "currency",
-      direction: "higher",
-      owner: "Financeiro"
+      objectiveId: "O2_BETTER",
+      title: "Churn < 8%",
+      metric_key: "churn_pct",
+      target_type: "monthly",
+      target: 8.0,
+      unit: "percentage",
+      direction: "lower",
+      owner: "CS"
     },
-    KR2_GERACAO_CAIXA: {
+    KR2_INADIMPLENCIA: {
       id: "O2_KR2",
-      objectiveId: "OX_LEGADO",
-      title: "Geração Caixa",
-      metric_key: "cash_generation",
-      target_type: "quarterly",
-      targets: { Q1: 394900, Q2: 663400, Q3: 825600, Q4: 1200000 },
-      unit: "currency",
-      direction: "higher",
-      owner: "Financeiro"
-    },
-    KR3_CAIXA_FINAL: {
-      id: "O2_KR3",
-      objectiveId: "OX_LEGADO",
-      title: "Caixa Final",
-      metric_key: "cash_balance_end",
-      target_type: "quarterly",
-      targets: { Q1: 1044900, Q2: 1708300, Q3: 2533900, Q4: 3733900 },
-      unit: "currency",
-      direction: "higher",
-      owner: "Financeiro"
-    },
-    KR4_INADIMPLENCIA: {
-      id: "O2_KR4",
-      objectiveId: "OX_LEGADO",
-      title: "Inadimplência % (até 6%)",
+      objectiveId: "O2_BETTER",
+      title: "Inadimplência < 6%",
       metric_key: "inadimplencia_pct",
       target_type: "monthly",
       target: 6.0,
@@ -114,86 +110,161 @@ export const OKR_CONFIG = {
       direction: "lower",
       owner: "Financeiro"
     },
-    KR5_GROSS_CHURN: {
-      id: "O2_KR5",
-      objectiveId: "OX_LEGADO",
-      title: "Gross MRR Churn % (até 9%)",
-      metric_key: "gross_mrr_churn_pct",
+    KR3_NPS: {
+      id: "O2_KR3",
+      objectiveId: "O2_BETTER",
+      title: "NPS > 70",
+      metric_key: "nps",
+      target_type: "quarterly",
+      targets: { Q1: 70, Q2: 70, Q3: 70, Q4: 70 },
+      unit: "number",
+      direction: "higher",
+      owner: "CS"
+    },
+    KR4_FATURAMENTO_POR_PESSOA: {
+      id: "O2_KR4",
+      objectiveId: "O2_BETTER",
+      title: "Faturamento por Pessoa > R$ 16.000",
+      metric_key: "faturamento_por_pessoa",
       target_type: "monthly",
-      target: 9.0,
+      target: 16000,
+      unit: "currency",
+      direction: "higher",
+      owner: "Gestão"
+    },
+    KR5_ENTREGAS_NO_PRAZO: {
+      id: "O2_KR5",
+      objectiveId: "O2_BETTER",
+      title: "Entregas Pontuais no Prazo > 90%",
+      metric_key: "entregas_no_prazo_pct",
+      target_type: "monthly",
+      target: 90,
+      unit: "percentage",
+      direction: "higher",
+      owner: "Operações"
+    },
+
+    // O3 - Board
+    KR_CAC: {
+      id: "O3_KR1",
+      objectiveId: "O3_BOARD",
+      title: "CAC",
+      metric_key: "cac",
+      target_type: "monthly",
+      target: 0,
+      unit: "currency",
+      direction: "lower",
+      owner: "Comercial"
+    },
+    KR_VENDAS_NOVAS: {
+      id: "O3_KR2",
+      objectiveId: "O3_BOARD",
+      title: "Vendas Novas",
+      metric_key: "vendas_novas",
+      target_type: "monthly",
+      target: 0,
+      unit: "currency",
+      direction: "higher",
+      owner: "Comercial"
+    },
+    KR_VENDA_BASE: {
+      id: "O3_KR3",
+      objectiveId: "O3_BOARD",
+      title: "Venda Base",
+      metric_key: "venda_base",
+      target_type: "monthly",
+      target: 0,
+      unit: "currency",
+      direction: "higher",
+      owner: "CS"
+    },
+    KR_ENPS: {
+      id: "O3_KR4",
+      objectiveId: "O3_BOARD",
+      title: "E-NPS",
+      metric_key: "enps",
+      target_type: "quarterly",
+      targets: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 },
+      unit: "number",
+      direction: "higher",
+      owner: "RH"
+    },
+    KR_TURNOVER: {
+      id: "O3_KR5",
+      objectiveId: "O3_BOARD",
+      title: "Turnover",
+      metric_key: "turnover",
+      target_type: "monthly",
+      target: 0,
+      unit: "percentage",
+      direction: "lower",
+      owner: "RH"
+    },
+    KR_AOV: {
+      id: "O3_KR6",
+      objectiveId: "O3_BOARD",
+      title: "AOV - Ticket Médio",
+      metric_key: "aov_ticket_medio",
+      target_type: "monthly",
+      target: 0,
+      unit: "currency",
+      direction: "higher",
+      owner: "Comercial"
+    },
+    KR_IMPOSTO: {
+      id: "O3_KR7",
+      objectiveId: "O3_BOARD",
+      title: "Imposto",
+      metric_key: "imposto",
+      target_type: "monthly",
+      target: 0,
+      unit: "currency",
+      direction: "lower",
+      owner: "Financeiro"
+    },
+    KR_LOGO_CHURN: {
+      id: "O3_KR8",
+      objectiveId: "O3_BOARD",
+      title: "Logo Churn",
+      metric_key: "logo_churn",
+      target_type: "monthly",
+      target: 0,
       unit: "percentage",
       direction: "lower",
       owner: "CS"
     },
-
-    // O3 - TurboOH
-    KR1_OH_RECEITA_LIQUIDA: {
-      id: "O3_KR1",
-      objectiveId: "OX_LEGADO",
-      title: "Receita Líquida TurboOH",
-      metric_key: "oh_net_revenue",
-      target_type: "quarterly",
-      targets: { Q1: 500000, Q2: 700000, Q3: 900000, Q4: 1100000 },
-      unit: "currency",
-      direction: "higher",
-      owner: "TurboOH"
-    },
-    KR2_OH_RESULTADO: {
-      id: "O3_KR2",
-      objectiveId: "OX_LEGADO",
-      title: "Resultado TurboOH",
-      metric_key: "oh_result",
-      target_type: "quarterly",
-      targets: { Q1: 300000, Q2: 450000, Q3: 600000, Q4: 750000 },
-      unit: "currency",
-      direction: "higher",
-      owner: "TurboOH"
-    },
-    KR3_OH_MARGEM: {
-      id: "O3_KR3",
-      objectiveId: "OX_LEGADO",
-      title: "Margem TurboOH %",
-      metric_key: "oh_margin_pct",
-      target_type: "quarterly",
-      targets: { Q1: 60, Q2: 64, Q3: 67, Q4: 68 },
+    KR_NRR: {
+      id: "O3_KR9",
+      objectiveId: "O3_BOARD",
+      title: "NRR",
+      metric_key: "nrr",
+      target_type: "monthly",
+      target: 0,
       unit: "percentage",
       direction: "higher",
-      owner: "TurboOH"
+      owner: "CS"
     },
-    KR4_OH_VACANCIA: {
-      id: "O3_KR4",
-      objectiveId: "OX_LEGADO",
-      title: "Vacância TurboOH % (até 0.5%)",
-      metric_key: "oh_vacancy",
+    KR_CSV_PCT: {
+      id: "O3_KR10",
+      objectiveId: "O3_BOARD",
+      title: "% CSV",
+      metric_key: "csv_pct",
       target_type: "monthly",
-      target: 0.5,
+      target: 0,
       unit: "percentage",
       direction: "lower",
-      owner: "TurboOH"
+      owner: "Operações"
     },
-
-    // O4 - Tech
-    KR1_TECH_ENTREGUES: {
-      id: "O4_KR1",
-      objectiveId: "OX_LEGADO",
-      title: "Projetos Tech Entregues",
-      metric_key: "tech_projects_delivered_value",
-      target_type: "quarterly",
-      targets: { Q1: 500000, Q2: 600000, Q3: 650000, Q4: 620000 },
-      unit: "currency",
-      direction: "higher",
-      owner: "Tech"
-    },
-    KR2_TECH_FREELANCERS: {
-      id: "O4_KR2",
-      objectiveId: "OX_LEGADO",
-      title: "Freelancers Tech % (até 6.5%)",
-      metric_key: "tech_freelancers_pct",
+    KR_INSCRITOS_FOLLOWS: {
+      id: "O3_KR11",
+      objectiveId: "O3_BOARD",
+      title: "Inscritos e Follows",
+      metric_key: "inscritos_follows",
       target_type: "monthly",
-      target: 6.5,
-      unit: "percentage",
-      direction: "lower",
-      owner: "Tech"
+      target: 0,
+      unit: "number",
+      direction: "higher",
+      owner: "Marketing"
     }
   },
 
