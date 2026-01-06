@@ -9859,6 +9859,262 @@ export class DbStorage implements IStorage {
       }
     };
   }
+
+  // Contribuição por Operador (responsável do contrato) - Estilo DFC
+  async getContribuicaoOperadorDfc(dataInicio: string, dataFim: string, operador?: string): Promise<{
+    operadores: string[];
+    receitas: {
+      categoriaId: string;
+      categoriaNome: string;
+      valor: number;
+      nivel: number;
+    }[];
+    despesas: {
+      categoriaId: string;
+      categoriaNome: string;
+      valor: number;
+      nivel: number;
+    }[];
+    totais: {
+      receitaTotal: number;
+      despesaTotal: number;
+      resultado: number;
+      quantidadeParcelas: number;
+      quantidadeContratos: number;
+    };
+  }> {
+    const dataFimComHora = `${dataFim} 23:59:59`;
+    
+    // Usa CTE para garantir apenas um contrato por CNPJ (evita duplicação)
+    // Seleciona o contrato com maior MRR para cada CNPJ único
+    const operadoresResult = await db.execute(sql`
+      WITH contratos_unicos AS (
+        SELECT DISTINCT ON (cnpj_limpo)
+          cnpj_limpo,
+          responsavel,
+          produto,
+          id_subtask
+        FROM (
+          SELECT 
+            REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+            cont.responsavel,
+            cont.produto,
+            cont.id_subtask,
+            COALESCE(cont.mrr::numeric, 0) as mrr_valor
+          FROM cup_clientes cup
+          JOIN cup_contratos cont ON cup.task_id = cont.id_task AND LOWER(cont.status) = 'ativo'
+          WHERE cup.cnpj IS NOT NULL AND TRIM(cup.cnpj) != ''
+        ) sub
+        ORDER BY cnpj_limpo, mrr_valor DESC
+      )
+      SELECT DISTINCT COALESCE(NULLIF(TRIM(cu.responsavel), ''), 'Sem Responsável') as operador
+      FROM caz_parcelas p
+      JOIN caz_clientes caz ON p.id_cliente::text = caz.ids::text
+      JOIN contratos_unicos cu ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = cu.cnpj_limpo
+      WHERE p.status = 'QUITADO'
+        AND p.tipo_evento = 'RECEITA'
+        AND p.data_quitacao >= ${dataInicio}::date
+        AND p.data_quitacao <= ${dataFimComHora}::timestamp
+        AND p.valor_pago IS NOT NULL
+        AND p.valor_pago::numeric > 0
+        AND p.descricao LIKE 'Venda%'
+      ORDER BY operador
+    `);
+    
+    const operadores = operadoresResult.rows.map((r: any) => r.operador);
+    
+    // Constrói filtro de operador se especificado
+    const operadorFilter = operador && operador !== 'todos' 
+      ? sql`AND COALESCE(NULLIF(TRIM(cu.responsavel), ''), 'Sem Responsável') = ${operador}`
+      : sql``;
+    
+    // Busca receitas agrupadas por produto do contrato (sem duplicação)
+    // Usa CTE para garantir apenas um contrato por CNPJ
+    const receitasResult = await db.execute(sql`
+      WITH contratos_unicos AS (
+        SELECT DISTINCT ON (cnpj_limpo)
+          cnpj_limpo,
+          responsavel,
+          produto,
+          id_subtask
+        FROM (
+          SELECT 
+            REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+            cont.responsavel,
+            cont.produto,
+            cont.id_subtask,
+            COALESCE(cont.mrr::numeric, 0) as mrr_valor
+          FROM cup_clientes cup
+          JOIN cup_contratos cont ON cup.task_id = cont.id_task AND LOWER(cont.status) = 'ativo'
+          WHERE cup.cnpj IS NOT NULL AND TRIM(cup.cnpj) != ''
+        ) sub
+        ORDER BY cnpj_limpo, mrr_valor DESC
+      )
+      SELECT 
+        COALESCE(cu.produto, 'Sem Produto') as produto_nome,
+        SUM(COALESCE(p.valor_pago::numeric, 0)) as valor_total,
+        COUNT(DISTINCT p.id) as quantidade_parcelas,
+        COUNT(DISTINCT cu.id_subtask) as quantidade_contratos
+      FROM caz_parcelas p
+      JOIN caz_clientes caz ON p.id_cliente::text = caz.ids::text
+      JOIN contratos_unicos cu ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = cu.cnpj_limpo
+      WHERE p.status = 'QUITADO'
+        AND p.tipo_evento = 'RECEITA'
+        AND p.data_quitacao >= ${dataInicio}::date
+        AND p.data_quitacao <= ${dataFimComHora}::timestamp
+        AND p.valor_pago IS NOT NULL
+        AND p.valor_pago::numeric > 0
+        AND p.descricao LIKE 'Venda%'
+        ${operadorFilter}
+      GROUP BY COALESCE(cu.produto, 'Sem Produto')
+      ORDER BY valor_total DESC
+    `);
+    
+    const receitas: {
+      categoriaId: string;
+      categoriaNome: string;
+      valor: number;
+      nivel: number;
+    }[] = [];
+    
+    let receitaTotal = 0;
+    let totalParcelas = 0;
+    let totalContratos = 0;
+    
+    for (const row of receitasResult.rows as any[]) {
+      const produtoNome = row.produto_nome || 'Sem Produto';
+      const categoriaId = `PROD.${produtoNome.substring(0, 10).toUpperCase().replace(/\s+/g, '_')}`;
+      
+      receitas.push({
+        categoriaId,
+        categoriaNome: produtoNome,
+        valor: Number(row.valor_total) || 0,
+        nivel: 2
+      });
+      
+      receitaTotal += Number(row.valor_total) || 0;
+      totalParcelas += Number(row.quantidade_parcelas) || 0;
+      totalContratos += Number(row.quantidade_contratos) || 0;
+    }
+    
+    // Calcula despesas
+    let salarioOperador = 0;
+    const salarioLider = 7000;
+    const taxaImposto = 0.16;
+    
+    // Buscar salário do operador se filtrado
+    console.log(`[ContribuicaoOperador] Buscando salário para operador="${operador}"`);
+    if (operador && operador !== 'todos') {
+      try {
+        const partes = operador.trim().split(/\s+/);
+        const primeiroNome = partes[0]?.toLowerCase() || '';
+        const sobrenome = partes.length > 1 ? partes[partes.length - 1]?.toLowerCase() : '';
+        
+        console.log(`[ContribuicaoOperador] Buscando por nome="${primeiroNome}" sobrenome="${sobrenome}"`);
+        
+        let salarioResult;
+        if (primeiroNome && sobrenome) {
+          const likeNome = `%${primeiroNome}%`;
+          const likeSobrenome = `%${sobrenome}%`;
+          salarioResult = await db.execute(sql`
+            SELECT salario as salario_bruto, nome
+            FROM rh_pessoal
+            WHERE LOWER(nome) LIKE ${likeNome}
+              AND LOWER(nome) LIKE ${likeSobrenome}
+              AND salario IS NOT NULL
+              AND salario != ''
+              AND LOWER(status) = 'ativo'
+            ORDER BY nome
+            LIMIT 1
+          `);
+        } else if (primeiroNome) {
+          const likeNome = `%${primeiroNome}%`;
+          salarioResult = await db.execute(sql`
+            SELECT salario as salario_bruto, nome
+            FROM rh_pessoal
+            WHERE LOWER(nome) LIKE ${likeNome}
+              AND salario IS NOT NULL
+              AND salario != ''
+              AND LOWER(status) = 'ativo'
+            ORDER BY nome
+            LIMIT 1
+          `);
+        } else {
+          salarioResult = { rows: [] };
+        }
+        
+        if (salarioResult.rows.length > 0) {
+          const salarioBruto = String((salarioResult.rows[0] as any).salario_bruto || '');
+          const nomeEncontrado = (salarioResult.rows[0] as any).nome;
+          
+          let salarioNormalizado = salarioBruto
+            .replace(/R\$/gi, '')
+            .replace(/\s/g, '')
+            .replace(/[^\d.,]/g, '');
+          
+          if (salarioNormalizado.includes(',')) {
+            salarioNormalizado = salarioNormalizado.replace(/\./g, '').replace(',', '.');
+          } else {
+            const pontos = (salarioNormalizado.match(/\./g) || []).length;
+            if (pontos > 1) {
+              salarioNormalizado = salarioNormalizado.replace(/\./g, '');
+            }
+          }
+          
+          const salarioNumerico = parseFloat(salarioNormalizado);
+          
+          if (!isNaN(salarioNumerico) && salarioNumerico > 0) {
+            salarioOperador = salarioNumerico;
+            console.log(`[ContribuicaoOperador] Salário encontrado para ${operador} (${nomeEncontrado}): R$ ${salarioOperador}`);
+          } else {
+            console.log(`[ContribuicaoOperador] Salário inválido para ${operador}: "${salarioBruto}"`);
+          }
+        } else {
+          console.log(`[ContribuicaoOperador] Salário NÃO encontrado para ${operador}`);
+        }
+      } catch (error) {
+        console.error(`[ContribuicaoOperador] Erro ao buscar salário para ${operador}:`, error);
+      }
+    }
+    
+    const impostos = receitaTotal * taxaImposto;
+    const despesaTotal = salarioOperador + salarioLider + impostos;
+    const resultado = receitaTotal - despesaTotal;
+    
+    const despesas = [
+      {
+        categoriaId: 'DESP.01',
+        categoriaNome: 'Salário do Operador',
+        valor: salarioOperador,
+        nivel: 2
+      },
+      {
+        categoriaId: 'DESP.02',
+        categoriaNome: 'Salário do Líder',
+        valor: salarioLider,
+        nivel: 2
+      },
+      {
+        categoriaId: 'DESP.03',
+        categoriaNome: 'Impostos (16%)',
+        valor: impostos,
+        nivel: 2
+      }
+    ];
+    
+    return {
+      operadores,
+      receitas,
+      despesas,
+      totais: {
+        receitaTotal,
+        despesaTotal,
+        resultado,
+        quantidadeParcelas: totalParcelas,
+        quantidadeContratos: totalContratos
+      }
+    };
+  }
 }
 
 export const storage = new DbStorage();
