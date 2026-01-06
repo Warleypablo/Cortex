@@ -9929,7 +9929,8 @@ export class DbStorage implements IStorage {
       ? sql`AND COALESCE(NULLIF(TRIM(ctu.responsavel), ''), 'Sem Operador') = ${operador}`
       : sql``;
     
-    // Query simples por categoria do Conta Azul (igual funciona no DFC)
+    // Query com hierarquia: Categoria → Item de Venda (caz_itensvenda.nome)
+    // Usa numero da parcela para linkar: parcela.descricao "Venda (123)" → caz_vendas.numero → caz_itensvenda.id
     const receitasResult = await db.execute(sql`
       WITH contratos_unicos AS (
         SELECT DISTINCT ON (cnpj_limpo)
@@ -9946,27 +9947,42 @@ export class DbStorage implements IStorage {
             AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
         ) sub
         ORDER BY cnpj_limpo, id_subtask DESC
+      ),
+      parcelas_base AS (
+        SELECT 
+          p.id,
+          p.id_cliente,
+          p.categoria_id,
+          p.categoria_nome,
+          p.valor_pago,
+          -- Extrai número da venda de "Venda (123)" ou "Venda Nº 123"
+          REGEXP_REPLACE(p.descricao, '[^0-9]', '', 'g') as numero_venda
+        FROM caz_parcelas p
+        WHERE p.status = 'QUITADO'
+          AND p.tipo_evento = 'RECEITA'
+          AND p.data_quitacao >= ${dataInicio}::date
+          AND p.data_quitacao <= ${dataFimComHora}::timestamp
+          AND p.valor_pago IS NOT NULL
+          AND p.valor_pago::numeric > 0
+          AND p.descricao LIKE 'Venda%'
       )
       SELECT 
-        COALESCE(p.categoria_id, 'SEM_CATEGORIA') as categoria_id,
-        COALESCE(p.categoria_nome, 'Sem Categoria') as categoria_nome,
-        SUM(p.valor_pago::numeric) as valor_total,
-        COUNT(p.id) as quantidade_parcelas,
-        COUNT(DISTINCT p.id_cliente) as quantidade_clientes
-      FROM caz_parcelas p
-      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+        COALESCE(pb.categoria_id, 'SEM_CATEGORIA') as categoria_id,
+        COALESCE(pb.categoria_nome, 'Sem Categoria') as categoria_nome,
+        COALESCE(iv.nome, 'Sem item identificado') as item_nome,
+        SUM(pb.valor_pago::numeric) as valor_total,
+        COUNT(pb.id) as quantidade_parcelas,
+        COUNT(DISTINCT pb.id_cliente) as quantidade_clientes
+      FROM parcelas_base pb
+      LEFT JOIN caz_clientes caz ON TRIM(pb.id_cliente::text) = TRIM(caz.ids::text)
       LEFT JOIN contratos_unicos ctu 
         ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = ctu.cnpj_limpo
-      WHERE p.status = 'QUITADO'
-        AND p.tipo_evento = 'RECEITA'
-        AND p.data_quitacao >= ${dataInicio}::date
-        AND p.data_quitacao <= ${dataFimComHora}::timestamp
-        AND p.valor_pago IS NOT NULL
-        AND p.valor_pago::numeric > 0
-        AND p.descricao LIKE 'Venda%'
+      LEFT JOIN caz_vendas v ON v.numero::text = pb.numero_venda
+      LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
+      WHERE 1=1
         ${operadorFilter}
-      GROUP BY p.categoria_id, p.categoria_nome
-      ORDER BY valor_total DESC
+      GROUP BY pb.categoria_id, pb.categoria_nome, iv.nome
+      ORDER BY pb.categoria_id, valor_total DESC
     `);
     
     const receitas: {
@@ -9980,24 +9996,71 @@ export class DbStorage implements IStorage {
     let totalParcelas = 0;
     let totalContratos = 0;
     
+    // Agrupa primeiro por categoria, depois por item
+    const categoriaMap = new Map<string, {
+      nome: string;
+      valorTotal: number;
+      itens: Map<string, number>;
+      parcelas: number;
+      clientes: number;
+    }>();
+    
     for (const row of receitasResult.rows as any[]) {
       const categoriaId = row.categoria_id || 'SEM_CATEGORIA';
       const categoriaNome = row.categoria_nome || 'Sem Categoria';
+      const itemNome = row.item_nome || 'Sem item identificado';
       const valor = Number(row.valor_total) || 0;
+      const parcelas = Number(row.quantidade_parcelas) || 0;
+      const clientes = Number(row.quantidade_clientes) || 0;
       
-      // Determina o nível pela quantidade de pontos no ID da categoria
-      const nivel = (categoriaId.match(/\./g) || []).length + 1;
+      if (!categoriaMap.has(categoriaId)) {
+        categoriaMap.set(categoriaId, {
+          nome: categoriaNome,
+          valorTotal: 0,
+          itens: new Map(),
+          parcelas: 0,
+          clientes: 0
+        });
+      }
       
-      receitas.push({
-        categoriaId,
-        categoriaNome,
-        valor,
-        nivel
-      });
+      const cat = categoriaMap.get(categoriaId)!;
+      cat.valorTotal += valor;
+      cat.parcelas += parcelas;
+      cat.clientes += clientes;
+      
+      // Agrupa itens
+      const itemValorAtual = cat.itens.get(itemNome) || 0;
+      cat.itens.set(itemNome, itemValorAtual + valor);
       
       receitaTotal += valor;
-      totalParcelas += Number(row.quantidade_parcelas) || 0;
-      totalContratos += Number(row.quantidade_clientes) || 0;
+      totalParcelas += parcelas;
+      totalContratos += clientes;
+    }
+    
+    // Monta hierarquia: nível 1 = categoria, nível 2 = itens
+    for (const [categoriaId, cat] of Array.from(categoriaMap.entries())) {
+      // Adiciona categoria (nível 1)
+      receitas.push({
+        categoriaId,
+        categoriaNome: cat.nome,
+        valor: cat.valorTotal,
+        nivel: 1
+      });
+      
+      // Adiciona itens da categoria (nível 2) - ordena por valor
+      const itensOrdenados = Array.from(cat.itens.entries())
+        .sort((a, b) => b[1] - a[1]);
+      
+      for (const [itemNome, itemValor] of itensOrdenados) {
+        // Gera ID único para o item (categoria.hash do nome)
+        const itemId = `${categoriaId}.${itemNome.substring(0, 30).replace(/\./g, '_')}`;
+        receitas.push({
+          categoriaId: itemId,
+          categoriaNome: itemNome,
+          valor: itemValor,
+          nivel: 2
+        });
+      }
     }
     
     // Calcula despesas
