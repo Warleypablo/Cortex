@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import { AssistantWidget } from "@/components/AssistantWidget";
 import { useDealNotifications } from "@/hooks/use-deal-notifications";
+import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 
 const Homepage = lazy(() => import("@/pages/Homepage"));
 const Clients = lazy(() => import("@/pages/Clients"));
@@ -326,6 +327,7 @@ function App() {
             <AppLayout />
           </AuthProvider>
           <Toaster />
+          <MaintenanceBanner />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
