@@ -246,13 +246,15 @@ export async function getCaixaAtual(): Promise<number> {
 
 export async function getInadimplenciaValor(): Promise<number> {
   try {
-    // Pega boletos vencidos de competência do mês atual (Janeiro 2026)
+    // Inadimplência = soma de nao_pago para boletos RECEITA vencidos no mês atual
+    // Usando a mesma lógica do /api/inadimplencia/resumo
+    const hoje = new Date().toISOString().split('T')[0];
     const result = await db.execute(sql`
-      SELECT COALESCE(SUM(nao_pago::numeric + COALESCE(perda::numeric, 0)), 0) as valor_inadimplente
+      SELECT COALESCE(SUM(nao_pago::numeric), 0) as valor_inadimplente
       FROM caz_parcelas
       WHERE tipo_evento = 'RECEITA'
-        AND status NOT IN ('QUITADO', 'PERDIDO')
-        AND data_vencimento < NOW()
+        AND data_vencimento < ${hoje}::date
+        AND nao_pago::numeric > 0
         AND TO_CHAR(data_vencimento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
     `);
     return parseFloat((result.rows[0] as any)?.valor_inadimplente || "0");
@@ -303,22 +305,13 @@ export async function getInadimplencia(): Promise<{ valor: number; percentual: n
 export async function getGrossChurnMrr(): Promise<number> {
   try {
     // Churn = contratos com data_solicitacao_encerramento no mês atual
-    // OU que estão com status "Em Cancelamento" / "cancelado" no mês atual
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valorr::numeric), 0) as churn_mrr
       FROM cup_contratos
       WHERE valorr IS NOT NULL
-        AND valorr > 0
-        AND (
-          -- Contratos com solicitação de cancelamento no mês atual
-          (data_solicitacao_encerramento IS NOT NULL 
-           AND TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM'))
-          OR
-          -- Contratos em processo de cancelamento ou cancelados no mês atual
-          (status IN ('em_cancelamento', 'Em Cancelamento', 'cancelamento', 'cancelado')
-           AND data_encerramento IS NOT NULL
-           AND TO_CHAR(data_encerramento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM'))
-        )
+        AND valorr::numeric > 0
+        AND data_solicitacao_encerramento IS NOT NULL 
+        AND TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
     `);
     return parseFloat((result.rows[0] as any)?.churn_mrr || "0");
   } catch (error) {
