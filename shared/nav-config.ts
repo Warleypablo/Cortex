@@ -22,6 +22,7 @@ export const PERMISSION_KEYS = {
     INADIMPLENCIA: 'fin.inadimplencia',
     AUDITORIA: 'fin.auditoria',
     CONTRIBUICAO_COLABORADOR: 'fin.contribuicao_colaborador',
+    CONTRIBUICAO_OPERADOR: 'fin.contribuicao_operador',
   },
   // Gestão (antigo Operação)
   GESTAO: {
@@ -166,6 +167,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/inadimplencia': PERMISSION_KEYS.FIN.INADIMPLENCIA,
   '/dashboard/auditoria-sistemas': PERMISSION_KEYS.FIN.AUDITORIA,
   '/dashboard/contribuicao-colaborador': PERMISSION_KEYS.FIN.CONTRIBUICAO_COLABORADOR,
+  '/dashboard/contribuicao-operador': PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/retencao': PERMISSION_KEYS.GESTAO.RETENCAO,
@@ -318,6 +320,7 @@ export const NAV_CONFIG = {
         { title: 'Inadimplência', url: '/dashboard/inadimplencia', icon: 'AlertTriangle', permissionKey: PERMISSION_KEYS.FIN.INADIMPLENCIA },
         { title: 'Auditoria de Sistemas', url: '/dashboard/auditoria-sistemas', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.FIN.AUDITORIA },
         { title: 'Contribuição por Colaborador', url: '/dashboard/contribuicao-colaborador', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.FIN.CONTRIBUICAO_COLABORADOR },
+        { title: 'Contribuição por Operador', url: '/dashboard/contribuicao-operador', icon: 'UserCog', permissionKey: PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR },
       ],
     },
     {

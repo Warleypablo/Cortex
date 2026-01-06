@@ -44,6 +44,7 @@ const FluxoCaixa = lazy(() => import("@/pages/FluxoCaixa"));
 const MetaAds = lazy(() => import("@/pages/MetaAds"));
 const AuditoriaSistemas = lazy(() => import("@/pages/AuditoriaSistemas"));
 const ContribuicaoColaborador = lazy(() => import("@/pages/ContribuicaoColaborador"));
+const ContribuicaoOperador = lazy(() => import("@/pages/ContribuicaoOperador"));
 const AdminUsuarios = lazy(() => import("@/pages/AdminUsuarios"));
 const AccessDenied = lazy(() => import("@/pages/AccessDenied"));
 const Login = lazy(() => import("@/pages/Login"));
@@ -190,6 +191,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/inadimplencia">{() => <ProtectedRoute path="/dashboard/inadimplencia" component={DashboardInadimplencia} />}</Route>
       <Route path="/dashboard/auditoria-sistemas">{() => <ProtectedRoute path="/dashboard/auditoria-sistemas" component={AuditoriaSistemas} />}</Route>
       <Route path="/dashboard/contribuicao-colaborador">{() => <ProtectedRoute path="/dashboard/contribuicao-colaborador" component={ContribuicaoColaborador} />}</Route>
+      <Route path="/dashboard/contribuicao-operador">{() => <ProtectedRoute path="/dashboard/contribuicao-operador" component={ContribuicaoOperador} />}</Route>
       <Route path="/contratos-module">{() => <ProtectedRoute path="/contratos-module" component={ContratosModule} />}</Route>
       
       {/* G&G */}
