@@ -9699,18 +9699,71 @@ export class DbStorage implements IStorage {
     
     // Buscar salário do responsável se filtrado
     if (responsavel && responsavel !== 'todos') {
-      const salarioResult = await db.execute(sql`
-        SELECT salario::numeric as salario
-        FROM rh_pessoal
-        WHERE LOWER(TRIM(nome)) = LOWER(TRIM(${responsavel}))
-          AND salario IS NOT NULL
-          AND salario != ''
-          AND salario ~ '^[0-9]+(\.[0-9]+)?$'
-        LIMIT 1
-      `);
-      
-      if (salarioResult.rows.length > 0) {
-        salarioResponsavel = Number((salarioResult.rows[0] as any).salario) || 0;
+      try {
+        // Busca salário bruto primeiro
+        let salarioResult = await db.execute(sql`
+          SELECT salario as salario_bruto, nome
+          FROM rh_pessoal
+          WHERE LOWER(TRIM(nome)) = LOWER(TRIM(${responsavel}))
+            AND salario IS NOT NULL
+            AND salario != ''
+            AND LOWER(status) = 'ativo'
+          LIMIT 1
+        `);
+        
+        // Segunda tentativa: busca parcial (caso nome tenha variações)
+        if (salarioResult.rows.length === 0) {
+          salarioResult = await db.execute(sql`
+            SELECT salario as salario_bruto, nome
+            FROM rh_pessoal
+            WHERE (
+              LOWER(TRIM(nome)) LIKE LOWER(TRIM(${responsavel})) || '%'
+              OR LOWER(TRIM(${responsavel})) LIKE LOWER(TRIM(nome)) || '%'
+            )
+              AND salario IS NOT NULL
+              AND salario != ''
+              AND LOWER(status) = 'ativo'
+            ORDER BY nome
+            LIMIT 1
+          `);
+        }
+        
+        if (salarioResult.rows.length > 0) {
+          const salarioBruto = String((salarioResult.rows[0] as any).salario_bruto || '');
+          const nomeEncontrado = (salarioResult.rows[0] as any).nome;
+          
+          // Normaliza o salário no JavaScript para maior controle
+          // Remove R$, espaços, e caracteres não numéricos exceto . e ,
+          let salarioNormalizado = salarioBruto
+            .replace(/R\$/gi, '')
+            .replace(/\s/g, '')
+            .replace(/[^\d.,]/g, '');
+          
+          // Se tem formato brasileiro (1.234,56), converte para americano (1234.56)
+          if (salarioNormalizado.includes(',')) {
+            // Remove pontos de milhar e converte vírgula para ponto
+            salarioNormalizado = salarioNormalizado.replace(/\./g, '').replace(',', '.');
+          } else {
+            // Se não tem vírgula mas tem múltiplos pontos (ex: 1.200.000), são separadores de milhar
+            const pontos = (salarioNormalizado.match(/\./g) || []).length;
+            if (pontos > 1) {
+              salarioNormalizado = salarioNormalizado.replace(/\./g, '');
+            }
+          }
+          
+          const salarioNumerico = parseFloat(salarioNormalizado);
+          
+          if (!isNaN(salarioNumerico) && salarioNumerico > 0) {
+            salarioResponsavel = salarioNumerico;
+            console.log(`[ContribuicaoDfc] Salário encontrado para ${responsavel} (${nomeEncontrado}): R$ ${salarioResponsavel}`);
+          } else {
+            console.log(`[ContribuicaoDfc] Salário inválido para ${responsavel}: "${salarioBruto}"`);
+          }
+        } else {
+          console.log(`[ContribuicaoDfc] Salário NÃO encontrado para ${responsavel}`);
+        }
+      } catch (error) {
+        console.error(`[ContribuicaoDfc] Erro ao buscar salário para ${responsavel}:`, error);
       }
     }
     
