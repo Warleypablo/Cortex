@@ -33,7 +33,7 @@ import {
   XCircle, Banknote, PiggyBank, ClipboardCheck, MessageSquare, History,
   CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building,
   LayoutGrid, List, Search, Loader2, Database, FileText, ListChecks, Calendar,
-  ChevronRight, X, ExternalLink, Tag, Lightbulb, Zap
+  ChevronRight, X, ExternalLink, Tag, Lightbulb, Zap, ShoppingCart
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -1986,20 +1986,52 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
     return kr.targets[effectiveQuarter] ?? null;
   };
 
-  const mrrTarget = getTargetForMetric("mrr_active");
-  const ebitdaTarget = getTargetForMetric("ebitda");
-  const cashGenTarget = getTargetForMetric("cash_generation");
-  const inadTarget = getTargetForMetric("delinquency_pct") ?? 6;
-  const netChurnTarget = getTargetForMetric("net_mrr_churn_pct") ?? 9;
-  const logoChurnTarget = getTargetForMetric("logo_churn_pct") ?? 10;
+  // Metas mensais baseadas nos OKRs definidos
+  const monthlyTargets: Record<MonthKey, { mrr: number; vendasMrr: number; inadimplencia: number; churn: number; geracaoCaixa: number }> = {
+    jan: { mrr: 1340000, vendasMrr: 250000, inadimplencia: 80400, churn: 107200, geracaoCaixa: 131630 },
+    fev: { mrr: 1423334, vendasMrr: 250000, inadimplencia: 85400, churn: 113867, geracaoCaixa: 131630 },
+    mar: { mrr: 1510001, vendasMrr: 250000, inadimplencia: 90600, churn: 120800, geracaoCaixa: 131630 },
+    abr: { mrr: 1600001, vendasMrr: 250000, inadimplencia: 96000, churn: 128000, geracaoCaixa: 131630 },
+    mai: { mrr: 1693335, vendasMrr: 250000, inadimplencia: 101600, churn: 135467, geracaoCaixa: 131630 },
+    jun: { mrr: 1790002, vendasMrr: 250000, inadimplencia: 107400, churn: 143200, geracaoCaixa: 131630 },
+    jul: { mrr: 1870002, vendasMrr: 250000, inadimplencia: 112200, churn: 149600, geracaoCaixa: 131630 },
+    ago: { mrr: 1973336, vendasMrr: 250000, inadimplencia: 118400, churn: 157867, geracaoCaixa: 131630 },
+    set: { mrr: 2080003, vendasMrr: 250000, inadimplencia: 124800, churn: 166400, geracaoCaixa: 131630 },
+    out: { mrr: 2170003, vendasMrr: 250000, inadimplencia: 130200, churn: 173600, geracaoCaixa: 131630 },
+    nov: { mrr: 2273337, vendasMrr: 250000, inadimplencia: 136400, churn: 181867, geracaoCaixa: 131630 },
+    dez: { mrr: 2380004, vendasMrr: 250000, inadimplencia: 142800, churn: 190400, geracaoCaixa: 131630 },
+  };
 
-  const inadPct = metrics.inadimplencia_percentual ?? 0;
-  const netChurnPct = metrics.net_churn_mrr_percentual ?? 0;
-  const logoChurnPct = metrics.logo_churn_percentual ?? 0;
+  // Metas trimestrais (soma dos meses)
+  const quarterlyTargets: Record<string, { mrr: number; vendasMrr: number; inadimplencia: number; churn: number; geracaoCaixa: number }> = {
+    Q1: { mrr: 1510001, vendasMrr: 750000, inadimplencia: 256400, churn: 341867, geracaoCaixa: 394890 },
+    Q2: { mrr: 1790002, vendasMrr: 750000, inadimplencia: 305000, churn: 406667, geracaoCaixa: 394890 },
+    Q3: { mrr: 2080003, vendasMrr: 750000, inadimplencia: 355400, churn: 473867, geracaoCaixa: 394890 },
+    Q4: { mrr: 2380004, vendasMrr: 750000, inadimplencia: 409400, churn: 545867, geracaoCaixa: 394890 },
+  };
 
-  const inadStatus = inadPct <= inadTarget ? "green" : inadPct <= (inadTarget * 1.1) ? "yellow" : "red";
-  const netChurnStatus = netChurnPct <= netChurnTarget ? "green" : netChurnPct <= (netChurnTarget * 1.1) ? "yellow" : "red";
-  const logoChurnStatus = logoChurnPct <= logoChurnTarget ? "green" : logoChurnPct <= (logoChurnTarget * 1.2) ? "yellow" : "red";
+  const getCurrentTargets = () => {
+    if (viewMode === "month") {
+      return monthlyTargets[selectedMonth];
+    }
+    return quarterlyTargets[selectedQuarter];
+  };
+
+  const currentTargets = getCurrentTargets();
+  const mrrTarget = currentTargets.mrr;
+  const vendasMrrTarget = currentTargets.vendasMrr;
+  const inadTarget = currentTargets.inadimplencia;
+  const churnTarget = currentTargets.churn;
+  const cashGenTarget = currentTargets.geracaoCaixa;
+
+  // Valores atuais
+  const inadValue = metrics.inadimplencia_brl ?? (metrics.inadimplencia_percentual ? (metrics.mrr_ativo ?? 0) * (metrics.inadimplencia_percentual / 100) : 0);
+  const churnValue = metrics.churn_brl ?? (metrics.net_churn_mrr_percentual ? (metrics.mrr_ativo ?? 0) * (metrics.net_churn_mrr_percentual / 100) : 0);
+  const vendasMrrValue = metrics.vendas_mrr ?? 0;
+
+  // Status baseado em valores em R$
+  const inadStatus = inadValue <= inadTarget ? "green" : inadValue <= (inadTarget * 1.1) ? "yellow" : "red";
+  const churnStatus = churnValue <= churnTarget ? "green" : churnValue <= (churnTarget * 1.1) ? "yellow" : "red";
 
   const computeAlerts = useMemo((): AlertItem[] => {
     const alerts: AlertItem[] = [];
@@ -2037,11 +2069,10 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
     };
     
     checkHigherMetric("MRR Ativo", metrics.mrr_ativo, mrrTarget, "currency");
-    checkHigherMetric("EBITDA", metrics.ebitda_ytd, ebitdaTarget, "currency");
+    checkHigherMetric("Vendas MRR", vendasMrrValue, vendasMrrTarget, "currency");
     checkHigherMetric("Geração Caixa", metrics.geracao_caixa_ytd, cashGenTarget, "currency");
-    checkLowerMetric("Inadimplência %", metrics.inadimplencia_percentual, inadTarget, "percent");
-    checkLowerMetric("Net Churn %", metrics.net_churn_mrr_percentual, netChurnTarget, "percent");
-    checkLowerMetric("Logo Churn %", metrics.logo_churn_percentual, logoChurnTarget, "percent");
+    checkLowerMetric("Inadimplência", inadValue, inadTarget, "currency");
+    checkLowerMetric("Churn", churnValue, churnTarget, "currency");
     
     alerts.sort((a, b) => {
       if (a.severity === "critical" && b.severity === "warning") return -1;
@@ -2050,7 +2081,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
     });
     
     return alerts;
-  }, [metrics, mrrTarget, ebitdaTarget, cashGenTarget, inadTarget, netChurnTarget, logoChurnTarget]);
+  }, [metrics, mrrTarget, vendasMrrTarget, vendasMrrValue, cashGenTarget, inadTarget, inadValue, churnTarget, churnValue]);
 
   return (
     <div className="space-y-6">
@@ -2078,57 +2109,54 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           direction="higher"
           icon={TrendingUp}
           tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label} (${effectiveQuarter})`
-            : `Meta ${selectedQuarter}: ${mrrTarget ? formatCurrency(mrrTarget) : "—"}`}
+            ? `${selectedMonthData?.label}: Meta ${formatCurrency(mrrTarget)}`
+            : `Meta ${selectedQuarter}: ${formatCurrency(mrrTarget)}`}
         />
         <HeroCard
-          title="Geração Caixa"
+          title="Vendas MRR"
+          value={vendasMrrValue}
+          target={vendasMrrTarget}
+          format="currency"
+          direction="higher"
+          icon={ShoppingCart}
+          tooltip={viewMode === "month"
+            ? `${selectedMonthData?.label}: Meta ${formatCurrency(vendasMrrTarget)}`
+            : `Meta ${selectedQuarter}: ${formatCurrency(vendasMrrTarget)}`}
+        />
+        <HeroCard
+          title="Inadimplência"
+          value={inadValue}
+          target={inadTarget}
+          format="currency"
+          direction="lower"
+          icon={CreditCard}
+          tooltip={viewMode === "month"
+            ? `${selectedMonthData?.label}: Máx ${formatCurrency(inadTarget)}`
+            : `Meta ${selectedQuarter}: Máx ${formatCurrency(inadTarget)}`}
+          status={inadStatus}
+        />
+        <HeroCard
+          title="Churn"
+          value={churnValue}
+          target={churnTarget}
+          format="currency"
+          direction="lower"
+          icon={TrendingDownIcon}
+          tooltip={viewMode === "month"
+            ? `${selectedMonthData?.label}: Máx ${formatCurrency(churnTarget)}`
+            : `Meta ${selectedQuarter}: Máx ${formatCurrency(churnTarget)}`}
+          status={churnStatus}
+        />
+        <HeroCard
+          title="Geração de Caixa"
           value={metrics.geracao_caixa_ytd}
           target={cashGenTarget}
           format="currency"
           direction="higher"
           icon={PiggyBank}
           tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label} (${effectiveQuarter})`
-            : `Meta ${selectedQuarter}: ${cashGenTarget ? formatCurrency(cashGenTarget) : "—"}`}
-        />
-        <HeroCard
-          title="Inadimplência %"
-          value={metrics.inadimplencia_percentual}
-          target={inadTarget}
-          format="percent"
-          direction="lower"
-          icon={CreditCard}
-          tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label} (Meta: ≤${inadTarget}%)`
-            : `Meta ${selectedQuarter}: <= ${inadTarget}%`}
-          status={inadStatus}
-        />
-        <HeroCard
-          title="Net Churn %"
-          value={viewMode === "month"
-            ? getValueFromSeries(series.churn, selectedMonth) ?? metrics.net_churn_mrr_percentual
-            : metrics.net_churn_mrr_percentual}
-          target={netChurnTarget}
-          format="percent"
-          direction="lower"
-          icon={TrendingDownIcon}
-          tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label} (Meta: ≤${netChurnTarget}%)`
-            : `Meta ${selectedQuarter}: <= ${netChurnTarget}%`}
-          status={netChurnStatus}
-        />
-        <HeroCard
-          title="Logo Churn %"
-          value={metrics.logo_churn_percentual}
-          target={logoChurnTarget}
-          format="percent"
-          direction="lower"
-          icon={Users}
-          tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label} (Meta: ≤${logoChurnTarget}%)`
-            : `Meta ${selectedQuarter}: <= ${logoChurnTarget}%`}
-          status={logoChurnStatus}
+            ? `${selectedMonthData?.label}: Meta ${formatCurrency(cashGenTarget)}`
+            : `Meta ${selectedQuarter}: ${formatCurrency(cashGenTarget)}`}
         />
       </div>
 
