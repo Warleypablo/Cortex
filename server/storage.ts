@@ -9929,10 +9929,7 @@ export class DbStorage implements IStorage {
       ? sql`AND COALESCE(NULLIF(TRIM(ctu.responsavel), ''), 'Sem Operador') = ${operador}`
       : sql``;
     
-    // Query com detalhamento por item de venda usando caz_itensvenda
-    // Fluxo: caz_parcelas.descricao → extrai numero → caz_vendas.numero → caz_itensvenda
-    // Nível 1: Categoria pai (ex: 03.01)
-    // Nível 2: Item de venda específico (descrição do caz_itensvenda)
+    // Query simples por categoria do Conta Azul (igual funciona no DFC)
     const receitasResult = await db.execute(sql`
       WITH contratos_unicos AS (
         SELECT DISTINCT ON (cnpj_limpo)
@@ -9949,43 +9946,27 @@ export class DbStorage implements IStorage {
             AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
         ) sub
         ORDER BY cnpj_limpo, id_subtask DESC
-      ),
-      parcelas_com_numero AS (
-        SELECT 
-          p.*,
-          -- Extrai o número da venda de "Venda (123)" ou "Venda Nº 123" etc
-          REGEXP_REPLACE(p.descricao, '[^0-9]', '', 'g') as numero_venda
-        FROM caz_parcelas p
-        WHERE p.status = 'QUITADO'
-          AND p.tipo_evento = 'RECEITA'
-          AND p.data_quitacao >= ${dataInicio}::date
-          AND p.data_quitacao <= ${dataFimComHora}::timestamp
-          AND p.valor_pago IS NOT NULL
-          AND p.valor_pago::numeric > 0
-          AND p.descricao LIKE 'Venda%'
       )
       SELECT 
         COALESCE(p.categoria_id, 'SEM_CATEGORIA') as categoria_id,
         COALESCE(p.categoria_nome, 'Sem Categoria') as categoria_nome,
-        COALESCE(iv.descricao, 'Item não identificado') as item_descricao,
-        SUM(COALESCE(
-          CASE 
-            WHEN iv.valor IS NOT NULL THEN iv.valor::numeric 
-            ELSE p.valor_pago::numeric 
-          END, 0
-        )) as valor_total,
+        SUM(p.valor_pago::numeric) as valor_total,
         COUNT(p.id) as quantidade_parcelas,
         COUNT(DISTINCT p.id_cliente) as quantidade_clientes
-      FROM parcelas_com_numero p
+      FROM caz_parcelas p
       LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
       LEFT JOIN contratos_unicos ctu 
         ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = ctu.cnpj_limpo
-      LEFT JOIN caz_vendas v ON v.numero::text = p.numero_venda
-      LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
-      WHERE 1=1
+      WHERE p.status = 'QUITADO'
+        AND p.tipo_evento = 'RECEITA'
+        AND p.data_quitacao >= ${dataInicio}::date
+        AND p.data_quitacao <= ${dataFimComHora}::timestamp
+        AND p.valor_pago IS NOT NULL
+        AND p.valor_pago::numeric > 0
+        AND p.descricao LIKE 'Venda%'
         ${operadorFilter}
-      GROUP BY p.categoria_id, p.categoria_nome, iv.descricao
-      ORDER BY p.categoria_id, valor_total DESC
+      GROUP BY p.categoria_id, p.categoria_nome
+      ORDER BY valor_total DESC
     `);
     
     const receitas: {
@@ -9999,57 +9980,24 @@ export class DbStorage implements IStorage {
     let totalParcelas = 0;
     let totalContratos = 0;
     
-    // Agrupa por categoria primeiro, depois adiciona itens como filhos
-    const categoriaMap = new Map<string, { 
-      id: string; 
-      nome: string; 
-      valorTotal: number;
-      itens: { descricao: string; valor: number }[];
-    }>();
-    
     for (const row of receitasResult.rows as any[]) {
       const categoriaId = row.categoria_id || 'SEM_CATEGORIA';
       const categoriaNome = row.categoria_nome || 'Sem Categoria';
-      const itemDescricao = row.item_descricao || 'Item não identificado';
       const valor = Number(row.valor_total) || 0;
       
-      if (!categoriaMap.has(categoriaId)) {
-        categoriaMap.set(categoriaId, {
-          id: categoriaId,
-          nome: categoriaNome,
-          valorTotal: 0,
-          itens: []
-        });
-      }
+      // Determina o nível pela quantidade de pontos no ID da categoria
+      const nivel = (categoriaId.match(/\./g) || []).length + 1;
       
-      const cat = categoriaMap.get(categoriaId)!;
-      cat.valorTotal += valor;
-      cat.itens.push({ descricao: itemDescricao, valor });
+      receitas.push({
+        categoriaId,
+        categoriaNome,
+        valor,
+        nivel
+      });
       
       receitaTotal += valor;
       totalParcelas += Number(row.quantidade_parcelas) || 0;
       totalContratos += Number(row.quantidade_clientes) || 0;
-    }
-    
-    // Constrói hierarquia: nível 1 = categoria, nível 2 = itens
-    for (const [categoriaId, cat] of categoriaMap.entries()) {
-      // Adiciona categoria (nível 1)
-      receitas.push({
-        categoriaId,
-        categoriaNome: cat.nome,
-        valor: cat.valorTotal,
-        nivel: 1
-      });
-      
-      // Adiciona itens da categoria (nível 2)
-      for (const item of cat.itens) {
-        receitas.push({
-          categoriaId: `${categoriaId}.${item.descricao.substring(0, 20)}`,
-          categoriaNome: item.descricao,
-          valor: item.valor,
-          nivel: 2
-        });
-      }
     }
     
     // Calcula despesas
