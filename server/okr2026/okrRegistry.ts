@@ -23,10 +23,25 @@ export interface ObjectiveDef {
 }
 
 // ============================================================================
-// OBJECTIVES - Legado consolidado
+// OBJECTIVES
 // ============================================================================
 
 export const objectives: ObjectiveDef[] = [
+  {
+    id: "O1",
+    title: "Bigger",
+    subtitle: "Crescimento e escala de receita"
+  },
+  {
+    id: "O2",
+    title: "Better",
+    subtitle: "Eficiência operacional e qualidade"
+  },
+  {
+    id: "O3",
+    title: "Board",
+    subtitle: "Métricas estratégicas de acompanhamento"
+  },
   {
     id: "Ox",
     title: "Legado",
@@ -35,13 +50,229 @@ export const objectives: ObjectiveDef[] = [
 ];
 
 // ============================================================================
-// KEY RESULTS - Todas as KRs legado consolidadas em Ox
+// KEY RESULTS
 // ============================================================================
 
 export const krs: KRDef[] = [
-  // Ecossistema (5 KRs)
+  // O1 - Bigger (5 KRs)
   {
     id: "O1_KR1",
+    objectiveId: "O1",
+    title: "Faturar 25M Legado",
+    metricKey: "faturamento_legado",
+    unit: "BRL",
+    direction: "gte",
+    aggregation: "quarter_sum",
+    targets: { Q1: 6250000, Q2: 6250000, Q3: 6250000, Q4: 6250000, FY: 25000000 }
+  },
+  {
+    id: "O1_KR2",
+    objectiveId: "O1",
+    title: "Vender 3M MRR",
+    metricKey: "vendas_mrr",
+    unit: "BRL",
+    direction: "gte",
+    aggregation: "quarter_sum",
+    targets: { Q1: 750000, Q2: 750000, Q3: 750000, Q4: 750000, FY: 3000000 }
+  },
+  {
+    id: "O1_KR3",
+    objectiveId: "O1",
+    title: "Vender 4.5M Pontual",
+    metricKey: "vendas_pontual",
+    unit: "BRL",
+    direction: "gte",
+    aggregation: "quarter_sum",
+    targets: { Q1: 1125000, Q2: 1125000, Q3: 1125000, Q4: 1125000, FY: 4500000 }
+  },
+  {
+    id: "O1_KR4",
+    objectiveId: "O1",
+    title: "Faturar 1M em outras receitas VENTURES",
+    metricKey: "faturamento_ventures",
+    unit: "BRL",
+    direction: "gte",
+    aggregation: "quarter_sum",
+    targets: { Q1: 250000, Q2: 250000, Q3: 250000, Q4: 250000, FY: 1000000 }
+  },
+  {
+    id: "O1_KR5",
+    objectiveId: "O1",
+    title: "Entregar 2.4M em Projetos Tech",
+    metricKey: "projetos_tech",
+    unit: "BRL",
+    direction: "gte",
+    aggregation: "quarter_sum",
+    targets: { Q1: 600000, Q2: 600000, Q3: 600000, Q4: 600000, FY: 2400000 }
+  },
+
+  // O2 - Better (5 KRs)
+  {
+    id: "O2_KR1",
+    objectiveId: "O2",
+    title: "Churn < 8%",
+    metricKey: "churn_pct",
+    unit: "PCT",
+    direction: "lte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 8, Q2: 8, Q3: 8, Q4: 8 }
+  },
+  {
+    id: "O2_KR2",
+    objectiveId: "O2",
+    title: "Inadimplência < 6%",
+    metricKey: "inadimplencia_pct",
+    unit: "PCT",
+    direction: "lte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 6, Q2: 6, Q3: 6, Q4: 6 }
+  },
+  {
+    id: "O2_KR3",
+    objectiveId: "O2",
+    title: "NPS > 70",
+    metricKey: "nps",
+    unit: "COUNT",
+    direction: "gte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 70, Q2: 70, Q3: 70, Q4: 70 }
+  },
+  {
+    id: "O2_KR4",
+    objectiveId: "O2",
+    title: "Faturamento por Pessoa > R$ 16.000",
+    metricKey: "faturamento_por_pessoa",
+    unit: "BRL",
+    direction: "gte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 16000, Q2: 16000, Q3: 16000, Q4: 16000 }
+  },
+  {
+    id: "O2_KR5",
+    objectiveId: "O2",
+    title: "Entregas Pontuais no Prazo > 90%",
+    metricKey: "entregas_no_prazo_pct",
+    unit: "PCT",
+    direction: "gte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 90, Q2: 90, Q3: 90, Q4: 90 }
+  },
+
+  // O3 - Board (11 KRs)
+  {
+    id: "O3_KR1",
+    objectiveId: "O3",
+    title: "CAC",
+    metricKey: "cac",
+    unit: "BRL",
+    direction: "lte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+  },
+  {
+    id: "O3_KR2",
+    objectiveId: "O3",
+    title: "Vendas Novas",
+    metricKey: "vendas_novas",
+    unit: "BRL",
+    direction: "gte",
+    aggregation: "quarter_sum",
+    targets: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+  },
+  {
+    id: "O3_KR3",
+    objectiveId: "O3",
+    title: "Venda Base",
+    metricKey: "venda_base",
+    unit: "BRL",
+    direction: "gte",
+    aggregation: "quarter_sum",
+    targets: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+  },
+  {
+    id: "O3_KR4",
+    objectiveId: "O3",
+    title: "E-NPS",
+    metricKey: "enps",
+    unit: "COUNT",
+    direction: "gte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+  },
+  {
+    id: "O3_KR5",
+    objectiveId: "O3",
+    title: "Turnover",
+    metricKey: "turnover",
+    unit: "PCT",
+    direction: "lte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+  },
+  {
+    id: "O3_KR6",
+    objectiveId: "O3",
+    title: "AOV - Ticket Médio",
+    metricKey: "aov_ticket_medio",
+    unit: "BRL",
+    direction: "gte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+  },
+  {
+    id: "O3_KR7",
+    objectiveId: "O3",
+    title: "Imposto",
+    metricKey: "imposto",
+    unit: "BRL",
+    direction: "lte",
+    aggregation: "quarter_sum",
+    targets: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+  },
+  {
+    id: "O3_KR8",
+    objectiveId: "O3",
+    title: "Logo Churn",
+    metricKey: "logo_churn",
+    unit: "PCT",
+    direction: "lte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+  },
+  {
+    id: "O3_KR9",
+    objectiveId: "O3",
+    title: "NRR",
+    metricKey: "nrr",
+    unit: "PCT",
+    direction: "gte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+  },
+  {
+    id: "O3_KR10",
+    objectiveId: "O3",
+    title: "% CSV",
+    metricKey: "csv_pct",
+    unit: "PCT",
+    direction: "lte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+  },
+  {
+    id: "O3_KR11",
+    objectiveId: "O3",
+    title: "Inscritos e Follows",
+    metricKey: "inscritos_follows",
+    unit: "COUNT",
+    direction: "gte",
+    aggregation: "quarter_sum",
+    targets: { Q1: 0, Q2: 0, Q3: 0, Q4: 0 }
+  },
+
+  // Ox - Legado (KRs antigas consolidadas)
+  {
+    id: "Ox_KR1",
     objectiveId: "Ox",
     title: "MRR Ativo",
     metricKey: "mrr_active",
@@ -51,7 +282,7 @@ export const krs: KRDef[] = [
     targets: { Q1: 1338870, Q2: 1611315, Q3: 1871384, Q4: 2122127 }
   },
   {
-    id: "O1_KR2",
+    id: "Ox_KR2",
     objectiveId: "Ox",
     title: "Receita Total Faturável",
     metricKey: "revenue_total_billable",
@@ -61,7 +292,7 @@ export const krs: KRDef[] = [
     targets: { Q1: 4566375, Q2: 5502104, Q3: 6460412, Q4: 7374380 }
   },
   {
-    id: "O1_KR3",
+    id: "Ox_KR3",
     objectiveId: "Ox",
     title: "Clientes ativos",
     metricKey: "active_customers",
@@ -71,7 +302,7 @@ export const krs: KRDef[] = [
     targets: { Q1: 346, Q2: 401, Q3: 456, Q4: 511 }
   },
   {
-    id: "O1_KR4",
+    id: "Ox_KR4",
     objectiveId: "Ox",
     title: "Vendas Novas MRR",
     metricKey: "new_mrr_sales",
@@ -81,7 +312,7 @@ export const krs: KRDef[] = [
     targets: { Q1: 600000, Q2: 660000, Q3: 720000, Q4: 780000 }
   },
   {
-    id: "O1_KR5",
+    id: "Ox_KR5",
     objectiveId: "Ox",
     title: "Expansão/Monetização Base",
     metricKey: "expansion_mrr",
@@ -90,10 +321,8 @@ export const krs: KRDef[] = [
     aggregation: "quarter_sum",
     targets: { Q1: 150000, Q2: 180000, Q3: 200000, Q4: 220000 }
   },
-
-  // Eficiência & Sistemas (5 KRs)
   {
-    id: "O2_KR1",
+    id: "Ox_KR6",
     objectiveId: "Ox",
     title: "EBITDA",
     metricKey: "ebitda",
@@ -103,7 +332,7 @@ export const krs: KRDef[] = [
     targets: { Q1: 746055, Q2: 1152814, Q3: 1398628, Q4: 1972271 }
   },
   {
-    id: "O2_KR2",
+    id: "Ox_KR7",
     objectiveId: "Ox",
     title: "Geração Caixa",
     metricKey: "cash_generation",
@@ -113,7 +342,7 @@ export const krs: KRDef[] = [
     targets: { Q1: 394897, Q2: 663357, Q3: 825594, Q4: 1204199 }
   },
   {
-    id: "O2_KR3",
+    id: "Ox_KR8",
     objectiveId: "Ox",
     title: "Caixa fim quarter",
     metricKey: "cash_balance",
@@ -123,71 +352,7 @@ export const krs: KRDef[] = [
     targets: { Q1: 1044897, Q2: 1708254, Q3: 2533848, Q4: 3738047 }
   },
   {
-    id: "O2_KR4",
-    objectiveId: "Ox",
-    title: "SG&A %",
-    metricKey: "sga_pct",
-    unit: "PCT",
-    direction: "lte",
-    aggregation: "quarter_avg",
-    targets: { Q1: 21, Q2: 21, Q3: 21, Q4: 21 }
-  },
-  {
-    id: "O2_KR5",
-    objectiveId: "Ox",
-    title: "CAC %",
-    metricKey: "cac_pct",
-    unit: "PCT",
-    direction: "lte",
-    aggregation: "quarter_avg",
-    targets: { Q1: 23, Q2: 23, Q3: 23, Q4: 23 }
-  },
-
-  // Hugz Ventures / DNVB Pet (4 KRs)
-  {
-    id: "O3_KR1",
-    objectiveId: "Ox",
-    title: "Inadimplência %",
-    metricKey: "delinquency_pct",
-    unit: "PCT",
-    direction: "lte",
-    aggregation: "quarter_avg",
-    targets: { Q1: 6.0, Q2: 6.0, Q3: 6.0, Q4: 6.0 }
-  },
-  {
-    id: "O3_KR2",
-    objectiveId: "Ox",
-    title: "Net MRR Churn %",
-    metricKey: "net_mrr_churn_pct",
-    unit: "PCT",
-    direction: "lte",
-    aggregation: "quarter_avg",
-    targets: { Q1: 9.0, Q2: 9.0, Q3: 9.0, Q4: 9.0 }
-  },
-  {
-    id: "O3_KR3",
-    objectiveId: "Ox",
-    title: "Logo Churn %",
-    metricKey: "logo_churn_pct",
-    unit: "PCT",
-    direction: "lte",
-    aggregation: "quarter_avg",
-    targets: { Q1: 10.0, Q2: 10.0, Q3: 10.0, Q4: 10.0 }
-  },
-  {
-    id: "O3_KR4",
-    objectiveId: "Ox",
-    title: "Gross MRR Churn",
-    metricKey: "gross_mrr_churn_brl",
-    unit: "BRL",
-    direction: "lte",
-    aggregation: "quarter_sum",
-    targets: { Q1: 337129, Q2: 412074, Q3: 483337, Q4: 551824 }
-  },
-
-  // TurboOH (3 KRs)
-  {
-    id: "O4_KR1",
+    id: "Ox_KR9",
     objectiveId: "Ox",
     title: "Receita Líquida OH",
     metricKey: "turbooh_revenue_net",
@@ -197,7 +362,7 @@ export const krs: KRDef[] = [
     targets: { Q1: 86400, Q2: 259200, Q3: 432000, Q4: 648000 }
   },
   {
-    id: "O4_KR2",
+    id: "Ox_KR10",
     objectiveId: "Ox",
     title: "Resultado OH",
     metricKey: "turbooh_result",
@@ -205,28 +370,6 @@ export const krs: KRDef[] = [
     direction: "gte",
     aggregation: "quarter_sum",
     targets: { Q1: 43650, Q2: 168950, Q3: 304900, Q4: 472200 }
-  },
-  {
-    id: "O4_KR3",
-    objectiveId: "Ox",
-    title: "Vacância OH %",
-    metricKey: "turbooh_vacancy_pct",
-    unit: "PCT",
-    direction: "lte",
-    aggregation: "quarter_avg",
-    targets: { Q1: 20, Q2: 15, Q3: 10, Q4: 5 }
-  },
-
-  // Padronização & Produto (1 KR)
-  {
-    id: "O5_KR1",
-    objectiveId: "Ox",
-    title: "% Iniciativas Padronização",
-    metricKey: "standardization_completion_pct",
-    unit: "PCT",
-    direction: "gte",
-    aggregation: "quarter_end",
-    targets: { Q1: 25, Q2: 50, Q3: 75, Q4: 100 }
   }
 ];
 
