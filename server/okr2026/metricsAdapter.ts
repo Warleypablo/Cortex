@@ -246,12 +246,14 @@ export async function getCaixaAtual(): Promise<number> {
 
 export async function getInadimplenciaValor(): Promise<number> {
   try {
+    // Pega boletos vencidos de competência do mês atual (Janeiro 2026)
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(nao_pago::numeric + COALESCE(perda::numeric, 0)), 0) as valor_inadimplente
       FROM caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND status NOT IN ('QUITADO', 'PERDIDO')
         AND data_vencimento < NOW()
+        AND TO_CHAR(data_vencimento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
     `);
     return parseFloat((result.rows[0] as any)?.valor_inadimplente || "0");
   } catch (error) {
@@ -300,14 +302,22 @@ export async function getInadimplencia(): Promise<{ valor: number; percentual: n
 
 export async function getGrossChurnMrr(): Promise<number> {
   try {
+    // Churn = contratos com data de solicitação de cancelamento no mês 
+    // OU que foram para status "Em Cancelamento" no mês atual
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valorr::numeric), 0) as churn_mrr
       FROM cup_contratos
-      WHERE status = 'cancelado'
-        AND data_encerramento IS NOT NULL
-        AND TO_CHAR(data_encerramento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
-        AND valorr IS NOT NULL
+      WHERE valorr IS NOT NULL
         AND valorr > 0
+        AND (
+          -- Contratos cancelados no mês atual
+          (status = 'cancelado' AND data_encerramento IS NOT NULL 
+           AND TO_CHAR(data_encerramento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM'))
+          OR
+          -- Contratos em processo de cancelamento no mês atual
+          (status IN ('em_cancelamento', 'Em Cancelamento', 'cancelamento')
+           AND TO_CHAR(COALESCE(data_encerramento, data_inicio), 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM'))
+        )
     `);
     return parseFloat((result.rows[0] as any)?.churn_mrr || "0");
   } catch (error) {
