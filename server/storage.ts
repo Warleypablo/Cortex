@@ -9930,7 +9930,7 @@ export class DbStorage implements IStorage {
       : sql``;
     
     // Query com hierarquia: Categoria → Item de Venda (caz_itensvenda.nome)
-    // Usa numero da parcela para linkar: parcela.descricao "Venda (123)" → caz_vendas.numero → caz_itensvenda.id
+    // Fluxo de join: parcela.descricao "Venda 123" → extrai numero → caz_vendas.numero → caz_vendas.id = caz_itensvenda.id
     const receitasResult = await db.execute(sql`
       WITH contratos_unicos AS (
         SELECT DISTINCT ON (cnpj_limpo)
@@ -9955,8 +9955,8 @@ export class DbStorage implements IStorage {
           p.categoria_id,
           p.categoria_nome,
           p.valor_pago,
-          -- Extrai número da venda de "Venda (123)" ou "Venda Nº 123"
-          REGEXP_REPLACE(p.descricao, '[^0-9]', '', 'g') as numero_venda
+          -- Extrai número da venda de "Venda 123" (formato correto)
+          TRIM(REGEXP_REPLACE(p.descricao, '^Venda[^0-9]*', '', 'i')) as numero_venda
         FROM caz_parcelas p
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
@@ -9978,7 +9978,7 @@ export class DbStorage implements IStorage {
       LEFT JOIN contratos_unicos ctu 
         ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = ctu.cnpj_limpo
       LEFT JOIN caz_vendas v ON v.numero::text = pb.numero_venda
-      LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
+      LEFT JOIN caz_itensvenda iv ON iv.id = v.id
       WHERE 1=1
         ${operadorFilter}
       GROUP BY pb.categoria_id, pb.categoria_nome, iv.nome
