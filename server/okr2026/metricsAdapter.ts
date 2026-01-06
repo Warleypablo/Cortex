@@ -25,6 +25,7 @@ export interface DashboardMetrics {
   geracao_caixa_ytd: number;
   caixa_atual: number;
   inadimplencia_valor: number;
+  inadimplencia_brl: number;
   inadimplencia_percentual: number;
   gross_churn_mrr: number;
   gross_mrr_churn_percentual: number;
@@ -1701,6 +1702,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     geracao_caixa_ytd: ebitdaYTD * 0.6,
     caixa_atual: caixaAtual,
     inadimplencia_valor: inadimplencia.valor,
+    inadimplencia_brl: inadimplencia.valor,
     inadimplencia_percentual: inadimplencia.percentual,
     gross_churn_mrr: churnMRR.gross,
     gross_mrr_churn_percentual: churnMRR.grossPercentual,
