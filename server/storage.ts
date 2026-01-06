@@ -9755,13 +9755,31 @@ export class DbStorage implements IStorage {
         
         // Segunda tentativa: busca parcial (caso nome tenha variações)
         if (salarioResult.rows.length === 0) {
+          console.log(`[ContribuicaoDfc] Tentando busca parcial para "${responsavel}"`);
+          const likePattern = `%${responsavel.toLowerCase().trim()}%`;
           salarioResult = await db.execute(sql`
             SELECT salario as salario_bruto, nome
             FROM rh_pessoal
             WHERE (
-              LOWER(TRIM(nome)) LIKE LOWER(TRIM(${responsavel})) || '%'
-              OR LOWER(TRIM(${responsavel})) LIKE LOWER(TRIM(nome)) || '%'
+              LOWER(TRIM(nome)) LIKE ${likePattern}
+              OR ${responsavel.toLowerCase().trim()} LIKE '%' || LOWER(TRIM(nome)) || '%'
             )
+              AND salario IS NOT NULL
+              AND salario != ''
+              AND LOWER(status) = 'ativo'
+            ORDER BY LENGTH(nome)
+            LIMIT 1
+          `);
+        }
+        
+        // Terceira tentativa: busca por primeiro nome
+        if (salarioResult.rows.length === 0) {
+          const primeiroNome = responsavel.split(' ')[0].toLowerCase().trim();
+          console.log(`[ContribuicaoDfc] Tentando busca por primeiro nome "${primeiroNome}"`);
+          salarioResult = await db.execute(sql`
+            SELECT salario as salario_bruto, nome
+            FROM rh_pessoal
+            WHERE LOWER(TRIM(nome)) LIKE ${primeiroNome + '%'}
               AND salario IS NOT NULL
               AND salario != ''
               AND LOWER(status) = 'ativo'
