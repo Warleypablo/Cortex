@@ -8207,25 +8207,35 @@ export class DbStorage implements IStorage {
       RETURNING contexto_juridico, procedimento_juridico, status_juridico, valor_acordado, atualizado_juridico_por, atualizado_juridico_em
     `));
     
-    // Se não existe, insere um novo registro
+    // Se não existe, insere um novo registro com valores padrão para campos obrigatórios
     if (!result.rows.length) {
       console.log(`[storage] Cliente ${data.clienteId} não existe em inadimplencia_contextos, criando registro...`);
       result = await db.execute(sql.raw(`
         INSERT INTO inadimplencia_contextos (
           cliente_id, 
+          contexto,
+          evidencias,
+          acao,
           contexto_juridico, 
           procedimento_juridico, 
           status_juridico, 
           valor_acordado, 
           atualizado_juridico_por, 
-          atualizado_juridico_em
+          atualizado_juridico_em,
+          atualizado_por,
+          atualizado_em
         )
         VALUES (
           '${escapedClienteId}',
+          '',
+          '',
+          'Análise Jurídica',
           NULLIF('${escapedContexto}', ''),
           NULLIF('${escapedProcedimento}', ''),
           NULLIF('${escapedStatus}', ''),
           ${valorAcordadoSql},
+          '${escapedAtualizadoPor}',
+          NOW(),
           '${escapedAtualizadoPor}',
           NOW()
         )
