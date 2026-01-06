@@ -1346,9 +1346,126 @@ interface TurboTool {
   observations: string | null;
 }
 
+function EditTurboToolDialog({
+  tool,
+  open,
+  onOpenChange,
+}: {
+  tool: TurboTool;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [username, setUsername] = useState(tool.username || "");
+  const [password, setPassword] = useState(tool.password || "");
+  const [accessUrl, setAccessUrl] = useState(tool.accessUrl || "");
+
+  useEffect(() => {
+    if (open) {
+      setUsername(tool.username || "");
+      setPassword(tool.password || "");
+      setAccessUrl(tool.accessUrl || "");
+    }
+  }, [open, tool]);
+
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("PATCH", `/api/ferramentas/tools/${tool.id}`, {
+        login: username,
+        password: password,
+        site: accessUrl,
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/acessos/turbo-tools"] });
+      toast({
+        title: "Ferramenta atualizada",
+        description: "As credenciais foram atualizadas com sucesso.",
+      });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao atualizar",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Editar Credencial - {tool.platform}</DialogTitle>
+          <DialogDescription>
+            Atualize as informações de acesso desta ferramenta.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <FormLabel>Usuário / Email</FormLabel>
+            <Input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Email ou usuário de acesso"
+              data-testid="input-edit-turbo-username"
+            />
+          </div>
+          <div className="space-y-2">
+            <FormLabel>Senha</FormLabel>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Senha de acesso"
+              data-testid="input-edit-turbo-password"
+            />
+          </div>
+          <div className="space-y-2">
+            <FormLabel>Link de Acesso</FormLabel>
+            <Input
+              value={accessUrl}
+              onChange={(e) => setAccessUrl(e.target.value)}
+              placeholder="https://..."
+              data-testid="input-edit-turbo-url"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            data-testid="button-cancel-turbo-edit"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => updateMutation.mutate()}
+            disabled={updateMutation.isPending}
+            data-testid="button-save-turbo-edit"
+          >
+            {updateMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              "Salvar"
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function TurboToolsSection() {
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingTool, setEditingTool] = useState<TurboTool | null>(null);
   const { toast } = useToast();
 
   const { data: tools = [], isLoading } = useQuery<TurboTool[]>({
@@ -1420,6 +1537,7 @@ function TurboToolsSection() {
               <TableHead>Usuário</TableHead>
               <TableHead>Senha</TableHead>
               <TableHead>URL</TableHead>
+              <TableHead className="w-[80px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1498,10 +1616,28 @@ function TurboToolsSection() {
                     "-"
                   )}
                 </TableCell>
+                <TableCell>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setEditingTool(tool)}
+                    data-testid={`button-edit-turbo-${tool.id}`}
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
+      )}
+
+      {editingTool && (
+        <EditTurboToolDialog
+          tool={editingTool}
+          open={!!editingTool}
+          onOpenChange={(open) => !open && setEditingTool(null)}
+        />
       )}
     </div>
   );
