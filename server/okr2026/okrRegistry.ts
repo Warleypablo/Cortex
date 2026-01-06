@@ -63,7 +63,7 @@ export const krs: KRDef[] = [
     unit: "BRL",
     direction: "gte",
     aggregation: "quarter_sum",
-    targets: { Q1: 6250000, Q2: 6250000, Q3: 6250000, Q4: 6250000, FY: 25000000 }
+    targets: { Q1: 4659023, Q2: 5833695, Q3: 7094030, Q4: 8381442, FY: 25968190 }
   },
   {
     id: "O1_KR2",
@@ -73,7 +73,7 @@ export const krs: KRDef[] = [
     unit: "BRL",
     direction: "gte",
     aggregation: "quarter_sum",
-    targets: { Q1: 750000, Q2: 750000, Q3: 750000, Q4: 750000, FY: 3000000 }
+    targets: { Q1: 645000, Q2: 720000, Q3: 810000, Q4: 900000, FY: 3075000 }
   },
   {
     id: "O1_KR3",
@@ -83,7 +83,7 @@ export const krs: KRDef[] = [
     unit: "BRL",
     direction: "gte",
     aggregation: "quarter_sum",
-    targets: { Q1: 1125000, Q2: 1125000, Q3: 1125000, Q4: 1125000, FY: 4500000 }
+    targets: { Q1: 810000, Q2: 975000, Q3: 1140000, Q4: 1305000, FY: 4230000 }
   },
   {
     id: "O1_KR4",
@@ -93,7 +93,7 @@ export const krs: KRDef[] = [
     unit: "BRL",
     direction: "gte",
     aggregation: "quarter_sum",
-    targets: { Q1: 250000, Q2: 250000, Q3: 250000, Q4: 250000, FY: 1000000 }
+    targets: { Q1: 90720, Q2: 291600, Q3: 546000, Q4: 874800, FY: 1803120 }
   },
   {
     id: "O1_KR5",
@@ -103,7 +103,7 @@ export const krs: KRDef[] = [
     unit: "BRL",
     direction: "gte",
     aggregation: "quarter_sum",
-    targets: { Q1: 600000, Q2: 600000, Q3: 600000, Q4: 600000, FY: 2400000 }
+    targets: { Q1: 450000, Q2: 600000, Q3: 660000, Q4: 660000, FY: 2370000 }
   },
 
   // O2 - Better (5 KRs)
