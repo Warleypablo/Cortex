@@ -33,6 +33,7 @@ export interface DashboardMetrics {
   net_churn_mrr_percentual: number | null;
   logo_churn: number;
   logo_churn_percentual: number | null;
+  churn_brl: number;
   clientes_ativos: number;
   clientes_inicio_mes: number;
   receita_recorrente_ytd: number | null;
@@ -1753,6 +1754,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     net_churn_mrr_percentual: churnMRR.netPercentual,
     logo_churn: churnMRR.logoChurn,
     logo_churn_percentual: churnMRR.logoChurnPct,
+    churn_brl: churnMRR.gross,
     clientes_ativos: clientesAtivos,
     clientes_inicio_mes: clientesInicioMes,
     receita_recorrente_ytd: receitaYTD.recorrente,
