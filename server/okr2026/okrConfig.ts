@@ -3,44 +3,20 @@ export const OKR_CONFIG = {
   title: "Bigger & Better — Consolidação, Escala e Padronização",
 
   objectives: {
-    O1_ECOSYSTEM_SCALE: {
-      id: "O1",
-      code: "O1_ECOSYSTEM_SCALE",
-      title: "Consolidar e escalar o ecossistema com previsibilidade",
-      description: "Core business - escalar receita recorrente mantendo coesão do ecossistema"
-    },
-    O2_EFFICIENCY_CASH: {
-      id: "O2",
-      code: "O2_EFFICIENCY_CASH",
-      title: "Aumentar eficiência e geração de caixa",
-      description: "Crescer sem quebrar - eficiência operacional e disciplina financeira"
-    },
-    O3_HUGZ_VENTURES: {
-      id: "O3",
-      code: "O3_HUGZ_VENTURES",
-      title: "Hugz Ventures - DNVB Pet com Cofril",
-      description: "Tirar a nova empresa do papel - DNVB de petiscos Pet em parceria com Cofril"
-    },
-    O4_TURBOOH_SCALE: {
-      id: "O4",
-      code: "O4_TURBOOH_SCALE",
-      title: "Escalar TurboOH com resultado positivo e disciplina de execução",
-      description: "Novo motor de crescimento - escalar TurboOH com rentabilidade"
-    },
-    O5_SYSTEMS_TECH: {
-      id: "O5",
-      code: "O5_SYSTEMS_TECH",
-      title: "Sistemas internos e Tech entregando com padrão e margem",
-      description: "Padronização de processos e instrumentação de métricas"
+    OX_LEGADO: {
+      id: "Ox",
+      code: "OX_LEGADO",
+      title: "Legado",
+      description: "KRs do sistema OKR legado consolidados"
     }
   },
 
   krs: {
-    // O1 - Ecosystem Scale
+    // O1 - Ecossistema (Consolidação + Escala)
     KR1_MRR_EOQ: {
-      id: "O1-KR1",
-      objectiveId: "O1_ECOSYSTEM_SCALE",
-      title: "MRR Ativo (EOQ)",
+      id: "O1_KR1",
+      objectiveId: "OX_LEGADO",
+      title: "MRR Ativo",
       metric_key: "mrr_active",
       target_type: "quarterly",
       targets: { Q1: 1338870, Q2: 1611315, Q3: 1871384, Q4: 2122127 },
@@ -48,113 +24,89 @@ export const OKR_CONFIG = {
       direction: "higher",
       owner: "Comercial"
     },
-    KR2_NET_REVENUE_YTD: {
-      id: "O1-KR2",
-      objectiveId: "O1_ECOSYSTEM_SCALE",
-      title: "Receita Líquida Anual",
-      metric_key: "revenue_net",
-      target_type: "annual",
-      target: 20055091,
+    KR2_RECEITA_TOTAL: {
+      id: "O1_KR2",
+      objectiveId: "OX_LEGADO",
+      title: "Receita Total Faturável",
+      metric_key: "revenue_total",
+      target_type: "quarterly",
+      targets: { Q1: 4573000, Q2: 5502000, Q3: 6461000, Q4: 7370000 },
       unit: "currency",
       direction: "higher",
       owner: "Financeiro"
     },
-    KR3_CLIENTS_EOY: {
-      id: "O1-KR3",
-      objectiveId: "O1_ECOSYSTEM_SCALE",
-      title: "Clientes Ativos EOY",
+    KR3_CLIENTES_ATIVOS: {
+      id: "O1_KR3",
+      objectiveId: "OX_LEGADO",
+      title: "Clientes ativos",
       metric_key: "clients_active",
-      target_type: "annual",
-      target: 511,
+      target_type: "quarterly",
+      targets: { Q1: 346, Q2: 401, Q3: 456, Q4: 511 },
       unit: "number",
       direction: "higher",
       owner: "Comercial"
     },
-    KR4_PRODUCTIVITY_EOY: {
-      id: "O1-KR4",
-      objectiveId: "O1_ECOSYSTEM_SCALE",
-      title: "Receita por Cabeça (Dez/26)",
-      metric_key: "revenue_per_head",
-      target_type: "annual",
-      target: 14184,
+    KR4_VENDAS_NOVAS_MRR: {
+      id: "O1_KR4",
+      objectiveId: "OX_LEGADO",
+      title: "Vendas Novas MRR",
+      metric_key: "new_mrr",
+      target_type: "quarterly",
+      targets: { Q1: 600000, Q2: 660000, Q3: 720000, Q4: 780000 },
       unit: "currency",
       direction: "higher",
-      owner: "Gestão"
-    },
-
-    // O2 - Efficiency & Cash
-    KR1_EBITDA_YTD: {
-      id: "O2-KR1",
-      objectiveId: "O2_EFFICIENCY_CASH",
-      title: "EBITDA Anual",
-      metric_key: "ebitda",
-      target_type: "annual",
-      target: 5269768,
-      unit: "currency",
-      direction: "higher",
-      owner: "Financeiro"
-    },
-    KR2_CASH_GEN_YTD: {
-      id: "O2-KR2",
-      objectiveId: "O2_EFFICIENCY_CASH",
-      title: "Geração de Caixa Anual",
-      metric_key: "cash_generation",
-      target_type: "annual",
-      target: 3088047,
-      unit: "currency",
-      direction: "higher",
-      owner: "Financeiro"
-    },
-    KR3_CASH_END: {
-      id: "O2-KR3",
-      objectiveId: "O2_EFFICIENCY_CASH",
-      title: "Caixa Final Dezembro",
-      metric_key: "cash_balance_end",
-      target_type: "annual",
-      target: 3738000,
-      unit: "currency",
-      direction: "higher",
-      owner: "Financeiro"
-    },
-    KR4_SGA_GUARDRAIL: {
-      id: "O2-KR4a",
-      objectiveId: "O2_EFFICIENCY_CASH",
-      title: "SG&A % Receita Líquida",
-      metric_key: "sga_pct",
-      target_type: "annual",
-      target: 20.0,
-      unit: "percentage",
-      direction: "lower",
-      owner: "Financeiro"
-    },
-    KR5_CAC_GUARDRAIL: {
-      id: "O2-KR4b",
-      objectiveId: "O2_EFFICIENCY_CASH",
-      title: "CAC % Receita Líquida",
-      metric_key: "cac_pct",
-      target_type: "annual",
-      target: 22.5,
-      unit: "percentage",
-      direction: "lower",
       owner: "Comercial"
     },
-    KR6_CSV_GUARDRAIL: {
-      id: "O2-KR4c",
-      objectiveId: "O2_EFFICIENCY_CASH",
-      title: "CSV % Receita Líquida",
-      metric_key: "csv_pct",
-      target_type: "annual",
-      target: 33.0,
-      unit: "percentage",
-      direction: "lower",
-      owner: "Operações"
+    KR5_EXPANSAO_MONETIZACAO: {
+      id: "O1_KR5",
+      objectiveId: "OX_LEGADO",
+      title: "Expansão/Monetização (média 20%)",
+      metric_key: "expansion_mrr",
+      target_type: "quarterly",
+      targets: { Q1: 150000, Q2: 180000, Q3: 200000, Q4: 220000 },
+      unit: "currency",
+      direction: "higher",
+      owner: "CS"
     },
 
-    // O3 - Hugz Ventures (DNVB Pet)
-    KR1_INADIMPLENCIA_MAX: {
-      id: "O3-KR1",
-      objectiveId: "O3_HUGZ_VENTURES",
-      title: "Inadimplência % (mensal)",
+    // O2 - Eficiência & Sistemas
+    KR1_EBITDA: {
+      id: "O2_KR1",
+      objectiveId: "OX_LEGADO",
+      title: "EBITDA",
+      metric_key: "ebitda",
+      target_type: "quarterly",
+      targets: { Q1: 746100, Q2: 1150000, Q3: 1400000, Q4: 1970000 },
+      unit: "currency",
+      direction: "higher",
+      owner: "Financeiro"
+    },
+    KR2_GERACAO_CAIXA: {
+      id: "O2_KR2",
+      objectiveId: "OX_LEGADO",
+      title: "Geração Caixa",
+      metric_key: "cash_generation",
+      target_type: "quarterly",
+      targets: { Q1: 394900, Q2: 663400, Q3: 825600, Q4: 1200000 },
+      unit: "currency",
+      direction: "higher",
+      owner: "Financeiro"
+    },
+    KR3_CAIXA_FINAL: {
+      id: "O2_KR3",
+      objectiveId: "OX_LEGADO",
+      title: "Caixa Final",
+      metric_key: "cash_balance_end",
+      target_type: "quarterly",
+      targets: { Q1: 1044900, Q2: 1708300, Q3: 2533900, Q4: 3733900 },
+      unit: "currency",
+      direction: "higher",
+      owner: "Financeiro"
+    },
+    KR4_INADIMPLENCIA: {
+      id: "O2_KR4",
+      objectiveId: "OX_LEGADO",
+      title: "Inadimplência % (até 6%)",
       metric_key: "inadimplencia_pct",
       target_type: "monthly",
       target: 6.0,
@@ -162,10 +114,10 @@ export const OKR_CONFIG = {
       direction: "lower",
       owner: "Financeiro"
     },
-    KR2_GROSS_CHURN_MAX: {
-      id: "O3-KR2",
-      objectiveId: "O3_HUGZ_VENTURES",
-      title: "Gross MRR Churn % (mensal)",
+    KR5_GROSS_CHURN: {
+      id: "O2_KR5",
+      objectiveId: "OX_LEGADO",
+      title: "Gross MRR Churn % (até 9%)",
       metric_key: "gross_mrr_churn_pct",
       target_type: "monthly",
       target: 9.0,
@@ -173,110 +125,74 @@ export const OKR_CONFIG = {
       direction: "lower",
       owner: "CS"
     },
-    KR3_NET_CHURN_READY: {
-      id: "O3-KR3",
-      objectiveId: "O3_HUGZ_VENTURES",
-      title: "Net Churn disponível no Cortex",
-      metric_key: "net_mrr_churn_pct",
-      target_type: "milestone",
-      target_quarter: "Q1",
-      unit: "percentage",
-      direction: "lower",
-      owner: "Tech",
-      status: "instrumentation"
-    },
-    KR4_LOGO_CHURN_READY: {
-      id: "O3-KR4",
-      objectiveId: "O3_HUGZ_VENTURES",
-      title: "Logo Churn % disponível no Cortex",
-      metric_key: "logo_churn_pct",
-      target_type: "milestone",
-      target_quarter: "Q1",
-      unit: "percentage",
-      direction: "lower",
-      owner: "Tech",
-      status: "instrumentation"
-    },
 
-    // O4 - TurboOH Scale
-    KR1_OH_SCREENS_EOY: {
-      id: "O4-KR1",
-      objectiveId: "O4_TURBOOH_SCALE",
-      title: "Telas TurboOH (Dez/26)",
-      metric_key: "oh_screens",
-      target_type: "annual",
-      target: 600,
-      unit: "number",
-      direction: "higher",
-      owner: "TurboOH"
-    },
-    KR2_OH_NETREV_YTD: {
-      id: "O4-KR2",
-      objectiveId: "O4_TURBOOH_SCALE",
-      title: "Receita Líquida TurboOH Anual",
+    // O3 - TurboOH
+    KR1_OH_RECEITA_LIQUIDA: {
+      id: "O3_KR1",
+      objectiveId: "OX_LEGADO",
+      title: "Receita Líquida TurboOH",
       metric_key: "oh_net_revenue",
-      target_type: "annual",
-      target: 2764800,
+      target_type: "quarterly",
+      targets: { Q1: 500000, Q2: 700000, Q3: 900000, Q4: 1100000 },
       unit: "currency",
       direction: "higher",
       owner: "TurboOH"
     },
-    KR3_OH_RESULT_YTD: {
-      id: "O4-KR3",
-      objectiveId: "O4_TURBOOH_SCALE",
-      title: "Resultado TurboOH Anual",
+    KR2_OH_RESULTADO: {
+      id: "O3_KR2",
+      objectiveId: "OX_LEGADO",
+      title: "Resultado TurboOH",
       metric_key: "oh_result",
-      target_type: "annual",
-      target: 2015000,
+      target_type: "quarterly",
+      targets: { Q1: 300000, Q2: 450000, Q3: 600000, Q4: 750000 },
       unit: "currency",
       direction: "higher",
       owner: "TurboOH"
     },
-    KR4_OH_VACANCY_MAX: {
-      id: "O4-KR4",
-      objectiveId: "O4_TURBOOH_SCALE",
-      title: "Vacância Média TurboOH",
+    KR3_OH_MARGEM: {
+      id: "O3_KR3",
+      objectiveId: "OX_LEGADO",
+      title: "Margem TurboOH %",
+      metric_key: "oh_margin_pct",
+      target_type: "quarterly",
+      targets: { Q1: 60, Q2: 64, Q3: 67, Q4: 68 },
+      unit: "percentage",
+      direction: "higher",
+      owner: "TurboOH"
+    },
+    KR4_OH_VACANCIA: {
+      id: "O3_KR4",
+      objectiveId: "OX_LEGADO",
+      title: "Vacância TurboOH % (até 0.5%)",
       metric_key: "oh_vacancy",
-      target_type: "annual",
-      target: 0.50,
+      target_type: "monthly",
+      target: 0.5,
       unit: "percentage",
       direction: "lower",
       owner: "TurboOH"
     },
 
-    // O5 - Systems & Tech
-    KR1_TECH_DELIVERED_YTD: {
-      id: "O5-KR1",
-      objectiveId: "O5_SYSTEMS_TECH",
-      title: "Valor Projetos Tech Entregues",
+    // O4 - Tech
+    KR1_TECH_ENTREGUES: {
+      id: "O4_KR1",
+      objectiveId: "OX_LEGADO",
+      title: "Projetos Tech Entregues",
       metric_key: "tech_projects_delivered_value",
-      target_type: "annual",
-      target: 2370000,
+      target_type: "quarterly",
+      targets: { Q1: 500000, Q2: 600000, Q3: 650000, Q4: 620000 },
       unit: "currency",
       direction: "higher",
       owner: "Tech"
     },
-    KR2_TECH_FREELA_GUARDRAIL: {
-      id: "O5-KR2",
-      objectiveId: "O5_SYSTEMS_TECH",
-      title: "Freelancers Tech % do Entregue",
+    KR2_TECH_FREELANCERS: {
+      id: "O4_KR2",
+      objectiveId: "OX_LEGADO",
+      title: "Freelancers Tech % (até 6.5%)",
       metric_key: "tech_freelancers_pct",
-      target_type: "annual",
+      target_type: "monthly",
       target: 6.5,
       unit: "percentage",
       direction: "lower",
-      owner: "Tech"
-    },
-    KR3_CORTEX_COVERAGE: {
-      id: "O5-KR3",
-      objectiveId: "O5_SYSTEMS_TECH",
-      title: "Cobertura de Métricas OKR",
-      metric_key: "cortex_coverage",
-      target_type: "milestone",
-      target_quarter: "Q2",
-      target: 95,
-      unit: "percentage",
-      direction: "higher",
       owner: "Tech"
     }
   },
@@ -284,10 +200,7 @@ export const OKR_CONFIG = {
   periods: ["YTD", "Q1", "Q2", "Q3", "Q4", "Last12m"],
   
   businessUnits: [
-    { id: "all", label: "Todas" },
-    { id: "turbooh", label: "TurboOH" },
-    { id: "tech", label: "Tech" },
-    { id: "commerce", label: "Commerce" }
+    { id: "all", label: "Todas" }
   ]
 };
 

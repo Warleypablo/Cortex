@@ -3858,23 +3858,16 @@ function SquadGoalsTab() {
   );
 }
 
-const BUSINESS_UNITS = [
-  { id: "all", label: "Todas" },
-  { id: "turbooh", label: "TurboOH" },
-  { id: "tech", label: "Tech" },
-  { id: "commerce", label: "Commerce" }
-];
 
 export default function OKR2026() {
   const { toast } = useToast();
   usePageTitle("OKR 2026");
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [selectedBU, setSelectedBU] = useState("all");
   const currentQuarter = getCurrentQuarter();
 
   const { data, isLoading, error } = useQuery<SummaryResponse>({
-    queryKey: ["/api/okr2026/summary", { bu: selectedBU }],
+    queryKey: ["/api/okr2026/summary", { bu: "all" }],
   });
 
   const { data: collaboratorsData } = useQuery<CollaboratorsResponse>({
@@ -3952,16 +3945,6 @@ export default function OKR2026() {
               </div>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              <Select value={selectedBU} onValueChange={setSelectedBU}>
-                <SelectTrigger className="w-[130px] bg-background/80 backdrop-blur-sm" data-testid="select-bu">
-                  <SelectValue placeholder="Unidade" />
-                </SelectTrigger>
-                <SelectContent>
-                  {BUSINESS_UNITS.map(bu => (
-                    <SelectItem key={bu.id} value={bu.id}>{bu.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Badge className="text-sm px-4 py-1.5 bg-primary text-primary-foreground shadow-lg shadow-primary/20">
                 2026
               </Badge>

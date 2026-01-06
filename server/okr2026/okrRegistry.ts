@@ -23,46 +23,26 @@ export interface ObjectiveDef {
 }
 
 // ============================================================================
-// OBJECTIVES
+// OBJECTIVES - Legado consolidado
 // ============================================================================
 
 export const objectives: ObjectiveDef[] = [
   {
-    id: "O1",
-    title: "Ecossistema (Consolidação + Escala)",
-    subtitle: "Core business - escalar receita recorrente mantendo coesão do ecossistema"
-  },
-  {
-    id: "O2",
-    title: "Eficiência & Sistemas",
-    subtitle: "Crescer sem quebrar - eficiência operacional e disciplina financeira"
-  },
-  {
-    id: "O3",
-    title: "Hugz Ventures",
-    subtitle: "DNVB de petiscos Pet em parceria com Cofril - tirar a nova empresa do papel"
-  },
-  {
-    id: "O4",
-    title: "TurboOH",
-    subtitle: "Novo motor de crescimento - escalar TurboOH com rentabilidade"
-  },
-  {
-    id: "O5",
-    title: "Padronização & Produto",
-    subtitle: "Padronização de processos e instrumentação de métricas"
+    id: "Ox",
+    title: "Legado",
+    subtitle: "KRs do sistema OKR legado consolidados"
   }
 ];
 
 // ============================================================================
-// KEY RESULTS
+// KEY RESULTS - Todas as KRs legado consolidadas em Ox
 // ============================================================================
 
 export const krs: KRDef[] = [
-  // O1 - Ecossistema (5 KRs)
+  // Ecossistema (5 KRs)
   {
     id: "O1_KR1",
-    objectiveId: "O1",
+    objectiveId: "Ox",
     title: "MRR Ativo",
     metricKey: "mrr_active",
     unit: "BRL",
@@ -72,7 +52,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O1_KR2",
-    objectiveId: "O1",
+    objectiveId: "Ox",
     title: "Receita Total Faturável",
     metricKey: "revenue_total_billable",
     unit: "BRL",
@@ -82,7 +62,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O1_KR3",
-    objectiveId: "O1",
+    objectiveId: "Ox",
     title: "Clientes ativos",
     metricKey: "active_customers",
     unit: "COUNT",
@@ -92,7 +72,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O1_KR4",
-    objectiveId: "O1",
+    objectiveId: "Ox",
     title: "Vendas Novas MRR",
     metricKey: "new_mrr_sales",
     unit: "BRL",
@@ -102,7 +82,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O1_KR5",
-    objectiveId: "O1",
+    objectiveId: "Ox",
     title: "Expansão/Monetização Base",
     metricKey: "expansion_mrr",
     unit: "BRL",
@@ -111,10 +91,10 @@ export const krs: KRDef[] = [
     targets: { Q1: 150000, Q2: 180000, Q3: 200000, Q4: 220000 }
   },
 
-  // O2 - Eficiência & Sistemas (5 KRs)
+  // Eficiência & Sistemas (5 KRs)
   {
     id: "O2_KR1",
-    objectiveId: "O2",
+    objectiveId: "Ox",
     title: "EBITDA",
     metricKey: "ebitda",
     unit: "BRL",
@@ -124,7 +104,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O2_KR2",
-    objectiveId: "O2",
+    objectiveId: "Ox",
     title: "Geração Caixa",
     metricKey: "cash_generation",
     unit: "BRL",
@@ -134,7 +114,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O2_KR3",
-    objectiveId: "O2",
+    objectiveId: "Ox",
     title: "Caixa fim quarter",
     metricKey: "cash_balance",
     unit: "BRL",
@@ -144,7 +124,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O2_KR4",
-    objectiveId: "O2",
+    objectiveId: "Ox",
     title: "SG&A %",
     metricKey: "sga_pct",
     unit: "PCT",
@@ -154,7 +134,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O2_KR5",
-    objectiveId: "O2",
+    objectiveId: "Ox",
     title: "CAC %",
     metricKey: "cac_pct",
     unit: "PCT",
@@ -163,10 +143,10 @@ export const krs: KRDef[] = [
     targets: { Q1: 23, Q2: 23, Q3: 23, Q4: 23 }
   },
 
-  // O3 - Hugz Ventures / DNVB Pet (4 KRs)
+  // Hugz Ventures / DNVB Pet (4 KRs)
   {
     id: "O3_KR1",
-    objectiveId: "O3",
+    objectiveId: "Ox",
     title: "Inadimplência %",
     metricKey: "delinquency_pct",
     unit: "PCT",
@@ -176,7 +156,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O3_KR2",
-    objectiveId: "O3",
+    objectiveId: "Ox",
     title: "Net MRR Churn %",
     metricKey: "net_mrr_churn_pct",
     unit: "PCT",
@@ -186,7 +166,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O3_KR3",
-    objectiveId: "O3",
+    objectiveId: "Ox",
     title: "Logo Churn %",
     metricKey: "logo_churn_pct",
     unit: "PCT",
@@ -196,7 +176,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O3_KR4",
-    objectiveId: "O3",
+    objectiveId: "Ox",
     title: "Gross MRR Churn",
     metricKey: "gross_mrr_churn_brl",
     unit: "BRL",
@@ -205,10 +185,10 @@ export const krs: KRDef[] = [
     targets: { Q1: 337129, Q2: 412074, Q3: 483337, Q4: 551824 }
   },
 
-  // O4 - TurboOH (3 KRs)
+  // TurboOH (3 KRs)
   {
     id: "O4_KR1",
-    objectiveId: "O4",
+    objectiveId: "Ox",
     title: "Receita Líquida OH",
     metricKey: "turbooh_revenue_net",
     unit: "BRL",
@@ -218,7 +198,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O4_KR2",
-    objectiveId: "O4",
+    objectiveId: "Ox",
     title: "Resultado OH",
     metricKey: "turbooh_result",
     unit: "BRL",
@@ -228,7 +208,7 @@ export const krs: KRDef[] = [
   },
   {
     id: "O4_KR3",
-    objectiveId: "O4",
+    objectiveId: "Ox",
     title: "Vacância OH %",
     metricKey: "turbooh_vacancy_pct",
     unit: "PCT",
@@ -237,10 +217,10 @@ export const krs: KRDef[] = [
     targets: { Q1: 20, Q2: 15, Q3: 10, Q4: 5 }
   },
 
-  // O5 - Padronização & Produto (1 KR)
+  // Padronização & Produto (1 KR)
   {
     id: "O5_KR1",
-    objectiveId: "O5",
+    objectiveId: "Ox",
     title: "% Iniciativas Padronização",
     metricKey: "standardization_completion_pct",
     unit: "PCT",
