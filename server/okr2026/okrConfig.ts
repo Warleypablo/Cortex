@@ -92,23 +92,25 @@ export const OKR_CONFIG = {
       id: "O2_KR1",
       objectiveId: "O2_BETTER",
       title: "Churn < 8%",
-      metric_key: "churn_pct",
-      target_type: "monthly",
-      target: 8.0,
-      unit: "percentage",
+      metric_key: "churn_brl",
+      target_type: "quarterly",
+      targets: { Q1: 341390, Q2: 428916, Q3: 515898, Q4: 603623 },
+      unit: "currency",
       direction: "lower",
-      owner: "CS"
+      owner: "CS",
+      notes: "Meta máxima de churn em R$ (8% do MRR projetado)"
     },
     KR2_INADIMPLENCIA: {
       id: "O2_KR2",
       objectiveId: "O2_BETTER",
       title: "Inadimplência < 6%",
-      metric_key: "inadimplencia_pct",
-      target_type: "monthly",
-      target: 6.0,
-      unit: "percentage",
+      metric_key: "inadimplencia_brl",
+      target_type: "quarterly",
+      targets: { Q1: 279541, Q2: 350022, Q3: 425642, Q4: 502887 },
+      unit: "currency",
       direction: "lower",
-      owner: "Financeiro"
+      owner: "Financeiro",
+      notes: "Meta máxima de inadimplência em R$ (6% do MRR projetado)"
     },
     KR3_NPS: {
       id: "O2_KR3",
@@ -126,19 +128,20 @@ export const OKR_CONFIG = {
       objectiveId: "O2_BETTER",
       title: "Faturamento por Pessoa > R$ 16.000",
       metric_key: "faturamento_por_pessoa",
-      target_type: "monthly",
-      target: 16000,
+      target_type: "quarterly",
+      targets: { Q1: 16000, Q2: 16000, Q3: 16000, Q4: 16000 },
       unit: "currency",
       direction: "higher",
-      owner: "Gestão"
+      owner: "Gestão",
+      notes: "Calculado: Faturamento 25M Legado / Colaboradores ativos no dia 01 do mês"
     },
     KR5_ENTREGAS_NO_PRAZO: {
       id: "O2_KR5",
       objectiveId: "O2_BETTER",
       title: "Entregas Pontuais no Prazo > 90%",
       metric_key: "entregas_no_prazo_pct",
-      target_type: "monthly",
-      target: 90,
+      target_type: "quarterly",
+      targets: { Q1: 90, Q2: 90, Q3: 90, Q4: 90 },
       unit: "percentage",
       direction: "higher",
       owner: "Operações"

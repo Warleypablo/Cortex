@@ -111,21 +111,23 @@ export const krs: KRDef[] = [
     id: "O2_KR1",
     objectiveId: "O2",
     title: "Churn < 8%",
-    metricKey: "churn_pct",
-    unit: "PCT",
+    metricKey: "churn_brl",
+    unit: "BRL",
     direction: "lte",
-    aggregation: "quarter_avg",
-    targets: { Q1: 8, Q2: 8, Q3: 8, Q4: 8 }
+    aggregation: "quarter_sum",
+    targets: { Q1: 341390, Q2: 428916, Q3: 515898, Q4: 603623, FY: 1889827 },
+    notes: "Meta máxima de churn em R$ (8% do MRR projetado)"
   },
   {
     id: "O2_KR2",
     objectiveId: "O2",
     title: "Inadimplência < 6%",
-    metricKey: "inadimplencia_pct",
-    unit: "PCT",
+    metricKey: "inadimplencia_brl",
+    unit: "BRL",
     direction: "lte",
-    aggregation: "quarter_avg",
-    targets: { Q1: 6, Q2: 6, Q3: 6, Q4: 6 }
+    aggregation: "quarter_sum",
+    targets: { Q1: 279541, Q2: 350022, Q3: 425642, Q4: 502887, FY: 1558092 },
+    notes: "Meta máxima de inadimplência em R$ (6% do MRR projetado)"
   },
   {
     id: "O2_KR3",
@@ -145,7 +147,8 @@ export const krs: KRDef[] = [
     unit: "BRL",
     direction: "gte",
     aggregation: "quarter_avg",
-    targets: { Q1: 16000, Q2: 16000, Q3: 16000, Q4: 16000 }
+    targets: { Q1: 16000, Q2: 16000, Q3: 16000, Q4: 16000 },
+    notes: "Calculado: Faturamento 25M Legado / Colaboradores ativos no dia 01 do mês"
   },
   {
     id: "O2_KR5",
