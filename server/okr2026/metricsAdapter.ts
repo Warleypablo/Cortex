@@ -302,21 +302,22 @@ export async function getInadimplencia(): Promise<{ valor: number; percentual: n
 
 export async function getGrossChurnMrr(): Promise<number> {
   try {
-    // Churn = contratos com data de solicitação de cancelamento no mês 
-    // OU que foram para status "Em Cancelamento" no mês atual
+    // Churn = contratos com data_solicitacao_encerramento no mês atual
+    // OU que estão com status "Em Cancelamento" / "cancelado" no mês atual
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valorr::numeric), 0) as churn_mrr
       FROM cup_contratos
       WHERE valorr IS NOT NULL
         AND valorr > 0
         AND (
-          -- Contratos cancelados no mês atual
-          (status = 'cancelado' AND data_encerramento IS NOT NULL 
-           AND TO_CHAR(data_encerramento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM'))
+          -- Contratos com solicitação de cancelamento no mês atual
+          (data_solicitacao_encerramento IS NOT NULL 
+           AND TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM'))
           OR
-          -- Contratos em processo de cancelamento no mês atual
-          (status IN ('em_cancelamento', 'Em Cancelamento', 'cancelamento')
-           AND TO_CHAR(COALESCE(data_encerramento, data_inicio), 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM'))
+          -- Contratos em processo de cancelamento ou cancelados no mês atual
+          (status IN ('em_cancelamento', 'Em Cancelamento', 'cancelamento', 'cancelado')
+           AND data_encerramento IS NOT NULL
+           AND TO_CHAR(data_encerramento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM'))
         )
     `);
     return parseFloat((result.rows[0] as any)?.churn_mrr || "0");
