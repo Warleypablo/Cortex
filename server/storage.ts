@@ -9860,7 +9860,9 @@ export class DbStorage implements IStorage {
     };
   }
 
-  // Contribuição por Operador (responsável do contrato) - Estilo DFC
+  // Contribuição por Operador (responsável do CONTRATO, não do cliente) - Estilo DFC
+  // Diferença do Colaborador: usa cup_contratos.responsavel (gestor do contrato)
+  // Colaborador usa cup_contratos.cx (CX que gerencia o cliente)
   async getContribuicaoOperadorDfc(dataInicio: string, dataFim: string, operador?: string): Promise<{
     operadores: string[];
     receitas: {
@@ -9885,28 +9887,31 @@ export class DbStorage implements IStorage {
   }> {
     const dataFimComHora = `${dataFim} 23:59:59`;
     
-    // CTE para deduplicar cup_clientes por CNPJ limpo (um responsável por cliente)
-    // Isso evita multiplicação de parcelas quando um cliente tem múltiplos tasks
+    // CTE para deduplicar contratos por CNPJ limpo (um responsável por cliente)
+    // Usa cup_contratos.responsavel (gestor do contrato) - diferente do Colaborador que usa cx
+    // Pega o contrato mais recente (maior id_subtask) para cada cliente
     const operadoresResult = await db.execute(sql`
-      WITH clientes_unicos AS (
+      WITH contratos_unicos AS (
         SELECT DISTINCT ON (cnpj_limpo)
           cnpj_limpo,
           responsavel
         FROM (
           SELECT 
-            REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
-            responsavel,
-            task_id
-          FROM cup_clientes
-          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
+            REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+            ct.responsavel,
+            ct.id_subtask
+          FROM cup_contratos ct
+          INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+          WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
+            AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
         ) sub
-        ORDER BY cnpj_limpo, task_id
+        ORDER BY cnpj_limpo, id_subtask DESC
       )
-      SELECT DISTINCT COALESCE(NULLIF(TRIM(cu.responsavel), ''), 'Sem Responsável') as operador
+      SELECT DISTINCT COALESCE(NULLIF(TRIM(ctu.responsavel), ''), 'Sem Operador') as operador
       FROM caz_parcelas p
       LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-      LEFT JOIN clientes_unicos cu 
-        ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = cu.cnpj_limpo
+      LEFT JOIN contratos_unicos ctu 
+        ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = ctu.cnpj_limpo
       WHERE p.status = 'QUITADO'
         AND p.tipo_evento = 'RECEITA'
         AND p.data_quitacao >= ${dataInicio}::date
@@ -9919,27 +9924,29 @@ export class DbStorage implements IStorage {
     
     const operadores = operadoresResult.rows.map((r: any) => r.operador);
     
-    // Constrói filtro de operador se especificado (usando responsável do cliente)
+    // Constrói filtro de operador se especificado (usando responsável do CONTRATO)
     const operadorFilter = operador && operador !== 'todos' 
-      ? sql`AND COALESCE(NULLIF(TRIM(cu.responsavel), ''), 'Sem Responsável') = ${operador}`
+      ? sql`AND COALESCE(NULLIF(TRIM(ctu.responsavel), ''), 'Sem Operador') = ${operador}`
       : sql``;
     
-    // CTE para deduplicar cup_clientes por CNPJ limpo
-    // Garante que cada parcela é contada apenas uma vez por cliente
+    // CTE para deduplicar contratos por CNPJ limpo
+    // Garante que cada parcela é atribuída a apenas um operador
     const receitasResult = await db.execute(sql`
-      WITH clientes_unicos AS (
+      WITH contratos_unicos AS (
         SELECT DISTINCT ON (cnpj_limpo)
           cnpj_limpo,
           responsavel
         FROM (
           SELECT 
-            REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
-            responsavel,
-            task_id
-          FROM cup_clientes
-          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
+            REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+            ct.responsavel,
+            ct.id_subtask
+          FROM cup_contratos ct
+          INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+          WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
+            AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
         ) sub
-        ORDER BY cnpj_limpo, task_id
+        ORDER BY cnpj_limpo, id_subtask DESC
       )
       SELECT 
         COALESCE(p.categoria_id, 'SEM_CATEGORIA') as categoria_id,
@@ -9949,8 +9956,8 @@ export class DbStorage implements IStorage {
         COUNT(DISTINCT p.id_cliente) as quantidade_clientes
       FROM caz_parcelas p
       LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-      LEFT JOIN clientes_unicos cu 
-        ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = cu.cnpj_limpo
+      LEFT JOIN contratos_unicos ctu 
+        ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = ctu.cnpj_limpo
       WHERE p.status = 'QUITADO'
         AND p.tipo_evento = 'RECEITA'
         AND p.data_quitacao >= ${dataInicio}::date
