@@ -9741,51 +9741,44 @@ export class DbStorage implements IStorage {
     console.log(`[ContribuicaoDfc] Buscando salário para responsavel="${responsavel}"`);
     if (responsavel && responsavel !== 'todos') {
       try {
-        // Busca salário bruto primeiro (correspondência exata)
-        console.log(`[ContribuicaoDfc] Tentando match exato para "${responsavel}"`);
-        let salarioResult = await db.execute(sql`
-          SELECT salario as salario_bruto, nome
-          FROM rh_pessoal
-          WHERE LOWER(TRIM(nome)) = LOWER(TRIM(${responsavel}))
-            AND salario IS NOT NULL
-            AND salario != ''
-            AND LOWER(status) = 'ativo'
-          LIMIT 1
-        `);
+        // Separa nome e sobrenome do responsável do ClickUp
+        const partes = responsavel.trim().split(/\s+/);
+        const primeiroNome = partes[0]?.toLowerCase() || '';
+        const sobrenome = partes.length > 1 ? partes[partes.length - 1]?.toLowerCase() : '';
         
-        // Segunda tentativa: busca parcial (caso nome tenha variações)
-        if (salarioResult.rows.length === 0) {
-          console.log(`[ContribuicaoDfc] Tentando busca parcial para "${responsavel}"`);
-          const likePattern = `%${responsavel.toLowerCase().trim()}%`;
+        console.log(`[ContribuicaoDfc] Buscando por nome="${primeiroNome}" sobrenome="${sobrenome}"`);
+        
+        // Busca onde nome E sobrenome estejam contidos no nome completo do RH
+        let salarioResult;
+        if (primeiroNome && sobrenome) {
+          const likeNome = `%${primeiroNome}%`;
+          const likeSobrenome = `%${sobrenome}%`;
           salarioResult = await db.execute(sql`
             SELECT salario as salario_bruto, nome
             FROM rh_pessoal
-            WHERE (
-              LOWER(TRIM(nome)) LIKE ${likePattern}
-              OR ${responsavel.toLowerCase().trim()} LIKE '%' || LOWER(TRIM(nome)) || '%'
-            )
-              AND salario IS NOT NULL
-              AND salario != ''
-              AND LOWER(status) = 'ativo'
-            ORDER BY LENGTH(nome)
-            LIMIT 1
-          `);
-        }
-        
-        // Terceira tentativa: busca por primeiro nome
-        if (salarioResult.rows.length === 0) {
-          const primeiroNome = responsavel.split(' ')[0].toLowerCase().trim();
-          console.log(`[ContribuicaoDfc] Tentando busca por primeiro nome "${primeiroNome}"`);
-          salarioResult = await db.execute(sql`
-            SELECT salario as salario_bruto, nome
-            FROM rh_pessoal
-            WHERE LOWER(TRIM(nome)) LIKE ${primeiroNome + '%'}
+            WHERE LOWER(nome) LIKE ${likeNome}
+              AND LOWER(nome) LIKE ${likeSobrenome}
               AND salario IS NOT NULL
               AND salario != ''
               AND LOWER(status) = 'ativo'
             ORDER BY nome
             LIMIT 1
           `);
+        } else if (primeiroNome) {
+          // Se só tem primeiro nome, busca por ele
+          const likeNome = `%${primeiroNome}%`;
+          salarioResult = await db.execute(sql`
+            SELECT salario as salario_bruto, nome
+            FROM rh_pessoal
+            WHERE LOWER(nome) LIKE ${likeNome}
+              AND salario IS NOT NULL
+              AND salario != ''
+              AND LOWER(status) = 'ativo'
+            ORDER BY nome
+            LIMIT 1
+          `);
+        } else {
+          salarioResult = { rows: [] };
         }
         
         if (salarioResult.rows.length > 0) {
