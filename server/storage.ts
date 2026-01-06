@@ -9603,8 +9603,16 @@ export class DbStorage implements IStorage {
         dataQuitacao: string;
       }[];
     }[];
+    despesas: {
+      categoriaId: string;
+      categoriaNome: string;
+      valor: number;
+      nivel: number;
+    }[];
     totais: {
       receitaTotal: number;
+      despesaTotal: number;
+      resultado: number;
       quantidadeParcelas: number;
       quantidadeClientes: number;
     };
