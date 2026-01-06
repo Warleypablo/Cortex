@@ -2111,14 +2111,16 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
         <HeroCard
           title="MRR Ativo"
           value={viewMode === "month" 
-            ? (isSelectedMonthFuture ? null : (isSelectedMonthCurrent ? metrics.mrr_ativo : getValueFromSeries(series.mrr || metrics.mrr_serie, selectedMonth)))
+            ? (isSelectedMonthCurrent || isSelectedMonthFuture 
+                ? metrics.mrr_ativo 
+                : getValueFromSeries(series.mrr || metrics.mrr_serie, selectedMonth) ?? metrics.mrr_ativo)
             : metrics.mrr_ativo}
           target={mrrTarget}
           format="currency"
           direction="higher"
           icon={TrendingUp}
           tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label}: Meta ${formatCurrency(mrrTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
+            ? `${selectedMonthData?.label}: Meta ${formatCurrency(mrrTarget)}${isSelectedMonthFuture ? ' (Valor atual - mês futuro)' : ''}`
             : `Meta ${selectedQuarter}: ${formatCurrency(mrrTarget)}`}
         />
         <HeroCard
