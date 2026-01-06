@@ -9954,8 +9954,7 @@ export class DbStorage implements IStorage {
           p.id_cliente,
           p.categoria_id,
           p.categoria_nome,
-          p.valor_pago,
-          p.descricao
+          p.valor_pago
         FROM caz_parcelas p
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
@@ -9968,19 +9967,16 @@ export class DbStorage implements IStorage {
       SELECT 
         COALESCE(pb.categoria_id, 'SEM_CATEGORIA') as categoria_id,
         COALESCE(pb.categoria_nome, 'Sem Categoria') as categoria_nome,
-        COALESCE(iv.nome, 'Sem item identificado') as item_nome,
+        COALESCE(caz.nome, 'Cliente não identificado') as cliente_nome,
         SUM(pb.valor_pago::numeric) as valor_total,
-        COUNT(pb.id) as quantidade_parcelas,
-        COUNT(DISTINCT pb.id_cliente) as quantidade_clientes
+        COUNT(pb.id) as quantidade_parcelas
       FROM parcelas_base pb
       LEFT JOIN caz_clientes caz ON TRIM(pb.id_cliente::text) = TRIM(caz.ids::text)
       LEFT JOIN contratos_unicos ctu 
         ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = ctu.cnpj_limpo
-      LEFT JOIN caz_vendas v ON pb.descricao = 'Venda ' || v.numero::text
-      LEFT JOIN caz_itensvenda iv ON iv.id = v.id
       WHERE 1=1
         ${operadorFilter}
-      GROUP BY pb.categoria_id, pb.categoria_nome, iv.nome
+      GROUP BY pb.categoria_id, pb.categoria_nome, caz.nome
       ORDER BY pb.categoria_id, valor_total DESC
     `);
     
@@ -10007,10 +10003,9 @@ export class DbStorage implements IStorage {
     for (const row of receitasResult.rows as any[]) {
       const categoriaId = row.categoria_id || 'SEM_CATEGORIA';
       const categoriaNome = row.categoria_nome || 'Sem Categoria';
-      const itemNome = row.item_nome || 'Sem item identificado';
+      const clienteNome = row.cliente_nome || 'Cliente não identificado';
       const valor = Number(row.valor_total) || 0;
       const parcelas = Number(row.quantidade_parcelas) || 0;
-      const clientes = Number(row.quantidade_clientes) || 0;
       
       if (!categoriaMap.has(categoriaId)) {
         categoriaMap.set(categoriaId, {
@@ -10025,18 +10020,22 @@ export class DbStorage implements IStorage {
       const cat = categoriaMap.get(categoriaId)!;
       cat.valorTotal += valor;
       cat.parcelas += parcelas;
-      cat.clientes += clientes;
+      cat.clientes += 1;
       
-      // Agrupa itens
-      const itemValorAtual = cat.itens.get(itemNome) || 0;
-      cat.itens.set(itemNome, itemValorAtual + valor);
+      // Agrupa por cliente (mostra de onde vem a receita)
+      const clienteValorAtual = cat.itens.get(clienteNome) || 0;
+      cat.itens.set(clienteNome, clienteValorAtual + valor);
       
       receitaTotal += valor;
       totalParcelas += parcelas;
-      totalContratos += clientes;
     }
     
-    // Monta hierarquia: nível 1 = categoria, nível 2 = itens
+    // Conta total de clientes únicos
+    for (const cat of Array.from(categoriaMap.values())) {
+      totalContratos += cat.itens.size;
+    }
+    
+    // Monta hierarquia: nível 1 = categoria, nível 2 = clientes
     for (const [categoriaId, cat] of Array.from(categoriaMap.entries())) {
       // Adiciona categoria (nível 1)
       receitas.push({
