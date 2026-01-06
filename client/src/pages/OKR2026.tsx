@@ -33,7 +33,7 @@ import {
   XCircle, Banknote, PiggyBank, ClipboardCheck, MessageSquare, History,
   CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building,
   LayoutGrid, List, Search, Loader2, Database, FileText, ListChecks, Calendar,
-  ChevronRight, X, ExternalLink, Tag, Lightbulb, Zap, ShoppingCart
+  ChevronRight, X, ExternalLink, Tag, Lightbulb, Zap, ShoppingCart, UserMinus, Wallet
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -3215,6 +3215,12 @@ function BPFinanceiroTab() {
     queryKey: ["/api/okr2026/bp-financeiro"],
   });
 
+  const { data: dashboardData } = useQuery<{ metrics: OKRMetrics }>({
+    queryKey: ["/api/okr2026/dashboard"],
+  });
+
+  const metrics = dashboardData?.metrics;
+
   const formatValue = (value: number | null, unit: string) => {
     if (value === null) return "—";
     if (unit === "PCT") return `${(value * 100).toFixed(1)}%`;
@@ -3309,8 +3315,109 @@ function BPFinanceiroTab() {
     return Math.round((actual / plan) * 100);
   };
 
+  const heroCards = [
+    {
+      key: "mrr_ativo",
+      title: "MRR Ativo",
+      value: metrics?.mrrAtivo ?? null,
+      target: metrics?.mrrAtivoTarget ?? null,
+      icon: <TrendingUp className="w-5 h-5" />,
+      direction: "higher_better",
+    },
+    {
+      key: "vendas_mrr",
+      title: "Vendas MRR",
+      value: metrics?.vendasMrr ?? null,
+      target: metrics?.vendasMrrTarget ?? null,
+      icon: <ShoppingCart className="w-5 h-5" />,
+      direction: "higher_better",
+    },
+    {
+      key: "inadimplencia",
+      title: "Inadimplência",
+      value: metrics?.inadimplencia_brl ?? null,
+      target: metrics?.inadimplenciaTarget ?? null,
+      icon: <AlertTriangle className="w-5 h-5" />,
+      direction: "lower_better",
+    },
+    {
+      key: "churn",
+      title: "Churn",
+      value: metrics?.churn_brl ?? null,
+      target: metrics?.churnTarget ?? null,
+      icon: <UserMinus className="w-5 h-5" />,
+      direction: "lower_better",
+    },
+    {
+      key: "geracao_caixa",
+      title: "Geração de Caixa",
+      value: metrics?.geracaoCaixa ?? null,
+      target: metrics?.geracaoCaixaTarget ?? null,
+      icon: <Wallet className="w-5 h-5" />,
+      direction: "higher_better",
+    },
+  ];
+
+  const getHeroStatus = (value: number | null, target: number | null, direction: string) => {
+    if (value === null || target === null) return "gray";
+    if (direction === "lower_better") {
+      if (value <= target) return "green";
+      if (value <= target * 1.1) return "yellow";
+      return "red";
+    }
+    const pct = (value / target) * 100;
+    if (pct >= 95) return "green";
+    if (pct >= 80) return "yellow";
+    return "red";
+  };
+
   return (
     <div className="space-y-6">
+      {metrics && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {heroCards.map((card) => {
+            const status = getHeroStatus(card.value, card.target, card.direction);
+            const progress = card.value && card.target 
+              ? card.direction === "lower_better"
+                ? Math.max(0, 100 - ((card.value / card.target - 1) * 100))
+                : Math.round((card.value / card.target) * 100)
+              : null;
+            return (
+              <Card key={card.key} className="overflow-hidden border-0 shadow-md bg-gradient-to-br from-card to-card/80">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className={`p-2 rounded-lg ${
+                      status === "green" ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400' :
+                      status === "yellow" ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400' :
+                      status === "red" ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/50 dark:text-rose-400' :
+                      'bg-muted text-muted-foreground'
+                    }`}>
+                      {card.icon}
+                    </div>
+                    <div className={`w-2.5 h-2.5 rounded-full ${
+                      status === "green" ? 'bg-green-500' :
+                      status === "yellow" ? 'bg-yellow-500' :
+                      status === "red" ? 'bg-red-500' :
+                      'bg-muted-foreground/30'
+                    }`} />
+                  </div>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">{card.title}</p>
+                  <p className="text-lg font-bold tracking-tight">
+                    {card.value !== null ? formatCurrency(card.value) : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Meta: {card.target !== null ? formatCurrency(card.target) : "—"}
+                  </p>
+                  {progress !== null && (
+                    <Progress value={Math.min(progress, 100)} className="h-1 mt-2" />
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {keyMetrics.map((metric) => {
           const progress = calculateProgress(metric.totals.actual, metric.totals.plan);
