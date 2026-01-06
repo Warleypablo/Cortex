@@ -9955,8 +9955,7 @@ export class DbStorage implements IStorage {
           p.categoria_id,
           p.categoria_nome,
           p.valor_pago,
-          -- Extrai número da venda de "Venda 123" (formato correto)
-          TRIM(REGEXP_REPLACE(p.descricao, '^Venda[^0-9]*', '', 'i')) as numero_venda
+          p.descricao
         FROM caz_parcelas p
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
@@ -9977,7 +9976,7 @@ export class DbStorage implements IStorage {
       LEFT JOIN caz_clientes caz ON TRIM(pb.id_cliente::text) = TRIM(caz.ids::text)
       LEFT JOIN contratos_unicos ctu 
         ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = ctu.cnpj_limpo
-      LEFT JOIN caz_vendas v ON v.numero::text = pb.numero_venda
+      LEFT JOIN caz_vendas v ON pb.descricao = 'Venda ' || v.numero::text
       LEFT JOIN caz_itensvenda iv ON iv.id = v.id
       WHERE 1=1
         ${operadorFilter}
