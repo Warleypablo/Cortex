@@ -44,6 +44,7 @@ export interface DashboardMetrics {
   expansion_mrr: number;
   expansion_mrr_ytd: number | null;
   vendas_pontual: number;
+  vendas_mrr: number;
   headcount: number;
   receita_por_head: number;
   mrr_por_head: number;
@@ -588,6 +589,25 @@ export async function getVendasPontual(): Promise<number> {
     return parseFloat((result.rows[0] as any)?.vendas_pontual || "0");
   } catch (error) {
     console.error("[OKR] Error fetching Vendas Pontual:", error);
+    return 0;
+  }
+}
+
+export async function getVendasMrr(): Promise<number> {
+  try {
+    // Vendas MRR = soma de valorr de deals com stage_name = 'Negócio Ganho' fechados no mês atual
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(valorr::numeric), 0) as vendas_mrr
+      FROM crm_deal
+      WHERE stage_name = 'Negócio Ganho'
+        AND data_fechamento IS NOT NULL
+        AND TO_CHAR(data_fechamento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+        AND valorr IS NOT NULL
+        AND valorr > 0
+    `);
+    return parseFloat((result.rows[0] as any)?.vendas_mrr || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Vendas MRR:", error);
     return 0;
   }
 }
@@ -1656,6 +1676,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     newMrrYTD,
     expansionMrr,
     vendasPontual,
+    vendasMrr,
     turboohReceita,
     turboohCustos,
     turboohResultado,
@@ -1680,6 +1701,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     getNewMrrYTD(),
     getExpansionMrr(),
     getVendasPontual(),
+    getVendasMrr(),
     getTurboohReceita(),
     getTurboohCustos(),
     getTurboohResultado(),
@@ -1721,6 +1743,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     expansion_mrr: expansionMrr,
     expansion_mrr_ytd: expansionMrr,
     vendas_pontual: vendasPontual,
+    vendas_mrr: vendasMrr,
     headcount,
     receita_por_head: receitaPorHead,
     mrr_por_head: mrrPorHead,
