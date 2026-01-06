@@ -344,12 +344,14 @@ export interface IStorage {
     faturamentoBruto: number;
     quantidadeClientes: number;
     quantidadeParcelas: number;
+    salario: number;
   }[]>;
   getContribuicaoColaboradorPeriodo(dataInicio: string, dataFim: string): Promise<{
     responsavel: string;
     faturamentoBruto: number;
     quantidadeClientes: number;
     quantidadeParcelas: number;
+    salario: number;
   }[]>;
   
   // Contribuição por Colaborador - Estilo DFC (hierárquico)
@@ -362,6 +364,13 @@ export interface IStorage {
       nivel: number;
       children: string[];
       isLeaf: boolean;
+      parcelas?: {
+        id: number;
+        descricao: string;
+        cliente: string;
+        valor: number;
+        dataQuitacao: string;
+      }[];
     }[];
     despesas: {
       categoriaId: string;
@@ -9486,12 +9495,13 @@ export class DbStorage implements IStorage {
   }
 
   // Contribuição por Colaborador - Faturamento Bruto por Responsável
-  // Fluxo: caz_parcelas.id_cliente -> caz_clientes.ids (para obter cnpj) -> cup_clientes.cnpj (para obter responsável)
+  // Fluxo: caz_parcelas.id_cliente -> caz_clientes.ids (para obter cnpj) -> cup_clientes.cnpj (para obter responsável) -> rh_pessoal.nome (para obter salário)
   async getContribuicaoColaborador(mes: number, ano: number): Promise<{
     responsavel: string;
     faturamentoBruto: number;
     quantidadeClientes: number;
     quantidadeParcelas: number;
+    salario: number;
   }[]> {
     // Primeiro e último dia do mês (usando cálculo seguro)
     const primeiroDia = `${ano}-${String(mes).padStart(2, '0')}-01`;
@@ -9503,12 +9513,16 @@ export class DbStorage implements IStorage {
         COALESCE(NULLIF(TRIM(cup.responsavel), ''), 'Sem Responsável') as responsavel,
         SUM(COALESCE(p.valor_pago::numeric, 0)) as faturamento_bruto,
         COUNT(DISTINCT p.id_cliente) as quantidade_clientes,
-        COUNT(p.id) as quantidade_parcelas
+        COUNT(p.id) as quantidade_parcelas,
+        MAX(COALESCE(rh.salario::numeric, 0)) as salario
       FROM caz_parcelas p
       LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
       LEFT JOIN cup_clientes cup 
         ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = 
            REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '')
+      LEFT JOIN rh_pessoal rh 
+        ON LOWER(TRIM(rh.nome)) = LOWER(TRIM(cup.responsavel))
+        AND (rh.demissao IS NULL OR rh.demissao > CURRENT_DATE)
       WHERE p.status = 'QUITADO'
         AND p.tipo_evento = 'RECEITA'
         AND p.data_quitacao >= ${primeiroDia}::date
@@ -9523,7 +9537,8 @@ export class DbStorage implements IStorage {
       responsavel: row.responsavel,
       faturamentoBruto: Number(row.faturamento_bruto) || 0,
       quantidadeClientes: Number(row.quantidade_clientes) || 0,
-      quantidadeParcelas: Number(row.quantidade_parcelas) || 0
+      quantidadeParcelas: Number(row.quantidade_parcelas) || 0,
+      salario: Number(row.salario) || 0
     }));
   }
 
@@ -9532,6 +9547,7 @@ export class DbStorage implements IStorage {
     faturamentoBruto: number;
     quantidadeClientes: number;
     quantidadeParcelas: number;
+    salario: number;
   }[]> {
     const dataFimComHora = `${dataFim} 23:59:59`;
     
@@ -9540,12 +9556,16 @@ export class DbStorage implements IStorage {
         COALESCE(NULLIF(TRIM(cup.responsavel), ''), 'Sem Responsável') as responsavel,
         SUM(COALESCE(p.valor_pago::numeric, 0)) as faturamento_bruto,
         COUNT(DISTINCT p.id_cliente) as quantidade_clientes,
-        COUNT(p.id) as quantidade_parcelas
+        COUNT(p.id) as quantidade_parcelas,
+        MAX(COALESCE(rh.salario::numeric, 0)) as salario
       FROM caz_parcelas p
       LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
       LEFT JOIN cup_clientes cup 
         ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = 
            REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '')
+      LEFT JOIN rh_pessoal rh 
+        ON LOWER(TRIM(rh.nome)) = LOWER(TRIM(cup.responsavel))
+        AND (rh.demissao IS NULL OR rh.demissao > CURRENT_DATE)
       WHERE p.status = 'QUITADO'
         AND p.tipo_evento = 'RECEITA'
         AND p.data_quitacao >= ${dataInicio}::date
@@ -9560,7 +9580,8 @@ export class DbStorage implements IStorage {
       responsavel: row.responsavel,
       faturamentoBruto: Number(row.faturamento_bruto) || 0,
       quantidadeClientes: Number(row.quantidade_clientes) || 0,
-      quantidadeParcelas: Number(row.quantidade_parcelas) || 0
+      quantidadeParcelas: Number(row.quantidade_parcelas) || 0,
+      salario: Number(row.salario) || 0
     }));
   }
 
