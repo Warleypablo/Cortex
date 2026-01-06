@@ -9981,7 +9981,7 @@ export class DbStorage implements IStorage {
       LEFT JOIN contratos_unicos ctu 
         ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = ctu.cnpj_limpo
       LEFT JOIN caz_vendas v ON v.numero::text = p.numero_venda
-      LEFT JOIN caz_itensvenda iv ON iv.id_venda::text = v.id::text
+      LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
       WHERE 1=1
         ${operadorFilter}
       GROUP BY p.categoria_id, p.categoria_nome, iv.descricao
