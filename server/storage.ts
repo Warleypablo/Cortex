@@ -9672,7 +9672,7 @@ export class DbStorage implements IStorage {
     if (responsavel && responsavel !== 'todos') {
       const salarioResult = await db.execute(sql`
         SELECT salario::numeric as salario
-        FROM rh_colaboradores
+        FROM rh_pessoal
         WHERE LOWER(TRIM(nome)) = LOWER(TRIM(${responsavel}))
           AND salario IS NOT NULL
           AND salario != ''
