@@ -207,6 +207,11 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
     },
   });
 
+  // Filter out ADMIN category permissions - these are sensitive and should not be selectable for regular users
+  const selectablePermissions = ALL_PERMISSION_KEYS.filter(key => !key.startsWith('admin.'));
+  // Filter out ADMIN category from display
+  const selectableCategories = PERMISSION_CATEGORIES.filter(cat => cat.key !== 'ADMIN');
+
   const handleToggleRoute = (route: string) => {
     if (selectedRoutes.includes(route)) {
       setSelectedRoutes(selectedRoutes.filter((r) => r !== route));
@@ -216,7 +221,7 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
   };
 
   const handleSelectAll = () => {
-    setSelectedRoutes([...ALL_PERMISSION_KEYS]);
+    setSelectedRoutes([...selectablePermissions]);
   };
 
   const handleDeselectAll = () => {
@@ -242,7 +247,14 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
   const handleApplyPreset = (presetId: string) => {
     const preset = ROLE_PRESETS.find(p => p.id === presetId);
     if (preset) {
-      setSelectedRoutes([...preset.permissions]);
+      // Control Tower preset should include all permissions (including admin)
+      // Other presets should filter out admin permissions for security
+      if (presetId === 'control_tower') {
+        setSelectedRoutes([...preset.permissions]);
+      } else {
+        const safePermissions = preset.permissions.filter(p => !p.startsWith('admin.'));
+        setSelectedRoutes([...safePermissions]);
+      }
       toast({
         title: "Perfil aplicado",
         description: `Perfil "${preset.label}" aplicado. Clique em Salvar para confirmar.`,
@@ -361,12 +373,12 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
                   Desmarcar Todas
                 </Button>
                 <div className="ml-auto text-sm text-muted-foreground">
-                  {selectedRoutes.length} de {ALL_PERMISSION_KEYS.length} selecionadas
+                  {selectedRoutes.length} de {selectablePermissions.length} selecionadas
                 </div>
               </div>
 
               <div className="space-y-6">
-                {PERMISSION_CATEGORIES.map((category) => {
+                {selectableCategories.map((category) => {
                   const categoryPerms = category.permissions.map(p => p.key);
                   const isFullySelected = isCategoryFullySelected(categoryPerms);
                   return (
@@ -484,6 +496,11 @@ function AddUserDialog({ open, onOpenChange }: {
     setEmailError("");
   };
 
+  // Filter out ADMIN category permissions - these are sensitive and should not be selectable for regular users
+  const selectablePermissions = ALL_PERMISSION_KEYS.filter(key => !key.startsWith('admin.'));
+  // Filter out ADMIN category from display
+  const selectableCategories = PERMISSION_CATEGORIES.filter(cat => cat.key !== 'ADMIN');
+
   const handleToggleRoute = (route: string) => {
     if (selectedRoutes.includes(route)) {
       setSelectedRoutes(selectedRoutes.filter((r) => r !== route));
@@ -493,7 +510,7 @@ function AddUserDialog({ open, onOpenChange }: {
   };
 
   const handleSelectAll = () => {
-    setSelectedRoutes([...ALL_PERMISSION_KEYS]);
+    setSelectedRoutes([...selectablePermissions]);
   };
 
   const handleDeselectAll = () => {
@@ -519,7 +536,14 @@ function AddUserDialog({ open, onOpenChange }: {
   const handleApplyPreset = (presetId: string) => {
     const preset = ROLE_PRESETS.find(p => p.id === presetId);
     if (preset) {
-      setSelectedRoutes([...preset.permissions]);
+      // Control Tower preset should include all permissions (including admin)
+      // Other presets should filter out admin permissions for security
+      if (presetId === 'control_tower') {
+        setSelectedRoutes([...preset.permissions]);
+      } else {
+        const safePermissions = preset.permissions.filter(p => !p.startsWith('admin.'));
+        setSelectedRoutes([...safePermissions]);
+      }
       toast({
         title: "Perfil aplicado",
         description: `Perfil "${preset.label}" aplicado.`,
@@ -669,12 +693,12 @@ function AddUserDialog({ open, onOpenChange }: {
                   Desmarcar Todas
                 </Button>
                 <div className="ml-auto text-sm text-muted-foreground">
-                  {selectedRoutes.length} de {ALL_PERMISSION_KEYS.length} selecionadas
+                  {selectedRoutes.length} de {selectablePermissions.length} selecionadas
                 </div>
               </div>
 
               <div className="space-y-6">
-                {PERMISSION_CATEGORIES.map((category) => {
+                {selectableCategories.map((category) => {
                   const categoryPerms = category.permissions.map(p => p.key);
                   const isFullySelected = isCategoryFullySelected(categoryPerms);
                   return (
