@@ -9924,38 +9924,40 @@ export class DbStorage implements IStorage {
     
     const operadores = operadoresResult.rows.map((r: any) => r.operador);
     
-    // Constrói filtro de operador se especificado (usando responsável do CONTRATO)
+    // Constrói filtro de operador se especificado (usando responsável do CONTRATO específico)
     const operadorFilter = operador && operador !== 'todos' 
-      ? sql`AND COALESCE(NULLIF(TRIM(ctu.responsavel), ''), 'Sem Operador') = ${operador}`
+      ? sql`AND COALESCE(NULLIF(TRIM(cts.responsavel), ''), 'Sem Operador') = ${operador}`
       : sql``;
     
-    // Query com hierarquia: Categoria → Item de Venda (caz_itensvenda.nome)
-    // Fluxo de join: parcela.descricao "Venda 123" → extrai numero → caz_vendas.numero → caz_vendas.id = caz_itensvenda.id
+    // Query com hierarquia: Categoria → Cliente → Contrato/Serviço
+    // Fluxo de join: parcela → venda → item_venda.nome → cruza com contrato.nome_servico → pega responsavel correto
     const receitasResult = await db.execute(sql`
-      WITH contratos_unicos AS (
-        SELECT DISTINCT ON (cnpj_limpo)
-          cnpj_limpo,
-          responsavel
-        FROM (
-          SELECT 
-            REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
-            ct.responsavel,
-            ct.id_subtask
-          FROM cup_contratos ct
-          INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
-          WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
-            AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
-        ) sub
-        ORDER BY cnpj_limpo, id_subtask DESC
+      WITH contratos_com_servico AS (
+        SELECT 
+          REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+          ct.responsavel,
+          ct.nome_servico,
+          LOWER(TRIM(REGEXP_REPLACE(ct.nome_servico, '\s+', ' ', 'g'))) as nome_servico_norm,
+          ct.id_subtask
+        FROM cup_contratos ct
+        INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+        WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
+          AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
+          AND ct.nome_servico IS NOT NULL AND TRIM(ct.nome_servico) != ''
       ),
-      parcelas_base AS (
+      parcelas_com_item AS (
         SELECT 
           p.id,
           p.id_cliente,
           p.categoria_id,
           p.categoria_nome,
-          p.valor_pago
+          p.valor_pago,
+          p.descricao,
+          iv.nome as item_nome,
+          LOWER(TRIM(REGEXP_REPLACE(COALESCE(iv.nome, ''), '\s+', ' ', 'g'))) as item_nome_norm
         FROM caz_parcelas p
+        LEFT JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
+        LEFT JOIN caz_itensvenda iv ON iv.id = v.id
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
@@ -9965,19 +9967,26 @@ export class DbStorage implements IStorage {
           AND p.descricao LIKE 'Venda%'
       )
       SELECT 
-        COALESCE(pb.categoria_id, 'SEM_CATEGORIA') as categoria_id,
-        COALESCE(pb.categoria_nome, 'Sem Categoria') as categoria_nome,
+        COALESCE(pci.categoria_id, 'SEM_CATEGORIA') as categoria_id,
+        COALESCE(pci.categoria_nome, 'Sem Categoria') as categoria_nome,
         COALESCE(caz.nome, 'Cliente não identificado') as cliente_nome,
-        SUM(pb.valor_pago::numeric) as valor_total,
-        COUNT(pb.id) as quantidade_parcelas
-      FROM parcelas_base pb
-      LEFT JOIN caz_clientes caz ON TRIM(pb.id_cliente::text) = TRIM(caz.ids::text)
-      LEFT JOIN contratos_unicos ctu 
-        ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = ctu.cnpj_limpo
+        COALESCE(cts.nome_servico, pci.item_nome, 'Serviço não identificado') as servico_nome,
+        COALESCE(NULLIF(TRIM(cts.responsavel), ''), 'Sem Operador') as responsavel,
+        SUM(pci.valor_pago::numeric) as valor_total,
+        COUNT(pci.id) as quantidade_parcelas
+      FROM parcelas_com_item pci
+      LEFT JOIN caz_clientes caz ON TRIM(pci.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN contratos_com_servico cts 
+        ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = cts.cnpj_limpo
+        AND (
+          cts.nome_servico_norm = pci.item_nome_norm
+          OR cts.nome_servico_norm LIKE '%' || pci.item_nome_norm || '%'
+          OR pci.item_nome_norm LIKE '%' || cts.nome_servico_norm || '%'
+        )
       WHERE 1=1
         ${operadorFilter}
-      GROUP BY pb.categoria_id, pb.categoria_nome, caz.nome
-      ORDER BY pb.categoria_id, valor_total DESC
+      GROUP BY pci.categoria_id, pci.categoria_nome, caz.nome, cts.nome_servico, pci.item_nome, cts.responsavel
+      ORDER BY pci.categoria_id, valor_total DESC
     `);
     
     const receitas: {
@@ -9991,51 +10000,66 @@ export class DbStorage implements IStorage {
     let totalParcelas = 0;
     let totalContratos = 0;
     
-    // Agrupa primeiro por categoria, depois por item
-    const categoriaMap = new Map<string, {
-      nome: string;
-      valorTotal: number;
-      itens: Map<string, number>;
-      parcelas: number;
-      clientes: number;
-    }>();
+    // Estrutura de 3 níveis: Categoria → Cliente → Serviço
+    type ServicoInfo = { valor: number; responsavel: string };
+    type ClienteInfo = { valorTotal: number; servicos: Map<string, ServicoInfo> };
+    type CategoriaInfo = { nome: string; valorTotal: number; clientes: Map<string, ClienteInfo> };
+    
+    const categoriaMap = new Map<string, CategoriaInfo>();
     
     for (const row of receitasResult.rows as any[]) {
       const categoriaId = row.categoria_id || 'SEM_CATEGORIA';
       const categoriaNome = row.categoria_nome || 'Sem Categoria';
       const clienteNome = row.cliente_nome || 'Cliente não identificado';
+      const servicoNome = row.servico_nome || 'Serviço não identificado';
+      const responsavel = row.responsavel || 'Sem Operador';
       const valor = Number(row.valor_total) || 0;
       const parcelas = Number(row.quantidade_parcelas) || 0;
       
+      // Inicializa categoria
       if (!categoriaMap.has(categoriaId)) {
         categoriaMap.set(categoriaId, {
           nome: categoriaNome,
           valorTotal: 0,
-          itens: new Map(),
-          parcelas: 0,
-          clientes: 0
+          clientes: new Map()
         });
       }
       
       const cat = categoriaMap.get(categoriaId)!;
       cat.valorTotal += valor;
-      cat.parcelas += parcelas;
-      cat.clientes += 1;
       
-      // Agrupa por cliente (mostra de onde vem a receita)
-      const clienteValorAtual = cat.itens.get(clienteNome) || 0;
-      cat.itens.set(clienteNome, clienteValorAtual + valor);
+      // Inicializa cliente dentro da categoria
+      if (!cat.clientes.has(clienteNome)) {
+        cat.clientes.set(clienteNome, {
+          valorTotal: 0,
+          servicos: new Map()
+        });
+      }
+      
+      const cliente = cat.clientes.get(clienteNome)!;
+      cliente.valorTotal += valor;
+      
+      // Adiciona serviço (pode somar se repetir)
+      const chaveServico = `${servicoNome}|${responsavel}`;
+      const servicoAtual = cliente.servicos.get(chaveServico);
+      if (servicoAtual) {
+        servicoAtual.valor += valor;
+      } else {
+        cliente.servicos.set(chaveServico, { valor, responsavel });
+      }
       
       receitaTotal += valor;
       totalParcelas += parcelas;
     }
     
-    // Conta total de clientes únicos
+    // Conta total de serviços únicos (contratos)
     for (const cat of Array.from(categoriaMap.values())) {
-      totalContratos += cat.itens.size;
+      for (const cliente of Array.from(cat.clientes.values())) {
+        totalContratos += cliente.servicos.size;
+      }
     }
     
-    // Monta hierarquia: nível 1 = categoria, nível 2 = clientes
+    // Monta hierarquia: nível 1 = categoria, nível 2 = cliente, nível 3 = serviço
     for (const [categoriaId, cat] of Array.from(categoriaMap.entries())) {
       // Adiciona categoria (nível 1)
       receitas.push({
@@ -10045,19 +10069,34 @@ export class DbStorage implements IStorage {
         nivel: 1
       });
       
-      // Adiciona itens da categoria (nível 2) - ordena por valor
-      const itensOrdenados = Array.from(cat.itens.entries())
-        .sort((a, b) => b[1] - a[1]);
+      // Ordena clientes por valor
+      const clientesOrdenados = Array.from(cat.clientes.entries())
+        .sort((a, b) => b[1].valorTotal - a[1].valorTotal);
       
-      for (const [itemNome, itemValor] of itensOrdenados) {
-        // Gera ID único para o item (categoria.hash do nome)
-        const itemId = `${categoriaId}.${itemNome.substring(0, 30).replace(/\./g, '_')}`;
+      for (const [clienteNome, clienteInfo] of clientesOrdenados) {
+        // Gera ID único para o cliente
+        const clienteId = `${categoriaId}.${clienteNome.substring(0, 30).replace(/\./g, '_')}`;
         receitas.push({
-          categoriaId: itemId,
-          categoriaNome: itemNome,
-          valor: itemValor,
+          categoriaId: clienteId,
+          categoriaNome: clienteNome,
+          valor: clienteInfo.valorTotal,
           nivel: 2
         });
+        
+        // Ordena serviços por valor
+        const servicosOrdenados = Array.from(clienteInfo.servicos.entries())
+          .sort((a, b) => b[1].valor - a[1].valor);
+        
+        for (const [chaveServico, servicoInfo] of servicosOrdenados) {
+          const servicoNome = chaveServico.split('|')[0];
+          const servicoId = `${clienteId}.${servicoNome.substring(0, 20).replace(/\./g, '_')}`;
+          receitas.push({
+            categoriaId: servicoId,
+            categoriaNome: `${servicoNome} (${servicoInfo.responsavel})`,
+            valor: servicoInfo.valor,
+            nivel: 3
+          });
+        }
       }
     }
     
