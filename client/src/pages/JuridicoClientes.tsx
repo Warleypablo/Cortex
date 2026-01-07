@@ -311,11 +311,15 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
   ], []);
 
   const recuperadosStats = useMemo(() => {
+    // Considera como recuperado se:
+    // 1. Procedimento = "acordo" (negociado) com qualquer status, OU
+    // 2. Status = "concluido" com procedimento "baixa"
+    const isRecuperado = (c: ClienteJuridico) => 
+      c.contexto?.procedimentoJuridico === 'acordo' || 
+      (c.contexto?.statusJuridico === 'concluido' && c.contexto?.procedimentoJuridico === 'baixa');
+    
     if (activeTab !== 'recuperados') {
-      const recuperadosSistemaCount = clientes.filter(c => 
-        c.contexto?.statusJuridico === 'concluido' && 
-        (c.contexto?.procedimentoJuridico === 'acordo' || c.contexto?.procedimentoJuridico === 'baixa')
-      ).length;
+      const recuperadosSistemaCount = clientes.filter(isRecuperado).length;
       return { 
         clientesRecuperados: recuperadosSistemaCount + clientesPreNegociados.length, 
         valorNegociado: 0, 
@@ -327,10 +331,7 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
       };
     }
     
-    const recuperadosSistema = clientes.filter(c => 
-      c.contexto?.statusJuridico === 'concluido' && 
-      (c.contexto?.procedimentoJuridico === 'acordo' || c.contexto?.procedimentoJuridico === 'baixa')
-    );
+    const recuperadosSistema = clientes.filter(isRecuperado);
     
     const totalRecuperados = recuperadosSistema.length + clientesPreNegociados.length;
     const valorNegociadoSistema = recuperadosSistema.reduce((acc, c) => acc + (c.contexto?.valorAcordado || 0), 0);
