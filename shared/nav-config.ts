@@ -51,6 +51,7 @@ export const PERMISSION_KEYS = {
     DET_SDRS: 'com.det_sdrs',
     DET_VENDAS: 'com.det_vendas',
     ANALISE_VENDAS: 'com.analise_vendas',
+    APRESENTACAO: 'com.apresentacao',
   },
   // Growth
   GROWTH: {
@@ -189,6 +190,8 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/comercial/detalhamento-sdrs': PERMISSION_KEYS.COM.DET_SDRS,
   '/dashboard/comercial/detalhamento-vendas': PERMISSION_KEYS.COM.DET_VENDAS,
   '/dashboard/comercial/analise-vendas': PERMISSION_KEYS.COM.ANALISE_VENDAS,
+  '/dashboard/comercial/apresentacao': PERMISSION_KEYS.COM.APRESENTACAO,
+  '/presentation': PERMISSION_KEYS.COM.APRESENTACAO,
   // Growth
   '/growth/visao-geral': PERMISSION_KEYS.GROWTH.VISAO_GERAL,
   '/dashboard/meta-ads': PERMISSION_KEYS.GROWTH.META_ADS,
