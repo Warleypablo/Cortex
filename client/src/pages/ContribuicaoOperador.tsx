@@ -152,8 +152,9 @@ export default function ContribuicaoOperador() {
 
     const despesasCategories = [
       { id: 'DESP.01', nome: 'Salário do Operador', nivel: 2 },
-      { id: 'DESP.02', nome: 'Salário do Líder', nivel: 2 },
-      { id: 'DESP.03', nome: 'Impostos (16%)', nivel: 2 }
+      { id: 'DESP.02', nome: 'Salário do CX', nivel: 2 },
+      { id: 'DESP.03', nome: 'Salário do Líder', nivel: 2 },
+      { id: 'DESP.04', nome: 'Impostos (16%)', nivel: 2 }
     ];
     
     const monthColumns = monthlyResults.map(m => ({

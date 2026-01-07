@@ -10103,18 +10103,16 @@ export class DbStorage implements IStorage {
     
     // Calcula despesas
     let salarioOperador = 0;
+    let salarioCx = 0;
     const salarioLider = 7000;
     const taxaImposto = 0.16;
     
-    // Buscar salário do operador se filtrado
-    console.log(`[ContribuicaoOperador] Buscando salário para operador="${operador}"`);
-    if (operador && operador !== 'todos') {
+    // Função auxiliar para buscar salário por nome
+    const buscarSalarioPorNome = async (nome: string): Promise<{ salario: number; nomeEncontrado: string | null }> => {
       try {
-        const partes = operador.trim().split(/\s+/);
+        const partes = nome.trim().split(/\s+/);
         const primeiroNome = partes[0]?.toLowerCase() || '';
         const sobrenome = partes.length > 1 ? partes[partes.length - 1]?.toLowerCase() : '';
-        
-        console.log(`[ContribuicaoOperador] Buscando por nome="${primeiroNome}" sobrenome="${sobrenome}"`);
         
         let salarioResult;
         if (primeiroNome && sobrenome) {
@@ -10144,7 +10142,7 @@ export class DbStorage implements IStorage {
             LIMIT 1
           `);
         } else {
-          salarioResult = { rows: [] };
+          return { salario: 0, nomeEncontrado: null };
         }
         
         if (salarioResult.rows.length > 0) {
@@ -10168,21 +10166,59 @@ export class DbStorage implements IStorage {
           const salarioNumerico = parseFloat(salarioNormalizado);
           
           if (!isNaN(salarioNumerico) && salarioNumerico > 0) {
-            salarioOperador = salarioNumerico;
-            console.log(`[ContribuicaoOperador] Salário encontrado para ${operador} (${nomeEncontrado}): R$ ${salarioOperador}`);
+            return { salario: salarioNumerico, nomeEncontrado };
+          }
+        }
+        return { salario: 0, nomeEncontrado: null };
+      } catch (error) {
+        console.error(`[ContribuicaoOperador] Erro ao buscar salário para ${nome}:`, error);
+        return { salario: 0, nomeEncontrado: null };
+      }
+    };
+    
+    // Buscar salário do operador se filtrado
+    console.log(`[ContribuicaoOperador] Buscando salário para operador="${operador}"`);
+    if (operador && operador !== 'todos') {
+      const resultadoOperador = await buscarSalarioPorNome(operador);
+      salarioOperador = resultadoOperador.salario;
+      if (salarioOperador > 0) {
+        console.log(`[ContribuicaoOperador] Salário encontrado para ${operador} (${resultadoOperador.nomeEncontrado}): R$ ${salarioOperador}`);
+      } else {
+        console.log(`[ContribuicaoOperador] Salário NÃO encontrado para ${operador}`);
+      }
+      
+      // Buscar CX associado ao operador através dos contratos
+      try {
+        const cxResult = await db.execute(sql`
+          SELECT DISTINCT ct.cx
+          FROM cup_contratos ct
+          WHERE TRIM(ct.responsavel) = ${operador}
+            AND ct.cx IS NOT NULL AND TRIM(ct.cx) != ''
+          ORDER BY ct.cx
+          LIMIT 1
+        `);
+        
+        if (cxResult.rows.length > 0) {
+          const cxNome = (cxResult.rows[0] as any).cx;
+          console.log(`[ContribuicaoOperador] CX encontrado para operador ${operador}: ${cxNome}`);
+          
+          const resultadoCx = await buscarSalarioPorNome(cxNome);
+          salarioCx = resultadoCx.salario;
+          if (salarioCx > 0) {
+            console.log(`[ContribuicaoOperador] Salário do CX ${cxNome} (${resultadoCx.nomeEncontrado}): R$ ${salarioCx}`);
           } else {
-            console.log(`[ContribuicaoOperador] Salário inválido para ${operador}: "${salarioBruto}"`);
+            console.log(`[ContribuicaoOperador] Salário do CX ${cxNome} NÃO encontrado`);
           }
         } else {
-          console.log(`[ContribuicaoOperador] Salário NÃO encontrado para ${operador}`);
+          console.log(`[ContribuicaoOperador] Nenhum CX associado ao operador ${operador}`);
         }
       } catch (error) {
-        console.error(`[ContribuicaoOperador] Erro ao buscar salário para ${operador}:`, error);
+        console.error(`[ContribuicaoOperador] Erro ao buscar CX para operador ${operador}:`, error);
       }
     }
     
     const impostos = receitaTotal * taxaImposto;
-    const despesaTotal = salarioOperador + salarioLider + impostos;
+    const despesaTotal = salarioOperador + salarioCx + salarioLider + impostos;
     const resultado = receitaTotal - despesaTotal;
     
     const despesas = [
@@ -10194,12 +10230,18 @@ export class DbStorage implements IStorage {
       },
       {
         categoriaId: 'DESP.02',
+        categoriaNome: 'Salário do CX',
+        valor: salarioCx,
+        nivel: 2
+      },
+      {
+        categoriaId: 'DESP.03',
         categoriaNome: 'Salário do Líder',
         valor: salarioLider,
         nivel: 2
       },
       {
-        categoriaId: 'DESP.03',
+        categoriaId: 'DESP.04',
         categoriaNome: 'Impostos (16%)',
         valor: impostos,
         nivel: 2
