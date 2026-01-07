@@ -9862,7 +9862,9 @@ export class DbStorage implements IStorage {
 
   // Contribuição por Operador (responsável do CONTRATO, não do cliente) - Estilo DFC
   // Diferença do Colaborador: usa cup_contratos.responsavel (gestor do contrato)
-  // Colaborador usa cup_contratos.cx (CX que gerencia o cliente)
+  // Colaborador usa cup_clientes.responsavel (CX que gerencia o cliente)
+  // CORRIGIDO: Usa mesma lógica de faturamento do Colaborador (100% das parcelas QUITADAS)
+  // mas atribui pelo operador do contrato mais recente do cliente
   async getContribuicaoOperadorDfc(dataInicio: string, dataFim: string, operador?: string): Promise<{
     operadores: string[];
     receitas: {
@@ -9918,76 +9920,59 @@ export class DbStorage implements IStorage {
         AND p.data_quitacao <= ${dataFimComHora}::timestamp
         AND p.valor_pago IS NOT NULL
         AND p.valor_pago::numeric > 0
-        AND p.descricao LIKE 'Venda%'
       ORDER BY operador
     `);
     
     const operadores = operadoresResult.rows.map((r: any) => r.operador);
     
-    // Constrói filtro de operador se especificado (usando responsável do CONTRATO específico)
+    // Constrói filtro de operador se especificado (usando responsável do CONTRATO mais recente)
     const operadorFilter = operador && operador !== 'todos' 
-      ? sql`AND COALESCE(NULLIF(TRIM(cts.responsavel), ''), 'Sem Operador') = ${operador}`
+      ? sql`AND COALESCE(NULLIF(TRIM(ctu.responsavel), ''), 'Sem Operador') = ${operador}`
       : sql``;
     
-    // Query com hierarquia: Categoria → Cliente → Serviço
-    // Fluxo: parcela QUITADA → venda → item de venda (usa VALOR do item, não da parcela!)
-    // Cruza item_nome com contrato.servico para achar responsável correto
+    // Query CORRIGIDA: Usa valor_pago da parcela (igual Colaborador) e atribui por contrato mais recente
+    // Hierarquia: Categoria → Cliente → Serviço (do contrato mais recente)
     const receitasResult = await db.execute(sql`
-      WITH contratos_com_servico AS (
-        SELECT 
-          REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
-          ct.responsavel,
-          ct.servico as nome_servico,
-          LOWER(TRIM(REGEXP_REPLACE(ct.servico, '\s+', ' ', 'g'))) as nome_servico_norm,
-          ct.id_subtask
-        FROM cup_contratos ct
-        INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
-        WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
-          AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
-          AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
-      ),
-      itens_vendidos AS (
-        SELECT 
-          p.id as parcela_id,
-          p.id_cliente,
-          p.categoria_id,
-          p.categoria_nome,
-          p.data_quitacao,
-          v.id as venda_id,
-          iv.nome as item_nome,
-          LOWER(TRIM(REGEXP_REPLACE(COALESCE(iv.nome, ''), '\s+', ' ', 'g'))) as item_nome_norm,
-          iv.valor as item_valor
-        FROM caz_parcelas p
-        INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
-        INNER JOIN caz_itensvenda iv ON iv.id::text = v.id::text
-        WHERE p.status = 'QUITADO'
-          AND p.tipo_evento = 'RECEITA'
-          AND p.data_quitacao >= ${dataInicio}::date
-          AND p.data_quitacao <= ${dataFimComHora}::timestamp
-          AND iv.valor IS NOT NULL
-          AND iv.valor::numeric > 0
+      WITH contratos_unicos AS (
+        SELECT DISTINCT ON (cnpj_limpo)
+          cnpj_limpo,
+          responsavel,
+          servico
+        FROM (
+          SELECT 
+            REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+            ct.responsavel,
+            ct.servico,
+            ct.id_subtask
+          FROM cup_contratos ct
+          INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+          WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
+            AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
+        ) sub
+        ORDER BY cnpj_limpo, id_subtask DESC
       )
       SELECT 
-        COALESCE(itv.categoria_id, 'SEM_CATEGORIA') as categoria_id,
-        COALESCE(itv.categoria_nome, 'Sem Categoria') as categoria_nome,
+        COALESCE(p.categoria_id, 'SEM_CATEGORIA') as categoria_id,
+        COALESCE(p.categoria_nome, 'Sem Categoria') as categoria_nome,
         COALESCE(caz.nome, 'Cliente não identificado') as cliente_nome,
-        COALESCE(cts.nome_servico, itv.item_nome, 'Serviço não identificado') as servico_nome,
-        COALESCE(NULLIF(TRIM(cts.responsavel), ''), 'Sem Operador') as responsavel,
-        SUM(itv.item_valor::numeric) as valor_total,
-        COUNT(DISTINCT itv.parcela_id) as quantidade_parcelas
-      FROM itens_vendidos itv
-      LEFT JOIN caz_clientes caz ON TRIM(itv.id_cliente::text) = TRIM(caz.ids::text)
-      LEFT JOIN contratos_com_servico cts 
-        ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = cts.cnpj_limpo
-        AND (
-          cts.nome_servico_norm = itv.item_nome_norm
-          OR cts.nome_servico_norm LIKE '%' || itv.item_nome_norm || '%'
-          OR itv.item_nome_norm LIKE '%' || cts.nome_servico_norm || '%'
-        )
-      WHERE 1=1
+        COALESCE(NULLIF(TRIM(ctu.servico), ''), 'Serviço não identificado') as servico_nome,
+        COALESCE(NULLIF(TRIM(ctu.responsavel), ''), 'Sem Operador') as responsavel,
+        SUM(COALESCE(p.valor_pago::numeric, 0)) as valor_total,
+        COUNT(p.id) as quantidade_parcelas,
+        COUNT(DISTINCT p.id_cliente) as quantidade_clientes
+      FROM caz_parcelas p
+      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN contratos_unicos ctu 
+        ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = ctu.cnpj_limpo
+      WHERE p.status = 'QUITADO'
+        AND p.tipo_evento = 'RECEITA'
+        AND p.data_quitacao >= ${dataInicio}::date
+        AND p.data_quitacao <= ${dataFimComHora}::timestamp
+        AND p.valor_pago IS NOT NULL
+        AND p.valor_pago::numeric > 0
         ${operadorFilter}
-      GROUP BY itv.categoria_id, itv.categoria_nome, caz.nome, cts.nome_servico, itv.item_nome, cts.responsavel
-      ORDER BY itv.categoria_id, valor_total DESC
+      GROUP BY p.categoria_id, p.categoria_nome, caz.nome, ctu.servico, ctu.responsavel
+      ORDER BY p.categoria_id, valor_total DESC
     `);
     
     const receitas: {
