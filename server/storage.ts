@@ -9929,8 +9929,9 @@ export class DbStorage implements IStorage {
       ? sql`AND COALESCE(NULLIF(TRIM(cts.responsavel), ''), 'Sem Operador') = ${operador}`
       : sql``;
     
-    // Query com hierarquia: Categoria → Cliente → Contrato/Serviço
-    // Fluxo de join: parcela → venda → item_venda.nome → cruza com contrato.nome_servico → pega responsavel correto
+    // Query com hierarquia: Categoria → Cliente → Serviço
+    // Fluxo: parcela QUITADA → venda → item de venda (usa VALOR do item, não da parcela!)
+    // Cruza item_nome com contrato.servico para achar responsável correto
     const receitasResult = await db.execute(sql`
       WITH contratos_com_servico AS (
         SELECT 
@@ -9945,48 +9946,47 @@ export class DbStorage implements IStorage {
           AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
           AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
       ),
-      parcelas_com_item AS (
+      itens_vendidos AS (
         SELECT 
-          p.id,
+          p.id as parcela_id,
           p.id_cliente,
           p.categoria_id,
           p.categoria_nome,
-          p.valor_pago,
-          p.descricao,
+          p.data_quitacao,
           iv.nome as item_nome,
-          LOWER(TRIM(REGEXP_REPLACE(COALESCE(iv.nome, ''), '\s+', ' ', 'g'))) as item_nome_norm
+          LOWER(TRIM(REGEXP_REPLACE(COALESCE(iv.nome, ''), '\s+', ' ', 'g'))) as item_nome_norm,
+          iv.valor as item_valor
         FROM caz_parcelas p
-        LEFT JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
-        LEFT JOIN caz_itensvenda iv ON iv.id = v.id
+        INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
+        INNER JOIN caz_itensvenda iv ON iv.id = v.id
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
           AND p.data_quitacao <= ${dataFimComHora}::timestamp
-          AND p.valor_pago IS NOT NULL
-          AND p.valor_pago::numeric > 0
-          AND p.descricao LIKE 'Venda%'
+          AND iv.valor IS NOT NULL
+          AND iv.valor::numeric > 0
       )
       SELECT 
-        COALESCE(pci.categoria_id, 'SEM_CATEGORIA') as categoria_id,
-        COALESCE(pci.categoria_nome, 'Sem Categoria') as categoria_nome,
+        COALESCE(itv.categoria_id, 'SEM_CATEGORIA') as categoria_id,
+        COALESCE(itv.categoria_nome, 'Sem Categoria') as categoria_nome,
         COALESCE(caz.nome, 'Cliente não identificado') as cliente_nome,
-        COALESCE(cts.nome_servico, pci.item_nome, 'Serviço não identificado') as servico_nome,
+        COALESCE(cts.nome_servico, itv.item_nome, 'Serviço não identificado') as servico_nome,
         COALESCE(NULLIF(TRIM(cts.responsavel), ''), 'Sem Operador') as responsavel,
-        SUM(pci.valor_pago::numeric) as valor_total,
-        COUNT(pci.id) as quantidade_parcelas
-      FROM parcelas_com_item pci
-      LEFT JOIN caz_clientes caz ON TRIM(pci.id_cliente::text) = TRIM(caz.ids::text)
+        SUM(itv.item_valor::numeric) as valor_total,
+        COUNT(DISTINCT itv.parcela_id) as quantidade_parcelas
+      FROM itens_vendidos itv
+      LEFT JOIN caz_clientes caz ON TRIM(itv.id_cliente::text) = TRIM(caz.ids::text)
       LEFT JOIN contratos_com_servico cts 
         ON REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') = cts.cnpj_limpo
         AND (
-          cts.nome_servico_norm = pci.item_nome_norm
-          OR cts.nome_servico_norm LIKE '%' || pci.item_nome_norm || '%'
-          OR pci.item_nome_norm LIKE '%' || cts.nome_servico_norm || '%'
+          cts.nome_servico_norm = itv.item_nome_norm
+          OR cts.nome_servico_norm LIKE '%' || itv.item_nome_norm || '%'
+          OR itv.item_nome_norm LIKE '%' || cts.nome_servico_norm || '%'
         )
       WHERE 1=1
         ${operadorFilter}
-      GROUP BY pci.categoria_id, pci.categoria_nome, caz.nome, cts.nome_servico, pci.item_nome, cts.responsavel
-      ORDER BY pci.categoria_id, valor_total DESC
+      GROUP BY itv.categoria_id, itv.categoria_nome, caz.nome, cts.nome_servico, itv.item_nome, cts.responsavel
+      ORDER BY itv.categoria_id, valor_total DESC
     `);
     
     const receitas: {
