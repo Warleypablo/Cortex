@@ -690,16 +690,15 @@ export default function DashboardSDRs() {
             </div>
 
             <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl overflow-hidden">
-              <div className="grid grid-cols-13 gap-1 p-3 bg-muted/50 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
+              <div className="grid grid-cols-12 gap-1 p-3 bg-muted/50 text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-1">#</div>
                 <div className="col-span-2">SDR</div>
-                <div className="col-span-1 text-right text-cyan-400">Reuniões</div>
+                <div className="col-span-2 text-right text-cyan-400">Reuniões</div>
                 <div className="col-span-2 text-right">MRR Gerado</div>
                 <div className="col-span-2 text-right">Pontual</div>
                 <div className="col-span-1 text-right">Contr.</div>
                 <div className="col-span-1 text-right">Conversão</div>
                 <div className="col-span-1 text-right">Leads</div>
-                <div className="col-span-2 text-right text-amber-400">Conv. L→R</div>
               </div>
 
               <div className="divide-y divide-border max-h-[400px] overflow-y-auto">
@@ -710,75 +709,60 @@ export default function DashboardSDRs() {
                     </div>
                   ))
                 ) : ranking.length > 0 ? (
-                  ranking.map((sdr, index) => {
-                    const convLeadsReuniao = sdr.leads > 0 ? (sdr.reunioesRealizadas / sdr.leads) * 100 : 0;
-                    return (
-                      <motion.div
-                        key={sdr.name}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.05 * index }}
-                        className={`grid grid-cols-13 gap-1 p-2 items-center hover:bg-muted/30 transition-colors ${
-                          sdr.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(sdr.position) : ''
-                        }`}
-                        data-testid={`ranking-row-${index}`}
-                      >
-                        <div className="col-span-1">
-                          {sdr.position <= 3 ? (
-                            <div className="w-5 h-5 flex items-center justify-center">
-                              {sdr.position === 1 && <Crown className="w-4 h-4 text-yellow-400" />}
-                              {sdr.position === 2 && <Medal className="w-3 h-3 text-gray-300" />}
-                              {sdr.position === 3 && <Medal className="w-3 h-3 text-amber-600" />}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground font-mono text-xs">{sdr.position}</span>
-                          )}
-                        </div>
-                        <div className="col-span-2 font-medium text-foreground truncate text-xs">
-                          {sdr.name}
-                        </div>
-                        <div className="col-span-1 text-right font-black text-cyan-400 text-sm">
-                          {sdr.reunioesRealizadas}
-                        </div>
-                        <div className="col-span-2 text-right font-semibold text-emerald-400 text-xs">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(sdr.mrr)}
-                        </div>
-                        <div className="col-span-2 text-right font-semibold text-blue-400 text-xs">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(sdr.pontual)}
-                        </div>
-                        <div className="col-span-1 text-right text-violet-400 text-xs font-semibold">
-                          {sdr.contratos}
-                        </div>
-                        <div className="col-span-1 text-right">
-                          <Badge 
-                            variant="outline" 
-                            className={`text-[10px] border-0 px-1 ${
-                              sdr.conversaoVendas >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
-                              sdr.conversaoVendas >= 15 ? 'bg-amber-500/20 text-amber-400' :
-                              'bg-muted/50 text-muted-foreground'
-                            }`}
-                          >
-                            {formatPercent(sdr.conversaoVendas)}
-                          </Badge>
-                        </div>
-                        <div className="col-span-1 text-right text-muted-foreground text-xs">
-                          {sdr.leads}
-                        </div>
-                        <div className="col-span-2 text-right">
-                          <Badge 
-                            variant="outline" 
-                            className={`text-[10px] border-0 px-1 ${
-                              convLeadsReuniao >= 1 ? 'bg-amber-500/20 text-amber-400' :
-                              convLeadsReuniao >= 0.5 ? 'bg-blue-500/20 text-blue-400' :
-                              'bg-muted/50 text-muted-foreground'
-                            }`}
-                          >
-                            {convLeadsReuniao.toFixed(2)}%
-                          </Badge>
-                        </div>
-                      </motion.div>
-                    );
-                  })
+                  ranking.map((sdr, index) => (
+                    <motion.div
+                      key={sdr.name}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.05 * index }}
+                      className={`grid grid-cols-12 gap-1 p-2 items-center hover:bg-muted/30 transition-colors ${
+                        sdr.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(sdr.position) : ''
+                      }`}
+                      data-testid={`ranking-row-${index}`}
+                    >
+                      <div className="col-span-1">
+                        {sdr.position <= 3 ? (
+                          <div className="w-5 h-5 flex items-center justify-center">
+                            {sdr.position === 1 && <Crown className="w-4 h-4 text-yellow-400" />}
+                            {sdr.position === 2 && <Medal className="w-3 h-3 text-gray-300" />}
+                            {sdr.position === 3 && <Medal className="w-3 h-3 text-amber-600" />}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground font-mono text-xs">{sdr.position}</span>
+                        )}
+                      </div>
+                      <div className="col-span-2 font-medium text-foreground truncate text-xs">
+                        {sdr.name}
+                      </div>
+                      <div className="col-span-2 text-right font-black text-cyan-400 text-sm">
+                        {sdr.reunioesRealizadas}
+                      </div>
+                      <div className="col-span-2 text-right font-semibold text-emerald-400 text-xs">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(sdr.mrr)}
+                      </div>
+                      <div className="col-span-2 text-right font-semibold text-blue-400 text-xs">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(sdr.pontual)}
+                      </div>
+                      <div className="col-span-1 text-right text-violet-400 text-xs font-semibold">
+                        {sdr.contratos}
+                      </div>
+                      <div className="col-span-1 text-right">
+                        <Badge 
+                          variant="outline" 
+                          className={`text-[10px] border-0 px-1 ${
+                            sdr.conversaoVendas >= 30 ? 'bg-emerald-500/20 text-emerald-400' :
+                            sdr.conversaoVendas >= 15 ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-muted/50 text-muted-foreground'
+                          }`}
+                        >
+                          {formatPercent(sdr.conversaoVendas)}
+                        </Badge>
+                      </div>
+                      <div className="col-span-1 text-right text-muted-foreground text-xs">
+                        {sdr.leads}
+                      </div>
+                    </motion.div>
+                  ))
                 ) : (
                   <div className="p-8 text-center text-muted-foreground">
                     Nenhum SDR encontrado
