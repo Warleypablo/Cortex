@@ -121,15 +121,21 @@ export default function ContribuicaoOperador() {
   const hierarchicalData = useMemo(() => {
     if (!monthlyResults) return { categories: [], despesas: [], monthColumns: [] };
     
+    // Agrupa categorias pelo prefixo normalizado (ex: "03.01.01" -> agrupa todas subcategorias)
     const allCategoriesMap = new Map<string, { id: string; nome: string; nivel: number }>();
     
     for (const monthData of monthlyResults) {
       if (monthData.data?.receitas) {
         for (const receita of monthData.data.receitas) {
-          if (!allCategoriesMap.has(receita.categoriaId)) {
-            allCategoriesMap.set(receita.categoriaId, {
-              id: receita.categoriaId,
-              nome: receita.categoriaNome,
+          // Para nível 1, normaliza o ID para evitar duplicatas
+          const catId = receita.nivel === 1 
+            ? receita.categoriaId.replace(/[^0-9.]/g, '').split('.').slice(0, 3).join('.')
+            : receita.categoriaId;
+          
+          if (!allCategoriesMap.has(catId)) {
+            allCategoriesMap.set(catId, {
+              id: catId,
+              nome: receita.nivel === 1 ? receita.categoriaNome : receita.categoriaNome,
               nivel: receita.nivel
             });
           }
@@ -141,7 +147,17 @@ export default function ContribuicaoOperador() {
     
     Array.from(allCategoriesMap.entries()).forEach(([id, cat]) => {
       const parts = id.split(".");
-      const parentId = parts.length > 1 ? parts.slice(0, -1).join(".") : null;
+      // Para níveis > 1, busca o parent correto
+      let parentId: string | null = null;
+      if (cat.nivel === 2) {
+        // Nível 2 (cliente) - parent é nível 1 (categoria)
+        parentId = parts.slice(0, 3).join(".");
+      } else if (cat.nivel === 3) {
+        // Nível 3 (serviço) - parent é nível 2 (cliente)
+        parentId = parts.slice(0, -1).join(".");
+      } else if (parts.length > 1) {
+        parentId = parts.slice(0, -1).join(".");
+      }
       categoriesByLevel.push({ ...cat, parentId });
     });
     
@@ -171,7 +187,14 @@ export default function ContribuicaoOperador() {
       const monthData = monthlyResults[i];
       if (monthData.data?.receitas) {
         for (const receita of monthData.data.receitas) {
-          monthColumns[i].valorPorCategoria.set(receita.categoriaId, receita.valor);
+          // Normaliza o ID para nível 1 (categoria) para evitar duplicatas
+          const catId = receita.nivel === 1 
+            ? receita.categoriaId.replace(/[^0-9.]/g, '').split('.').slice(0, 3).join('.')
+            : receita.categoriaId;
+          
+          // Soma valores se a categoria já existir
+          const valorAtual = monthColumns[i].valorPorCategoria.get(catId) || 0;
+          monthColumns[i].valorPorCategoria.set(catId, valorAtual + receita.valor);
         }
       }
       if (monthData.data?.despesas) {
