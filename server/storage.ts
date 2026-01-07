@@ -10188,11 +10188,12 @@ export class DbStorage implements IStorage {
       }
       
       // Buscar CX associado ao operador através dos contratos (CX está em cup_clientes.responsavel)
+      // Mesmo relacionamento usado em getContribuicaoColaboradorDfc: cup_contratos.id_task = cup_clientes.task_id
       try {
         const cxResult = await db.execute(sql`
           SELECT DISTINCT cl.responsavel as cx
           FROM cup_contratos ct
-          JOIN cup_clientes cl ON ct.cliente_id = cl.id
+          JOIN cup_clientes cl ON ct.id_task = cl.task_id
           WHERE TRIM(ct.responsavel) = ${operador}
             AND cl.responsavel IS NOT NULL AND TRIM(cl.responsavel) != ''
           ORDER BY cl.responsavel
