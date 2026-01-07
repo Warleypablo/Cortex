@@ -9936,14 +9936,14 @@ export class DbStorage implements IStorage {
         SELECT 
           REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
           ct.responsavel,
-          ct.nome_servico,
-          LOWER(TRIM(REGEXP_REPLACE(ct.nome_servico, '\s+', ' ', 'g'))) as nome_servico_norm,
+          ct.servico as nome_servico,
+          LOWER(TRIM(REGEXP_REPLACE(ct.servico, '\s+', ' ', 'g'))) as nome_servico_norm,
           ct.id_subtask
         FROM cup_contratos ct
         INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
         WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
           AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
-          AND ct.nome_servico IS NOT NULL AND TRIM(ct.nome_servico) != ''
+          AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
       ),
       parcelas_com_item AS (
         SELECT 
