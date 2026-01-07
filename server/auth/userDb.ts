@@ -170,6 +170,7 @@ const ALL_ROUTES = [
   '/dashboard/comercial/detalhamento-vendas',
   '/dashboard/comercial/analise-vendas',
   '/dashboard/comercial/apresentacao',
+  '/presentation',
   '/growth/visao-geral',
   '/growth/criativos',
   '/growth/performance-plataformas',
@@ -220,18 +221,35 @@ const DEFAULT_USER_ROUTES = [
   '/dashboard/comercial/analise-vendas',
   '/dashboard/comercial/detalhamento-vendas',
   '/dashboard/comercial/apresentacao',
+  '/presentation',
   // Growth
   '/growth/visao-geral',
   '/growth/criativos',
   '/growth/performance-plataformas',
 ];
 
-// Migra permissões antigas ("/" -> "/clientes") automaticamente
+// Migra permissões antigas automaticamente
 function migrateAllowedRoutes(routes: string[] | null): string[] {
   if (!routes) return DEFAULT_USER_ROUTES;
   
   // Substituir "/" por "/clientes" para manter compatibilidade
-  return routes.map(route => route === '/' ? '/clientes' : route);
+  let migratedRoutes = routes.map(route => route === '/' ? '/clientes' : route);
+  
+  // Auto-adicionar rotas de apresentação se usuário tem outras rotas comerciais
+  const hasComercialRoutes = migratedRoutes.some(r => 
+    r.includes('/dashboard/comercial/') && !r.includes('apresentacao')
+  );
+  
+  if (hasComercialRoutes) {
+    if (!migratedRoutes.includes('/dashboard/comercial/apresentacao')) {
+      migratedRoutes.push('/dashboard/comercial/apresentacao');
+    }
+    if (!migratedRoutes.includes('/presentation')) {
+      migratedRoutes.push('/presentation');
+    }
+  }
+  
+  return migratedRoutes;
 }
 
 function dbUserToUser(dbUser: typeof authUsers.$inferSelect): User {
